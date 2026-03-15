@@ -247,6 +247,8 @@ export default function App(){
       myFinal.budget+=rev.ticket+rev.sponsor+rev.merch;
     }
 
+    saveGame({teams:newTeams,myId,gameDay:newDay,year,faPool,faYears,seasonHistory,news,mailbox});
+    setSaveExists(true);
     setTeams(newTeams);
     setGameDay(newDay);
     setBatchResults(results);
