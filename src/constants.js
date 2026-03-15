@@ -1,0 +1,154 @@
+/* ═══════════════════════════════════════════════
+   CONSTANTS
+═══════════════════════════════════════════════ */
+
+export const SEASON_GAMES = 143;
+export const BATCH = 5;
+export const MAX_ROSTER = 28;
+export const MAX_FARM = 30;
+export const MAX_外国人_一軍 = 4;  // NPB規定: 一軍出場選手登録は外国人最大4名
+export const ACCEPT_THRESHOLD = 55;
+export const PITCH_WARNING = 100;
+export const PITCH_LIMIT = 120;
+
+export const TEAM_DEFS = [
+  { id: 0,  name: "東京スワローズ",     short: "東京S",  league: "セ", emoji: "🦢", color: "#22d3ee", city: "東京",   budget: 500000 },
+  { id: 1,  name: "横浜ベイスターズ",   short: "横浜",   league: "セ", emoji: "⭐", color: "#3b82f6", city: "横浜",   budget: 480000 },
+  { id: 2,  name: "広島カープ",         short: "広島",   league: "セ", emoji: "🎏", color: "#ef4444", city: "広島",   budget: 350000 },
+  { id: 3,  name: "阪神タイガース",     short: "阪神",   league: "セ", emoji: "🐯", color: "#fbbf24", city: "大阪",   budget: 600000 },
+  { id: 4,  name: "読売ジャイアンツ",   short: "巨人",   league: "セ", emoji: "🟠", color: "#f97316", city: "東京",   budget: 650000 },
+  { id: 5,  name: "中日ドラゴンズ",     short: "中日",   league: "セ", emoji: "🐲", color: "#06b6d4", city: "名古屋", budget: 420000 },
+  { id: 6,  name: "福岡ホークス",       short: "福岡",   league: "パ", emoji: "🦅", color: "#f5c842", city: "福岡",   budget: 580000 },
+  { id: 7,  name: "東北イーグルス",     short: "東北",   league: "パ", emoji: "🦆", color: "#dc2626", city: "仙台",   budget: 360000 },
+  { id: 8,  name: "埼玉ライオンズ",     short: "埼玉",   league: "パ", emoji: "🦁", color: "#a78bfa", city: "所沢",   budget: 400000 },
+  { id: 9,  name: "千葉マリーンズ",     short: "千葉",   league: "パ", emoji: "⚓", color: "#0ea5e9", city: "千葉",   budget: 370000 },
+  { id: 10, name: "北海道ファイターズ", short: "北海道", league: "パ", emoji: "⚔️", color: "#818cf8", city: "札幌",   budget: 450000 },
+  { id: 11, name: "大阪バファローズ",   short: "大阪",   league: "パ", emoji: "🦬", color: "#10b981", city: "大阪",   budget: 460000 },
+];
+
+export const POSITIONS = ["捕手", "一塁手", "二塁手", "三塁手", "遊撃手", "左翼手", "中堅手", "右翼手"];
+
+export const COACH_DEFS = [
+  { type: "batting",  name: "打撃コーチ",     emoji: "🏏" },
+  { type: "pitching", name: "投手コーチ",     emoji: "⚾" },
+  { type: "defense",  name: "守備コーチ",     emoji: "🧤" },
+  { type: "running",  name: "走塁コーチ",     emoji: "🏃" },
+  { type: "mental",   name: "メンタルコーチ", emoji: "🧠" },
+];
+
+export const COACH_GRADES = [
+  { g: 1, label: "平凡",     salary: 3000,  bonus: 1 },
+  { g: 2, label: "経験豊富", salary: 7000,  bonus: 2 },
+  { g: 3, label: "一流",     salary: 15000, bonus: 3 },
+  { g: 4, label: "レジェンド", salary: 30000, bonus: 5 },
+];
+
+export const SCOUT_REGIONS = [
+  { id: "dom_a", name: "国内一軍候補",   weeks: 4,  qMin: 65, qMax: 82, cost: 5000,  foreign: false },
+  { id: "dom_b", name: "国内独立リーグ", weeks: 6,  qMin: 50, qMax: 72, cost: 3000,  foreign: false },
+  { id: "us",    name: "北米メジャー",   weeks: 8,  qMin: 70, qMax: 90, cost: 12000, foreign: true },
+  { id: "kr",    name: "韓国KBO",        weeks: 6,  qMin: 60, qMax: 78, cost: 8000,  foreign: true },
+  { id: "latin", name: "中南米",          weeks: 10, qMin: 55, qMax: 85, cost: 9000,  foreign: true },
+];
+
+export const INJURY_TABLE = [
+  { name: "打撲",     days: 3 },
+  { name: "肉離れ",   days: 14 },
+  { name: "捻挫",     days: 7 },
+  { name: "疲労骨折", days: 30, severe: true },
+  { name: "靭帯損傷", days: 60, severe: true },
+  { name: "肩炎症",   days: 21 },
+];
+
+export const STRATEGY_OPTS = [
+  { id: "normal",  label: "通常",      desc: "通常の打席",        icon: "⚾" },
+  { id: "bunt",    label: "バント",    desc: "ランナー進塁を優先", icon: "🟡" },
+  { id: "hitrun",  label: "エンドラン", desc: "走者がスタート",    icon: "🏃" },
+  { id: "walk",    label: "敬遠",      desc: "申告敬遠",          icon: "🚶" },
+  { id: "steal",   label: "盗塁",      desc: "走者が走る",        icon: "⚡" },
+];
+
+export const PVAL_DEFS = [
+  { k: "money",     lbl: "💰 金銭欲",     color: "#f5c842" },
+  { k: "winning",   lbl: "🏆 勝利欲",     color: "#34d399" },
+  { k: "playing",   lbl: "⚾ 出場欲",     color: "#60a5fa" },
+  { k: "hometown",  lbl: "🏠 地元愛",     color: "#f97316" },
+  { k: "loyalty",   lbl: "🤝 忠誠心",     color: "#a78bfa" },
+  { k: "stability", lbl: "📈 安定志向",   color: "#06b6d4" },
+  { k: "future",    lbl: "🌱 将来性重視", color: "#22d3ee" },
+];
+
+// ニュース・インタビュー用テンプレート
+export const NEWS_TEMPLATES_WIN = [
+  "{team}が{opp}に快勝！監督の采配が光る",
+  "{team}、{score}で{opp}を撃破。エースが好投",
+  "連勝街道！{team}が{opp}を下す",
+  "{team}が逆転勝利！ベンチの底力を見せた",
+];
+export const NEWS_TEMPLATES_LOSE = [
+  "{team}が{opp}に敗北。立て直しが急務か",
+  "苦しい試合展開…{team}は{opp}に敗れる",
+  "{team}、連敗のピンチ。{opp}の勢いに押される",
+  "打線が沈黙…{team}は{opp}に完封負け",
+];
+export const INTERVIEW_QUESTIONS_WIN = [
+  "今日の勝利について一言お願いします！",
+  "連勝中ですが、チームの状態はいかがですか？",
+  "ファンへのメッセージをどうぞ！",
+];
+export const INTERVIEW_QUESTIONS_LOSE = [
+  "今日の敗戦を振り返ってどうですか？",
+  "立て直しに向けて何か手を打ちますか？",
+  "ファンへの言葉をお願いします。",
+];
+export const INTERVIEW_OPTIONS_WIN = [
+  { text: "「選手全員の力です。これからも応援よろしく！」", popMod: 3, moraleMod: 5, label: "謙虚" },
+  { text: "「完璧な試合でした。我々は最強です！」",       popMod: 1, moraleMod: 8, label: "強気" },
+  { text: "「まだまだ改善点はある。油断せず戦います」",   popMod: 2, moraleMod: 3, label: "冷静" },
+];
+export const INTERVIEW_OPTIONS_LOSE = [
+  { text: "「敗因は私の采配にあります。申し訳ない」", popMod: 4,  moraleMod: -2, label: "誠実" },
+  { text: "「次は必ず勝ちます。信じてください！」",   popMod: 2,  moraleMod: 4,  label: "前向き" },
+  { text: "「選手は頑張った。運がなかっただけです」", popMod: -2, moraleMod: 2,  label: "強がり" },
+];
+
+// ドラフト関連定数
+export const DRAFT_ROUNDS = 6;
+export const DRAFT_POOL_SIZE = 80;
+
+export const PLAYER_TYPES_B = ["天才肌", "ガッツ型", "技巧派", "パワーヒッター", "俊足巧打", "守備の名手", "走塁のスペシャリスト", "勝負強い打者"];
+export const PLAYER_TYPES_P = ["本格派", "技巧派", "速球派", "変化球のスペシャリスト", "制球の鬼", "エース候補", "抑えの切り札", "二刀流候補"];
+export const PLAYER_COMMENTS_B = [
+  "高校通算本塁打記録を持つ強打者", "守備範囲の広さは他の追随を許さない",
+  "選球眼の良さでチームに貢献できる", "俊足を活かした内野安打が得意",
+  "勝負どころでの強さが光る", "粘り強い打撃でチャンスメーカーとなれる",
+  "パンチ力のある打撃で観客を沸かせる", "広角に打てるセンスを持つ",
+];
+export const PLAYER_COMMENTS_P = [
+  "最速153km/hを誇る剛腕", "切れ味鋭いスライダーが武器",
+  "抜群の制球力で打者を翻弄する", "多彩な変化球で打者を打ち取る",
+  "ピンチでも動じない精神的な強さを持つ", "将来のエース候補として高い評価",
+  "球持ちの良さで打者のタイミングを外す", "テンポの良い投球でリズムを作れる",
+];
+export const DRAFT_COMMENTS_MY = [
+  "「この選手を指名します！」", "「将来のエースになってくれると信じています」",
+  "「即戦力として期待しています」", "「長年追いかけてきた選手です」",
+  "「チームに必要なピースです」",
+];
+export const DRAFT_COMMENTS_CPU = [
+  "が電撃指名！", "が獲得に成功！", "が交渉権を獲得！",
+  "がこの選手を選択！", "が抑えた！",
+];
+
+// 結果ラベル
+export const RLABEL = {
+  hr: "⚾ ホームラン！！", t: "⚡ 三塁打！", d: "💥 二塁打",
+  s: "✅ ヒット", bb: "🎯 四球", hbp: "💢 死球",
+  k: "🌀 三振", go: "🌿 ゴロアウト", fo: "🌬️ フライアウト", out: "🌿 アウト",
+  sac: "🟡 バント成功", sb: "💨 盗塁成功！", cs: "🛑 盗塁死",
+};
+
+export const IS_HIT = (r) => ["hr", "t", "d", "s"].includes(r);
+export const IS_OUT = (r) => ["k", "go", "fo", "sac", "out"].includes(r);
+
+
