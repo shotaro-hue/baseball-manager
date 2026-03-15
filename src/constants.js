@@ -12,18 +12,18 @@ export const PITCH_WARNING = 100;
 export const PITCH_LIMIT = 120;
 
 export const TEAM_DEFS = [
-  { id: 0,  name: "東京スワローズ",     short: "東京S",  league: "セ", emoji: "🦢", color: "#22d3ee", city: "東京",   budget: 500000 },
-  { id: 1,  name: "横浜ベイスターズ",   short: "横浜",   league: "セ", emoji: "⭐", color: "#3b82f6", city: "横浜",   budget: 480000 },
-  { id: 2,  name: "広島カープ",         short: "広島",   league: "セ", emoji: "🎏", color: "#ef4444", city: "広島",   budget: 350000 },
-  { id: 3,  name: "阪神タイガース",     short: "阪神",   league: "セ", emoji: "🐯", color: "#fbbf24", city: "大阪",   budget: 600000 },
-  { id: 4,  name: "読売ジャイアンツ",   short: "巨人",   league: "セ", emoji: "🟠", color: "#f97316", city: "東京",   budget: 650000 },
-  { id: 5,  name: "中日ドラゴンズ",     short: "中日",   league: "セ", emoji: "🐲", color: "#06b6d4", city: "名古屋", budget: 420000 },
-  { id: 6,  name: "福岡ホークス",       short: "福岡",   league: "パ", emoji: "🦅", color: "#f5c842", city: "福岡",   budget: 580000 },
-  { id: 7,  name: "東北イーグルス",     short: "東北",   league: "パ", emoji: "🦆", color: "#dc2626", city: "仙台",   budget: 360000 },
-  { id: 8,  name: "埼玉ライオンズ",     short: "埼玉",   league: "パ", emoji: "🦁", color: "#a78bfa", city: "所沢",   budget: 400000 },
-  { id: 9,  name: "千葉マリーンズ",     short: "千葉",   league: "パ", emoji: "⚓", color: "#0ea5e9", city: "千葉",   budget: 370000 },
-  { id: 10, name: "北海道ファイターズ", short: "北海道", league: "パ", emoji: "⚔️", color: "#818cf8", city: "札幌",   budget: 450000 },
-  { id: 11, name: "大阪バファローズ",   short: "大阪",   league: "パ", emoji: "🦬", color: "#10b981", city: "大阪",   budget: 460000 },
+  { id: 0,  name: "東京ヤクルトスワローズ",         short: "ヤクルト",   league: "セ", emoji: "🦢", color: "#22d3ee", city: "東京",   budget: 500000 },
+  { id: 1,  name: "横浜DeNAベイスターズ",           short: "DeNA",       league: "セ", emoji: "⭐", color: "#3b82f6", city: "横浜",   budget: 480000 },
+  { id: 2,  name: "広島東洋カープ",                 short: "広島",       league: "セ", emoji: "🎏", color: "#ef4444", city: "広島",   budget: 350000 },
+  { id: 3,  name: "阪神タイガース",                 short: "阪神",       league: "セ", emoji: "🐯", color: "#fbbf24", city: "大阪",   budget: 600000 },
+  { id: 4,  name: "読売ジャイアンツ",               short: "巨人",       league: "セ", emoji: "🟠", color: "#f97316", city: "東京",   budget: 650000 },
+  { id: 5,  name: "中日ドラゴンズ",                 short: "中日",       league: "セ", emoji: "🐲", color: "#06b6d4", city: "名古屋", budget: 420000 },
+  { id: 6,  name: "福岡ソフトバンクホークス",       short: "ソフトバンク", league: "パ", emoji: "🦅", color: "#f5c842", city: "福岡",   budget: 580000 },
+  { id: 7,  name: "東北楽天ゴールデンイーグルス",   short: "楽天",       league: "パ", emoji: "🦆", color: "#dc2626", city: "仙台",   budget: 360000 },
+  { id: 8,  name: "埼玉西武ライオンズ",             short: "西武",       league: "パ", emoji: "🦁", color: "#a78bfa", city: "所沢",   budget: 400000 },
+  { id: 9,  name: "千葉ロッテマリーンズ",           short: "ロッテ",     league: "パ", emoji: "⚓", color: "#0ea5e9", city: "千葉",   budget: 370000 },
+  { id: 10, name: "北海道日本ハムファイターズ",     short: "日本ハム",   league: "パ", emoji: "⚔️", color: "#818cf8", city: "札幌",   budget: 450000 },
+  { id: 11, name: "オリックス・バファローズ",       short: "オリックス", league: "パ", emoji: "🦬", color: "#10b981", city: "大阪",   budget: 460000 },
 ];
 
 export const POSITIONS = ["捕手", "一塁手", "二塁手", "三塁手", "遊撃手", "左翼手", "中堅手", "右翼手"];

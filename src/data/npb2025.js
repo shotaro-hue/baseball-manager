@@ -113,7 +113,7 @@ export const NPB2025_ROSTERS = {
     ],
     pitchers: [
       { name:'戸郷 翔征', age:25, pos:'先発', hand:'right', hometown:'宮崎', salary:18000, stats:{ ERA:2.80, W:14, L:7, IP:175, K:168, BB:38, WHIP:1.08 } },
-      { name:'菅野 智之', age:35, pos:'先発', hand:'right', hometown:'東京', salary:55000, stats:{ ERA:3.25, W:11, L:8, IP:165, K:148, BB:35, WHIP:1.18 } },
+      { name:'赤星 優志', age:25, pos:'先発', hand:'right', hometown:'大阪', salary:5000, stats:{ ERA:3.10, W:10, L:8, IP:158, K:145, BB:40, WHIP:1.18 } },
       { name:'グリフィン', age:28, pos:'先発', hand:'right', hometown:'アメリカ', isForeign:true, salary:20000, stats:{ ERA:3.45, W:9, L:8, IP:155, K:138, BB:42, WHIP:1.22 } },
       { name:'山崎 伊織', age:25, pos:'先発', hand:'right', hometown:'神奈川', salary:5000, stats:{ ERA:3.10, W:10, L:8, IP:158, K:145, BB:38, WHIP:1.15 } },
       { name:'大勢', age:25, pos:'抑え', hand:'right', hometown:'大阪', salary:12000, stats:{ ERA:2.10, W:3, L:2, SV:36, IP:60, K:68, BB:15, WHIP:0.92 } },
@@ -162,7 +162,7 @@ export const NPB2025_ROSTERS = {
     pitchers: [
       { name:'有原 航平', age:32, pos:'先発', hand:'right', hometown:'広島', salary:35000, stats:{ ERA:2.60, W:14, L:6, IP:175, K:170, BB:35, WHIP:1.05 } },
       { name:'東浜 巨', age:34, pos:'先発', hand:'right', hometown:'沖縄', salary:20000, stats:{ ERA:3.20, W:11, L:8, IP:160, K:138, BB:38, WHIP:1.18 } },
-      { name:'和田 毅', age:43, pos:'先発', hand:'left', hometown:'島根', salary:20000, stats:{ ERA:3.45, W:8, L:7, IP:142, K:115, BB:30, WHIP:1.22 } },
+      { name:'上沢 直之', age:30, pos:'先発', hand:'right', hometown:'千葉', salary:20000, stats:{ ERA:3.30, W:10, L:9, IP:162, K:148, BB:38, WHIP:1.20 } },
       { name:'スチュワート・ジュニア', age:26, pos:'先発', hand:'right', hometown:'アメリカ', isForeign:true, salary:18000, stats:{ ERA:3.35, W:10, L:8, IP:158, K:155, BB:45, WHIP:1.20 } },
       { name:'オスナ', age:32, pos:'抑え', hand:'right', hometown:'メキシコ', isForeign:true, salary:20000, stats:{ ERA:2.00, W:2, L:2, SV:35, IP:58, K:72, BB:12, WHIP:0.88 } },
       { name:'松本 裕樹', age:28, pos:'中継ぎ', hand:'left', hometown:'青森', salary:5000, stats:{ ERA:2.80, W:4, L:2, IP:68, K:65, BB:20, WHIP:1.08 } },
@@ -256,7 +256,6 @@ export const NPB2025_ROSTERS = {
       { name:'野村 佑希', age:25, pos:'三塁手', hometown:'大阪', salary:4000, stats:{ AVG:0.255, HR:12, RBI:48, SB:2, BB:25, PA:400, OPS:0.730 } },
     ],
     pitchers: [
-      { name:'上沢 直之', age:30, pos:'先発', hand:'right', hometown:'千葉', salary:20000, stats:{ ERA:3.30, W:10, L:9, IP:162, K:148, BB:38, WHIP:1.20 } },
       { name:'伊藤 大海', age:26, pos:'先発', hand:'right', hometown:'北海道', salary:12000, stats:{ ERA:3.15, W:11, L:9, IP:165, K:165, BB:42, WHIP:1.18 } },
       { name:'加藤 貴之', age:31, pos:'先発', hand:'left', hometown:'北海道', salary:10000, stats:{ ERA:3.40, W:9, L:8, IP:155, K:128, BB:35, WHIP:1.22 } },
       { name:'北山 亘基', age:24, pos:'先発', hand:'right', hometown:'北海道', salary:3500, stats:{ ERA:3.65, W:7, L:9, IP:140, K:118, BB:42, WHIP:1.28 } },
