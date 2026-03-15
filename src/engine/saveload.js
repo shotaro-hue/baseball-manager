@@ -20,7 +20,11 @@ export function saveGame(state) {
     }));
     return true;
   } catch (e) {
-    console.error('Save failed:', e);
+    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+      console.error('Save failed: storage quota exceeded');
+    } else {
+      console.error('Save failed:', e);
+    }
     return false;
   }
 }
@@ -28,7 +32,13 @@ export function saveGame(state) {
 export function loadGame() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const state = JSON.parse(raw);
+    if (!state || !Array.isArray(state.teams)) {
+      console.error('Load failed: invalid save data');
+      return null;
+    }
+    return state;
   } catch (e) {
     console.error('Load failed:', e);
     return null;
