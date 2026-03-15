@@ -147,8 +147,8 @@ function calcGrowthBudget(p) {
   const age = p.age;
   const pot = p.potential ?? 65;
   let base;
-  if      (age <= 22) base = rng(12, 18) + Math.round((pot - 65) * 0.7);   // 若手: 大きく成長
-  else if (age <= 24) base = rng(8, 12)  + Math.round((pot - 65) * 0.5);
+  if      (age <= 20) base = rng(8, 13)  + Math.round((pot - 65) * 0.5);   // 若手: 原石、まだ荒削り
+  else if (age <= 24) base = rng(12, 18) + Math.round((pot - 65) * 0.7);  // 全盛期: 最大成長ピーク
   else if (age <= 27) base = rng(4, 8);
   else if (age <= 30) base = rng(-1, 4);
   else if (age <= 33) base = rng(-5, -2);

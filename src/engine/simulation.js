@@ -311,7 +311,7 @@ function processAtBat(gs, strategy = 'normal') {
     if (stealBase >= 0) {
       const lineup      = isMyAtBat ? gs.myLineup : gs.opLineup;
       const runner      = lineup.find(p => p.id === newBases[stealBase]) || batter;
-      const successRate = clamp(0.55 + (runner?.batting?.speed||50)/500 + (runner?.batting?.stealSkill||50)/600 - (pitcher?.pitching?.control||60)/600, 0.25, 0.88);
+      const successRate = clamp(0.65 + (runner?.batting?.speed||50)/500 + (runner?.batting?.stealSkill||50)/600 - (pitcher?.pitching?.control||60)/600, 0.35, 0.92);
       const success     = Math.random() < successRate;
       if (success) { newBases[stealBase+1] = newBases[stealBase]; newBases[stealBase] = null; }
       else          { newBases[stealBase] = null; }

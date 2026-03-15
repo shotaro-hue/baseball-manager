@@ -101,7 +101,7 @@ export function applyPostGameCondition(players, log, isMyTeam) {
       if (!played) return p;
       const recoveryBonus = ((p.batting?.recovery || 50) - 50) / 300;
       const delta = clamp(Math.round(-3 + recoveryBonus * 5), -5, 2);
-      const newCond = clamp(p.condition + delta, 50, 100);
+      const newCond = clamp(p.condition + delta, 60, 100);
       return { ...p, condition: newCond };
     }
   });
