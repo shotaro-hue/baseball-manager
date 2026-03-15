@@ -19,13 +19,18 @@ import { RetireModal } from './components/RetireModal';
 import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab } from './components/Tabs';
 import { SEASON_GAMES, BATCH, MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, ACCEPT_THRESHOLD, TEAM_DEFS, POSITIONS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE } from './constants';
 import { saveGame, loadGame, hasSave, getSaveMeta, deleteSave } from './engine/saveload';
+import { buildRealTeam } from './engine/realplayer';
+import { NPB2025_ROSTERS } from './data/npb2025';
 
 
 /* ═══════════════════════════════════════════════
    MAIN APP
 ═══════════════════════════════════════════════ */
 
-const INIT_TEAMS=TEAM_DEFS.map(function(d){const t=buildTeam(d);t.history=[];return t;});
+const INIT_TEAMS=TEAM_DEFS.map(function(d){
+  const t=NPB2025_ROSTERS[d.id]?buildRealTeam(d,NPB2025_ROSTERS[d.id]):buildTeam(d);
+  t.history=[];return t;
+});
 
 export default function App(){
   const [screen,setScreen]=useState("title");
