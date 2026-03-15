@@ -18,6 +18,7 @@ import { PlayoffScreen } from './components/PlayoffScreen';
 import { RetireModal } from './components/RetireModal';
 import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab } from './components/Tabs';
 import { SEASON_GAMES, BATCH, MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, ACCEPT_THRESHOLD, TEAM_DEFS, POSITIONS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE } from './constants';
+import { saveGame, loadGame, hasSave, getSaveMeta, deleteSave } from './engine/saveload';
 
 
 /* ═══════════════════════════════════════════════
@@ -45,11 +46,37 @@ export default function App(){
   const [batchResults,setBatchResults]=useState([]);
   const [developmentSummary,setDevelopmentSummary]=useState(null);
   const [seasonHistory,setSeasonHistory]=useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[]});
+  const [saveExists,setSaveExists]=useState(()=>hasSave());
 
   const myTeam=useMemo(()=>teams.find(t=>t.id===myId),[teams,myId]);
   const notify=useCallback((msg,type="ok")=>{setNotif({msg,type});setTimeout(()=>setNotif(null),3500);},[]);
   const upd=useCallback((id,fn)=>setTeams(prev=>prev.map(t=>t.id===id?fn(t):t)),[]);
   const setTrainingFocus=(pid,focus)=>upd(myId,t=>({...t,players:t.players.map(p=>p.id===pid?{...p,trainingFocus:focus}:p)}));
+
+  const handleSave=()=>{
+    const ok=saveGame({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox});
+    setSaveExists(ok);
+    notify(ok?'💾 セーブしました':'セーブに失敗しました',ok?'ok':'warn');
+  };
+  const handleLoad=()=>{
+    const saved=loadGame();
+    if(!saved){notify('セーブデータがありません','warn');return;}
+    setTeams(saved.teams);
+    setMyId(saved.myId);
+    setGameDay(saved.gameDay);
+    setYear(saved.year);
+    setFaPool(saved.faPool||[]);
+    setFaYears(saved.faYears||{});
+    setSeasonHistory(saved.seasonHistory||{awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[]});
+    setNews(saved.news||[]);
+    setMailbox(saved.mailbox||[]);
+    setCpuTradeOffers([]);
+    setDraftPool(null);
+    setDraftResult(null);
+    setPlayoff(null);
+    setTab('roster');
+    setScreen('hub');
+  };
 
   const addToHistory=(teamId,player,exitReason)=>{
     if(!player) return;
@@ -392,7 +419,7 @@ export default function App(){
   };
 
   // ── RENDER ──
-  if(screen==="title") return(<><div className="app"><div className="title"><div className="tlogo">⚾ BASEBALL<br/>MANAGER 2025</div><div className="tsub">NPB SIMULATION v2.1 — TACTICAL MODE</div><div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,zIndex:1,position:"relative"}}>◈ セントラルリーグ</div><div className="tgrid" style={{marginBottom:14}}>{TEAM_DEFS.filter(t=>t.league==="セ").map(t=><div key={t.id} className="tcard" style={{"--c":t.color}} onClick={()=>handleSelect(t.id)}><span style={{fontSize:24,display:"block",marginBottom:5}}>{t.emoji}</span><div className="tcard-nm">{t.name}</div></div>)}</div><div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,zIndex:1,position:"relative"}}>◈ パシフィックリーグ</div><div className="tgrid">{TEAM_DEFS.filter(t=>t.league==="パ").map(t=><div key={t.id} className="tcard" style={{"--c":t.color}} onClick={()=>handleSelect(t.id)}><span style={{fontSize:24,display:"block",marginBottom:5}}>{t.emoji}</span><div className="tcard-nm">{t.name}</div></div>)}</div></div></div></>);
+  if(screen==="title") return(<><div className="app"><div className="title"><div className="tlogo">⚾ BASEBALL<br/>MANAGER 2025</div><div className="tsub">NPB SIMULATION v2.1 — TACTICAL MODE</div>{saveExists&&(()=>{const m=getSaveMeta();return(<div style={{background:"rgba(74,222,128,.08)",border:"1px solid rgba(74,222,128,.3)",borderRadius:8,padding:"10px 14px",marginBottom:16,textAlign:"left"}}><div style={{fontSize:10,color:"#4ade80",letterSpacing:".1em",marginBottom:6}}>◈ セーブデータ</div><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}><div><div style={{fontWeight:700,fontSize:15}}>{m?.teamEmoji} {m?.teamName}</div><div style={{fontSize:11,color:"#94a3b8"}}>{m?.year}年 第{m?.gameDay}戦 {m?.wins}勝{m?.losses}敗</div><div style={{fontSize:9,color:"#64748b",marginTop:2}}>{m?.savedAt}</div></div><div style={{display:"flex",gap:6,alignItems:"center"}}><button className="sim-btn" style={{margin:0,padding:"8px 18px",fontSize:13,background:"linear-gradient(135deg,#14532d,#166534)",borderColor:"rgba(74,222,128,.6)",color:"#4ade80"}} onClick={handleLoad}>▶ 続きから</button><button className="bsm bgr" style={{padding:"6px 10px"}} onClick={()=>{deleteSave();setSaveExists(false);}}>削除</button></div></div></div>);})()}<div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,marginTop:saveExists?8:0,zIndex:1,position:"relative"}}>◈ 新規ゲーム — チームを選択</div><div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,zIndex:1,position:"relative"}}>◈ セントラルリーグ</div><div className="tgrid" style={{marginBottom:14}}>{TEAM_DEFS.filter(t=>t.league==="セ").map(t=><div key={t.id} className="tcard" style={{"--c":t.color}} onClick={()=>handleSelect(t.id)}><span style={{fontSize:24,display:"block",marginBottom:5}}>{t.emoji}</span><div className="tcard-nm">{t.name}</div></div>)}</div><div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,zIndex:1,position:"relative"}}>◈ パシフィックリーグ</div><div className="tgrid">{TEAM_DEFS.filter(t=>t.league==="パ").map(t=><div key={t.id} className="tcard" style={{"--c":t.color}} onClick={()=>handleSelect(t.id)}><span style={{fontSize:24,display:"block",marginBottom:5}}>{t.emoji}</span><div className="tcard-nm">{t.name}</div></div>)}</div></div></div></>);
 
   if(screen==="mode_select") return(<><ModeSelectScreen myTeam={myTeam} oppTeam={currentOpp} onSelect={handleModeSelect} onBack={()=>setScreen("hub")}/></>);
   if(screen==="tactical_game"&&currentOpp) return(<><TacticalGameScreen myTeam={myTeam} oppTeam={currentOpp} onGameEnd={handleTacticalGameEnd}/></>);
@@ -477,6 +504,7 @@ export default function App(){
       <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14,color:myTeam?.color}}>{myTeam?.name}</div><div style={{fontSize:10,color:"#374151"}}>{year}年 / 第{gameDay}戦 / 残り{remain}試合</div></div>
       <div style={{display:"flex",gap:5,flexWrap:"wrap"}}><span className="chip cg">{myTeam?.wins}勝</span><span className="chip cr">{myTeam?.losses}敗</span><span className="chip cy">{fmtM(myTeam?.budget||0)}</span></div>
       <div className="tb-record">{myTeam?.wins}勝{myTeam?.losses}敗</div>
+      <button style={{background:"rgba(74,222,128,.1)",border:"1px solid rgba(74,222,128,.4)",color:"#4ade80",borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}} onClick={handleSave}>💾 保存</button>
     </div>
 
     {notif&&<div className={`notif ${notif.type==="ok"?"nok":notif.type==="warn"?"nwarn":"nbad"}`}>{notif.msg}</div>}
