@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import './styles.css';
 import { rng, clamp, uid, pname, fmtM, fmtSal } from './utils';
 import { buildTeam, makePlayer, emptyStats, calcRetireWill, rollRetire, developPlayers, checkForInjuries, tickInjuries } from './engine/player';
@@ -54,10 +54,17 @@ export default function App(){
   const setTrainingFocus=(pid,focus)=>upd(myId,t=>({...t,players:t.players.map(p=>p.id===pid?{...p,trainingFocus:focus}:p)}));
 
   const handleSave=()=>{
-    const ok=saveGame({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox});
-    if(ok) setSaveExists(true);
-    notify(ok?'💾 セーブしました':'セーブに失敗しました',ok?'ok':'warn');
+    const result=saveGame({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox});
+    if(result.ok) setSaveExists(true);
+    notify(result.ok?'💾 セーブしました':result.quota?'💾 ストレージ容量が不足しています':'セーブに失敗しました',result.ok?'ok':'warn');
   };
+  useEffect(()=>{
+    if(screen!=='hub') return;
+    const result=saveGame({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox});
+    if(result.ok){setSaveExists(true);notify('💾 オートセーブ','ok');}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[screen]);
+
   const handleLoad=()=>{
     const saved=loadGame();
     if(!saved){notify('セーブデータがありません','warn');return;}

@@ -18,14 +18,11 @@ export function saveGame(state) {
       losses:    myTeam?.losses ?? 0,
       savedAt:   new Date().toLocaleString('ja-JP'),
     }));
-    return true;
+    return { ok: true };
   } catch (e) {
-    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-      console.error('Save failed: storage quota exceeded');
-    } else {
-      console.error('Save failed:', e);
-    }
-    return false;
+    const quota = e instanceof DOMException && e.name === 'QuotaExceededError';
+    console.error(quota ? 'Save failed: storage quota exceeded' : 'Save failed:', e);
+    return { ok: false, quota };
   }
 }
 
