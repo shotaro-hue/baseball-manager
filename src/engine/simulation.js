@@ -341,17 +341,22 @@ function processAtBat(gs, strategy = 'normal') {
     outs++; momentumDelta = isMyAtBat ? -3 : 3;
     if (result === 'sac' && newBases[0]) newBases = [null, newBases[0], null];
   } else if (result === 'bb' || result === 'hbp') {
-    if (newBases[0]&&newBases[1]&&newBases[2]) { runs++; rbi=1; }
-    else if (newBases[0]&&newBases[1]) newBases[2]=newBases[1];
-    else if (newBases[0]) newBases[1]=newBases[0];
-    newBases[0]=batter?.id||'r'; momentumDelta=isMyAtBat?2:-2;
+    if (newBases[0]&&newBases[1]&&newBases[2]) {
+      runs++; rbi=1;
+      newBases=[batter?.id||'r', newBases[0], newBases[1]]; // r3得点, r2→3塁, r1→2塁, 打者→1塁
+    } else {
+      if (newBases[0]&&newBases[1]) { newBases[2]=newBases[1]; newBases[1]=newBases[0]; } // r2→3塁, r1→2塁
+      else if (newBases[0]) newBases[1]=newBases[0]; // r1→2塁
+      newBases[0]=batter?.id||'r';
+    }
+    momentumDelta=isMyAtBat?2:-2;
   } else if (result === 'hr') {
     rbi=1+newBases.filter(Boolean).length; runs=rbi; newBases=[null,null,null]; momentumDelta=isMyAtBat?18:-18;
   } else if (result === 't') {
     rbi=newBases.filter(Boolean).length; runs=rbi; newBases=[null,null,batter?.id||'r']; momentumDelta=isMyAtBat?12:-12;
   } else if (result === 'd') {
     const r3=newBases[2]?1:0, r2=newBases[1]?1:0, r1=newBases[0]&&Math.random()<advanceProb(runnerOf(0),0.40)?1:0;
-    runs=r3+r2+r1; rbi=runs; newBases=[null,batter?.id||'r',null]; momentumDelta=isMyAtBat?8:-8;
+    runs=r3+r2+r1; rbi=runs; newBases=[null,batter?.id||'r',r1?null:newBases[0]]; momentumDelta=isMyAtBat?8:-8;
   } else if (result === 's') {
     const r3=newBases[2]?1:0, r2=newBases[1]&&Math.random()<advanceProb(runnerOf(1),0.55)?1:0;
     runs=r3+r2; rbi=runs; newBases=[batter?.id||'r',newBases[0],r2?null:newBases[1]]; momentumDelta=isMyAtBat?5:-5;

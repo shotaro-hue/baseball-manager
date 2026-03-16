@@ -274,6 +274,9 @@ export default function App(){
       };
       updated.players=applyGameStatsFromLog(updated.players, gsResult.log, true, won);
       updated.players=applyPostGameCondition(updated.players, gsResult.log, true);
+      updated.players=tickInjuries(updated.players);
+      const newInj=checkForInjuries(updated.players);
+      if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
       const rev=calcRevenue(updated);
       updated.budget+=rev.ticket+rev.sponsor+rev.merch;
       return updated;
