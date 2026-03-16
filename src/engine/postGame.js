@@ -93,7 +93,7 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won) {
       // 勝利投手・敗戦投手（先発をベースに）
       if (p.id === starterId) {
         s.W += won ? 1 : 0;
-        s.L += won ? 0 : 1;
+        s.L += (!won && finalLead < 0) ? 1 : 0; // 引き分けは敗戦なし
         // QS: 先発が6回以上投げ自責点3以下
         const sm = pitcherMap[starterId];
         if (sm && sm.outs >= 18 && sm.ER <= 3) s.QS++;
@@ -103,7 +103,7 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won) {
       if (isMulti && p.id === closerId && p.id !== starterId) {
         if (saveSit) s.SV++;
         // BS: セーブ状況で登板したが守れなかった（チームが負けた）
-        else if (!won && finalLead <= 0 && Math.abs(finalLead) <= 3) s.BS++;
+        else if (!won && finalLead < 0 && Math.abs(finalLead) <= 3) s.BS++; // 引き分けはBS対象外
       }
 
       // HLD: 中継ぎ投手（先発でも抑えでもない）がセーブ状況を保持
