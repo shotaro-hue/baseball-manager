@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import './styles.css';
-import { rng, clamp, uid, pname, fmtM, fmtSal } from './utils';
+import { rng, clamp, uid, pname, fmtM, fmtSal, gameDayToDate } from './utils';
 import { buildTeam, makePlayer, emptyStats, calcRetireWill, rollRetire, developPlayers, checkForInjuries, tickInjuries } from './engine/player';
 import { calcSeasonAwards, updateRecords, checkHallOfFame } from './engine/awards';
 import { evalOffer, cpuRenewContracts, processCpuFaBids } from './engine/contract';
@@ -104,11 +104,19 @@ export default function App(){
 
   const handleSelect=id=>{setMyId(id);setScreen("hub");setTab("roster");};
 
+  // ④ gameDay に応じて対戦相手を選択（60〜94: 交流戦）
+  const pickOpponent=(day,myLeague)=>{
+    const isInterleague=day>=60&&day<=94;
+    const pool=isInterleague
+      ?teams.filter(t=>t.id!==myId&&t.league!==myLeague)
+      :teams.filter(t=>t.id!==myId&&t.league===myLeague);
+    return pool[rng(0,pool.length-1)];
+  };
+
   // Pick opponent and go to mode select
   const handleStartGame=()=>{
     if(!myTeam) return;
-    const sameLeague=teams.filter(t=>t.id!==myId&&t.league===myTeam.league);
-    const opp=sameLeague[rng(0,sameLeague.length-1)];
+    const opp=pickOpponent(gameDay,myTeam.league);
     // CPU vs CPU for other games
     let newTeams=[...teams];
     const others=newTeams.filter(t=>t.id!==myId&&t.id!==opp.id);
@@ -153,7 +161,7 @@ export default function App(){
         rotIdx:t.rotIdx+1,
       };
       updated.players=applyGameStatsFromLog(updated.players, r.log||[], true, won);
-      updated.players=applyPostGameCondition(updated.players, r.log||[], true);
+      updated.players=applyPostGameCondition(updated.players, r.log||[], true, gameDay);
       updated.players=tickInjuries(updated.players);
       const newInj=checkForInjuries(updated.players);
       if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
@@ -208,13 +216,17 @@ export default function App(){
   // バッチ処理の共通ロジック
   const runBatchGames=(count)=>{
     if(!myTeam) return;
-    const sameLeague=teams.filter(t=>t.id!==myId&&t.league===myTeam.league);
     let newTeams=[...teams.map(t=>({...t,players:[...t.players.map(p=>({...p,stats:{...p.stats}}))],...(t.id===myId?{}:{})}))];
     const results=[];
     let newDay=gameDay;
 
     for(let g=0;g<count;g++){
-      const opp=sameLeague[rng(0,sameLeague.length-1)];
+      // ④ 交流戦期間(第60〜94戦)は他リーグから対戦相手を選択
+      const isInterleague=newDay>=60&&newDay<=94;
+      const oppPool=isInterleague
+        ?newTeams.filter(t=>t.id!==myId&&t.league!==myTeam.league)
+        :newTeams.filter(t=>t.id!==myId&&t.league===myTeam.league);
+      const opp=oppPool[rng(0,oppPool.length-1)]||newTeams.filter(t=>t.id!==myId)[0];
       // CPU vs CPU
       const others=newTeams.filter(t=>t.id!==myId&&t.id!==opp.id);
       for(let i=0;i<others.length-1;i+=2){
@@ -237,7 +249,7 @@ export default function App(){
       else{myT.losses++;myT.rf+=r.score.my;myT.ra+=r.score.opp;}
       myT.rotIdx++;
       myT.players=applyGameStatsFromLog(myT.players, r.log||[], true, won);
-      myT.players=applyPostGameCondition(myT.players, r.log||[], true);
+      myT.players=applyPostGameCondition(myT.players, r.log||[], true, newDay);
       myT.players=tickInjuries(myT.players);
       const _inj=checkForInjuries(myT.players);
       if(_inj.length>0)myT.players=myT.players.map(p=>{const inj=_inj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
@@ -273,7 +285,7 @@ export default function App(){
         rotIdx:t.rotIdx+1,
       };
       updated.players=applyGameStatsFromLog(updated.players, gsResult.log, true, won);
-      updated.players=applyPostGameCondition(updated.players, gsResult.log, true);
+      updated.players=applyPostGameCondition(updated.players, gsResult.log, true, gameDay);
       updated.players=tickInjuries(updated.players);
       const newInj=checkForInjuries(updated.players);
       if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
@@ -519,7 +531,7 @@ export default function App(){
   return(<><div className="app"><div className="hub">
     <div className="topbar">
       <span style={{fontSize:26}}>{myTeam?.emoji}</span>
-      <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14,color:myTeam?.color}}>{myTeam?.name}</div><div style={{fontSize:10,color:"#374151"}}>{year}年 / 第{gameDay}戦 / 残り{remain}試合</div></div>
+      <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14,color:myTeam?.color}}>{myTeam?.name}</div><div style={{fontSize:10,color:"#374151"}}>{year}年 {(d=>d.month+"月"+d.day+"日")(gameDayToDate(gameDay))} / 第{gameDay}戦{gameDay>=60&&gameDay<=94?" 🔄交流戦":""} / 残り{remain}試合</div></div>
       <div style={{display:"flex",gap:5,flexWrap:"wrap"}}><span className="chip cg">{myTeam?.wins}勝</span><span className="chip cr">{myTeam?.losses}敗</span><span className="chip cy">{fmtM(myTeam?.budget||0)}</span></div>
       <div className="tb-record">{myTeam?.wins}勝{myTeam?.losses}敗</div>
       <button style={{background:"rgba(74,222,128,.1)",border:"1px solid rgba(74,222,128,.4)",color:"#4ade80",borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}} onClick={handleSave}>💾 保存</button>

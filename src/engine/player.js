@@ -10,7 +10,7 @@ import { POSITIONS, PLAYER_TYPES_B, PLAYER_TYPES_P, PLAYER_COMMENTS_B, PLAYER_CO
 export const emptyStats = () => ({
   PA: 0, AB: 0, H: 0, D: 0, T: 0, HR: 0, RBI: 0, BB: 0, K: 0, HBP: 0,
   SB: 0, CS: 0, R: 0, SF: 0, evSum: 0, evN: 0, laSum: 0, laN: 0,
-  IP: 0, ER: 0, BBp: 0, HBPp: 0, Kp: 0, HRp: 0, Hp: 0, BF: 0, W: 0, L: 0, SV: 0,
+  IP: 0, ER: 0, BBp: 0, HBPp: 0, Kp: 0, HRp: 0, Hp: 0, BF: 0, W: 0, L: 0, SV: 0, HLD: 0, QS: 0, BS: 0,
 });
 
 // 性格生成
@@ -37,6 +37,7 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
     personality: makePers(age), skills: [],
     growthPhase: age <= 24 ? "growth" : age <= 29 ? "peak" : age <= 33 ? "earlydecline" : "decline",
     stats: emptyStats(),
+    serviceYears: 0, entryAge: age, recentPitchingDays: [],
   };
 
   if (isPitch) {

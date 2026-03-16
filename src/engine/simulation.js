@@ -231,9 +231,12 @@ function applyBatterSituation(bat, situation) {
   const isClutch  = situation.runnersInScoring && situation.closeGame;
   const clutchMod = isClutch ? (clutch - 50) / 200 : 0;
   const moraleMod = (morale - 60) / 500;
+  // ① 対左投手補正: 左投手の場合、打者のvsLeft能力で打撃を補正
+  const vsLeft    = bat?.batting?.vsLeft || 50;
+  const vsLeftMod = (situation.pitcherHand === 'left') ? (vsLeft - 50) / 300 : 0;
   return { ...bat, batting: { ...bat?.batting,
-    contact: clamp((bat?.batting?.contact||50) * condition + clutchMod * 50 + moraleMod * 50, 1, 99),
-    power:   clamp((bat?.batting?.power  ||50) * condition + clutchMod * 30, 1, 99),
+    contact: clamp((bat?.batting?.contact||50) * condition + clutchMod * 50 + moraleMod * 50 + vsLeftMod * 50, 1, 99),
+    power:   clamp((bat?.batting?.power  ||50) * condition + clutchMod * 30 + vsLeftMod * 30, 1, 99),
     eye:     clamp((bat?.batting?.eye    ||50) * condition, 1, 99),
   }};
 }
@@ -327,7 +330,7 @@ function processAtBat(gs, strategy = 'normal') {
 
   const ftl           = (isMyAtBat ? gs.opLineup : gs.myLineup).filter(p => !p.isPitcher);
   const fieldingLevel = ftl.length > 0 ? ftl.reduce((s,p) => s+(p.batting?.defense||50),0)/ftl.length : 50;
-  const situation     = { runnersOnBase: gs.bases.some(Boolean), runnersInScoring: gs.bases[1]||gs.bases[2], lateGame: gs.inning>=7, closeGame: Math.abs((gs.score?.my||0)-(gs.score?.opp||0))<=2, fieldingLevel, pitchCount, teamMorale: gs.teamMorale||60, stadium: gs.stadium };
+  const situation     = { runnersOnBase: gs.bases.some(Boolean), runnersInScoring: gs.bases[1]||gs.bases[2], lateGame: gs.inning>=7, closeGame: Math.abs((gs.score?.my||0)-(gs.score?.opp||0))<=2, fieldingLevel, pitchCount, teamMorale: gs.teamMorale||60, stadium: gs.stadium, pitcherHand: pitcher?.hand || 'right' };
 
   const { result, pitches, pitchType, zone, isIntentional, pitchLog } = simAtBat(batter, pitcher, strategy, pitchCount, situation, gs.leagueEnv);
 
