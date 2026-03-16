@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import './styles.css';
-import { rng, clamp, uid, pname, fmtM, fmtSal } from './utils';
+import { rng, clamp, uid, pname, fmtM, fmtSal, gameDayToDate } from './utils';
 import { buildTeam, makePlayer, emptyStats, calcRetireWill, rollRetire, developPlayers, checkForInjuries, tickInjuries } from './engine/player';
 import { calcSeasonAwards, updateRecords, checkHallOfFame } from './engine/awards';
 import { evalOffer, cpuRenewContracts, processCpuFaBids } from './engine/contract';
@@ -19,13 +19,18 @@ import { RetireModal } from './components/RetireModal';
 import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab } from './components/Tabs';
 import { SEASON_GAMES, BATCH, MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, ACCEPT_THRESHOLD, TEAM_DEFS, POSITIONS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE } from './constants';
 import { saveGame, loadGame, hasSave, getSaveMeta, deleteSave } from './engine/saveload';
+import { buildRealTeam } from './engine/realplayer';
+import { NPB2025_ROSTERS } from './data/npb2025';
 
 
 /* ═══════════════════════════════════════════════
    MAIN APP
 ═══════════════════════════════════════════════ */
 
-const INIT_TEAMS=TEAM_DEFS.map(function(d){const t=buildTeam(d);t.history=[];return t;});
+const INIT_TEAMS=TEAM_DEFS.map(function(d){
+  const t=NPB2025_ROSTERS[d.id]?buildRealTeam(d,NPB2025_ROSTERS[d.id]):buildTeam(d);
+  t.history=[];return t;
+});
 
 export default function App(){
   const [screen,setScreen]=useState("title");
@@ -54,10 +59,17 @@ export default function App(){
   const setTrainingFocus=(pid,focus)=>upd(myId,t=>({...t,players:t.players.map(p=>p.id===pid?{...p,trainingFocus:focus}:p)}));
 
   const handleSave=()=>{
-    const ok=saveGame({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox});
-    setSaveExists(ok);
-    notify(ok?'💾 セーブしました':'セーブに失敗しました',ok?'ok':'warn');
+    const result=saveGame({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox});
+    if(result.ok) setSaveExists(true);
+    notify(result.ok?'💾 セーブしました':result.quota?'💾 ストレージ容量が不足しています':'セーブに失敗しました',result.ok?'ok':'warn');
   };
+  useEffect(()=>{
+    if(screen!=='hub') return;
+    const result=saveGame({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox});
+    if(result.ok){setSaveExists(true);notify('💾 オートセーブ','ok');}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[screen]);
+
   const handleLoad=()=>{
     const saved=loadGame();
     if(!saved){notify('セーブデータがありません','warn');return;}
@@ -74,6 +86,7 @@ export default function App(){
     setDraftPool(null);
     setDraftResult(null);
     setPlayoff(null);
+    setDevelopmentSummary(null);
     setTab('roster');
     setScreen('hub');
   };
@@ -91,11 +104,19 @@ export default function App(){
 
   const handleSelect=id=>{setMyId(id);setScreen("hub");setTab("roster");};
 
+  // ④ gameDay に応じて対戦相手を選択（60〜94: 交流戦）
+  const pickOpponent=(day,myLeague)=>{
+    const isInterleague=day>=60&&day<=94;
+    const pool=isInterleague
+      ?teams.filter(t=>t.id!==myId&&t.league!==myLeague)
+      :teams.filter(t=>t.id!==myId&&t.league===myLeague);
+    return pool[rng(0,pool.length-1)];
+  };
+
   // Pick opponent and go to mode select
   const handleStartGame=()=>{
     if(!myTeam) return;
-    const sameLeague=teams.filter(t=>t.id!==myId&&t.league===myTeam.league);
-    const opp=sameLeague[rng(0,sameLeague.length-1)];
+    const opp=pickOpponent(gameDay,myTeam.league);
     // CPU vs CPU for other games
     let newTeams=[...teams];
     const others=newTeams.filter(t=>t.id!==myId&&t.id!==opp.id);
@@ -140,7 +161,7 @@ export default function App(){
         rotIdx:t.rotIdx+1,
       };
       updated.players=applyGameStatsFromLog(updated.players, r.log||[], true, won);
-      updated.players=applyPostGameCondition(updated.players, r.log||[], true);
+      updated.players=applyPostGameCondition(updated.players, r.log||[], true, gameDay);
       updated.players=tickInjuries(updated.players);
       const newInj=checkForInjuries(updated.players);
       if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
@@ -195,13 +216,17 @@ export default function App(){
   // バッチ処理の共通ロジック
   const runBatchGames=(count)=>{
     if(!myTeam) return;
-    const sameLeague=teams.filter(t=>t.id!==myId&&t.league===myTeam.league);
     let newTeams=[...teams.map(t=>({...t,players:[...t.players.map(p=>({...p,stats:{...p.stats}}))],...(t.id===myId?{}:{})}))];
     const results=[];
     let newDay=gameDay;
 
     for(let g=0;g<count;g++){
-      const opp=sameLeague[rng(0,sameLeague.length-1)];
+      // ④ 交流戦期間(第60〜94戦)は他リーグから対戦相手を選択
+      const isInterleague=newDay>=60&&newDay<=94;
+      const oppPool=isInterleague
+        ?newTeams.filter(t=>t.id!==myId&&t.league!==myTeam.league)
+        :newTeams.filter(t=>t.id!==myId&&t.league===myTeam.league);
+      const opp=oppPool[rng(0,oppPool.length-1)]||newTeams.filter(t=>t.id!==myId)[0];
       // CPU vs CPU
       const others=newTeams.filter(t=>t.id!==myId&&t.id!==opp.id);
       for(let i=0;i<others.length-1;i+=2){
@@ -224,7 +249,7 @@ export default function App(){
       else{myT.losses++;myT.rf+=r.score.my;myT.ra+=r.score.opp;}
       myT.rotIdx++;
       myT.players=applyGameStatsFromLog(myT.players, r.log||[], true, won);
-      myT.players=applyPostGameCondition(myT.players, r.log||[], true);
+      myT.players=applyPostGameCondition(myT.players, r.log||[], true, newDay);
       myT.players=tickInjuries(myT.players);
       const _inj=checkForInjuries(myT.players);
       if(_inj.length>0)myT.players=myT.players.map(p=>{const inj=_inj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
@@ -239,6 +264,8 @@ export default function App(){
       myFinal.budget+=rev.ticket+rev.sponsor+rev.merch;
     }
 
+    const batchSaveResult=saveGame({teams:newTeams,myId,gameDay:newDay,year,faPool,faYears,seasonHistory,news,mailbox});
+    if(batchSaveResult.ok) setSaveExists(true);
     setTeams(newTeams);
     setGameDay(newDay);
     setBatchResults(results);
@@ -258,7 +285,10 @@ export default function App(){
         rotIdx:t.rotIdx+1,
       };
       updated.players=applyGameStatsFromLog(updated.players, gsResult.log, true, won);
-      updated.players=applyPostGameCondition(updated.players, gsResult.log, true);
+      updated.players=applyPostGameCondition(updated.players, gsResult.log, true, gameDay);
+      updated.players=tickInjuries(updated.players);
+      const newInj=checkForInjuries(updated.players);
+      if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
       const rev=calcRevenue(updated);
       updated.budget+=rev.ticket+rev.sponsor+rev.merch;
       return updated;
@@ -419,9 +449,9 @@ export default function App(){
   };
 
   // ── RENDER ──
-  if(screen==="title") return(<><div className="app"><div className="title"><div className="tlogo">⚾ BASEBALL<br/>MANAGER 2025</div><div className="tsub">NPB SIMULATION v2.1 — TACTICAL MODE</div>{saveExists&&(()=>{const m=getSaveMeta();return(<div style={{background:"rgba(74,222,128,.08)",border:"1px solid rgba(74,222,128,.3)",borderRadius:8,padding:"10px 14px",marginBottom:16,textAlign:"left"}}><div style={{fontSize:10,color:"#4ade80",letterSpacing:".1em",marginBottom:6}}>◈ セーブデータ</div><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}><div><div style={{fontWeight:700,fontSize:15}}>{m?.teamEmoji} {m?.teamName}</div><div style={{fontSize:11,color:"#94a3b8"}}>{m?.year}年 第{m?.gameDay}戦 {m?.wins}勝{m?.losses}敗</div><div style={{fontSize:9,color:"#64748b",marginTop:2}}>{m?.savedAt}</div></div><div style={{display:"flex",gap:6,alignItems:"center"}}><button className="sim-btn" style={{margin:0,padding:"8px 18px",fontSize:13,background:"linear-gradient(135deg,#14532d,#166534)",borderColor:"rgba(74,222,128,.6)",color:"#4ade80"}} onClick={handleLoad}>▶ 続きから</button><button className="bsm bgr" style={{padding:"6px 10px"}} onClick={()=>{deleteSave();setSaveExists(false);}}>削除</button></div></div></div>);})()}<div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,marginTop:saveExists?8:0,zIndex:1,position:"relative"}}>◈ 新規ゲーム — チームを選択</div><div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,zIndex:1,position:"relative"}}>◈ セントラルリーグ</div><div className="tgrid" style={{marginBottom:14}}>{TEAM_DEFS.filter(t=>t.league==="セ").map(t=><div key={t.id} className="tcard" style={{"--c":t.color}} onClick={()=>handleSelect(t.id)}><span style={{fontSize:24,display:"block",marginBottom:5}}>{t.emoji}</span><div className="tcard-nm">{t.name}</div></div>)}</div><div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,zIndex:1,position:"relative"}}>◈ パシフィックリーグ</div><div className="tgrid">{TEAM_DEFS.filter(t=>t.league==="パ").map(t=><div key={t.id} className="tcard" style={{"--c":t.color}} onClick={()=>handleSelect(t.id)}><span style={{fontSize:24,display:"block",marginBottom:5}}>{t.emoji}</span><div className="tcard-nm">{t.name}</div></div>)}</div></div></div></>);
+  if(screen==="title"){const saveMeta=saveExists?getSaveMeta():null;return(<><div className="app"><div className="title"><div className="tlogo">⚾ BASEBALL<br/>MANAGER 2025</div><div className="tsub">NPB SIMULATION v2.1 — TACTICAL MODE</div>{saveMeta&&(<div style={{background:"rgba(74,222,128,.08)",border:"1px solid rgba(74,222,128,.3)",borderRadius:8,padding:"10px 14px",marginBottom:16,textAlign:"left"}}><div style={{fontSize:10,color:"#4ade80",letterSpacing:".1em",marginBottom:6}}>◈ セーブデータ</div><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}><div><div style={{fontWeight:700,fontSize:15}}>{saveMeta.teamEmoji} {saveMeta.teamName}</div><div style={{fontSize:11,color:"#94a3b8"}}>{saveMeta.year}年 第{saveMeta.gameDay}戦 {saveMeta.wins}勝{saveMeta.losses}敗</div><div style={{fontSize:9,color:"#64748b",marginTop:2}}>{saveMeta.savedAt}</div></div><div style={{display:"flex",gap:6,alignItems:"center"}}><button className="sim-btn" style={{margin:0,padding:"8px 18px",fontSize:13,background:"linear-gradient(135deg,#14532d,#166534)",borderColor:"rgba(74,222,128,.6)",color:"#4ade80"}} onClick={handleLoad}>▶ 続きから</button><button className="bsm bgr" style={{padding:"6px 10px"}} onClick={()=>{if(window.confirm('セーブデータを削除しますか？')){deleteSave();setSaveExists(false);}}}>削除</button></div></div></div>)}<div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,marginTop:saveExists?8:0,zIndex:1,position:"relative"}}>◈ 新規ゲーム — チームを選択</div><div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,zIndex:1,position:"relative"}}>◈ セントラルリーグ</div><div className="tgrid" style={{marginBottom:14}}>{TEAM_DEFS.filter(t=>t.league==="セ").map(t=><div key={t.id} className="tcard" style={{"--c":t.color}} onClick={()=>handleSelect(t.id)}><span style={{fontSize:24,display:"block",marginBottom:5}}>{t.emoji}</span><div className="tcard-nm">{t.name}</div></div>)}</div><div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,zIndex:1,position:"relative"}}>◈ パシフィックリーグ</div><div className="tgrid">{TEAM_DEFS.filter(t=>t.league==="パ").map(t=><div key={t.id} className="tcard" style={{"--c":t.color}} onClick={()=>handleSelect(t.id)}><span style={{fontSize:24,display:"block",marginBottom:5}}>{t.emoji}</span><div className="tcard-nm">{t.name}</div></div>)}</div></div></div></>);}
 
-  if(screen==="mode_select") return(<><ModeSelectScreen myTeam={myTeam} oppTeam={currentOpp} onSelect={handleModeSelect} onBack={()=>setScreen("hub")}/></>);
+  if(screen==="mode_select") return(<><ModeSelectScreen myTeam={myTeam} oppTeam={currentOpp} gameDay={gameDay} onSelect={handleModeSelect} onBack={()=>setScreen("hub")}/></>);
   if(screen==="tactical_game"&&currentOpp) return(<><TacticalGameScreen myTeam={myTeam} oppTeam={currentOpp} onGameEnd={handleTacticalGameEnd}/></>);
   if(screen==="batch_result") return(<><BatchResultScreen results={batchResults} myTeam={myTeam} onEnd={()=>setScreen("hub")}/></>);
 
@@ -501,7 +531,7 @@ export default function App(){
   return(<><div className="app"><div className="hub">
     <div className="topbar">
       <span style={{fontSize:26}}>{myTeam?.emoji}</span>
-      <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14,color:myTeam?.color}}>{myTeam?.name}</div><div style={{fontSize:10,color:"#374151"}}>{year}年 / 第{gameDay}戦 / 残り{remain}試合</div></div>
+      <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14,color:myTeam?.color}}>{myTeam?.name}</div><div style={{fontSize:10,color:"#374151"}}>{year}年 {(d=>d.month+"月"+d.day+"日")(gameDayToDate(gameDay))} / 第{gameDay}戦{gameDay>=60&&gameDay<=94?" 🔄交流戦":""} / 残り{remain}試合</div></div>
       <div style={{display:"flex",gap:5,flexWrap:"wrap"}}><span className="chip cg">{myTeam?.wins}勝</span><span className="chip cr">{myTeam?.losses}敗</span><span className="chip cy">{fmtM(myTeam?.budget||0)}</span></div>
       <div className="tb-record">{myTeam?.wins}勝{myTeam?.losses}敗</div>
       <button style={{background:"rgba(74,222,128,.1)",border:"1px solid rgba(74,222,128,.4)",color:"#4ade80",borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}} onClick={handleSave}>💾 保存</button>

@@ -18,17 +18,24 @@ export function saveGame(state) {
       losses:    myTeam?.losses ?? 0,
       savedAt:   new Date().toLocaleString('ja-JP'),
     }));
-    return true;
+    return { ok: true };
   } catch (e) {
-    console.error('Save failed:', e);
-    return false;
+    const quota = e instanceof DOMException && e.name === 'QuotaExceededError';
+    console.error(quota ? 'Save failed: storage quota exceeded' : 'Save failed:', e);
+    return { ok: false, quota };
   }
 }
 
 export function loadGame() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const state = JSON.parse(raw);
+    if (!state || !Array.isArray(state.teams)) {
+      console.error('Load failed: invalid save data');
+      return null;
+    }
+    return state;
   } catch (e) {
     console.error('Load failed:', e);
     return null;

@@ -231,9 +231,12 @@ function applyBatterSituation(bat, situation) {
   const isClutch  = situation.runnersInScoring && situation.closeGame;
   const clutchMod = isClutch ? (clutch - 50) / 200 : 0;
   const moraleMod = (morale - 60) / 500;
+  // ① 対左投手補正: 左投手の場合、打者のvsLeft能力で打撃を補正
+  const vsLeft    = bat?.batting?.vsLeft || 50;
+  const vsLeftMod = (situation.pitcherHand === 'left') ? (vsLeft - 50) / 300 : 0;
   return { ...bat, batting: { ...bat?.batting,
-    contact: clamp((bat?.batting?.contact||50) * condition + clutchMod * 50 + moraleMod * 50, 1, 99),
-    power:   clamp((bat?.batting?.power  ||50) * condition + clutchMod * 30, 1, 99),
+    contact: clamp((bat?.batting?.contact||50) * condition + clutchMod * 50 + moraleMod * 50 + vsLeftMod * 50, 1, 99),
+    power:   clamp((bat?.batting?.power  ||50) * condition + clutchMod * 30 + vsLeftMod * 30, 1, 99),
     eye:     clamp((bat?.batting?.eye    ||50) * condition, 1, 99),
   }};
 }
@@ -311,7 +314,7 @@ function processAtBat(gs, strategy = 'normal') {
     if (stealBase >= 0) {
       const lineup      = isMyAtBat ? gs.myLineup : gs.opLineup;
       const runner      = lineup.find(p => p.id === newBases[stealBase]) || batter;
-      const successRate = clamp(0.55 + (runner?.batting?.speed||50)/500 + (runner?.batting?.stealSkill||50)/600 - (pitcher?.pitching?.control||60)/600, 0.25, 0.88);
+      const successRate = clamp(0.65 + (runner?.batting?.speed||50)/500 + (runner?.batting?.stealSkill||50)/600 - (pitcher?.pitching?.control||60)/600, 0.35, 0.92);
       const success     = Math.random() < successRate;
       if (success) { newBases[stealBase+1] = newBases[stealBase]; newBases[stealBase] = null; }
       else          { newBases[stealBase] = null; }
@@ -327,7 +330,7 @@ function processAtBat(gs, strategy = 'normal') {
 
   const ftl           = (isMyAtBat ? gs.opLineup : gs.myLineup).filter(p => !p.isPitcher);
   const fieldingLevel = ftl.length > 0 ? ftl.reduce((s,p) => s+(p.batting?.defense||50),0)/ftl.length : 50;
-  const situation     = { runnersOnBase: gs.bases.some(Boolean), runnersInScoring: gs.bases[1]||gs.bases[2], lateGame: gs.inning>=7, closeGame: Math.abs((gs.score?.my||0)-(gs.score?.opp||0))<=2, fieldingLevel, pitchCount, teamMorale: gs.teamMorale||60, stadium: gs.stadium };
+  const situation     = { runnersOnBase: gs.bases.some(Boolean), runnersInScoring: gs.bases[1]||gs.bases[2], lateGame: gs.inning>=7, closeGame: Math.abs((gs.score?.my||0)-(gs.score?.opp||0))<=2, fieldingLevel, pitchCount, teamMorale: gs.teamMorale||60, stadium: gs.stadium, pitcherHand: pitcher?.hand || 'right' };
 
   const { result, pitches, pitchType, zone, isIntentional, pitchLog } = simAtBat(batter, pitcher, strategy, pitchCount, situation, gs.leagueEnv);
 
@@ -341,17 +344,22 @@ function processAtBat(gs, strategy = 'normal') {
     outs++; momentumDelta = isMyAtBat ? -3 : 3;
     if (result === 'sac' && newBases[0]) newBases = [null, newBases[0], null];
   } else if (result === 'bb' || result === 'hbp') {
-    if (newBases[0]&&newBases[1]&&newBases[2]) { runs++; rbi=1; }
-    else if (newBases[0]&&newBases[1]) newBases[2]=newBases[1];
-    else if (newBases[0]) newBases[1]=newBases[0];
-    newBases[0]=batter?.id||'r'; momentumDelta=isMyAtBat?2:-2;
+    if (newBases[0]&&newBases[1]&&newBases[2]) {
+      runs++; rbi=1;
+      newBases=[batter?.id||'r', newBases[0], newBases[1]]; // r3得点, r2→3塁, r1→2塁, 打者→1塁
+    } else {
+      if (newBases[0]&&newBases[1]) { newBases[2]=newBases[1]; newBases[1]=newBases[0]; } // r2→3塁, r1→2塁
+      else if (newBases[0]) newBases[1]=newBases[0]; // r1→2塁
+      newBases[0]=batter?.id||'r';
+    }
+    momentumDelta=isMyAtBat?2:-2;
   } else if (result === 'hr') {
     rbi=1+newBases.filter(Boolean).length; runs=rbi; newBases=[null,null,null]; momentumDelta=isMyAtBat?18:-18;
   } else if (result === 't') {
     rbi=newBases.filter(Boolean).length; runs=rbi; newBases=[null,null,batter?.id||'r']; momentumDelta=isMyAtBat?12:-12;
   } else if (result === 'd') {
     const r3=newBases[2]?1:0, r2=newBases[1]?1:0, r1=newBases[0]&&Math.random()<advanceProb(runnerOf(0),0.40)?1:0;
-    runs=r3+r2+r1; rbi=runs; newBases=[null,batter?.id||'r',null]; momentumDelta=isMyAtBat?8:-8;
+    runs=r3+r2+r1; rbi=runs; newBases=[null,batter?.id||'r',r1?null:newBases[0]]; momentumDelta=isMyAtBat?8:-8;
   } else if (result === 's') {
     const r3=newBases[2]?1:0, r2=newBases[1]&&Math.random()<advanceProb(runnerOf(1),0.55)?1:0;
     runs=r3+r2; rbi=runs; newBases=[batter?.id||'r',newBases[0],r2?null:newBases[1]]; momentumDelta=isMyAtBat?5:-5;

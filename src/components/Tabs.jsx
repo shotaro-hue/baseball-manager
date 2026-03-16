@@ -114,6 +114,9 @@ export function StatsTab({teams,myId}){
   <th>役割</th>
   <th>勝</th>
   <th>敗</th>
+  <th title="セーブ">S</th>
+  <th title="ホールド">H</th>
+  <th title="クオリティスタート">QS</th>
   <ThCell label="投球回"  openLabel={openTip} onOpen={setOpenTip}/>
   <ThCell label="防御率"  openLabel={openTip} onOpen={setOpenTip}/>
   <ThCell label="WHIP"   openLabel={openTip} onOpen={setOpenTip}/>
@@ -129,6 +132,9 @@ export function StatsTab({teams,myId}){
                     <td style={{fontWeight:700,fontSize:12,color:selId===p.id?"#f5c842":undefined}}>{p.name}<HandBadge p={p}/></td>
                     <td style={{fontSize:10,color:"#374151"}}>{p.subtype}</td>
                     <td className="mono" style={{color:"#34d399"}}>{p.stats.W}</td><td className="mono" style={{color:"#f87171"}}>{p.stats.L}</td>
+                    <td className="mono" style={{color:p.stats.SV>0?"#34d399":undefined}}>{p.stats.SV||"-"}</td>
+                    <td className="mono" style={{color:p.stats.HLD>0?"#60a5fa":undefined}}>{p.stats.HLD||"-"}</td>
+                    <td className="mono" style={{color:p.stats.QS>0?"#f5c842":undefined}}>{p.stats.QS||"-"}</td>
                     <td className="mono">{p.stats.IP>0?fmtIP(p.stats.IP):"---"}</td>
                     <td className="mono" style={{color:sp.WHIP>0&&sp.WHIP<1.0?"#34d399":sp.WHIP<1.3?"#f5c842":sp.WHIP<1.5?"#94a3b8":"#f87171"}}>{sp.WHIP>0?sp.WHIP:"---"}</td>
                     <td className="mono" style={{color:sp.FIP<3?"#34d399":sp.FIP<4?"#f5c842":sp.FIP>0?"#f87171":undefined}}>{sp.FIP>0?sp.FIP:"---"}</td>

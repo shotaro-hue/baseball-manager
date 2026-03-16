@@ -61,6 +61,21 @@ export const CITIES = ["東京","大阪","横浜","名古屋","福岡","仙台",
 export const pname = () =>
   `${LAST_NAMES[rng(0, LAST_NAMES.length - 1)]} ${FIRST_NAMES[rng(0, FIRST_NAMES.length - 1)]}`;
 
+// NPBカレンダー: gameDay 1〜143 を月日にマッピング
+// 開幕: 3月29日(火)、週6試合(火〜日)、月曜休み
+// オールスター: gameDay 72 以降に3日のオフを挿入
+export function gameDayToDate(gameDay) {
+  const week = Math.floor((gameDay - 1) / 6);
+  const dayInWeek = (gameDay - 1) % 6; // 0=火, 1=水, 2=木, 3=金, 4=土, 5=日
+  let calDays = week * 7 + dayInWeek;   // 開幕日からの経過カレンダー日数(0始まり)
+  if (gameDay > 72) calDays += 3;       // オールスター休暇3日
+  // 3月29日から calDays 日後を計算
+  const dpm = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  let m = 3, d = 29 + calDays;
+  while (d > dpm[m]) { d -= dpm[m]; m++; if (m > 12) m = 1; }
+  return { month: m, day: d };
+}
+
 // スカウト評価ノイズ: 選手ID+能力キーから決定的なブレを生成（同一選手は毎回同じ表示値）
 export const scoutNoise = (val, playerId, key, noiseRange = 12) => {
   let h = 0;

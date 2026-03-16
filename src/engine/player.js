@@ -10,7 +10,7 @@ import { POSITIONS, PLAYER_TYPES_B, PLAYER_TYPES_P, PLAYER_COMMENTS_B, PLAYER_CO
 export const emptyStats = () => ({
   PA: 0, AB: 0, H: 0, D: 0, T: 0, HR: 0, RBI: 0, BB: 0, K: 0, HBP: 0,
   SB: 0, CS: 0, R: 0, SF: 0, evSum: 0, evN: 0, laSum: 0, laN: 0,
-  IP: 0, ER: 0, BBp: 0, HBPp: 0, Kp: 0, HRp: 0, Hp: 0, BF: 0, W: 0, L: 0, SV: 0,
+  IP: 0, ER: 0, BBp: 0, HBPp: 0, Kp: 0, HRp: 0, Hp: 0, BF: 0, W: 0, L: 0, SV: 0, HLD: 0, QS: 0, BS: 0,
 });
 
 // 性格生成
@@ -37,6 +37,7 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
     personality: makePers(age), skills: [],
     growthPhase: age <= 24 ? "growth" : age <= 29 ? "peak" : age <= 33 ? "earlydecline" : "decline",
     stats: emptyStats(),
+    serviceYears: 0, entryAge: age, recentPitchingDays: [],
   };
 
   if (isPitch) {
@@ -147,8 +148,8 @@ function calcGrowthBudget(p) {
   const age = p.age;
   const pot = p.potential ?? 65;
   let base;
-  if      (age <= 22) base = rng(12, 18) + Math.round((pot - 65) * 0.7);   // 若手: 大きく成長
-  else if (age <= 24) base = rng(8, 12)  + Math.round((pot - 65) * 0.5);
+  if      (age <= 20) base = rng(8, 13)  + Math.round((pot - 65) * 0.5);   // 若手: 原石、まだ荒削り
+  else if (age <= 24) base = rng(12, 18) + Math.round((pot - 65) * 0.7);  // 全盛期: 最大成長ピーク
   else if (age <= 27) base = rng(4, 8);
   else if (age <= 30) base = rng(-1, 4);
   else if (age <= 33) base = rng(-5, -2);

@@ -98,15 +98,41 @@ npm run dev            # ゲームを起動
 
 ---
 
+## 🔄 選手データの更新（spaia.jp API）
+
+`src/data/npb2025.js` の選手成績データは、spaia.jp から自動取得できます。
+
+```bash
+node scripts/fetch-spaia.js
+```
+
+### オプション
+
+| コマンド | 説明 |
+|---|---|
+| `node scripts/fetch-spaia.js` | 2024年成績を取得して `src/data/npb2025.js` を上書き |
+| `node scripts/fetch-spaia.js --year=2023` | 取得する年度を指定 |
+| `node scripts/fetch-spaia.js --dry-run` | ファイルを書き込まずコンソールに出力して確認 |
+
+**注意:**
+- Node.js v18 以上が必要です（`fetch` が組み込みで使えるバージョン）
+- 実行すると元のファイルが自動バックアップされます（`src/data/npb2025.backup.*.js`）
+- spaia.jp は非公式 API のため、レスポンス形式が変わる場合があります
+
+---
+
 ## 📁 ファイル構成（参考）
 
 ```
 baseball-manager/
+├── scripts/
+│   └── fetch-spaia.js      ← spaia.jp から選手データを取得するスクリプト
 ├── src/
 │   ├── constants.js        ← チーム定義、ポジション等の定数
 │   ├── utils.js            ← 汎用関数（乱数、フォーマット等）
 │   ├── engine/             ← ゲームロジック（シミュレーション等）
 │   │   ├── player.js       ← 選手生成、引退判定
+│   │   ├── realplayer.js   ← 実成績 → ゲーム能力値変換
 │   │   ├── sabermetrics.js ← セイバーメトリクス計算
 │   │   ├── contract.js     ← 契約交渉ロジック
 │   │   ├── simulation.js   ← 打席・試合シミュレーション
@@ -114,7 +140,10 @@ baseball-manager/
 │   │   ├── trade.js        ← トレード評価
 │   │   ├── finance.js      ← 収益計算
 │   │   ├── draft.js        ← ドラフト候補生成
+│   │   ├── saveload.js     ← セーブ／ロード（localStorage）
 │   │   └── playoff.js      ← プレーオフ構造
+│   ├── data/
+│   │   └── npb2025.js      ← NPB選手データ（fetch-spaia.js で更新可能）
 │   ├── components/         ← 画面パーツ（UI）
 │   │   ├── ui.jsx          ← 小さな共通部品
 │   │   ├── TacticalGame.jsx← 采配モード画面
