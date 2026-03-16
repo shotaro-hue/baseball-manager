@@ -5,11 +5,11 @@ import { calcRetireWill } from '../engine/player';
 
 
 
-export function ModeSelectScreen({myTeam,oppTeam,onSelect,onBack}){
+export function ModeSelectScreen({myTeam,oppTeam,gameDay,onSelect,onBack}){
   return(
     <div className="app">
       <div className="mode-wrap">
-        <div style={{marginBottom:6,fontSize:11,color:"#374151",letterSpacing:".2em"}}>第{" "}戦</div>
+        <div style={{marginBottom:6,fontSize:11,color:"#374151",letterSpacing:".2em"}}>第{gameDay}戦</div>
         <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:36,color:"#f5c842",letterSpacing:".1em",marginBottom:4}}>
           vs {oppTeam?.name}
         </div>

@@ -25,14 +25,14 @@ export function recommendForTeam(team, pool) {
 }
 
 export function initDraftPool(myTeam) {
-  const pos = [...Array(6)].map(() => "先発")
-    .concat([...Array(3)].map(() => "中継ぎ"))
-    .concat([...Array(3)].map(() => "抑え"))
-    .concat(POSITIONS.flatMap((q) => [q, q, q, q]));
+  const pitPos = [...Array(12)].map(() => "先発")
+    .concat([...Array(10)].map(() => "中継ぎ"))
+    .concat([...Array(8)].map(() => "抑え"));  // 30 slots
+  const pos = pitPos.concat(POSITIONS.flatMap((q) => [q, q, q, q]));
   const raw = Array.from({ length: DRAFT_POOL_SIZE }, (_, i) => {
-    const isPitch = i < 12;
+    const isPitch = i < 30;
     const q = rng(40, 78);
-    return makePlayer(isPitch ? pos[i % 12] : POSITIONS[i % 7], q, isPitch, rng(18, 22));
+    return makePlayer(isPitch ? pitPos[i % 30] : POSITIONS[i % 8], q, isPitch, rng(18, 22));
   });
   const scoutedPlayers = (myTeam?.scoutResults || []).map((p) => ({
     ...p, fromScout: true, age: clamp(p.age || 20, 18, 22),
