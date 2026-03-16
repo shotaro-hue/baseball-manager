@@ -140,6 +140,23 @@ baseball-manager/
 | 対戦相手 | 毎試合ランダムに相手チームが決定（CPU同士の試合もシム） |
 | 勝率計算 | 引き分けを除外した勝敗で算出 |
 
+#### カレンダーシステム
+
+| 項目 | 内容 |
+|------|------|
+| 開幕日 | 3月29日（火曜） |
+| 週スケジュール | 火〜日の6試合／週（月曜は休み） |
+| オールスター休止 | gameDay 72 終了後に3日間の休止 |
+| 日付表示 | ハブ画面上部に「M月D日 / 第N戦」形式で表示（`gameDayToDate()` in utils.js） |
+
+#### 交流戦
+
+| 項目 | 内容 |
+|------|------|
+| 対象期間 | gameDay 60〜94（35試合） |
+| 対戦ルール | この期間は相手リーグのチームを対戦相手として選出 |
+| 表示 | ハブ画面上部に「🔄交流戦」バッジを表示 |
+
 ---
 
 ### 4.2 試合モード
@@ -210,6 +227,14 @@ baseball-manager/
 | `earlydecline` | 30〜33歳 | 微衰退（-1〜+4） |
 | `decline` | 34歳〜 | 衰退（-9〜-5） |
 
+#### その他フィールド
+
+| フィールド | 型 | 意味 |
+|------------|-----|------|
+| `serviceYears` | number | 通算在籍年数 |
+| `entryAge` | number | 入団時年齢 |
+| `recentPitchingDays` | number[] | 直近7試合の登板 gameDay 配列（投手専用） |
+
 #### 選手タイプ（フレーバー）
 
 - **打者**: 天才肌 / ガッツ型 / 技巧派 / パワーヒッター / 俊足巧打 / 守備の名手 / 走塁のスペシャリスト / 勝負強い打者
@@ -248,7 +273,19 @@ baseball-manager/
 | **クラッチ補正** | 得点圏×接戦時に打者の `contact`・`power` を強化 |
 | **モメンタム** | 1〜100のモメンタム値によりチーム全体の打者能力を ±数%調整 |
 | **コンディション** | 選手コンディション（60〜100）が打者能力に直接乗算 |
-| **対左投手** | 打者の `vsLeft` が対左時に補正として加算 |
+| **対左投手（vsLeft）** | 左投手対戦時に `(vsLeft - 50) / 300` を contact・power に加算 |
+| **連投疲労（試合またぎ）** | 中継ぎ投手の `recentPitchingDays` に基づき連続登板ペナルティを付与（2試合連続: -5、3試合以上: -15） |
+
+#### 投手統計（試合結果集計）
+
+| 統計 | 付与条件 |
+|------|---------|
+| **W（勝利）** | 先発/救援で勝利時にリードしていた投手に付与 |
+| **L（敗戦）** | 失点してリードを失った投手に付与（引き分けは除外） |
+| **SV（セーブ）** | 1〜3点差でゲームを締めた最終投手 |
+| **HLD（ホールド）** | セーブシチュエーションを保持して交代した中継ぎ投手 |
+| **BS（ブローセーブ）** | セーブシチュエーションを失った投手（引き分け時は除外） |
+| **QS（クオリティスタート）** | 先発が6回以上・自責3点以下で投げ切った試合 |
 
 #### 戦術選択肢
 
@@ -481,6 +518,8 @@ base = 0.3% / 試合
   trainingFocus, // トレーニング集中対象能力名 (nullable)
   retireStyle,   // 引退スタイル (0〜100)
   hometown,      // 出身地（都市名）
+  serviceYears,  // 通算在籍年数
+  entryAge,      // 入団時年齢
 
   personality: { money, winning, playing, hometown, loyalty, stability, future },
 
@@ -493,12 +532,13 @@ base = 0.3% / 試合
   subtype,       // "先発" | "中継ぎ" | "抑え"
   pitching: { velocity, control, stamina, breaking, variety, sharpness,
               tempo, clutchP, recovery, durability },
+  recentPitchingDays, // 直近7試合の登板 gameDay 配列（連投疲労計算用）
 
   // 成績（シーズン累積）
   stats: {
     PA, AB, H, D, T, HR, RBI, BB, K, HBP, SB, CS, R, SF,
     evSum, evN, laSum, laN,           // 打球速度・角度の累積（平均算出用）
-    IP, ER, BBp, HBPp, Kp, HRp, Hp, BF, W, L, SV   // 投手
+    IP, ER, BBp, HBPp, Kp, HRp, Hp, BF, W, L, SV, HLD, QS, BS   // 投手
   },
   playoffStats,  // 同上・プレーオフ分
   careerLog,     // [{ year, stats, playoffStats }, ...]
@@ -731,6 +771,47 @@ HR 補正: 1.0 より大きいと HR になりやすい、小さいと HR が二
 
 > 最新エントリが最上部。過去のエントリは削除しない。
 > 仕様本文を変更した場合は「旧 → 新」を明記、内部バグ修正のみの場合は概要のみ記録。
+
+---
+
+### 2026-03-16 — バグ修正（postGame.js）
+
+**仕様本文への影響あり**
+
+- **§4.4 試合シミュレーション — 投手統計**
+  - **L（敗戦）・BS（ブローセーブ）の引き分け除外**
+    - 旧: `!won`（L）/ `!won && finalLead <= 0`（BS）で判定し、引き分けも誤ってカウント
+    - 新: `!won && finalLead < 0` で判定（引き分け = finalLead === 0 を除外）
+
+---
+
+### 2026-03-16 — Tier1 新機能実装（App.jsx / utils.js / simulation.js / player.js / postGame.js / Tabs.jsx）
+
+**仕様本文への影響あり（§4.1・§4.3・§4.4・§5）**
+
+- **⓪ カレンダーシステム + 在籍年数基盤**（§4.1）
+  - `gameDayToDate()` を utils.js に追加（gameDay 1〜143 → 実際の日付へ変換）
+  - 開幕日: 3月29日、週6試合（火〜日）、月曜休み、gameDay 72 後にオールスター3日休止
+  - ハブ上部に「M月D日 / 第N戦」形式で表示
+  - Player に `serviceYears`・`entryAge`・`recentPitchingDays` フィールドを追加
+
+- **① 投手利き腕 × 打者 vsLeft 補正**（§4.4）
+  - 打席処理（`processAtBat`）に `pitcherHand` を渡すよう変更
+  - 左投手対戦時に `(vsLeft - 50) / 300` を contact・power に加算
+
+- **② 投手統計拡充（SV / HLD / QS / BS）**（§4.4・§5）
+  - `emptyStats()` に HLD・QS・BS を追加
+  - `applyGameStatsFromLog` で投手順を追跡し各統計を付与
+  - Tabs.jsx の投手成績表に「S / H / QS」列を追加
+
+- **③ 中継ぎ連投疲労**（§4.4）
+  - `applyPostGameCondition` に `gameDay` パラメータを追加
+  - `recentPitchingDays` で直近7試合の登板 gameDay を管理
+  - 2試合連続登板: コンディション -5、3試合以上: -15
+
+- **④ 交流戦（gameDay 60〜94）**（§4.1）
+  - `pickOpponent()` ヘルパーを追加し、60〜94 試合目は相手リーグから対戦相手を選出
+  - ハブ画面に「🔄交流戦」バッジを表示（`handleStartGame` / `runBatchGames` 両対応）
 
 ---
 
