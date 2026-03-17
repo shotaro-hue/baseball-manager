@@ -3,6 +3,19 @@ import { ACCEPT_THRESHOLD } from '../constants';
 import { tradeValue, analyzeTeamNeeds } from './trade';
 
 /* ═══════════════════════════════════════════════
+   FA 資格閾値 (NPB公式準拠)
+   高卒 (entryAge ≤ 19): 国内FA 8年 / 海外FA 9年
+   大卒・社会人 (entryAge ≥ 22): 国内FA 7年 / 海外FA 9年
+═══════════════════════════════════════════════ */
+export function getFaThreshold(player) {
+  const isHighSchool = (player.entryAge || player.age) <= 19;
+  return {
+    domestic: isHighSchool ? 8 : 7,
+    overseas: 9,
+  };
+}
+
+/* ═══════════════════════════════════════════════
    CONTRACT EVALUATION
 ═══════════════════════════════════════════════ */
 
@@ -67,6 +80,55 @@ export function cpuRenewContracts(teams, myId, allTeams) {
     let budget = t.budget;
 
     for (const p of expiring) {
+      const threshold = getFaThreshold(p);
+      const serviceYears = p.serviceYears || 0;
+      const overseas = p.personality?.overseas || 0;
+
+      // FA資格なし: 球団側から再契約を強制提示 (選手は国内FA権を持っていない)
+      if (serviceYears < threshold.domestic) {
+        const salary = Math.round(p.salary * 1.02); // わずかな昇給のみ
+        if (budget >= salary) {
+          players = players.map(x => x.id === p.id
+            ? { ...x, salary, contractYears: 1, contractYearsLeft: 1 }
+            : x
+          );
+          budget -= salary;
+        } else {
+          players = players.filter(x => x.id !== p.id);
+          newFaPlayers.push({ ...p, isFA: true });
+        }
+        continue;
+      }
+
+      // 海外志向かつ海外FA資格あり: NPB離脱
+      if (overseas >= 70 && serviceYears >= threshold.overseas) {
+        players = players.filter(x => x.id !== p.id);
+        news.push({
+          type: 'season',
+          headline: `【海外FA】${p.name}（${t.name}）が海外移籍を宣言`,
+          source: '野球速報',
+          dateLabel: '',
+          body: `${p.name}選手（${p.age}歳）が海外FA権を行使し、NPBを離脱した。`,
+        });
+        continue;
+      }
+
+      // 海外志向かつ国内FA資格はあるが海外FA資格なし: 国内FAをスキップして待機
+      if (overseas >= 70 && serviceYears < threshold.overseas) {
+        const salary = Math.round(p.salary * 1.03);
+        if (budget >= salary) {
+          players = players.map(x => x.id === p.id
+            ? { ...x, salary, contractYears: 1, contractYearsLeft: 1 }
+            : x
+          );
+          budget -= salary;
+        } else {
+          players = players.filter(x => x.id !== p.id);
+          newFaPlayers.push({ ...p, isFA: true });
+        }
+        continue;
+      }
+
       const raise = tradeValue(p) >= 70 ? 1.15 : 1.0;
       const salary = Math.round(p.salary * raise);
       const years = p.age <= 28 ? 2 : 1;
@@ -79,15 +141,15 @@ export function cpuRenewContracts(teams, myId, allTeams) {
         );
         budget -= salary;
       } else {
-        // 球団側が自由契約（保有権切れで放出）
+        // FA宣言 (国内FA資格あり)
         players = players.filter(x => x.id !== p.id);
         newFaPlayers.push({ ...p, isFA: true });
         news.push({
           type: 'season',
-          headline: `【自由契約】${t.name}が${p.name}を自由契約`,
+          headline: `【FA】${p.name}（${t.name}）が国内FA宣言`,
           source: '野球速報',
           dateLabel: '',
-          body: `${t.name}は${p.name}選手（${p.age}歳）を自由契約とした。`,
+          body: `${p.name}選手（${p.age}歳）が国内FA権を行使した。`,
         });
       }
     }

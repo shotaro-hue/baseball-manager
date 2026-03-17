@@ -19,6 +19,7 @@ const makePers = (age) => ({
   hometown: rng(0, 80), loyalty: rng(10, 85),
   stability: rng(age > 28 ? 50 : 20, age > 28 ? 90 : 70),
   future: rng(age < 27 ? 50 : 10, age < 27 ? 90 : 60),
+  overseas: rng(0, 100), // 海外志向 (≥70: 国内FAをスキップして海外FA待ち)
 });
 
 // 選手生成

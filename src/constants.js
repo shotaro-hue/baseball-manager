@@ -44,11 +44,11 @@ export const COACH_GRADES = [
 ];
 
 export const SCOUT_REGIONS = [
-  { id: "dom_a", name: "国内一軍候補",   weeks: 4,  qMin: 65, qMax: 82, cost: 5000,  foreign: false },
-  { id: "dom_b", name: "国内独立リーグ", weeks: 6,  qMin: 50, qMax: 72, cost: 3000,  foreign: false },
-  { id: "us",    name: "北米メジャー",   weeks: 8,  qMin: 70, qMax: 90, cost: 12000, foreign: true },
-  { id: "kr",    name: "韓国KBO",        weeks: 6,  qMin: 60, qMax: 78, cost: 8000,  foreign: true },
-  { id: "latin", name: "中南米",          weeks: 10, qMin: 55, qMax: 85, cost: 9000,  foreign: true },
+  { id: "dom_a", name: "国内一軍候補",   weeks: 4,  qMin: 65, qMax: 82, cost: 5000,  foreign: false, regionFactor: 0.8 },
+  { id: "dom_b", name: "国内独立リーグ", weeks: 6,  qMin: 50, qMax: 72, cost: 3000,  foreign: false, regionFactor: 0.9 },
+  { id: "us",    name: "北米メジャー",   weeks: 8,  qMin: 70, qMax: 90, cost: 12000, foreign: true,  regionFactor: 1.2 },
+  { id: "kr",    name: "韓国KBO",        weeks: 6,  qMin: 60, qMax: 78, cost: 8000,  foreign: true,  regionFactor: 1.1 },
+  { id: "latin", name: "中南米",          weeks: 10, qMin: 55, qMax: 85, cost: 9000,  foreign: true,  regionFactor: 1.3 },
 ];
 
 export const INJURY_TABLE = [

@@ -1,9 +1,9 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import './styles.css';
-import { rng, clamp, uid, pname, fmtM, fmtSal, gameDayToDate } from './utils';
+import { rng, clamp, uid, pname, fmtM, fmtSal, gameDayToDate, scoutedValue } from './utils';
 import { buildTeam, makePlayer, emptyStats, calcRetireWill, rollRetire, developPlayers, checkForInjuries, tickInjuries } from './engine/player';
 import { calcSeasonAwards, updateRecords, checkHallOfFame } from './engine/awards';
-import { evalOffer, cpuRenewContracts, processCpuFaBids } from './engine/contract';
+import { evalOffer, cpuRenewContracts, processCpuFaBids, getFaThreshold } from './engine/contract';
 import { quickSimGame } from './engine/simulation';
 import { applyGameStatsFromLog, applyPostGameCondition } from './engine/postGame';
 import { calcRevenue } from './engine/finance';
@@ -313,17 +313,18 @@ export default function App(){
     upd(myId,t=>({...t,lineup:inL?t.lineup.filter(id=>id!==pid):[...t.lineup,pid]}));
   };
   const setStarter=pid=>{upd(myId,t=>({...t,rotation:t.rotation.includes(pid)?t.rotation:[...t.rotation,pid]}));notify("先発ローテに追加","ok");};
-  const promote=pid=>{if(!myTeam) return;const p=myTeam.farm.find(x=>x.id===pid);if(!p) return;if(myTeam.players.length>=MAX_ROSTER){notify("一軍枠満杯","warn");return;}if(p.isForeign&&myTeam.players.filter(x=>x.isForeign).length>=MAX_外国人_一軍){notify(`外国人枠は${MAX_外国人_一軍}名まで`,"warn");return;}upd(myId,t=>({...t,players:[...t.players,p],farm:t.farm.filter(x=>x.id!==pid)}));notify(`${p.name}を一軍昇格！`,"ok");};
+  const promote=pid=>{if(!myTeam) return;const p=myTeam.farm.find(x=>x.id===pid);if(!p) return;if(p.育成){notify("育成選手は一軍出場不可。先に支配下登録してください","warn");return;}if(myTeam.players.length>=MAX_ROSTER){notify("一軍枠満杯","warn");return;}if(p.isForeign&&myTeam.players.filter(x=>x.isForeign).length>=MAX_外国人_一軍){notify(`外国人枠は${MAX_外国人_一軍}名まで`,"warn");return;}upd(myId,t=>({...t,players:[...t.players,p],farm:t.farm.filter(x=>x.id!==pid)}));notify(`${p.name}を一軍昇格！`,"ok");};
+  const convertIkusei=pid=>{if(!myTeam) return;const p=myTeam.farm.find(x=>x.id===pid);if(!p||!p.育成) return;if(myTeam.players.length>=MAX_ROSTER){notify("支配下枠満杯（最大"+MAX_ROSTER+"名）","warn");return;}const minSal=p.isPitcher?50000:40000;const newSal=Math.max(p.salary,minSal);upd(myId,t=>({...t,budget:t.budget-(newSal-p.salary),farm:t.farm.map(x=>x.id===pid?{...x,育成:false,salary:newSal,contractYears:1,contractYearsLeft:1,ikuseiYears:0}:x)}));notify(`${p.name}を支配下登録！`,"ok");};
   const demote=pid=>{if(!myTeam) return;const p=myTeam.players.find(x=>x.id===pid);if(!p) return;if(myTeam.farm.length>=MAX_FARM){notify("二軍満杯","warn");return;}upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),lineup:t.lineup.filter(id=>id!==pid),rotation:t.rotation.filter(id=>id!==pid),farm:[...t.farm,p]}));notify(`${p.name}を二軍降格`,"warn");};
   const hireCoach=(cd,cg)=>{if(!myTeam||myTeam.budget<cg.salary*12){notify("予算不足","warn");return;}upd(myId,t=>({...t,budget:t.budget-cg.salary*12,coaches:[...t.coaches,{type:cd.type,typeName:cd.name,emoji:cd.emoji,name:pname(),grade:cg.g,label:cg.label,salary:cg.salary*12,bonus:cg.bonus}]}));notify(`${cd.name}(Lv${cg.g})を雇いました！`,"ok");};
   const fireCoach=idx=>{upd(myId,t=>({...t,coaches:t.coaches.filter((_,i)=>i!==idx)}));notify("コーチを解雇","warn");};
 
   const sendScout=region=>{
     if(!myTeam||myTeam.budget<region.cost){notify("予算不足","warn");return;}
-    upd(myId,t=>({...t,budget:t.budget-region.cost,scoutMissions:[...t.scoutMissions,{id:uid(),name:region.name,weeksLeft:region.weeks,qMin:region.qMin,qMax:region.qMax,cost:region.cost,foreign:region.foreign}]}));
+    upd(myId,t=>({...t,budget:t.budget-region.cost,scoutMissions:[...t.scoutMissions,{id:uid(),name:region.name,weeksLeft:region.weeks,qMin:region.qMin,qMax:region.qMax,cost:region.cost,foreign:region.foreign,regionFactor:region.regionFactor||1.0}]}));
     notify(`${region.name}へスカウト派遣！`,"ok");
     setTimeout(()=>{
-      upd(myId,t=>{const mis=t.scoutMissions.find(m=>m.name===region.name);if(!mis) return t;const np=makePlayer(Math.random()<0.4?"先発":POSITIONS[rng(0,7)],rng(mis.qMin,mis.qMax),Math.random()<0.4,undefined,mis.foreign&&Math.random()<0.7);return{...t,scoutMissions:t.scoutMissions.filter(m=>m!==mis),scoutResults:[...t.scoutResults,np]};});
+      upd(myId,t=>{const mis=t.scoutMissions.find(m=>m.name===region.name);if(!mis) return t;const np=makePlayer(Math.random()<0.4?"先発":POSITIONS[rng(0,7)],rng(mis.qMin,mis.qMax),Math.random()<0.4,undefined,mis.foreign&&Math.random()<0.7);return{...t,scoutMissions:t.scoutMissions.filter(m=>m!==mis),scoutResults:[...t.scoutResults,{...np,_scoutRegionFactor:mis.regionFactor||1.0,_scoutBudgetFactor:t.budget>300000?0.7:t.budget>150000?0.85:1.0}]};});
       notify("スカウト報告が届きました！","ok");
     },3000);
   };
@@ -433,7 +434,7 @@ export default function App(){
   };
 
   const handleNextYear=()=>{
-    setYear(y=>y+1);setGameDay(1);setFaPool([]);setTeams(prev=>prev.map(t=>({...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,players:t.players.filter(p=>!p._retireNow).map(p=>({...p,age:p.age+1,stats:emptyStats(),playoffStats:emptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:Math.max(0,p.contractYearsLeft-1),growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlydecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),careerLog:[...(p.careerLog||[]),{year,stats:{...p.stats},playoffStats:{...(p.playoffStats||emptyStats())}}]})),farm:t.farm.map(p=>({...p,age:p.age+1,stats:emptyStats(),injury:null}))})));setScreen("hub");setTab("roster");notify(`${year+1}年シーズン開幕！`,"ok");};
+    setYear(y=>y+1);setGameDay(1);setFaPool([]);setTeams(prev=>prev.map(t=>({...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,players:t.players.filter(p=>!p._retireNow).map(p=>({...p,age:p.age+1,stats:emptyStats(),playoffStats:emptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:Math.max(0,p.contractYearsLeft-1),growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlydecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),careerLog:[...(p.careerLog||[]),{year,stats:{...p.stats},playoffStats:{...(p.playoffStats||emptyStats())}}],serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0})),farm:t.farm.map(p=>({...p,age:p.age+1,stats:emptyStats(),injury:null,serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}))})));setScreen("hub");setTab("roster");notify(`${year+1}年シーズン開幕！`,"ok");};
 
   const [news,setNews]=useState([]);
   const [mailbox,setMailbox]=useState([]);
@@ -489,7 +490,52 @@ export default function App(){
         finalPlayers=[...res.players,...promoted];
         finalFarm=finalFarm.filter(p=>!pIds.has(p.id));
       }
-      return{...t,players:finalPlayers,farm:finalFarm};
+      // ── モラル変動 (シーズン終了時) ──
+      const winPct=(t.wins||0)/Math.max(1,(t.wins||0)+(t.losses||0));
+      const updatedPlayers=finalPlayers.map(p=>{
+        const pers=p.personality||{};
+        const pa=p.stats?.PA||0; const bf=p.stats?.BF||0;
+        let delta=0;
+        // 出場機会
+        if(pa>=400||bf>=200) delta+=3;
+        if(pa>=300||bf>=150) delta+=5; else if(pa<200&&bf<80) delta+=pers.playing>65?-12:-8;
+        // チーム成績
+        if(winPct>=0.6) delta+=5; else if(winPct<0.4) delta+=(pers.winning>65?-8:-5);
+        // 年俸 (概算市場価値: salary * 1.0 がベース)
+        if(p.salary>0){const marketBase=p.salary;if(p.salary>=marketBase*1.1) delta+=3;else if(p.salary<marketBase*0.9) delta+=(pers.money>70?-8:-5);}
+        // 長期在籍
+        if((p.serviceYears||0)>=5) delta+=3;
+        // 自然回復 (70へ収束)
+        const current=p.morale||70; delta+=current<70?3:current>70?-3:0;
+        const newMorale=clamp((current)+delta,20,100);
+        return{...p,morale:newMorale};
+      });
+      // ── 育成3年自動解雇 ──
+      const ikuseiDismissed=new Set();
+      const farmAfterIkusei=finalFarm.filter(fp=>{
+        if(fp.育成&&(fp.ikuseiYears||0)>=3){
+          ikuseiDismissed.add(fp.id);
+          addNews({type:"season",headline:"【育成契約満了】"+fp.name+"（"+t.name+"）が契約満了",source:"野球速報",dateLabel:year+"年",body:fp.name+"選手（"+fp.age+"歳）は育成3年を満了し、自由契約となった。"});
+          return false;
+        }
+        return true;
+      });
+      // ── 低モラル警告メール (自チームのみ) ──
+      if(t.id===myId){updatedPlayers.filter(p=>(p.morale||70)<45).forEach(p=>{setMailbox(prev=>[...prev,{id:uid(),type:"morale_warning",read:false,subject:"【モラル低下】"+p.name+"のモラルが低下しています",body:p.name+"選手（"+p.pos+"）のモラルが"+Math.round(p.morale||70)+"まで低下しています。出場機会や年俸条件を確認してください。",player:p}]);});}
+      // ── 海外FA宣言 (自チーム選手) ──
+      const overseasDeparted=new Set();
+      const playersAfterOverseas=updatedPlayers.filter(p=>{
+        const thresh=getFaThreshold(p);
+        const overseas=p.personality?.overseas||0;
+        if(overseas>=70&&(p.serviceYears||0)>=thresh.overseas){
+          overseasDeparted.add(p.id);
+          addNews({type:"season",headline:"【海外FA】"+p.name+"（"+t.name+"）が海外移籍を宣言",source:"野球速報",dateLabel:year+"年",body:p.name+"選手（"+p.age+"歳）が海外FA権を行使し、NPBを離脱した。"});
+          if(t.id===myId) setMailbox(prev=>[...prev,{id:uid(),type:"overseas_fa",read:false,subject:"【海外FA】"+p.name+"が海外移籍を宣言",body:p.name+"選手（"+p.age+"歳）が海外FA権を行使しました。チームを離れます。",player:p}]);
+          return false;
+        }
+        return true;
+      });
+      return{...t,players:playersAfterOverseas,farm:farmAfterIkusei};
     });
     // CPU 球団の契約満了選手を再契約（失敗は自由契約として faPool へ）
     const renewResult=cpuRenewContracts(developedTeams,myId,developedTeams);
@@ -561,7 +607,7 @@ export default function App(){
       ))}
     </div>
 
-    {tab==="roster"&&<RosterTab team={myTeam} onToggle={toggleLineup} onSetStarter={setStarter} onPromo={promote} onDemo={demote} onSetTrainingFocus={setTrainingFocus}/>}
+    {tab==="roster"&&<RosterTab team={myTeam} onToggle={toggleLineup} onSetStarter={setStarter} onPromo={promote} onDemo={demote} onSetTrainingFocus={setTrainingFocus} onConvertIkusei={convertIkusei}/>}
     {tab==="records"&&<RecordsTab history={seasonHistory}/>}
     {tab==="news"&&<NewsTab news={news} onInterview={handleInterview}/>}
     {tab==="mailbox"&&<MailboxTab mailbox={mailbox} onRead={handleMailRead} onAction={handleMailAction} teams={teams} myTeam={myTeam} onTrade={handleTrade}/>}
@@ -593,7 +639,29 @@ export default function App(){
     )}
     {tab==="scout"&&(
       <div>
-        {myTeam?.scoutResults.length>0&&<div className="card"><div className="card-h">スカウト報告</div>{myTeam.scoutResults.map((p,i)=><div key={p.id} className="card2"><div className="fsb"><span style={{fontWeight:700}}>{p.name} <span style={{fontSize:10,color:"#374151"}}>{p.pos}/{p.age}歳</span></span><div style={{display:"flex",gap:6}}><button className="bsm bga" onClick={()=>signPlayer(i)}>獲得</button><button className="bsm bgr" onClick={()=>upd(myId,t=>({...t,scoutResults:t.scoutResults.filter((_,j)=>j!==i)}))}>見送り</button></div></div></div>)}</div>}
+        {myTeam?.scoutResults.length>0&&<div className="card"><div className="card-h">スカウト報告</div>{myTeam.scoutResults.map((p,i)=>{
+          const bf=p._scoutBudgetFactor||1.0; const rf=p._scoutRegionFactor||1.0;
+          const sv=(key,val)=>scoutedValue(val,p.id,key,15,bf,rf);
+          const ScoutVal=({k,v})=>{const r=sv(k,v);return <span style={{color:r.estimated?"#f5c842":"#94a3b8"}}>{r.value}{r.estimated&&<span style={{fontSize:8,opacity:.6}}>?</span>}</span>;};
+          return <div key={p.id} className="card2">
+            <div className="fsb" style={{marginBottom:6}}><span style={{fontWeight:700}}>{p.name} <span style={{fontSize:10,color:"#374151"}}>{p.pos}/{p.age}歳</span>{p.isForeign&&<span className="chip cb" style={{marginLeft:4,fontSize:8}}>外</span>}</span><div style={{display:"flex",gap:6}}><button className="bsm bga" onClick={()=>signPlayer(i)}>獲得</button><button className="bsm bgr" onClick={()=>upd(myId,t=>({...t,scoutResults:t.scoutResults.filter((_,j)=>j!==i)}))}>見送り</button></div></div>
+            <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:10}}>
+              {p.isPitcher?<>
+                <span style={{color:"#374151"}}>球速 <ScoutVal k="velocity" v={p.pitching?.velocity}/></span>
+                <span style={{color:"#374151"}}>制球 <ScoutVal k="control" v={p.pitching?.control}/></span>
+                <span style={{color:"#374151"}}>変化 <ScoutVal k="breaking" v={p.pitching?.breaking}/></span>
+                <span style={{color:"#374151"}}>スタ <ScoutVal k="stamina" v={p.pitching?.stamina}/></span>
+              </>:<>
+                <span style={{color:"#374151"}}>ミート <ScoutVal k="contact" v={p.batting?.contact}/></span>
+                <span style={{color:"#374151"}}>長打 <ScoutVal k="power" v={p.batting?.power}/></span>
+                <span style={{color:"#374151"}}>走力 <ScoutVal k="speed" v={p.batting?.speed}/></span>
+                <span style={{color:"#374151"}}>選球 <ScoutVal k="eye" v={p.batting?.eye}/></span>
+              </>}
+              <span style={{color:"#374151"}}>潜在 <ScoutVal k="potential" v={p.potential}/></span>
+            </div>
+            <div style={{fontSize:9,color:"#374151",marginTop:4}}>{fmtSal(p.salary)}/年 · <span style={{color:"#f5c842"}}>?マークは推定値</span></div>
+          </div>;
+        })}</div>}
         <div className="card"><div className="card-h">スカウト派遣</div><div className="g2">{SCOUT_REGIONS.map(sr=><div key={sr.id} className="card2" style={{cursor:"pointer"}} onClick={()=>sendScout(sr)}><div style={{fontWeight:700,fontSize:12,marginBottom:3}}>{sr.name}</div><div style={{fontSize:10,color:"#374151"}}>費用:{fmtSal(sr.cost)} / Lv{sr.qMin}〜{sr.qMax}</div></div>)}</div></div>
       </div>
     )}

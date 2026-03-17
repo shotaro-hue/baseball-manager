@@ -84,3 +84,11 @@ export const scoutNoise = (val, playerId, key, noiseRange = 12) => {
   const noise = (h % (noiseRange * 2 + 1)) - noiseRange;
   return Math.min(99, Math.max(1, (val || 50) + noise));
 };
+
+// スカウト精度付き能力表示値: noiseLevel=0は実値, >0は推定値(±noiseRange)
+// budgetFactor: 0.7(高予算)〜1.0(低予算), regionFactor: 0.8(国内)〜1.2(海外)
+export const scoutedValue = (trueVal, playerId, key, noiseLevel = 0, budgetFactor = 1.0, regionFactor = 1.0) => {
+  if (noiseLevel === 0) return { value: trueVal, estimated: false };
+  const effectiveRange = Math.round(noiseLevel * budgetFactor * regionFactor);
+  return { value: scoutNoise(trueVal, playerId, key, effectiveRange), estimated: true };
+};
