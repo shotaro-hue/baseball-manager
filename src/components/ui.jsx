@@ -47,6 +47,34 @@ export function PersonalityView({ p }) {
   );
 }
 
+export const PITCH_COLORS = {
+  fastball: '#f87171',
+  slider:   '#60a5fa',
+  curve:    '#34d399',
+  fork:     '#a78bfa',
+  changeup: '#f5c842',
+};
+const PITCH_NAMES = {
+  fastball: '直球', slider: 'スライダー', curve: 'カーブ', fork: 'フォーク', changeup: 'チェンジアップ',
+};
+export const ZONE_LABELS = {
+  inner_mid: '内角', mid_mid: '真中', outer_mid: '外角',
+  inner_low: '内低', mid_low: '低め', outer_low: '外低',
+};
+
+export function PitchBadge({ pitchType, zone }) {
+  if (!pitchType) return null;
+  const color = PITCH_COLORS[pitchType] || '#374151';
+  return (
+    <span style={{ display: 'inline-flex', gap: 3, marginLeft: 5, verticalAlign: 'middle' }}>
+      <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: `${color}22`, color, border: `1px solid ${color}55`, fontWeight: 600 }}>
+        {PITCH_NAMES[pitchType] || pitchType}
+      </span>
+      {zone && <span style={{ fontSize: 9, color: '#6b7280' }}>{ZONE_LABELS[zone] || zone}</span>}
+    </span>
+  );
+}
+
 // セイバーメトリクスの解説ツールチップ付きテーブルヘッダー
 const STAT_TIPS = {
   "打席": { en: "PA", desc: "打席に立った回数" },
