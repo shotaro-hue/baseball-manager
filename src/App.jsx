@@ -492,7 +492,7 @@ export default function App(){
       }
       // ── モラル変動 (シーズン終了時) ──
       const winPct=(t.wins||0)/Math.max(1,(t.wins||0)+(t.losses||0));
-      const updatedPlayers=finalPlayers.map(p=>{
+      const updatedPlayers=finalPlayers.filter(p=>!p._retireNow).map(p=>{
         const pers=p.personality||{};
         const pa=p.stats?.PA||0; const bf=p.stats?.BF||0;
         let delta=0;

@@ -220,7 +220,7 @@ function simAtBat(bat, pit, strategy = 'normal', pitchCount = 0, situation = {},
 
 function applyFatigue(pit, fatigue) {
   const moraleMod = ((pit?.morale || 70) - 70) / 250; // 個人モラルを投手能力に反映
-  if (fatigue < 30 && moraleMod === 0) return pit;
+  if (fatigue < 30 && Math.abs(moraleMod) < 0.001) return pit;
   const m = fatigue / 100;
   return { ...pit, pitching: { ...pit?.pitching,
     control:  Math.max(1, (pit?.pitching?.control||50)  - m*20 + moraleMod * 50),

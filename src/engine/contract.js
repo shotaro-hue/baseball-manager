@@ -8,7 +8,7 @@ import { tradeValue, analyzeTeamNeeds } from './trade';
    大卒・社会人 (entryAge ≥ 22): 国内FA 7年 / 海外FA 9年
 ═══════════════════════════════════════════════ */
 export function getFaThreshold(player) {
-  const isHighSchool = (player.entryAge || player.age) <= 19;
+  const isHighSchool = player.entryAge != null ? player.entryAge <= 19 : false;
   return {
     domestic: isHighSchool ? 8 : 7,
     overseas: 9,

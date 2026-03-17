@@ -871,7 +871,7 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
                     </td>
                   </tr>
                 ))}
-                {team.farm.length===0&&<tr><td colSpan={7} style={{color:"#1e2d3d",padding:"16px",textAlign:"center"}}>二軍選手なし</td></tr>}
+                {team.farm.length===0&&<tr><td colSpan={8} style={{color:"#1e2d3d",padding:"16px",textAlign:"center"}}>二軍選手なし</td></tr>}
               </tbody>
             </table>
           </div>
