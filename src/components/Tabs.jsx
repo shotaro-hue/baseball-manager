@@ -609,6 +609,8 @@ export function AlumniTab({myTeam}){
 
 export function CareerTable({player}){
   const [mode,setMode]=useState("regular");
+  const [metricKey,setMetricKey]=useState(player.isPitcher?"ERA":"HR");
+
   const log=player.careerLog||[];
   if(log.length===0) return null;
   const hasPlayoff=log.some(r=>{const ps=r.playoffStats||emptyStats();return ps.PA>0||ps.BF>0;});
@@ -619,8 +621,8 @@ export function CareerTable({player}){
 
   // ⑥ キャリア推移グラフ用指標定義
   const BATTER_METRICS=[
-    {key:"HR",  label:"本塁打", get:s=>s.HR},
-    {key:"RBI", label:"打点",   get:s=>s.RBI},
+    {key:"HR",  label:"本塁打", get:s=>s.HR,    isCount:true},
+    {key:"RBI", label:"打点",   get:s=>s.RBI,   isCount:true},
     {key:"AVG", label:"打率",   get:s=>saberBatter(s).AVG},
     {key:"OPS", label:"OPS",   get:s=>saberBatter(s).OPS},
     {key:"wOBA",label:"wOBA",  get:s=>saberBatter(s).wOBA},
@@ -628,14 +630,13 @@ export function CareerTable({player}){
   ];
   const PITCHER_METRICS=[
     {key:"ERA", label:"防御率", get:s=>saberPitcher(s).ERA},
-    {key:"W",   label:"勝利",   get:s=>s.W},
+    {key:"W",   label:"勝利",   get:s=>s.W,     isCount:true},
     {key:"WHIP",label:"WHIP",  get:s=>saberPitcher(s).WHIP},
-    {key:"K",   label:"奪三振", get:s=>s.Kp},
+    {key:"K",   label:"奪三振", get:s=>s.Kp,   isCount:true},
     {key:"FIP", label:"FIP",   get:s=>saberPitcher(s).FIP},
     {key:"WAR", label:"WAR",   get:s=>saberPitcher(s).WAR},
   ];
   const metrics=ip?PITCHER_METRICS:BATTER_METRICS;
-  const [metricKey,setMetricKey]=useState(ip?"ERA":"HR");
   const activeMet=metrics.find(m=>m.key===metricKey)||metrics[0];
   const chartData=[...log].map(row=>{const s=getS(row);return{year:row.year,value:activeMet.get(s)};});
 
@@ -669,7 +670,7 @@ export function CareerTable({player}){
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.05)"/>
               <XAxis dataKey="year" tick={{fill:"#6b7280",fontSize:9}}/>
               <YAxis tick={{fill:"#6b7280",fontSize:9}} width={36}/>
-              <Tooltip contentStyle={{background:"#0b1c30",border:"1px solid rgba(245,200,66,.3)",borderRadius:6,fontSize:10}} labelStyle={{color:"#f5c842"}} itemStyle={{color:"#c0cfe0"}} formatter={v=>[typeof v==="number"?v.toFixed(3):v,activeMet.label]}/>
+              <Tooltip contentStyle={{background:"#0b1c30",border:"1px solid rgba(245,200,66,.3)",borderRadius:6,fontSize:10}} labelStyle={{color:"#f5c842"}} itemStyle={{color:"#c0cfe0"}} formatter={v=>[typeof v==="number"?(activeMet.isCount?String(v):v.toFixed(3)):v,activeMet.label]}/>
               <Line type="monotone" dataKey="value" stroke="#f5c842" strokeWidth={2} dot={{r:3,fill:"#f5c842"}} activeDot={{r:5}}/>
             </LineChart>
           </ResponsiveContainer>
