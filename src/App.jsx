@@ -110,7 +110,7 @@ export default function App(){
     const pool=isInterleague
       ?teams.filter(t=>t.id!==myId&&t.league!==myLeague)
       :teams.filter(t=>t.id!==myId&&t.league===myLeague);
-    return pool[rng(0,pool.length-1)];
+    return pool[rng(0,pool.length-1)]||teams.filter(t=>t.id!==myId)[0];
   };
 
   // Pick opponent and go to mode select
