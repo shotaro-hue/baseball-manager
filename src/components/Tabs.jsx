@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis } from "recharts";
+import { ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis,
+  LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, PVAL_DEFS, ACCEPT_THRESHOLD, SCOUT_REGIONS, IS_HIT } from '../constants';
 import { fmtAvg, fmtPct, fmtSal, fmtM, fmtIP, scoutNoise } from '../utils';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
@@ -616,6 +617,28 @@ export function CareerTable({player}){
   // 各年のデータ取得
   const getS=(row)=>mode==="playoff"?(row.playoffStats||emptyStats()):(row.stats||emptyStats());
 
+  // ⑥ キャリア推移グラフ用指標定義
+  const BATTER_METRICS=[
+    {key:"HR",  label:"本塁打", get:s=>s.HR},
+    {key:"RBI", label:"打点",   get:s=>s.RBI},
+    {key:"AVG", label:"打率",   get:s=>saberBatter(s).AVG},
+    {key:"OPS", label:"OPS",   get:s=>saberBatter(s).OPS},
+    {key:"wOBA",label:"wOBA",  get:s=>saberBatter(s).wOBA},
+    {key:"WAR", label:"WAR",   get:s=>saberBatter(s).WAR},
+  ];
+  const PITCHER_METRICS=[
+    {key:"ERA", label:"防御率", get:s=>saberPitcher(s).ERA},
+    {key:"W",   label:"勝利",   get:s=>s.W},
+    {key:"WHIP",label:"WHIP",  get:s=>saberPitcher(s).WHIP},
+    {key:"K",   label:"奪三振", get:s=>s.Kp},
+    {key:"FIP", label:"FIP",   get:s=>saberPitcher(s).FIP},
+    {key:"WAR", label:"WAR",   get:s=>saberPitcher(s).WAR},
+  ];
+  const metrics=ip?PITCHER_METRICS:BATTER_METRICS;
+  const [metricKey,setMetricKey]=useState(ip?"ERA":"HR");
+  const activeMet=metrics.find(m=>m.key===metricKey)||metrics[0];
+  const chartData=[...log].map(row=>{const s=getS(row);return{year:row.year,value:activeMet.get(s)};});
+
   // 通算計算
   const sumK=(k)=>log.reduce((a,r)=>a+(getS(r)[k]||0),0);
   const totals={PA:sumK("PA"),AB:sumK("AB"),H:sumK("H"),HR:sumK("HR"),RBI:sumK("RBI"),SB:sumK("SB"),BF:sumK("BF"),W:sumK("W"),L:sumK("L"),SV:sumK("SV"),IP:sumK("IP"),Kp:sumK("Kp"),ER:sumK("ER"),BB:sumK("BB"),HRA:sumK("HRA")};
@@ -632,6 +655,26 @@ export function CareerTable({player}){
           </div>
         )}
       </div>
+      {log.length>=2&&(
+        <div style={{marginBottom:10}}>
+          <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}>
+            {metrics.map(m=>(
+              <button key={m.key} onClick={()=>setMetricKey(m.key)} style={{fontSize:9,padding:"2px 7px",borderRadius:10,cursor:"pointer",background:metricKey===m.key?"rgba(245,200,66,.15)":"transparent",color:metricKey===m.key?"#f5c842":"#6b7280",border:metricKey===m.key?"1px solid rgba(245,200,66,.5)":"1px solid rgba(255,255,255,.08)"}}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <ResponsiveContainer width="100%" height={120}>
+            <LineChart data={chartData} margin={{top:4,right:8,bottom:0,left:-20}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.05)"/>
+              <XAxis dataKey="year" tick={{fill:"#6b7280",fontSize:9}}/>
+              <YAxis tick={{fill:"#6b7280",fontSize:9}} width={36}/>
+              <Tooltip contentStyle={{background:"#0b1c30",border:"1px solid rgba(245,200,66,.3)",borderRadius:6,fontSize:10}} labelStyle={{color:"#f5c842"}} itemStyle={{color:"#c0cfe0"}} formatter={v=>[typeof v==="number"?v.toFixed(3):v,activeMet.label]}/>
+              <Line type="monotone" dataKey="value" stroke="#f5c842" strokeWidth={2} dot={{r:3,fill:"#f5c842"}} activeDot={{r:5}}/>
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
       <div style={{overflowX:"auto"}}>
         {ip&&(
           <table className="tbl" style={{fontSize:9,width:"100%"}}>

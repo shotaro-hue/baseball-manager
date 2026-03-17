@@ -774,6 +774,22 @@ HR 補正: 1.0 より大きいと HR になりやすい、小さいと HR が二
 
 ---
 
+### 2026-03-17 — Tier2 ⑥ 選手個人成績グラフ（Tabs.jsx）
+
+**仕様本文への影響あり（§5 / CareerTable）**
+
+- `CareerTable` コンポーネントに年度別キャリア推移グラフを追加
+  - Recharts `LineChart` を使用（既存 RadarChart に加えて新規インポート）
+  - データソース: `player.careerLog`（シーズン単位）
+  - 表示指標（打者）: 本塁打 / 打点 / 打率 / OPS / wOBA / WAR
+  - 表示指標（投手）: 防御率 / 勝利 / WHIP / 奪三振 / FIP / WAR
+  - 指標セレクター（ピルボタン）でリアルタイム切替可能
+  - `saberBatter()` / `saberPitcher()` で sabermetrics 指標を計算（既存関数を再利用）
+  - careerLog が1件以下（新人）はグラフ非表示
+  - 既存のレギュラー/ポストシーズン切替（`mode` ステート）と連動
+
+---
+
 ### 2026-03-17 — Tier2 ⑤ 球種・コース表示（ui.jsx / TacticalGame.jsx）
 
 **仕様本文への影響あり（§4.4）**
