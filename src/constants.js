@@ -3,6 +3,9 @@
 ═══════════════════════════════════════════════ */
 
 export const SEASON_GAMES = 143;
+export const HANSHIN_ID = 3;   // 阪神タイガース（甲子園使用制限の影響チーム）
+export const ORIX_ID    = 11;  // オリックス・バファローズ（京セラドーム共同利用）
+export const KYOCERA_DOME_TEAMS = [3, 11]; // 甲子園制限期間中に京セラを共有するチーム
 export const BATCH = 5;
 export const MAX_ROSTER = 28;
 export const MAX_FARM = 30;

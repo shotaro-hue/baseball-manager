@@ -1,6 +1,6 @@
 # Baseball Manager 2025 — 仕様書
 
-> 最終更新: 2026-03-18（Tier 5 完了）
+> 最終更新: 2026-03-18（NPBリアル日程システム実装・バグ修正 B1/B2/B3 完了）
 
 > **運用ルール**: コードに改修を加えた際は、仕様への影響を確認し、影響がある場合のみ本文を更新する。
 > 変更の有無にかかわらず `変更履歴` に日付・内容を追記し、**過去の記録は削除しない**。
@@ -77,9 +77,11 @@ baseball-manager/
     │   ├── sabermetrics.js  # 高度打撃/投球指標計算
     │   ├── awards.js        # 表彰・歴代記録・殿堂入りチェック
     │   ├── saveload.js      # localStorage 読み書き
-    │   └── realplayer.js    # 実成績 → ゲーム内能力値変換
+    │   ├── realplayer.js    # 実成績 → ゲーム内能力値変換
+    │   └── scheduleGen.js   # NPBシーズン日程生成エンジン（143日分事前生成）
     ├── data/
-    │   └── npb2025.js       # 実NPB 2025年ロスターデータ（オプション）
+    │   ├── npb2025.js       # 実NPB 2025年ロスターデータ（オプション）
+    │   └── scheduleParams.js# 年度別シーズンパラメータ（開幕日・交流戦・甲子園制約等）
     └── components/
         ├── TacticalGame.jsx # 戦術モード（イニング制御）UI
         ├── BatchResult.jsx  # 5試合一括シム結果表示
@@ -137,24 +139,36 @@ baseball-manager/
 |------|----|
 | 試合数 | 143試合 |
 | チーム数 | 12（セ・リーグ 6、パ・リーグ 6） |
-| 対戦相手 | 毎試合ランダムに相手チームが決定（CPU同士の試合もシム） |
+| 対戦相手 | シーズン開幕時に143日分の全試合日程を事前生成（`scheduleGen.js`）。各チームが全対戦相手と規定試合数を消化する |
+| リーグ内対戦 | 同一リーグ5チームと各25試合（計125試合）。Berger方式ラウンドロビンで 13H/12A に配分 |
+| 交流戦 | 相手リーグ6チームと各3試合（計18試合）。6シリーズ×3連戦で PAホーム/CEホームを交互に実施 |
 | 勝率計算 | 引き分けを除外した勝敗で算出 |
 
 #### カレンダーシステム
 
 | 項目 | 内容 |
 |------|------|
-| 開幕日 | 3月29日（火曜） |
-| 週スケジュール | 火〜日の6試合／週（月曜は休み） |
-| オールスター休止 | gameDay 72 終了後に3日間の休止 |
-| 日付表示 | ハブ画面上部に「M月D日 / 第N戦」形式で表示（`gameDayToDate()` in utils.js） |
+| 開幕日 | 2025年: 3月28日（金）。2026年以降: 3月最終金曜日（3月25〜31日）を自動算出 |
+| 週スケジュール | 火〜日（月曜は休み）。AllStar期間（3日間）も休止 |
+| 交流戦期間 | 2025年: 6月3日〜6月22日（18日間）。2026年以降: 6月第1火曜日から18ゲーム日 |
+| 日付表示 | ハブ画面上部に「M月D日 / 第N戦」形式で表示（`gameDayToDate(gameDay, schedule)` in utils.js） |
+| 日程生成 | `generateSeasonSchedule(year, teams)` が `[null, ScheduleDay1, …, ScheduleDay143]` を返す |
+
+#### 甲子園制約（阪神・オリックス）
+
+| 制約 | 内容 |
+|------|------|
+| 春（センバツ）期間 | 2025年: 3/20〜4/6。阪神ホームは `venueNote: "kyocera"` を付与（京セラドーム代替）。オリックスは同期間中ホームゲーム不可（アウェイ配置） |
+| 夏（甲子園大会）期間 | 2025年: 8/4〜8/24。同上 |
+| 2026年以降 | 春: 3月第3土曜〜4月第1日曜。夏: 8月第1木曜〜8月第4日曜。自動算出 |
 
 #### 交流戦
 
 | 項目 | 内容 |
 |------|------|
-| 対象期間 | gameDay 60〜94（35試合） |
-| 対戦ルール | この期間は相手リーグのチームを対戦相手として選出 |
+| 対象期間 | `schedule[gameDay].isInterleague === true` の試合日（計18日） |
+| ホーム配分 | 偶数ラウンド（0,2,4）: PAホーム、奇数ラウンド（1,3,5）: CEホーム。各チーム9H/9A |
+| 2025年実績カード | scheduleParams.js の `interleagueRound1PaHosts` で初戦カードを固定（日本ハム-阪神 等） |
 | 表示 | ハブ画面上部に「🔄交流戦」バッジを表示 |
 
 ---
@@ -902,6 +916,40 @@ HR 補正: 1.0 より大きいと HR になりやすい、小さいと HR が二
 
 > 最新エントリが最上部。過去のエントリは削除しない。
 > 仕様本文を変更した場合は「旧 → 新」を明記、内部バグ修正のみの場合は概要のみ記録。
+
+---
+
+### 2026-03-18 — バグ修正 B1/B2/B3 + NPBリアル日程システム実装
+
+**仕様本文への影響あり（§2 / §4.1）**
+
+#### B1: CPU選手個人成績未更新（P0）
+
+- **旧**: CPU vs CPU 試合では勝敗・得失点のみ更新。`applyGameStatsFromLog` / `applyPostGameCondition` / `tickInjuries` / `checkForInjuries` が未呼び出し → MVP・沢村賞・個人タイトル・記録が破綻
+- **新**: `runBatchGames` の CPU vs CPU ループ、および `handleAutoSimEnd` / `handleTacticalGameEnd` の CPU 試合処理で両チームの全選手に対して個人成績更新を適用
+
+#### B2: handleStartGame 二重カウント（P1）
+
+- **旧**: `handleStartGame` がモード選択画面への遷移前に CPU 試合をシム・状態を commit → ハブに戻って再び試合ボタンを押すと二重集計
+- **新**: CPU 試合のシムをモード確定後（`handleAutoSimEnd` / `handleTacticalGameEnd`）に移動。`handleStartGame` は対戦相手決定と画面遷移のみ実行
+
+#### B3: CS Final シード誤り（P2）
+
+- **旧**: `PlayoffScreen.simAllRemaining()` で `cs1_se.teams[0]`（CS 1st ステージの2位チーム）を CS Final の1位側に使用 → アドバンテージが逆転
+- **新**: `state.se1` / `state.pa1`（リーグ1位・アドバンテージあり）を正しく参照するよう修正
+
+#### NPBリアル日程システム（§4.1 大幅改定）
+
+- **§2 ディレクトリ構成**: `engine/scheduleGen.js`・`data/scheduleParams.js` を新規追加
+- **§4.1 シーズン構成**: 「毎試合ランダム対戦相手」→「143日分事前生成スケジュール参照」に変更
+  - `ScheduleDay = { gameNo, date, isInterleague, matchups[] }` を新設
+  - `Matchup = { homeId, awayId, isInterleague, venueNote }` を新設
+  - Berger 方式ラウンドロビン（6チーム5ラウンド）× 25回 = 125日リーグ内日程
+  - offset-based rotation で交流戦全18日程（各チームが全6相手と3試合ずつ）
+  - 甲子園ブラックアウト制約: 阪神ホームに `venueNote:"kyocera"`、オリックスはブラックアウト期間をアウェイ優先配置（ホーム試合数57→69に改善）
+  - `gameDayToDate(gameDay, schedule)`: schedule 参照対応（後方互換あり）
+  - `getMyMatchup(schedule, gameDay, myId)` / `getCpuMatchups(schedule, gameDay, myId, oppId)` を App.jsx から呼び出し
+- **§4.1 交流戦**: gameDay 60〜94 の固定判定 → `schedule[d].isInterleague` 参照に変更
 
 ---
 
