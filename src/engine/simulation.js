@@ -433,9 +433,9 @@ function endHalfInning(gs) {
 }
 
 function checkStopCondition(gs) {
-  if (!gs.isTop && gs.myPitchCount>=PITCH_WARNING && gs.myBullpen.length>0)
+  if (gs.isTop && gs.myPitchCount>=PITCH_WARNING && gs.myBullpen.length>0)
     return { reason:'pitcher_tired',           label:'⚠️ 投手疲労警告',           priority:2, data:{ pitchCount:gs.myPitchCount, pitcher:gs.myPitcher } };
-  if (!gs.isTop && gs.myPitchCount>=PITCH_LIMIT)
+  if (gs.isTop && gs.myPitchCount>=PITCH_LIMIT)
     return { reason:'pitcher_limit',           label:'🚨 投手交代必須',             priority:5, data:{ pitchCount:gs.myPitchCount, pitcher:gs.myPitcher } };
   if (gs.isTop && gs.outs===2 && (gs.bases[1]||gs.bases[2]) && gs.myBullpen.length>0)
     return { reason:'scoring_position_crisis', label:'🔴 得点圏ピンチ！',           priority:3, data:null };
