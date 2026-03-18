@@ -17,6 +17,7 @@ import { ModeSelectScreen, ResultScreen, RetirePhaseScreen, WaiverPhaseScreen, G
 import { DraftPreviewScreen, DraftLotteryScreen, DraftScreen, DraftReviewScreen } from './components/Draft';
 import { PlayoffScreen } from './components/PlayoffScreen';
 import { RetireModal } from './components/RetireModal';
+import { ScheduleTab } from './components/ScheduleTab';
 import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab } from './components/Tabs';
 import { SEASON_GAMES, BATCH, MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, ACCEPT_THRESHOLD, MIN_SALARY_SHIHAKA, TEAM_DEFS, POSITIONS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE } from './constants';
 import { saveGame, loadGame, hasSave, getSaveMeta, deleteSave } from './engine/saveload';
@@ -778,7 +779,7 @@ export default function App(){
     )}
 
     <div className="tabs">
-      {[["roster","👥 ロースター"],["news","📰 ニュース"],["mailbox","📨 メール"],["trade","🔄 トレード"],["alumni","📖 歴代"],["contract","📝 契約"],["fa","🏪 FA"],["scout","🔍 スカウト"],["finance","💴 財務"],["standings","🏆 順位"],["stats","📊 成績"],["records","🏛 記録"]].map(([id,l])=>(
+      {[["roster","👥 ロースター"],["schedule","🗓️ 日程"],["news","📰 ニュース"],["mailbox","📨 メール"],["trade","🔄 トレード"],["alumni","📖 歴代"],["contract","📝 契約"],["fa","🏪 FA"],["scout","🔍 スカウト"],["finance","💴 財務"],["standings","🏆 順位"],["stats","📊 成績"],["records","🏛 記録"]].map(([id,l])=>(
         <button key={id} className={`tab ${tab===id?"on":""}`} onClick={()=>setTab(id)}>
           {l}{id==="mailbox"&&mailbox.filter(m=>!m.read).length>0&&<span style={{marginLeft:4,background:"#f87171",color:"#fff",borderRadius:8,padding:"0 5px",fontSize:9,fontWeight:700}}>{mailbox.filter(m=>!m.read).length}</span>}
         </button>
@@ -786,6 +787,7 @@ export default function App(){
     </div>
 
     {tab==="roster"&&<RosterTab team={myTeam} onToggle={toggleLineup} onSetStarter={setStarter} onPromo={promote} onDemo={demote} onSetTrainingFocus={setTrainingFocus} onConvertIkusei={convertIkusei}/>}
+    {tab==="schedule"&&<ScheduleTab schedule={schedule} gameDay={gameDay} myTeam={myTeam} teams={teams} year={year}/>}
     {tab==="records"&&<RecordsTab history={seasonHistory}/>}
     {tab==="news"&&<NewsTab news={news} onInterview={handleInterview}/>}
     {tab==="mailbox"&&<MailboxTab mailbox={mailbox} onRead={handleMailRead} onAction={handleMailAction} teams={teams} myTeam={myTeam} onTrade={handleTrade}/>}
