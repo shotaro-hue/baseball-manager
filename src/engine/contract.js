@@ -20,7 +20,7 @@ export function getFaThreshold(player) {
 ═══════════════════════════════════════════════ */
 
 export function evalOffer(player, offer, myTeam, allTeams) {
-  const p = player.personality;
+  const p = player.personality || { money:50, winning:50, playing:50, hometown:30, loyalty:50, stability:50, future:50 };
   const g = myTeam.wins + myTeam.losses;
   const winPct = g > 0 ? myTeam.wins / g : 0.5;
   const rank = [...allTeams]
@@ -205,7 +205,7 @@ export function processCpuFaBids(teams, myId, faPool, allTeams) {
 
     teamMap.set(bid.tid, {
       ...team,
-      players: [...team.players, { ...player, isFA: false, contractYearsLeft: 1 }],
+      players: [...team.players, { ...player, isFA: false, contractYearsLeft: 1, salary: bid.salary }],
       budget: team.budget - bid.salary,
     });
     remainingPool = remainingPool.filter(p => p.id !== bid.pid);
