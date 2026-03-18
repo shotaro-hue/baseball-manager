@@ -157,8 +157,16 @@ export function StatsTab({teams,myId}){
    STANDINGS TAB
 ═══════════════════════════════════════════════ */
 
-export function FinanceTab({team}){
+export function FinanceTab({team,onStadiumUpgrade,gameDay}){
   const rev=calcRevenue(team);
+  const lvl=team.stadiumLevel??0;
+  const UPGRADE_COSTS=[5000000,10000000,20000000];
+  const MULT_LABELS=["1.0x","1.25x","1.6x","2.0x"];
+  const STAR_LABELS=["★☆☆","★★☆","★★★","★★★+"];
+  const nextCost=lvl<3?UPGRADE_COSTS[lvl]:null;
+  const revThisSeason=team.revenueThisSeason??0;
+  const gamesPlayed=(gameDay||1)-1;
+  const projected=gamesPlayed>0?Math.round(revThisSeason/gamesPlayed*143):0;
   return(
     <div>
       <div className="g2">
@@ -175,6 +183,22 @@ export function FinanceTab({team}){
             <div key={l} className="fsb" style={{padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,.03)"}}><span style={{fontSize:11,color:"#4b5563"}}>{l}</span><span className="mono" style={{color:"#f87171"}}>{v}</span></div>
           ))}
         </div>
+      </div>
+      <div className="card">
+        <div className="card-h">📈 シーズン収益サマリー</div>
+        {[["シーズン累計",fmtM(revThisSeason)],["投資済み球場レベル",`Lv${lvl} ${STAR_LABELS[lvl]} (${MULT_LABELS[lvl]})`],["シーズン収入予測",gamesPlayed>0?fmtM(projected):"計算中..."]].map(([l,v])=>(
+          <div key={l} className="fsb" style={{padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,.03)"}}><span style={{fontSize:11,color:"#4b5563"}}>{l}</span><span className="mono" style={{color:"#34d399"}}>{v}</span></div>
+        ))}
+      </div>
+      <div className="card">
+        <div className="card-h">🏟️ 球場投資</div>
+        <div className="fsb" style={{marginBottom:8}}><span style={{fontSize:12}}>現在: Lv{lvl} {STAR_LABELS[lvl]}</span><span style={{fontSize:11,color:"#34d399"}}>チケット {MULT_LABELS[lvl]}</span></div>
+        {lvl<3?(<>
+          <div style={{fontSize:11,color:"#4b5563",marginBottom:8}}>Lv{lvl+1}アップグレード: {fmtM(nextCost)}<span style={{fontSize:10,color:"#34d399",marginLeft:6}}>→ {MULT_LABELS[lvl+1]}</span></div>
+          <button className="btn btn-gold" style={{width:"100%",opacity:(team.budget??0)>=nextCost?1:0.4}} disabled={(team.budget??0)<nextCost} onClick={onStadiumUpgrade}>🏗️ Lv{lvl+1}に投資する ({fmtM(nextCost)})</button>
+        </>):(
+          <div style={{fontSize:12,color:"#f5c842",textAlign:"center",padding:"8px 0"}}>✅ 球場は最高レベルです</div>
+        )}
       </div>
       <div className="card">
         <div className="card-h">予算 / 年俸上位</div>
@@ -408,6 +432,8 @@ export function TradeTab({myTeam,teams,onTrade,cpuOffers,onAcceptOffer,onDecline
   const [myCash,setMyCash]=useState(0);
   const [tradeResult,setTradeResult]=useState(null);
   const [counter,setCounter]=useState(null);
+  const [counterRound,setCounterRound]=useState(0);
+  const [cpuReasons,setCpuReasons]=useState([]);
 
   const otherTeams=teams.filter(t=>t.id!==myTeam.id);
   const myOutVal=myOut.reduce((s,p)=>s+tradeValue(p),0);
@@ -422,17 +448,26 @@ export function TradeTab({myTeam,teams,onTrade,cpuOffers,onAcceptOffer,onDecline
   const proposeTrade=()=>{
     if(!canPropose||!targetTeam) return;
     const ev=evalTradeForCpu(targetTeam,myOut,theirIn,myCash);
+    setCpuReasons(ev.reasons||[]);
+    if(counterRound>=2){
+      if(ev.favorable||(ev.fair&&Math.random()<0.5)){onTrade(myOut,theirIn,targetTeam,myCash);setTradeResult("accept");}
+      else{setTradeResult("reject");}
+      return;
+    }
+    const acceptThreshold=counterRound===0?0.55:0.30;
     if(ev.favorable){
       onTrade(myOut,theirIn,targetTeam,myCash);setTradeResult("accept");
     } else if(ev.fair){
-      if(Math.random()<0.55){onTrade(myOut,theirIn,targetTeam,myCash);setTradeResult("accept");}
-      else {
+      if(Math.random()<acceptThreshold){onTrade(myOut,theirIn,targetTeam,myCash);setTradeResult("accept");}
+      else{
         const extra=targetTeam.players.filter(p=>!theirIn.find(x=>x.id===p.id)).sort((a,b)=>tradeValue(a)-tradeValue(b))[0];
         const needCash=Math.max(0,Math.round((theirInVal-myOutVal-cashVal)*10));
-        setCounter({extraPlayer:Math.random()<0.5&&extra?extra:null,extraCash:Math.random()<0.5&&extra?0:needCash});
+        const cashMult=counterRound===1?1.5:1;
+        setCounter({extraPlayer:Math.random()<0.5&&extra?extra:null,extraCash:Math.random()<0.5&&extra?0:Math.round(needCash*cashMult)});
+        setCounterRound(r=>r+1);
         setTradeResult("counter");
       }
-    } else { setTradeResult("reject"); }
+    } else{setTradeResult("reject");}
   };
 
   const acceptCounter=()=>{
@@ -440,7 +475,7 @@ export function TradeTab({myTeam,teams,onTrade,cpuOffers,onAcceptOffer,onDecline
     onTrade(myOut,newIn,targetTeam,myCash+(counter?.extraCash||0));
     setTradeResult("accept");
   };
-  const reset=()=>{setPhase("top");setTargetTeam(null);setMyOut([]);setTheirIn([]);setMyCash(0);setTradeResult(null);setCounter(null);};
+  const reset=()=>{setPhase("top");setTargetTeam(null);setMyOut([]);setTheirIn([]);setMyCash(0);setTradeResult(null);setCounter(null);setCounterRound(0);setCpuReasons([]);};
   const fmtV=v=>{const c=v>=80?"#ffd700":v>=65?"#34d399":v>=50?"#60a5fa":"#94a3b8";return <span style={{fontWeight:700,color:c,fontFamily:"monospace"}}>{v}</span>;};
   const sl=p=>p.isPitcher?`球速${p.pitching?.velocity} 制球${p.pitching?.control}`:`ミート${p.batting?.contact} 長打${p.batting?.power}`;
   const slNoisy=p=>p.isPitcher?`球速${scoutNoise(p.pitching?.velocity,p.id,"velocity")} 制球${scoutNoise(p.pitching?.control,p.id,"control")}`:`ミート${scoutNoise(p.batting?.contact,p.id,"contact")} 長打${scoutNoise(p.batting?.power,p.id,"power")}`;
@@ -544,12 +579,19 @@ export function TradeTab({myTeam,teams,onTrade,cpuOffers,onAcceptOffer,onDecline
       {tradeResult&&(<div className="card" style={{textAlign:"center",padding:"24px 16px"}}>
         {tradeResult==="accept"&&<><div style={{fontSize:40,marginBottom:8}}>🎉</div><div style={{fontFamily:"'Bebas Neue',cursive",fontSize:28,color:"#34d399",marginBottom:8}}>トレード成立！</div><p style={{fontSize:12,color:"#374151",marginBottom:16}}>{targetTeam?.name}との交渉が成立しました</p></>}
         {tradeResult==="reject"&&<><div style={{fontSize:40,marginBottom:8}}>❌</div><div style={{fontFamily:"'Bebas Neue',cursive",fontSize:28,color:"#f87171",marginBottom:8}}>拒否されました</div><p style={{fontSize:12,color:"#374151",marginBottom:16}}>金銭を上乗せするか、条件を変えて再提案しましょう。</p></>}
-        {tradeResult==="counter"&&counter&&<><div style={{fontSize:40,marginBottom:8}}>🔄</div><div style={{fontFamily:"'Bebas Neue',cursive",fontSize:28,color:"#f5c842",marginBottom:8}}>逆提案が来ました！</div>
+        {tradeResult==="counter"&&counter&&<><div style={{fontSize:40,marginBottom:8}}>🔄</div>
+          <div style={{fontSize:10,color:"#f5c842",marginBottom:6}}>交渉 {counterRound}/{3} ラウンド目</div>
+          <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:28,color:"#f5c842",marginBottom:8}}>逆提案が来ました！</div>
           <div className="card" style={{textAlign:"left",marginBottom:12}}><div className="card-h">{targetTeam?.name}の追加要求</div>
             {counter.extraPlayer&&<div style={{padding:"6px 0",fontSize:12,color:"#f5c842"}}>「{counter.extraPlayer.name}も一緒に欲しい」<span style={{fontSize:9,color:"#374151",marginLeft:6}}>{counter.extraPlayer.pos} 評価{tradeValue(counter.extraPlayer)}</span></div>}
             {!counter.extraPlayer&&counter.extraCash>0&&<div style={{padding:"6px 0",fontSize:12,color:"#f5c842"}}>「{counter.extraCash.toLocaleString()}万円を上乗せしてほしい」</div>}
+            {cpuReasons.length>0&&<div style={{marginTop:8,padding:"6px 10px",background:"rgba(255,255,255,.04)",borderRadius:6,fontSize:11,color:"#94a3b8"}}><div style={{fontSize:9,color:"#374151",marginBottom:3}}>CPU の本音：</div>{cpuReasons.map((r,i)=><div key={i} style={{padding:"2px 0"}}>「{r}」</div>)}</div>}
           </div>
-          <div style={{display:"flex",gap:8}}><button className="btn btn-gold" style={{flex:1}} onClick={acceptCounter}>✅ 受け入れる</button><button className="bsm bgr" style={{flex:1,padding:"10px 0"}} onClick={reset}>❌ 断る</button></div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <button className="btn btn-gold" style={{flex:1}} onClick={acceptCounter}>✅ 受け入れる</button>
+            {counterRound<3&&<button className="bsm bga" style={{flex:1,padding:"10px 0"}} onClick={()=>{setTradeResult(null);setPhase("build");}}>✏️ 修正して再提案</button>}
+            <button className="bsm bgr" style={{flex:1,padding:"10px 0"}} onClick={reset}>❌ 断る</button>
+          </div>
         </>}
         {(tradeResult==="reject"||tradeResult==="accept")&&<button className="bsm bga" style={{marginTop:12}} onClick={reset}>続けて交渉する</button>}
       </div>)}

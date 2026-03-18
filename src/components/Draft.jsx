@@ -1,17 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import React from "react";
 import { POSITIONS, DRAFT_ROUNDS, DRAFT_COMMENTS_MY, DRAFT_COMMENTS_CPU } from '../constants';
-import { rng, clamp } from '../utils';
+import { rng, clamp, scoutedValue } from '../utils';
 import { analyzeTeamNeeds } from '../engine/trade';
 import { draftOverallComment, recommendForTeam } from '../engine/draft';
 import { OV, HandBadge } from './ui';
 
 
 
-export function DraftPreviewScreen({teams,myId,year,pool,onStart}){
+export function DraftPreviewScreen({teams,myId,year,pool,draftAllocation,onAllocationChange,onStart}){
   const myTeam=teams.find(t=>t.id===myId);
   const rec=recommendForTeam(myTeam,pool);
   const spots=pool.filter(p=>p.spotlight);
+  const alloc=draftAllocation??{pitcher:50,batter:50};
   const predictTeam=player=>{
     const cands=[...teams].sort((a,b)=>a.wins-b.wins).slice(0,4);
     return cands.find(t=>{const n=analyzeTeamNeeds(t);return player.isPitcher?n.some(x=>x.includes("投手")):n.some(x=>x.includes("ミート"));})||cands[0];
@@ -25,7 +26,7 @@ export function DraftPreviewScreen({teams,myId,year,pool,onStart}){
         <div style={{fontSize:11,color:"#374151"}}>会議開始前の事前情報 — スカウト陣からのレポート</div>
       </div>
       <div style={{display:"flex",gap:6,marginBottom:12}}>
-        {[["overview","📋 総評"],["teams","🏟️ 各球団"],["rec","⭐ おすすめ"]].map(([k,l])=>(<button key={k} className={"bsm "+(tab===k?"bgb":"bga")} style={{flex:1,padding:"7px 0",fontSize:12}} onClick={()=>setTab(k)}>{l}</button>))}
+        {[["overview","📋 総評"],["teams","🏟️ 各球団"],["rec","⭐ おすすめ"],["alloc","⚙️ 予算配分"]].map(([k,l])=>(<button key={k} className={"bsm "+(tab===k?"bgb":"bga")} style={{flex:1,padding:"7px 0",fontSize:11}} onClick={()=>setTab(k)}>{l}</button>))}
       </div>
       {tab==="overview"&&(<>
         <div className="card" style={{marginBottom:10}}>
@@ -57,6 +58,24 @@ export function DraftPreviewScreen({teams,myId,year,pool,onStart}){
           {p.playerComment&&<div style={{fontSize:8,color:"#374151",marginTop:1,fontStyle:"italic"}}>"{p.playerComment}"</div>}
           {p.fromScout&&<div style={{fontSize:8,color:"#34d399",marginTop:1}}>✅ スカウト済み選手</div>}
         </div>);})}
+      </div>)}
+      {tab==="alloc"&&(<div className="card"><div className="card-h">⚙️ スカウト予算配分</div>
+        <p style={{fontSize:11,color:"#374151",marginBottom:12}}>投手・野手スカウトへの予算配分を設定。高配分ほど精度UP・自動開示人数UP。</p>
+        <div style={{marginBottom:16}}>
+          <div className="fsb" style={{marginBottom:6}}><span style={{fontSize:12}}>投手スカウト</span><span style={{fontWeight:700,color:"#f5c842"}}>{alloc.pitcher}%</span></div>
+          <input type="range" min="10" max="90" step="5" value={alloc.pitcher} onChange={e=>{const p=Number(e.target.value);onAllocationChange&&onAllocationChange({pitcher:p,batter:100-p});}} style={{width:"100%"}}/>
+          <div className="fsb" style={{fontSize:10,color:"#374151",marginTop:4}}><span>野手スカウト: {alloc.batter}%</span><span>合計: {alloc.pitcher+alloc.batter}%</span></div>
+        </div>
+        {[{label:"投手",share:alloc.pitcher/100,isPitcher:true},{label:"野手",share:alloc.batter/100,isPitcher:false}].map(({label,share,isPitcher})=>{
+          const stars=share>=0.7?"★★★":share>=0.5?"★★☆":"★☆☆";
+          const noise=Math.round(10*(1.0-share*0.5));
+          const autoReveal=Math.round(share*8);
+          const poolCount=pool.filter(p=>p.isPitcher===isPitcher).length;
+          return(<div key={label} style={{padding:"10px",marginBottom:8,borderRadius:6,background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)"}}>
+            <div className="fsb"><span style={{fontWeight:700,fontSize:13}}>{label}スカウト</span><span style={{color:"#f5c842"}}>{stars}</span></div>
+            <div style={{fontSize:10,color:"#4b5563",marginTop:4}}>精度: ±{noise}点　自動開示: {autoReveal}名 / {poolCount}名中</div>
+          </div>);
+        })}
       </div>)}
       <div style={{textAlign:"center",marginTop:16}}><button className="btn btn-gold" style={{padding:"12px 48px",fontSize:15}} onClick={onStart}>⚾ ドラフト会議を開始する</button></div>
     </div></div>
@@ -331,7 +350,8 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
 }
 
 
-export function DraftScreen({teams,myId,year,pool,onDraftDone}){
+export function DraftScreen({teams,myId,year,pool,draftAllocation,onDraftDone}){
+  const alloc=draftAllocation??{pitcher:50,batter:50};
   const allSorted=[...teams].sort((a,b)=>a.wins-b.wins);
   const draftOrder=[];
   for(let round=0;round<DRAFT_ROUNDS;round++){allSorted.forEach(t=>draftOrder.push({round,team:t}));}
@@ -341,7 +361,18 @@ export function DraftScreen({teams,myId,year,pool,onDraftDone}){
   const [drafted,setDrafted]=useState({});
   const [log,setLog]=useState([]);
   const [done,setDone]=useState(false);
-  const [scouted,setScouted]=useState(new Set());
+  // 予算配分に応じた自動スカウト開示
+  const autoScout=useMemo(()=>{
+    const pShare=alloc.pitcher/100;
+    const bShare=alloc.batter/100;
+    const pitchers=pool.filter(p=>p.isPitcher&&!p.fromScout).sort((a,b)=>b.potential-a.potential);
+    const batters=pool.filter(p=>!p.isPitcher&&!p.fromScout).sort((a,b)=>b.potential-a.potential);
+    const autoP=Math.round(pShare*8);
+    const autoB=Math.round(bShare*8);
+    const s=new Set([...pitchers.slice(0,autoP).map(p=>p.id),...batters.slice(0,autoB).map(p=>p.id),...pool.filter(p=>p.fromScout).map(p=>p.id)]);
+    return s;
+  },[pool,alloc.pitcher,alloc.batter]);
+  const [scouted,setScouted]=useState(autoScout);
   const [scoutPt,setScoutPt]=useState(5);
   const [announcement,setAnnouncement]=useState(null);
   const [autoRunning,setAutoRunning]=useState(false);
@@ -399,8 +430,22 @@ export function DraftScreen({teams,myId,year,pool,onDraftDone}){
   const myPick=pid=>{const pick=pool.find(p=>p.id===pid);if(!pick||drafted[pick.id]||!isMyTurn) return;doPick(pick,true);};
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(()=>{if(isMyTurn||done||pickIdx>=draftOrderFiltered.length) return;const t=setTimeout(cpuPick,350);return()=>clearTimeout(t);},[pickIdx,isMyTurn,done]);
-  const statView=p=>{const sc=scouted.has(p.id)||drafted[p.id]===myId||p.fromScout;return p.isPitcher?sc?`球速${p.pitching.velocity} 制球${p.pitching.control} 変化${p.pitching.breaking} スタ${p.pitching.stamina}`:`球速??? 制球??? 変化??? スタ???`:sc?`ミート${p.batting.contact} 長打${p.batting.power} 走力${p.batting.speed} 選球${p.batting.eye}`:`ミート??? 長打??? 走力??? 選球???`;};
-  const ovView=p=>{if(!scouted.has(p.id)&&drafted[p.id]!==myId&&!p.fromScout) return "??";return p.isPitcher?Math.round((p.pitching.velocity+p.pitching.control+p.pitching.breaking)/3):Math.round((p.batting.contact+p.batting.power+p.batting.eye+p.batting.speed)/4);};
+  const getBudgetFactor=p=>1.0-(p.isPitcher?alloc.pitcher:alloc.batter)/100*0.5;
+  const statView=p=>{
+    const sc=scouted.has(p.id)||drafted[p.id]===myId||p.fromScout;
+    if(!sc) return p.isPitcher?"球速??? 制球??? 変化??? スタ???":"ミート??? 長打??? 走力??? 選球???";
+    if(p.fromScout){return p.isPitcher?`球速${p.pitching.velocity} 制球${p.pitching.control} 変化${p.pitching.breaking} スタ${p.pitching.stamina}`:`ミート${p.batting.contact} 長打${p.batting.power} 走力${p.batting.speed} 選球${p.batting.eye}`;}
+    const bf=getBudgetFactor(p);
+    const sv=(obj,k)=>scoutedValue(obj[k],p.id,k,10,bf).value;
+    return p.isPitcher?`球速${sv(p.pitching,"velocity")} 制球${sv(p.pitching,"control")} 変化${sv(p.pitching,"breaking")} スタ${sv(p.pitching,"stamina")}`:`ミート${sv(p.batting,"contact")} 長打${sv(p.batting,"power")} 走力${sv(p.batting,"speed")} 選球${sv(p.batting,"eye")}`;
+  };
+  const ovView=p=>{
+    if(!scouted.has(p.id)&&drafted[p.id]!==myId&&!p.fromScout) return "??";
+    if(p.fromScout) return p.isPitcher?Math.round((p.pitching.velocity+p.pitching.control+p.pitching.breaking)/3):Math.round((p.batting.contact+p.batting.power+p.batting.eye+p.batting.speed)/4);
+    const bf=getBudgetFactor(p);
+    const sv=(obj,k)=>scoutedValue(obj[k],p.id,k,10,bf).value;
+    return p.isPitcher?Math.round((sv(p.pitching,"velocity")+sv(p.pitching,"control")+sv(p.pitching,"breaking"))/3):Math.round((sv(p.batting,"contact")+sv(p.batting,"power")+sv(p.batting,"eye")+sv(p.batting,"speed"))/4);
+  };
   const progress=Math.round(pickIdx/draftOrderFiltered.length*100);
   return(
     <div className="app">
