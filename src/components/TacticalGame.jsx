@@ -3,7 +3,7 @@ import { STRATEGY_OPTS, RLABEL, IS_HIT, IS_OUT, BATCH, PITCH_WARNING } from '../
 import { fmtAvg, fmtPct } from '../utils';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 import { initGameState, matchupScore, calcFatigue, processAtBat, endHalfInning, checkStopCondition } from '../engine/simulation';
-import { OV, CondBadge, HandBadge } from './ui';
+import { OV, CondBadge, HandBadge, PitchBadge } from './ui';
 
 
 
@@ -238,6 +238,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
                   <span style={{fontSize:9,color:"#1e2d3d",marginRight:3}}>{e.inning}{e.isTop?"表":"裏"}</span>
                   <span style={{color:"#374151",fontSize:11,marginRight:5}}>{e.batter}</span>
                   <span>{RLABEL[e.result]||e.result}</span>
+                  <PitchBadge pitchType={e.pitchType} zone={e.zone} />
                   {e.strategy&&<span style={{fontSize:9,color:"#a78bfa",marginLeft:4}}>[{e.strategy}]</span>}
                   {e.ev>0&&<span style={{fontFamily:"monospace",fontSize:9,color:"#1e2d3d",marginLeft:4}}>EV:{e.ev} LA:{e.la}° {e.dist>0&&`${e.dist}m`}</span>}
                   {e.rbi>0&&<span style={{color:"#f5c842",marginLeft:5,fontSize:11}}>+{e.rbi}点！</span>}

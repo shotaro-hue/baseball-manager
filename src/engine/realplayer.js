@@ -89,6 +89,9 @@ export function realBatterToPlayer(b, teamDef) {
     growthPhase,
     stats: emptyStats(),
     batting,
+    serviceYears: rng(0, Math.max(0, age - 18)),
+    entryAge: age - rng(0, Math.max(0, age - 18)),
+    ikuseiYears: 0,
     playerType: '',
     playerComment: '',
   };
@@ -137,6 +140,9 @@ export function realPitcherToPlayer(p, teamDef) {
     growthPhase,
     stats: { ...emptyStats(), W: 0, L: 0, SV: 0 },
     pitching,
+    serviceYears: rng(0, Math.max(0, age - 18)),
+    entryAge: age - rng(0, Math.max(0, age - 18)),
+    ikuseiYears: 0,
     playerType: '',
     playerComment: '',
   };

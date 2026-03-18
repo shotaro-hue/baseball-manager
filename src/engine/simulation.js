@@ -219,25 +219,30 @@ function simAtBat(bat, pit, strategy = 'normal', pitchCount = 0, situation = {},
 // ═══════════════════════════════════════════════════════════════
 
 function applyFatigue(pit, fatigue) {
-  if (fatigue < 30) return pit;
+  const moraleMod = ((pit?.morale || 70) - 70) / 250; // 個人モラルを投手能力に反映
+  if (fatigue < 30 && Math.abs(moraleMod) < 0.001) return pit;
   const m = fatigue / 100;
-  return { ...pit, pitching: { ...pit?.pitching, control: Math.max(1, (pit?.pitching?.control||50) - m*20), velocity: Math.max(1, (pit?.pitching?.velocity||50) - m*15), breaking: Math.max(1, (pit?.pitching?.breaking||50) - m*10) } };
+  return { ...pit, pitching: { ...pit?.pitching,
+    control:  Math.max(1, (pit?.pitching?.control||50)  - m*20 + moraleMod * 50),
+    velocity: Math.max(1, (pit?.pitching?.velocity||50) - m*15 + moraleMod * 30),
+    breaking: Math.max(1, (pit?.pitching?.breaking||50) - m*10 + moraleMod * 20),
+  }};
 }
 
 function applyBatterSituation(bat, situation) {
   const clutch    = bat?.batting?.clutch || 50;
   const condition = (bat?.condition || 100) / 100;
-  const morale    = situation.teamMorale || 60;
+  const morale    = bat?.morale || 70; // 個人モラルを使用
   const isClutch  = situation.runnersInScoring && situation.closeGame;
   const clutchMod = isClutch ? (clutch - 50) / 200 : 0;
-  const moraleMod = (morale - 60) / 500;
+  const moraleMod = (morale - 70) / 250; // 効果2倍, 基準値を70に変更
   // ① 対左投手補正: 左投手の場合、打者のvsLeft能力で打撃を補正
   const vsLeft    = bat?.batting?.vsLeft || 50;
   const vsLeftMod = (situation.pitcherHand === 'left') ? (vsLeft - 50) / 300 : 0;
   return { ...bat, batting: { ...bat?.batting,
     contact: clamp((bat?.batting?.contact||50) * condition + clutchMod * 50 + moraleMod * 50 + vsLeftMod * 50, 1, 99),
-    power:   clamp((bat?.batting?.power  ||50) * condition + clutchMod * 30 + vsLeftMod * 30, 1, 99),
-    eye:     clamp((bat?.batting?.eye    ||50) * condition, 1, 99),
+    power:   clamp((bat?.batting?.power  ||50) * condition + clutchMod * 30 + moraleMod * 30 + vsLeftMod * 30, 1, 99),
+    eye:     clamp((bat?.batting?.eye    ||50) * condition + moraleMod * 20, 1, 99),
   }};
 }
 

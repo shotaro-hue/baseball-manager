@@ -87,27 +87,33 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won) {
     const finalLead = myRuns - oppRuns; // 正: 自チームがリード
     const saveSit   = won && finalLead >= 1 && finalLead <= 3; // セーブ状況
 
+    // 勝利投手の決定: 先発が5回以上(outs>=15)投げていれば先発、そうでなければ最初の中継ぎ
+    const starterQualifies = won && (pitcherMap[starterId]?.outs ?? 0) >= 15;
+    const winnerId = won ? (starterQualifies ? starterId : (pitcherOrder[1] ?? starterId)) : null;
+
     return updated.map((p) => {
       const s = { ...p.stats };
 
-      // 勝利投手・敗戦投手（先発をベースに）
       if (p.id === starterId) {
-        s.W += won ? 1 : 0;
-        s.L += (!won && finalLead < 0) ? 1 : 0; // 引き分けは敗戦なし
+        if (p.id === winnerId) s.W++;
+        if (!won && finalLead < 0) s.L++; // 引き分けは敗戦なし
         // QS: 先発が6回以上投げ自責点3以下
         const sm = pitcherMap[starterId];
         if (sm && sm.outs >= 18 && sm.ER <= 3) s.QS++;
       }
 
-      // SV: リリーフが勝利チームのクローズを務めた（セーブ状況）
-      if (isMulti && p.id === closerId && p.id !== starterId) {
+      // 先発が資格なし(5回未満): 最初の中継ぎが勝利投手
+      if (winnerId && p.id === winnerId && p.id !== starterId) s.W++;
+
+      // SV: 勝利投手でないクローザーがセーブ状況を締めた
+      if (isMulti && p.id === closerId && p.id !== starterId && p.id !== winnerId) {
         if (saveSit) s.SV++;
-        // BS: セーブ状況で登板したが守れなかった（チームが負けた）
-        else if (!won && finalLead < 0 && Math.abs(finalLead) <= 3) s.BS++; // 引き分けはBS対象外
+        // BS: セーブ状況で登板したが守れなかった（引き分けはBS対象外）
+        else if (!won && finalLead < 0 && Math.abs(finalLead) <= 3) s.BS++;
       }
 
-      // HLD: 中継ぎ投手（先発でも抑えでもない）がセーブ状況を保持
-      if (isMulti && p.id !== starterId && p.id !== closerId) {
+      // HLD: 先発・クローザー・勝利投手でない中継ぎがセーブ状況を保持
+      if (isMulti && p.id !== starterId && p.id !== closerId && p.id !== winnerId) {
         if (pitcherMap[p.id] && saveSit) s.HLD++;
       }
 

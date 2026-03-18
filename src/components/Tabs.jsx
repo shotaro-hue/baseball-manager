@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis } from "recharts";
+import { ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis,
+  LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, PVAL_DEFS, ACCEPT_THRESHOLD, SCOUT_REGIONS, IS_HIT } from '../constants';
 import { fmtAvg, fmtPct, fmtSal, fmtM, fmtIP, scoutNoise } from '../utils';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
@@ -608,6 +609,8 @@ export function AlumniTab({myTeam}){
 
 export function CareerTable({player}){
   const [mode,setMode]=useState("regular");
+  const [metricKey,setMetricKey]=useState(player.isPitcher?"ERA":"HR");
+
   const log=player.careerLog||[];
   if(log.length===0) return null;
   const hasPlayoff=log.some(r=>{const ps=r.playoffStats||emptyStats();return ps.PA>0||ps.BF>0;});
@@ -615,6 +618,27 @@ export function CareerTable({player}){
 
   // 各年のデータ取得
   const getS=(row)=>mode==="playoff"?(row.playoffStats||emptyStats()):(row.stats||emptyStats());
+
+  // ⑥ キャリア推移グラフ用指標定義
+  const BATTER_METRICS=[
+    {key:"HR",  label:"本塁打", get:s=>s.HR,    isCount:true},
+    {key:"RBI", label:"打点",   get:s=>s.RBI,   isCount:true},
+    {key:"AVG", label:"打率",   get:s=>saberBatter(s).AVG},
+    {key:"OPS", label:"OPS",   get:s=>saberBatter(s).OPS},
+    {key:"wOBA",label:"wOBA",  get:s=>saberBatter(s).wOBA},
+    {key:"WAR", label:"WAR",   get:s=>saberBatter(s).WAR},
+  ];
+  const PITCHER_METRICS=[
+    {key:"ERA", label:"防御率", get:s=>saberPitcher(s).ERA},
+    {key:"W",   label:"勝利",   get:s=>s.W,     isCount:true},
+    {key:"WHIP",label:"WHIP",  get:s=>saberPitcher(s).WHIP},
+    {key:"K",   label:"奪三振", get:s=>s.Kp,   isCount:true},
+    {key:"FIP", label:"FIP",   get:s=>saberPitcher(s).FIP},
+    {key:"WAR", label:"WAR",   get:s=>saberPitcher(s).WAR},
+  ];
+  const metrics=ip?PITCHER_METRICS:BATTER_METRICS;
+  const activeMet=metrics.find(m=>m.key===metricKey)||metrics[0];
+  const chartData=[...log].map(row=>{const s=getS(row);return{year:row.year,value:activeMet.get(s)};});
 
   // 通算計算
   const sumK=(k)=>log.reduce((a,r)=>a+(getS(r)[k]||0),0);
@@ -632,6 +656,26 @@ export function CareerTable({player}){
           </div>
         )}
       </div>
+      {log.length>=2&&(
+        <div style={{marginBottom:10}}>
+          <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}>
+            {metrics.map(m=>(
+              <button key={m.key} onClick={()=>setMetricKey(m.key)} style={{fontSize:9,padding:"2px 7px",borderRadius:10,cursor:"pointer",background:metricKey===m.key?"rgba(245,200,66,.15)":"transparent",color:metricKey===m.key?"#f5c842":"#6b7280",border:metricKey===m.key?"1px solid rgba(245,200,66,.5)":"1px solid rgba(255,255,255,.08)"}}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <ResponsiveContainer width="100%" height={120}>
+            <LineChart data={chartData} margin={{top:4,right:8,bottom:0,left:-20}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.05)"/>
+              <XAxis dataKey="year" tick={{fill:"#6b7280",fontSize:9}}/>
+              <YAxis tick={{fill:"#6b7280",fontSize:9}} width={36}/>
+              <Tooltip contentStyle={{background:"#0b1c30",border:"1px solid rgba(245,200,66,.3)",borderRadius:6,fontSize:10}} labelStyle={{color:"#f5c842"}} itemStyle={{color:"#c0cfe0"}} formatter={v=>[typeof v==="number"?(activeMet.isCount?String(v):v.toFixed(3)):v,activeMet.label]}/>
+              <Line type="monotone" dataKey="value" stroke="#f5c842" strokeWidth={2} dot={{r:3,fill:"#f5c842"}} activeDot={{r:5}}/>
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
       <div style={{overflowX:"auto"}}>
         {ip&&(
           <table className="tbl" style={{fontSize:9,width:"100%"}}>
@@ -720,7 +764,9 @@ export function CareerTable({player}){
 
 const TRAINING_OPTIONS=[["","バランス"],["contact","ミート"],["power","長打"],["eye","選球"],["speed","走力"],["arm","肩"],["defense","守備"],["velocity","球速"],["control","制球"],["breaking","変化球"],["stamina","スタミナ"]];
 
-export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTrainingFocus}){
+const MoralBadge=({v})=>{const m=v||70;const icon=m>=75?"😊":m>=50?"😐":"😟";const col=m>=75?"#34d399":m>=50?"#f5c842":"#f87171";return <span style={{fontSize:10,color:col}}>{icon}{m}</span>;};
+
+export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei}){
   const [view,setView]=useState("batters");
   const batters=team.players.filter(p=>!p.isPitcher);
   const pitchers=team.players.filter(p=>p.isPitcher);
@@ -751,7 +797,7 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
           <div className="card-h">打線設定 ({team.lineup.length}/9)</div>
           <div style={{overflowX:"auto"}}>
             <table className="tbl">
-              <thead><tr><th>#</th><th>選手名</th><th>守備</th><th>年齢</th><th>ミート</th><th>長打</th><th>走力</th><th>選球</th><th>クラッチ</th><th>変化球</th><th>状態</th><th>打率</th><th>HR</th><th>OPS</th><th>強化</th><th></th></tr></thead>
+              <thead><tr><th>#</th><th>選手名</th><th>守備</th><th>年齢</th><th>ミート</th><th>長打</th><th>走力</th><th>選球</th><th>クラッチ</th><th>変化球</th><th>状態</th><th>モラル</th><th>打率</th><th>HR</th><th>OPS</th><th>強化</th><th></th></tr></thead>
               <tbody>
                 {batters.map(p=>{const inL=team.lineup.includes(p.id);const sb=saberBatter(p.stats);const isInj=(p.injuryDaysLeft??0)>0;return(
                   <tr key={p.id} style={isInj?{opacity:.55}:undefined}>
@@ -761,6 +807,7 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
                     <td><OV v={p.batting.contact}/></td><td><OV v={p.batting.power}/></td><td><OV v={p.batting.speed}/></td><td><OV v={p.batting.eye}/></td>
                     <td><OV v={p.batting.clutch}/></td><td><OV v={p.batting.breakingBall}/></td>
                     <td><CondBadge p={p}/></td>
+                    <td><MoralBadge v={p.morale}/></td>
                     <td className="mono">{fmtAvg(p.stats.H,p.stats.AB)}</td>
                     <td className="mono" style={{color:p.stats.HR>=20?"#f5c842":undefined}}>{p.stats.HR}</td>
                     <td className="mono" style={{color:sb.OPS>=.850?"#34d399":sb.OPS>=.700?"#f5c842":undefined}}>{sb.OPS>0?sb.OPS.toFixed(3):"---"}</td>
@@ -778,7 +825,7 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
           <div className="card-h">投手陣</div>
           <div style={{overflowX:"auto"}}>
             <table className="tbl">
-              <thead><tr><th></th><th>選手名</th><th>役割</th><th>年齢</th><th>球速</th><th>制球</th><th>スタミナ</th><th>変化球</th><th>球種</th><th>ピンチ</th><th>状態</th><th>防御率</th><th>WHIP</th><th>勝</th><th>敗</th><th></th></tr></thead>
+              <thead><tr><th></th><th>選手名</th><th>役割</th><th>年齢</th><th>球速</th><th>制球</th><th>スタミナ</th><th>変化球</th><th>球種</th><th>ピンチ</th><th>状態</th><th>モラル</th><th>防御率</th><th>WHIP</th><th>勝</th><th>敗</th><th></th></tr></thead>
               <tbody>
                 {pitchers.map(p=>{const inR=team.rotation.includes(p.id);const sp=saberPitcher(p.stats);return(
                   <tr key={p.id}>
@@ -788,6 +835,7 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
                     <td><OV v={p.pitching.velocity}/></td><td><OV v={p.pitching.control}/></td><td><OV v={p.pitching.stamina}/></td><td><OV v={p.pitching.breaking}/></td>
                     <td><OV v={p.pitching.variety}/></td><td><OV v={p.pitching.clutchP}/></td>
                     <td><CondBadge p={p}/></td>
+                    <td><MoralBadge v={p.morale}/></td>
                     <td className="mono" style={{color:sp.ERA>0&&sp.ERA<3?"#34d399":sp.ERA<4?"#f5c842":sp.ERA>0?"#f87171":undefined}}>{sp.ERA>0?sp.ERA:"---"}</td>
                     <td className="mono" style={{color:sp.WHIP>0&&sp.WHIP<1.0?"#34d399":sp.WHIP<1.3?"#f5c842":sp.WHIP<1.5?"#94a3b8":"#f87171"}}>{sp.WHIP>0?sp.WHIP:"---"}</td>
                     <td className="mono" style={{color:"#34d399"}}>{p.stats.W}</td><td className="mono" style={{color:"#f87171"}}>{p.stats.L}</td>
@@ -805,18 +853,25 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
           <div className="card-h">二軍 ({team.farm.length}/{MAX_FARM})</div>
           <div style={{overflowX:"auto"}}>
             <table className="tbl">
-              <thead><tr><th>選手名</th><th>守備</th><th>年齢</th><th>潜在</th><th>主要能力</th><th>状態</th><th></th></tr></thead>
+              <thead><tr><th>選手名</th><th>守備</th><th>年齢</th><th>育成年</th><th>潜在</th><th>主要能力</th><th>状態</th><th></th></tr></thead>
               <tbody>
                 {team.farm.map(p=>(
                   <tr key={p.id}>
-                    <td style={{fontWeight:600,fontSize:12}}>{p.name}{p.育成&&<span style={{fontSize:9,color:"#a78bfa",marginLeft:4}}>[育]</span>}</td>
-                    <td style={{fontSize:10,color:"#374151"}}>{p.pos}</td><td className="mono" style={{color:"#374151"}}>{p.age}</td><td><OV v={p.potential}/></td>
+                    <td style={{fontWeight:600,fontSize:12}}>{p.name}{p.育成&&<span style={{fontSize:9,color:"#a78bfa",marginLeft:4}}>[育{p.ikuseiYears||0}年]</span>}</td>
+                    <td style={{fontSize:10,color:"#374151"}}>{p.pos}</td><td className="mono" style={{color:"#374151"}}>{p.age}</td>
+                    <td className="mono" style={{color:p.育成?"#a78bfa":"#1e2d3d",fontSize:10}}>{p.育成?(p.ikuseiYears||0)+"年":"—"}</td>
+                    <td><OV v={p.potential}/></td>
                     <td><OV v={p.isPitcher?p.pitching.velocity:p.batting.contact}/></td>
                     <td><CondBadge p={p}/></td>
-                    <td>{!p.育成&&<button className="bsm bga" onClick={()=>onPromo(p.id)}>↑一軍</button>}</td>
+                    <td style={{display:"flex",gap:4}}>
+                      {p.育成
+                        ?<button className="bsm" style={{background:"rgba(167,139,250,.15)",border:"1px solid rgba(167,139,250,.4)",color:"#a78bfa",fontSize:9,padding:"2px 6px",borderRadius:4,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>onConvertIkusei&&onConvertIkusei(p.id)}>支配下登録</button>
+                        :<button className="bsm bga" onClick={()=>onPromo(p.id)}>↑一軍</button>
+                      }
+                    </td>
                   </tr>
                 ))}
-                {team.farm.length===0&&<tr><td colSpan={7} style={{color:"#1e2d3d",padding:"16px",textAlign:"center"}}>二軍選手なし</td></tr>}
+                {team.farm.length===0&&<tr><td colSpan={8} style={{color:"#1e2d3d",padding:"16px",textAlign:"center"}}>二軍選手なし</td></tr>}
               </tbody>
             </table>
           </div>
