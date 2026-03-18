@@ -143,5 +143,10 @@ export function checkHallOfFame(hallOfFame, allAlumni, year) {
     const careerPA = (p.careerLog || []).reduce((s, y) => s + (y.stats?.PA || 0), 0);
     return careerHR >= 200 || careerW >= 100 || careerPA >= 3000;
   });
-  return candidates.slice(0, 3).map(p => ({ playerId: p.id, playerName: p.name, inductYear: year }));
+  return candidates.slice(0, 3).map(p => {
+    const careerHR = (p.careerLog || []).reduce((s, y) => s + (y.stats?.HR || 0), 0);
+    const careerW  = (p.careerLog || []).reduce((s, y) => s + (y.stats?.W  || 0), 0);
+    const careerPA = (p.careerLog || []).reduce((s, y) => s + (y.stats?.PA || 0), 0);
+    return { playerId: p.id, playerName: p.name, inductYear: year, careerHR, careerW, careerPA };
+  });
 }

@@ -920,7 +920,7 @@ export function StandingsTab({teams,myId}){
 ═══════════════════════════════════════════════ */
 
 export function RecordsTab({ history }) {
-  const { awards = [], records = {}, hallOfFame = [] } = history || {};
+  const { awards = [], records = {}, hallOfFame = [], championships = [] } = history || {};
   const latest = awards.length > 0 ? awards[awards.length - 1] : null;
 
   const topCareerHR = Object.values(records.careerHR || {}).sort((a, b) => b.value - a.value).slice(0, 5);
@@ -990,15 +990,37 @@ export function RecordsTab({ history }) {
         </div>
       )}
 
+      {championships.length > 0 && (
+        <div className="card" style={{ marginBottom: 10 }}>
+          <div className="card-h">🏆 優勝履歴</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {[...championships].reverse().map((c, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", borderRadius: 6, background: "rgba(245,200,66,.06)", border: "1px solid rgba(245,200,66,.15)" }}>
+                <span style={{ fontSize: 18 }}>🏆</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#f5c842" }}>{c.year}年 日本シリーズ制覇</div>
+                  <div style={{ fontSize: 10, color: "#94a3b8" }}>{c.championName} vs {c.opponent}（{c.seriesResult}）</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {hallOfFame.length > 0 && (
         <div className="card">
-          <div className="card-h">🏛 殿堂入り</div>
-          {hallOfFame.map((h, i) => (
-            <div key={i} style={{ fontSize: 11, padding: "3px 0", borderBottom: "1px solid rgba(255,255,255,.04)", color: "#94a3b8" }}>
-              <span style={{ color: "#f5c842" }}>{h.playerName}</span>
-              <span style={{ marginLeft: 8, fontSize: 10 }}>{h.inductYear}年度殿堂入り</span>
-            </div>
-          ))}
+          <div className="card-h">🏛 球団殿堂</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 8 }}>
+            {hallOfFame.map((h, i) => (
+              <div key={i} style={{ padding: "8px 10px", borderRadius: 6, background: "rgba(245,200,66,.05)", border: "1px solid rgba(245,200,66,.12)" }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#f5c842", marginBottom: 2 }}>{h.playerName}</div>
+                <div style={{ fontSize: 9, color: "#94a3b8", marginBottom: 4 }}>{h.inductYear}年度殿堂入り</div>
+                {h.careerHR > 0 && <div style={{ fontSize: 10, color: "#e0d4bf" }}>通算{h.careerHR}本塁打</div>}
+                {h.careerW  > 0 && <div style={{ fontSize: 10, color: "#e0d4bf" }}>通算{h.careerW}勝</div>}
+                {h.careerPA > 0 && <div style={{ fontSize: 10, color: "#94a3b8" }}>{h.careerPA}打席</div>}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

@@ -854,6 +854,53 @@ HR 補正: 1.0 より大きいと HR になりやすい、小さいと HR が二
 
 ---
 
+### 2026-03-18 — Tier 4 ⑪⑫⑬ 試合内戦術・コーチ効果・フランチャイズ記録
+
+**仕様本文への影響あり（§4.4 / §4.12 / §4.13 / §8）**
+
+#### ⑪ 試合内戦術詳細化
+
+- **エンドラン（hitrun）実装** — `simulation.js` `processAtBat()`
+  - 一塁走者ありの場合に hitrun 後処理を適用
+  - 単打: 1塁走者が3塁へ進塁（通常は2塁）
+  - 2塁打: 1塁走者が生還（通常は3塁）
+  - 三振: 50% で CS（走者アウト、outs+1）
+  - アウト（ゴロ/フライ判定 50/50）: ゴロ→走者2塁へ / フライ→70% CS
+- **投球方針セレクタ** — `constants.js` `PITCHING_POLICY_OPTS` / `TacticalGame.jsx`
+  - 4択: 通常 / 速球主体 / 変化球主体 / コントロール重視
+  - `applyPitchingPolicy(probs, policy)` で確率補正（normalizeあり）
+  - TacticalGame.jsx の投手情報カードに方針ボタン追加
+  - `gs.pitchingPolicy` → situation 経由で simulation に渡す
+
+#### ⑫ コーチングスタッフ シーズン中効果
+
+- **走塁コーチ → 盗塁成功率 UP** — `processAtBat` steal 分岐
+  - `runningBonus * 0.025` を successRate に加算（gs.coachBonuses.running）
+- **投手コーチ → 疲労耐性 UP** — `applyFatigue(pit, fatigue, pitchingBonus)`
+  - 疲労ペナルティ開始閾値: `30 → 30 + pitchingBonus * 3`（grade4=5→閾値45）
+- **守備コーチ → 怪我回復速度 UP** — `App.jsx` tickInjuries 直後
+  - `applyDefenseCoachRecovery()` で確率的追加回復（defBonus * 10% / 試合）
+- **メンタルコーチ → 年度末モラル回復ボーナス** — App.jsx シーズン末モラル処理
+  - `mentalBonus = coaches.mental.reduce(bonus/2)` を delta に加算
+- 全コーチボーナスは `initGameState` で `myTeam.coaches` から自動計算して `gs.coachBonuses` に格納
+
+#### ⑬ 長期フランチャイズ記録・球団史
+
+- **`seasonHistory.championships`** 配列追加
+  - 日本シリーズ勝者確定時（PlayoffScreen onFinish コールバック）に追記
+  - 構造: `{ year, championId, championName, opponent, seriesResult }`
+  - 自チームが優勝時にメールボックスへ通知
+- **RecordsTab — 優勝履歴セクション** (`Tabs.jsx`)
+  - 年降順で優勝旗バッジ付きカード表示
+- **RecordsTab — 球団殿堂 HOF カード強化** (`Tabs.jsx`)
+  - 旧: 名前リスト → 新: グリッドカード（通算HR/勝利/打席付き）
+- **殿堂入り通知メール** (`App.jsx`)
+  - 新規殿堂入り選手発生時にメールボックスへ自動追加（type: "hof"）
+- **`checkHallOfFame` 返り値拡張** (`awards.js`)
+  - `{ playerId, playerName, inductYear, careerHR, careerW, careerPA }` に変更
+
+---
+
 ### 2026-03-17 — Tier2 ⑥ 選手個人成績グラフ（Tabs.jsx）
 
 **仕様本文への影響あり（§5 / CareerTable）**

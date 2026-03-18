@@ -55,6 +55,18 @@ function mergeProb(batterProb, pitcherProb) {
   return (batterProb + pitcherProb) / 2;
 }
 
+// 投球方針による確率補正
+function applyPitchingPolicy(probs, policy) {
+  if (!policy || policy === 'normal') return probs;
+  const m = { ...probs };
+  if (policy === 'fastball') { m.hr *= 1.10; m.k   *= 1.15; m.bb  *= 1.12; }
+  if (policy === 'breaking') { m.k  *= 1.20; m.out *= 1.10; m.hr  *= 0.85; }
+  if (policy === 'control')  { m.bb *= 0.65; m.k   *= 0.88; m.s   *= 1.08; }
+  const sum = Object.values(m).reduce((a, b) => a + b, 0);
+  Object.keys(m).forEach(k => { m[k] /= sum; });
+  return m;
+}
+
 
 // ═══════════════════════════════════════════════════════════════
 //  SECTION 3: 環境レイヤー（球場・リーグ係数）
@@ -193,11 +205,13 @@ function simAtBat(bat, pit, strategy = 'normal', pitchCount = 0, situation = {},
     return { result: 'bb', pitches: 1, isIntentional: true, pitchType: null, zone: null, pitchLog: [] };
   }
 
-  const fatigue     = calcFatigue(pitchCount, pit?.pitching?.stamina || 50);
-  const fatiguedPit = applyFatigue(pit, fatigue);
-  const situatedBat = applyBatterSituation(bat, situation);
-  const probs       = calcPAProbs(situatedBat, fatiguedPit, leagueEnv);
-  const stadium     = situation.stadium ? STADIUMS[situation.stadium] : null;
+  const pitchingBonus = situation.coachBonuses?.pitching || 0;
+  const fatigue       = calcFatigue(pitchCount, pit?.pitching?.stamina || 50);
+  const fatiguedPit   = applyFatigue(pit, fatigue, pitchingBonus);
+  const situatedBat   = applyBatterSituation(bat, situation);
+  let   probs         = calcPAProbs(situatedBat, fatiguedPit, leagueEnv);
+  probs               = applyPitchingPolicy(probs, situation.pitchingPolicy);
+  const stadium       = situation.stadium ? STADIUMS[situation.stadium] : null;
 
   let result = sampleResult(probs);
   result = applyStadiumFactor(result, bat, stadium);
@@ -218,9 +232,9 @@ function simAtBat(bat, pit, strategy = 'normal', pitchCount = 0, situation = {},
 //  SECTION 9: 補助関数
 // ═══════════════════════════════════════════════════════════════
 
-function applyFatigue(pit, fatigue) {
+function applyFatigue(pit, fatigue, pitchingBonus = 0) {
   const moraleMod = ((pit?.morale || 70) - 70) / 250; // 個人モラルを投手能力に反映
-  if (fatigue < 30 && Math.abs(moraleMod) < 0.001) return pit;
+  if (fatigue < (30 + pitchingBonus * 3) && Math.abs(moraleMod) < 0.001) return pit;
   const m = fatigue / 100;
   return { ...pit, pitching: { ...pit?.pitching,
     control:  Math.max(1, (pit?.pitching?.control||50)  - m*20 + moraleMod * 50),
@@ -303,6 +317,8 @@ function initGameState(myTeam, oppTeam) {
     teamMorale: myTeam.morale || 60,
     stadium: stadiumKey,
     leagueEnv: myTeam.leagueEnv || DEFAULT_LEAGUE_ENV,
+    coachBonuses: (()=>{ const c=myTeam.coaches||[]; return { running:c.filter(x=>x.type==='running').reduce((s,x)=>s+(x.bonus||0),0), pitching:c.filter(x=>x.type==='pitching').reduce((s,x)=>s+(x.bonus||0),0) }; })(),
+    pitchingPolicy: myTeam.pitchingPolicy || 'normal',
   };
 }
 
@@ -318,8 +334,9 @@ function processAtBat(gs, strategy = 'normal') {
     const stealBase = newBases[0] ? 0 : newBases[1] ? 1 : -1;
     if (stealBase >= 0) {
       const lineup      = isMyAtBat ? gs.myLineup : gs.opLineup;
-      const runner      = lineup.find(p => p.id === newBases[stealBase]) || batter;
-      const successRate = clamp(0.65 + (runner?.batting?.speed||50)/500 + (runner?.batting?.stealSkill||50)/600 - (pitcher?.pitching?.control||60)/600, 0.35, 0.92);
+      const runner       = lineup.find(p => p.id === newBases[stealBase]) || batter;
+      const runningBonus = gs.coachBonuses?.running || 0;
+      const successRate  = clamp(0.65 + (runner?.batting?.speed||50)/500 + (runner?.batting?.stealSkill||50)/600 - (pitcher?.pitching?.control||60)/600 + runningBonus * 0.025, 0.35, 0.92);
       const success     = Math.random() < successRate;
       if (success) { newBases[stealBase+1] = newBases[stealBase]; newBases[stealBase] = null; }
       else          { newBases[stealBase] = null; }
@@ -335,7 +352,7 @@ function processAtBat(gs, strategy = 'normal') {
 
   const ftl           = (isMyAtBat ? gs.opLineup : gs.myLineup).filter(p => !p.isPitcher);
   const fieldingLevel = ftl.length > 0 ? ftl.reduce((s,p) => s+(p.batting?.defense||50),0)/ftl.length : 50;
-  const situation     = { runnersOnBase: gs.bases.some(Boolean), runnersInScoring: gs.bases[1]||gs.bases[2], lateGame: gs.inning>=7, closeGame: Math.abs((gs.score?.my||0)-(gs.score?.opp||0))<=2, fieldingLevel, pitchCount, teamMorale: gs.teamMorale||60, stadium: gs.stadium, pitcherHand: pitcher?.hand || 'right' };
+  const situation     = { runnersOnBase: gs.bases.some(Boolean), runnersInScoring: gs.bases[1]||gs.bases[2], lateGame: gs.inning>=7, closeGame: Math.abs((gs.score?.my||0)-(gs.score?.opp||0))<=2, fieldingLevel, pitchCount, teamMorale: gs.teamMorale||60, stadium: gs.stadium, pitcherHand: pitcher?.hand || 'right', pitchingPolicy: isMyAtBat ? 'normal' : (gs.pitchingPolicy || 'normal'), coachBonuses: isMyAtBat ? {} : (gs.coachBonuses || {}) };
 
   const { result, pitches, pitchType, zone, isIntentional, pitchLog } = simAtBat(batter, pitcher, strategy, pitchCount, situation, gs.leagueEnv);
 
@@ -368,6 +385,30 @@ function processAtBat(gs, strategy = 'normal') {
   } else if (result === 's') {
     const r3=newBases[2]?1:0, r2=newBases[1]&&Math.random()<advanceProb(runnerOf(1),0.55)?1:0;
     runs=r3+r2; rbi=runs; newBases=[batter?.id||'r',newBases[0],r2?null:newBases[1]]; momentumDelta=isMyAtBat?5:-5;
+  }
+
+  // エンドラン: 一塁走者の追加進塁処理
+  if (strategy === 'hitrun' && gs.bases[0]) {
+    const r1id = gs.bases[0];
+    if (result === 's' && newBases[1] === r1id && !newBases[2]) {
+      // 単打: 1塁走者が3塁へ（2塁に止まらずさらに進塁）
+      newBases[2] = r1id; newBases[1] = null;
+    } else if (result === 'd' && newBases[2] === r1id) {
+      // 2塁打: 1塁走者が生還（3塁で止まらず生還）
+      runs++; rbi++; newBases[2] = null;
+    } else if (result === 'k') {
+      // 三振: 走者が走っているため50%でCS
+      if (Math.random() < 0.50) { outs++; newBases[0] = null; }
+    } else if (result === 'out' && newBases[0] === r1id) {
+      // ゴロ/フライ判定（50/50）
+      if (Math.random() < 0.50) {
+        // ゴロ想定: 走者が2塁へ進塁
+        if (!newBases[1]) { newBases[1] = r1id; newBases[0] = null; }
+      } else {
+        // フライ想定: タッグアップ 70%でCS
+        if (Math.random() < 0.70) { outs++; newBases[0] = null; }
+      }
+    }
   }
 
   const newMomentum = clamp(gs.momentum+momentumDelta, 0, 100);
