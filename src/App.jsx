@@ -119,24 +119,10 @@ export default function App(){
     return pool[rng(0,pool.length-1)]||teams.filter(t=>t.id!==myId)[0];
   };
 
-  // Pick opponent and go to mode select
+  // Pick opponent and go to mode select (CPU vs CPU games are simulated after the player's game ends)
   const handleStartGame=()=>{
     if(!myTeam) return;
     const opp=pickOpponent(gameDay,myTeam.league);
-    // CPU vs CPU for other games
-    let newTeams=[...teams];
-    const others=newTeams.filter(t=>t.id!==myId&&t.id!==opp.id);
-    for(let i=0;i<others.length-1;i+=2){
-      const a=newTeams.find(t=>t.id===others[i].id);
-      const b=newTeams.find(t=>t.id===others[i+1]?.id);
-      if(!a||!b) continue;
-      const r=quickSimGame(a,b);
-      const drew=r.score.my===r.score.opp;
-      if(r.won){a.wins++;a.rf+=r.score.my;a.ra+=r.score.opp;b.losses++;b.rf+=r.score.opp;b.ra+=r.score.my;}
-      else if(drew){a.draws++;a.rf+=r.score.my;a.ra+=r.score.opp;b.draws++;b.rf+=r.score.opp;b.ra+=r.score.my;}
-      else{b.wins++;b.rf+=r.score.opp;b.ra+=r.score.my;a.losses++;a.rf+=r.score.my;a.ra+=r.score.opp;}
-    }
-    setTeams(newTeams);
     setCurrentOpp(opp);
     setScreen("mode_select");
   };
@@ -177,6 +163,44 @@ export default function App(){
       updated.budget+=revTotal;
       updated.revenueThisSeason=(updated.revenueThisSeason??0)+revTotal;
       return updated;
+    });
+    // Update opponent's individual player stats
+    upd(currentOpp.id,t=>{
+      let updated={...t};
+      updated.players=applyGameStatsFromLog(updated.players,r.log||[],false,!won&&!drew);
+      updated.players=applyPostGameCondition(updated.players,r.log||[],false,gameDay);
+      updated.players=tickInjuries(updated.players);
+      const newInj=checkForInjuries(updated.players);
+      if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+      return updated;
+    });
+    // Simulate remaining CPU vs CPU games for this day (with full individual stat updates)
+    const _oppId=currentOpp.id;
+    setTeams(prev=>{
+      let newTeams=prev.map(t=>({...t,players:t.players.map(p=>({...p,stats:{...p.stats}}))}));
+      const others=newTeams.filter(t=>t.id!==myId&&t.id!==_oppId);
+      for(let i=0;i<others.length-1;i+=2){
+        const a=newTeams.find(t=>t.id===others[i].id);
+        const b=newTeams.find(t=>t.id===others[i+1]?.id);
+        if(!a||!b) continue;
+        const cr=quickSimGame(a,b);
+        const cdrew=cr.score.my===cr.score.opp;
+        const aWon=cr.won;
+        if(aWon){a.wins++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.losses++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
+        else if(cdrew){a.draws++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.draws++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
+        else{b.wins++;b.rf+=cr.score.opp;b.ra+=cr.score.my;a.losses++;a.rf+=cr.score.my;a.ra+=cr.score.opp;}
+        a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon);
+        a.players=applyPostGameCondition(a.players,cr.log||[],true,gameDay);
+        a.players=tickInjuries(a.players);
+        const aInj=checkForInjuries(a.players);
+        if(aInj.length>0)a.players=a.players.map(p=>{const inj=aInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+        b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew);
+        b.players=applyPostGameCondition(b.players,cr.log||[],false,gameDay);
+        b.players=tickInjuries(b.players);
+        const bInj=checkForInjuries(b.players);
+        if(bInj.length>0)b.players=b.players.map(p=>{const inj=bInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+      }
+      return newTeams;
     });
     setGameResult({score:r.score,won,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:currentOpp});
     tryGenerateCpuOffer();
@@ -242,11 +266,22 @@ export default function App(){
         const a=newTeams.find(t=>t.id===others[i].id);
         const b=newTeams.find(t=>t.id===others[i+1]?.id);
         if(!a||!b) continue;
-        const r=quickSimGame(a,b);
-        const drew=r.score.my===r.score.opp;
-        if(r.won){a.wins++;a.rf+=r.score.my;a.ra+=r.score.opp;b.losses++;b.rf+=r.score.opp;b.ra+=r.score.my;}
-        else if(drew){a.draws++;a.rf+=r.score.my;a.ra+=r.score.opp;b.draws++;b.rf+=r.score.opp;b.ra+=r.score.my;}
-        else{b.wins++;b.rf+=r.score.opp;b.ra+=r.score.my;a.losses++;a.rf+=r.score.my;a.ra+=r.score.opp;}
+        const cr=quickSimGame(a,b);
+        const cdrew=cr.score.my===cr.score.opp;
+        const aWon=cr.won;
+        if(aWon){a.wins++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.losses++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
+        else if(cdrew){a.draws++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.draws++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
+        else{b.wins++;b.rf+=cr.score.opp;b.ra+=cr.score.my;a.losses++;a.rf+=cr.score.my;a.ra+=cr.score.opp;}
+        a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon);
+        a.players=applyPostGameCondition(a.players,cr.log||[],true,newDay);
+        a.players=tickInjuries(a.players);
+        const aInj=checkForInjuries(a.players);
+        if(aInj.length>0)a.players=a.players.map(p=>{const inj=aInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+        b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew);
+        b.players=applyPostGameCondition(b.players,cr.log||[],false,newDay);
+        b.players=tickInjuries(b.players);
+        const bInj=checkForInjuries(b.players);
+        if(bInj.length>0)b.players=b.players.map(p=>{const inj=bInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
       }
       // 自チームの試合
       const myT=newTeams.find(t=>t.id===myId);
@@ -263,6 +298,15 @@ export default function App(){
       myT.players=applyDefenseCoachRecovery(myT.players,myT.coaches);
       const _inj=checkForInjuries(myT.players);
       if(_inj.length>0)myT.players=myT.players.map(p=>{const inj=_inj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+      // 対戦相手の個人成績更新
+      const oppT=newTeams.find(t=>t.id===opp.id);
+      if(oppT){
+        oppT.players=applyGameStatsFromLog(oppT.players,r.log||[],false,!won&&!drew);
+        oppT.players=applyPostGameCondition(oppT.players,r.log||[],false,newDay);
+        oppT.players=tickInjuries(oppT.players);
+        const oppInj=checkForInjuries(oppT.players);
+        if(oppInj.length>0)oppT.players=oppT.players.map(p=>{const inj=oppInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+      }
       // 収益更新（試合ごと）
       const rev=calcRevenue(myT);
       const revTotal=rev.ticket+rev.sponsor+rev.merch;
@@ -305,6 +349,44 @@ export default function App(){
       updated.budget+=revTotal;
       updated.revenueThisSeason=(updated.revenueThisSeason??0)+revTotal;
       return updated;
+    });
+    // Update opponent's individual player stats
+    upd(currentOpp.id,t=>{
+      let updated={...t};
+      updated.players=applyGameStatsFromLog(updated.players,gsResult.log,false,!won&&!drew);
+      updated.players=applyPostGameCondition(updated.players,gsResult.log,false,gameDay);
+      updated.players=tickInjuries(updated.players);
+      const newInj=checkForInjuries(updated.players);
+      if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+      return updated;
+    });
+    // Simulate remaining CPU vs CPU games for this day (with full individual stat updates)
+    const _tOppId=currentOpp.id;
+    setTeams(prev=>{
+      let newTeams=prev.map(t=>({...t,players:t.players.map(p=>({...p,stats:{...p.stats}}))}));
+      const others=newTeams.filter(t=>t.id!==myId&&t.id!==_tOppId);
+      for(let i=0;i<others.length-1;i+=2){
+        const a=newTeams.find(t=>t.id===others[i].id);
+        const b=newTeams.find(t=>t.id===others[i+1]?.id);
+        if(!a||!b) continue;
+        const cr=quickSimGame(a,b);
+        const cdrew=cr.score.my===cr.score.opp;
+        const aWon=cr.won;
+        if(aWon){a.wins++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.losses++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
+        else if(cdrew){a.draws++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.draws++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
+        else{b.wins++;b.rf+=cr.score.opp;b.ra+=cr.score.my;a.losses++;a.rf+=cr.score.my;a.ra+=cr.score.opp;}
+        a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon);
+        a.players=applyPostGameCondition(a.players,cr.log||[],true,gameDay);
+        a.players=tickInjuries(a.players);
+        const aInj=checkForInjuries(a.players);
+        if(aInj.length>0)a.players=a.players.map(p=>{const inj=aInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+        b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew);
+        b.players=applyPostGameCondition(b.players,cr.log||[],false,gameDay);
+        b.players=tickInjuries(b.players);
+        const bInj=checkForInjuries(b.players);
+        if(bInj.length>0)b.players=b.players.map(p=>{const inj=bInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+      }
+      return newTeams;
     });
     setGameResult({...gsResult,oppTeam:currentOpp,won});
     setGameDay(d=>d+1);

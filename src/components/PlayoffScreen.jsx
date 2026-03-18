@@ -66,14 +66,12 @@ export function PlayoffScreen({playoff,setPlayoff,teams,myId,year,onFinish}){
 
     // CS2（CS1の勝者が確定してから）
     if(seW1&&state.cs1_se&&state.cs1_se.done){
-      const cs1Se=state.cs1_se;
-      const seTop=cs1Se.teams[0]; // 1位チーム（アドバンテージあり）
+      const seTop=state.se1; // リーグ1位チーム（アドバンテージあり）
       state.cs2_se={label:"CSファイナルステージ（セ）",teams:[seTop,seW1],wins:[1,0],adv:[1,0],games:[],done:false,winner:null};
       simSeriesAll("cs2_se",4);
     }
     if(paW1&&state.cs1_pa&&state.cs1_pa.done){
-      const cs1Pa=state.cs1_pa;
-      const paTop=cs1Pa.teams[0];
+      const paTop=state.pa1; // リーグ1位チーム（アドバンテージあり）
       state.cs2_pa={label:"CSファイナルステージ（パ）",teams:[paTop,paW1],wins:[1,0],adv:[1,0],games:[],done:false,winner:null};
       simSeriesAll("cs2_pa",4);
     }
