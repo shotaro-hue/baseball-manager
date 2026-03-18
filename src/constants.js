@@ -8,6 +8,8 @@ export const MAX_ROSTER = 28;
 export const MAX_FARM = 30;
 export const MAX_外国人_一軍 = 4;  // NPB規定: 一軍出場選手登録は外国人最大4名
 export const ACCEPT_THRESHOLD = 55;
+export const MIN_SALARY_SHIHAKA = 4200000;  // 支配下選手最低年俸 420万円 (NPB協約 第89条)
+export const MIN_SALARY_IKUSEI  = 2400000;  // 育成選手最低年俸  240万円 (NPB協約)
 export const PITCH_WARNING = 100;
 export const PITCH_LIMIT = 120;
 

@@ -1,5 +1,5 @@
 import { rng, clamp, uid, pname, CITIES } from '../utils';
-import { POSITIONS, PLAYER_TYPES_B, PLAYER_TYPES_P, PLAYER_COMMENTS_B, PLAYER_COMMENTS_P } from '../constants';
+import { POSITIONS, PLAYER_TYPES_B, PLAYER_TYPES_P, PLAYER_COMMENTS_B, PLAYER_COMMENTS_P, MIN_SALARY_IKUSEI } from '../constants';
 
 
 /* ═══════════════════════════════════════════════
@@ -50,7 +50,7 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
     };
     p.subtype = pos === "抑え" ? "抑え" : pos === "中継ぎ" ? "中継ぎ" : "先発";
     const ov = (p.pitching.velocity + p.pitching.control * 1.2 + p.pitching.stamina + p.pitching.breaking + p.pitching.clutchP * 0.3) / 4.5;
-    p.salary = clamp(Math.round((ov * 60 - 2800) / 500) * 500, 500, 50000) * 100;
+    p.salary = Math.max(MIN_SALARY_IKUSEI, clamp(Math.round((ov * 60 - 2800) / 500) * 500, 0, 50000) * 100);
   } else {
     p.batting = {
       contact: s(), power: s(), eye: s(-5), speed: s(), arm: s(-5),
@@ -58,7 +58,7 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
       clutch: s(-8), vsLeft: s(-5), breakingBall: s(-8), stamina: s(-3), recovery: s(-5),
     };
     const ov = (p.batting.contact * 1.2 + p.batting.power + p.batting.eye + p.batting.speed * 0.7 + p.batting.clutch * 0.3) / 4.2;
-    p.salary = clamp(Math.round((ov * 55 - 2500) / 500) * 500, 400, 60000) * 100;
+    p.salary = Math.max(MIN_SALARY_IKUSEI, clamp(Math.round((ov * 55 - 2500) / 500) * 500, 0, 60000) * 100);
   }
 
   const types = isPitch ? PLAYER_TYPES_P : PLAYER_TYPES_B;

@@ -1,5 +1,5 @@
 import { clamp } from '../utils';
-import { ACCEPT_THRESHOLD } from '../constants';
+import { ACCEPT_THRESHOLD, MIN_SALARY_SHIHAKA, MIN_SALARY_IKUSEI } from '../constants';
 import { tradeValue, analyzeTeamNeeds } from './trade';
 
 /* ═══════════════════════════════════════════════
@@ -86,7 +86,7 @@ export function cpuRenewContracts(teams, myId, allTeams) {
 
       // FA資格なし: 球団側から再契約を強制提示 (選手は国内FA権を持っていない)
       if (serviceYears < threshold.domestic) {
-        const salary = Math.round(p.salary * 1.02); // わずかな昇給のみ
+        const salary = Math.max(MIN_SALARY_SHIHAKA, Math.round(p.salary * 1.02)); // 支配下最低年俸を保証
         if (budget >= salary) {
           players = players.map(x => x.id === p.id
             ? { ...x, salary, contractYears: 1, contractYearsLeft: 1 }
@@ -115,7 +115,7 @@ export function cpuRenewContracts(teams, myId, allTeams) {
 
       // 海外志向かつ国内FA資格はあるが海外FA資格なし: 国内FAをスキップして待機
       if (overseas >= 70 && serviceYears < threshold.overseas) {
-        const salary = Math.round(p.salary * 1.03);
+        const salary = Math.max(MIN_SALARY_SHIHAKA, Math.round(p.salary * 1.03));
         if (budget >= salary) {
           players = players.map(x => x.id === p.id
             ? { ...x, salary, contractYears: 1, contractYearsLeft: 1 }
@@ -130,7 +130,7 @@ export function cpuRenewContracts(teams, myId, allTeams) {
       }
 
       const raise = tradeValue(p) >= 70 ? 1.15 : 1.0;
-      const salary = Math.round(p.salary * raise);
+      const salary = Math.max(MIN_SALARY_SHIHAKA, Math.round(p.salary * raise));
       const years = p.age <= 28 ? 2 : 1;
       const result = evalOffer(p, { salary, years }, t, allTeams);
 
@@ -180,6 +180,7 @@ export function processCpuFaBids(teams, myId, faPool, allTeams) {
 
     const candidates = remainingPool
       .filter(p => wantPitcher ? p.isPitcher : !p.isPitcher)
+      .map(p => ({ ...p, salary: Math.max(MIN_SALARY_SHIHAKA, p.salary) }))
       .filter(p => t.budget >= p.salary)
       .map(p => {
         const r = evalOffer(p, { salary: p.salary, years: 1 }, t, allTeams);
