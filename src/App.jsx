@@ -106,6 +106,7 @@ export default function App(){
     setMyId(saved.myId);
     setGameDay(saved.gameDay);
     setYear(saved.year);
+    setSchedule(generateSeasonSchedule(saved.year, saved.teams));
     setFaPool(saved.faPool||[]);
     setFaYears(saved.faYears||{});
     setSeasonHistory(saved.seasonHistory||{awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[]});
@@ -131,7 +132,7 @@ export default function App(){
     }));
   };
 
-  const handleSelect=id=>{setMyId(id);setScreen("hub");setTab("roster");};
+  const handleSelect=id=>{setMyId(id);setScreen("hub");setTab("roster");setSchedule(generateSeasonSchedule(year,teams));};
 
   // スケジュールから対戦相手を取得（フォールバック: ランダム同リーグ選択）
   const pickOpponentFromSchedule=(day)=>{
