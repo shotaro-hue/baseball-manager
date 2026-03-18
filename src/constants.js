@@ -70,6 +70,13 @@ export const STRATEGY_OPTS = [
   { id: "steal",   label: "盗塁",      desc: "走者が走る",        icon: "⚡" },
 ];
 
+export const PITCHING_POLICY_OPTS = [
+  { id: 'normal',   label: '通常',           icon: '⚾', desc: '標準' },
+  { id: 'fastball', label: '速球主体',       icon: '🔥', desc: 'K率・HR率上昇、BB微増' },
+  { id: 'breaking', label: '変化球主体',     icon: '🌀', desc: 'K率・GO率上昇、HR率低下' },
+  { id: 'control',  label: 'コントロール重視', icon: '🎯', desc: 'BB大幅減、被安打微増' },
+];
+
 export const PVAL_DEFS = [
   { k: "money",     lbl: "💰 金銭欲",     color: "#f5c842" },
   { k: "winning",   lbl: "🏆 勝利欲",     color: "#34d399" },

@@ -50,11 +50,17 @@ export default function App(){
   const [gameMode,setGameMode]=useState(null); // "tactical"|"auto"
   const [batchResults,setBatchResults]=useState([]);
   const [developmentSummary,setDevelopmentSummary]=useState(null);
-  const [seasonHistory,setSeasonHistory]=useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[]});
+  const [seasonHistory,setSeasonHistory]=useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[]});
   const [saveExists,setSaveExists]=useState(()=>hasSave());
 
   const myTeam=useMemo(()=>teams.find(t=>t.id===myId),[teams,myId]);
   const notify=useCallback((msg,type="ok")=>{setNotif({msg,type});setTimeout(()=>setNotif(null),3500);},[]);
+  // 守備コーチボーナス: 怪我回復速度 UP
+  const applyDefenseCoachRecovery=(players,coaches)=>{
+    const defBonus=(coaches||[]).filter(c=>c.type==='defense').reduce((s,c)=>s+(c.bonus||0),0);
+    if(!defBonus) return players;
+    return players.map(p=>{if(!p.injuryDaysLeft) return p;const extra=Math.random()<(defBonus*0.1)?1:0;if(!extra) return p;const next=Math.max(0,p.injuryDaysLeft-extra);return{...p,injuryDaysLeft:next,injury:next>0?p.injury:null};});
+  };
   const upd=useCallback((id,fn)=>setTeams(prev=>prev.map(t=>t.id===id?fn(t):t)),[]);
   const setTrainingFocus=(pid,focus)=>upd(myId,t=>({...t,players:t.players.map(p=>p.id===pid?{...p,trainingFocus:focus}:p)}));
 
@@ -79,7 +85,7 @@ export default function App(){
     setYear(saved.year);
     setFaPool(saved.faPool||[]);
     setFaYears(saved.faYears||{});
-    setSeasonHistory(saved.seasonHistory||{awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[]});
+    setSeasonHistory(saved.seasonHistory||{awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[]});
     setNews(saved.news||[]);
     setMailbox(saved.mailbox||[]);
     setCpuTradeOffers([]);
@@ -163,6 +169,7 @@ export default function App(){
       updated.players=applyGameStatsFromLog(updated.players, r.log||[], true, won);
       updated.players=applyPostGameCondition(updated.players, r.log||[], true, gameDay);
       updated.players=tickInjuries(updated.players);
+      updated.players=applyDefenseCoachRecovery(updated.players,t.coaches);
       const newInj=checkForInjuries(updated.players);
       if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
       const rev=calcRevenue(updated);
@@ -251,6 +258,7 @@ export default function App(){
       myT.players=applyGameStatsFromLog(myT.players, r.log||[], true, won);
       myT.players=applyPostGameCondition(myT.players, r.log||[], true, newDay);
       myT.players=tickInjuries(myT.players);
+      myT.players=applyDefenseCoachRecovery(myT.players,myT.coaches);
       const _inj=checkForInjuries(myT.players);
       if(_inj.length>0)myT.players=myT.players.map(p=>{const inj=_inj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
       results.push({...r,won,oppTeam:opp,gameNo:newDay});
@@ -287,6 +295,7 @@ export default function App(){
       updated.players=applyGameStatsFromLog(updated.players, gsResult.log, true, won);
       updated.players=applyPostGameCondition(updated.players, gsResult.log, true, gameDay);
       updated.players=tickInjuries(updated.players);
+      updated.players=applyDefenseCoachRecovery(updated.players,t.coaches);
       const newInj=checkForInjuries(updated.players);
       if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
       const rev=calcRevenue(updated);
@@ -507,6 +516,9 @@ export default function App(){
         if((p.serviceYears||0)>=5) delta+=3;
         // 自然回復 (70へ収束)
         const current=p.morale||70; delta+=current<70?3:current>70?-3:0;
+        // メンタルコーチボーナス
+        const mentalBonus=(t.coaches||[]).filter(c=>c.type==='mental').reduce((s,c)=>s+Math.floor((c.bonus||0)/2),0);
+        delta+=mentalBonus;
         const newMorale=clamp((current)+delta,20,100);
         return{...p,morale:newMorale};
       });
@@ -548,7 +560,9 @@ export default function App(){
     const awards=calcSeasonAwards(finalTeams,year);
     const newRec=updateRecords(seasonHistory.records,finalTeams);
     const allAlumni=finalTeams.flatMap(t=>t.history||[]);
-    const newHoF=[...seasonHistory.hallOfFame,...checkHallOfFame(seasonHistory.hallOfFame,allAlumni,year)];
+    const newInductees=checkHallOfFame(seasonHistory.hallOfFame,allAlumni,year);
+    const newHoF=[...seasonHistory.hallOfFame,...newInductees];
+    if(newInductees.length>0){newInductees.forEach(h=>{setMailbox(prev=>[...prev,{id:uid(),type:"hof",read:false,subject:"🏛 殿堂入り: "+h.playerName,body:h.playerName+"選手が"+year+"年度の球団殿堂入りを果たした。"+[h.careerHR>0?"通算"+h.careerHR+"本塁打":"",h.careerW>0?"通算"+h.careerW+"勝":"",h.careerPA>0?"通算"+h.careerPA+"打席":""].filter(Boolean).join(" / ")}]);}); }
     setSeasonHistory(prev=>({...prev,awards:[...prev.awards,awards],records:newRec,hallOfFame:newHoF}));
     setScreen("development_phase");
   }}/></> );
@@ -565,7 +579,16 @@ export default function App(){
   faResult.news.forEach(n=>addNews(n));
   setFaYears({});
   setDraftPool(initDraftPool(myTeam));setScreen("draft_preview");}}/></> );
-  if(screen==="playoff"&&playoff) return(<><PlayoffScreen playoff={playoff} setPlayoff={setPlayoff} teams={teams} myId={myId} year={year} onFinish={()=>setScreen("retire_phase")}/></>);
+  if(screen==="playoff"&&playoff) return(<><PlayoffScreen playoff={playoff} setPlayoff={setPlayoff} teams={teams} myId={myId} year={year} onFinish={()=>{
+    if(playoff?.champion){
+      const jpS=playoff.jpSeries;
+      const opp=jpS?jpS.teams.find(t=>t.id!==playoff.champion.id):null;
+      const seriesResult=jpS?jpS.wins[0]+"-"+jpS.wins[1]:"4-?";
+      setSeasonHistory(prev=>({...prev,championships:[...(prev.championships||[]),{year,championId:playoff.champion.id,championName:playoff.champion.name,opponent:opp?.name||"?",seriesResult}]}));
+      if(playoff.champion.id===myId){setMailbox(prev=>[...prev,{id:uid(),type:"championship",read:false,subject:"🏆 "+year+"年 日本一達成！",body:playoff.champion.name+"が"+year+"年の日本シリーズを制覇しました（"+seriesResult+"）。球団史に残る偉業です！"}]);}
+    }
+    setScreen("retire_phase");
+  }}/></>);
   if(screen==="draft_preview"&&draftPool) return(<><DraftPreviewScreen teams={teams} myId={myId} year={year} pool={draftPool} onStart={()=>setScreen("draft_lottery")}/></>);
   if(screen==="draft_lottery"&&draftPool) return(<><DraftLotteryScreen teams={teams} myId={myId} year={year} pool={draftPool} onDone={(r1)=>{setDraftPool(prev=>prev.map(p=>{const winner=Object.entries(r1).find(function(e){return e[1]&&e[1].id===p.id;});return{...p,_drafted:winner?true:undefined,_r1winner:winner?winner[0]:undefined};}));setScreen("draft");}}/></>);
   if(screen==="draft"&&draftPool) return(<><DraftScreen teams={teams} myId={myId} year={year} pool={draftPool} onDraftDone={(pl,dr)=>{setDraftResult({pool:pl,drafted:dr});setScreen("draft_review");}}/></>);

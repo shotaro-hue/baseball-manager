@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { STRATEGY_OPTS, RLABEL, IS_HIT, IS_OUT, BATCH, PITCH_WARNING } from '../constants';
+import { STRATEGY_OPTS, PITCHING_POLICY_OPTS, RLABEL, IS_HIT, IS_OUT, BATCH, PITCH_WARNING } from '../constants';
 import { fmtAvg, fmtPct } from '../utils';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 import { initGameState, matchupScore, calcFatigue, processAtBat, endHalfInning, checkStopCondition } from '../engine/simulation';
@@ -14,6 +14,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   const [selectedRP,setSelectedRP]=useState(null);
   const [selectedStrat,setSelectedStrat]=useState("normal");
   const [showMenu,setShowMenu]=useState(null); // "pitcher"|"pinch"|"strategy"
+  const [pitchingPolicy,setPitchingPolicy]=useState("normal");
   const logRef=useRef(null);
 
   // Auto-scroll log
@@ -53,6 +54,9 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
 
   // 続行（停止解除）
   const resume=()=>{setGs(prev=>({...prev,stopped:false,stopReason:null,stopData:null}));setShowMenu(null);setAutoRunning(true);};
+
+  // 投球方針変更
+  const changePitchingPolicy=pol=>{setPitchingPolicy(pol);setGs(prev=>({...prev,pitchingPolicy:pol}));};
 
   // 投手交代
   const changePitcher=rpId=>{
@@ -192,6 +196,14 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
                 <span style={{fontFamily:"monospace",fontSize:10,color:fatigueColor,width:28}}>{fatigue}%</span>
               </div>
               <div style={{marginTop:6,fontSize:9,color:"#374151"}}>球速<OV v={curPitcher?.pitching?.velocity||0}/> 制球<OV v={curPitcher?.pitching?.control||0}/></div>
+              <div style={{marginTop:8,fontSize:9,color:"#374151",letterSpacing:".1em",marginBottom:4}}>投球方針</div>
+              <div style={{display:"flex",gap:3,flexWrap:"wrap"}}>
+                {PITCHING_POLICY_OPTS.map(opt=>(
+                  <button key={opt.id} onClick={()=>changePitchingPolicy(opt.id)} style={{padding:"3px 7px",fontSize:9,borderRadius:4,cursor:"pointer",border:pitchingPolicy===opt.id?"1px solid #f5c842":"1px solid rgba(255,255,255,.1)",background:pitchingPolicy===opt.id?"rgba(245,200,66,.15)":"rgba(255,255,255,.04)",color:pitchingPolicy===opt.id?"#f5c842":"#94a3b8",whiteSpace:"nowrap"}}>
+                    {opt.icon} {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
