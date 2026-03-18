@@ -44,7 +44,13 @@ export function evalTradeForCpu(cpuTeam, give, receive, cashDiff) {
   const np = needs.some((n) => n.includes("投手"));
   give.forEach((p) => { if (np && p.isPitcher) diff += 8; if (!np && !p.isPitcher) diff += 5; if ((p.age || 25) <= 23) diff += 5; });
   receive.forEach((p) => { if ((p.age || 25) <= 26 && tradeValue(p) > 70) diff -= 8; });
-  return { diff, fair: diff >= -5, favorable: diff >= 8 };
+  const reasons = [];
+  if (diff < -5) reasons.push(`対価が不足（差: ${Math.abs(Math.round(diff))}点）`);
+  if (np) reasons.push("投手補強を優先したい");
+  else reasons.push("打線強化を優先したい");
+  const hasYoungGive = give.some(p => (p.age || 25) <= 23);
+  if (!hasYoungGive) reasons.push("若手選手が欲しい");
+  return { diff, fair: diff >= -5, favorable: diff >= 8, reasons: reasons.slice(0, 2) };
 }
 
 export function generateCpuOffer(cpuTeam, myTeam) {

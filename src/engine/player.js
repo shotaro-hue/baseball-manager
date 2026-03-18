@@ -90,6 +90,8 @@ export function buildTeam(def) {
     coaches: [], budget: def.budget,
     scoutMissions: [], scoutResults: [],
     popularity: rng(40, 70),
+    stadiumLevel: 0,
+    revenueThisSeason: 0,
   };
 }
 /* ═══════════════════════════════════════════════

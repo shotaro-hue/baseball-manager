@@ -173,7 +173,9 @@ export default function App(){
       const newInj=checkForInjuries(updated.players);
       if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
       const rev=calcRevenue(updated);
-      updated.budget+=rev.ticket+rev.sponsor+rev.merch;
+      const revTotal=rev.ticket+rev.sponsor+rev.merch;
+      updated.budget+=revTotal;
+      updated.revenueThisSeason=(updated.revenueThisSeason??0)+revTotal;
       return updated;
     });
     setGameResult({score:r.score,won,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:currentOpp});
@@ -261,16 +263,16 @@ export default function App(){
       myT.players=applyDefenseCoachRecovery(myT.players,myT.coaches);
       const _inj=checkForInjuries(myT.players);
       if(_inj.length>0)myT.players=myT.players.map(p=>{const inj=_inj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+      // 収益更新（試合ごと）
+      const rev=calcRevenue(myT);
+      const revTotal=rev.ticket+rev.sponsor+rev.merch;
+      myT.budget+=revTotal;
+      myT.revenueThisSeason=(myT.revenueThisSeason??0)+revTotal;
       results.push({...r,won,oppTeam:opp,gameNo:newDay});
       newDay++;
     }
 
-    // 収益更新
     const myFinal=newTeams.find(t=>t.id===myId);
-    for(let g=0;g<count;g++){
-      const rev=calcRevenue(myFinal);
-      myFinal.budget+=rev.ticket+rev.sponsor+rev.merch;
-    }
 
     const batchSaveResult=saveGame({teams:newTeams,myId,gameDay:newDay,year,faPool,faYears,seasonHistory,news,mailbox});
     if(batchSaveResult.ok) setSaveExists(true);
@@ -299,7 +301,9 @@ export default function App(){
       const newInj=checkForInjuries(updated.players);
       if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
       const rev=calcRevenue(updated);
-      updated.budget+=rev.ticket+rev.sponsor+rev.merch;
+      const revTotal=rev.ticket+rev.sponsor+rev.merch;
+      updated.budget+=revTotal;
+      updated.revenueThisSeason=(updated.revenueThisSeason??0)+revTotal;
       return updated;
     });
     setGameResult({...gsResult,oppTeam:currentOpp,won});
@@ -443,7 +447,7 @@ export default function App(){
   };
 
   const handleNextYear=()=>{
-    setYear(y=>y+1);setGameDay(1);setFaPool([]);setTeams(prev=>prev.map(t=>({...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,players:t.players.filter(p=>!p._retireNow).map(p=>({...p,age:p.age+1,stats:emptyStats(),playoffStats:emptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:Math.max(0,p.contractYearsLeft-1),growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlydecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),careerLog:[...(p.careerLog||[]),{year,stats:{...p.stats},playoffStats:{...(p.playoffStats||emptyStats())}}],serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0})),farm:t.farm.map(p=>({...p,age:p.age+1,stats:emptyStats(),injury:null,serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}))})));setScreen("hub");setTab("roster");notify(`${year+1}年シーズン開幕！`,"ok");};
+    setYear(y=>y+1);setGameDay(1);setFaPool([]);setDraftAllocation({pitcher:50,batter:50});setTeams(prev=>prev.map(t=>({...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,revenueThisSeason:0,stadiumLevel:t.stadiumLevel??0,players:t.players.filter(p=>!p._retireNow).map(p=>({...p,age:p.age+1,stats:emptyStats(),playoffStats:emptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:Math.max(0,p.contractYearsLeft-1),growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlydecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),careerLog:[...(p.careerLog||[]),{year,stats:{...p.stats},playoffStats:{...(p.playoffStats||emptyStats())}}],serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0})),farm:t.farm.map(p=>({...p,age:p.age+1,stats:emptyStats(),injury:null,serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}))})));setScreen("hub");setTab("roster");notify(`${year+1}年シーズン開幕！`,"ok");};
 
   const [news,setNews]=useState([]);
   const [mailbox,setMailbox]=useState([]);
@@ -451,6 +455,19 @@ export default function App(){
   const [draftPool,setDraftPool]=useState(null);
   const [draftResult,setDraftResult]=useState(null);
   const [playoff,setPlayoff]=useState(null);
+  const [draftAllocation,setDraftAllocation]=useState({pitcher:50,batter:50});
+
+  const handleStadiumUpgrade=()=>{
+    if(!myTeam) return;
+    const lvl=myTeam.stadiumLevel??0;
+    const UPGRADE_COSTS=[5000000,10000000,20000000];
+    if(lvl>=3){notify("球場はすでに最高レベルです","warn");return;}
+    const cost=UPGRADE_COSTS[lvl];
+    if(myTeam.budget<cost){notify("予算不足","warn");return;}
+    upd(myId,t=>({...t,budget:t.budget-cost,stadiumLevel:(t.stadiumLevel??0)+1}));
+    notify(`球場をLv${lvl+1}にアップグレード！チケット収入 UP`,"ok");
+  };
+
   // initDraftPool is imported from engine/draft.js
   const handleDraftComplete=(pl,dr)=>{
     const myPicks=pl.filter(p=>dr[p.id]===myId);
@@ -589,9 +606,9 @@ export default function App(){
     }
     setScreen("retire_phase");
   }}/></>);
-  if(screen==="draft_preview"&&draftPool) return(<><DraftPreviewScreen teams={teams} myId={myId} year={year} pool={draftPool} onStart={()=>setScreen("draft_lottery")}/></>);
+  if(screen==="draft_preview"&&draftPool) return(<><DraftPreviewScreen teams={teams} myId={myId} year={year} pool={draftPool} draftAllocation={draftAllocation} onAllocationChange={setDraftAllocation} onStart={()=>setScreen("draft_lottery")}/></>);
   if(screen==="draft_lottery"&&draftPool) return(<><DraftLotteryScreen teams={teams} myId={myId} year={year} pool={draftPool} onDone={(r1)=>{setDraftPool(prev=>prev.map(p=>{const winner=Object.entries(r1).find(function(e){return e[1]&&e[1].id===p.id;});return{...p,_drafted:winner?true:undefined,_r1winner:winner?winner[0]:undefined};}));setScreen("draft");}}/></>);
-  if(screen==="draft"&&draftPool) return(<><DraftScreen teams={teams} myId={myId} year={year} pool={draftPool} onDraftDone={(pl,dr)=>{setDraftResult({pool:pl,drafted:dr});setScreen("draft_review");}}/></>);
+  if(screen==="draft"&&draftPool) return(<><DraftScreen teams={teams} myId={myId} year={year} pool={draftPool} draftAllocation={draftAllocation} onDraftDone={(pl,dr)=>{setDraftResult({pool:pl,drafted:dr});setScreen("draft_review");}}/></>);
   if(screen==="draft_review"&&draftResult) return(<><DraftReviewScreen teams={teams} myId={myId} year={year} pool={draftResult.pool} drafted={draftResult.drafted} onEnd={()=>handleDraftComplete(draftResult.pool,draftResult.drafted)}/></>);
 
   const g=(myTeam?.wins||0)+(myTeam?.losses||0);
@@ -688,7 +705,7 @@ export default function App(){
         <div className="card"><div className="card-h">スカウト派遣</div><div className="g2">{SCOUT_REGIONS.map(sr=><div key={sr.id} className="card2" style={{cursor:"pointer"}} onClick={()=>sendScout(sr)}><div style={{fontWeight:700,fontSize:12,marginBottom:3}}>{sr.name}</div><div style={{fontSize:10,color:"#374151"}}>費用:{fmtSal(sr.cost)} / Lv{sr.qMin}〜{sr.qMax}</div></div>)}</div></div>
       </div>
     )}
-    {tab==="finance"&&<FinanceTab team={myTeam}/>}
+    {tab==="finance"&&<FinanceTab team={myTeam} onStadiumUpgrade={handleStadiumUpgrade} gameDay={gameDay}/>}
     {tab==="standings"&&<StandingsTab teams={teams} myId={myId}/>}
     {tab==="stats"&&<StatsTab teams={teams} myId={myId}/>}
 
