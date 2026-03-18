@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import './styles.css';
 import { rng, clamp, uid, pname, fmtM, fmtSal, gameDayToDate, scoutedValue } from './utils';
 import { buildTeam, makePlayer, emptyStats, calcRetireWill, rollRetire, developPlayers, checkForInjuries, tickInjuries } from './engine/player';
@@ -54,6 +54,8 @@ export default function App(){
   const [seasonHistory,setSeasonHistory]=useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[]});
   const [saveExists,setSaveExists]=useState(()=>hasSave());
   const [schedule,setSchedule]=useState(null);
+  // プレーオフ初期化待機フラグ: 最終戦後に全setTeamsが反映されてからinitPlayoffを呼ぶ
+  const pendingPlayoffRef=useRef(false);
 
   // シーズン日程をyear変更時に再生成（チームID・リーグ構成は不変なのでteams.lengthで十分）
   useEffect(()=>{
@@ -62,6 +64,16 @@ export default function App(){
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[year,teams.length]);
+
+  // 最終戦終了後: 全setState（対戦相手記録・CPU試合）が反映された teams でプレーオフ初期化
+  useEffect(()=>{
+    if(pendingPlayoffRef.current){
+      pendingPlayoffRef.current=false;
+      setPlayoff(initPlayoff(teams));
+      setScreen('playoff');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[teams]);
 
   const myTeam=useMemo(()=>teams.find(t=>t.id===myId),[teams,myId]);
   const notify=useCallback((msg,type="ok")=>{setNotif({msg,type});setTimeout(()=>setNotif(null),3500);},[]);
@@ -178,9 +190,15 @@ export default function App(){
       updated.revenueThisSeason=(updated.revenueThisSeason??0)+revTotal;
       return updated;
     });
-    // Update opponent's individual player stats
+    // Update opponent's team record and individual player stats
     upd(currentOpp.id,t=>{
-      let updated={...t};
+      let updated={...t,
+        wins:t.wins+(!won&&!drew?1:0),
+        losses:t.losses+(won?1:0),
+        draws:t.draws+(drew?1:0),
+        rf:t.rf+r.score.opp,
+        ra:t.ra+r.score.my,
+      };
       updated.players=applyGameStatsFromLog(updated.players,r.log||[],false,!won&&!drew);
       updated.players=applyPostGameCondition(updated.players,r.log||[],false,gameDay);
       updated.players=tickInjuries(updated.players);
@@ -242,8 +260,8 @@ export default function App(){
     }
     setGameDay(d=>d+1);
     if(gameDay>=SEASON_GAMES){
-      const finalTeams=teams.map(t=>t.id===myId?{...t,wins:t.wins+(won?1:0),losses:t.losses+(!won&&!drew?1:0),draws:t.draws+(drew?1:0),rf:t.rf+r.score.my,ra:t.ra+r.score.opp}:t);
-      setPlayoff(initPlayoff(finalTeams));setScreen("playoff");
+      // 全setState反映後の teams でinitPlayoffを呼ぶためuseEffectに委譲
+      pendingPlayoffRef.current=true;
     }
     else setScreen("result");
   };
@@ -324,9 +342,12 @@ export default function App(){
       myT.players=applyDefenseCoachRecovery(myT.players,myT.coaches);
       const _inj=checkForInjuries(myT.players);
       if(_inj.length>0)myT.players=myT.players.map(p=>{const inj=_inj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
-      // 対戦相手の個人成績更新
+      // 対戦相手のチーム成績・個人成績更新
       const oppT=newTeams.find(t=>t.id===opp.id);
       if(oppT){
+        if(won){oppT.losses++;oppT.rf+=r.score.opp;oppT.ra+=r.score.my;}
+        else if(drew){oppT.draws++;oppT.rf+=r.score.opp;oppT.ra+=r.score.my;}
+        else{oppT.wins++;oppT.rf+=r.score.opp;oppT.ra+=r.score.my;}
         oppT.players=applyGameStatsFromLog(oppT.players,r.log||[],false,!won&&!drew);
         oppT.players=applyPostGameCondition(oppT.players,r.log||[],false,newDay);
         oppT.players=tickInjuries(oppT.players);
@@ -376,9 +397,15 @@ export default function App(){
       updated.revenueThisSeason=(updated.revenueThisSeason??0)+revTotal;
       return updated;
     });
-    // Update opponent's individual player stats
+    // Update opponent's team record and individual player stats
     upd(currentOpp.id,t=>{
-      let updated={...t};
+      let updated={...t,
+        wins:t.wins+(!won&&!drew?1:0),
+        losses:t.losses+(won?1:0),
+        draws:t.draws+(drew?1:0),
+        rf:t.rf+gsResult.score.opp,
+        ra:t.ra+gsResult.score.my,
+      };
       updated.players=applyGameStatsFromLog(updated.players,gsResult.log,false,!won&&!drew);
       updated.players=applyPostGameCondition(updated.players,gsResult.log,false,gameDay);
       updated.players=tickInjuries(updated.players);
@@ -420,8 +447,8 @@ export default function App(){
     setGameResult({...gsResult,oppTeam:currentOpp,won});
     setGameDay(d=>d+1);
     if(gameDay>=SEASON_GAMES){
-      const finalTeams=teams.map(t=>t.id===myId?{...t,wins:t.wins+(won?1:0),losses:t.losses+(!won&&!drew?1:0),draws:t.draws+(drew?1:0),rf:t.rf+gsResult.score.my,ra:t.ra+gsResult.score.opp}:t);
-      setPlayoff(initPlayoff(finalTeams));setScreen("playoff");
+      // 全setState反映後の teams でinitPlayoffを呼ぶためuseEffectに委譲
+      pendingPlayoffRef.current=true;
     }
     else setScreen("result");
   };
