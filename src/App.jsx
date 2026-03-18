@@ -10,6 +10,7 @@ import { calcRevenue } from './engine/finance';
 import { generateCpuOffer } from './engine/trade';
 import { initDraftPool } from './engine/draft';
 import { initPlayoff } from './engine/playoff';
+import { generateSeasonSchedule, getMyMatchup, getCpuMatchups } from './engine/scheduleGen';
 import { TacticalGameScreen } from './components/TacticalGame';
 import { BatchResultScreen } from './components/BatchResult';
 import { ModeSelectScreen, ResultScreen, RetirePhaseScreen, WaiverPhaseScreen, GrowthSummaryScreen } from './components/Screens';
@@ -52,6 +53,15 @@ export default function App(){
   const [developmentSummary,setDevelopmentSummary]=useState(null);
   const [seasonHistory,setSeasonHistory]=useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[]});
   const [saveExists,setSaveExists]=useState(()=>hasSave());
+  const [schedule,setSchedule]=useState(null);
+
+  // シーズン日程をyear変更時に再生成（チームID・リーグ構成は不変なのでteams.lengthで十分）
+  useEffect(()=>{
+    if(teams.length===12){
+      setSchedule(generateSeasonSchedule(year,teams));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[year,teams.length]);
 
   const myTeam=useMemo(()=>teams.find(t=>t.id===myId),[teams,myId]);
   const notify=useCallback((msg,type="ok")=>{setNotif({msg,type});setTimeout(()=>setNotif(null),3500);},[]);
@@ -110,19 +120,23 @@ export default function App(){
 
   const handleSelect=id=>{setMyId(id);setScreen("hub");setTab("roster");};
 
-  // ④ gameDay に応じて対戦相手を選択（60〜94: 交流戦）
-  const pickOpponent=(day,myLeague)=>{
-    const isInterleague=day>=60&&day<=94;
-    const pool=isInterleague
-      ?teams.filter(t=>t.id!==myId&&t.league!==myLeague)
-      :teams.filter(t=>t.id!==myId&&t.league===myLeague);
-    return pool[rng(0,pool.length-1)]||teams.filter(t=>t.id!==myId)[0];
+  // スケジュールから対戦相手を取得（フォールバック: ランダム同リーグ選択）
+  const pickOpponentFromSchedule=(day)=>{
+    const matchup=getMyMatchup(schedule,day,myId);
+    if(matchup){
+      return {opp:teams.find(t=>t.id===matchup.oppId)||null, isHome:matchup.isHome, venueNote:matchup.venueNote};
+    }
+    // フォールバック（scheduleがまだ生成されていない場合）
+    const myLeague=myTeam?.league;
+    const pool=teams.filter(t=>t.id!==myId&&t.league===myLeague);
+    return {opp:pool[rng(0,pool.length-1)]||teams.find(t=>t.id!==myId),isHome:true,venueNote:null};
   };
 
   // Pick opponent and go to mode select (CPU vs CPU games are simulated after the player's game ends)
   const handleStartGame=()=>{
     if(!myTeam) return;
-    const opp=pickOpponent(gameDay,myTeam.league);
+    const {opp}=pickOpponentFromSchedule(gameDay);
+    if(!opp) return;
     setCurrentOpp(opp);
     setScreen("mode_select");
   };
@@ -174,14 +188,18 @@ export default function App(){
       if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
       return updated;
     });
-    // Simulate remaining CPU vs CPU games for this day (with full individual stat updates)
+    // Simulate remaining CPU vs CPU games for this day (schedule-based matchups)
     const _oppId=currentOpp.id;
+    const _cpuMatchups=getCpuMatchups(schedule,gameDay,myId,_oppId);
     setTeams(prev=>{
       let newTeams=prev.map(t=>({...t,players:t.players.map(p=>({...p,stats:{...p.stats}}))}));
-      const others=newTeams.filter(t=>t.id!==myId&&t.id!==_oppId);
-      for(let i=0;i<others.length-1;i+=2){
-        const a=newTeams.find(t=>t.id===others[i].id);
-        const b=newTeams.find(t=>t.id===others[i+1]?.id);
+      const matchupList=_cpuMatchups.length>0
+        ?_cpuMatchups
+        // フォールバック: scheduleがない場合は残りチームをペアリング
+        :(()=>{const others=newTeams.filter(t=>t.id!==myId&&t.id!==_oppId);const pairs=[];for(let i=0;i<others.length-1;i+=2)pairs.push({homeId:others[i].id,awayId:others[i+1].id});return pairs;})();
+      for(const matchup of matchupList){
+        const a=newTeams.find(t=>t.id===matchup.homeId);
+        const b=newTeams.find(t=>t.id===matchup.awayId);
         if(!a||!b) continue;
         const cr=quickSimGame(a,b);
         const cdrew=cr.score.my===cr.score.opp;
@@ -254,17 +272,25 @@ export default function App(){
     let newDay=gameDay;
 
     for(let g=0;g<count;g++){
-      // ④ 交流戦期間(第60〜94戦)は他リーグから対戦相手を選択
-      const isInterleague=newDay>=60&&newDay<=94;
-      const oppPool=isInterleague
-        ?newTeams.filter(t=>t.id!==myId&&t.league!==myTeam.league)
-        :newTeams.filter(t=>t.id!==myId&&t.league===myTeam.league);
-      const opp=oppPool[rng(0,oppPool.length-1)]||newTeams.filter(t=>t.id!==myId)[0];
-      // CPU vs CPU
-      const others=newTeams.filter(t=>t.id!==myId&&t.id!==opp.id);
-      for(let i=0;i<others.length-1;i+=2){
-        const a=newTeams.find(t=>t.id===others[i].id);
-        const b=newTeams.find(t=>t.id===others[i+1]?.id);
+      // スケジュールから対戦相手を取得（フォールバック: ランダム）
+      const scheduleMatchup=getMyMatchup(schedule,newDay,myId);
+      let oppId=scheduleMatchup?.oppId;
+      if(!oppId){
+        const isInterleague=newDay>=60&&newDay<=94;
+        const oppPool=isInterleague
+          ?newTeams.filter(t=>t.id!==myId&&t.league!==myTeam.league)
+          :newTeams.filter(t=>t.id!==myId&&t.league===myTeam.league);
+        oppId=(oppPool[rng(0,oppPool.length-1)]||newTeams.find(t=>t.id!==myId))?.id;
+      }
+      const opp=newTeams.find(t=>t.id===oppId)||newTeams.find(t=>t.id!==myId);
+      // CPU vs CPU（スケジュール参照）
+      const batchCpuMatchups=getCpuMatchups(schedule,newDay,myId,opp.id);
+      const cpuPairs=batchCpuMatchups.length>0
+        ?batchCpuMatchups
+        :(()=>{const others=newTeams.filter(t=>t.id!==myId&&t.id!==opp.id);const pairs=[];for(let i=0;i<others.length-1;i+=2)pairs.push({homeId:others[i].id,awayId:others[i+1].id});return pairs;})();
+      for(const cpuMatchup of cpuPairs){
+        const a=newTeams.find(t=>t.id===cpuMatchup.homeId);
+        const b=newTeams.find(t=>t.id===cpuMatchup.awayId);
         if(!a||!b) continue;
         const cr=quickSimGame(a,b);
         const cdrew=cr.score.my===cr.score.opp;
@@ -360,14 +386,17 @@ export default function App(){
       if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
       return updated;
     });
-    // Simulate remaining CPU vs CPU games for this day (with full individual stat updates)
+    // Simulate remaining CPU vs CPU games for this day (schedule-based matchups)
     const _tOppId=currentOpp.id;
+    const _tCpuMatchups=getCpuMatchups(schedule,gameDay,myId,_tOppId);
     setTeams(prev=>{
       let newTeams=prev.map(t=>({...t,players:t.players.map(p=>({...p,stats:{...p.stats}}))}));
-      const others=newTeams.filter(t=>t.id!==myId&&t.id!==_tOppId);
-      for(let i=0;i<others.length-1;i+=2){
-        const a=newTeams.find(t=>t.id===others[i].id);
-        const b=newTeams.find(t=>t.id===others[i+1]?.id);
+      const tMatchupList=_tCpuMatchups.length>0
+        ?_tCpuMatchups
+        :(()=>{const others=newTeams.filter(t=>t.id!==myId&&t.id!==_tOppId);const pairs=[];for(let i=0;i<others.length-1;i+=2)pairs.push({homeId:others[i].id,awayId:others[i+1].id});return pairs;})();
+      for(const matchup of tMatchupList){
+        const a=newTeams.find(t=>t.id===matchup.homeId);
+        const b=newTeams.find(t=>t.id===matchup.awayId);
         if(!a||!b) continue;
         const cr=quickSimGame(a,b);
         const cdrew=cr.score.my===cr.score.opp;
@@ -699,7 +728,7 @@ export default function App(){
   return(<><div className="app"><div className="hub">
     <div className="topbar">
       <span style={{fontSize:26}}>{myTeam?.emoji}</span>
-      <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14,color:myTeam?.color}}>{myTeam?.name}</div><div style={{fontSize:10,color:"#374151"}}>{year}年 {(d=>d.month+"月"+d.day+"日")(gameDayToDate(gameDay))} / 第{gameDay}戦{gameDay>=60&&gameDay<=94?" 🔄交流戦":""} / 残り{remain}試合</div></div>
+      <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14,color:myTeam?.color}}>{myTeam?.name}</div><div style={{fontSize:10,color:"#374151"}}>{year}年 {(d=>d.month+"月"+d.day+"日")(gameDayToDate(gameDay,schedule))} / 第{gameDay}戦{schedule?.[gameDay]?.isInterleague?" 🔄交流戦":""} / 残り{remain}試合</div></div>
       <div style={{display:"flex",gap:5,flexWrap:"wrap"}}><span className="chip cg">{myTeam?.wins}勝</span><span className="chip cr">{myTeam?.losses}敗</span><span className="chip cy">{fmtM(myTeam?.budget||0)}</span></div>
       <div className="tb-record">{myTeam?.wins}勝{myTeam?.losses}敗</div>
       <button style={{background:"rgba(74,222,128,.1)",border:"1px solid rgba(74,222,128,.4)",color:"#4ade80",borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}} onClick={handleSave}>💾 保存</button>
