@@ -294,6 +294,17 @@ function matchupScore(bat, pit) {
 //  SECTION 10: ゲーム状態管理（既存コードと互換）
 // ═══════════════════════════════════════════════════════════════
 
+// ブルペンを役割順（中継ぎ→抑え→先発）に並べる
+function sortBullpen(pitchers) {
+  const ORDER = { '中継ぎ': 0, '抑え': 1, '先発': 2 };
+  return [...pitchers].sort((a, b) => {
+    const ao = ORDER[a.subtype] ?? 2;
+    const bo = ORDER[b.subtype] ?? 2;
+    if (ao !== bo) return ao - bo;
+    return (b.pitching?.stamina ?? 50) - (a.pitching?.stamina ?? 50);
+  });
+}
+
 function initGameState(myTeam, oppTeam) {
   const myL = myTeam.lineup.map(id => myTeam.players.find(p => p.id === id)).filter(Boolean);
   const opL = oppTeam.lineup.map(id => oppTeam.players.find(p => p.id === id)).filter(Boolean);
@@ -308,8 +319,8 @@ function initGameState(myTeam, oppTeam) {
     myBatIdx: 0, opBatIdx: 0,
     myPitcher: myStarter, opPitcher: opStarter,
     myPitchCount: 0, opPitchCount: 0,
-    myBullpen: myTeam.players.filter(p => p.isPitcher && p.id !== myStarter?.id),
-    opBullpen: oppTeam.players.filter(p => p.isPitcher && p.id !== opStarter?.id),
+    myBullpen: sortBullpen(myTeam.players.filter(p => p.isPitcher && p.id !== myStarter?.id)),
+    opBullpen: sortBullpen(oppTeam.players.filter(p => p.isPitcher && p.id !== opStarter?.id)),
     myBench:   myTeam.players.filter(p => !p.isPitcher && !myTeam.lineup.includes(p.id)),
     usedBullpen: [], usedPH: {}, usedPR: {},
     momentum: 50, stopped: false, stopReason: null, stopData: null,
@@ -457,17 +468,42 @@ function checkStopCondition(gs) {
   return null;
 }
 
+// バッチシム用: 両チームの自動投手交代（球数・終盤・ピンチ対応）
+function autoSwapPitcher(gs, side) {
+  const pitcher    = side === 'my' ? gs.myPitcher    : gs.opPitcher;
+  const pitchCount = side === 'my' ? gs.myPitchCount : gs.opPitchCount;
+  const bullpen    = side === 'my' ? gs.myBullpen     : gs.opBullpen;
+
+  if (!bullpen || bullpen.length === 0) return gs;
+
+  const mustSwap = pitchCount >= PITCH_LIMIT;
+  const tiredSwap = pitchCount >= PITCH_WARNING;
+  const myLead = gs.score.my - gs.score.opp;
+  const lead = side === 'my' ? myLead : -myLead;
+  const closers = bullpen.filter(p => p.subtype === '抑え' || p.subtype === '中継ぎ');
+  const closerTime = gs.inning >= 8 && lead >= 1 && lead <= 2
+    && pitcher?.subtype === '先発' && closers.length > 0;
+  const inScoringCrisis = gs.outs === 2 && (gs.bases[1] || gs.bases[2])
+    && tiredSwap && pitcher?.subtype === '先発';
+
+  if (!mustSwap && !closerTime && !inScoringCrisis && !tiredSwap) return gs;
+
+  const rp = (closerTime && closers.length > 0) ? closers[0] : bullpen[0];
+  const newBullpen = bullpen.filter(p => p.id !== rp.id);
+
+  if (side === 'my') {
+    return { ...gs, myPitcher: rp, myBullpen: newBullpen, myPitchCount: 0 };
+  } else {
+    return { ...gs, opPitcher: rp, opBullpen: newBullpen, opPitchCount: 0 };
+  }
+}
+
 function quickSimGame(myTeam, oppTeam) {
   let gs = initGameState(myTeam, oppTeam);
   while (!gs.gameOver) {
-    const stop = checkStopCondition(gs);
-    if (stop?.reason==='pitcher_limit'||stop?.reason==='pitcher_tired') {
-      if (gs.myBullpen.length>0) { const rp=gs.myBullpen[0]; gs={...gs,myPitcher:rp,myBullpen:gs.myBullpen.slice(1),myPitchCount:0}; }
-    }
-    // 相手チーム投手の疲労チェック（!isTop = 自チームが打席 = 相手が投球中）
-    if (!gs.isTop && gs.opPitchCount>=PITCH_WARNING && gs.opBullpen?.length>0) {
-      const rp=gs.opBullpen[0]; gs={...gs,opPitcher:rp,opBullpen:gs.opBullpen.slice(1),opPitchCount:0};
-    }
+    // 守備側チームの自動継投（球数・終盤・ピンチを両チーム対称に処理）
+    if (gs.isTop)  gs = autoSwapPitcher(gs, 'my');
+    if (!gs.isTop) gs = autoSwapPitcher(gs, 'op');
     let autoStrategy='normal';
     if (gs.bases[0]&&!gs.bases[1]&&gs.outs<2) {
       const lineup=(!gs.isTop?gs.myLineup:gs.opLineup);

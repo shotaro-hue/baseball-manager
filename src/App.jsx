@@ -328,6 +328,8 @@ export default function App(){
         b.players=tickInjuries(b.players);
         const bInj=checkForInjuries(b.players);
         if(bInj.length>0)b.players=b.players.map(p=>{const inj=bInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+        a.rotIdx=(a.rotIdx||0)+1;
+        b.rotIdx=(b.rotIdx||0)+1;
       }
       // 自チームの試合
       const myT=newTeams.find(t=>t.id===myId);
@@ -355,6 +357,7 @@ export default function App(){
         oppT.players=tickInjuries(oppT.players);
         const oppInj=checkForInjuries(oppT.players);
         if(oppInj.length>0)oppT.players=oppT.players.map(p=>{const inj=oppInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+        oppT.rotIdx=(oppT.rotIdx||0)+1;
       }
       // 収益更新（試合ごと）
       const rev=calcRevenue(myT);
