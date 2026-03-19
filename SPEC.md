@@ -1,6 +1,6 @@
 # Baseball Manager 2025 — 仕様書
 
-> 最終更新: 2026-03-18（NPBリアル日程システム実装・バグ修正 B1/B2/B3/B4/B5/B6/B7 完了）
+> 最終更新: 2026-03-18（NPBリアル日程システム実装・バグ修正 B1/B2/B3/B4/B5/B6/B7/B8 完了）
 
 > **運用ルール**: コードに改修を加えた際は、仕様への影響を確認し、影響がある場合のみ本文を更新する。
 > 変更の有無にかかわらず `変更履歴` に日付・内容を追記し、**過去の記録は削除しない**。
@@ -916,6 +916,24 @@ HR 補正: 1.0 より大きいと HR になりやすい、小さいと HR が二
 
 > 最新エントリが最上部。過去のエントリは削除しない。
 > 仕様本文を変更した場合は「旧 → 新」を明記、内部バグ修正のみの場合は概要のみ記録。
+
+---
+
+### 2026-03-18 — バグ修正 B8: 相手チーム投手が絶対に交代しないバグ修正（本当の根本原因）
+
+**仕様本文への影響あり（§4.4）**
+
+#### B8: `initGameState` に `opBullpen` が存在せず `quickSimGame` が相手投手を管理しない（P0）
+
+- **根本原因**: `initGameState()` は `myBullpen`（自チームのブルペン）を生成するが `opBullpen`（相手チームのブルペン）が一切存在しなかった。
+  `quickSimGame()` のループは `myPitcher` の疲労のみチェックし `opPitcher/opPitchCount` を管理するコードがゼロだった。
+  結果として、全オートシム・バッチシム・CPU vs CPU ゲームで相手先発投手は何球投げても絶対に交代しなかった。
+  B7 fix（isTop フラグ修正）は自チーム投手の交代タイミング改善だったが、本問題（相手投手の未管理）は未タッチだった。
+- **修正 1**: `initGameState` の return 内に `opBullpen: oppTeam.players.filter(p => p.isPitcher && p.id !== opStarter?.id)` を追加
+- **修正 2**: `quickSimGame` のループに相手投手疲労チェックを追加:
+  `!gs.isTop && gs.opPitchCount >= PITCH_WARNING && gs.opBullpen?.length > 0` の場合に `opPitcher` を交代
+  （`!isTop` = 自チームが打席 = 相手が投球中。自チーム投手チェックの対称的な実装）
+- **変更ファイル**: `src/engine/simulation.js`（initGameState line 312、quickSimGame lines 467–470）
 
 ---
 

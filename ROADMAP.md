@@ -1,6 +1,6 @@
 # Baseball Manager 2025 — ロードマップ
 
-> 最終更新: 2026-03-18（NPBリアル日程システム実装・バグ修正完了・B5/B6/B7 修正追記）
+> 最終更新: 2026-03-18（NPBリアル日程システム実装・バグ修正完了・B8 相手投手未管理バグ修正）
 > **ゴール**: NPB版 OOTP / Football Manager — 深いシミュレーションと長期フランチャイズ経営
 > **運用ルール**: 実装完了した項目は ✅ に更新。新規項目は末尾に追記。過去の記録は削除しない。
 
@@ -77,6 +77,7 @@
 | B5 | **[P1] 翌年開幕時に日程タブが旧年スケジュール表示** | `handleNextYear` が `setSchedule` を呼ばずに `setYear(y=>y+1)` + `setScreen("hub")` のみ発火させていたため、翌年ハブ画面の初期レンダリング時点でスケジュールが前年分のままになるバグを修正。`handleNextYear` に `setSchedule(generateSeasonSchedule(year+1, teams))` を追加 | — |
 | B6 | **[P0] エントリーポイント誤設定による日程タブ完全未表示** | `src/main.jsx` の import が `'../combined-artifact'`（旧全結合ファイル）を参照しており `src/App.jsx` が一切使われていなかった。B4/B5 を含む全修正が未反映だった。import を `'./App'` に変更して修正 | — |
 | B7 | **[P1] バッチシムで中継ぎが起用されず先発が常に完投** | `checkStopCondition()` のピッチカウント閾値条件が `!gs.isTop`（自チームが打席の回）を見ていたため、自チーム投手が投球中（`isTop=true`）に閾値に達しても交代条件が発火しなかった。`!gs.isTop` → `gs.isTop` に修正 | bce22ba |
+| B8 | **[P0] 相手チーム投手が全試合で絶対に交代しない（本当の根本原因）** | `initGameState` に `opBullpen` が存在せず `quickSimGame` に相手投手の疲労チェックが一切なかった。全オートシム・バッチシム・CPU vs CPU で相手先発は常に完投していた。`opBullpen` フィールドを追加し `quickSimGame` に相手投手の自動交代ロジックを追加 | — |
 
 ---
 

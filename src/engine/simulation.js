@@ -309,6 +309,7 @@ function initGameState(myTeam, oppTeam) {
     myPitcher: myStarter, opPitcher: opStarter,
     myPitchCount: 0, opPitchCount: 0,
     myBullpen: myTeam.players.filter(p => p.isPitcher && p.id !== myStarter?.id),
+    opBullpen: oppTeam.players.filter(p => p.isPitcher && p.id !== opStarter?.id),
     myBench:   myTeam.players.filter(p => !p.isPitcher && !myTeam.lineup.includes(p.id)),
     usedBullpen: [], usedPH: {}, usedPR: {},
     momentum: 50, stopped: false, stopReason: null, stopData: null,
@@ -462,6 +463,10 @@ function quickSimGame(myTeam, oppTeam) {
     const stop = checkStopCondition(gs);
     if (stop?.reason==='pitcher_limit'||stop?.reason==='pitcher_tired') {
       if (gs.myBullpen.length>0) { const rp=gs.myBullpen[0]; gs={...gs,myPitcher:rp,myBullpen:gs.myBullpen.slice(1),myPitchCount:0}; }
+    }
+    // 相手チーム投手の疲労チェック（!isTop = 自チームが打席 = 相手が投球中）
+    if (!gs.isTop && gs.opPitchCount>=PITCH_WARNING && gs.opBullpen?.length>0) {
+      const rp=gs.opBullpen[0]; gs={...gs,opPitcher:rp,opBullpen:gs.opBullpen.slice(1),opPitchCount:0};
     }
     let autoStrategy='normal';
     if (gs.bases[0]&&!gs.bases[1]&&gs.outs<2) {
