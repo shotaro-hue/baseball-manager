@@ -1,5 +1,5 @@
 import { rng, rngf, clamp } from '../utils';
-import { PITCH_WARNING, PITCH_LIMIT } from '../constants';
+import { PITCH_NORM, PITCH_HARD_CAP, FATIGUE_WARNING, FATIGUE_LIMIT } from '../constants';
 
 /* ================================================================
    SIMULATION ENGINE v4.0
@@ -206,7 +206,7 @@ function simAtBat(bat, pit, strategy = 'normal', pitchCount = 0, situation = {},
   }
 
   const pitchingBonus = situation.coachBonuses?.pitching || 0;
-  const fatigue       = calcFatigue(pitchCount, pit?.pitching?.stamina || 50);
+  const fatigue       = calcEffectiveFatigue(pitchCount, pit);
   const fatiguedPit   = applyFatigue(pit, fatigue, pitchingBonus);
   const situatedBat   = applyBatterSituation(bat, situation);
   let   probs         = calcPAProbs(situatedBat, fatiguedPit, leagueEnv);
@@ -272,7 +272,13 @@ function estimatePitchCount(result) {
 }
 
 function calcFatigue(pitchCount, stamina) {
-  return clamp(Math.round(pitchCount / PITCH_LIMIT * 100 * (1 - (stamina - 50) / 200)), 0, 100);
+  return clamp(Math.round(pitchCount / PITCH_NORM * 100 * (1 - (stamina - 50) / 200)), 0, 100);
+}
+
+function calcEffectiveFatigue(pitchCount, pitcher) {
+  const stamina   = pitcher?.pitching?.stamina ?? 50;
+  const condition = pitcher?.condition ?? 70;
+  return calcFatigue(pitchCount, stamina * (condition / 100));
 }
 
 function weightedRandom(weights) {
@@ -490,10 +496,11 @@ function endHalfInning(gs) {
 }
 
 function checkStopCondition(gs) {
-  if (gs.isTop && gs.myPitchCount>=PITCH_WARNING && gs.myBullpen.length>0)
-    return { reason:'pitcher_tired',           label:'⚠️ 投手疲労警告',           priority:2, data:{ pitchCount:gs.myPitchCount, pitcher:gs.myPitcher } };
-  if (gs.isTop && gs.myPitchCount>=PITCH_LIMIT)
-    return { reason:'pitcher_limit',           label:'🚨 投手交代必須',             priority:5, data:{ pitchCount:gs.myPitchCount, pitcher:gs.myPitcher } };
+  const myEffFatigue = calcEffectiveFatigue(gs.myPitchCount, gs.myPitcher);
+  if (gs.isTop && (myEffFatigue >= FATIGUE_LIMIT || gs.myPitchCount >= PITCH_HARD_CAP))
+    return { reason:'pitcher_limit',           label:'🚨 投手交代必須',             priority:5, data:{ pitchCount:gs.myPitchCount, fatigue:myEffFatigue, pitcher:gs.myPitcher } };
+  if (gs.isTop && myEffFatigue >= FATIGUE_WARNING && gs.myBullpen.length>0)
+    return { reason:'pitcher_tired',           label:'⚠️ 投手疲労警告',           priority:2, data:{ pitchCount:gs.myPitchCount, fatigue:myEffFatigue, pitcher:gs.myPitcher } };
   if (gs.isTop && gs.outs===2 && (gs.bases[1]||gs.bases[2]) && gs.myBullpen.length>0)
     return { reason:'scoring_position_crisis', label:'🔴 得点圏ピンチ！',           priority:3, data:null };
   const myBehind = gs.score.opp-gs.score.my;
@@ -506,7 +513,8 @@ function checkStopCondition(gs) {
   }
   if (gs.isTop && gs.inning>=8) {
     const diff=gs.score.my-gs.score.opp;
-    const closers=gs.myBullpen.filter(p=>p.subtype==='抑え'||p.subtype==='中継ぎ');
+    // 本物の抑えがいる場合のみクローザー投入タイミングを通知する
+    const closers=gs.myBullpen.filter(p=>p.subtype==='抑え');
     if (diff>=1 && diff<=2 && closers.length>0 && gs.myPitcher?.subtype==='先発')
       return { reason:'closer_time',           label:'🔒 クローザー投入タイミング', priority:2, data:{ closers } };
   }
@@ -530,8 +538,9 @@ function autoSwapPitcher(gs, side) {
   const isExtra = gs.inning >= 10;
   const isCloseGame = Math.abs(lead) <= 3;
   const runnersInScoringPosition = Boolean(gs.bases[1] || gs.bases[2]);
-  const fatigueWarning = pitchCount >= PITCH_WARNING;
-  const fatigueLimit = pitchCount >= PITCH_LIMIT;
+  const effectiveFatigue = calcEffectiveFatigue(pitchCount, pitcher);
+  const fatigueWarning = effectiveFatigue >= FATIGUE_WARNING || pitchCount >= PITCH_HARD_CAP;
+  const fatigueLimit   = effectiveFatigue >= FATIGUE_LIMIT   || pitchCount >= PITCH_HARD_CAP;
   const battersFaced = pitcherState?.battersFaced || 0;
   const startedPreviousDefensiveFrame = Boolean(pitcherState) && pitcherState.enteredInning !== gs.inning;
 
@@ -543,16 +552,17 @@ function autoSwapPitcher(gs, side) {
   const starterShouldYield = isStarter && (
     fatigueLimit
     || (gs.inning >= 6 && fatigueWarning)
-    || (gs.inning >= 7 && lead >= 0)
-    || (leverageCrisis && pitchCount >= Math.max(PITCH_WARNING - 12, 55))
+    || (gs.inning >= 7 && lead > 0)  // 同点(lead=0)では先発続投を許容
+    || (leverageCrisis && effectiveFatigue >= Math.max(FATIGUE_WARNING - 10, 50))
   );
 
+  const hasCloserInBullpen = bullpen.some(p => p.subtype === '抑え');
   const relieverShouldYield = isReliever && (
     fatigueLimit
     || (fatigueWarning && battersFaced >= 4)
     || (startedPreviousDefensiveFrame && battersFaced >= 3)
-    || (saveSituation && pitcher?.subtype !== '抑え')
-    || (setupSituation && pitchCount >= Math.max(PITCH_WARNING - 18, 22))
+    || (saveSituation && pitcher?.subtype !== '抑え' && hasCloserInBullpen)  // ブルペンに抑えがいる場合のみ交代
+    || (setupSituation && effectiveFatigue >= Math.max(FATIGUE_WARNING - 15, 30))
   );
 
   if (!starterShouldYield && !relieverShouldYield) return gs;
@@ -563,9 +573,7 @@ function autoSwapPitcher(gs, side) {
       ? 'setup'
       : (isExtra || lead <= -2)
         ? 'long'
-        : bridgeSituation
-          ? 'middle'
-          : 'middle';
+        : 'middle';
 
   const nextPitcher = pickBullpenArm(bullpen, targetRole);
   if (!nextPitcher) return gs;
