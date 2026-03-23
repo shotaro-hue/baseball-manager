@@ -490,10 +490,11 @@ function endHalfInning(gs) {
 }
 
 function checkStopCondition(gs) {
-  if (gs.isTop && gs.myPitchCount>=PITCH_WARNING && gs.myBullpen.length>0)
-    return { reason:'pitcher_tired',           label:'⚠️ 投手疲労警告',           priority:2, data:{ pitchCount:gs.myPitchCount, pitcher:gs.myPitcher } };
+  // pitcher_limit を先に判定しないと PITCH_WARNING>=100 の条件に先に引っかかり dead code になる
   if (gs.isTop && gs.myPitchCount>=PITCH_LIMIT)
     return { reason:'pitcher_limit',           label:'🚨 投手交代必須',             priority:5, data:{ pitchCount:gs.myPitchCount, pitcher:gs.myPitcher } };
+  if (gs.isTop && gs.myPitchCount>=PITCH_WARNING && gs.myBullpen.length>0)
+    return { reason:'pitcher_tired',           label:'⚠️ 投手疲労警告',           priority:2, data:{ pitchCount:gs.myPitchCount, pitcher:gs.myPitcher } };
   if (gs.isTop && gs.outs===2 && (gs.bases[1]||gs.bases[2]) && gs.myBullpen.length>0)
     return { reason:'scoring_position_crisis', label:'🔴 得点圏ピンチ！',           priority:3, data:null };
   const myBehind = gs.score.opp-gs.score.my;
@@ -506,7 +507,8 @@ function checkStopCondition(gs) {
   }
   if (gs.isTop && gs.inning>=8) {
     const diff=gs.score.my-gs.score.opp;
-    const closers=gs.myBullpen.filter(p=>p.subtype==='抑え'||p.subtype==='中継ぎ');
+    // 本物の抑えがいる場合のみクローザー投入タイミングを通知する
+    const closers=gs.myBullpen.filter(p=>p.subtype==='抑え');
     if (diff>=1 && diff<=2 && closers.length>0 && gs.myPitcher?.subtype==='先発')
       return { reason:'closer_time',           label:'🔒 クローザー投入タイミング', priority:2, data:{ closers } };
   }
@@ -543,15 +545,16 @@ function autoSwapPitcher(gs, side) {
   const starterShouldYield = isStarter && (
     fatigueLimit
     || (gs.inning >= 6 && fatigueWarning)
-    || (gs.inning >= 7 && lead >= 0)
+    || (gs.inning >= 7 && lead > 0)  // 同点(lead=0)では先発続投を許容
     || (leverageCrisis && pitchCount >= Math.max(PITCH_WARNING - 12, 55))
   );
 
+  const hasCloserInBullpen = bullpen.some(p => p.subtype === '抑え');
   const relieverShouldYield = isReliever && (
     fatigueLimit
     || (fatigueWarning && battersFaced >= 4)
     || (startedPreviousDefensiveFrame && battersFaced >= 3)
-    || (saveSituation && pitcher?.subtype !== '抑え')
+    || (saveSituation && pitcher?.subtype !== '抑え' && hasCloserInBullpen)  // ブルペンに抑えがいる場合のみ交代
     || (setupSituation && pitchCount >= Math.max(PITCH_WARNING - 18, 22))
   );
 
@@ -563,9 +566,7 @@ function autoSwapPitcher(gs, side) {
       ? 'setup'
       : (isExtra || lead <= -2)
         ? 'long'
-        : bridgeSituation
-          ? 'middle'
-          : 'middle';
+        : 'middle';
 
   const nextPitcher = pickBullpenArm(bullpen, targetRole);
   if (!nextPitcher) return gs;
