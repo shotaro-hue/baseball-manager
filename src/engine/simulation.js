@@ -305,6 +305,43 @@ function sortBullpen(pitchers) {
   });
 }
 
+function makePitcherState(inning, isTop) {
+  return { enteredInning: inning, enteredIsTop: isTop, enteredOuts: 0, battersFaced: 0 };
+}
+
+function scoreBullpenArm(pitcher, targetRole) {
+  const stuff = ((pitcher?.pitching?.velocity ?? 50) + (pitcher?.pitching?.control ?? 50) * 1.2 + (pitcher?.pitching?.breaking ?? 50)) / 3.2;
+  const stamina = pitcher?.pitching?.stamina ?? 50;
+  const condition = pitcher?.condition ?? 70;
+  const subtype = pitcher?.subtype;
+  const roleBonus = targetRole === 'closer'
+    ? (subtype === '抑え' ? 14 : subtype === '中継ぎ' ? 7 : -8)
+    : targetRole === 'setup'
+      ? (subtype === '中継ぎ' ? 10 : subtype === '抑え' ? 6 : -4)
+      : targetRole === 'long'
+        ? (subtype === '先発' ? 12 : subtype === '中継ぎ' ? 4 : -6)
+        : (subtype === '中継ぎ' ? 9 : subtype === '先発' ? 4 : 2);
+  return stuff + stamina * 0.18 + condition * 0.22 + roleBonus;
+}
+
+function pickBullpenArm(bullpen, targetRole) {
+  if (!bullpen?.length) return null;
+
+  const roleGroups = {
+    closer: ['抑え', '中継ぎ', '先発'],
+    setup: ['中継ぎ', '抑え', '先発'],
+    middle: ['中継ぎ', '先発', '抑え'],
+    long: ['先発', '中継ぎ', '抑え'],
+  };
+
+  const groups = roleGroups[targetRole] || roleGroups.middle;
+  const candidates = groups
+    .map(subtype => bullpen.filter(p => p.subtype === subtype))
+    .find(group => group.length > 0) || bullpen;
+
+  return [...candidates].sort((a, b) => scoreBullpenArm(b, targetRole) - scoreBullpenArm(a, targetRole))[0] || bullpen[0];
+}
+
 function initGameState(myTeam, oppTeam) {
   const myL = myTeam.lineup.map(id => myTeam.players.find(p => p.id === id)).filter(Boolean);
   const opL = oppTeam.lineup.map(id => oppTeam.players.find(p => p.id === id)).filter(Boolean);
@@ -319,6 +356,8 @@ function initGameState(myTeam, oppTeam) {
     myBatIdx: 0, opBatIdx: 0,
     myPitcher: myStarter, opPitcher: opStarter,
     myPitchCount: 0, opPitchCount: 0,
+    myPitcherState: makePitcherState(1, true),
+    opPitcherState: makePitcherState(1, false),
     myBullpen: sortBullpen(myTeam.players.filter(p => p.isPitcher && p.id !== myStarter?.id)),
     opBullpen: sortBullpen(oppTeam.players.filter(p => p.isPitcher && p.id !== opStarter?.id)),
     myBench:   myTeam.players.filter(p => !p.isPitcher && !myTeam.lineup.includes(p.id)),
@@ -430,8 +469,14 @@ function processAtBat(gs, strategy = 'normal') {
   if (isMyAtBat) newOpPC+=pitches; else newMyPC+=pitches;
 
   const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, pitcherId:pitcher?.id, result, ev:0, la:0, dist:0, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog, pitchType, zone };
+  const nextMyPitcherState = isMyAtBat
+    ? gs.myPitcherState
+    : { ...(gs.myPitcherState || makePitcherState(gs.inning, gs.isTop)), battersFaced: (gs.myPitcherState?.battersFaced || 0) + 1 };
+  const nextOpPitcherState = isMyAtBat
+    ? { ...(gs.opPitcherState || makePitcherState(gs.inning, gs.isTop)), battersFaced: (gs.opPitcherState?.battersFaced || 0) + 1 }
+    : gs.opPitcherState;
 
-  return { ...gs, outs, bases:newBases, score:newScore, log:[...gs.log,logEntry], myBatIdx:isMyAtBat?gs.myBatIdx+1:gs.myBatIdx, opBatIdx:!isMyAtBat?gs.opBatIdx+1:gs.opBatIdx, myPitchCount:newMyPC, opPitchCount:newOpPC, momentum:newMomentum, myInningRuns:!gs.isTop?gs.myInningRuns+runs:gs.myInningRuns, opInningRuns:gs.isTop?gs.opInningRuns+runs:gs.opInningRuns, stopped:false, stopReason:null, pendingStrategy:'normal' };
+  return { ...gs, outs, bases:newBases, score:newScore, log:[...gs.log,logEntry], myBatIdx:isMyAtBat?gs.myBatIdx+1:gs.myBatIdx, opBatIdx:!isMyAtBat?gs.opBatIdx+1:gs.opBatIdx, myPitchCount:newMyPC, opPitchCount:newOpPC, myPitcherState:nextMyPitcherState, opPitcherState:nextOpPitcherState, momentum:newMomentum, myInningRuns:!gs.isTop?gs.myInningRuns+runs:gs.myInningRuns, opInningRuns:gs.isTop?gs.opInningRuns+runs:gs.opInningRuns, stopped:false, stopReason:null, pendingStrategy:'normal' };
 }
 
 function endHalfInning(gs) {
@@ -468,34 +513,70 @@ function checkStopCondition(gs) {
   return null;
 }
 
-// バッチシム用: 両チームの自動投手交代（球数・終盤・ピンチ対応）
+// バッチシム用: 先発→中継ぎ→セットアッパー→抑えの流れを意識して自動継投
 function autoSwapPitcher(gs, side) {
-  const pitcher    = side === 'my' ? gs.myPitcher    : gs.opPitcher;
+  const pitcher = side === 'my' ? gs.myPitcher : gs.opPitcher;
   const pitchCount = side === 'my' ? gs.myPitchCount : gs.opPitchCount;
-  const bullpen    = side === 'my' ? gs.myBullpen     : gs.opBullpen;
+  const pitcherState = side === 'my' ? gs.myPitcherState : gs.opPitcherState;
+  const bullpen = side === 'my' ? gs.myBullpen : gs.opBullpen;
 
   if (!bullpen || bullpen.length === 0) return gs;
 
-  const mustSwap = pitchCount >= PITCH_LIMIT;
-  const tiredSwap = pitchCount >= PITCH_WARNING;
   const myLead = gs.score.my - gs.score.opp;
   const lead = side === 'my' ? myLead : -myLead;
-  const closers = bullpen.filter(p => p.subtype === '抑え' || p.subtype === '中継ぎ');
-  const closerTime = gs.inning >= 8 && lead >= 1 && lead <= 2
-    && pitcher?.subtype === '先発' && closers.length > 0;
-  const inScoringCrisis = gs.outs === 2 && (gs.bases[1] || gs.bases[2])
-    && tiredSwap && pitcher?.subtype === '先発';
+  const isStarter = pitcher?.subtype === '先発';
+  const isReliever = !isStarter;
+  const isLate = gs.inning >= 7;
+  const isExtra = gs.inning >= 10;
+  const isCloseGame = Math.abs(lead) <= 3;
+  const runnersInScoringPosition = Boolean(gs.bases[1] || gs.bases[2]);
+  const fatigueWarning = pitchCount >= PITCH_WARNING;
+  const fatigueLimit = pitchCount >= PITCH_LIMIT;
+  const battersFaced = pitcherState?.battersFaced || 0;
+  const startedPreviousDefensiveFrame = Boolean(pitcherState) && pitcherState.enteredInning !== gs.inning;
 
-  if (!mustSwap && !closerTime && !inScoringCrisis && !tiredSwap) return gs;
+  const saveSituation = gs.inning >= 9 && lead >= 1 && lead <= 3;
+  const setupSituation = gs.inning === 8 && lead >= 0 && lead <= 3;
+  const bridgeSituation = gs.inning >= 6 && gs.inning <= 7 && lead >= -2 && lead <= 4;
+  const leverageCrisis = isLate && isCloseGame && runnersInScoringPosition && gs.outs >= 1;
 
-  const rp = (closerTime && closers.length > 0) ? closers[0] : bullpen[0];
-  const newBullpen = bullpen.filter(p => p.id !== rp.id);
+  const starterShouldYield = isStarter && (
+    fatigueLimit
+    || (gs.inning >= 6 && fatigueWarning)
+    || (gs.inning >= 7 && lead >= 0)
+    || (leverageCrisis && pitchCount >= Math.max(PITCH_WARNING - 12, 55))
+  );
+
+  const relieverShouldYield = isReliever && (
+    fatigueLimit
+    || (fatigueWarning && battersFaced >= 4)
+    || (startedPreviousDefensiveFrame && battersFaced >= 3)
+    || (saveSituation && pitcher?.subtype !== '抑え')
+    || (setupSituation && pitchCount >= Math.max(PITCH_WARNING - 18, 22))
+  );
+
+  if (!starterShouldYield && !relieverShouldYield) return gs;
+
+  const targetRole = saveSituation
+    ? 'closer'
+    : (setupSituation || leverageCrisis)
+      ? 'setup'
+      : (isExtra || lead <= -2)
+        ? 'long'
+        : bridgeSituation
+          ? 'middle'
+          : 'middle';
+
+  const nextPitcher = pickBullpenArm(bullpen, targetRole);
+  if (!nextPitcher) return gs;
+
+  const newBullpen = bullpen.filter(p => p.id !== nextPitcher.id);
+  const resetState = makePitcherState(gs.inning, gs.isTop);
 
   if (side === 'my') {
-    return { ...gs, myPitcher: rp, myBullpen: newBullpen, myPitchCount: 0 };
-  } else {
-    return { ...gs, opPitcher: rp, opBullpen: newBullpen, opPitchCount: 0 };
+    return { ...gs, myPitcher: nextPitcher, myBullpen: newBullpen, myPitchCount: 0, myPitcherState: resetState };
   }
+  return { ...gs, opPitcher: nextPitcher, opBullpen: newBullpen, opPitchCount: 0, opPitcherState: resetState };
 }
 
 function quickSimGame(myTeam, oppTeam) {
