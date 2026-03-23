@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { STRATEGY_OPTS, PITCHING_POLICY_OPTS, RLABEL, IS_HIT, IS_OUT, BATCH, FATIGUE_WARNING } from '../constants';
 import { fmtAvg, fmtPct } from '../utils';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
-import { initGameState, matchupScore, calcFatigue, calcEffectiveFatigue, processAtBat, endHalfInning, checkStopCondition } from '../engine/simulation';
+import { initGameState, matchupScore, calcEffectiveFatigue, processAtBat, endHalfInning, checkStopCondition } from '../engine/simulation';
 import { OV, CondBadge, HandBadge, PitchBadge } from './ui';
 
 
@@ -108,7 +108,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   }
 
   const curPitcher=gs.myPitcher;
-  const fatigue=calcFatigue(gs.myPitchCount,curPitcher?.pitching?.stamina||60);
+  const fatigue=calcEffectiveFatigue(gs.myPitchCount,curPitcher);
   const fatigueColor=fatigue<40?"#34d399":fatigue<70?"#f5c842":"#f87171";
   const nextBatter=!gs.isTop?gs.myLineup[gs.myBatIdx%Math.max(gs.myLineup.length,1)]:gs.opLineup[gs.opBatIdx%Math.max(gs.opLineup.length,1)];
   const mu=matchupScore(!gs.isTop?nextBatter:null,gs.isTop?curPitcher:gs.opPitcher);
@@ -426,7 +426,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
             <div style={{fontSize:10,color:"#374151"}}>球数: <span style={{color:"#94a3b8",fontFamily:"monospace"}}>{gs.opPitchCount}球</span></div>
             <div style={{fontSize:9,color:"#374151",marginTop:3}}>疲労</div>
             <div className="fat-bar" style={{marginTop:3}}>
-              <div className="fat-fill" style={{width:`${calcFatigue(gs.opPitchCount,gs.opPitcher?.pitching?.stamina||60)}%`,background:"#f87171"}}/>
+              <div className="fat-fill" style={{width:`${calcEffectiveFatigue(gs.opPitchCount,gs.opPitcher)}%`,background:"#f87171"}}/>
             </div>
           </div>
         </div>
