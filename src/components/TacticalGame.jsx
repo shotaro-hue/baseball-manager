@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { STRATEGY_OPTS, PITCHING_POLICY_OPTS, RLABEL, IS_HIT, IS_OUT, BATCH, PITCH_WARNING } from '../constants';
+import { STRATEGY_OPTS, PITCHING_POLICY_OPTS, RLABEL, IS_HIT, IS_OUT, BATCH, FATIGUE_WARNING } from '../constants';
 import { fmtAvg, fmtPct } from '../utils';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
-import { initGameState, matchupScore, calcFatigue, processAtBat, endHalfInning, checkStopCondition } from '../engine/simulation';
+import { initGameState, matchupScore, calcFatigue, calcEffectiveFatigue, processAtBat, endHalfInning, checkStopCondition } from '../engine/simulation';
 import { OV, CondBadge, HandBadge, PitchBadge } from './ui';
 
 
@@ -187,7 +187,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
             <div className="card2" style={{minWidth:160,margin:0}}>
               <div style={{fontSize:9,color:"#374151",letterSpacing:".2em",marginBottom:6}}>自チーム投手</div>
               <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>{curPitcher?.name||"—"}</div>
-              <div style={{fontSize:10,color:"#374151",marginBottom:6}}>球数: <span style={{fontFamily:"monospace",color:gs.myPitchCount>=PITCH_WARNING?"#f87171":"#f5c842"}}>{gs.myPitchCount}</span>球</div>
+              <div style={{fontSize:10,color:"#374151",marginBottom:6}}>球数: <span style={{fontFamily:"monospace",color:calcEffectiveFatigue(gs.myPitchCount,gs.myPitcher)>=FATIGUE_WARNING?"#f87171":"#f5c842"}}>{gs.myPitchCount}</span>球</div>
               <div style={{fontSize:9,color:"#374151",marginBottom:3}}>疲労度</div>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <div className="fat-bar" style={{flex:1}}>
