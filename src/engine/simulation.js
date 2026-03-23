@@ -607,4 +607,4 @@ function quickSimGame(myTeam, oppTeam) {
   return { score:gs.score, won:gs.score.my>gs.score.opp, log:gs.log, inningSummary:gs.inningSummary };
 }
 
-export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, matchupScore, calcFatigue, PITCH_TYPES, BASELINE, ABILITY_RANGE };
+export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, matchupScore, calcFatigue, calcEffectiveFatigue, PITCH_TYPES, BASELINE, ABILITY_RANGE };
