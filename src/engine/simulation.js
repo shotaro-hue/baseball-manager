@@ -330,9 +330,26 @@ function scoreBullpenArm(pitcher, targetRole) {
   return stuff + stamina * 0.18 + condition * 0.22 + roleBonus;
 }
 
-function pickBullpenArm(bullpen, targetRole) {
+function pickBullpenArm(bullpen, targetRole, pattern = {}) {
   if (!bullpen?.length) return null;
 
+  // 指名投手チェック（ブルペンにいる場合のみ有効、いなければフォールバック）
+  if (targetRole === 'closer' && pattern.closerId) {
+    const d = bullpen.find(p => p.id === pattern.closerId);
+    if (d) return d;
+  }
+  if (targetRole === 'setup' && pattern.setupId) {
+    const d = bullpen.find(p => p.id === pattern.setupId);
+    if (d) return d;
+  }
+  if ((targetRole === 'middle' || targetRole === 'long') && pattern.middleOrder?.length) {
+    for (const id of pattern.middleOrder) {
+      const d = bullpen.find(p => p.id === id);
+      if (d) return d;
+    }
+  }
+
+  // スコアベース選択（フォールバック）
   const roleGroups = {
     closer: ['抑え', '中継ぎ', '先発'],
     setup: ['中継ぎ', '抑え', '先発'],
@@ -376,6 +393,8 @@ function initGameState(myTeam, oppTeam) {
     leagueEnv: myTeam.leagueEnv || DEFAULT_LEAGUE_ENV,
     coachBonuses: (()=>{ const c=myTeam.coaches||[]; return { running:c.filter(x=>x.type==='running').reduce((s,x)=>s+(x.bonus||0),0), pitching:c.filter(x=>x.type==='pitching').reduce((s,x)=>s+(x.bonus||0),0) }; })(),
     pitchingPolicy: myTeam.pitchingPolicy || 'normal',
+    myPitchingPattern: myTeam.pitchingPattern ?? { closerId: null, setupId: null, middleOrder: [] },
+    opPitchingPattern: { closerId: null, setupId: null, middleOrder: [] },
   };
 }
 
@@ -527,6 +546,7 @@ function autoSwapPitcher(gs, side) {
   const pitchCount = side === 'my' ? gs.myPitchCount : gs.opPitchCount;
   const pitcherState = side === 'my' ? gs.myPitcherState : gs.opPitcherState;
   const bullpen = side === 'my' ? gs.myBullpen : gs.opBullpen;
+  const pattern = side === 'my' ? (gs.myPitchingPattern ?? {}) : (gs.opPitchingPattern ?? {});
 
   if (!bullpen || bullpen.length === 0) return gs;
 
@@ -575,7 +595,7 @@ function autoSwapPitcher(gs, side) {
         ? 'long'
         : 'middle';
 
-  const nextPitcher = pickBullpenArm(bullpen, targetRole);
+  const nextPitcher = pickBullpenArm(bullpen, targetRole, pattern);
   if (!nextPitcher) return gs;
 
   const newBullpen = bullpen.filter(p => p.id !== nextPitcher.id);

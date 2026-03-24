@@ -808,7 +808,7 @@ const TRAINING_OPTIONS=[["","バランス"],["contact","ミート"],["power","�
 
 const MoralBadge=({v})=>{const m=v||70;const icon=m>=75?"😊":m>=50?"😐":"😟";const col=m>=75?"#34d399":m>=50?"#f5c842":"#f87171";return <span style={{fontSize:10,color:col}}>{icon}{m}</span>;};
 
-export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei}){
+export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern}){
   const [view,setView]=useState("batters");
   const batters=team.players.filter(p=>!p.isPitcher);
   const pitchers=team.players.filter(p=>p.isPitcher);
@@ -828,7 +828,7 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
         </div>
       )}
       <div style={{display:"flex",gap:6,marginBottom:10}}>
-        {[["batters","🏏 野手"],["pitchers","⚾ 投手"],["farm","🌿 二軍"]].map(([k,l])=>(
+        {[["batters","🏏 野手"],["pitchers","⚾ 投手"],["farm","🌿 二軍"],["pattern","📋 継投"]].map(([k,l])=>(
           <button key={k} onClick={()=>setView(k)} className={`tab ${view===k?"on":""}`} style={{flex:0,padding:"6px 14px"}}>{l}</button>
         ))}
         <span className="chip cy" style={{marginLeft:"auto",alignSelf:"center"}}>一軍 {team.players.length}/{MAX_ROSTER}</span>
@@ -919,6 +919,115 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
           </div>
         </div>
       )}
+      {view==="pattern"&&(()=>{
+        const pattern=team.pitchingPattern??{closerId:null,setupId:null,middleOrder:[]};
+        const rotPitchers=team.rotation.map(id=>team.players.find(p=>p.id===id)).filter(Boolean);
+        const nonRotPitchers=pitchers.filter(p=>!team.rotation.includes(p.id));
+        const closerP=pitchers.find(p=>p.id===pattern.closerId);
+        const setupP=pitchers.find(p=>p.id===pattern.setupId);
+        const middleOrder=pattern.middleOrder??[];
+        const orderedBullpen=[
+          ...middleOrder.map(id=>pitchers.find(p=>p.id===id)).filter(Boolean),
+          ...nonRotPitchers.filter(p=>!middleOrder.includes(p.id)),
+        ];
+        const moveMiddle=(pid,dir)=>{
+          const arr=[...middleOrder];
+          const i=arr.indexOf(pid);
+          if(i<0){onSetPitchingPattern&&onSetPitchingPattern({middleOrder:[...arr,pid]});return;}
+          const j=i+dir;if(j<0||j>=arr.length)return;
+          [arr[i],arr[j]]=[arr[j],arr[i]];
+          onSetPitchingPattern&&onSetPitchingPattern({middleOrder:arr});
+        };
+        const addToMiddle=pid=>{if(!middleOrder.includes(pid))onSetPitchingPattern&&onSetPitchingPattern({middleOrder:[...middleOrder,pid]});};
+        const removeFromMiddle=pid=>onSetPitchingPattern&&onSetPitchingPattern({middleOrder:middleOrder.filter(id=>id!==pid)});
+        const cardStyle={background:"rgba(14,27,46,.6)",border:"1px solid #1e3a5f",borderRadius:6,padding:"10px 12px",flex:1,minWidth:140};
+        const rowStyle={display:"flex",alignItems:"center",gap:6,padding:"5px 0",borderBottom:"1px solid rgba(30,58,95,.4)"};
+        const btnSm={fontSize:10,padding:"1px 6px",borderRadius:3,cursor:"pointer",background:"rgba(30,58,95,.6)",border:"1px solid #1e3a5f",color:"#94a3b8"};
+        return(
+          <div>
+            <div className="card" style={{marginBottom:8}}>
+              <div className="card-h">先発ローテーション ({rotPitchers.length}/6)</div>
+              {rotPitchers.map((p,i)=>(
+                <div key={p.id} style={rowStyle}>
+                  <span style={{fontSize:10,color:"#374151",width:16,textAlign:"right"}}>{i+1}</span>
+                  <span style={{flex:1,fontWeight:600,fontSize:12}}>{p.name}</span>
+                  <span style={{fontSize:9,color:"#94a3b8"}}>スタミナ</span><span style={{fontSize:11,color:"#f5c842",fontFamily:"monospace"}}>{p.pitching?.stamina??50}</span>
+                  <span style={{fontSize:9,color:"#94a3b8",marginLeft:4}}>Cond</span><span style={{fontSize:11,color:(p.condition??70)>=80?"#34d399":(p.condition??70)>=60?"#f5c842":"#f87171",fontFamily:"monospace"}}>{p.condition??70}</span>
+                  <button style={btnSm} onClick={()=>onMoveRotation&&onMoveRotation(p.id,-1)} disabled={i===0}>↑</button>
+                  <button style={btnSm} onClick={()=>onMoveRotation&&onMoveRotation(p.id,1)} disabled={i===rotPitchers.length-1}>↓</button>
+                  <button style={{...btnSm,color:"#f87171"}} onClick={()=>onRemoveFromRotation&&onRemoveFromRotation(p.id)}>✕</button>
+                </div>
+              ))}
+              {rotPitchers.length<6&&nonRotPitchers.length>0&&(
+                <div style={{marginTop:6}}>
+                  <select style={{fontSize:10,background:"#0d1b2a",color:"#94a3b8",border:"1px solid #1e3a5f",borderRadius:3,padding:"3px 6px"}}
+                    value="" onChange={e=>{if(e.target.value)onSetStarter&&onSetStarter(e.target.value);}}>
+                    <option value="">＋ 先発追加...</option>
+                    {nonRotPitchers.map(p=><option key={p.id} value={p.id}>{p.name}（{p.subtype}）</option>)}
+                  </select>
+                </div>
+              )}
+              {rotPitchers.length===0&&<div style={{color:"#374151",fontSize:11,padding:"8px 0"}}>先発投手が未設定です</div>}
+            </div>
+            <div className="card" style={{marginBottom:8}}>
+              <div className="card-h">指名投手</div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {[
+                  {key:"closerId",label:"🔒 抑え（9回）",current:closerP,otherId:pattern.setupId},
+                  {key:"setupId",label:"⚙️ セットアッパー（8回）",current:setupP,otherId:pattern.closerId},
+                ].map(({key,label,current,otherId})=>(
+                  <div key={key} style={cardStyle}>
+                    <div style={{fontSize:9,color:"#374151",marginBottom:4,letterSpacing:".1em"}}>{label}</div>
+                    <select style={{fontSize:11,background:"#0d1b2a",color:"#e0d4bf",border:"1px solid #1e3a5f",borderRadius:3,padding:"3px 6px",width:"100%"}}
+                      value={pattern[key]??""} onChange={e=>onSetPitchingPattern&&onSetPitchingPattern({[key]:e.target.value||null})}>
+                      <option value="">指名なし（自動）</option>
+                      {pitchers.map(p=><option key={p.id} value={p.id} disabled={p.id===otherId}>{p.name}（{p.subtype}）</option>)}
+                    </select>
+                    {current&&(
+                      <div style={{marginTop:6,display:"flex",gap:8,fontSize:10}}>
+                        <span style={{color:"#94a3b8"}}>球速</span><span style={{color:"#e0d4bf",fontFamily:"monospace"}}>{current.pitching?.velocity??50}</span>
+                        <span style={{color:"#94a3b8"}}>制球</span><span style={{color:"#e0d4bf",fontFamily:"monospace"}}>{current.pitching?.control??50}</span>
+                        <span style={{color:"#94a3b8"}}>Cond</span><span style={{color:(current.condition??70)>=80?"#34d399":(current.condition??70)>=60?"#f5c842":"#f87171",fontFamily:"monospace"}}>{current.condition??70}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-h">中継ぎ優先順 <span style={{fontSize:9,color:"#374151",fontWeight:400}}>（上から順に登板 / リスト外はスコア自動選択）</span></div>
+              {orderedBullpen.map((p,i)=>{
+                const inOrder=middleOrder.includes(p.id);
+                const isCloser=p.id===pattern.closerId;
+                const isSetup=p.id===pattern.setupId;
+                const orderIdx=middleOrder.indexOf(p.id);
+                return(
+                  <div key={p.id} style={{...rowStyle,opacity:isCloser||isSetup?0.5:1}}>
+                    <span style={{fontSize:10,color:inOrder?"#f5c842":"#374151",width:16,textAlign:"right",fontFamily:"monospace"}}>{inOrder?orderIdx+1:"—"}</span>
+                    <span style={{flex:1,fontWeight:600,fontSize:12}}>{p.name}</span>
+                    <span style={{fontSize:9,color:"#374151"}}>{p.subtype}</span>
+                    <span style={{fontSize:9,color:"#94a3b8",marginLeft:4}}>St</span><span style={{fontSize:10,color:"#e0d4bf",fontFamily:"monospace"}}>{p.pitching?.stamina??50}</span>
+                    {isCloser&&<span style={{fontSize:9,color:"#f5c842",background:"rgba(245,200,66,.1)",padding:"1px 5px",borderRadius:3}}>抑え指名</span>}
+                    {isSetup&&<span style={{fontSize:9,color:"#60a5fa",background:"rgba(96,165,250,.1)",padding:"1px 5px",borderRadius:3}}>セットアッパー指名</span>}
+                    {!isCloser&&!isSetup&&(<>
+                      {inOrder?(
+                        <>
+                          <button style={btnSm} onClick={()=>moveMiddle(p.id,-1)} disabled={orderIdx===0}>↑</button>
+                          <button style={btnSm} onClick={()=>moveMiddle(p.id,1)} disabled={orderIdx===middleOrder.length-1}>↓</button>
+                          <button style={{...btnSm,color:"#f87171"}} onClick={()=>removeFromMiddle(p.id)}>✕</button>
+                        </>
+                      ):(
+                        <button style={{...btnSm,color:"#34d399"}} onClick={()=>addToMiddle(p.id)}>＋優先</button>
+                      )}
+                    </>)}
+                  </div>
+                );
+              })}
+              {orderedBullpen.length===0&&<div style={{color:"#374151",fontSize:11,padding:"8px 0"}}>ブルペン投手なし</div>}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
