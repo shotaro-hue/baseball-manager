@@ -1,6 +1,6 @@
 # Baseball Manager 2025 — ロードマップ
 
-> 最終更新: 2026-03-18（NPBリアル日程システム実装・バグ修正完了・B8 相手投手未管理バグ修正）
+> 最終更新: 2026-03-24（スタミナ連動疲弊度計算・継投パターン設定画面実装）
 > **ゴール**: NPB版 OOTP / Football Manager — 深いシミュレーションと長期フランチャイズ経営
 > **運用ルール**: 実装完了した項目は ✅ に更新。新規項目は末尾に追記。過去の記録は削除しない。
 
@@ -78,6 +78,8 @@
 | B6 | **[P0] エントリーポイント誤設定による日程タブ完全未表示** | `src/main.jsx` の import が `'../combined-artifact'`（旧全結合ファイル）を参照しており `src/App.jsx` が一切使われていなかった。B4/B5 を含む全修正が未反映だった。import を `'./App'` に変更して修正 | — |
 | B7 | **[P1] バッチシムで中継ぎが起用されず先発が常に完投** | `checkStopCondition()` のピッチカウント閾値条件が `!gs.isTop`（自チームが打席の回）を見ていたため、自チーム投手が投球中（`isTop=true`）に閾値に達しても交代条件が発火しなかった。`!gs.isTop` → `gs.isTop` に修正 | bce22ba |
 | B8 | **[P0] 相手チーム投手が全試合で絶対に交代しない（本当の根本原因）** | `initGameState` に `opBullpen` が存在せず `quickSimGame` に相手投手の疲労チェックが一切なかった。全オートシム・バッチシム・CPU vs CPU で相手先発は常に完投していた。`opBullpen` フィールドを追加し `quickSimGame` に相手投手の自動交代ロジックを追加 | — |
+| E1 | **スタミナ連動疲弊度計算** | `calcEffectiveFatigue(pitchCount, pitcher)` を新設。`effectiveStamina = stamina × (condition/100)` でコンディションも加味し疲弊度%で交代判断。`PITCH_WARNING/PITCH_LIMIT` を廃止し `FATIGUE_WARNING=83/FATIGUE_LIMIT=100/PITCH_HARD_CAP=130` に置換。スタミナ高の投手は長く投げられ、低コンディション時は早く疲弊するようになった | — |
+| E2 | **継投パターン設定画面** | RosterTab に「📋 継投」サブタブを追加。①先発ローテーション並び替え・除外・追加、②抑え/セットアッパー指名（重複禁止バリデーション）、③中継ぎ優先順設定。`team.pitchingPattern` フィールドを新設し `pickBullpenArm` に反映。指名投手不在時はスコアベース選択にフォールバック | — |
 
 ---
 

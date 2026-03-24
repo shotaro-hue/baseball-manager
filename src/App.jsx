@@ -469,6 +469,9 @@ export default function App(){
     upd(myId,t=>({...t,lineup:inL?t.lineup.filter(id=>id!==pid):[...t.lineup,pid]}));
   };
   const setStarter=pid=>{upd(myId,t=>({...t,rotation:t.rotation.includes(pid)?t.rotation:[...t.rotation,pid]}));notify("先発ローテに追加","ok");};
+  const moveRotation=(pid,dir)=>upd(myId,t=>{const r=[...t.rotation];const i=r.indexOf(pid);if(i<0)return t;const j=i+dir;if(j<0||j>=r.length)return t;[r[i],r[j]]=[r[j],r[i]];return{...t,rotation:r};});
+  const removeFromRotation=pid=>upd(myId,t=>({...t,rotation:t.rotation.filter(id=>id!==pid)}));
+  const setPitchingPattern=patch=>upd(myId,t=>({...t,pitchingPattern:{...(t.pitchingPattern??{}), ...patch}}));
   const promote=pid=>{if(!myTeam) return;const p=myTeam.farm.find(x=>x.id===pid);if(!p) return;if(p.育成){notify("育成選手は一軍出場不可。先に支配下登録してください","warn");return;}if(myTeam.players.length>=MAX_ROSTER){notify("一軍枠満杯","warn");return;}if(p.isForeign&&myTeam.players.filter(x=>x.isForeign).length>=MAX_外国人_一軍){notify(`外国人枠は${MAX_外国人_一軍}名まで`,"warn");return;}upd(myId,t=>({...t,players:[...t.players,p],farm:t.farm.filter(x=>x.id!==pid)}));notify(`${p.name}を一軍昇格！`,"ok");};
   const convertIkusei=pid=>{if(!myTeam) return;const p=myTeam.farm.find(x=>x.id===pid);if(!p||!p.育成) return;if(myTeam.players.length>=MAX_ROSTER){notify("支配下枠満杯（最大"+MAX_ROSTER+"名）","warn");return;}const minSal=MIN_SALARY_SHIHAKA;const newSal=Math.max(p.salary,minSal);const diff=newSal-p.salary;if(diff>0&&myTeam.budget<diff){notify("予算不足（差額"+Math.round(diff/10000)+"万円必要）","warn");return;}upd(myId,t=>({...t,budget:t.budget-diff,farm:t.farm.map(x=>x.id===pid?{...x,育成:false,salary:newSal,contractYears:1,contractYearsLeft:1,ikuseiYears:0}:x)}));notify(`${p.name}を支配下登録！`,"ok");};
   const demote=pid=>{if(!myTeam) return;const p=myTeam.players.find(x=>x.id===pid);if(!p) return;if(myTeam.farm.length>=MAX_FARM){notify("二軍満杯","warn");return;}upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),lineup:t.lineup.filter(id=>id!==pid),rotation:t.rotation.filter(id=>id!==pid),farm:[...t.farm,p]}));notify(`${p.name}を二軍降格`,"warn");};
@@ -790,7 +793,7 @@ export default function App(){
       ))}
     </div>
 
-    {tab==="roster"&&<RosterTab team={myTeam} onToggle={toggleLineup} onSetStarter={setStarter} onPromo={promote} onDemo={demote} onSetTrainingFocus={setTrainingFocus} onConvertIkusei={convertIkusei}/>}
+    {tab==="roster"&&<RosterTab team={myTeam} onToggle={toggleLineup} onSetStarter={setStarter} onPromo={promote} onDemo={demote} onSetTrainingFocus={setTrainingFocus} onConvertIkusei={convertIkusei} onMoveRotation={moveRotation} onRemoveFromRotation={removeFromRotation} onSetPitchingPattern={setPitchingPattern}/>}
     {tab==="schedule"&&<ScheduleTab schedule={schedule} gameDay={gameDay} myTeam={myTeam} teams={teams} year={year}/>}
     {tab==="records"&&<RecordsTab history={seasonHistory}/>}
     {tab==="news"&&<NewsTab news={news} onInterview={handleInterview}/>}
