@@ -285,7 +285,7 @@ baseball-manager/
 
 | 補正名 | 説明 |
 |--------|------|
-| **疲労補正** | 投球数が増えるにつれ制球・球速が低下（100球超: 警告、120球超: 強制交代推奨） |
+| **疲労補正** | `calcEffectiveFatigue(pitchCount, pitcher)` でスタミナ×コンディション補正後の疲弊度（0〜100+）を算出。疲弊度 83以上: 警告、100以上または130球以上: 強制交代推奨。スタミナ50/コンディション100の標準投手では従来通り約100球で警告、約120球で強制交代 |
 | **球場補正** | 球場の `hrMod` に基づきHR↔二塁打変換（甲子園 0.90、横浜 1.20 など） |
 | **クラッチ補正** | 得点圏×接戦時に打者の `contact`・`power` を強化 |
 | **モメンタム** | 1〜100のモメンタム値によりチーム全体の打者能力を ±数%調整 |
@@ -705,6 +705,7 @@ base = 0.3% / 試合
   lineup,      // 打線：打者IDの配列（9名）
   rotation,    // ローテ：投手IDの配列（最大6名）
   rotIdx,      // 現在ローテインデックス
+  pitchingPattern, // 継投パターン: { closerId, setupId, middleOrder[] } — 未設定時はスコアベース自動選択
 
   wins, losses, draws,
   rf, ra,      // 総得点・総失点
@@ -804,8 +805,10 @@ base = 0.3% / 試合
 | `MAX_FARM` | 30 | 二軍ロスター上限 |
 | `MAX_外国人_一軍` | 4 | 一軍外国人枠上限 |
 | `ACCEPT_THRESHOLD` | 55 | 契約成立に必要なオファースコア |
-| `PITCH_WARNING` | 100 | 投球数疲労警告閾値 |
-| `PITCH_LIMIT` | 120 | 投球数強制交代推奨閾値 |
+| `PITCH_NORM` | 120 | `calcFatigue` 正規化分母（スタミナ50基準の球数スケール） |
+| `PITCH_HARD_CAP` | 130 | 投球数の絶対上限（疲弊度に関わらず強制交代） |
+| `FATIGUE_WARNING` | 83 | 疲弊度警告閾値（スタミナ50/コンディション100 時 ≈ 100球相当） |
+| `FATIGUE_LIMIT` | 100 | 疲弊度強制交代閾値（スタミナ50/コンディション100 時 ≈ 120球相当） |
 | `DRAFT_ROUNDS` | 6 | ドラフトラウンド数 |
 | `DRAFT_POOL_SIZE` | 80 | ドラフト候補者数 |
 | `MIN_SALARY_SHIHAKA` | 4,200,000 | 支配下選手最低年俸（420万円 / NPB協約 第89条） |
@@ -916,6 +919,26 @@ HR 補正: 1.0 より大きいと HR になりやすい、小さいと HR が二
 
 > 最新エントリが最上部。過去のエントリは削除しない。
 > 仕様本文を変更した場合は「旧 → 新」を明記、内部バグ修正のみの場合は概要のみ記録。
+
+---
+
+### 2026-03-24 — E1: スタミナ連動疲弊度計算 / E2: 継投パターン設定画面
+
+**仕様本文への影響あり（§4.4 疲労補正、§7 定数表、§5.1 チームデータモデル）**
+
+#### E1: スタミナ・コンディション連動疲弊度計算（`calcEffectiveFatigue`）
+
+- **旧**: 疲労判定を投球数の固定閾値（`PITCH_WARNING=100` / `PITCH_LIMIT=120`）で行っていた。スタミナ差が交代判断に反映されなかった。
+- **新**: `calcEffectiveFatigue(pitchCount, pitcher)` を導入。`effectiveStamina = stamina × (condition / 100)` でコンディションも加味した補正スタミナを算出し、疲弊度パーセントで閾値判定（`FATIGUE_WARNING=83` / `FATIGUE_LIMIT=100`）。スタミナ高の投手は同球数でも疲弊度が低く長く投げられる。
+- **定数変更**: `PITCH_WARNING` / `PITCH_LIMIT` を廃止し `PITCH_NORM=120` / `PITCH_HARD_CAP=130` / `FATIGUE_WARNING=83` / `FATIGUE_LIMIT=100` に置換（§7 参照）。
+- **影響範囲**: `simulation.js`（`checkStopCondition` / `autoSwapPitcher` / `simAtBat`）、`TacticalGame.jsx`（疲労バー表示・球数カラー）。
+
+#### E2: 継投パターン設定画面（RosterTab「📋 継投」タブ）
+
+- **新機能**: ロスター画面に「📋 継投」サブタブを追加。試合前に抑え・セットアッパー指名と中継ぎ優先順を設定できる。
+- **データ**: `team.pitchingPattern = { closerId, setupId, middleOrder[] }` を追加（§5.1 参照）。未設定または指名投手不在の場合は従来のスコアベース自動選択にフォールバック。
+- **UI構成**: ①先発ローテーション管理（↑↓並び替え・✕除外・追加ドロップダウン）、②抑え/セットアッパー指名（同一選手の重複指定を禁止）、③中継ぎ優先順（＋追加・↑↓並び替え・✕削除）。
+- **エンジン反映**: `pickBullpenArm(bullpen, targetRole, pattern)` に `pattern` 引数を追加。`initGameState` に `myPitchingPattern` / `opPitchingPattern` を追加し `autoSwapPitcher` 経由で `pickBullpenArm` に渡す。CPU側は常に `{}` でスコアベース選択。
 
 ---
 
