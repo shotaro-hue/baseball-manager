@@ -1,6 +1,6 @@
 # Baseball Manager 2025 — 仕様書
 
-> 最終更新: 2026-03-24（Tier 7〜12 / 保守性 / UI改善 計画追記。グローバル選手モーダル仕様追加）
+> 最終更新: 2026-03-25（T2・U1・U2・U3・F2/F3/F4 実装記録）
 
 > **運用ルール**: コードに改修を加えた際は、仕様への影響を確認し、影響がある場合のみ本文を更新する。
 > 変更の有無にかかわらず `変更履歴` に日付・内容を追記し、**過去の記録は削除しない**。
@@ -94,7 +94,8 @@ baseball-manager/
         ├── Draft.jsx        # ドラフト画面（抽選→指名→確認）
         ├── PlayoffScreen.jsx# プレーオフシリーズ管理
         ├── RetireModal.jsx  # 引退処理モーダル
-        ├── PlayerModal.jsx  # 【計画中】グローバル選手詳細モーダル（どのタブからでも開ける）
+        ├── PlayerModal.jsx  # グローバル選手詳細モーダル（どのタブからでも開ける）✅ 実装済み
+        ├── DashboardTab.jsx # ハブ用ダッシュボードタブ（U2 対応）✅ 実装済み
         └── ui.jsx           # 小型共通コンポーネント（OV・CondBadge・HandBadge 等）
 ```
 
@@ -113,9 +114,11 @@ baseball-manager/
  │  試合ボタン: [1試合] [5試合一括] [残り全試合シム]               │
  │                                                                  │
  │  タブ:                                                           │
+ │  🏠概況（デフォルト）                                           │
  │  👥ロスター │ 📰ニュース │ 📨メールボックス │ 🔄トレード        │
  │  📖OB名簿  │ 📝契約     │ 🏪FA市場        │ 🔍スカウト        │
  │  💴財務    │ 🏆順位     │ 📊成績         │ 🏛️記録            │
+ │  ※各タブに通知バッジ（赤/黄/グレー）常時表示（U3）             │
  └──────────────────────────────────────────────────────────────────┘
          ↓ 1試合 or 5試合一括
 [モード選択画面]
@@ -927,6 +930,71 @@ HR 補正: 1.0 より大きいと HR になりやすい、小さいと HR が二
 
 ---
 
+### 2026-03-25 — U2: ダッシュボード画面 / U3: 通知バッジシステム（345c0f3）
+
+**仕様本文への影響あり（§2 ディレクトリ構成、§15.2、§15.3）**
+
+#### U2: ダッシュボード画面（DashboardTab.jsx 新規）
+
+- `src/components/DashboardTab.jsx` を新規作成
+- 表示: チーム概況（順位・GB・勝率・得失差・勝敗・予算）/ 次の試合 / 直近5試合バッジ / 要対応アクション
+- 要対応アクションのクリックで該当タブに遷移（`onTabSwitch` prop）
+- `recentResults` state を App.jsx に追加（`{won,drew,oppName,myScore,oppScore,gameNo}[]`）
+- `pushResult` useCallback で handleAutoSimEnd・handleTacticalGameEnd・runBatchGames の3パスから結果を蓄積
+- デフォルトタブを `"roster"` → `"dashboard"` に統一変更（useState・handleSelect・handleLoad・リセット処理）
+- §2 ディレクトリ構成: `DashboardTab.jsx` を `# 【計画中】` → `✅ 実装済み` に更新
+
+#### U3: 通知バッジシステム
+
+- `tabBadges` useMemo を App.jsx に追加（roster赤・contract黄・trade橙・mailbox橙/黄・fa灰）
+- タブバー描画を `tabBadges` に統一 — 旧 mailbox 専用ハードコードバッジを削除
+- §15.2 を「計画策定済み」→「実装済み」に更新、§15.3 同様
+
+---
+
+### 2026-03-25 — T2: Error Boundary / F2/F3/F4: 歴史データベース先行実装 / U1: グローバル選手詳細モーダル
+
+**仕様本文への影響あり（§2 ディレクトリ構成、§3 画面フロー、§13.5、§15.1）**
+
+#### T2: React Error Boundary 追加（fb47d0f）
+
+- `src/components/ErrorBoundary.jsx` を新規作成し、App.jsx の各主要レンダリング箇所をラップ
+- シミュ中エラー（null 参照・不正 state 等）で画面が白くなる現象を防止
+- エラー発生時: 「リセット」ボタン付きのリカバリー画面を表示し、ハブ画面に戻れる
+- §14 T2 → ✅ 完了
+
+#### F2: standingsHistory 蓄積（8056f2c）
+
+- `seasonHistory.standingsHistory: Array<{year, standings: [{id, name, emoji, wins, losses, draws, rf, ra}[セ], [...パ]}>`
+- シーズン終了時の `onNext` コールバックでスナップショット蓄積（セ/パ独立配列）
+- RecordsTab に「年度別最終順位」セクション追加（新→旧順）
+- 古いセーブデータとの互換は `|| []` でフォールバック
+
+#### F3: 年度アーカイブ UI（c6a19f7）
+
+- RecordsTab「年度別最終順位」を `<details>/<summary>` で折りたたみ可能に（最新年のみデフォルト展開）
+- 「歴代シーズン表彰」を「歴代 MVP」から「歴代シーズン表彰」に拡張
+  - MVP（金）・沢村賞（青）・新人王（緑）を全年度分カラーバッジで表示
+
+#### F4: 記録更新ニュース通知（f0594b0）
+
+- `updateRecords(players, records)` 戻り値を `records` 単体 → `{ records, broken }` に変更
+- `broken`: 更新された記録エントリ配列（`{key, name, value, playerName}`）
+- ニュース通知対象: シーズン本塁打・打率・奪三振の記録更新（初年度・通算記録は対象外）
+- 変更ファイル: `src/engine/awards.js`、`src/App.jsx`（呼び出し箇所で broken を消費）
+
+#### U1: グローバル選手詳細モーダル（d7885d0）
+
+- `src/components/PlayerModal.jsx` を新規作成（§13.5 仕様通り実装）
+- `App.jsx` に `selectedPlayerId` state と `handlePlayerClick(id)` / `handleCloseModal()` を追加
+- モーダル内タブ: 基本情報 / 能力値 / 今季成績 / 契約情報
+- 開き方: `onPlayerClick` props を各 Tab コンポーネントに配布
+- 閉じ方: ESC キー / 背景クリック / × ボタン
+- PlayerLink コンポーネントは作成せず、`onPlayerClick` コールバックを直接 props で渡す方式を採用
+- §15.1 → ✅ 実装済み
+
+---
+
 ### 2026-03-24 — E1: スタミナ連動疲弊度計算 / E2: 継投パターン設定画面
 
 **仕様本文への影響あり（§4.4 疲労補正、§7 定数表、§5.1 チームデータモデル）**
@@ -1460,15 +1528,14 @@ decline期 (34+):  各能力 rand(-3, -1)
 
 ---
 
-### 13.5 グローバル選手詳細モーダル（Tier 9 / UI改善 最優先）🔴
+### 13.5 グローバル選手詳細モーダル ✅ 実装済み（d7885d0）
 
 > **どのタブ・どの画面からでも** 選手名クリックで選手詳細を表示する。
-> 現状は特定タブのみで選手詳細が閲覧可能だが、全画面に統一する。
 
 #### コンポーネント仕様
-- **ファイル:** `src/components/PlayerModal.jsx`（新規作成）
+- **ファイル:** `src/components/PlayerModal.jsx`
 - **State:** `App.jsx` に `selectedPlayerId` (string|null) を追加
-- **開き方:** `openPlayerModal(playerId)` 関数を Context または props で配布
+- **開き方:** `handlePlayerClick(id)` を `onPlayerClick` props として各タブに配布
 - **閉じ方:** ESCキー / モーダル背景クリック / ×ボタン
 
 #### モーダル内タブ構成
@@ -1556,38 +1623,49 @@ awards.js:       MVP/沢村賞の選出ロジック
 
 > 既存機能の使いやすさ向上。OOTP/FM レベルの情報密度を快適に扱えるUIを目指す。
 
-### 15.1 グローバル選手詳細モーダル（最優先）
+### 15.1 グローバル選手詳細モーダル ✅ 実装済み（d7885d0）
 
-→ §13.5 を参照。技術仕様はそちらに記載。
+→ §13.5 参照。
 
-**実装優先度:** Tier 7 着手前に完了させる。
+### 15.2 ダッシュボード画面（U2）✅ 実装済み（345c0f3）
 
-### 15.2 ダッシュボード画面
+ハブ画面のランディングページ。`src/components/DashboardTab.jsx` を新規作成し、デフォルトタブ（`"dashboard"`）として表示。
 
-ハブ画面のランディングページとして実装。
+#### 表示ブロック
 
+| ブロック | 内容 |
+|---------|------|
+| チーム概況 | 順位・GB・勝率・得失差（±表示）・勝敗・予算 |
+| 次の試合 | 日付・対戦相手・ホーム/アウェイ・交流戦フラグ |
+| 直近5試合 | W/L + スコアバッジ（ホバーで相手名と詳細スコア） |
+| 要対応アクション | 枠超過/契約満了/トレード/未読メール/負傷/FA → クリックで該当タブ遷移 |
+
+#### 実装詳細
+
+**新規 state（App.jsx）:**
+```js
+const [recentResults, setRecentResults] = useState([]);
+// 型: {won, drew, oppName, myScore, oppScore, gameNo}[]
 ```
-┌─────────────────────────────────────────┐
-│  2026シーズン 第75日目  [阪神タイガース]    │
-├──────────┬──────────┬───────────────────┤
-│ 現在順位  │ 次の試合  │ 要対応アクション         │
-│ CL 2位   │ vs 巨人  │ 🔴 FA交渉期限3日 (2)   │
-│ 62-38    │ 明日     │ 🟡 トレード提示 (1)     │
-│          │          │ ⚪ 新着ニュース (3)      │
-├──────────┴──────────┴───────────────────┤
-│ 直近5試合: ○○●○○  得点: +15 失点: -8     │
-└─────────────────────────────────────────┘
-```
 
-### 15.3 通知バッジシステム
+**更新箇所:** `handleAutoSimEnd`・`handleTacticalGameEnd`・`runBatchGames` の計3パス
 
-| 種別 | 色 | 条件例 |
-|------|----|--------|
-| 緊急 | 🔴 赤 | FA期限切れ・ロースター枠超過・主力負傷 |
-| 確認 | 🟡 黄 | トレード提示・ドラフト指名順・契約更改期限 |
-| 情報 | ⚪ グレー | 試合結果・ニュース・お知らせ |
+**DashboardTab props:**
+`myTeam, teams, schedule, gameDay, year, recentResults, mailbox, faPool, onTabSwitch`
 
-各タブのラベルに未読バッジ数を常時表示。
+**デフォルトタブ変更:** `useState("roster")` → `useState("dashboard")` / `handleSelect`・`handleLoad`・リセット処理も統一
+
+### 15.3 通知バッジシステム（U3）✅ 実装済み（345c0f3、U2 と同時）
+
+| タブ | 色 | 条件 |
+|------|----|------|
+| `roster` | 🔴 赤 | ロースター枠超過（`players.length > MAX_ROSTER`） |
+| `contract` | 🟡 黄 | 契約満了選手あり（`contractYearsLeft <= 1`、育成除く） |
+| `trade` | 🟠 橙 | 未読トレードオファーあり |
+| `mailbox` | 🟡/🟠 | 未読メールあり（トレードあり→橙、他→黄） |
+| `fa` | ⚪ グレー | FA市場に選手あり |
+
+**実装:** `tabBadges` useMemo を App.jsx に追加。タブ配列レンダリング時に統一的にバッジ表示。旧: mailbox 専用ハードコードバッジを tabBadges に統合して削除。
 
 ### 15.4 選手能力グレード表示
 

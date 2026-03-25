@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles.css';
 import { rng, clamp, uid, pname, fmtM, fmtSal, gameDayToDate, scoutedValue } from './utils';
 import { buildTeam, makePlayer, emptyStats, calcRetireWill, rollRetire, developPlayers, checkForInjuries, tickInjuries } from './engine/player';
@@ -17,6 +18,8 @@ import { ModeSelectScreen, ResultScreen, RetirePhaseScreen, WaiverPhaseScreen, G
 import { DraftPreviewScreen, DraftLotteryScreen, DraftScreen, DraftReviewScreen } from './components/Draft';
 import { PlayoffScreen } from './components/PlayoffScreen';
 import { RetireModal } from './components/RetireModal';
+import { PlayerModal } from './components/PlayerModal';
+import { DashboardTab } from './components/DashboardTab';
 import { ScheduleTab } from './components/ScheduleTab';
 import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab } from './components/Tabs';
 import { SEASON_GAMES, BATCH, MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, ACCEPT_THRESHOLD, MIN_SALARY_SHIHAKA, TEAM_DEFS, POSITIONS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE } from './constants';
@@ -37,11 +40,12 @@ const INIT_TEAMS=TEAM_DEFS.map(function(d){
 export default function App(){
   const [screen,setScreen]=useState("title");
   const [retireModal,setRetireModal]=useState(null); // {player,type:"announce"|"season_end"}
+  const [playerModal,setPlayerModal]=useState(null); // {player,teamName}
   const [retireGamePlayer,setRetireGamePlayer]=useState(null); // 引退試合対象選手
   const [retireRole,setRetireRole]=useState(null); // "starter"|"reliever"|"pinch"|"runner"
   const [teams,setTeams]=useState(INIT_TEAMS);
   const [myId,setMyId]=useState(null);
-  const [tab,setTab]=useState("roster");
+  const [tab,setTab]=useState("dashboard");
   const [gameDay,setGameDay]=useState(1);
   const [year,setYear]=useState(2025);
   const [gameResult,setGameResult]=useState(null);
@@ -51,8 +55,9 @@ export default function App(){
   const [currentOpp,setCurrentOpp]=useState(null);
   const [gameMode,setGameMode]=useState(null); // "tactical"|"auto"
   const [batchResults,setBatchResults]=useState([]);
+  const [recentResults,setRecentResults]=useState([]);
   const [developmentSummary,setDevelopmentSummary]=useState(null);
-  const [seasonHistory,setSeasonHistory]=useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[]});
+  const [seasonHistory,setSeasonHistory]=useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[]});
   const [saveExists,setSaveExists]=useState(()=>hasSave());
   const [schedule,setSchedule]=useState(null);
   // プレーオフ初期化待機フラグ: 最終戦後に全setTeamsが反映されてからinitPlayoffを呼ぶ
@@ -77,7 +82,23 @@ export default function App(){
   },[teams]);
 
   const myTeam=useMemo(()=>teams.find(t=>t.id===myId),[teams,myId]);
+  const tabBadges=useMemo(()=>{
+    if(!myTeam) return {};
+    const expiringCount=myTeam.players.filter(p=>!p.isIkusei&&(p.contractYearsLeft??99)<=1).length;
+    const pendingTrades=mailbox.filter(m=>m.type==="trade"&&!m.resolved&&!m.read).length;
+    const unreadMail=mailbox.filter(m=>!m.read).length;
+    return {
+      roster: myTeam.players.filter(p=>!p.isIkusei).length>MAX_ROSTER?{n:myTeam.players.filter(p=>!p.isIkusei).length-MAX_ROSTER,color:"#f87171"}:null,
+      contract: expiringCount>0?{n:expiringCount,color:"#f5c842"}:null,
+      trade: pendingTrades>0?{n:pendingTrades,color:"#f97316"}:null,
+      mailbox: unreadMail>0?{n:unreadMail,color:pendingTrades>0?"#f97316":"#f5c842"}:null,
+      fa: faPool.length>0?{n:faPool.length,color:"#94a3b8"}:null,
+    };
+  },[myTeam,mailbox,faPool]);
   const notify=useCallback((msg,type="ok")=>{setNotif({msg,type});setTimeout(()=>setNotif(null),3500);},[]);
+  const pushResult=useCallback((won,drew,oppName,myScore,oppScore,gameNo)=>{
+    setRecentResults(prev=>[{won,drew,oppName,myScore,oppScore,gameNo},...prev].slice(0,5));
+  },[]);
   // 守備コーチボーナス: 怪我回復速度 UP
   const applyDefenseCoachRecovery=(players,coaches)=>{
     const defBonus=(coaches||[]).filter(c=>c.type==='defense').reduce((s,c)=>s+(c.bonus||0),0);
@@ -86,6 +107,7 @@ export default function App(){
   };
   const upd=useCallback((id,fn)=>setTeams(prev=>prev.map(t=>t.id===id?fn(t):t)),[]);
   const setTrainingFocus=(pid,focus)=>upd(myId,t=>({...t,players:t.players.map(p=>p.id===pid?{...p,trainingFocus:focus}:p)}));
+  const handlePlayerClick=useCallback((player,teamName)=>setPlayerModal({player,teamName}),[]);
 
   const handleSave=()=>{
     const result=saveGame({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox});
@@ -109,7 +131,7 @@ export default function App(){
     setSchedule(generateSeasonSchedule(saved.year, saved.teams));
     setFaPool(saved.faPool||[]);
     setFaYears(saved.faYears||{});
-    setSeasonHistory(saved.seasonHistory||{awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[]});
+    setSeasonHistory(saved.seasonHistory||{awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[]});
     setNews(saved.news||[]);
     setMailbox(saved.mailbox||[]);
     setCpuTradeOffers([]);
@@ -117,7 +139,7 @@ export default function App(){
     setDraftResult(null);
     setPlayoff(null);
     setDevelopmentSummary(null);
-    setTab('roster');
+    setTab('dashboard');
     setScreen('hub');
   };
 
@@ -132,7 +154,7 @@ export default function App(){
     }));
   };
 
-  const handleSelect=id=>{setMyId(id);setScreen("hub");setTab("roster");setSchedule(generateSeasonSchedule(year,teams));};
+  const handleSelect=id=>{setMyId(id);setScreen("hub");setTab("dashboard");setSchedule(generateSeasonSchedule(year,teams));};
 
   // スケジュールから対戦相手を取得（フォールバック: ランダム同リーグ選択）
   const pickOpponentFromSchedule=(day)=>{
@@ -260,6 +282,8 @@ export default function App(){
       const _opts=won?INTERVIEW_OPTIONS_WIN:INTERVIEW_OPTIONS_LOSE;
       addNews({type:"interview",headline:"【インタビュー】"+(myTeam?.name||"")+"監督に直撃！",source:"野球速報",dateLabel:year+"年 "+gameDay+"日目",body:"試合後、記者団が監督にコメントを求めた。",question:_qs[rng(0,_qs.length-1)],options:_opts});
     }
+    const _adrew=r.score.my===r.score.opp;
+    pushResult(won,_adrew,currentOpp?.name||"",r.score.my,r.score.opp,gameDay);
     setGameDay(d=>d+1);
     if(gameDay>=SEASON_GAMES){
       // 全setState反映後の teams でinitPlayoffを呼ぶためuseEffectに委譲
@@ -375,6 +399,7 @@ export default function App(){
     setTeams(newTeams);
     setGameDay(newDay);
     setBatchResults(results);
+    setRecentResults(prev=>[...results.map(r=>({won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp,gameNo:r.gameNo})).reverse(),...prev].slice(0,5));
     if(newDay-1>=SEASON_GAMES){setPlayoff(initPlayoff(newTeams));setScreen("playoff");}
     else setScreen("batch_result");
   };
@@ -450,6 +475,8 @@ export default function App(){
       return newTeams;
     });
     setGameResult({...gsResult,oppTeam:currentOpp,won});
+    const _tdrew=gsResult.score.my===gsResult.score.opp;
+    pushResult(won,_tdrew,currentOpp?.name||"",gsResult.score.my,gsResult.score.opp,gameDay);
     setGameDay(d=>d+1);
     if(gameDay>=SEASON_GAMES){
       // 全setState反映後の teams でinitPlayoffを呼ぶためuseEffectに委譲
@@ -593,7 +620,7 @@ export default function App(){
   };
 
   const handleNextYear=()=>{
-    setYear(y=>y+1);setGameDay(1);setFaPool([]);setDraftAllocation({pitcher:50,batter:50});setTeams(prev=>prev.map(t=>({...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,revenueThisSeason:0,stadiumLevel:t.stadiumLevel??0,players:t.players.filter(p=>!p._retireNow).map(p=>({...p,age:p.age+1,stats:emptyStats(),playoffStats:emptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:Math.max(0,p.contractYearsLeft-1),growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlydecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),careerLog:[...(p.careerLog||[]),{year,stats:{...p.stats},playoffStats:{...(p.playoffStats||emptyStats())}}],serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0})),farm:t.farm.map(p=>({...p,age:p.age+1,stats:emptyStats(),injury:null,serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}))})));setSchedule(generateSeasonSchedule(year+1,teams));setScreen("hub");setTab("roster");notify(`${year+1}年シーズン開幕！`,"ok");};
+    setYear(y=>y+1);setGameDay(1);setFaPool([]);setDraftAllocation({pitcher:50,batter:50});setTeams(prev=>prev.map(t=>{const nextPlayers=t.players.filter(p=>!p._retireNow).map(p=>({...p,age:p.age+1,stats:emptyStats(),playoffStats:emptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:Math.max(0,p.contractYearsLeft-1),growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlydecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),careerLog:[...(p.careerLog||[]),{year,stats:{...p.stats},playoffStats:{...(p.playoffStats||emptyStats())}}],serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}));const nextIds=new Set(nextPlayers.map(p=>p.id));return{...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,revenueThisSeason:0,stadiumLevel:t.stadiumLevel??0,players:nextPlayers,lineup:(t.lineup||[]).filter(id=>nextIds.has(id)),rotation:(t.rotation||[]).filter(id=>nextIds.has(id)),farm:t.farm.map(p=>({...p,age:p.age+1,stats:emptyStats(),injury:null,serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}))};}));setSchedule(generateSeasonSchedule(year+1,teams));setScreen("hub");setTab("roster");notify(`${year+1}年シーズン開幕！`,"ok");};
 
   const [news,setNews]=useState([]);
   const [mailbox,setMailbox]=useState([]);
@@ -625,12 +652,12 @@ export default function App(){
   if(screen==="title"){const saveMeta=saveExists?getSaveMeta():null;return(<><div className="app"><div className="title"><div className="tlogo">⚾ BASEBALL<br/>MANAGER 2025</div><div className="tsub">NPB SIMULATION v2.1 — TACTICAL MODE</div>{saveMeta&&(<div style={{background:"rgba(74,222,128,.08)",border:"1px solid rgba(74,222,128,.3)",borderRadius:8,padding:"10px 14px",marginBottom:16,textAlign:"left"}}><div style={{fontSize:10,color:"#4ade80",letterSpacing:".1em",marginBottom:6}}>◈ セーブデータ</div><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}><div><div style={{fontWeight:700,fontSize:15}}>{saveMeta.teamEmoji} {saveMeta.teamName}</div><div style={{fontSize:11,color:"#94a3b8"}}>{saveMeta.year}年 第{saveMeta.gameDay}戦 {saveMeta.wins}勝{saveMeta.losses}敗</div><div style={{fontSize:9,color:"#64748b",marginTop:2}}>{saveMeta.savedAt}</div></div><div style={{display:"flex",gap:6,alignItems:"center"}}><button className="sim-btn" style={{margin:0,padding:"8px 18px",fontSize:13,background:"linear-gradient(135deg,#14532d,#166534)",borderColor:"rgba(74,222,128,.6)",color:"#4ade80"}} onClick={handleLoad}>▶ 続きから</button><button className="bsm bgr" style={{padding:"6px 10px"}} onClick={()=>{if(window.confirm('セーブデータを削除しますか？')){deleteSave();setSaveExists(false);}}}>削除</button></div></div></div>)}<div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,marginTop:saveExists?8:0,zIndex:1,position:"relative"}}>◈ 新規ゲーム — チームを選択</div><div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,zIndex:1,position:"relative"}}>◈ セントラルリーグ</div><div className="tgrid" style={{marginBottom:14}}>{TEAM_DEFS.filter(t=>t.league==="セ").map(t=><div key={t.id} className="tcard" style={{"--c":t.color}} onClick={()=>handleSelect(t.id)}><span style={{fontSize:24,display:"block",marginBottom:5}}>{t.emoji}</span><div className="tcard-nm">{t.name}</div></div>)}</div><div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,zIndex:1,position:"relative"}}>◈ パシフィックリーグ</div><div className="tgrid">{TEAM_DEFS.filter(t=>t.league==="パ").map(t=><div key={t.id} className="tcard" style={{"--c":t.color}} onClick={()=>handleSelect(t.id)}><span style={{fontSize:24,display:"block",marginBottom:5}}>{t.emoji}</span><div className="tcard-nm">{t.name}</div></div>)}</div></div></div></>);}
 
   if(screen==="mode_select") return(<><ModeSelectScreen myTeam={myTeam} oppTeam={currentOpp} gameDay={gameDay} onSelect={handleModeSelect} onBack={()=>setScreen("hub")}/></>);
-  if(screen==="tactical_game"&&currentOpp) return(<><TacticalGameScreen myTeam={myTeam} oppTeam={currentOpp} onGameEnd={handleTacticalGameEnd}/></>);
-  if(screen==="batch_result") return(<><BatchResultScreen results={batchResults} myTeam={myTeam} onEnd={()=>setScreen("hub")}/></>);
+  if(screen==="tactical_game"&&currentOpp) return(<><ErrorBoundary onReset={()=>setScreen("hub")}><TacticalGameScreen myTeam={myTeam} oppTeam={currentOpp} onGameEnd={handleTacticalGameEnd}/></ErrorBoundary></>);
+  if(screen==="batch_result") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><BatchResultScreen results={batchResults} myTeam={myTeam} onEnd={()=>setScreen("hub")}/></ErrorBoundary></>);
 
   if(screen==="result"&&gameResult) return(<><ResultScreen gsResult={gameResult} myTeam={myTeam} oppTeam={gameResult.oppTeam} gameDay={gameDay-1} onNext={()=>setScreen("hub")}/></>);
 
-  if(screen==="retire_phase") return(<><RetirePhaseScreen teams={teams} myId={myId} year={year} onNext={(decisions)=>{
+  if(screen==="retire_phase") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><RetirePhaseScreen teams={teams} myId={myId} year={year} onNext={(decisions)=>{
     // 引退処理
     if(decisions){Object.entries(decisions).forEach(function(e){const pid=e[0];const dec=e[1];const p=myTeam?.players.find(function(x){return x.id===pid;});if(!p) return;if(dec==="accepted"||dec==="retain_failed"){upd(myId,function(t){return{...t,players:t.players.map(function(x){return x.id===pid?{...x,isRetired:true,_retireNow:true}:x;})};});addToHistory(myId,p,"引退");addNews({type:"season",headline:"【引退】"+p.name+"選手が現役引退",source:"野球速報",dateLabel:year+"年",body:p.name+"選手（"+p.age+"歳）が"+year+"年シーズンをもって現役を引退した。"});}else if(dec==="retained"){notify(p.name+"の引き留め成功！","ok");}});
     }
@@ -721,16 +748,19 @@ export default function App(){
     setDevelopmentSummary(mySummary);
     // シーズン表彰計算
     const awards=calcSeasonAwards(finalTeams,year);
-    const newRec=updateRecords(seasonHistory.records,finalTeams);
+    const {records:newRec,broken:brokenRecs}=updateRecords(seasonHistory.records,finalTeams);
+    if(brokenRecs.length>0){const recLabel={singleSeasonHR:"シーズン本塁打",singleSeasonAVG:"シーズン打率",singleSeasonK:"シーズン奪三振"};const fmtVal=r=>r.type==="singleSeasonAVG"?`.${String(Math.round(r.value*1000)).padStart(3,"0")}`:r.type==="singleSeasonK"?`${r.value}奪三振`:`${r.value}本塁打`;const fmtOld=r=>r.type==="singleSeasonAVG"?`.${String(Math.round(r.oldValue*1000)).padStart(3,"0")}`:r.type==="singleSeasonK"?`${r.oldValue}奪三振`:`${r.oldValue}本塁打`;brokenRecs.forEach(r=>addNews({type:"record",headline:`🏅 ${r.playerName}（${r.teamName}）が${recLabel[r.type]}記録を更新！`,source:"NPB記録部",dateLabel:`${year}年`,body:`${r.playerName}（${r.teamName}）が${year}年シーズンに${fmtVal(r)}を記録し、従来の${recLabel[r.type]}記録（${fmtOld(r)}）を塗り替えた。`}));}
     const allAlumni=finalTeams.flatMap(t=>t.history||[]);
     const newInductees=checkHallOfFame(seasonHistory.hallOfFame,allAlumni,year);
     const newHoF=[...seasonHistory.hallOfFame,...newInductees];
     if(newInductees.length>0){newInductees.forEach(h=>{setMailbox(prev=>[...prev,{id:uid(),type:"hof",read:false,subject:"🏛 殿堂入り: "+h.playerName,body:h.playerName+"選手が"+year+"年度の球団殿堂入りを果たした。"+[h.careerHR>0?"通算"+h.careerHR+"本塁打":"",h.careerW>0?"通算"+h.careerW+"勝":"",h.careerPA>0?"通算"+h.careerPA+"打席":""].filter(Boolean).join(" / ")}]);}); }
-    setSeasonHistory(prev=>({...prev,awards:[...prev.awards,awards],records:newRec,hallOfFame:newHoF}));
+    const makeRanking=(lg)=>finalTeams.filter(t=>t.league===lg).sort((a,b)=>{const pa=a.wins/Math.max(1,a.wins+a.losses);const pb=b.wins/Math.max(1,b.wins+b.losses);return pb-pa||(b.rf-b.ra)-(a.rf-a.ra);}).map(t=>({id:t.id,name:t.name,emoji:t.emoji,wins:t.wins,losses:t.losses,rf:t.rf,ra:t.ra}));
+    const standingsSnap={year,central:makeRanking("セ"),pacific:makeRanking("パ")};
+    setSeasonHistory(prev=>({...prev,awards:[...prev.awards,awards],records:newRec,hallOfFame:newHoF,standingsHistory:[...(prev.standingsHistory||[]),standingsSnap]}));
     setScreen("development_phase");
-  }}/></> );
-  if(screen==="development_phase") return(<><GrowthSummaryScreen summary={developmentSummary} year={year} onNext={()=>setScreen("waiver_phase")}/></>);
-  if(screen==="waiver_phase") return(<><WaiverPhaseScreen teams={teams} myId={myId} year={year} onRelease={(pid)=>{const p=myTeam?.players.find(x=>x.id===pid);upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid)}));if(p) setFaPool(prev=>[...prev,{...p,isFA:true}]);}} onNext={(markedIds)=>{
+  }}/></ErrorBoundary></> );
+  if(screen==="development_phase") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><GrowthSummaryScreen summary={developmentSummary} year={year} onNext={()=>setScreen("waiver_phase")}/></ErrorBoundary></>);
+  if(screen==="waiver_phase") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><WaiverPhaseScreen teams={teams} myId={myId} year={year} onRelease={(pid)=>{const p=myTeam?.players.find(x=>x.id===pid);upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid)}));if(p) setFaPool(prev=>[...prev,{...p,isFA:true}]);}} onNext={(markedIds)=>{
   // プレイヤーの戦力外処理（同期的に収集）
   const waiverReleased=[];
   markedIds.forEach(pid=>{const p=myTeam?.players.find(x=>x.id===pid);upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid)}));if(p){addToHistory(myId,p,"戦力外");waiverReleased.push({...p,isFA:true});addNews({type:"season",headline:"【戦力外】"+p.name+"選手に戦力外通告",source:"野球速報",dateLabel:year+"年",body:p.name+"選手（"+p.age+"歳）が戦力外通告を受けた。"});}});
@@ -741,8 +771,8 @@ export default function App(){
   setFaPool(faResult.remainingFaPool);
   faResult.news.forEach(n=>addNews(n));
   setFaYears({});
-  setDraftPool(initDraftPool(myTeam));setScreen("draft_preview");}}/></> );
-  if(screen==="playoff"&&playoff) return(<><PlayoffScreen playoff={playoff} setPlayoff={setPlayoff} teams={teams} myId={myId} year={year} onFinish={()=>{
+  setDraftPool(initDraftPool(myTeam));setScreen("draft_preview");}}/></ErrorBoundary></> );
+  if(screen==="playoff"&&playoff) return(<><ErrorBoundary onReset={()=>setScreen("hub")}><PlayoffScreen playoff={playoff} setPlayoff={setPlayoff} teams={teams} myId={myId} year={year} onFinish={()=>{
     if(playoff?.champion){
       const jpS=playoff.jpSeries;
       const opp=jpS?jpS.teams.find(t=>t.id!==playoff.champion.id):null;
@@ -751,7 +781,7 @@ export default function App(){
       if(playoff.champion.id===myId){setMailbox(prev=>[...prev,{id:uid(),type:"championship",read:false,subject:"🏆 "+year+"年 日本一達成！",body:playoff.champion.name+"が"+year+"年の日本シリーズを制覇しました（"+seriesResult+"）。球団史に残る偉業です！"}]);}
     }
     setScreen("retire_phase");
-  }}/></>);
+  }}/></ErrorBoundary></>);
   if(screen==="draft_preview"&&draftPool) return(<><DraftPreviewScreen teams={teams} myId={myId} year={year} pool={draftPool} draftAllocation={draftAllocation} onAllocationChange={setDraftAllocation} onStart={()=>setScreen("draft_lottery")}/></>);
   if(screen==="draft_lottery"&&draftPool) return(<><DraftLotteryScreen teams={teams} myId={myId} year={year} pool={draftPool} onDone={(r1)=>{setDraftPool(prev=>prev.map(p=>{const winner=Object.entries(r1).find(function(e){return e[1]&&e[1].id===p.id;});return{...p,_drafted:winner?true:undefined,_r1winner:winner?winner[0]:undefined};}));setScreen("draft");}}/></>);
   if(screen==="draft"&&draftPool) return(<><DraftScreen teams={teams} myId={myId} year={year} pool={draftPool} draftAllocation={draftAllocation} onDraftDone={(pl,dr)=>{setDraftResult({pool:pl,drafted:dr});setScreen("draft_review");}}/></>);
@@ -786,19 +816,21 @@ export default function App(){
     )}
 
     <div className="tabs">
-      {[["roster","👥 ロースター"],["schedule","🗓️ 日程"],["news","📰 ニュース"],["mailbox","📨 メール"],["trade","🔄 トレード"],["alumni","📖 歴代"],["contract","📝 契約"],["fa","🏪 FA"],["scout","🔍 スカウト"],["finance","💴 財務"],["standings","🏆 順位"],["stats","📊 成績"],["records","🏛 記録"]].map(([id,l])=>(
+      {[["dashboard","🏠 概況"],["roster","👥 ロースター"],["schedule","🗓️ 日程"],["news","📰 ニュース"],["mailbox","📨 メール"],["trade","🔄 トレード"],["alumni","📖 歴代"],["contract","📝 契約"],["fa","🏪 FA"],["scout","🔍 スカウト"],["finance","💴 財務"],["standings","🏆 順位"],["stats","📊 成績"],["records","🏛 記録"]].map(([id,l])=>(
         <button key={id} className={`tab ${tab===id?"on":""}`} onClick={()=>setTab(id)}>
-          {l}{id==="mailbox"&&mailbox.filter(m=>!m.read).length>0&&<span style={{marginLeft:4,background:"#f87171",color:"#fff",borderRadius:8,padding:"0 5px",fontSize:9,fontWeight:700}}>{mailbox.filter(m=>!m.read).length}</span>}
+          {l}{tabBadges[id]&&<span style={{marginLeft:4,background:tabBadges[id].color,color:"#fff",borderRadius:8,padding:"0 5px",fontSize:9,fontWeight:700}}>{tabBadges[id].n}</span>}
         </button>
       ))}
     </div>
 
-    {tab==="roster"&&<RosterTab team={myTeam} onToggle={toggleLineup} onSetStarter={setStarter} onPromo={promote} onDemo={demote} onSetTrainingFocus={setTrainingFocus} onConvertIkusei={convertIkusei} onMoveRotation={moveRotation} onRemoveFromRotation={removeFromRotation} onSetPitchingPattern={setPitchingPattern}/>}
+    <ErrorBoundary key={tab}>
+    {tab==="dashboard"&&<DashboardTab myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year} recentResults={recentResults} mailbox={mailbox} faPool={faPool} onTabSwitch={setTab}/>}
+    {tab==="roster"&&<RosterTab team={myTeam} onToggle={toggleLineup} onSetStarter={setStarter} onPromo={promote} onDemo={demote} onSetTrainingFocus={setTrainingFocus} onConvertIkusei={convertIkusei} onMoveRotation={moveRotation} onRemoveFromRotation={removeFromRotation} onSetPitchingPattern={setPitchingPattern} onPlayerClick={handlePlayerClick}/>}
     {tab==="schedule"&&<ScheduleTab schedule={schedule} gameDay={gameDay} myTeam={myTeam} teams={teams} year={year}/>}
     {tab==="records"&&<RecordsTab history={seasonHistory}/>}
     {tab==="news"&&<NewsTab news={news} onInterview={handleInterview}/>}
     {tab==="mailbox"&&<MailboxTab mailbox={mailbox} onRead={handleMailRead} onAction={handleMailAction} teams={teams} myTeam={myTeam} onTrade={handleTrade}/>}
-    {tab==="trade"&&(()=>{const pendingTrades=mailbox.filter(m=>m.type==="trade"&&!m.resolved);return<TradeTab myTeam={myTeam} teams={teams} onTrade={handleTrade} cpuOffers={pendingTrades.map(m=>m.offer)} onAcceptOffer={(idx)=>handleMailAction(pendingTrades[idx].id,"accept")} onDeclineOffer={(idx)=>handleMailAction(pendingTrades[idx].id,"decline")} deadlinePassed={gameDay>95}/>;})()}
+    {tab==="trade"&&(()=>{const pendingTrades=mailbox.filter(m=>m.type==="trade"&&!m.resolved);return<TradeTab myTeam={myTeam} teams={teams} onTrade={handleTrade} cpuOffers={pendingTrades.map(m=>m.offer)} onAcceptOffer={(idx)=>handleMailAction(pendingTrades[idx].id,"accept")} onDeclineOffer={(idx)=>handleMailAction(pendingTrades[idx].id,"decline")} deadlinePassed={gameDay>95} onPlayerClick={handlePlayerClick}/>;})()}
     {tab==="contract"&&<ContractTab team={myTeam} allTeams={teams} onOffer={handleContractOffer} onRelease={pid=>{const p=myTeam?.players.find(x=>x.id===pid);upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid)}));if(p){addToHistory(myId,p,"自由契約");setFaPool(prev=>[...prev,{...p,isFA:true}]);}notify("放出しました","warn");}}/>}
     {tab==="alumni"&&<AlumniTab myTeam={myTeam}/>}
     {tab==="fa"&&(
@@ -852,7 +884,7 @@ export default function App(){
         <div className="card"><div className="card-h">スカウト派遣</div><div className="g2">{SCOUT_REGIONS.map(sr=><div key={sr.id} className="card2" style={{cursor:"pointer"}} onClick={()=>sendScout(sr)}><div style={{fontWeight:700,fontSize:12,marginBottom:3}}>{sr.name}</div><div style={{fontSize:10,color:"#374151"}}>費用:{fmtSal(sr.cost)} / Lv{sr.qMin}〜{sr.qMax}</div></div>)}</div></div>
       </div>
     )}
-    {tab==="finance"&&<FinanceTab team={myTeam} onStadiumUpgrade={handleStadiumUpgrade} gameDay={gameDay}/>}
+    {tab==="finance"&&<FinanceTab team={myTeam} onStadiumUpgrade={handleStadiumUpgrade} gameDay={gameDay} onPlayerClick={handlePlayerClick}/>}
     {tab==="standings"&&<StandingsTab teams={teams} myId={myId}/>}
     {tab==="stats"&&<StatsTab teams={teams} myId={myId}/>}
 
@@ -864,5 +896,7 @@ export default function App(){
       </div>
     )}
     <RetireModal modal={retireModal} retireRole={retireRole} setRetireRole={setRetireRole} onRetain={()=>handleRetain(retireModal.player)} onAccept={()=>handleAcceptRetire(retireModal.player)} onStartRetireGame={()=>handleStartRetireGame(retireModal.player)} onSkipRetireGame={()=>handleSkipRetireGame(retireModal.player)}/>
+    {playerModal&&<PlayerModal player={playerModal.player} teamName={playerModal.teamName} onClose={()=>setPlayerModal(null)}/>}
+    </ErrorBoundary>
   </div></div></>);
 }
