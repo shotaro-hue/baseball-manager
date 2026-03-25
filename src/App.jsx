@@ -19,6 +19,7 @@ import { DraftPreviewScreen, DraftLotteryScreen, DraftScreen, DraftReviewScreen 
 import { PlayoffScreen } from './components/PlayoffScreen';
 import { RetireModal } from './components/RetireModal';
 import { PlayerModal } from './components/PlayerModal';
+import { DashboardTab } from './components/DashboardTab';
 import { ScheduleTab } from './components/ScheduleTab';
 import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab } from './components/Tabs';
 import { SEASON_GAMES, BATCH, MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, ACCEPT_THRESHOLD, MIN_SALARY_SHIHAKA, TEAM_DEFS, POSITIONS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE } from './constants';
@@ -44,7 +45,7 @@ export default function App(){
   const [retireRole,setRetireRole]=useState(null); // "starter"|"reliever"|"pinch"|"runner"
   const [teams,setTeams]=useState(INIT_TEAMS);
   const [myId,setMyId]=useState(null);
-  const [tab,setTab]=useState("roster");
+  const [tab,setTab]=useState("dashboard");
   const [gameDay,setGameDay]=useState(1);
   const [year,setYear]=useState(2025);
   const [gameResult,setGameResult]=useState(null);
@@ -54,6 +55,7 @@ export default function App(){
   const [currentOpp,setCurrentOpp]=useState(null);
   const [gameMode,setGameMode]=useState(null); // "tactical"|"auto"
   const [batchResults,setBatchResults]=useState([]);
+  const [recentResults,setRecentResults]=useState([]);
   const [developmentSummary,setDevelopmentSummary]=useState(null);
   const [seasonHistory,setSeasonHistory]=useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[]});
   const [saveExists,setSaveExists]=useState(()=>hasSave());
@@ -80,7 +82,23 @@ export default function App(){
   },[teams]);
 
   const myTeam=useMemo(()=>teams.find(t=>t.id===myId),[teams,myId]);
+  const tabBadges=useMemo(()=>{
+    if(!myTeam) return {};
+    const expiringCount=myTeam.players.filter(p=>!p.isIkusei&&(p.contractYearsLeft??99)<=1).length;
+    const pendingTrades=mailbox.filter(m=>m.type==="trade"&&!m.resolved&&!m.read).length;
+    const unreadMail=mailbox.filter(m=>!m.read).length;
+    return {
+      roster: myTeam.players.filter(p=>!p.isIkusei).length>MAX_ROSTER?{n:myTeam.players.filter(p=>!p.isIkusei).length-MAX_ROSTER,color:"#f87171"}:null,
+      contract: expiringCount>0?{n:expiringCount,color:"#f5c842"}:null,
+      trade: pendingTrades>0?{n:pendingTrades,color:"#f97316"}:null,
+      mailbox: unreadMail>0?{n:unreadMail,color:pendingTrades>0?"#f97316":"#f5c842"}:null,
+      fa: faPool.length>0?{n:faPool.length,color:"#94a3b8"}:null,
+    };
+  },[myTeam,mailbox,faPool]);
   const notify=useCallback((msg,type="ok")=>{setNotif({msg,type});setTimeout(()=>setNotif(null),3500);},[]);
+  const pushResult=useCallback((won,drew,oppName,myScore,oppScore,gameNo)=>{
+    setRecentResults(prev=>[{won,drew,oppName,myScore,oppScore,gameNo},...prev].slice(0,5));
+  },[]);
   // 守備コーチボーナス: 怪我回復速度 UP
   const applyDefenseCoachRecovery=(players,coaches)=>{
     const defBonus=(coaches||[]).filter(c=>c.type==='defense').reduce((s,c)=>s+(c.bonus||0),0);
@@ -121,7 +139,7 @@ export default function App(){
     setDraftResult(null);
     setPlayoff(null);
     setDevelopmentSummary(null);
-    setTab('roster');
+    setTab('dashboard');
     setScreen('hub');
   };
 
@@ -136,7 +154,7 @@ export default function App(){
     }));
   };
 
-  const handleSelect=id=>{setMyId(id);setScreen("hub");setTab("roster");setSchedule(generateSeasonSchedule(year,teams));};
+  const handleSelect=id=>{setMyId(id);setScreen("hub");setTab("dashboard");setSchedule(generateSeasonSchedule(year,teams));};
 
   // スケジュールから対戦相手を取得（フォールバック: ランダム同リーグ選択）
   const pickOpponentFromSchedule=(day)=>{
@@ -264,6 +282,8 @@ export default function App(){
       const _opts=won?INTERVIEW_OPTIONS_WIN:INTERVIEW_OPTIONS_LOSE;
       addNews({type:"interview",headline:"【インタビュー】"+(myTeam?.name||"")+"監督に直撃！",source:"野球速報",dateLabel:year+"年 "+gameDay+"日目",body:"試合後、記者団が監督にコメントを求めた。",question:_qs[rng(0,_qs.length-1)],options:_opts});
     }
+    const _adrew=r.score.my===r.score.opp;
+    pushResult(won,_adrew,currentOpp?.name||"",r.score.my,r.score.opp,gameDay);
     setGameDay(d=>d+1);
     if(gameDay>=SEASON_GAMES){
       // 全setState反映後の teams でinitPlayoffを呼ぶためuseEffectに委譲
@@ -379,6 +399,7 @@ export default function App(){
     setTeams(newTeams);
     setGameDay(newDay);
     setBatchResults(results);
+    setRecentResults(prev=>[...results.map(r=>({won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp,gameNo:r.gameNo})).reverse(),...prev].slice(0,5));
     if(newDay-1>=SEASON_GAMES){setPlayoff(initPlayoff(newTeams));setScreen("playoff");}
     else setScreen("batch_result");
   };
@@ -454,6 +475,8 @@ export default function App(){
       return newTeams;
     });
     setGameResult({...gsResult,oppTeam:currentOpp,won});
+    const _tdrew=gsResult.score.my===gsResult.score.opp;
+    pushResult(won,_tdrew,currentOpp?.name||"",gsResult.score.my,gsResult.score.opp,gameDay);
     setGameDay(d=>d+1);
     if(gameDay>=SEASON_GAMES){
       // 全setState反映後の teams でinitPlayoffを呼ぶためuseEffectに委譲
@@ -793,14 +816,15 @@ export default function App(){
     )}
 
     <div className="tabs">
-      {[["roster","👥 ロースター"],["schedule","🗓️ 日程"],["news","📰 ニュース"],["mailbox","📨 メール"],["trade","🔄 トレード"],["alumni","📖 歴代"],["contract","📝 契約"],["fa","🏪 FA"],["scout","🔍 スカウト"],["finance","💴 財務"],["standings","🏆 順位"],["stats","📊 成績"],["records","🏛 記録"]].map(([id,l])=>(
+      {[["dashboard","🏠 概況"],["roster","👥 ロースター"],["schedule","🗓️ 日程"],["news","📰 ニュース"],["mailbox","📨 メール"],["trade","🔄 トレード"],["alumni","📖 歴代"],["contract","📝 契約"],["fa","🏪 FA"],["scout","🔍 スカウト"],["finance","💴 財務"],["standings","🏆 順位"],["stats","📊 成績"],["records","🏛 記録"]].map(([id,l])=>(
         <button key={id} className={`tab ${tab===id?"on":""}`} onClick={()=>setTab(id)}>
-          {l}{id==="mailbox"&&mailbox.filter(m=>!m.read).length>0&&<span style={{marginLeft:4,background:"#f87171",color:"#fff",borderRadius:8,padding:"0 5px",fontSize:9,fontWeight:700}}>{mailbox.filter(m=>!m.read).length}</span>}
+          {l}{tabBadges[id]&&<span style={{marginLeft:4,background:tabBadges[id].color,color:"#fff",borderRadius:8,padding:"0 5px",fontSize:9,fontWeight:700}}>{tabBadges[id].n}</span>}
         </button>
       ))}
     </div>
 
     <ErrorBoundary key={tab}>
+    {tab==="dashboard"&&<DashboardTab myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year} recentResults={recentResults} mailbox={mailbox} faPool={faPool} onTabSwitch={setTab}/>}
     {tab==="roster"&&<RosterTab team={myTeam} onToggle={toggleLineup} onSetStarter={setStarter} onPromo={promote} onDemo={demote} onSetTrainingFocus={setTrainingFocus} onConvertIkusei={convertIkusei} onMoveRotation={moveRotation} onRemoveFromRotation={removeFromRotation} onSetPitchingPattern={setPitchingPattern} onPlayerClick={handlePlayerClick}/>}
     {tab==="schedule"&&<ScheduleTab schedule={schedule} gameDay={gameDay} myTeam={myTeam} teams={teams} year={year}/>}
     {tab==="records"&&<RecordsTab history={seasonHistory}/>}
