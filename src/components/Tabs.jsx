@@ -1071,7 +1071,7 @@ export function StandingsTab({teams,myId}){
 ═══════════════════════════════════════════════ */
 
 export function RecordsTab({ history }) {
-  const { awards = [], records = {}, hallOfFame = [], championships = [] } = history || {};
+  const { awards = [], records = {}, hallOfFame = [], championships = [], standingsHistory = [] } = history || {};
   const latest = awards.length > 0 ? awards[awards.length - 1] : null;
 
   const topCareerHR = Object.values(records.careerHR || {}).sort((a, b) => b.value - a.value).slice(0, 5);
@@ -1136,6 +1136,28 @@ export function RecordsTab({ history }) {
             <div key={i} style={{ fontSize: 11, padding: "3px 0", borderBottom: "1px solid rgba(255,255,255,.04)", display: "flex", justifyContent: "space-between" }}>
               <span style={{ color: "#94a3b8" }}><span style={{ color: i===0?"#ffd700":i===1?"#c0c0c0":i===2?"#b45309":"#374151", marginRight: 6, fontWeight: 700 }}>{i+1}.</span>{r.playerName}</span>
               <span style={{ color: "#f5c842", fontWeight: 700 }}>{r.value}本</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {standingsHistory.length > 0 && (
+        <div className="card">
+          <div className="card-h">📊 年度別最終順位</div>
+          {[...standingsHistory].reverse().map(snap => (
+            <div key={snap.year} style={{marginBottom:14}}>
+              <div style={{fontWeight:700,fontSize:12,marginBottom:6,color:"#f5c842"}}>{snap.year}年</div>
+              {[["セ",snap.central],["パ",snap.pacific]].map(([lg,ranking])=>(
+                <div key={lg} style={{marginBottom:8}}>
+                  <div style={{fontSize:10,color:"#94a3b8",marginBottom:3}}>{lg}リーグ</div>
+                  {(ranking||[]).map((t,i)=>(
+                    <div key={t.id} className="fsb" style={{fontSize:11,padding:"2px 0"}}>
+                      <span>{i+1}位 {t.emoji} {t.name}</span>
+                      <span style={{color:"#94a3b8"}}>{t.wins}勝{t.losses}敗<span style={{marginLeft:6,fontSize:9}}>{t.rf}得/{t.ra}失</span></span>
+                    </div>
+                  ))}
+                </div>
+              ))}
             </div>
           ))}
         </div>

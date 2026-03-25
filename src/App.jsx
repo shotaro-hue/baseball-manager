@@ -53,7 +53,7 @@ export default function App(){
   const [gameMode,setGameMode]=useState(null); // "tactical"|"auto"
   const [batchResults,setBatchResults]=useState([]);
   const [developmentSummary,setDevelopmentSummary]=useState(null);
-  const [seasonHistory,setSeasonHistory]=useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[]});
+  const [seasonHistory,setSeasonHistory]=useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[]});
   const [saveExists,setSaveExists]=useState(()=>hasSave());
   const [schedule,setSchedule]=useState(null);
   // プレーオフ初期化待機フラグ: 最終戦後に全setTeamsが反映されてからinitPlayoffを呼ぶ
@@ -110,7 +110,7 @@ export default function App(){
     setSchedule(generateSeasonSchedule(saved.year, saved.teams));
     setFaPool(saved.faPool||[]);
     setFaYears(saved.faYears||{});
-    setSeasonHistory(saved.seasonHistory||{awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[]});
+    setSeasonHistory(saved.seasonHistory||{awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[]});
     setNews(saved.news||[]);
     setMailbox(saved.mailbox||[]);
     setCpuTradeOffers([]);
@@ -727,7 +727,9 @@ export default function App(){
     const newInductees=checkHallOfFame(seasonHistory.hallOfFame,allAlumni,year);
     const newHoF=[...seasonHistory.hallOfFame,...newInductees];
     if(newInductees.length>0){newInductees.forEach(h=>{setMailbox(prev=>[...prev,{id:uid(),type:"hof",read:false,subject:"🏛 殿堂入り: "+h.playerName,body:h.playerName+"選手が"+year+"年度の球団殿堂入りを果たした。"+[h.careerHR>0?"通算"+h.careerHR+"本塁打":"",h.careerW>0?"通算"+h.careerW+"勝":"",h.careerPA>0?"通算"+h.careerPA+"打席":""].filter(Boolean).join(" / ")}]);}); }
-    setSeasonHistory(prev=>({...prev,awards:[...prev.awards,awards],records:newRec,hallOfFame:newHoF}));
+    const makeRanking=(lg)=>finalTeams.filter(t=>t.league===lg).sort((a,b)=>{const pa=a.wins/Math.max(1,a.wins+a.losses);const pb=b.wins/Math.max(1,b.wins+b.losses);return pb-pa||(b.rf-b.ra)-(a.rf-a.ra);}).map(t=>({id:t.id,name:t.name,emoji:t.emoji,wins:t.wins,losses:t.losses,rf:t.rf,ra:t.ra}));
+    const standingsSnap={year,central:makeRanking("セ"),pacific:makeRanking("パ")};
+    setSeasonHistory(prev=>({...prev,awards:[...prev.awards,awards],records:newRec,hallOfFame:newHoF,standingsHistory:[...(prev.standingsHistory||[]),standingsSnap]}));
     setScreen("development_phase");
   }}/></ErrorBoundary></> );
   if(screen==="development_phase") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><GrowthSummaryScreen summary={developmentSummary} year={year} onNext={()=>setScreen("waiver_phase")}/></ErrorBoundary></>);
