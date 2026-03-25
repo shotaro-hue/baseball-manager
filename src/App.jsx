@@ -60,6 +60,13 @@ export default function App(){
   const [seasonHistory,setSeasonHistory]=useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[]});
   const [saveExists,setSaveExists]=useState(()=>hasSave());
   const [schedule,setSchedule]=useState(null);
+  const [news,setNews]=useState([]);
+  const [mailbox,setMailbox]=useState([]);
+  const [cpuTradeOffers,setCpuTradeOffers]=useState([]);
+  const [draftPool,setDraftPool]=useState(null);
+  const [draftResult,setDraftResult]=useState(null);
+  const [playoff,setPlayoff]=useState(null);
+  const [draftAllocation,setDraftAllocation]=useState({pitcher:50,batter:50});
   // プレーオフ初期化待機フラグ: 最終戦後に全setTeamsが反映されてからinitPlayoffを呼ぶ
   const pendingPlayoffRef=useRef(false);
 
@@ -621,14 +628,6 @@ export default function App(){
 
   const handleNextYear=()=>{
     setYear(y=>y+1);setGameDay(1);setFaPool([]);setDraftAllocation({pitcher:50,batter:50});setTeams(prev=>prev.map(t=>{const nextPlayers=t.players.filter(p=>!p._retireNow).map(p=>({...p,age:p.age+1,stats:emptyStats(),playoffStats:emptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:Math.max(0,p.contractYearsLeft-1),growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlydecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),careerLog:[...(p.careerLog||[]),{year,stats:{...p.stats},playoffStats:{...(p.playoffStats||emptyStats())}}],serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}));const nextIds=new Set(nextPlayers.map(p=>p.id));return{...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,revenueThisSeason:0,stadiumLevel:t.stadiumLevel??0,players:nextPlayers,lineup:(t.lineup||[]).filter(id=>nextIds.has(id)),rotation:(t.rotation||[]).filter(id=>nextIds.has(id)),farm:t.farm.map(p=>({...p,age:p.age+1,stats:emptyStats(),injury:null,serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}))};}));setSchedule(generateSeasonSchedule(year+1,teams));setScreen("hub");setTab("roster");notify(`${year+1}年シーズン開幕！`,"ok");};
-
-  const [news,setNews]=useState([]);
-  const [mailbox,setMailbox]=useState([]);
-  const [cpuTradeOffers,setCpuTradeOffers]=useState([]);
-  const [draftPool,setDraftPool]=useState(null);
-  const [draftResult,setDraftResult]=useState(null);
-  const [playoff,setPlayoff]=useState(null);
-  const [draftAllocation,setDraftAllocation]=useState({pitcher:50,batter:50});
 
   const handleStadiumUpgrade=()=>{
     if(!myTeam) return;
