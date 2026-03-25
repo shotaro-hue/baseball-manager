@@ -1144,21 +1144,25 @@ export function RecordsTab({ history }) {
       {standingsHistory.length > 0 && (
         <div className="card">
           <div className="card-h">📊 年度別最終順位</div>
-          {[...standingsHistory].reverse().map(snap => (
-            <div key={snap.year} style={{marginBottom:14}}>
-              <div style={{fontWeight:700,fontSize:12,marginBottom:6,color:"#f5c842"}}>{snap.year}年</div>
-              {[["セ",snap.central],["パ",snap.pacific]].map(([lg,ranking])=>(
-                <div key={lg} style={{marginBottom:8}}>
-                  <div style={{fontSize:10,color:"#94a3b8",marginBottom:3}}>{lg}リーグ</div>
-                  {(ranking||[]).map((t,i)=>(
-                    <div key={t.id} className="fsb" style={{fontSize:11,padding:"2px 0"}}>
-                      <span>{i+1}位 {t.emoji} {t.name}</span>
-                      <span style={{color:"#94a3b8"}}>{t.wins}勝{t.losses}敗<span style={{marginLeft:6,fontSize:9}}>{t.rf}得/{t.ra}失</span></span>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
+          {[...standingsHistory].reverse().map((snap, idx) => (
+            <details key={snap.year} open={idx === 0} style={{marginBottom:6, borderBottom:"1px solid rgba(255,255,255,.04)"}}>
+              <summary style={{cursor:"pointer", fontSize:12, fontWeight:700, color:"#f5c842", padding:"4px 0", listStyle:"none", userSelect:"none"}}>
+                ▸ {snap.year}年
+              </summary>
+              <div style={{paddingTop:8, paddingBottom:4}}>
+                {[["セ",snap.central],["パ",snap.pacific]].map(([lg,ranking])=>(
+                  <div key={lg} style={{marginBottom:8}}>
+                    <div style={{fontSize:10,color:"#94a3b8",marginBottom:3}}>{lg}リーグ</div>
+                    {(ranking||[]).map((t,i)=>(
+                      <div key={t.id} className="fsb" style={{fontSize:11,padding:"2px 0"}}>
+                        <span>{i+1}位 {t.emoji} {t.name}</span>
+                        <span style={{color:"#94a3b8"}}>{t.wins}勝{t.losses}敗<span style={{marginLeft:6,fontSize:9}}>{t.rf}得/{t.ra}失</span></span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </details>
           ))}
         </div>
       )}
@@ -1199,11 +1203,31 @@ export function RecordsTab({ history }) {
 
       {awards.length > 1 && (
         <div className="card" style={{ marginTop: 10 }}>
-          <div className="card-h">📅 歴代MVP</div>
-          {[...awards].reverse().map((a, i) => a.mvp && (
-            <div key={i} style={{ fontSize: 11, padding: "3px 0", borderBottom: "1px solid rgba(255,255,255,.04)", display: "flex", justifyContent: "space-between" }}>
-              <span style={{ color: "#374151" }}>{a.year}年</span>
-              <span style={{ color: "#e0d4bf" }}>{a.mvp.name} <span style={{ color: "#94a3b8", fontSize: 10 }}>({a.mvp.teamName})</span></span>
+          <div className="card-h">📅 歴代シーズン表彰</div>
+          {[...awards].reverse().map((a, i) => (
+            <div key={i} style={{marginBottom:10, paddingBottom:8, borderBottom:"1px solid rgba(255,255,255,.04)"}}>
+              <div style={{fontSize:11, fontWeight:700, color:"#f5c842", marginBottom:4}}>{a.year}年</div>
+              {a.mvp && (
+                <div className="fsb" style={{fontSize:11, padding:"2px 0"}}>
+                  <span style={{color:"#f5c842", minWidth:52}}>MVP</span>
+                  <span style={{flex:1}}>{a.mvp.name}</span>
+                  <span style={{color:"#94a3b8", fontSize:10}}>{a.mvp.teamName} OPS {a.mvp.OPS?.toFixed(3)}</span>
+                </div>
+              )}
+              {a.sawamura && (
+                <div className="fsb" style={{fontSize:11, padding:"2px 0"}}>
+                  <span style={{color:"#60a5fa", minWidth:52}}>沢村賞</span>
+                  <span style={{flex:1}}>{a.sawamura.name}</span>
+                  <span style={{color:"#94a3b8", fontSize:10}}>{a.sawamura.teamName} {a.sawamura.W}勝</span>
+                </div>
+              )}
+              {a.rookie && (
+                <div className="fsb" style={{fontSize:11, padding:"2px 0"}}>
+                  <span style={{color:"#34d399", minWidth:52}}>新人王</span>
+                  <span style={{flex:1}}>{a.rookie.name}</span>
+                  <span style={{color:"#94a3b8", fontSize:10}}>{a.rookie.teamName}</span>
+                </div>
+              )}
             </div>
           ))}
         </div>
