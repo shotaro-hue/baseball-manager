@@ -18,6 +18,7 @@ import { ModeSelectScreen, ResultScreen, RetirePhaseScreen, WaiverPhaseScreen, G
 import { DraftPreviewScreen, DraftLotteryScreen, DraftScreen, DraftReviewScreen } from './components/Draft';
 import { PlayoffScreen } from './components/PlayoffScreen';
 import { RetireModal } from './components/RetireModal';
+import { PlayerModal } from './components/PlayerModal';
 import { ScheduleTab } from './components/ScheduleTab';
 import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab } from './components/Tabs';
 import { SEASON_GAMES, BATCH, MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, ACCEPT_THRESHOLD, MIN_SALARY_SHIHAKA, TEAM_DEFS, POSITIONS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE } from './constants';
@@ -38,6 +39,7 @@ const INIT_TEAMS=TEAM_DEFS.map(function(d){
 export default function App(){
   const [screen,setScreen]=useState("title");
   const [retireModal,setRetireModal]=useState(null); // {player,type:"announce"|"season_end"}
+  const [playerModal,setPlayerModal]=useState(null); // {player,teamName}
   const [retireGamePlayer,setRetireGamePlayer]=useState(null); // 引退試合対象選手
   const [retireRole,setRetireRole]=useState(null); // "starter"|"reliever"|"pinch"|"runner"
   const [teams,setTeams]=useState(INIT_TEAMS);
@@ -87,6 +89,7 @@ export default function App(){
   };
   const upd=useCallback((id,fn)=>setTeams(prev=>prev.map(t=>t.id===id?fn(t):t)),[]);
   const setTrainingFocus=(pid,focus)=>upd(myId,t=>({...t,players:t.players.map(p=>p.id===pid?{...p,trainingFocus:focus}:p)}));
+  const handlePlayerClick=useCallback((player,teamName)=>setPlayerModal({player,teamName}),[]);
 
   const handleSave=()=>{
     const result=saveGame({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox});
@@ -798,12 +801,12 @@ export default function App(){
     </div>
 
     <ErrorBoundary key={tab}>
-    {tab==="roster"&&<RosterTab team={myTeam} onToggle={toggleLineup} onSetStarter={setStarter} onPromo={promote} onDemo={demote} onSetTrainingFocus={setTrainingFocus} onConvertIkusei={convertIkusei} onMoveRotation={moveRotation} onRemoveFromRotation={removeFromRotation} onSetPitchingPattern={setPitchingPattern}/>}
+    {tab==="roster"&&<RosterTab team={myTeam} onToggle={toggleLineup} onSetStarter={setStarter} onPromo={promote} onDemo={demote} onSetTrainingFocus={setTrainingFocus} onConvertIkusei={convertIkusei} onMoveRotation={moveRotation} onRemoveFromRotation={removeFromRotation} onSetPitchingPattern={setPitchingPattern} onPlayerClick={handlePlayerClick}/>}
     {tab==="schedule"&&<ScheduleTab schedule={schedule} gameDay={gameDay} myTeam={myTeam} teams={teams} year={year}/>}
     {tab==="records"&&<RecordsTab history={seasonHistory}/>}
     {tab==="news"&&<NewsTab news={news} onInterview={handleInterview}/>}
     {tab==="mailbox"&&<MailboxTab mailbox={mailbox} onRead={handleMailRead} onAction={handleMailAction} teams={teams} myTeam={myTeam} onTrade={handleTrade}/>}
-    {tab==="trade"&&(()=>{const pendingTrades=mailbox.filter(m=>m.type==="trade"&&!m.resolved);return<TradeTab myTeam={myTeam} teams={teams} onTrade={handleTrade} cpuOffers={pendingTrades.map(m=>m.offer)} onAcceptOffer={(idx)=>handleMailAction(pendingTrades[idx].id,"accept")} onDeclineOffer={(idx)=>handleMailAction(pendingTrades[idx].id,"decline")} deadlinePassed={gameDay>95}/>;})()}
+    {tab==="trade"&&(()=>{const pendingTrades=mailbox.filter(m=>m.type==="trade"&&!m.resolved);return<TradeTab myTeam={myTeam} teams={teams} onTrade={handleTrade} cpuOffers={pendingTrades.map(m=>m.offer)} onAcceptOffer={(idx)=>handleMailAction(pendingTrades[idx].id,"accept")} onDeclineOffer={(idx)=>handleMailAction(pendingTrades[idx].id,"decline")} deadlinePassed={gameDay>95} onPlayerClick={handlePlayerClick}/>;})()}
     {tab==="contract"&&<ContractTab team={myTeam} allTeams={teams} onOffer={handleContractOffer} onRelease={pid=>{const p=myTeam?.players.find(x=>x.id===pid);upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid)}));if(p){addToHistory(myId,p,"自由契約");setFaPool(prev=>[...prev,{...p,isFA:true}]);}notify("放出しました","warn");}}/>}
     {tab==="alumni"&&<AlumniTab myTeam={myTeam}/>}
     {tab==="fa"&&(
@@ -857,7 +860,7 @@ export default function App(){
         <div className="card"><div className="card-h">スカウト派遣</div><div className="g2">{SCOUT_REGIONS.map(sr=><div key={sr.id} className="card2" style={{cursor:"pointer"}} onClick={()=>sendScout(sr)}><div style={{fontWeight:700,fontSize:12,marginBottom:3}}>{sr.name}</div><div style={{fontSize:10,color:"#374151"}}>費用:{fmtSal(sr.cost)} / Lv{sr.qMin}〜{sr.qMax}</div></div>)}</div></div>
       </div>
     )}
-    {tab==="finance"&&<FinanceTab team={myTeam} onStadiumUpgrade={handleStadiumUpgrade} gameDay={gameDay}/>}
+    {tab==="finance"&&<FinanceTab team={myTeam} onStadiumUpgrade={handleStadiumUpgrade} gameDay={gameDay} onPlayerClick={handlePlayerClick}/>}
     {tab==="standings"&&<StandingsTab teams={teams} myId={myId}/>}
     {tab==="stats"&&<StatsTab teams={teams} myId={myId}/>}
 
@@ -869,6 +872,7 @@ export default function App(){
       </div>
     )}
     <RetireModal modal={retireModal} retireRole={retireRole} setRetireRole={setRetireRole} onRetain={()=>handleRetain(retireModal.player)} onAccept={()=>handleAcceptRetire(retireModal.player)} onStartRetireGame={()=>handleStartRetireGame(retireModal.player)} onSkipRetireGame={()=>handleSkipRetireGame(retireModal.player)}/>
+    {playerModal&&<PlayerModal player={playerModal.player} teamName={playerModal.teamName} onClose={()=>setPlayerModal(null)}/>}
     </ErrorBoundary>
   </div></div></>);
 }

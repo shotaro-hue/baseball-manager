@@ -157,7 +157,7 @@ export function StatsTab({teams,myId}){
    STANDINGS TAB
 ═══════════════════════════════════════════════ */
 
-export function FinanceTab({team,onStadiumUpgrade,gameDay}){
+export function FinanceTab({team,onStadiumUpgrade,gameDay,onPlayerClick}){
   const rev=calcRevenue(team);
   const lvl=team.stadiumLevel??0;
   const UPGRADE_COSTS=[5000000,10000000,20000000];
@@ -204,7 +204,7 @@ export function FinanceTab({team,onStadiumUpgrade,gameDay}){
         <div className="card-h">予算 / 年俸上位</div>
         <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:24,color:"#60a5fa",marginBottom:12}}>{fmtM(team.budget)}</div>
         {team.players.sort((a,b)=>b.salary-a.salary).slice(0,6).map(p=>(
-          <div key={p.id} className="fsb" style={{padding:"5px 0",borderBottom:"1px solid rgba(255,255,255,.025)"}}><span style={{fontSize:12}}>{p.name} <span style={{fontSize:10,color:"#374151"}}>{p.pos}/{p.contractYearsLeft}年</span></span><span className="mono" style={{color:"#f5c842"}}>{fmtSal(p.salary)}</span></div>
+          <div key={p.id} className="fsb" style={{padding:"5px 0",borderBottom:"1px solid rgba(255,255,255,.025)"}}><span style={{fontSize:12,cursor:"pointer"}} onClick={()=>onPlayerClick?.(p,team.name)}><span style={{color:"#60a5fa"}}>{p.name}</span> <span style={{fontSize:10,color:"#374151"}}>{p.pos}/{p.contractYearsLeft}年</span></span><span className="mono" style={{color:"#f5c842"}}>{fmtSal(p.salary)}</span></div>
         ))}
       </div>
     </div>
@@ -424,7 +424,7 @@ export function MailboxTab({mailbox, onRead, onAction, teams, myTeam, onTrade}){
 }
 
 
-export function TradeTab({myTeam,teams,onTrade,cpuOffers,onAcceptOffer,onDeclineOffer,deadlinePassed=false}){
+export function TradeTab({myTeam,teams,onTrade,cpuOffers,onAcceptOffer,onDeclineOffer,deadlinePassed=false,onPlayerClick}){
   const [phase,setPhase]=useState("top");
   const [targetTeam,setTargetTeam]=useState(null);
   const [myOut,setMyOut]=useState([]);
@@ -545,7 +545,7 @@ export function TradeTab({myTeam,teams,onTrade,cpuOffers,onAcceptOffer,onDecline
               <div style={{maxHeight:220,overflowY:"auto"}}>
                 {myTeam.players.map(p=>{const sel=!!myOut.find(x=>x.id===p.id);return(
                   <div key={p.id} onClick={()=>toggleMyOut(p)} style={{padding:"5px 6px",marginBottom:3,borderRadius:4,cursor:"pointer",background:sel?"rgba(248,113,113,.12)":"rgba(255,255,255,.02)",border:sel?"1px solid rgba(248,113,113,.4)":"1px solid transparent"}}>
-                    <div className="fsb"><span style={{fontSize:11,fontWeight:sel?700:400}}>{p.name}</span>{fmtV(tradeValue(p))}</div>
+                    <div className="fsb"><span style={{fontSize:11,fontWeight:sel?700:400}}><span style={{color:"#60a5fa"}} onClick={e=>{e.stopPropagation();onPlayerClick?.(p,myTeam.name);}}>{p.name}</span></span>{fmtV(tradeValue(p))}</div>
                     <div style={{fontSize:9,color:"#374151"}}>{p.pos}/{p.age}歳 {sl(p)}</div>
                   </div>
                 );})}
@@ -557,7 +557,7 @@ export function TradeTab({myTeam,teams,onTrade,cpuOffers,onAcceptOffer,onDecline
               <div style={{maxHeight:220,overflowY:"auto"}}>
                 {targetTeam.players.map(p=>{const sel=!!theirIn.find(x=>x.id===p.id);return(
                   <div key={p.id} onClick={()=>toggleTheirIn(p)} style={{padding:"5px 6px",marginBottom:3,borderRadius:4,cursor:"pointer",background:sel?"rgba(52,211,153,.08)":"rgba(255,255,255,.02)",border:sel?"1px solid rgba(52,211,153,.3)":"1px solid transparent"}}>
-                    <div className="fsb"><span style={{fontSize:11,fontWeight:sel?700:400}}>{p.name}</span>{fmtV(tradeValue(p))}</div>
+                    <div className="fsb"><span style={{fontSize:11,fontWeight:sel?700:400}}><span style={{color:"#60a5fa"}} onClick={e=>{e.stopPropagation();onPlayerClick?.(p,targetTeam.name);}}>{p.name}</span></span>{fmtV(tradeValue(p))}</div>
                     <div style={{fontSize:9,color:"#374151"}}>{p.pos}/{p.age}歳 {slNoisy(p)}</div>
                   </div>
                 );})}
@@ -808,7 +808,7 @@ const TRAINING_OPTIONS=[["","バランス"],["contact","ミート"],["power","�
 
 const MoralBadge=({v})=>{const m=v||70;const icon=m>=75?"😊":m>=50?"😐":"😟";const col=m>=75?"#34d399":m>=50?"#f5c842":"#f87171";return <span style={{fontSize:10,color:col}}>{icon}{m}</span>;};
 
-export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern}){
+export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onPlayerClick}){
   const [view,setView]=useState("batters");
   const batters=team.players.filter(p=>!p.isPitcher);
   const pitchers=team.players.filter(p=>p.isPitcher);
@@ -821,7 +821,7 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
           <div className="card-h" style={{color:"#f87171"}}>🤕 負傷者リスト ({injured.length}人)</div>
           {injured.map(p=>(
             <div key={p.id} style={{fontSize:11,padding:"3px 0",color:"#94a3b8",display:"flex",justifyContent:"space-between"}}>
-              <span>{p.name} <span style={{color:"#f87171"}}>[{p.injury}]</span></span>
+              <span><span style={{cursor:"pointer",color:"#93c5fd"}} onClick={()=>onPlayerClick?.(p,team.name)}>{p.name}</span> <span style={{color:"#f87171"}}>[{p.injury}]</span></span>
               <span>残{p.injuryDaysLeft}試合</span>
             </div>
           ))}
@@ -844,7 +844,7 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
                 {batters.map(p=>{const inL=team.lineup.includes(p.id);const sb=saberBatter(p.stats);const isInj=(p.injuryDaysLeft??0)>0;return(
                   <tr key={p.id} style={isInj?{opacity:.55}:undefined}>
                     <td>{inL?<span className="lnb">{liMap[p.id]}</span>:<span style={{color:"#1e2d3d"}}>—</span>}</td>
-                    <td style={{fontWeight:inL?700:400,color:inL?"#e0d4bf":"#374151"}}>{p.name}{p.isForeign&&<span className="chip cb" style={{marginLeft:4,fontSize:8}}>外</span>}{isInj&&<span style={{marginLeft:4,fontSize:9,color:"#f87171"}}>🤕{p.injuryDaysLeft}</span>}</td>
+                    <td style={{fontWeight:inL?700:400,cursor:"pointer"}} onClick={()=>onPlayerClick?.(p,team.name)}><span style={{color:inL?"#93c5fd":"#60a5fa"}}>{p.name}</span>{p.isForeign&&<span className="chip cb" style={{marginLeft:4,fontSize:8}}>外</span>}{isInj&&<span style={{marginLeft:4,fontSize:9,color:"#f87171"}}>🤕{p.injuryDaysLeft}</span>}</td>
                     <td style={{fontSize:10,color:"#374151"}}>{p.pos}</td><td className="mono" style={{color:"#374151"}}>{p.age}</td>
                     <td><OV v={p.batting.contact}/></td><td><OV v={p.batting.power}/></td><td><OV v={p.batting.speed}/></td><td><OV v={p.batting.eye}/></td>
                     <td><OV v={p.batting.clutch}/></td><td><OV v={p.batting.breakingBall}/></td>
@@ -872,7 +872,7 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
                 {pitchers.map(p=>{const inR=team.rotation.includes(p.id);const sp=saberPitcher(p.stats);return(
                   <tr key={p.id}>
                     <td>{inR&&<span style={{fontSize:9,color:"#f5c842",background:"rgba(245,200,66,.1)",padding:"1px 5px",borderRadius:3}}>先発</span>}</td>
-                    <td style={{fontWeight:700,fontSize:12}}>{p.name}<HandBadge p={p}/>{(p.injuryDaysLeft??0)>0&&<span style={{marginLeft:4,fontSize:9,color:"#f87171"}}>🤕{p.injuryDaysLeft}</span>}</td>
+                    <td style={{fontWeight:700,fontSize:12,cursor:"pointer"}} onClick={()=>onPlayerClick?.(p,team.name)}><span style={{color:"#60a5fa"}}>{p.name}</span><HandBadge p={p}/>{(p.injuryDaysLeft??0)>0&&<span style={{marginLeft:4,fontSize:9,color:"#f87171"}}>🤕{p.injuryDaysLeft}</span>}</td>
                     <td style={{fontSize:10,color:"#374151"}}>{p.subtype}</td><td className="mono" style={{color:"#374151"}}>{p.age}</td>
                     <td><OV v={p.pitching.velocity}/></td><td><OV v={p.pitching.control}/></td><td><OV v={p.pitching.stamina}/></td><td><OV v={p.pitching.breaking}/></td>
                     <td><OV v={p.pitching.variety}/></td><td><OV v={p.pitching.clutchP}/></td>
@@ -899,7 +899,7 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
               <tbody>
                 {team.farm.map(p=>(
                   <tr key={p.id}>
-                    <td style={{fontWeight:600,fontSize:12}}>{p.name}{p.育成&&<span style={{fontSize:9,color:"#a78bfa",marginLeft:4}}>[育{p.ikuseiYears||0}年]</span>}</td>
+                    <td style={{fontWeight:600,fontSize:12,cursor:"pointer"}} onClick={()=>onPlayerClick?.(p,team.name)}><span style={{color:"#60a5fa"}}>{p.name}</span>{p.育成&&<span style={{fontSize:9,color:"#a78bfa",marginLeft:4}}>[育{p.ikuseiYears||0}年]</span>}</td>
                     <td style={{fontSize:10,color:"#374151"}}>{p.pos}</td><td className="mono" style={{color:"#374151"}}>{p.age}</td>
                     <td className="mono" style={{color:p.育成?"#a78bfa":"#1e2d3d",fontSize:10}}>{p.育成?(p.ikuseiYears||0)+"年":"—"}</td>
                     <td><OV v={p.potential}/></td>
@@ -950,7 +950,7 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
               {rotPitchers.map((p,i)=>(
                 <div key={p.id} style={rowStyle}>
                   <span style={{fontSize:10,color:"#374151",width:16,textAlign:"right"}}>{i+1}</span>
-                  <span style={{flex:1,fontWeight:600,fontSize:12}}>{p.name}</span>
+                  <span style={{flex:1,fontWeight:600,fontSize:12,cursor:"pointer",color:"#60a5fa"}} onClick={()=>onPlayerClick?.(p,team.name)}>{p.name}</span>
                   <span style={{fontSize:9,color:"#94a3b8"}}>スタミナ</span><span style={{fontSize:11,color:"#f5c842",fontFamily:"monospace"}}>{p.pitching?.stamina??50}</span>
                   <span style={{fontSize:9,color:"#94a3b8",marginLeft:4}}>Cond</span><span style={{fontSize:11,color:(p.condition??70)>=80?"#34d399":(p.condition??70)>=60?"#f5c842":"#f87171",fontFamily:"monospace"}}>{p.condition??70}</span>
                   <button style={btnSm} onClick={()=>onMoveRotation&&onMoveRotation(p.id,-1)} disabled={i===0}>↑</button>
@@ -1004,7 +1004,7 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
                 return(
                   <div key={p.id} style={{...rowStyle,opacity:isCloser||isSetup?0.5:1}}>
                     <span style={{fontSize:10,color:inOrder?"#f5c842":"#374151",width:16,textAlign:"right",fontFamily:"monospace"}}>{inOrder?orderIdx+1:"—"}</span>
-                    <span style={{flex:1,fontWeight:600,fontSize:12}}>{p.name}</span>
+                    <span style={{flex:1,fontWeight:600,fontSize:12,cursor:"pointer",color:"#60a5fa"}} onClick={()=>onPlayerClick?.(p,team.name)}>{p.name}</span>
                     <span style={{fontSize:9,color:"#374151"}}>{p.subtype}</span>
                     <span style={{fontSize:9,color:"#94a3b8",marginLeft:4}}>St</span><span style={{fontSize:10,color:"#e0d4bf",fontFamily:"monospace"}}>{p.pitching?.stamina??50}</span>
                     {isCloser&&<span style={{fontSize:9,color:"#f5c842",background:"rgba(245,200,66,.1)",padding:"1px 5px",borderRadius:3}}>抑え指名</span>}
