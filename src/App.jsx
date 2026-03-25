@@ -722,7 +722,8 @@ export default function App(){
     setDevelopmentSummary(mySummary);
     // シーズン表彰計算
     const awards=calcSeasonAwards(finalTeams,year);
-    const newRec=updateRecords(seasonHistory.records,finalTeams);
+    const {records:newRec,broken:brokenRecs}=updateRecords(seasonHistory.records,finalTeams);
+    if(brokenRecs.length>0){const recLabel={singleSeasonHR:"シーズン本塁打",singleSeasonAVG:"シーズン打率",singleSeasonK:"シーズン奪三振"};const fmtVal=r=>r.type==="singleSeasonAVG"?`.${String(Math.round(r.value*1000)).padStart(3,"0")}`:r.type==="singleSeasonK"?`${r.value}奪三振`:`${r.value}本塁打`;const fmtOld=r=>r.type==="singleSeasonAVG"?`.${String(Math.round(r.oldValue*1000)).padStart(3,"0")}`:r.type==="singleSeasonK"?`${r.oldValue}奪三振`:`${r.oldValue}本塁打`;brokenRecs.forEach(r=>addNews({type:"record",headline:`🏅 ${r.playerName}（${r.teamName}）が${recLabel[r.type]}記録を更新！`,source:"NPB記録部",dateLabel:`${year}年`,body:`${r.playerName}（${r.teamName}）が${year}年シーズンに${fmtVal(r)}を記録し、従来の${recLabel[r.type]}記録（${fmtOld(r)}）を塗り替えた。`}));}
     const allAlumni=finalTeams.flatMap(t=>t.history||[]);
     const newInductees=checkHallOfFame(seasonHistory.hallOfFame,allAlumni,year);
     const newHoF=[...seasonHistory.hallOfFame,...newInductees];

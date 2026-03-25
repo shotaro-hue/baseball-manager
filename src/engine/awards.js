@@ -98,23 +98,33 @@ export function updateRecords(records, teams) {
     careerHR: { ...(records.careerHR ?? {}) },
     careerW:  { ...(records.careerW  ?? {}) },
   };
+  const broken = [];
 
   for (const t of teams) {
     for (const p of t.players) {
       const s = p.stats;
       if (!s) continue;
 
-      if ((s.HR || 0) > (newRec.singleSeasonHR?.value || 0))
+      if ((s.HR || 0) > (newRec.singleSeasonHR?.value || 0)) {
+        if (newRec.singleSeasonHR)
+          broken.push({ type:"singleSeasonHR", playerName:p.name, teamName:t.name, value:s.HR, oldValue:newRec.singleSeasonHR.value });
         newRec.singleSeasonHR = { value: s.HR, playerName: p.name };
+      }
 
       if ((s.AB || 0) >= 100) {
         const avg = s.H / s.AB;
-        if (avg > (newRec.singleSeasonAVG?.value || 0))
+        if (avg > (newRec.singleSeasonAVG?.value || 0)) {
+          if (newRec.singleSeasonAVG)
+            broken.push({ type:"singleSeasonAVG", playerName:p.name, teamName:t.name, value:avg, oldValue:newRec.singleSeasonAVG.value });
           newRec.singleSeasonAVG = { value: avg, playerName: p.name };
+        }
       }
 
-      if ((s.Kp || 0) > (newRec.singleSeasonK?.value || 0))
+      if ((s.Kp || 0) > (newRec.singleSeasonK?.value || 0)) {
+        if (newRec.singleSeasonK)
+          broken.push({ type:"singleSeasonK", playerName:p.name, teamName:t.name, value:s.Kp, oldValue:newRec.singleSeasonK.value });
         newRec.singleSeasonK = { value: s.Kp, playerName: p.name };
+      }
 
       // 通算本塁打
       const careerHR = (p.careerLog || []).reduce((sum, y) => sum + (y.stats?.HR || 0), s.HR || 0);
@@ -127,7 +137,7 @@ export function updateRecords(records, teams) {
         newRec.careerW[p.id] = { value: careerW, playerName: p.name };
     }
   }
-  return newRec;
+  return { records: newRec, broken };
 }
 
 /* ─── 殿堂チェック ───────────────────────────── */
