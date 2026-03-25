@@ -1,6 +1,6 @@
 # Baseball Manager 2025 — 仕様書
 
-> 最終更新: 2026-03-25（T2・U1・U2・U3・F2/F3/F4 実装記録。B9 起動黒画面修正）
+> 最終更新: 2026-03-25（**Tier 7 全完了** — マルチシーズン・選手加齢引退・能力変化・歴史データベース。U5 能力グレード表示。T2・U1・U2・U3・F2/F3/F4 実装記録。B9 起動黒画面修正）
 
 > **運用ルール**: コードに改修を加えた際は、仕様への影響を確認し、影響がある場合のみ本文を更新する。
 > 変更の有無にかかわらず `変更履歴` に日付・内容を追記し、**過去の記録は削除しない**。
@@ -134,7 +134,11 @@ baseball-manager/
     日本シリーズ（セ代表 vs パ代表、7試合制）
          ↓
 [オフシーズン処理]
-    引退処理 → 選手育成 → ウェーバー →  FA市場 → ドラフト → 新シーズン
+    引退処理 → 選手育成 → ウェーバー →  FA市場 → ドラフト
+         ↓
+[新シーズン開幕画面（NewSeasonScreen）]
+    引退選手サマリー / ドラフト指名結果 / ブレイクアウト選手
+    「開幕！」ボタン → [ハブ画面（翌年）]
 ```
 
 ---
@@ -247,7 +251,7 @@ baseball-manager/
 |----------|------|----------|
 | `growth` | ≤24歳 | 大幅成長（+8〜+13 + ポテンシャルボーナス） |
 | `peak` | 25〜29歳 | 安定成長（+4〜+8） |
-| `earlydecline` | 30〜33歳 | 微衰退（-1〜+4） |
+| `earlyDecline` | 30〜33歳 | 微衰退（-1〜+4） |
 | `decline` | 34歳〜 | 衰退（-9〜-5） |
 
 #### その他フィールド
@@ -558,10 +562,13 @@ base = 0.3% / 試合
 
 | 条件 | 加算値 |
 |------|--------|
-| 40歳以上 | +50 |
-| 38〜39歳 | +30 |
-| 36〜37歳 | +15 |
-| 35歳 | +5 |
+| 42歳以上 | +80 |
+| 41歳 | +65 |
+| 40歳 | +50 |
+| 38〜39歳 | +28 |
+| 36〜37歳 | +12 |
+| 35歳 | +3 |
+| シーズンエンド怪我（injuryDaysLeft ≥ 100） | +25 |
 | 出場機会が少ない | +15 |
 | モラル < 40 | +10 |
 | 契約切れ | +20 |
@@ -608,6 +615,27 @@ base = 0.3% / 試合
 - **トレーニング集中**設定済みの能力は優先配分（成長: +4〜+10、衰退: 0〜-2 で抑制）
 - 全能力値は `1 ≤ 値 ≤ potential` にクランプ
 - 5% の確率で **ブレイク（成長量 2 倍）**、3% で **スランプ（0 成長）**
+
+#### 投手衰退ウェイト（PITCHER_DECLINE_WEIGHTS）
+
+衰退フェーズの投手は能力ごとに異なる重みで能力が低下する。
+
+| 能力 | 重み | 意味 |
+|------|------|------|
+| `velocity` | 1.4 | 最も優先して低下 |
+| `stamina` | 1.2 | 次いで低下 |
+| `sharpness` | 0.9 | 標準 |
+| `control` | 0.8 | 比較的維持 |
+| `breaking` | 0.7 | 維持されやすい |
+| `variety` | 0.6 | 最も維持 |
+
+#### 晩年ブレイクスルー
+
+28〜34歳の選手で成長バジェットが負（衰退）の場合、**2% の確率**で衰退量を反転して1.5倍の成長に転換する。
+
+#### peakAbilities スナップショット
+
+`growthPhase` が `"peak"` → `"earlyDecline"` に遷移する際、その時点の能力値（打者: batting、投手: pitching）を `player.peakAbilities` として保存する。衰退後の下限計算（peak値 × 0.6）に使用。
 
 ---
 
@@ -659,7 +687,7 @@ base = 0.3% / 試合
   isFA,          // boolean（FA選手）
 
   potential,     // ポテンシャル上限 (55〜99)
-  growthPhase,   // "growth" | "peak" | "earlydecline" | "decline"
+  growthPhase,   // "growth" | "peak" | "earlyDecline" | "decline"
   morale,        // モラル (0〜100)
   trust,         // 信頼度 (0〜100)
   condition,     // コンディション (60〜100)
@@ -682,14 +710,17 @@ base = 0.3% / 試合
               tempo, clutchP, recovery, durability },
   recentPitchingDays, // 直近7試合の登板 gameDay 配列（連投疲労計算用）
 
+  peakAbilities, // peak→earlyDecline 遷移時にスナップショット保存（打者: batting値コピー、投手: pitching値コピー）
+
   // 成績（シーズン累積）
   stats: {
-    PA, AB, H, D, T, HR, RBI, BB, K, HBP, SB, CS, R, SF,
-    evSum, evN, laSum, laN,           // 打球速度・角度の累積（平均算出用）
+    PA, AB, H, D, T, HR, RBI, BB, K, HBP, SB, SF,
     IP, ER, BBp, HBPp, Kp, HRp, Hp, BF, W, L, SV, HLD, QS, BS   // 投手
+    // ※ CS, R, BS, evSum/evN/laSum/laN は careerLog では省略（コンパクト形式）
   },
   playoffStats,  // 同上・プレーオフ分
-  careerLog,     // [{ year, stats, playoffStats }, ...]
+  careerLog,     // [{ year, teamId, teamName, stats, playoffStats }, ...]
+                 // stats/playoffStats は25フィールドのコンパクト形式（PA/AB/H/D/T/HR/RBI/BB/K/HBP/SF/SB/IP/ER/BBp/HBPp/Kp/HRp/Hp/BF/W/L/SV/HLD/QS）
 
   injury,        // 怪我名称（文字列）または null
   injuryDaysLeft,// 残怪我日数
@@ -866,10 +897,27 @@ base = 0.3% / 試合
 
 | 賞 | 選出基準 |
 |----|----------|
-| **MVP** | WAR×0.6 + OPS×18 + RBI×0.04 + チームボーナス が最大の打者 |
+| **MVP（セ）** | セ・リーグ打者の WAR×0.6 + OPS×18 + RBI×0.04 + チームボーナス が最大の選手 |
+| **MVP（パ）** | パ・リーグ打者の同計算式 |
 | **沢村賞** | FIP 最小の投手（130 IP 以上・ERA ≤ 3.50・10 勝以上） |
 | **新人王** | WAR 最大の若手（27歳以下・通算打席<60 または通算投球回<60） |
-| **ベストナイン** | ポジションごとに WAR 最大の選手 |
+| **ベストナイン（セ）** | セ・リーグのポジションごとに WAR 最大の選手 |
+| **ベストナイン（パ）** | パ・リーグのポジションごとに WAR 最大の選手 |
+
+### 個人タイトル（`calcTitles`）
+
+セ・リーグ / パ・リーグそれぞれで以下8タイトルを選出し `standingsSnap.awards.titles` に保存:
+
+| タイトル | 選出基準 |
+|---------|---------|
+| 首位打者（avg） | 打率最高（規定打席 PA ≥ 400） |
+| 本塁打王（hr） | 本塁打最多 |
+| 打点王（rbi） | 打点最多 |
+| 盗塁王（sb） | 盗塁最多 |
+| 最優秀防御率（era） | ERA 最低（規定投球回 IP ≥ 130） |
+| 最多勝（win） | 勝利数最多 |
+| 最多奪三振（so） | 奪三振最多 |
+| 最多セーブ（sv） | セーブ最多 |
 
 ### 殿堂入り基準
 
@@ -927,6 +975,47 @@ HR 補正: 1.0 より大きいと HR になりやすい、小さいと HR が二
 
 > 最新エントリが最上部。過去のエントリは削除しない。
 > 仕様本文を変更した場合は「旧 → 新」を明記、内部バグ修正のみの場合は概要のみ記録。
+
+---
+
+### 2026-03-25 — Tier 7 全完了: マルチシーズンフランチャイズ基盤（c1c404b）
+
+**仕様本文への影響あり（§3・§4.3・§4.11・§4.12・§5・§9・§13.1・§15.4）**
+
+#### ⑳ マルチシーズン継続
+
+- `handleNextYear` 完全実装。`setSchedule` 呼び出しを含む全状態リセットを実行
+- **予算リセット式**: `max(baseBudget × 0.5, baseBudget + revenue×0.6 − seasonalPayroll)`
+- 選手全員の `age++`, `serviceYears++`, `ikuseiYears++`（該当者のみ）
+- ローテーション・ラインナップ引き継ぎ（退団・引退選手を自動除外）
+- **careerLog コンパクト化**: 25フィールド形式（CS/R/BS/evSum/evN/laSum/laN 除去）+ `teamId`/`teamName` 追加。25年分のプレイで localStorage 5MB 上限に余裕あり
+- **NewSeasonScreen 新設**: ドラフト完了後に `new_season` 画面遷移。引退選手数・ドラフト指名数・ブレイクアウト選手名一覧を表示し「開幕！」ボタンでハブへ
+- `newSeasonInfo` state（App.jsx）で オフシーズンサマリーを NewSeasonScreen に受け渡し
+
+#### ㉑ 選手加齢・引退パイプライン
+
+- **calcRetireWill 精緻化**: 旧テーブル（40歳:+50 / 38-39:+30 / 36-37:+15 / 35:+5）→ 新テーブル（42歳+:+80 / 41歳:+65 / 40歳:+50 / 38-39歳:+28 / 36-37歳:+12 / 35歳:+3）。シーズンエンド怪我（injuryDaysLeft ≥ 100）で +25 追加（§4.11 参照）
+- **CPU alumni 修正**: CPU チーム引退選手が `t.history[]` に記録されていなかったバグを修正。`teams.map()` 内で直接 `history: [...t.history, ...cpuAlumni]` をマージ
+
+#### ㉒ 能力自然変化（成長/衰退）
+
+- **PITCHER_DECLINE_WEIGHTS 導入**: 投手衰退時の能力別ウェイト（velocity:1.4 優先低下）を追加（§4.12 参照）
+- **晩年ブレイクスルー**: 28〜34歳・成長バジェット負の場合、2% 確率で衰退反転（1.5倍成長）
+- **peakAbilities スナップショット**: `"peak"→"earlyDecline"` 遷移時に打者/投手能力値を `player.peakAbilities` に保存。衰退下限（peak × 0.6）計算に使用
+- `growthPhase` 文字列を `"earlydecline"` → `"earlyDecline"` に統一（realplayer.js も修正）
+- **GrowthSummaryScreen 衰退警告**: 33歳以上・能力低下幅 ≥ 5 の選手に「⚠️ 衰退警告」を表示
+
+#### ㉓ 歴史データベース（完成）
+
+- **RecordsTab 5サブタブ再編**: 今季表彰 / タイトル歴代 / 通算記録 / 年度別順位 / 殿堂
+- **calcTitles()**: セ/パ別8タイトル（首位打者・HR王・打点王・盗塁王・最優秀防御率・最多勝・最多奪三振・最多セーブ）を計算し `standingsSnap.awards.titles` に保存
+- **セ/パ別 MVP**: `calcSeasonAwards` を `{ central: ..., pacific: ... }` 形式に変更。RecordsTab の `getMvp()` ヘルパーで旧形式との後方互換を維持
+- `standingsSnap` に `awards`（mvp/sawamura/rookie/bestNine/titles）を含めて蓄積
+
+#### U5 選手能力グレード表示
+
+- `PlayerModal.jsx` に `abilityGrade(v)` 関数と `AbilityBar` コンポーネントを追加
+- S（90+）/A（80+）/B（65+）/C（50+）/D（35+）/E（<35）の色付きバッジ表示（§15.4 参照）
 
 ---
 
@@ -1437,42 +1526,18 @@ HR 補正: 1.0 より大きいと HR になりやすい、小さいと HR が二
 
 ---
 
-### 13.1 複数年フランチャイズ（Tier 7）🔴
+### 13.1 複数年フランチャイズ（Tier 7）— ✅ 実装済み（c1c404b）
 
-**概要:** 単年シーズンを超えた長期フランチャイズ経営の実現。OOTPの核心機能。
+> §3・§4.11・§4.12・§5・§9 に詳細を移動。
 
-#### マルチシーズン継続
-- `year` カウンタを年度をまたいで更新
-- シーズン終了後に「次のシーズンへ」遷移
-- 選手全員の `age++`, `serviceYears++`
-- ローテーション・ラインナップを引き継ぎ（退団・引退選手は除去）
-
-#### 選手加齢・引退
-- 35歳以上: 毎年末に引退確率 = `(age - 34) × 0.15 + 乱数補正`
-- careerPhase=decline の選手は確率上昇
-- 引退選手は `awards.js` の殿堂入り判定を通過
-- 殿堂入りならニュース通知・球団史に記録
-
-#### 能力自然変化
-```
-growth期 (≤24):   各能力 ± rand(0, +3) × potentialFactor
-peak期 (25-29):   各能力 ± rand(-1, +1)
-earlydecline期 (30-33): 各能力 rand(-2, 0)
-decline期 (34+):  各能力 rand(-3, -1)
-```
-
-#### 歴史データベース
-```javascript
-// seasonHistory[] の各要素に追加するフィールド
-{
-  year: 2025,
-  champion: "阪神タイガース",
-  standings: [...],          // 12球団の最終順位
-  awards: { mvp, sawamura, rookie, bestNine },
-  records: { teamHR, individualHR, wins, era },
-  hallOfFame: [playerId, ...]
-}
-```
+**実装済み機能:**
+- `handleNextYear` 完全実装（予算リセット・選手加齢・ローテ引き継ぎ）
+- `NewSeasonScreen` — 引退サマリー・ドラフト結果・ブレイクアウト選手の開幕前画面
+- `calcRetireWill` 精緻化（§4.11 参照）
+- `PITCHER_DECLINE_WEIGHTS` / 晩年ブレイクスルー / `peakAbilities`（§4.12 参照）
+- RecordsTab 5サブタブ再編 / `calcTitles` / セ/パ別 MVP（§9 参照）
+- `careerLog` コンパクト25フィールド形式（§5 参照）
+- CPU チーム引退選手の `t.history[]` アーカイブ修正
 
 ---
 
@@ -1584,9 +1649,11 @@ export function PlayerLink({ player, onOpen }) {
 
 > エラーが起きづらく、長期的に保守しやすいコードベースを維持するための施策。
 
-### 14.1 IndexedDB 移行（P0 / Tier 7 着手前）
+### 14.1 IndexedDB 移行（P1 / Tier 8 着手前）
 
 **背景:** localStorage の上限は約5MB。複数年の選手履歴・シーズン記録が蓄積すると超過する。
+
+> **現状（2026-03-25）**: careerLog をコンパクト25フィールド形式に変更したことで、25年以上のプレイでも5MB上限に余裕があることを確認。優先度を P0 → P1 に引き下げ、Tier 8 着手前に再評価する。
 
 **移行方針:**
 ```javascript
@@ -1678,18 +1745,18 @@ const [recentResults, setRecentResults] = useState([]);
 
 **実装:** `tabBadges` useMemo を App.jsx に追加。タブ配列レンダリング時に統一的にバッジ表示。旧: mailbox 専用ハードコードバッジを tabBadges に統合して削除。
 
-### 15.4 選手能力グレード表示
+### 15.4 選手能力グレード表示 ✅ 実装済み（c1c404b）
 
-OOTP 方式の A〜E グレード変換（数値の直感的把握のため）:
+`PlayerModal.jsx` の `abilityGrade(v)` + `AbilityBar` コンポーネントで能力値を S〜E グレードに変換して色付きバッジ表示。
 
-| グレード | 能力値範囲 |
-|---------|----------|
-| S | 90〜100 |
-| A | 75〜89 |
-| B | 60〜74 |
-| C | 45〜59 |
-| D | 30〜44 |
-| E | 0〜29 |
+| グレード | 能力値範囲 | バッジ色 |
+|---------|----------|----|
+| S | 90〜100 | 紫（#e879f9） |
+| A | 80〜89 | 緑（#34d399） |
+| B | 65〜79 | 黄（#f5c842） |
+| C | 50〜64 | グレー（#94a3b8） |
+| D | 35〜49 | オレンジ（#f97316） |
+| E | 0〜34 | 赤（#f87171） |
 
 ### 15.5 選手比較ツール
 
