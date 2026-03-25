@@ -36,7 +36,7 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
     morale: rng(60, 100), trust: 50,
     hometown: CITIES[rng(0, CITIES.length - 1)],
     personality: makePers(age), skills: [],
-    growthPhase: age <= 24 ? "growth" : age <= 29 ? "peak" : age <= 33 ? "earlydecline" : "decline",
+    growthPhase: age <= 24 ? "growth" : age <= 29 ? "peak" : age <= 33 ? "earlyDecline" : "decline",
     stats: emptyStats(),
     serviceYears: 0, entryAge: age, recentPitchingDays: [],
   };
@@ -103,23 +103,33 @@ export function calcRetireWill(p) {
   if (p.age < 35) return 0;
   let score = 0;
 
-  // 年齢
-  if (p.age >= 40) score += 50;
-  else if (p.age >= 38) score += 30;
-  else if (p.age >= 36) score += 15;
-  else score += 5;
+  // 年齢（精緻化テーブル）
+  if      (p.age >= 42) score += 80;
+  else if (p.age >= 41) score += 65;
+  else if (p.age >= 40) score += 50;
+  else if (p.age >= 38) score += 28;
+  else if (p.age >= 36) score += 12;
+  else                  score += 3; // 35歳
 
   // 出場機会
   const pa = p.stats?.PA || 0;
   const bf = p.stats?.BF || 0;
-  if (p.isPitcher && bf < 40) score += 15;
-  if (!p.isPitcher && pa < 80) score += 15;
+  if (p.isPitcher) {
+    if (bf < 15)  score += 20;  // ほぼ投げていない
+    else if (bf < 40) score += 15;
+  } else {
+    if (pa < 30)  score += 20;
+    else if (pa < 80) score += 15;
+  }
 
   // モラル
   if ((p.morale || 60) < 40) score += 10;
 
   // 契約残年
   if ((p.contractYearsLeft || 0) === 0) score += 20;
+
+  // 長期負傷（シーズンエンド相当）
+  if ((p.injuryDaysLeft || 0) >= 100) score += 25;
 
   // 引退に関する価値観
   const rs = p.retireStyle || 50;
@@ -147,12 +157,17 @@ export function rollRetire(p) {
 const BATTER_KEYS  = ['contact','power','eye','speed','arm','defense','stealSkill','baseRunning','clutch'];
 const PITCHER_KEYS = ['velocity','control','stamina','breaking','variety','sharpness'];
 
+// 投手の能力別衰退ウェイト（速球は早く衰え、変化球・制球は長持ち）
+const PITCHER_DECLINE_WEIGHTS = {
+  velocity: 1.4, stamina: 1.2, sharpness: 0.9, control: 0.8, breaking: 0.7, variety: 0.6,
+};
+
 function calcGrowthBudget(p) {
   const age = p.age;
   const pot = p.potential ?? 65;
   let base;
-  if      (age <= 20) base = rng(8, 13)  + Math.round((pot - 65) * 0.5);   // 若手: 原石、まだ荒削り
-  else if (age <= 24) base = rng(12, 18) + Math.round((pot - 65) * 0.7);  // 全盛期: 最大成長ピーク
+  if      (age <= 20) base = rng(8, 13)  + Math.round((pot - 65) * 0.5);
+  else if (age <= 24) base = rng(12, 18) + Math.round((pot - 65) * 0.7);
   else if (age <= 27) base = rng(4, 8);
   else if (age <= 30) base = rng(-1, 4);
   else if (age <= 33) base = rng(-5, -2);
@@ -165,10 +180,16 @@ function calcGrowthBudget(p) {
     if (roll < 0.05) return base * 2;   // ブレイク 5%
     if (roll < 0.08) return 0;           // バスト   3%
   }
+
+  // 晩年ブレイクスルー（28〜34歳: 2%確率で改善ボーナス）
+  if (age >= 28 && age <= 34 && base < 0) {
+    if (Math.random() < 0.02) return Math.abs(base) * 1.5;
+  }
+
   return base;
 }
 
-function applyGrowthToAbilities(abilities, keys, budget, trainingFocus, potential) {
+function applyGrowthToAbilities(abilities, keys, budget, trainingFocus, potential, isPitcher = false) {
   if (!abilities || budget === 0) return { ...abilities };
   const cap = Math.min(potential ?? 90, 99);
   const result = { ...abilities };
@@ -180,21 +201,24 @@ function applyGrowthToAbilities(abilities, keys, budget, trainingFocus, potentia
   if (trainingFocus && keys.includes(trainingFocus)) {
     const idx = shuffled.indexOf(trainingFocus);
     shuffled.splice(idx, 1);
-    if (isGrowth) shuffled.unshift(trainingFocus);   // 成長: focus を先に
-    else          shuffled.push(trainingFocus);        // 劣化: focus を最後に（保護）
+    if (isGrowth) shuffled.unshift(trainingFocus);
+    else          shuffled.push(trainingFocus);
   }
 
   for (const key of shuffled) {
     if (remaining <= 0 || !(key in result)) break;
     const isFocus = key === trainingFocus;
+    // 投手衰退時: 速球は優先的に、制球・変化球は緩やかに衰退
+    const declineWeight = (!isGrowth && isPitcher) ? (PITCHER_DECLINE_WEIGHTS[key] ?? 1.0) : 1.0;
     if (isGrowth) {
       const gain = isFocus ? Math.min(remaining, rng(4, 10)) : Math.min(remaining, rng(2, 6));
       result[key] = Math.min(cap, (result[key] || 50) + gain);
       remaining -= gain;
     } else {
-      const loss = isFocus ? Math.min(remaining, rng(0, 2)) : Math.min(remaining, rng(2, 5));
+      const rawLoss = isFocus ? rng(0, 2) : rng(2, 5);
+      const loss = Math.min(remaining, Math.round(rawLoss * declineWeight));
       result[key] = Math.max(1, (result[key] || 50) - loss);
-      remaining -= loss;
+      remaining -= Math.max(1, loss);
     }
   }
   return result;
@@ -218,21 +242,28 @@ export function developPlayers(players, coaches = []) {
 
     if (p.isPitcher && p.pitching) {
       const before = { ...p.pitching };
-      newP.pitching = applyGrowthToAbilities(p.pitching, PITCHER_KEYS, budget, focus, pot);
+      newP.pitching = applyGrowthToAbilities(p.pitching, PITCHER_KEYS, budget, focus, pot, true);
       const diff = PITCHER_KEYS.reduce((s, k) => s + (newP.pitching[k] || 0) - (before[k] || 0), 0);
       if (budget > 0 && diff >= 8) summary.breakout.push({ p, diff, type: 'pitcher' });
       else if (diff > 1)  summary.growth.push({ p, diff });
       else if (diff < -4) summary.decline.push({ p, diff });
     } else if (!p.isPitcher && p.batting) {
       const before = { ...p.batting };
-      newP.batting = applyGrowthToAbilities(p.batting, BATTER_KEYS, budget, focus, pot);
+      newP.batting = applyGrowthToAbilities(p.batting, BATTER_KEYS, budget, focus, pot, false);
       const diff = BATTER_KEYS.reduce((s, k) => s + (newP.batting[k] || 0) - (before[k] || 0), 0);
       if (budget > 0 && diff >= 10) summary.breakout.push({ p, diff, type: 'batter' });
       else if (diff > 1)  summary.growth.push({ p, diff });
       else if (diff < -5) summary.decline.push({ p, diff });
     }
 
-    newP.growthPhase = p.age <= 24 ? 'growth' : p.age <= 29 ? 'peak' : p.age <= 33 ? 'earlydecline' : 'decline';
+    const newPhase = p.age <= 24 ? 'growth' : p.age <= 29 ? 'peak' : p.age <= 33 ? 'earlyDecline' : 'decline';
+    newP.growthPhase = newPhase;
+
+    // peakAbilities スナップショット: peak→earlyDecline 遷移時に保存
+    if (p.growthPhase === 'peak' && newPhase === 'earlyDecline' && !p.peakAbilities) {
+      newP.peakAbilities = p.isPitcher ? { ...p.pitching } : { ...p.batting };
+    }
+
     return newP;
   });
 

@@ -14,7 +14,7 @@ import { initPlayoff } from './engine/playoff';
 import { generateSeasonSchedule, getMyMatchup, getCpuMatchups } from './engine/scheduleGen';
 import { TacticalGameScreen } from './components/TacticalGame';
 import { BatchResultScreen } from './components/BatchResult';
-import { ModeSelectScreen, ResultScreen, RetirePhaseScreen, WaiverPhaseScreen, GrowthSummaryScreen } from './components/Screens';
+import { ModeSelectScreen, ResultScreen, RetirePhaseScreen, WaiverPhaseScreen, GrowthSummaryScreen, NewSeasonScreen } from './components/Screens';
 import { DraftPreviewScreen, DraftLotteryScreen, DraftScreen, DraftReviewScreen } from './components/Draft';
 import { PlayoffScreen } from './components/PlayoffScreen';
 import { RetireModal } from './components/RetireModal';
@@ -57,6 +57,7 @@ export default function App(){
   const [batchResults,setBatchResults]=useState([]);
   const [recentResults,setRecentResults]=useState([]);
   const [developmentSummary,setDevelopmentSummary]=useState(null);
+  const [newSeasonInfo,setNewSeasonInfo]=useState(null); // NewSeasonScreen用サマリー
   const [seasonHistory,setSeasonHistory]=useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[]});
   const [saveExists,setSaveExists]=useState(()=>hasSave());
   const [schedule,setSchedule]=useState(null);
@@ -626,8 +627,26 @@ export default function App(){
     notify(p.name+"が引退しました","warn");
   };
 
+  // careerLogをコンパクト形式で保存（evSum/evN等の不要フィールドを除外）
+  const mkCareerEntry=(s,ps,yr,teamId,teamName)=>{
+    const pick=x=>({PA:x.PA,AB:x.AB,H:x.H,D:x.D,T:x.T,HR:x.HR,RBI:x.RBI,BB:x.BB,K:x.K,HBP:x.HBP,SF:x.SF,SB:x.SB,IP:x.IP,ER:x.ER,BBp:x.BBp,HBPp:x.HBPp,Kp:x.Kp,HRp:x.HRp,Hp:x.Hp,BF:x.BF,W:x.W,L:x.L,SV:x.SV,HLD:x.HLD,QS:x.QS});
+    return{year:yr,teamId,teamName,stats:pick(s),playoffStats:pick(ps||emptyStats())};
+  };
+
   const handleNextYear=()=>{
-    setYear(y=>y+1);setGameDay(1);setFaPool([]);setDraftAllocation({pitcher:50,batter:50});setTeams(prev=>prev.map(t=>{const nextPlayers=t.players.filter(p=>!p._retireNow).map(p=>({...p,age:p.age+1,stats:emptyStats(),playoffStats:emptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:Math.max(0,p.contractYearsLeft-1),growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlydecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),careerLog:[...(p.careerLog||[]),{year,stats:{...p.stats},playoffStats:{...(p.playoffStats||emptyStats())}}],serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}));const nextIds=new Set(nextPlayers.map(p=>p.id));return{...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,revenueThisSeason:0,stadiumLevel:t.stadiumLevel??0,players:nextPlayers,lineup:(t.lineup||[]).filter(id=>nextIds.has(id)),rotation:(t.rotation||[]).filter(id=>nextIds.has(id)),farm:t.farm.map(p=>({...p,age:p.age+1,stats:emptyStats(),injury:null,serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}))};}));setSchedule(generateSeasonSchedule(year+1,teams));setScreen("hub");setTab("roster");notify(`${year+1}年シーズン開幕！`,"ok");};
+    setYear(y=>y+1);setGameDay(1);setFaPool([]);setDraftAllocation({pitcher:50,batter:50});
+    setTeams(prev=>prev.map(t=>{
+      const nextPlayers=t.players.filter(p=>!p._retireNow).map(p=>({...p,age:p.age+1,stats:emptyStats(),playoffStats:emptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:Math.max(0,p.contractYearsLeft-1),growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlyDecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),careerLog:[...(p.careerLog||[]),mkCareerEntry(p.stats,p.playoffStats,year,t.id,t.name)],serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}));
+      const nextIds=new Set(nextPlayers.map(p=>p.id));
+      // 予算リセット: 基本予算 + 収益60% − 選手年俸
+      const baseBudget=TEAM_DEFS.find(d=>d.id===t.id)?.budget??t.budget;
+      const seasonalPayroll=nextPlayers.reduce((s,p)=>s+(p.salary||0),0)+(t.farm||[]).reduce((s,p)=>s+(p.salary||0),0);
+      const newBudget=Math.max(Math.round(baseBudget*0.5),baseBudget+Math.round((t.revenueThisSeason||0)*0.6)-seasonalPayroll);
+      return{...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,revenueThisSeason:0,stadiumLevel:t.stadiumLevel??0,budget:newBudget,players:nextPlayers,lineup:(t.lineup||[]).filter(id=>nextIds.has(id)),rotation:(t.rotation||[]).filter(id=>nextIds.has(id)),farm:t.farm.map(p=>({...p,age:p.age+1,stats:emptyStats(),injury:null,serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}))};
+    }));
+    // スケジュール再生成はuseEffect([year])に委譲するため削除
+    setScreen("new_season");
+  };
 
   const handleStadiumUpgrade=()=>{
     if(!myTeam) return;
@@ -644,6 +663,7 @@ export default function App(){
   const handleDraftComplete=(pl,dr)=>{
     const myPicks=pl.filter(p=>dr[p.id]===myId);
     setTeams(prev=>prev.map(t=>{if(t.id!==myId) return t;return{...t,farm:[...t.farm,...myPicks.map(p=>({...p,育成:true}))]};}));
+    setNewSeasonInfo(prev=>({...(prev||{}),draftCount:myPicks.length,draftNames:myPicks.slice(0,3).map(p=>p.name)}));
     handleNextYear();
   };
 
@@ -664,12 +684,9 @@ export default function App(){
     let mySummary=null;
     const developedTeams=teams.map(t=>{
       // 他チーム引退判定（実際にロスターから除去）
-      const retiredIds=t.id!==myId
-        ? new Set(t.players.filter(p=>p.age>=35&&rollRetire(p)).map(p=>{
-            addNews({type:"season",headline:"【引退】"+p.name+"（"+t.name+"）が引退",source:"野球速報",dateLabel:year+"年",body:p.name+"選手（"+p.age+"歳）が引退を発表。"});
-            return p.id;
-          }))
-        : new Set();
+      const cpuRetiredPlayers=t.id!==myId?t.players.filter(p=>p.age>=35&&rollRetire(p)):[];
+      if(t.id!==myId)cpuRetiredPlayers.forEach(p=>{addNews({type:"season",headline:"【引退】"+p.name+"（"+t.name+"）が引退",source:"野球速報",dateLabel:year+"年",body:p.name+"選手（"+p.age+"歳）が引退を発表。"});});
+      const retiredIds=new Set(cpuRetiredPlayers.map(p=>p.id));
       const activePlayers=t.players.filter(p=>!retiredIds.has(p.id));
       // 成長・劣化（一軍・ファーム両方）
       const res=developPlayers(activePlayers, t.coaches||[]);
@@ -736,7 +753,9 @@ export default function App(){
         }
         return true;
       });
-      return{...t,players:playersAfterOverseas,farm:farmAfterIkusei};
+      // CPUチーム引退選手をhistoryに追加（アルムナイ記録）
+      const cpuAlumni=cpuRetiredPlayers.map(p=>({...p,exitYear:year,exitReason:"引退",tenure:p.serviceYears||1}));
+      return{...t,players:playersAfterOverseas,farm:farmAfterIkusei,history:[...(t.history||[]),...cpuAlumni]};
     });
     // CPU 球団の契約満了選手を再契約（失敗は自由契約として faPool へ）
     const renewResult=cpuRenewContracts(developedTeams,myId,developedTeams);
@@ -754,8 +773,10 @@ export default function App(){
     const newHoF=[...seasonHistory.hallOfFame,...newInductees];
     if(newInductees.length>0){newInductees.forEach(h=>{setMailbox(prev=>[...prev,{id:uid(),type:"hof",read:false,subject:"🏛 殿堂入り: "+h.playerName,body:h.playerName+"選手が"+year+"年度の球団殿堂入りを果たした。"+[h.careerHR>0?"通算"+h.careerHR+"本塁打":"",h.careerW>0?"通算"+h.careerW+"勝":"",h.careerPA>0?"通算"+h.careerPA+"打席":""].filter(Boolean).join(" / ")}]);}); }
     const makeRanking=(lg)=>finalTeams.filter(t=>t.league===lg).sort((a,b)=>{const pa=a.wins/Math.max(1,a.wins+a.losses);const pb=b.wins/Math.max(1,b.wins+b.losses);return pb-pa||(b.rf-b.ra)-(a.rf-a.ra);}).map(t=>({id:t.id,name:t.name,emoji:t.emoji,wins:t.wins,losses:t.losses,rf:t.rf,ra:t.ra}));
-    const standingsSnap={year,central:makeRanking("セ"),pacific:makeRanking("パ")};
+    const standingsSnap={year,central:makeRanking("セ"),pacific:makeRanking("パ"),titles:awards.titles,playerAwards:{mvpCentral:awards.mvp?.central,mvpPacific:awards.mvp?.pacific,sawamura:awards.sawamura,rookie:awards.rookie}};
     setSeasonHistory(prev=>({...prev,awards:[...prev.awards,awards],records:newRec,hallOfFame:newHoF,standingsHistory:[...(prev.standingsHistory||[]),standingsSnap]}));
+    const retiredMyNames=decisions?Object.entries(decisions).filter(([,d])=>d==="accepted"||d==="retain_failed").map(([pid])=>myTeam?.players.find(x=>x.id===pid)?.name).filter(Boolean):[];
+    setNewSeasonInfo({retiredNames:retiredMyNames,year:year+1,draftCount:0,draftNames:[]});
     setScreen("development_phase");
   }}/></ErrorBoundary></> );
   if(screen==="development_phase") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><GrowthSummaryScreen summary={developmentSummary} year={year} onNext={()=>setScreen("waiver_phase")}/></ErrorBoundary></>);
@@ -785,6 +806,7 @@ export default function App(){
   if(screen==="draft_lottery"&&draftPool) return(<><DraftLotteryScreen teams={teams} myId={myId} year={year} pool={draftPool} onDone={(r1)=>{setDraftPool(prev=>prev.map(p=>{const winner=Object.entries(r1).find(function(e){return e[1]&&e[1].id===p.id;});return{...p,_drafted:winner?true:undefined,_r1winner:winner?winner[0]:undefined};}));setScreen("draft");}}/></>);
   if(screen==="draft"&&draftPool) return(<><DraftScreen teams={teams} myId={myId} year={year} pool={draftPool} draftAllocation={draftAllocation} onDraftDone={(pl,dr)=>{setDraftResult({pool:pl,drafted:dr});setScreen("draft_review");}}/></>);
   if(screen==="draft_review"&&draftResult) return(<><DraftReviewScreen teams={teams} myId={myId} year={year} pool={draftResult.pool} drafted={draftResult.drafted} onEnd={()=>handleDraftComplete(draftResult.pool,draftResult.drafted)}/></>);
+  if(screen==="new_season") return(<><NewSeasonScreen year={year} info={newSeasonInfo} developmentSummary={developmentSummary} onStart={()=>{setScreen("hub");setTab("dashboard");notify(`${year}年シーズン開幕！`,"ok");}}/></>);
 
   const g=(myTeam?.wins||0)+(myTeam?.losses||0);
   const remain=SEASON_GAMES-g;
