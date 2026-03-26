@@ -280,9 +280,13 @@ baseball-manager/
 
 | フィールド | 型 | 意味 |
 |------------|-----|------|
-| `serviceYears` | number | 支配下登録年数（FA資格カウント用。育成期間はカウントしない） |
-| `entryAge` | number | 入団時年齢（高卒≤19 / 大卒≥22 で FA 閾値を決定） |
+| `serviceYears` | number | UI表示用の換算登録年数（`Math.floor(daysOnActiveRoster / 120)`。FA判定はdaysOnActiveRosterで行う） |
+| `daysOnActiveRoster` | number | 一軍（players配列）に在籍した累積日数。毎年リセットしない。FA権取得後も保持。 |
+| `entryAge` | number | 入団時年齢 |
+| `entryType` | string | 入団区分: `"高卒"` / `"大卒"` / `"社会人"` / `"外国人"`。FA閾値の判定基準。`entryAge` による推測を廃止しこの値で判定する |
 | `ikuseiYears` | number | 育成契約年数（最大3年。超過で自動解雇） |
+| `registrationCooldownDays` | number | 一軍登録抹消後の再登録不可残日数（抹消時10をセット・毎日デクリメント。怪我による自動降格にも適用） |
+| `stats2` | object | 二軍成績（PA/H/HR/IP/ER/K の6統計のみ。一軍statsとは別フィールド） |
 | `morale` | number(0〜100) | 個人モラル。打撃・投球能力に `(morale-70)/250` を加算 |
 | `recentPitchingDays` | number[] | 直近7試合の登板 gameDay 配列（投手専用） |
 
@@ -376,14 +380,38 @@ baseball-manager/
 
 #### FA 資格（NPB協約準拠）
 
-| 入団区分 | 国内FA取得 | 海外FA取得 |
-|----------|-----------|-----------|
-| 高卒（`entryAge ≤ 19`） | 8年 | 9年 |
-| 大卒・社会人（`entryAge ≥ 22`） | 7年 | 9年 |
-| `entryAge` 未設定 | 大卒扱い（7年） | 9年 |
+FA判定は `entryAge` による推測を廃止し、`entryType` フィールドで行う（`daysOnActiveRoster` 累積日数方式）。
+
+| `entryType` | `entryAge` | 国内FA取得（累積日数） | 海外FA取得（累積日数） |
+|-------------|-----------|----------------------|----------------------|
+| `"高卒"` | 18 | 8年 × 120日 = **960日** | 9年 = 1080日 |
+| `"大卒"` | 22 | 7年 × 120日 = **840日** | 9年 = 1080日 |
+| `"社会人"` | 24–25 | 7年 × 120日 = **840日** | 9年 = 1080日 |
+| `"外国人"` | 22–28 | 8年 × 120日 = **960日** | 9年 = 1080日 |
 
 - `overseas ≥ 70` の選手: 国内FA権があっても行使せず **海外FA権取得まで待機**
 - `overseas ≥ 70` かつ海外FA資格あり: NPB離脱
+
+#### 外国人選手のFA権と外国人枠免除（NPB協約 第82条準拠）
+
+外国人選手も上記と同じ `daysOnActiveRoster` 累積日数でFA権を取得できる。
+
+| 条件 | 内容 |
+|---|---|
+| `daysOnActiveRoster >= FOREIGN_EXEMPTION_DAYS`（960日） | FA権取得と同時に外国人枠から自動除外（翌シーズンから日本人扱い） |
+| FA移籍時の補償 | なし（国内選手のFA補償ランク制度は適用されない） |
+
+```javascript
+// 外国人枠免除判定（フィールドは追加しない・毎回導出する）
+const isForeignExempt = (p) =>
+  p.isForeign && (p.daysOnActiveRoster ?? 0) >= FOREIGN_EXEMPTION_DAYS;  // = 960
+
+// promote() での外国人枠チェック変更後
+const foreignActive = team.players.filter(x => x.isForeign && !isForeignExempt(x)).length;
+if (p.isForeign && !isForeignExempt(p) && foreignActive >= MAX_外国人_一軍) { ... }
+```
+
+UI: PlayerModal の外国人バッジを `外国人枠免除まであとX日` で表示。免除済みは `元外国人` バッジに変更。
 
 #### 育成契約（ikusei）
 
@@ -862,9 +890,13 @@ base = 0.3% / 試合
 |--------|----|------|
 | `SEASON_GAMES` | 143 | 1シーズンの試合数 |
 | `BATCH` | 5 | 一括シムの試合数 |
-| `MAX_ROSTER` | 28 | 一軍ロスター上限 |
+| `MAX_ROSTER` | 28 | 一軍出場選手登録上限 |
 | `MAX_FARM` | 30 | 二軍ロスター上限 |
+| `MAX_SHIHAKA_TOTAL` | 70 | 支配下登録選手の球団総数上限（一軍+二軍合計、NPB協約準拠） |
 | `MAX_外国人_一軍` | 4 | 一軍外国人枠上限 |
+| `INJURY_AUTO_DEMOTE_DAYS` | 10 | この日数を超える怪我は自動二軍降格（≤10日は確認ダイアログ） |
+| `ACTIVE_ROSTER_FA_DAYS_PER_YEAR` | 120 | FA年数1年分の基準一軍在籍日数（NPB145日/181日ルール準拠の換算値） |
+| `FOREIGN_EXEMPTION_DAYS` | 960 | 外国人選手が外国人枠から免除される累積一軍在籍日数（= 8 × 120、NPB協約第82条準拠） |
 | `ACCEPT_THRESHOLD` | 55 | 契約成立に必要なオファースコア |
 | `PITCH_NORM` | 120 | `calcFatigue` 正規化分母（スタミナ50基準の球数スケール） |
 | `PITCH_HARD_CAP` | 130 | 投球数の絶対上限（疲弊度に関わらず強制交代） |
@@ -1583,16 +1615,96 @@ HR 補正: 1.0 より大きいと HR になりやすい、小さいと HR が二
 
 ### 13.2 ファームシステム拡張（Tier 8）🟡
 
-#### 二軍簡易シミュレーション
-- 一軍シーズン進行に連動して二軍143試合を自動バッチ処理
-- 使用する選手: `team.farm[]` + 一軍出場機会のない支配下選手
-- 二軍成績は `player.stats2` に蓄積（別フィールドで一軍と分離）
-- 二軍タイトル（HR王・最多勝・首位打者）を年度末に表彰
+#### ㉔ 二軍簡易シミュレーション
 
-#### オプション制度
-- `player.optionYears`: 支配下登録後3年間の降格可能回数（初期値3）
-- 降格時: `optionYears--`。0になった選手を降格するにはウェーバー公示が必要
-- UI: ロスタータブで「オプション残: N年」を表示
+**リーグ分類（NPBリーグ名準拠・ゲーム内簡略化）**
+- セ球団（6チーム）→ イースタン・リーグ
+- パ球団（6チーム）→ ウエスタン・リーグ
+- ※ NPB実態の7+5構成はゲームのセ/パ前提設計と整合しないため採用しない
+
+**シミュレーション粒度（確率的シム）**
+- 新規 `farmSimGame(teamA, teamB)` で処理（`quickSimGame` のフルイニング制は不使用）
+- 打者/投手の平均能力値から期待得点を計算 → W/L と基本スタットを乱数生成
+- 打席単位の解決なし。1試合を数行の計算で完結させる（処理負荷を最小化）
+- 二軍選手はprocedural生成のまま（リアル選手データの取り込み不要）
+
+**成績管理**
+- 二軍成績は `player.stats2`（PA/H/HR/IP/ER/K の6統計）に蓄積。一軍 `stats` とは別フィールド
+- 二軍タイトル（HR王・最多勝・首位打者）をリーグ別に年度末に表彰
+
+---
+
+#### ㉕ 育成→支配下昇格とFA管理
+
+**entryType フィールドの新規追加**
+
+`entryAge` 数値による推測（`≤19` → 高卒）を廃止し、明示的な `entryType` フィールドで入団区分を管理する。
+
+```javascript
+entryType: "高卒" | "大卒" | "社会人" | "外国人"
+```
+
+| entryType | entryAge | FA国内閾値 | 特徴 |
+|---|---|---|---|
+| `"高卒"` | 18 | 960日（8年×120） | 長期育成型。Tier 10 ㉝ で成長カーブ差を実装予定 |
+| `"大卒"` | 22 | 840日（7年×120） | 標準 |
+| `"社会人"` | 24–25 | 840日 | 即戦力型 |
+| `"外国人"` | 22–28 | 960日 → FA取得で外国人枠免除 | 詳細は §4.5 参照 |
+
+- `getFaThreshold()` を `entryType` ベースに変更（`contract.js` と `PlayerModal.jsx` の不整合を解消）
+- ドラフト候補・生成選手に `entryType` を付与（`draft.js` / `player.js`）
+- Draft UI に入団区分バッジを表示（詳細な体験は Tier 10 ㉝ に委ねる）
+
+**FA権判定の累積日数方式**
+
+> `serviceYears` 年単位カウントを廃止し、`daysOnActiveRoster`（累積日数）でFA権を判定する。
+> NPB規則: 145日/年（5ヶ月）の一軍登録で1年カウント。ゲーム内換算: **120日/年**
+
+```javascript
+// contract.js getF aThreshold（変更後）
+export function getFaThreshold(p) {
+  const base = (p.entryType === '高卒' || p.entryType === '外国人') ? 8 : 7;
+  return {
+    domestic: base * ACTIVE_ROSTER_FA_DAYS_PER_YEAR,   // 高卒・外国人=960 / 大卒・社会人=840
+    overseas: 9 * ACTIVE_ROSTER_FA_DAYS_PER_YEAR,      // 全員=1080
+  };
+}
+```
+
+- `daysOnActiveRoster` は一軍（`players` 配列）にいる gameDay ごとに +1
+- 累積・リセットなし（FA取得後も記録を保持）
+- `serviceYears` はUI表示用に残す: `Math.floor(p.daysOnActiveRoster / 120)` で換算表示
+
+**昇格フロー改善**
+- `convertIkusei()`（育成→支配下変換）後、続けて「一軍昇格する」ボタンを表示する1フロー化
+- 選手カードに「FA資格: あとX日（Y年相当）」を表示
+- 昇格判断材料: 「今年昇格するとFA資格がN年に早まります」を明示
+- 外国人選手には「外国人枠免除まであとX日」を追加表示
+
+---
+
+#### ㉖ 怪我降格・登録抹消10日ルール・支配下70人枠
+
+> **NPB準拠**: NPBに故障者リスト（MLB式IL）の概念はない。怪我した選手は「出場選手登録抹消＋二軍降格」が実態。
+
+**怪我時の挙動（`injuryDaysLeft` で分岐）**
+
+| `injuryDaysLeft` | 挙動 |
+|---|---|
+| **> `INJURY_AUTO_DEMOTE_DAYS`（10日）** | 自動で `players → farm` 移動 + `registrationCooldownDays = 10`（手動降格と同一ロジック） |
+| **≤ 10日（短期）** | 確認ダイアログ「N日の怪我です。二軍降格しますか？」→ Yes なら降格+クールダウン |
+| **手動降格（怪我なし）** | `registrationCooldownDays = 10` |
+
+- farm 内でもリハビリ進行（`tickInjuries` を `t.farm` にも適用）
+- 回復後（`injuryDaysLeft = 0` かつ `registrationCooldownDays = 0`）: 枠の有無に関わらず「X選手が回復しました。一軍昇格できます」通知を表示
+
+**ロスター空き通知**
+- `players.length < MAX_ROSTER`（1枠でも空き）かつ昇格可能なfarm選手がいる場合: 能力値上位の候補を自動推薦（完全自動昇格はしない）
+
+**支配下70人枠**
+- 一軍 + 二軍の支配下選手合計 ≤ `MAX_SHIHAKA_TOTAL = 70`
+- 育成選手は別枠（上限外）
+- 70名到達時は補強・ドラフト指名不可。ロスタータブに「支配下 XX / 70」を常時表示
 
 ---
 
