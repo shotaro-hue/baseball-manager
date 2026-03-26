@@ -1,0 +1,93 @@
+---
+name: game-bugfix
+description: バグの症状を受け取り、原因を調査・修正してコミット・プッシュするワークフロー。シミュレーションのおかしな挙動、UI の不具合、データ不整合などを修正したいときに使う。
+---
+
+# Game Bug Fix スキル
+
+バグの症状から原因を特定し、修正してコミット・プッシュするワークフロー。
+
+## ワークフロー
+
+Make a todo list for all the tasks in this workflow and work on them one after another.
+
+### 1. バグの症状を確認
+
+ユーザーからバグの情報を受け取る。不明な場合は以下を確認する:
+- どんな操作をしたときに発生するか
+- 期待される動作と実際の動作の違い
+- エラーメッセージ（ブラウザコンソール等）があれば内容
+- 再現手順
+
+### 2. ROADMAP.md でバグ記録を確認
+
+`ROADMAP.md` を読み、既知のバグリスト（B* タグ）に記載がないか確認する。
+同様の症状の修正履歴があれば、そのアプローチを参考にする。
+
+### 3. 関連コードを調査
+
+症状から影響範囲を推測し、該当ファイルを読み込む:
+
+**シミュレーション系のバグ**:
+- `src/engine/simulation.js` — ピッチ解決・打席結果・イニング進行
+- `src/engine/postGame.js` — 試合後の成績集計
+
+**選手・チーム管理系のバグ**:
+- `src/engine/player.js` — 選手生成・老化・引退
+- `src/engine/contract.js` — 契約処理
+- `src/engine/trade.js` — トレード処理
+
+**UI 系のバグ**:
+- `src/components/Tabs.jsx` — ハブタブ
+- `src/components/TacticalGame.jsx` — 試合操作
+- `src/App.jsx` — state 管理・game flow
+
+**データ・永続化系のバグ**:
+- `src/engine/saveload.js` — localStorage 読み書き
+- `src/constants.js` — 定数・初期値
+
+コードを読む際は、バグが起きうる条件分岐・境界値・null チェックに注目する。
+
+### 4. 根本原因の特定
+
+- データの流れを追いかけ、不正な値が発生する箇所を特定する
+- 副作用（state の意図しない変更、配列の直接操作など）がないか確認する
+- 類似のバグが他の箇所にも潜んでいないか確認する
+
+### 5. 修正
+
+- 最小限の変更で根本原因を直す
+- 修正によって他の動作が壊れないか確認する
+- 必要に応じて防御的なコード（null チェック、デフォルト値）を追加する
+
+### 6. ビルド確認
+
+```bash
+cd /home/user/baseball-manager && npm run build
+```
+
+ビルドエラーがあれば修正する。
+
+### 7. ROADMAP.md を更新
+
+バグが ROADMAP.md に記載されていた場合、ステータスを ✅ に更新する。
+新たに発見したバグがあれば B* タグで追記する。
+
+### 8. コミット・プッシュ
+
+```bash
+cd /home/user/baseball-manager
+git add -p   # 関連ファイルのみステージ
+git commit -m "fix: <バグの内容の簡潔な説明>"
+git push -u origin <current-branch>
+```
+
+## 完了時の報告
+
+以下の形式でユーザーに報告する:
+
+- 特定した根本原因
+- 修正内容の概要
+- 変更したファイル一覧
+- ビルド結果: ✅ 成功 / ‼️ 失敗（詳細）
+- 関連して発見した潜在的な問題（あれば）
