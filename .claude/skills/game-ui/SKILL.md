@@ -46,7 +46,7 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 ### 3. 関連コードを調査
 
 **UI 層** (`src/components/`):
-- `Tabs.jsx` — 対象タブの現状実装
+- `src/components/tabs/` — 対象タブの現状実装
 - `TacticalGame.jsx` — 試合操作 UI（試合系改善の場合）
 - `Screens.jsx` — 画面切り替え
 
