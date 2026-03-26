@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { gameDayToDate } from '../utils';
-import { getMyMatchup } from '../engine/scheduleGen';
+import { gameDayToDate } from '../../utils';
+import { getMyMatchup } from '../../engine/scheduleGen';
 
 const MONTH_LABELS = ['3月','4月','5月','6月','7月','8月','9月','10月'];
 
