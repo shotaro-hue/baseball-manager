@@ -1,6 +1,7 @@
 ---
 name: game-review
 description: SPEC.md と ROADMAP.md を読み込み、ゲームの理想形と現状の乖離を評価し、優先度付きで次のアクションを提案するワークフロー。「次に何をすべきか」「理想のゲームに近づけるには」を知りたいときに使う。
+allowed-tools: Read, Glob, Grep
 ---
 
 # Game Review スキル
@@ -87,14 +88,7 @@ ROADMAP と SPEC を照合しながら、主要ファイルを確認する:
 
 ---
 
-### 5. ROADMAP.md を更新（任意）
-
-レビューで新たに発見した以下の情報があれば ROADMAP.md に追記する:
-- 新たなバグ（B* タグ）
-- 仕様との乖離（TODO として記録）
-- 完了していたが未更新のステータス
-
-### 6. ユーザーへの報告
+### 5. ユーザーへの報告
 
 レポートを提示し、「次の一手」のスキル（`/game-feature`, `/game-bugfix`, `/game-balance`）を案内する。
 
