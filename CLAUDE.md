@@ -3,7 +3,7 @@
 ## プロジェクト概要
 
 NPB（日本プロ野球）球団経営シミュレーションゲーム。OOTP / Football Manager レベルの深いフランチャイズ経営体験を目標とする。
-React 18 + Vite 5 + Recharts で動作するシングルページアプリ。localStorage で永続化（Tier 7 着手前に IndexedDB 移行予定）。
+React 18 + Vite 5 + Recharts で動作するシングルページアプリ。localStorage で永続化（IndexedDB 移行は Tier 8 着手前に再評価予定）。
 
 詳細仕様は `SPEC.md`（80KB）、開発状況は `ROADMAP.md` を参照。
 
@@ -24,7 +24,10 @@ node scripts/fetch-spaia.js  # NPB 2025 実選手データ取得 → src/data/np
 
 | パス | 役割 | サイズ |
 |---|---|---|
-| `src/App.jsx` | グローバル state 管理・全ゲームロジック呼び出し・画面遷移 | 67KB |
+| `src/App.jsx` | render coordinator・画面ルーティング | 198行 |
+| `src/hooks/useGameState.js` | チーム・選手・ゲーム state 管理 | 258行 |
+| `src/hooks/useSeasonFlow.js` | 試合シミュ・プレーオフ進行 | 402行 |
+| `src/hooks/useOffseason.js` | オフシーズン・ドラフト・引退処理 | 259行 |
 | `src/constants.js` | チーム定義・ゲームバランス定数・能力値テーブル | — |
 | `src/utils.js` | RNG・フォーマッタ・uid 生成・日付ユーティリティ | — |
 | `src/styles.css` | CSS 変数によるチームカラーテーマ | — |
@@ -37,7 +40,8 @@ node scripts/fetch-spaia.js  # NPB 2025 実選手データ取得 → src/data/np
 | `src/engine/saveload.js` | localStorage 読み書き | — |
 | `src/engine/scheduleGen.js` | 143試合の NPB シーズン日程生成 | 14KB |
 | `src/engine/postGame.js` | 試合後の成績集計・W/L 判定 | — |
-| `src/components/Tabs.jsx` | メインハブの全タブ（T4 で分割予定） | 85KB |
+| `src/components/Tabs.jsx` | バレルファイル（tabs/ の re-export） | 13行 |
+| `src/components/tabs/` | 各タブ独立コンポーネント（12ファイル） | — |
 | `src/components/TacticalGame.jsx` | イニング別試合操作 UI | 27KB |
 | `src/components/Draft.jsx` | ドラフト UI（抽選・選択・確認） | 41KB |
 | `src/components/Screens.jsx` | モード選択・試合結果・プレーオフ画面 | — |
@@ -47,19 +51,18 @@ node scripts/fetch-spaia.js  # NPB 2025 実選手データ取得 → src/data/np
 
 ## 現在の開発フォーカス
 
-### 最優先: Tier 7（複数年フランチャイズ基盤）🔴
+### 最優先: Tier 8（二軍シミュレーション基盤）🔴
 
-- **前提必須: T1** localStorage → IndexedDB 移行（5MB 上限対策）
-- **⑳** マルチシーズン継続（選手 age/serviceYears++ ・ロースター引き継ぎ）
-- **㉑** 選手加齢・引退パイプライン（35歳以上の引退確率）
-- **㉒** 能力自然変化（growth/decline フェーズ別の能力微調整）
-- **㉓** 歴史データベース（F2/F3/F4 は実装済み、通算記録 DB が残件）
+- **㉔** 二軍シミュレーション（farm simulation）
+- **㉕** 育成→支配下昇格パイプライン（ikusei → shihaka）
+- **㉖** オプション制度
+- **㉗** 選手育成目標・指示システム
 
 ### 並行整備
 
-- **T3**: App.jsx 分割 → `useGameState` / `useSeasonFlow` / `useOffseason` カスタムフックへの切り出し
-- **T4**: Tabs.jsx 分割 → `src/components/tabs/` 以下に各タブを独立ファイル化
-- **T7**: Vitest 導入 → `resolveAtBat` / `calcEffectiveFatigue` 等のエンジン関数からテスト追加
+- **T5**: セーブデータバリデーション（ロード時 null チェック・ローリングバックアップ 2世代）
+- **T6**: JSDoc 型注釈（player.js / simulation.js の主要関数から順次）
+- **T7**: Vitest 拡充 → `resolveAtBat` / `calcEffectiveFatigue` 等（3ファイル実装済み、追加カバレッジ）
 
 詳細は `ROADMAP.md` を参照。
 
@@ -96,7 +99,7 @@ node scripts/fetch-spaia.js  # NPB 2025 実選手データ取得 → src/data/np
 | `/game-bugfix` | バグの調査・修正・コミット・プッシュ |
 | `/game-balance` | `constants.js` のパラメータ分析・調整 |
 | `/game-review` | SPEC.md × ROADMAP.md × コードを照合して乖離を評価・次アクション提案 |
-| `/game-refactor` | App.jsx（T3）・Tabs.jsx（T4）等の肥大化ファイルを安全に分割 |
+| `/game-refactor` | 肥大化ファイルを安全に分割・リファクタリング |
 
 ---
 
