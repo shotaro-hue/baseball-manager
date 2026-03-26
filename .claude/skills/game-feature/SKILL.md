@@ -92,6 +92,23 @@ git commit -m "feat: <機能名の簡潔な説明>"
 git push -u origin <current-branch>
 ```
 
+### 8. PR 作成・マージ
+
+以下の内容をユーザーに提示し、**承認を得てから** PR 作成・マージを実行する:
+
+```
+以下の内容で PR を作成してマージしてよいですか？
+
+タイトル: feat: <機能名の簡潔な説明>
+ベースブランチ: main
+変更概要:
+- <変更点1>
+- <変更点2>
+```
+
+承認を得たら `mcp__github__create_pull_request` で PR を作成し、
+続けて `mcp__github__merge_pull_request`（squash）でマージする。
+
 ## 完了時の報告
 
 以下の形式でユーザーに報告する:
@@ -100,4 +117,5 @@ git push -u origin <current-branch>
 - 変更したファイル一覧
 - ビルド結果: ✅ 成功 / ‼️ 失敗（詳細）
 - ROADMAP.md の更新内容
+- マージ完了: PR #番号
 - 次に実装を推奨する機能（あれば）
