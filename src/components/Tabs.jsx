@@ -10,3 +10,4 @@ export { CareerTable } from './tabs/CareerTable';
 export { RosterTab } from './tabs/RosterTab';
 export { StandingsTab } from './tabs/StandingsTab';
 export { RecordsTab } from './tabs/RecordsTab';
+export { ScheduleTab } from './tabs/ScheduleTab';
