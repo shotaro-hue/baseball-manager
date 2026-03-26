@@ -13,11 +13,13 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 
 ### 1. バグの症状を確認
 
-ユーザーからバグの情報を受け取る。不明な場合は以下を確認する:
+ユーザーからバグの情報を受け取る。以下の情報が揃っていない場合は、**実装より先にユーザーに確認する**:
 - どんな操作をしたときに発生するか
 - 期待される動作と実際の動作の違い
 - エラーメッセージ（ブラウザコンソール等）があれば内容
 - 再現手順
+
+再現手順が不明なまま調査に進んではならない。
 
 ### 2. ROADMAP.md でバグ記録を確認
 
@@ -106,6 +108,7 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 - 修正内容の概要
 - 変更したファイル一覧
 - ビルド結果: ✅ 成功 / ‼️ 失敗（詳細）
+- ROADMAP.md の更新内容（変更した場合のみ）
 - SPEC.md の更新内容（CHANGELOG.md + 更新したセクション一覧）
 - マージ完了: PR #番号
 - 関連して発見した潜在的な問題（あれば）

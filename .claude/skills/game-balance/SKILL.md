@@ -81,7 +81,12 @@ const HR_BASE_PROB = 0.030;
 
 `.claude/skills/_shared/build-and-test.md` を Read ツールで読み込み、記載の手順を実行する。
 
-### 7. SPEC.md を更新
+### 7. ROADMAP.md を更新（該当あれば）
+
+バランス調整に対応する ROADMAP のタスク（E* タグ等）があれば 🔴 → ✅（または 🔶）に更新する。
+対応するタスクがなければスキップする。
+
+### 8. SPEC.md を更新
 
 - **`CHANGELOG.md`**（必須）: 最新エントリを先頭に追加する
 
