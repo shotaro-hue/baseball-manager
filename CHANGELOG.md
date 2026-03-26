@@ -6,6 +6,19 @@
 ---
 
 
+### 2026-03-26 — T5: セーブデータバリデーション（ローリングバックアップ・フィールドマイグレーション）
+
+**仕様本文への影響なし（内部実装のみ）**
+
+- `src/engine/saveload.js` に `validateAndMigrateSave()` / `migratePlayer()` を追加
+- ロード時に必須フィールドの null チェックを実施し、欠落フィールドにデフォルト値を補完
+  - 選手: `entryAge` / `serviceYears` / `ikuseiYears` / `condition` / `morale` / `trust` / `injuryDaysLeft` / `growthPhase` / `recentPitchingDays` / `careerLog` / `peakAbilities`
+  - チーム: `pitchingPattern` / `stadiumLevel` / `revenueThisSeason`
+- ローリングバックアップ2世代（`bk1` / `bk2`）を実装。`saveGame()` 時にローテーション、`loadGame()` 時にフォールバック
+- `deleteSave()` でバックアップキーも合わせて削除
+
+---
+
 ### 2026-03-26 — T3/T4 ファイル分割完了 + SPEC.md 同期
 
 **仕様本文への影響あり（§2・§14）**
