@@ -6,14 +6,26 @@ import { saberBatter, saberPitcher } from '../engine/sabermetrics';
    PLAYER DETAIL MODAL
 ═══════════════════════════════════════════════ */
 
+function abilityGrade(v){
+  if(v>=90) return{g:"S",c:"#e879f9"};
+  if(v>=80) return{g:"A",c:"#34d399"};
+  if(v>=65) return{g:"B",c:"#f5c842"};
+  if(v>=50) return{g:"C",c:"#94a3b8"};
+  if(v>=35) return{g:"D",c:"#f97316"};
+  return{g:"E",c:"#f87171"};
+}
+
 function AbilityBar({label, value, color="#60a5fa"}){
   const pct=Math.round((value/99)*100);
-  const c=value>=80?"#34d399":value>=65?"#f5c842":value>=50?"#94a3b8":"#f87171";
+  const {g,c}=abilityGrade(value);
   return(
     <div style={{marginBottom:5}}>
-      <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:2,alignItems:"center"}}>
         <span style={{fontSize:10,color:"#94a3b8"}}>{label}</span>
-        <span style={{fontSize:10,fontFamily:"monospace",color:c,fontWeight:700}}>{value}</span>
+        <div style={{display:"flex",alignItems:"center",gap:5}}>
+          <span style={{fontSize:9,fontWeight:700,color:c,background:"rgba(0,0,0,.3)",borderRadius:3,padding:"0 4px",minWidth:14,textAlign:"center"}}>{g}</span>
+          <span style={{fontSize:10,fontFamily:"monospace",color:c,fontWeight:700}}>{value}</span>
+        </div>
       </div>
       <div style={{height:4,background:"rgba(255,255,255,.08)",borderRadius:2,overflow:"hidden"}}>
         <div style={{height:"100%",width:pct+"%",background:c,borderRadius:2,transition:"width .3s"}}/>
@@ -34,8 +46,8 @@ export function PlayerModal({player:p, teamName, onClose}){
   const sb=!p.isPitcher?saberBatter(p.stats):null;
   const sp=p.isPitcher?saberPitcher(p.stats):null;
 
-  const phase=p.growthPhase==="growth"?"成長期":p.growthPhase==="peak"?"全盛期":p.growthPhase==="earlydecline"?"衰退初期":"衰退期";
-  const phaseColor=p.growthPhase==="growth"?"#34d399":p.growthPhase==="peak"?"#f5c842":p.growthPhase==="earlydecline"?"#f97316":"#f87171";
+  const phase=p.growthPhase==="growth"?"成長期":p.growthPhase==="peak"?"全盛期":p.growthPhase==="earlyDecline"?"衰退初期":"衰退期";
+  const phaseColor=p.growthPhase==="growth"?"#34d399":p.growthPhase==="peak"?"#f5c842":p.growthPhase==="earlyDecline"?"#f97316":"#f87171";
 
   // FA資格
   const faYrs=p.entryAge<=17?8:7;

@@ -252,6 +252,8 @@ export function WaiverPhaseScreen({teams,myId,year,onRelease,onNext}){
 export function GrowthSummaryScreen({ summary, year, onNext }) {
   const { breakout = [], growth = [], decline = [] } = summary || {};
   const hasAny = breakout.length + growth.length + decline.length > 0;
+  // 33歳以上の主力選手で衰退した選手を警告対象に
+  const declineWarnings = decline.filter(item => item.p?.age >= 33 && Math.abs(item.diff) >= 5);
   return (
     <div className="app">
       <div style={{ padding: "16px 14px 0" }}>
@@ -296,6 +298,18 @@ export function GrowthSummaryScreen({ summary, year, onNext }) {
           </div>
         )}
 
+        {declineWarnings.length > 0 && (
+          <div className="card" style={{ marginBottom: 10, background: "rgba(248,113,113,.06)", border: "1px solid rgba(248,113,113,.2)" }}>
+            <div className="card-h" style={{ color: "#f87171" }}>⚠️ 衰退警告（33歳以上）</div>
+            {declineWarnings.map((item, i) => (
+              <div key={i} style={{ fontSize: 11, padding: "3px 0", borderBottom: "1px solid rgba(255,255,255,.04)", display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "#e0d4bf" }}>{item.p.name} <span style={{ fontSize: 10, color: "#94a3b8" }}>{item.p.age}歳</span></span>
+                <span style={{ color: "#f87171" }}>{item.diff}pt ⚠</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {!hasAny && (
           <div className="card" style={{ marginBottom: 10 }}>
             <div style={{ fontSize: 12, color: "#374151" }}>今シーズンは大きな変化なし</div>
@@ -312,5 +326,82 @@ export function GrowthSummaryScreen({ summary, year, onNext }) {
 
 
 /* ═══════════════════════════════════════════════
-   RETIRE PHASE SCREEN
+   NEW SEASON SCREEN — 年度開幕インタースティシャル
 ═══════════════════════════════════════════════ */
+
+export function NewSeasonScreen({ year, info, developmentSummary, onStart }) {
+  const retiredNames = info?.retiredNames || [];
+  const draftCount = info?.draftCount || 0;
+  const draftNames = info?.draftNames || [];
+  const breakout = developmentSummary?.breakout || [];
+  const topBreakout = breakout.slice(0, 3);
+
+  return (
+    <div className="app">
+      <div style={{ padding: "24px 16px 0", display: "flex", flexDirection: "column", gap: 14 }}>
+        {/* 年度バナー */}
+        <div style={{ textAlign: "center", paddingBottom: 8 }}>
+          <div style={{ fontSize: 11, color: "#94a3b8", letterSpacing: ".2em", marginBottom: 6 }}>SEASON START</div>
+          <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: 48, color: "#f5c842", letterSpacing: ".1em", lineHeight: 1 }}>
+            {year}
+          </div>
+          <div style={{ fontSize: 13, color: "#e0d4bf", marginTop: 4, letterSpacing: ".1em" }}>年シーズン 開幕</div>
+        </div>
+
+        {/* オフシーズンサマリー */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div className="card" style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: ".1em", marginBottom: 4 }}>引退選手</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "#f87171" }}>{retiredNames.length}</div>
+            <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>名</div>
+          </div>
+          <div className="card" style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: ".1em", marginBottom: 4 }}>ドラフト指名</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "#60a5fa" }}>{draftCount}</div>
+            <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>名</div>
+          </div>
+        </div>
+
+        {/* 引退選手リスト */}
+        {retiredNames.length > 0 && (
+          <div className="card">
+            <div className="card-h" style={{ color: "#f87171" }}>⬛ 引退</div>
+            <div style={{ fontSize: 11, color: "#94a3b8" }}>{retiredNames.join("、")}</div>
+          </div>
+        )}
+
+        {/* ドラフト新入団 */}
+        {draftCount > 0 && (
+          <div className="card">
+            <div className="card-h" style={{ color: "#60a5fa" }}>⭐ ドラフト入団</div>
+            <div style={{ fontSize: 11, color: "#94a3b8" }}>
+              {draftNames.length > 0 ? draftNames.join("、") : ""}
+              {draftCount > draftNames.length ? `ほか${draftCount - draftNames.length}名` : ""}
+            </div>
+          </div>
+        )}
+
+        {/* ブレイクスルー */}
+        {topBreakout.length > 0 && (
+          <div className="card" style={{ background: "rgba(251,191,36,.06)", border: "1px solid rgba(251,191,36,.2)" }}>
+            <div className="card-h" style={{ color: "#f5c842" }}>⚡ ブレイクスルー</div>
+            {topBreakout.map((item, i) => (
+              <div key={i} style={{ fontSize: 11, padding: "3px 0", borderBottom: "1px solid rgba(255,255,255,.04)", display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "#e0d4bf" }}>{item.p.name} <span style={{ fontSize: 10, color: "#94a3b8" }}>{item.p.age}歳</span></span>
+                <span style={{ color: "#f5c842" }}>+{item.diff}pt</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button
+          className="btn btn-gold"
+          style={{ width: "100%", padding: "16px 0", fontSize: 16, fontWeight: 700, marginTop: 8, letterSpacing: ".1em" }}
+          onClick={onStart}
+        >
+          ⚾ 開幕！
+        </button>
+      </div>
+    </div>
+  );
+}

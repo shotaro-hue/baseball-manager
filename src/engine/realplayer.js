@@ -70,7 +70,7 @@ export function realBatterToPlayer(b, teamDef) {
     recovery:    clamp(55 + rng(-10, 15), 35, 80),
   };
 
-  const growthPhase = age <= 24 ? 'growth' : age <= 29 ? 'peak' : age <= 33 ? 'earlydecline' : 'decline';
+  const growthPhase = age <= 24 ? 'growth' : age <= 29 ? 'peak' : age <= 33 ? 'earlyDecline' : 'decline';
 
   return {
     id: uid(), name, pos, age,
@@ -119,7 +119,7 @@ export function realPitcherToPlayer(p, teamDef) {
   };
 
   const subtype = pos === '抑え' ? '抑え' : pos === '中継ぎ' ? '中継ぎ' : '先発';
-  const growthPhase = age <= 24 ? 'growth' : age <= 29 ? 'peak' : age <= 33 ? 'earlydecline' : 'decline';
+  const growthPhase = age <= 24 ? 'growth' : age <= 29 ? 'peak' : age <= 33 ? 'earlyDecline' : 'decline';
 
   return {
     id: uid(), name, pos, age,
