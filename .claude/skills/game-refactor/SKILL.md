@@ -42,13 +42,9 @@ ROADMAP.md の「保守性・コード品質」セクション（T* タグ）を
 新ファイルを作成し、分割元から該当コードを移動する。
 import/export を正確に更新する。
 
-### 5. ビルド確認
+### 5. ビルド・テスト確認
 
-```bash
-cd /home/user/baseball-manager && npm run build
-```
-
-リファクタリングなのでビルドエラーは必ず 0 にする。
+`.claude/skills/_shared/build-and-test.md` を Read ツールで読み込み、記載の手順を実行する。リファクタリングなのでビルドエラー・テスト失敗は必ず 0 にする。
 
 ### 6. ROADMAP.md を更新
 
@@ -56,7 +52,7 @@ cd /home/user/baseball-manager && npm run build
 
 ### 7. SPEC.md を更新
 
-- **§12 変更履歴**（必須）: 最新エントリを先頭に追加する
+- **`CHANGELOG.md`**（必須）: 最新エントリを先頭に追加する
 
   ```
   ### YYYY-MM-DD — <リファクタリング内容>（コミットハッシュ）
@@ -69,37 +65,15 @@ cd /home/user/baseball-manager && npm run build
 - **§2 ディレクトリ構成**: 新規ファイル・ディレクトリの追加、削除・統合を反映する（必須）
 - **§14 保守性・技術的負債**: 完了した T* タスクのステータスを「計画中」→「✅ 完了」に更新する（必須）
 
-### 8. コミット・プッシュ
+### 8. コミット・プッシュ・PR
 
-```bash
-cd /home/user/baseball-manager
-git add <変更ファイル>
-git commit -m "refactor: <分割内容の簡潔な説明>"
-git push -u origin <current-branch>
-```
-
-### 9. PR 作成・マージ
-
-以下の内容をユーザーに提示し、**承認を得てから** PR 作成・マージを実行する:
-
-```
-以下の内容で PR を作成してマージしてよいですか？
-
-タイトル: refactor: <分割内容の簡潔な説明>
-ベースブランチ: main
-変更概要:
-- <新規作成ファイル>
-- <削除・変更ファイル>
-```
-
-承認を得たら `mcp__github__create_pull_request` で PR を作成し、
-続けて `mcp__github__merge_pull_request`（squash）でマージする。
+`.claude/skills/_shared/commit-push-pr.md` を Read ツールで読み込み、記載の手順を実行する。コミットプレフィックスは `refactor:` を使う。PR の変更概要には新規作成・削除・変更ファイル一覧を含める。
 
 ## 完了時の報告
 
 - 分割したファイル一覧（新規作成・削除・変更）
 - ビルド結果: ✅ 成功 / ‼️ 失敗（詳細）
 - ROADMAP.md 更新内容
-- SPEC.md の更新内容（§12 変更履歴 + §2 ディレクトリ構成 + §14 保守性セクション）
+- SPEC.md の更新内容（CHANGELOG.md + §2 ディレクトリ構成 + §14 保守性セクション）
 - マージ完了: PR #番号
 - 次に分割を推奨するファイル（あれば）
