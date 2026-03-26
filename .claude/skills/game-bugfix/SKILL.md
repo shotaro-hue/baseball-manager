@@ -71,7 +71,7 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 
 ### 8. SPEC.md を更新
 
-- **§12 変更履歴**（必須）: 最新エントリを先頭に追加する
+- **`CHANGELOG.md`**（必須）: 最新エントリを先頭に追加する
 
   ```
   ### YYYY-MM-DD — バグ修正: <バグの内容>（コミットハッシュ）
@@ -84,7 +84,7 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 
 - 修正によってゲーム仕様の挙動が変わった場合のみ、§4 等の本文セクションも更新する
 
-> **運用ルール**: 内部バグ修正のみの場合でも §12 変更履歴への追記は必須。
+> **運用ルール**: 内部バグ修正のみの場合でも `CHANGELOG.md` への追記は必須。
 
 ### 9. コミット・プッシュ・PR
 
@@ -98,6 +98,6 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 - 修正内容の概要
 - 変更したファイル一覧
 - ビルド結果: ✅ 成功 / ‼️ 失敗（詳細）
-- SPEC.md の更新内容（§12 変更履歴 + 更新したセクション一覧）
+- SPEC.md の更新内容（CHANGELOG.md + 更新したセクション一覧）
 - マージ完了: PR #番号
 - 関連して発見した潜在的な問題（あれば）

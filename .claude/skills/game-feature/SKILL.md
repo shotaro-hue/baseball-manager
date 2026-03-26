@@ -95,7 +95,7 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 
 ### 7. SPEC.md を更新
 
-- **§12 変更履歴**（必須）: 最新エントリを先頭に追加する
+- **`CHANGELOG.md`**（必須）: 最新エントリを先頭に追加する
 
   ```
   ### YYYY-MM-DD — <機能名>（コミットハッシュ）
@@ -109,7 +109,7 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 - **§5 データモデル**: 新しい state・フィールドを追加した場合のみ更新する
 - **§13 計画中システム**: 完了した機能の記述を更新する（未着手 → 実装済み 等）
 
-> **運用ルール**: 仕様本文は変更があった箇所のみ更新する。変更がない場合でも §12 変更履歴への追記は必須。
+> **運用ルール**: 仕様本文は変更があった箇所のみ更新する。変更がない場合でも `CHANGELOG.md` への追記は必須。
 
 ### 8. コミット・プッシュ・PR
 
@@ -123,6 +123,6 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 - 変更したファイル一覧
 - ビルド結果: ✅ 成功 / ‼️ 失敗（詳細）
 - ROADMAP.md の更新内容
-- SPEC.md の更新内容（§12 変更履歴 + 更新したセクション一覧）
+- SPEC.md の更新内容（CHANGELOG.md + 更新したセクション一覧）
 - マージ完了: PR #番号
 - 次に実装を推奨する機能（あれば）
