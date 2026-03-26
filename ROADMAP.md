@@ -211,7 +211,7 @@
 
 | # | 課題 | 内容 | 状態 |
 |---|------|------|------|
-| T7 | Vitest ユニットテスト | resolveAtBat / calcEffectiveFatigue / calcOfferScore / FA資格判定 等のエンジン関数から導入 | 未着手 |
+| T7 | Vitest ユニットテスト | resolveAtBat / calcEffectiveFatigue / calcOfferScore / FA資格判定 等のエンジン関数から導入 | 🔶 部分実装（純粋関数32件 `src/engine/__tests__/`） |
 | T8 | useReducer 移行 | 複数年でstate更新競合が増える前に。dispatch(action) パターンで状態遷移を明示化 | 未着手 |
 
 ---
