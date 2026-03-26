@@ -1,6 +1,6 @@
 # Baseball Manager 2025 — ロードマップ
 
-> 最終更新: 2026-03-25（**Tier 7 全完了** — ⑳㉑㉒㉓ マルチシーズンフランチャイズ基盤。T2・U1・U2・U3・U5 完了。F2/F3/F4 先行実装。B9 起動黒画面修正）
+> 最終更新: 2026-03-26（**次フォーカス: T3/T4 リファクタリング → Tier 8** — T3（App.jsx分割）・T4（Tabs.jsx分割）を Tier 8 着手前に完了させる方針に決定。T7 Vitest 部分実装済み）
 > **ゴール**: NPB版 OOTP / Football Manager — 深いシミュレーションと長期フランチャイズ経営
 > **運用ルール**: 実装完了した項目は ✅ に更新。新規項目は末尾に追記。過去の記録は削除しない。
 
@@ -198,12 +198,12 @@
 | T1 | localStorage → IndexedDB 移行 | 複数年データで5MB上限を超過する前に移行。saveload.js を差し替え。セーブのバージョニング導入 | 🔶 延期（careerLog コンパクト形式で25年分安全確認済み。Tier 8 着手前に再評価） |
 | T2 | React Error Boundary 追加 | シミュ中エラーで画面が白くなるのを防止。各主要コンポーネントをラップ。エラー時にリカバリー画面を表示 | ✅ 完了 (fb47d0f) |
 
-### P1: 新機能追加と並行して整備
+### P1: **🔴 Tier 8 着手前に完了（現フォーカス）**
 
 | # | 課題 | 内容 | 状態 |
 |---|------|------|------|
-| T3 | App.jsx 分割（63KB） | useGameState.js / useSeasonFlow.js / useOffseason.js に切り出し。HubScreen / GameScreen 等を独立ファイル化 | 未着手 |
-| T4 | Tabs.jsx 分割（81KB） | タブごとに独立ファイル化（src/components/tabs/RosterTab.jsx 等） | 未着手 |
+| T3 | App.jsx 分割（923行） | useGameState.js / useSeasonFlow.js / useOffseason.js に切り出し。HubScreen / GameScreen 等を独立ファイル化 | 🔴 着手予定 |
+| T4 | Tabs.jsx 分割（1,282行） | タブごとに独立ファイル化（src/components/tabs/RosterTab.jsx 等） | 🔴 着手予定 |
 | T5 | セーブデータバリデーション | ロード時の必須フィールドnullチェック。破損時のバックアップ復元（ローリング2世代） | 未着手 |
 | T6 | JSDoc 型注釈 | player.js / simulation.js の主要関数から順次追加。TypeScript 移行の前段 | 未着手 |
 
