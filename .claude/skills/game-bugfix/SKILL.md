@@ -60,13 +60,9 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 - 修正によって他の動作が壊れないか確認する
 - 必要に応じて防御的なコード（null チェック、デフォルト値）を追加する
 
-### 6. ビルド確認
+### 6. ビルド・テスト確認
 
-```bash
-cd /home/user/baseball-manager && npm run build && npm test -- --run
-```
-
-ビルドエラー・テスト失敗があれば修正する。
+`.claude/skills/_shared/build-and-test.md` を Read ツールで読み込み、記載の手順を実行する。
 
 ### 7. ROADMAP.md を更新
 
@@ -90,31 +86,9 @@ cd /home/user/baseball-manager && npm run build && npm test -- --run
 
 > **運用ルール**: 内部バグ修正のみの場合でも §12 変更履歴への追記は必須。
 
-### 9. コミット・プッシュ
+### 9. コミット・プッシュ・PR
 
-```bash
-cd /home/user/baseball-manager
-git add -p   # 関連ファイルのみステージ
-git commit -m "fix: <バグの内容の簡潔な説明>"
-git push -u origin <current-branch>
-```
-
-### 10. PR 作成・マージ
-
-以下の内容をユーザーに提示し、**承認を得てから** PR 作成・マージを実行する:
-
-```
-以下の内容で PR を作成してマージしてよいですか？
-
-タイトル: fix: <バグの内容の簡潔な説明>
-ベースブランチ: main
-変更概要:
-- 根本原因: <原因>
-- 修正内容: <修正点>
-```
-
-承認を得たら `mcp__github__create_pull_request` で PR を作成し、
-続けて `mcp__github__merge_pull_request`（squash）でマージする。
+`.claude/skills/_shared/commit-push-pr.md` を Read ツールで読み込み、記載の手順を実行する。コミットプレフィックスは `fix:` を使う。PR の変更概要には「根本原因」と「修正内容」を含める。
 
 ## 完了時の報告
 

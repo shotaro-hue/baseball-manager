@@ -69,13 +69,9 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 const HR_BASE_PROB = 0.030;
 ```
 
-### 6. ビルド確認
+### 6. ビルド・テスト確認
 
-```bash
-cd /home/user/baseball-manager && npm run build && npm test -- --run
-```
-
-ビルドエラー・テスト失敗があれば修正する。
+`.claude/skills/_shared/build-and-test.md` を Read ツールで読み込み、記載の手順を実行する。
 
 ### 7. SPEC.md を更新
 
@@ -92,30 +88,9 @@ cd /home/user/baseball-manager && npm run build && npm test -- --run
 - **§7 ゲームバランス定数**（必須）: 変更した定数の値を本文テーブルに反映する
   - テーブル内の数値を更新し、コードと SPEC が常に一致するよう保つ
 
-### 8. コミット・プッシュ
+### 8. コミット・プッシュ・PR
 
-```bash
-cd /home/user/baseball-manager
-git add src/constants.js src/engine/simulation.js   # 変更したファイルのみ
-git commit -m "balance: <調整内容の簡潔な説明>"
-git push -u origin <current-branch>
-```
-
-### 9. PR 作成・マージ
-
-以下の内容をユーザーに提示し、**承認を得てから** PR 作成・マージを実行する:
-
-```
-以下の内容で PR を作成してマージしてよいですか？
-
-タイトル: balance: <調整内容の簡潔な説明>
-ベースブランチ: main
-変更概要:
-- <パラメータ名>: <旧値> → <新値>（<変更理由>）
-```
-
-承認を得たら `mcp__github__create_pull_request` で PR を作成し、
-続けて `mcp__github__merge_pull_request`（squash）でマージする。
+`.claude/skills/_shared/commit-push-pr.md` を Read ツールで読み込み、記載の手順を実行する。コミットプレフィックスは `balance:` を使う。PR の変更概要には「パラメータ名: 旧値 → 新値（変更理由）」の形式で記載する。
 
 ## 完了時の報告
 

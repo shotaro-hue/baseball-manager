@@ -77,13 +77,9 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 - 機能に UI（新規タブ・モーダル・表示セクション等）が伴う場合は、同一スキル内で `src/components/` 層も実装する。ただし「ゲームロジックを UI 層に書かない」原則は維持する
 - **UI のみの改善**（既存機能の表示方法改善・UX 向上）は `/game-ui` を使う
 
-### 5. ビルド確認
+### 5. ビルド・テスト確認
 
-```bash
-cd /home/user/baseball-manager && npm run build && npm test -- --run
-```
-
-ビルドエラー・テスト失敗があれば修正する。
+`.claude/skills/_shared/build-and-test.md` を Read ツールで読み込み、記載の手順を実行する。
 
 ### 6. ROADMAP.md を更新
 
@@ -107,31 +103,9 @@ cd /home/user/baseball-manager && npm run build && npm test -- --run
 
 > **運用ルール**: 仕様本文は変更があった箇所のみ更新する。変更がない場合でも §12 変更履歴への追記は必須。
 
-### 8. コミット・プッシュ
+### 8. コミット・プッシュ・PR
 
-```bash
-cd /home/user/baseball-manager
-git add -p   # 関連ファイルのみステージ
-git commit -m "feat: <機能名の簡潔な説明>"
-git push -u origin <current-branch>
-```
-
-### 9. PR 作成・マージ
-
-以下の内容をユーザーに提示し、**承認を得てから** PR 作成・マージを実行する:
-
-```
-以下の内容で PR を作成してマージしてよいですか？
-
-タイトル: feat: <機能名の簡潔な説明>
-ベースブランチ: main
-変更概要:
-- <変更点1>
-- <変更点2>
-```
-
-承認を得たら `mcp__github__create_pull_request` で PR を作成し、
-続けて `mcp__github__merge_pull_request`（squash）でマージする。
+`.claude/skills/_shared/commit-push-pr.md` を Read ツールで読み込み、記載の手順を実行する。コミットプレフィックスは `feat:` を使う。
 
 ## 完了時の報告
 

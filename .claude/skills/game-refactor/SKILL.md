@@ -42,13 +42,9 @@ ROADMAP.md の「保守性・コード品質」セクション（T* タグ）を
 新ファイルを作成し、分割元から該当コードを移動する。
 import/export を正確に更新する。
 
-### 5. ビルド確認
+### 5. ビルド・テスト確認
 
-```bash
-cd /home/user/baseball-manager && npm run build && npm test -- --run
-```
-
-リファクタリングなのでビルドエラー・テスト失敗は必ず 0 にする。
+`.claude/skills/_shared/build-and-test.md` を Read ツールで読み込み、記載の手順を実行する。リファクタリングなのでビルドエラー・テスト失敗は必ず 0 にする。
 
 ### 6. ROADMAP.md を更新
 
@@ -69,31 +65,9 @@ cd /home/user/baseball-manager && npm run build && npm test -- --run
 - **§2 ディレクトリ構成**: 新規ファイル・ディレクトリの追加、削除・統合を反映する（必須）
 - **§14 保守性・技術的負債**: 完了した T* タスクのステータスを「計画中」→「✅ 完了」に更新する（必須）
 
-### 8. コミット・プッシュ
+### 8. コミット・プッシュ・PR
 
-```bash
-cd /home/user/baseball-manager
-git add <変更ファイル>
-git commit -m "refactor: <分割内容の簡潔な説明>"
-git push -u origin <current-branch>
-```
-
-### 9. PR 作成・マージ
-
-以下の内容をユーザーに提示し、**承認を得てから** PR 作成・マージを実行する:
-
-```
-以下の内容で PR を作成してマージしてよいですか？
-
-タイトル: refactor: <分割内容の簡潔な説明>
-ベースブランチ: main
-変更概要:
-- <新規作成ファイル>
-- <削除・変更ファイル>
-```
-
-承認を得たら `mcp__github__create_pull_request` で PR を作成し、
-続けて `mcp__github__merge_pull_request`（squash）でマージする。
+`.claude/skills/_shared/commit-push-pr.md` を Read ツールで読み込み、記載の手順を実行する。コミットプレフィックスは `refactor:` を使う。PR の変更概要には新規作成・削除・変更ファイル一覧を含める。
 
 ## 完了時の報告
 
