@@ -99,6 +99,7 @@ node scripts/fetch-spaia.js  # NPB 2025 実選手データ取得 → src/data/np
 | `/game-bugfix` | バグの調査・修正・コミット・プッシュ |
 | `/game-balance` | `constants.js` のパラメータ分析・調整 |
 | `/game-review` | SPEC.md × ROADMAP.md × コードを照合して乖離を評価・次アクション提案 |
+| `/game-sprint` | ROADMAP から次タスクを選定し実装まで完結（`--review` でフルレビューモード） |
 | `/game-refactor` | 肥大化ファイルを安全に分割・リファクタリング |
 
 ---
