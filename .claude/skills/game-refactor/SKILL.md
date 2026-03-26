@@ -1,6 +1,6 @@
 ---
 name: game-refactor
-description: App.jsx（T3）・Tabs.jsx（T4）等の肥大化ファイルを安全に分割するリファクタリングワークフロー。動作を変えずにコード構造だけを改善したいときに使う。
+description: コード品質・保守性の改善を目的としたリファクタリングワークフロー（ファイル分割・フック抽出・useReducer 移行等）。動作を変えずにコード構造だけを改善したいときに使う。
 ---
 
 # Game Refactor スキル
@@ -12,19 +12,14 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 ### 1. 対象タスクを確認
 
 ROADMAP.md の「保守性・コード品質」セクション（T* タグ）を読み、
-リファクタリング対象と分割方針を確認する:
+未着手・部分実装のタスクを確認する。
 
-- **T3: App.jsx 分割**（67KB）
-  - `src/hooks/useGameState.js` — 選手・チーム・schedule の state
-  - `src/hooks/useSeasonFlow.js` — 試合進行・gameDay 管理
-  - `src/hooks/useOffseason.js` — FA・トレード・ドラフト・契約
-  - `src/screens/HubScreen.jsx` / `src/screens/GameScreen.jsx` — 画面コンポーネント
+現在の残件例（**ROADMAP.md を必ず再確認すること**）:
+- **T5**: セーブデータバリデーション（ロード時 null チェック・ローリングバックアップ）
+- **T6**: JSDoc 型注釈（player.js / simulation.js から順次）
+- **T8**: useReducer 移行（useState + useCallback → dispatch(action) パターン化）
 
-- **T4: Tabs.jsx 分割**（85KB）
-  - `src/components/tabs/RosterTab.jsx`
-  - `src/components/tabs/TradeTab.jsx`
-  - `src/components/tabs/RecordsTab.jsx`
-  - …各タブを独立ファイルに
+ユーザーが対象を指定していない場合は、ROADMAP の優先度（P0 > P1 > P2）に従って提案する。
 
 ### 2. 対象ファイルを読む
 

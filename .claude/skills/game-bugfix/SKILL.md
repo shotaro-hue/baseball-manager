@@ -38,9 +38,9 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 - `src/engine/trade.js` — トレード処理
 
 **UI 系のバグ**:
-- `src/components/Tabs.jsx` — ハブタブ
+- `src/components/tabs/` — 各タブコンポーネント（RosterTab / StatsTab 等）
 - `src/components/TacticalGame.jsx` — 試合操作
-- `src/App.jsx` — state 管理・game flow
+- `src/hooks/useGameState.js` / `useSeasonFlow.js` / `useOffseason.js` — state 管理・game flow
 
 **データ・永続化系のバグ**:
 - `src/engine/saveload.js` — localStorage 読み書き

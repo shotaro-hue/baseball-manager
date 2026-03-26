@@ -52,12 +52,14 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 - `awards.js` — 表彰・記録
 
 **UI 層** (`src/components/`):
-- `Tabs.jsx` — メインハブのタブ群
+- `tabs/` — 各タブコンポーネント（RosterTab / StatsTab / TradeTab 等）
 - `TacticalGame.jsx` — 試合操作 UI
 - `Screens.jsx` — 画面切り替え
 
-**状態管理**:
-- `src/App.jsx` — グローバル state と game flow
+**状態管理** (`src/hooks/`):
+- `useGameState.js` — チーム・選手・schedule の state
+- `useSeasonFlow.js` — 試合進行・gameDay・プレーオフ
+- `useOffseason.js` — FA・トレード・ドラフト・契約
 
 **定数**:
 - `src/constants.js` — チーム定義・ゲームバランス定数
@@ -70,6 +72,8 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 - `src/utils.js` の既存ユーティリティ（RNG、フォーマット、uid）を活用する
 - ゲームバランスに影響する数値は `src/constants.js` に定数として切り出す
 - エラーが起きうる箇所には適切な guard を入れる
+- 機能に UI（新規タブ・モーダル・表示セクション等）が伴う場合は、同一スキル内で `src/components/` 層も実装する。ただし「ゲームロジックを UI 層に書かない」原則は維持する
+- **UI のみの改善**（既存機能の表示方法改善・UX 向上）は `/game-ui` を使う
 
 ### 5. ビルド確認
 
