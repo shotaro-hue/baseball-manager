@@ -202,7 +202,7 @@
 
 | # | 課題 | 内容 | 状態 |
 |---|------|------|------|
-| T3 | App.jsx 分割（923行） | useGameState.js / useSeasonFlow.js / useOffseason.js に切り出し。HubScreen / GameScreen 等を独立ファイル化 | 🔴 着手予定 |
+| T3 | App.jsx 分割（923行） | useGameState.js / useSeasonFlow.js / useOffseason.js に切り出し。HubScreen / GameScreen 等を独立ファイル化 | ✅ 完了（hooks 3本抽出・App.jsx を 200行のrender専用に縮小） |
 | T4 | Tabs.jsx 分割（1,282行） | タブごとに独立ファイル化（src/components/tabs/RosterTab.jsx 等） | 🔴 着手予定 |
 | T5 | セーブデータバリデーション | ロード時の必須フィールドnullチェック。破損時のバックアップ復元（ローリング2世代） | 未着手 |
 | T6 | JSDoc 型注釈 | player.js / simulation.js の主要関数から順次追加。TypeScript 移行の前段 | 未着手 |
