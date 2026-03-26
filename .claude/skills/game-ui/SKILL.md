@@ -64,10 +64,10 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 ### 5. ビルド確認
 
 ```bash
-cd /home/user/baseball-manager && npm run build
+cd /home/user/baseball-manager && npm run build && npm test -- --run
 ```
 
-ビルドエラーがあれば修正する。
+ビルドエラー・テスト失敗があれば修正する。
 
 ### 6. ROADMAP.md を更新（該当あれば）
 

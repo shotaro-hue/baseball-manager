@@ -45,10 +45,10 @@ import/export を正確に更新する。
 ### 5. ビルド確認
 
 ```bash
-cd /home/user/baseball-manager && npm run build
+cd /home/user/baseball-manager && npm run build && npm test -- --run
 ```
 
-リファクタリングなのでビルドエラーは必ず 0 にする。
+リファクタリングなのでビルドエラー・テスト失敗は必ず 0 にする。
 
 ### 6. ROADMAP.md を更新
 

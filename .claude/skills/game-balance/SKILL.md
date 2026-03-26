@@ -72,10 +72,10 @@ const HR_BASE_PROB = 0.030;
 ### 6. ビルド確認
 
 ```bash
-cd /home/user/baseball-manager && npm run build
+cd /home/user/baseball-manager && npm run build && npm test -- --run
 ```
 
-ビルドエラーがあれば修正する。
+ビルドエラー・テスト失敗があれば修正する。
 
 ### 7. SPEC.md を更新
 
