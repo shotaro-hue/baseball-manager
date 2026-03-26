@@ -282,7 +282,8 @@ baseball-manager/
 |------------|-----|------|
 | `serviceYears` | number | UI表示用の換算登録年数（`Math.floor(daysOnActiveRoster / 120)`。FA判定はdaysOnActiveRosterで行う） |
 | `daysOnActiveRoster` | number | 一軍（players配列）に在籍した累積日数。毎年リセットしない。FA権取得後も保持。 |
-| `entryAge` | number | 入団時年齢（高卒≤19 / 大卒≥22 で FA 閾値を決定） |
+| `entryAge` | number | 入団時年齢 |
+| `entryType` | string | 入団区分: `"高卒"` / `"大卒"` / `"社会人"` / `"外国人"`。FA閾値の判定基準。`entryAge` による推測を廃止しこの値で判定する |
 | `ikuseiYears` | number | 育成契約年数（最大3年。超過で自動解雇） |
 | `registrationCooldownDays` | number | 一軍登録抹消後の再登録不可残日数（抹消時10をセット・毎日デクリメント。怪我による自動降格にも適用） |
 | `stats2` | object | 二軍成績（PA/H/HR/IP/ER/K の6統計のみ。一軍statsとは別フィールド） |
@@ -379,14 +380,38 @@ baseball-manager/
 
 #### FA 資格（NPB協約準拠）
 
-| 入団区分 | 国内FA取得 | 海外FA取得 |
-|----------|-----------|-----------|
-| 高卒（`entryAge ≤ 19`） | 8年 | 9年 |
-| 大卒・社会人（`entryAge ≥ 22`） | 7年 | 9年 |
-| `entryAge` 未設定 | 大卒扱い（7年） | 9年 |
+FA判定は `entryAge` による推測を廃止し、`entryType` フィールドで行う（`daysOnActiveRoster` 累積日数方式）。
+
+| `entryType` | `entryAge` | 国内FA取得（累積日数） | 海外FA取得（累積日数） |
+|-------------|-----------|----------------------|----------------------|
+| `"高卒"` | 18 | 8年 × 120日 = **960日** | 9年 = 1080日 |
+| `"大卒"` | 22 | 7年 × 120日 = **840日** | 9年 = 1080日 |
+| `"社会人"` | 24–25 | 7年 × 120日 = **840日** | 9年 = 1080日 |
+| `"外国人"` | 22–28 | 8年 × 120日 = **960日** | 9年 = 1080日 |
 
 - `overseas ≥ 70` の選手: 国内FA権があっても行使せず **海外FA権取得まで待機**
 - `overseas ≥ 70` かつ海外FA資格あり: NPB離脱
+
+#### 外国人選手のFA権と外国人枠免除（NPB協約 第82条準拠）
+
+外国人選手も上記と同じ `daysOnActiveRoster` 累積日数でFA権を取得できる。
+
+| 条件 | 内容 |
+|---|---|
+| `daysOnActiveRoster >= FOREIGN_EXEMPTION_DAYS`（960日） | FA権取得と同時に外国人枠から自動除外（翌シーズンから日本人扱い） |
+| FA移籍時の補償 | なし（国内選手のFA補償ランク制度は適用されない） |
+
+```javascript
+// 外国人枠免除判定（フィールドは追加しない・毎回導出する）
+const isForeignExempt = (p) =>
+  p.isForeign && (p.daysOnActiveRoster ?? 0) >= FOREIGN_EXEMPTION_DAYS;  // = 960
+
+// promote() での外国人枠チェック変更後
+const foreignActive = team.players.filter(x => x.isForeign && !isForeignExempt(x)).length;
+if (p.isForeign && !isForeignExempt(p) && foreignActive >= MAX_外国人_一軍) { ... }
+```
+
+UI: PlayerModal の外国人バッジを `外国人枠免除まであとX日` で表示。免除済みは `元外国人` バッジに変更。
 
 #### 育成契約（ikusei）
 
@@ -871,6 +896,7 @@ base = 0.3% / 試合
 | `MAX_外国人_一軍` | 4 | 一軍外国人枠上限 |
 | `INJURY_AUTO_DEMOTE_DAYS` | 10 | この日数を超える怪我は自動二軍降格（≤10日は確認ダイアログ） |
 | `ACTIVE_ROSTER_FA_DAYS_PER_YEAR` | 120 | FA年数1年分の基準一軍在籍日数（NPB145日/181日ルール準拠の換算値） |
+| `FOREIGN_EXEMPTION_DAYS` | 960 | 外国人選手が外国人枠から免除される累積一軍在籍日数（= 8 × 120、NPB協約第82条準拠） |
 | `ACCEPT_THRESHOLD` | 55 | 契約成立に必要なオファースコア |
 | `PITCH_NORM` | 120 | `calcFatigue` 正規化分母（スタミナ50基準の球数スケール） |
 | `PITCH_HARD_CAP` | 130 | 投球数の絶対上限（疲弊度に関わらず強制交代） |
@@ -1610,16 +1636,39 @@ HR 補正: 1.0 より大きいと HR になりやすい、小さいと HR が二
 
 #### ㉕ 育成→支配下昇格とFA管理
 
-**FA権判定の累積日数方式**
+**entryType フィールドの新規追加**
 
-> 現行の `serviceYears` 年単位カウントを廃止し、`daysOnActiveRoster`（累積日数）でFA権を判定する。
-> NPB規則: 145日/年（約5ヶ月）の一軍登録で1年カウント。ゲーム内換算: **120日/年**
+`entryAge` 数値による推測（`≤19` → 高卒）を廃止し、明示的な `entryType` フィールドで入団区分を管理する。
 
 ```javascript
-// contract.js のFA判定（変更後）
-const FA_DOMESTIC_DAYS = p.entryAge <= 19 ? 8 * 120 : 7 * 120;  // 高卒960日 / 大卒840日
-const FA_OVERSEAS_DAYS = 9 * 120;                                  // 全員1080日
-// p.daysOnActiveRoster >= FA_DOMESTIC_DAYS で国内FA権取得
+entryType: "高卒" | "大卒" | "社会人" | "外国人"
+```
+
+| entryType | entryAge | FA国内閾値 | 特徴 |
+|---|---|---|---|
+| `"高卒"` | 18 | 960日（8年×120） | 長期育成型。Tier 10 ㉝ で成長カーブ差を実装予定 |
+| `"大卒"` | 22 | 840日（7年×120） | 標準 |
+| `"社会人"` | 24–25 | 840日 | 即戦力型 |
+| `"外国人"` | 22–28 | 960日 → FA取得で外国人枠免除 | 詳細は §4.5 参照 |
+
+- `getFaThreshold()` を `entryType` ベースに変更（`contract.js` と `PlayerModal.jsx` の不整合を解消）
+- ドラフト候補・生成選手に `entryType` を付与（`draft.js` / `player.js`）
+- Draft UI に入団区分バッジを表示（詳細な体験は Tier 10 ㉝ に委ねる）
+
+**FA権判定の累積日数方式**
+
+> `serviceYears` 年単位カウントを廃止し、`daysOnActiveRoster`（累積日数）でFA権を判定する。
+> NPB規則: 145日/年（5ヶ月）の一軍登録で1年カウント。ゲーム内換算: **120日/年**
+
+```javascript
+// contract.js getF aThreshold（変更後）
+export function getFaThreshold(p) {
+  const base = (p.entryType === '高卒' || p.entryType === '外国人') ? 8 : 7;
+  return {
+    domestic: base * ACTIVE_ROSTER_FA_DAYS_PER_YEAR,   // 高卒・外国人=960 / 大卒・社会人=840
+    overseas: 9 * ACTIVE_ROSTER_FA_DAYS_PER_YEAR,      // 全員=1080
+  };
+}
 ```
 
 - `daysOnActiveRoster` は一軍（`players` 配列）にいる gameDay ごとに +1
@@ -1630,6 +1679,7 @@ const FA_OVERSEAS_DAYS = 9 * 120;                                  // 全員1080
 - `convertIkusei()`（育成→支配下変換）後、続けて「一軍昇格する」ボタンを表示する1フロー化
 - 選手カードに「FA資格: あとX日（Y年相当）」を表示
 - 昇格判断材料: 「今年昇格するとFA資格がN年に早まります」を明示
+- 外国人選手には「外国人枠免除まであとX日」を追加表示
 
 ---
 
