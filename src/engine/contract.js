@@ -1,17 +1,18 @@
 import { clamp } from '../utils';
-import { ACCEPT_THRESHOLD, MIN_SALARY_SHIHAKA, MIN_SALARY_IKUSEI } from '../constants';
+import { ACCEPT_THRESHOLD, MIN_SALARY_SHIHAKA, MIN_SALARY_IKUSEI, ACTIVE_ROSTER_FA_DAYS_PER_YEAR } from '../constants';
 import { tradeValue, analyzeTeamNeeds } from './trade';
 
 /* ═══════════════════════════════════════════════
-   FA 資格閾値 (NPB公式準拠)
-   高卒 (entryAge ≤ 19): 国内FA 8年 / 海外FA 9年
-   大卒・社会人 (entryAge ≥ 22): 国内FA 7年 / 海外FA 9年
+   FA 資格閾値 (NPB公式準拠・累積日数方式)
+   高卒・外国人: 国内FA 960日 (8年×120) / 海外FA 1080日 (9年×120)
+   大卒・社会人: 国内FA 840日 (7年×120) / 海外FA 1080日
+   判定フィールド: daysOnActiveRoster（一軍在籍累積日数）
 ═══════════════════════════════════════════════ */
 export function getFaThreshold(player) {
-  const isHighSchool = player.entryAge != null ? player.entryAge <= 19 : false;
+  const base = (player.entryType === '高卒' || player.entryType === '外国人') ? 8 : 7;
   return {
-    domestic: isHighSchool ? 8 : 7,
-    overseas: 9,
+    domestic: base * ACTIVE_ROSTER_FA_DAYS_PER_YEAR,
+    overseas: 9 * ACTIVE_ROSTER_FA_DAYS_PER_YEAR,
   };
 }
 
@@ -81,11 +82,11 @@ export function cpuRenewContracts(teams, myId, allTeams) {
 
     for (const p of expiring) {
       const threshold = getFaThreshold(p);
-      const serviceYears = p.serviceYears || 0;
+      const days = p.daysOnActiveRoster ?? (p.serviceYears ?? 0) * ACTIVE_ROSTER_FA_DAYS_PER_YEAR;
       const overseas = p.personality?.overseas || 0;
 
       // FA資格なし: 球団側から再契約を強制提示 (選手は国内FA権を持っていない)
-      if (serviceYears < threshold.domestic) {
+      if (days < threshold.domestic) {
         const salary = Math.max(MIN_SALARY_SHIHAKA, Math.round(p.salary * 1.02)); // 支配下最低年俸を保証
         if (budget >= salary) {
           players = players.map(x => x.id === p.id
@@ -101,7 +102,7 @@ export function cpuRenewContracts(teams, myId, allTeams) {
       }
 
       // 海外志向かつ海外FA資格あり: NPB離脱
-      if (overseas >= 70 && serviceYears >= threshold.overseas) {
+      if (overseas >= 70 && days >= threshold.overseas) {
         players = players.filter(x => x.id !== p.id);
         news.push({
           type: 'season',
@@ -114,7 +115,7 @@ export function cpuRenewContracts(teams, myId, allTeams) {
       }
 
       // 海外志向かつ国内FA資格はあるが海外FA資格なし: 国内FAをスキップして待機
-      if (overseas >= 70 && serviceYears < threshold.overseas) {
+      if (overseas >= 70 && days < threshold.overseas) {
         const salary = Math.max(MIN_SALARY_SHIHAKA, Math.round(p.salary * 1.03));
         if (budget >= salary) {
           players = players.map(x => x.id === p.id

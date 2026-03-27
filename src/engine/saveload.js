@@ -36,6 +36,8 @@ function migratePlayer(p) {
     careerLog:          p.careerLog          ?? [],
     peakAbilities:      p.peakAbilities      ?? null,
     stats2:             p.stats2             ?? { PA:0, H:0, HR:0, W:0, IP:0, ER:0, K:0 },
+    entryType:          p.entryType          ?? (p.isForeign ? '外国人' : (p.entryAge??p.age) <= 19 ? '高卒' : (p.entryAge??p.age) <= 22 ? '大卒' : '社会人'),
+    daysOnActiveRoster: p.daysOnActiveRoster ?? (p.serviceYears ?? 0) * 120,
   };
 }
 

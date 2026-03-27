@@ -5,6 +5,22 @@
 
 ---
 
+### 2026-03-27 — ㉕ 育成→支配下昇格とFA管理
+
+- `src/constants.js`: `ACTIVE_ROSTER_FA_DAYS_PER_YEAR = 120` を追加
+- `src/engine/player.js`: `makePlayer` に `entryType`（高卒/大卒/社会人/外国人）・`daysOnActiveRoster: 0` を追加
+- `src/engine/realplayer.js`: 実選手生成に `entryType` / `daysOnActiveRoster` を追加
+- `src/engine/saveload.js`: `migratePlayer` に `entryType` / `daysOnActiveRoster` マイグレーションを追加
+- `src/engine/contract.js`: `getFaThreshold` を `entryType` ベース・日数返値（高卒/外国人=960日、大卒/社会人=840日）に変更。FA比較を `daysOnActiveRoster` ベースに切り替え
+- `src/hooks/useSeasonFlow.js`: 全3ゲームパスで一軍選手の `daysOnActiveRoster += 1`/日
+- `src/hooks/useOffseason.js`: 海外FA判定を `daysOnActiveRoster` ベースに更新
+- `src/components/PlayerModal.jsx`: 「FA まで X日（Y年相当）」・外国人は「外国人枠免除まであとX日」を表示
+- `src/components/tabs/RosterTab.jsx`: 支配下登録直後に「↑一軍昇格」ボタンを表示する1フロー化
+- `src/components/Draft.jsx`: ドラフト候補一覧に `entryType` バッジを表示
+- `src/engine/__tests__/contract.test.js`: `getFaThreshold` テストを日数ベースに更新
+
+---
+
 ### 2026-03-27 — ㉔ 二軍簡易シミュレーション（Tier 8 第1弾）
 
 - `src/engine/simulation.js`: `farmSimGame(farmA, farmB)` 追加（期待値ベース高速シム、打席単位の解決なし）

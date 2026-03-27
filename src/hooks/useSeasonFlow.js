@@ -118,6 +118,7 @@ export function useSeasonFlow(gs) {
       updated.players=applyGameStatsFromLog(updated.players, r.log||[], true, won);
       updated.players=applyPostGameCondition(updated.players, r.log||[], true, gameDay);
       updated.players=tickInjuries(updated.players);
+      updated.players=updated.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
       updated.players=applyDefenseCoachRecovery(updated.players,t.coaches);
       const newInj=checkForInjuries(updated.players);
       if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
@@ -255,11 +256,13 @@ export function useSeasonFlow(gs) {
         a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon);
         a.players=applyPostGameCondition(a.players,cr.log||[],true,newDay);
         a.players=tickInjuries(a.players);
+        a.players=a.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
         const aInj=checkForInjuries(a.players);
         if(aInj.length>0)a.players=a.players.map(p=>{const inj=aInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
         b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew);
         b.players=applyPostGameCondition(b.players,cr.log||[],false,newDay);
         b.players=tickInjuries(b.players);
+        b.players=b.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
         const bInj=checkForInjuries(b.players);
         if(bInj.length>0)b.players=b.players.map(p=>{const inj=bInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
         a.rotIdx=(a.rotIdx||0)+1;
@@ -276,6 +279,7 @@ export function useSeasonFlow(gs) {
       myT.players=applyGameStatsFromLog(myT.players, r.log||[], true, won);
       myT.players=applyPostGameCondition(myT.players, r.log||[], true, newDay);
       myT.players=tickInjuries(myT.players);
+      myT.players=myT.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
       myT.players=applyDefenseCoachRecovery(myT.players,myT.coaches);
       const _inj=checkForInjuries(myT.players);
       if(_inj.length>0)myT.players=myT.players.map(p=>{const inj=_inj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
@@ -323,6 +327,7 @@ export function useSeasonFlow(gs) {
       updated.players=applyGameStatsFromLog(updated.players, gsResult.log, true, won);
       updated.players=applyPostGameCondition(updated.players, gsResult.log, true, gameDay);
       updated.players=tickInjuries(updated.players);
+      updated.players=updated.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
       updated.players=applyDefenseCoachRecovery(updated.players,t.coaches);
       const newInj=checkForInjuries(updated.players);
       if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});

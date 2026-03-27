@@ -2,20 +2,20 @@ import { describe, it, expect } from 'vitest';
 import { getFaThreshold, evalOffer } from '../contract';
 
 describe('getFaThreshold', () => {
-  it('高卒（entryAge=18）は国内FA 8年', () => {
-    expect(getFaThreshold({ entryAge: 18 })).toEqual({ domestic: 8, overseas: 9 });
+  it('高卒は国内FA 960日 (8年×120)', () => {
+    expect(getFaThreshold({ entryType: '高卒' })).toEqual({ domestic: 960, overseas: 1080 });
   });
-  it('高卒上限（entryAge=19）は国内FA 8年', () => {
-    expect(getFaThreshold({ entryAge: 19 })).toEqual({ domestic: 8, overseas: 9 });
+  it('外国人は国内FA 960日', () => {
+    expect(getFaThreshold({ entryType: '外国人' })).toEqual({ domestic: 960, overseas: 1080 });
   });
-  it('大卒（entryAge=22）は国内FA 7年', () => {
-    expect(getFaThreshold({ entryAge: 22 })).toEqual({ domestic: 7, overseas: 9 });
+  it('大卒は国内FA 840日 (7年×120)', () => {
+    expect(getFaThreshold({ entryType: '大卒' })).toEqual({ domestic: 840, overseas: 1080 });
   });
-  it('社会人（entryAge=24）は国内FA 7年', () => {
-    expect(getFaThreshold({ entryAge: 24 })).toEqual({ domestic: 7, overseas: 9 });
+  it('社会人は国内FA 840日', () => {
+    expect(getFaThreshold({ entryType: '社会人' })).toEqual({ domestic: 840, overseas: 1080 });
   });
-  it('entryAge が未定義の場合は大卒扱い（7年）', () => {
-    expect(getFaThreshold({})).toEqual({ domestic: 7, overseas: 9 });
+  it('entryType 未定義の場合は大卒扱い（840日）', () => {
+    expect(getFaThreshold({})).toEqual({ domestic: 840, overseas: 1080 });
   });
 });
 
