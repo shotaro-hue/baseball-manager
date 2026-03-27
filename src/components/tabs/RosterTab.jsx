@@ -10,6 +10,8 @@ const MoralBadge=({v})=>{const m=v||70;const icon=m>=75?"😊":m>=50?"😐":"�
 
 export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onPlayerClick}){
   const [view,setView]=useState("batters");
+  const [justConverted,setJustConverted]=useState(new Set());
+  const handleConvertIkusei=(pid)=>{onConvertIkusei&&onConvertIkusei(pid);setJustConverted(s=>new Set([...s,pid]));};
   const batters=team.players.filter(p=>!p.isPitcher);
   const pitchers=team.players.filter(p=>p.isPitcher);
   const liMap={};team.lineup.forEach((id,i)=>liMap[id]=i+1);
@@ -115,9 +117,10 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
                     <td className="mono" style={{fontSize:10,color:"#94a3b8"}}>{farmStat}</td>
                     <td style={{display:"flex",gap:4}}>
                       {p.育成
-                        ?<button className="bsm" style={{background:"rgba(167,139,250,.15)",border:"1px solid rgba(167,139,250,.4)",color:"#a78bfa",fontSize:9,padding:"2px 6px",borderRadius:4,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>onConvertIkusei&&onConvertIkusei(p.id)}>支配下登録</button>
+                        ?<><button className="bsm" style={{background:"rgba(167,139,250,.15)",border:"1px solid rgba(167,139,250,.4)",color:"#a78bfa",fontSize:9,padding:"2px 6px",borderRadius:4,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>handleConvertIkusei(p.id)}>支配下登録</button></>
                         :<button className="bsm bga" onClick={()=>onPromo(p.id)}>↑一軍</button>
                       }
+                      {justConverted.has(p.id)&&!p.育成&&<button className="bsm" style={{background:"rgba(52,211,153,.15)",border:"1px solid rgba(52,211,153,.4)",color:"#34d399",fontSize:9,padding:"2px 6px",borderRadius:4,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>{onPromo(p.id);setJustConverted(s=>{const n=new Set(s);n.delete(p.id);return n;});}}>↑一軍昇格</button>}
                     </td>
                   </tr>
                   );

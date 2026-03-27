@@ -40,6 +40,8 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
     stats: emptyStats(),
     stats2: { PA:0, H:0, HR:0, W:0, IP:0, ER:0, K:0 },
     serviceYears: 0, entryAge: age, recentPitchingDays: [],
+    entryType: isForeign ? '外国人' : age <= 19 ? '高卒' : age <= 22 ? '大卒' : '社会人',
+    daysOnActiveRoster: 0,
   };
 
   if (isPitch) {
