@@ -49,10 +49,16 @@ export function PlayerModal({player:p, teamName, onClose}){
   const phase=p.growthPhase==="growth"?"成長期":p.growthPhase==="peak"?"全盛期":p.growthPhase==="earlyDecline"?"衰退初期":"衰退期";
   const phaseColor=p.growthPhase==="growth"?"#34d399":p.growthPhase==="peak"?"#f5c842":p.growthPhase==="earlyDecline"?"#f97316":"#f87171";
 
-  // FA資格
-  const faYrs=p.entryAge<=17?8:7;
-  const faLeft=Math.max(0,faYrs-(p.serviceYears||0));
-  const faLabel=p.isFA?"FA中":faLeft===0?"FA資格あり":`FA まで ${faLeft} 年`;
+  // FA資格（累積日数方式）
+  const FA_DAYS = 120;
+  const domDays = (p.entryType==='高卒'||p.entryType==='外国人') ? 8*FA_DAYS : 7*FA_DAYS;
+  const ovsDays = 9 * FA_DAYS;
+  const days = p.daysOnActiveRoster ?? (p.serviceYears??0)*FA_DAYS;
+  const domLeft = Math.max(0, domDays - days);
+  const faLabel = p.isFA ? "FA中"
+    : domLeft===0 ? "FA資格あり"
+    : `FA まで ${domLeft}日（${Math.ceil(domLeft/FA_DAYS)}年相当）`;
+  const foreignExemptDays = p.isForeign && !p.isFA ? Math.max(0, ovsDays - days) : 0;
 
   return(
     <div
@@ -85,8 +91,9 @@ export function PlayerModal({player:p, teamName, onClose}){
         {/* 状態バッジ行 */}
         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
           <span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(255,255,255,.05)",color:phaseColor,border:`1px solid ${phaseColor}40`}}>{phase}</span>
-          <span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(255,255,255,.05)",color:"#94a3b8"}}>在籍 {p.serviceYears||0} 年目</span>
+          <span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(255,255,255,.05)",color:"#94a3b8"}}>在籍 {Math.floor(days/FA_DAYS)||p.serviceYears||0} 年目</span>
           <span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(255,255,255,.05)",color:p.isFA?"#f5c842":"#94a3b8"}}>{faLabel}</span>
+          {foreignExemptDays>0&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(96,165,250,.08)",color:"#60a5fa",border:"1px solid rgba(96,165,250,.25)"}}>外国人枠免除まで {foreignExemptDays}日</span>}
           {(p.injuryDaysLeft??0)>0&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(248,113,113,.1)",color:"#f87171",border:"1px solid rgba(248,113,113,.3)"}}>🤕 {p.injury} 残{p.injuryDaysLeft}試合</span>}
         </div>
 

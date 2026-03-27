@@ -189,7 +189,7 @@ export function useOffseason(gs) {
       const playersAfterOverseas=updatedPlayers.filter(p=>{
         const thresh=getFaThreshold(p);
         const overseas=p.personality?.overseas||0;
-        if(overseas>=70&&(p.serviceYears||0)>=thresh.overseas){
+        if(overseas>=70&&(p.daysOnActiveRoster??(p.serviceYears??0)*120)>=thresh.overseas){
           overseasDeparted.add(p.id);
           addNews({type:"season",headline:"【海外FA】"+p.name+"（"+t.name+"）が海外移籍を宣言",source:"野球速報",dateLabel:year+"年",body:p.name+"選手（"+p.age+"歳）が海外FA権を行使し、NPBを離脱した。"});
           if(t.id===myId) setMailbox(prev=>[...prev,{id:uid(),type:"overseas_fa",read:false,subject:"【海外FA】"+p.name+"が海外移籍を宣言",body:p.name+"選手（"+p.age+"歳）が海外FA権を行使しました。チームを離れます。",player:p}]);

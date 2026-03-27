@@ -127,8 +127,8 @@
 
 | # | 機能 | 概要 | 状態 |
 |---|------|------|------|
-| ㉔ | 二軍簡易シミュレーション | 確率的シム（farmSimGame）で143試合をバッチ処理。二軍成績をstats2（6統計）に蓄積。CE→イースタン/PA→ウエスタン（各6球団）でリーグ別タイトル表彰。リアル選手データは不要（procedural生成） | 未着手 |
-| ㉕ | 育成→支配下昇格とFA管理 | `entryType`（高卒/大卒/社会人/外国人）フィールドを新設しFA閾値を明示化。累積日数方式（daysOnActiveRoster/120日=1年）でFA権判定。外国人選手はFA取得（960日）で外国人枠から自動免除。育成→支配下→一軍昇格を1フロー化 | 未着手 |
+| ㉔ | 二軍簡易シミュレーション | 確率的シム（farmSimGame）で143試合をバッチ処理。二軍成績をstats2（6統計）に蓄積。CE→イースタン/PA→ウエスタン（各6球団）でリーグ別タイトル表彰。リアル選手データは不要（procedural生成） | ✅ 完了 |
+| ㉕ | 育成→支配下昇格とFA管理 | `entryType`（高卒/大卒/社会人/外国人）フィールドを新設しFA閾値を明示化。累積日数方式（daysOnActiveRoster/120日=1年）でFA権判定。外国人選手はFA取得（960日）で外国人枠から自動免除。育成→支配下→一軍昇格を1フロー化 | ✅ 完了 |
 | ㉖ | 怪我降格・登録抹消10日ルール・支配下70人枠 | 怪我>10日で自動二軍降格（cooldown付き）、≤10日で確認ダイアログ。farm選手にもtickInjuries適用。怪我回復/枠空き時に昇格サジェスト通知。MAX_SHIHAKA_TOTAL=70の総枠管理 | 未着手 |
 | ㉗ | 選手育成目標設定 | 「一軍レギュラー狙い」「支配下昇格目標」「投手→野手転向」等のNPB色ある目標UI。目標に基づくtrainingFocus自動選択 | 未着手 |
 
@@ -204,7 +204,7 @@
 |---|------|------|------|
 | T3 | App.jsx 分割（923行） | useGameState.js / useSeasonFlow.js / useOffseason.js に切り出し。HubScreen / GameScreen 等を独立ファイル化 | ✅ 完了（hooks 3本抽出・App.jsx を 200行のrender専用に縮小） |
 | T4 | Tabs.jsx 分割（1,282行） | タブごとに独立ファイル化（src/components/tabs/RosterTab.jsx 等）。ScheduleTab.jsx も tabs/ に移動し Tabs.jsx バレルに統合 | ✅ 完了 |
-| T5 | セーブデータバリデーション | ロード時の必須フィールドnullチェック。破損時のバックアップ復元（ローリング2世代） | 未着手 |
+| T5 | セーブデータバリデーション | ロード時の必須フィールドnullチェック。破損時のバックアップ復元（ローリング2世代） | ✅ 完了 |
 | T6 | JSDoc 型注釈 | player.js / simulation.js の主要関数から順次追加。TypeScript 移行の前段 | 未着手 |
 
 ### P2: 中長期
@@ -212,6 +212,7 @@
 | # | 課題 | 内容 | 状態 |
 |---|------|------|------|
 | T7 | Vitest ユニットテスト | resolveAtBat / calcEffectiveFatigue / calcOfferScore / FA資格判定 等のエンジン関数から導入 | 🔶 部分実装（純粋関数32件 `src/engine/__tests__/`） |
+| T7-E2E | Playwright E2E テスト | コアフロー（タイトル画面・チーム選択・HUB遷移）の自動テスト基盤。`playwright.config.js` + `e2e/title.spec.js` 追加。Tier 8 完了後に拡充予定 | 🔶 部分実装（タイトル画面 `e2e/title.spec.js` のみ） |
 | T8 | useReducer 移行 | 複数年でstate更新競合が増える前に。dispatch(action) パターンで状態遷移を明示化 | 未着手 |
 
 ---

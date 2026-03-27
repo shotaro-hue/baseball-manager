@@ -627,4 +627,61 @@ function quickSimGame(myTeam, oppTeam) {
   return { score:gs.score, won:gs.score.my>gs.score.opp, log:gs.log, inningSummary:gs.inningSummary };
 }
 
+// ── 二軍簡易シミュレーション ──────────────────────────────
+// 1試合を期待値ベースで高速シム（打席単位の解決なし）
+export function farmSimGame(farmA, farmB) {
+  const mean = (arr, fn, def=50) => arr.length ? arr.reduce((s,p)=>s+fn(p),0)/arr.length : def;
+  const bats = (f) => f.filter(p=>!p.isPitcher);
+  const pits = (f) => f.filter(p=> p.isPitcher);
+
+  const batPowA = mean(bats(farmA), p=>(p.batting?.contact||50)*0.6+(p.batting?.power||50)*0.4);
+  const pitPowA = mean(pits(farmA), p=>(p.pitching?.control||50)*0.5+(p.pitching?.velocity||50)*0.5);
+  const batPowB = mean(bats(farmB), p=>(p.batting?.contact||50)*0.6+(p.batting?.power||50)*0.4);
+  const pitPowB = mean(pits(farmB), p=>(p.pitching?.control||50)*0.5+(p.pitching?.velocity||50)*0.5);
+
+  const BASE = 4.0;
+  const scoreA = Math.max(0, Math.round(BASE * Math.sqrt(batPowA/50) * Math.sqrt(50/Math.max(pitPowB,1)) * rngf(0.4, 1.6)));
+  const scoreB = Math.max(0, Math.round(BASE * Math.sqrt(batPowB/50) * Math.sqrt(50/Math.max(pitPowA,1)) * rngf(0.4, 1.6)));
+  const wonA = scoreA !== scoreB ? scoreA > scoreB : rng(0,1) === 0;
+  return { wonA, scoreA, scoreB };
+}
+
+// 1試合分のstats2デルタをfarm各選手に加算して新しい配列を返す
+function applyOneFarmGame(farm, wonA, scoreA, scoreB) {
+  const pits = farm.filter(p => p.isPitcher);
+  const nPit = Math.max(pits.length, 1);
+  const ipEach = Math.round((9 / nPit) * 10) / 10;
+  const starterId = pits.length > 0 ? pits[0].id : null;
+
+  return farm.map(p => {
+    const s2 = p.stats2 ?? { PA:0, H:0, HR:0, W:0, IP:0, ER:0, K:0 };
+    if (p.isPitcher) {
+      const isWinner = wonA && p.id === starterId;
+      const er = Math.max(0, Math.round(scoreB / nPit * rngf(0.3, 1.7)));
+      const k  = Math.max(0, Math.round(ipEach * (p.pitching?.breaking||50) / 50 * 0.8 * rngf(0.5, 1.5)));
+      return { ...p, stats2: { ...s2, W: s2.W+(isWinner?1:0), IP: Math.round((s2.IP+ipEach)*10)/10, ER: s2.ER+er, K: s2.K+k } };
+    } else {
+      const h  = Math.min(4, Math.max(0, Math.round(4 * (p.batting?.contact||50) / 200 * rngf(0.5, 1.5))));
+      const hr = rngf(0,1) < (p.batting?.power||50) / 350 ? 1 : 0;
+      return { ...p, stats2: { ...s2, PA: s2.PA+4, H: s2.H+h, HR: s2.HR+Math.min(hr,h) } };
+    }
+  });
+}
+
+// 二軍シーズン143試合をバッチ処理 → 全チームのfarmにstats2を蓄積したteams配列を返す
+export function runFarmSeason(teams) {
+  const FARM_GAMES = 143;
+  return teams.map(teamA => {
+    const opponents = teams.filter(t => t.league === teamA.league && t.id !== teamA.id);
+    if (!opponents.length || !teamA.farm?.length) return teamA;
+    let farm = teamA.farm.map(p => ({ ...p, stats2: { PA:0, H:0, HR:0, W:0, IP:0, ER:0, K:0 } }));
+    for (let g = 0; g < FARM_GAMES; g++) {
+      const opp = opponents[rng(0, opponents.length-1)];
+      const { wonA, scoreA, scoreB } = farmSimGame(farm, opp.farm);
+      farm = applyOneFarmGame(farm, wonA, scoreA, scoreB);
+    }
+    return { ...teamA, farm };
+  });
+}
+
 export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, matchupScore, calcFatigue, calcEffectiveFatigue, PITCH_TYPES, BASELINE, ABILITY_RANGE };

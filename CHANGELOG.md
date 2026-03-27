@@ -5,6 +5,57 @@
 
 ---
 
+### 2026-03-27 — Playwright E2E テスト基盤追加（T7-E2E）
+
+- `playwright.config.js`: Playwright 設定追加（Chromium・`webServer` で `npm run dev` 自動起動・baseURL=localhost:5173）
+- `e2e/title.spec.js`: タイトル画面 E2E テスト（ゲームタイトル表示・セ/パ全12チーム表示・チーム選択→HUB遷移を検証）
+- `SPEC.md`: ディレクトリ構成に `playwright.config.js` / `e2e/` を追記
+- `ROADMAP.md`: 保守性セクションに `T7-E2E`（部分実装）を追記
+- 方針: Tier 8 完了後にコアフロー（HUB・保存/ロード・試合シム）テストを拡充予定
+
+---
+
+### 2026-03-27 — ㉕ 育成→支配下昇格とFA管理
+
+- `src/constants.js`: `ACTIVE_ROSTER_FA_DAYS_PER_YEAR = 120` を追加
+- `src/engine/player.js`: `makePlayer` に `entryType`（高卒/大卒/社会人/外国人）・`daysOnActiveRoster: 0` を追加
+- `src/engine/realplayer.js`: 実選手生成に `entryType` / `daysOnActiveRoster` を追加
+- `src/engine/saveload.js`: `migratePlayer` に `entryType` / `daysOnActiveRoster` マイグレーションを追加
+- `src/engine/contract.js`: `getFaThreshold` を `entryType` ベース・日数返値（高卒/外国人=960日、大卒/社会人=840日）に変更。FA比較を `daysOnActiveRoster` ベースに切り替え
+- `src/hooks/useSeasonFlow.js`: 全3ゲームパスで一軍選手の `daysOnActiveRoster += 1`/日
+- `src/hooks/useOffseason.js`: 海外FA判定を `daysOnActiveRoster` ベースに更新
+- `src/components/PlayerModal.jsx`: 「FA まで X日（Y年相当）」・外国人は「外国人枠免除まであとX日」を表示
+- `src/components/tabs/RosterTab.jsx`: 支配下登録直後に「↑一軍昇格」ボタンを表示する1フロー化
+- `src/components/Draft.jsx`: ドラフト候補一覧に `entryType` バッジを表示
+- `src/engine/__tests__/contract.test.js`: `getFaThreshold` テストを日数ベースに更新
+
+---
+
+### 2026-03-27 — ㉔ 二軍簡易シミュレーション（Tier 8 第1弾）
+
+- `src/engine/simulation.js`: `farmSimGame(farmA, farmB)` 追加（期待値ベース高速シム、打席単位の解決なし）
+- `src/engine/simulation.js`: `applyOneFarmGame()` 追加（1試合分のstats2デルタを各選手に加算）
+- `src/engine/simulation.js`: `runFarmSeason(teams)` 追加（143試合バッチ処理、セ→イースタン/パ→ウエスタン）
+- `src/engine/player.js`: `makePlayer` に `stats2: { PA, H, HR, W, IP, ER, K }` 初期化を追加
+- `src/engine/saveload.js`: `migratePlayer` に `stats2` マイグレーションを追加（既存セーブの後方互換）
+- `src/engine/awards.js`: `calcFarmAwards(teams)` 追加（首位打者・HR王・最多勝をリーグ別表彰）、`calcSeasonAwards` の戻り値に `farmAwards` を追加
+- `src/hooks/useSeasonFlow.js`: シーズン終了時（3か所）に `runFarmSeason` を呼び出してfarm stats2を蓄積
+- `src/components/tabs/RosterTab.jsx`: 二軍一覧に「二軍成績」列を追加（打者: 打率/HR、投手: 勝利数/ERA）
+
+---
+
+### 2026-03-26 — T5: セーブデータバリデーション（ローリングバックアップ・フィールドマイグレーション）
+
+**仕様本文への影響なし（内部実装のみ）**
+
+- `src/engine/saveload.js` に `validateAndMigrateSave()` / `migratePlayer()` を追加
+- ロード時に必須フィールドの null チェックを実施し、欠落フィールドにデフォルト値を補完
+  - 選手: `entryAge` / `serviceYears` / `ikuseiYears` / `condition` / `morale` / `trust` / `injuryDaysLeft` / `growthPhase` / `recentPitchingDays` / `careerLog` / `peakAbilities`
+  - チーム: `pitchingPattern` / `stadiumLevel` / `revenueThisSeason`
+- ローリングバックアップ2世代（`bk1` / `bk2`）を実装。`saveGame()` 時にローテーション、`loadGame()` 時にフォールバック
+- `deleteSave()` でバックアップキーも合わせて削除
+
+---
 
 ### 2026-03-26 — T3/T4 ファイル分割完了 + SPEC.md 同期
 
