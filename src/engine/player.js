@@ -38,6 +38,7 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
     personality: makePers(age), skills: [],
     growthPhase: age <= 24 ? "growth" : age <= 29 ? "peak" : age <= 33 ? "earlyDecline" : "decline",
     stats: emptyStats(),
+    stats2: { PA:0, H:0, HR:0, W:0, IP:0, ER:0, K:0 },
     serviceYears: 0, entryAge: age, recentPitchingDays: [],
   };
 

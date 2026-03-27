@@ -5,6 +5,18 @@
 
 ---
 
+### 2026-03-27 — ㉔ 二軍簡易シミュレーション（Tier 8 第1弾）
+
+- `src/engine/simulation.js`: `farmSimGame(farmA, farmB)` 追加（期待値ベース高速シム、打席単位の解決なし）
+- `src/engine/simulation.js`: `applyOneFarmGame()` 追加（1試合分のstats2デルタを各選手に加算）
+- `src/engine/simulation.js`: `runFarmSeason(teams)` 追加（143試合バッチ処理、セ→イースタン/パ→ウエスタン）
+- `src/engine/player.js`: `makePlayer` に `stats2: { PA, H, HR, W, IP, ER, K }` 初期化を追加
+- `src/engine/saveload.js`: `migratePlayer` に `stats2` マイグレーションを追加（既存セーブの後方互換）
+- `src/engine/awards.js`: `calcFarmAwards(teams)` 追加（首位打者・HR王・最多勝をリーグ別表彰）、`calcSeasonAwards` の戻り値に `farmAwards` を追加
+- `src/hooks/useSeasonFlow.js`: シーズン終了時（3か所）に `runFarmSeason` を呼び出してfarm stats2を蓄積
+- `src/components/tabs/RosterTab.jsx`: 二軍一覧に「二軍成績」列を追加（打者: 打率/HR、投手: 勝利数/ERA）
+
+---
 
 ### 2026-03-26 — T5: セーブデータバリデーション（ローリングバックアップ・フィールドマイグレーション）
 

@@ -19,11 +19,12 @@ export function calcSeasonAwards(teams, year) {
 
   return {
     year,
-    mvp:      { central: pickMVP(seBatters, allPlayers), pacific: pickMVP(paBatters, allPlayers) },
-    sawamura: pickSawamura(pitchers),
-    rookie:   pickRookie(allPlayers),
-    bestNine: { central: pickBestNine(seBatters, sePitchers), pacific: pickBestNine(paBatters, paPitchers) },
-    titles:   { central: calcTitles(seTeams), pacific: calcTitles(paTeams) },
+    mvp:        { central: pickMVP(seBatters, allPlayers), pacific: pickMVP(paBatters, allPlayers) },
+    sawamura:   pickSawamura(pitchers),
+    rookie:     pickRookie(allPlayers),
+    bestNine:   { central: pickBestNine(seBatters, sePitchers), pacific: pickBestNine(paBatters, paPitchers) },
+    titles:     { central: calcTitles(seTeams), pacific: calcTitles(paTeams) },
+    farmAwards: calcFarmAwards(teams),
   };
 }
 
@@ -136,6 +137,33 @@ function pickBestNine(batters, pitchers) {
     result['投手'] = bp ? [{ name: bp.name, teamName: bp._teamName, pos: '投手' }] : [];
   }
   return result;
+}
+
+/* ─── 二軍タイトル（イースタン/ウエスタン） ─────── */
+
+function calcFarmAwards(teams) {
+  const leagueAwards = (leagueTeams, leagueName) => {
+    const all = leagueTeams.flatMap(t => (t.farm||[]).map(p => ({ ...p, _teamName: t.name })));
+    const batters  = all.filter(p => !p.isPitcher && (p.stats2?.PA||0) >= 50);
+    const pitchers = all.filter(p =>  p.isPitcher && (p.stats2?.IP||0) >= 30);
+    const top = (arr, fn) => {
+      if (!arr.length) return null;
+      const winner = arr.reduce((a,b) => fn(a) >= fn(b) ? a : b);
+      return { name: winner.name, teamName: winner._teamName, value: fn(winner) };
+    };
+    return {
+      league:  leagueName,
+      batting: top(batters, p => p.stats2.PA > 0 ? (p.stats2.H||0) / p.stats2.PA : 0),
+      hr:      top(all.filter(p=>!p.isPitcher), p => p.stats2?.HR||0),
+      wins:    top(pitchers, p => p.stats2?.W||0),
+    };
+  };
+  const seTeams = teams.filter(t => t.league === 'セ');
+  const paTeams = teams.filter(t => t.league === 'パ');
+  return {
+    eastern: leagueAwards(seTeams, 'イースタン'),
+    western: leagueAwards(paTeams, 'ウエスタン'),
+  };
 }
 
 /* ─── 歴代記録の更新 ─────────────────────────── */

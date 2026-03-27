@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { uid, rng } from '../utils';
 import { checkForInjuries, tickInjuries, calcRetireWill } from '../engine/player';
-import { quickSimGame } from '../engine/simulation';
+import { quickSimGame, runFarmSeason } from '../engine/simulation';
 import { applyGameStatsFromLog, applyPostGameCondition } from '../engine/postGame';
 import { calcRevenue } from '../engine/finance';
 import { generateCpuOffer } from '../engine/trade';
@@ -39,7 +39,9 @@ export function useSeasonFlow(gs) {
   useEffect(()=>{
     if(pendingPlayoffRef.current){
       pendingPlayoffRef.current=false;
-      setPlayoff(initPlayoff(teams));
+      const withFarm=runFarmSeason(teams);
+      setTeams(withFarm);
+      setPlayoff(initPlayoff(withFarm));
       setScreen('playoff');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -303,7 +305,7 @@ export function useSeasonFlow(gs) {
     setGameDay(newDay);
     setBatchResults(results);
     gs.setRecentResults(prev=>[...results.map(r=>({won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp,gameNo:r.gameNo})).reverse(),...prev].slice(0,5));
-    if(newDay-1>=SEASON_GAMES){setPlayoff(initPlayoff(newTeams));setScreen("playoff");}
+    if(newDay-1>=SEASON_GAMES){const withFarm=runFarmSeason(newTeams);setTeams(withFarm);setPlayoff(initPlayoff(withFarm));setScreen("playoff");}
     else setScreen("batch_result");
   };
 
