@@ -8,13 +8,32 @@ import { generateCpuOffer } from '../engine/trade';
 import { initPlayoff } from '../engine/playoff';
 import { getMyMatchup, getCpuMatchups } from '../engine/scheduleGen';
 import { saveGame } from '../engine/saveload';
-import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE } from '../constants';
+import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, MAX_FARM } from '../constants';
 
 // 守備コーチボーナス: 怪我回復速度 UP
 function applyDefenseCoachRecovery(players, coaches) {
   const defBonus=(coaches||[]).filter(c=>c.type==='defense').reduce((s,c)=>s+(c.bonus||0),0);
   if(!defBonus) return players;
   return players.map(p=>{if(!p.injuryDaysLeft) return p;const extra=Math.random()<(defBonus*0.1)?1:0;if(!extra) return p;const next=Math.max(0,p.injuryDaysLeft-extra);return{...p,injuryDaysLeft:next,injury:next>0?p.injury:null};});
+}
+
+// 登録クールダウンを1日デクリメント
+function tickCooldowns(players) {
+  return players.map(p=>{const cd=p.registrationCooldownDays??0;if(!cd)return p;return{...p,registrationCooldownDays:Math.max(0,cd-1)};});
+}
+
+// 怪我日数 > INJURY_AUTO_DEMOTE_DAYS の一軍選手を自動二軍降格し、クールダウンをセット
+function autoInjuryDemote(team) {
+  const farm=team.farm??[];
+  const demoted=[];const kept=[];
+  for(const p of team.players){
+    if((p.injuryDaysLeft??0)>INJURY_AUTO_DEMOTE_DAYS&&farm.length+demoted.length<MAX_FARM){
+      demoted.push({...p,registrationCooldownDays:REGISTRATION_COOLDOWN_DAYS});
+    }else{kept.push(p);}
+  }
+  if(demoted.length===0)return team;
+  const demotedIds=new Set(demoted.map(p=>p.id));
+  return{...team,players:kept,lineup:(team.lineup??[]).filter(id=>!demotedIds.has(id)),rotation:(team.rotation??[]).filter(id=>!demotedIds.has(id)),farm:[...farm,...demoted]};
 }
 
 export function useSeasonFlow(gs) {
@@ -34,6 +53,8 @@ export function useSeasonFlow(gs) {
   const [batchResults, setBatchResults] = useState([]);
   const [playoff, setPlayoff] = useState(null);
   const pendingPlayoffRef = useRef(false);
+  const prevMyPlayersRef = useRef(null);
+  const prevMyFarmRef = useRef(null);
 
   // 最終戦終了後: 全setState（対戦相手記録・CPU試合）が反映された teams でプレーオフ初期化
   useEffect(()=>{
@@ -46,6 +67,33 @@ export function useSeasonFlow(gs) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[teams]);
+
+  // 自動降格・回復通知: myTeam の players/farm 変化を検知して通知
+  useEffect(()=>{
+    if(!myTeam||!myId) return;
+    const prevPlayers=prevMyPlayersRef.current;
+    const prevFarm=prevMyFarmRef.current;
+    if(prevPlayers!==null){
+      const prevPlayerIds=new Set(prevPlayers.map(p=>p.id));
+      // 一軍から二軍に移動 かつ 怪我あり → 自動降格通知
+      const newlyDemotedInj=myTeam.farm.filter(p=>prevPlayerIds.has(p.id)&&!myTeam.players.find(x=>x.id===p.id)&&(p.injuryDaysLeft??0)>0);
+      if(newlyDemotedInj.length>0){
+        const names=newlyDemotedInj.map(p=>`${p.name}（残${p.injuryDaysLeft}試合）`).join('、');
+        notify(`🤕 ${names}が怪我で自動二軍降格`,'warn');
+      }
+    }
+    if(prevFarm!==null){
+      const prevIneligibleIds=new Set(prevFarm.filter(p=>!p.育成&&((p.injuryDaysLeft??0)>0||(p.registrationCooldownDays??0)>0)).map(p=>p.id));
+      const newlyEligible=myTeam.farm.filter(p=>!p.育成&&prevIneligibleIds.has(p.id)&&(p.injuryDaysLeft??0)===0&&(p.registrationCooldownDays??0)===0);
+      if(newlyEligible.length>0){
+        const names=newlyEligible.map(p=>p.name).join('、');
+        notify(`✅ ${names}が回復！一軍昇格可能`,'ok');
+      }
+    }
+    prevMyPlayersRef.current=myTeam.players;
+    prevMyFarmRef.current=myTeam.farm;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[myTeam]);
 
   const tryGenerateCpuOffer = () => {
     if(Math.random()>0.05||cpuTradeOffers.length>=2||!myTeam) return;
@@ -122,6 +170,13 @@ export function useSeasonFlow(gs) {
       updated.players=applyDefenseCoachRecovery(updated.players,t.coaches);
       const newInj=checkForInjuries(updated.players);
       if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+      // 登録クールダウンデクリメント
+      updated.players=tickCooldowns(updated.players);
+      // 二軍: 怪我回復 + クールダウンデクリメント
+      updated.farm=tickInjuries(updated.farm??[]);
+      updated.farm=tickCooldowns(updated.farm??[]);
+      // 怪我日数 > 10日の一軍選手を自動二軍降格
+      updated=autoInjuryDemote(updated);
       const rev=calcRevenue(updated);
       const revTotal=rev.ticket+rev.sponsor+rev.merch;
       updated.budget+=revTotal;
@@ -283,6 +338,13 @@ export function useSeasonFlow(gs) {
       myT.players=applyDefenseCoachRecovery(myT.players,myT.coaches);
       const _inj=checkForInjuries(myT.players);
       if(_inj.length>0)myT.players=myT.players.map(p=>{const inj=_inj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+      // 登録クールダウンデクリメント
+      myT.players=tickCooldowns(myT.players);
+      // 二軍: 怪我回復 + クールダウンデクリメント
+      myT.farm=tickInjuries(myT.farm??[]);
+      myT.farm=tickCooldowns(myT.farm??[]);
+      // 怪我日数 > 10日の一軍選手を自動二軍降格（インライン: myT参照を維持）
+      {const farm=myT.farm??[];const demotedB=[];const keptB=[];for(const p of myT.players){if((p.injuryDaysLeft??0)>INJURY_AUTO_DEMOTE_DAYS&&farm.length+demotedB.length<MAX_FARM){demotedB.push({...p,registrationCooldownDays:REGISTRATION_COOLDOWN_DAYS});}else{keptB.push(p);}}if(demotedB.length>0){const dIds=new Set(demotedB.map(p=>p.id));myT.players=keptB;myT.farm=[...farm,...demotedB];myT.lineup=(myT.lineup??[]).filter(id=>!dIds.has(id));myT.rotation=(myT.rotation??[]).filter(id=>!dIds.has(id));}}
       const oppT=newTeams.find(t=>t.id===opp.id);
       if(oppT){
         if(won){oppT.losses++;oppT.rf+=r.score.opp;oppT.ra+=r.score.my;}
@@ -331,6 +393,13 @@ export function useSeasonFlow(gs) {
       updated.players=applyDefenseCoachRecovery(updated.players,t.coaches);
       const newInj=checkForInjuries(updated.players);
       if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+      // 登録クールダウンデクリメント
+      updated.players=tickCooldowns(updated.players);
+      // 二軍: 怪我回復 + クールダウンデクリメント
+      updated.farm=tickInjuries(updated.farm??[]);
+      updated.farm=tickCooldowns(updated.farm??[]);
+      // 怪我日数 > 10日の一軍選手を自動二軍降格
+      updated=autoInjuryDemote(updated);
       const rev=calcRevenue(updated);
       const revTotal=rev.ticket+rev.sponsor+rev.merch;
       updated.budget+=revTotal;
