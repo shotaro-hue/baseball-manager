@@ -5,6 +5,16 @@
 
 ---
 
+### 2026-03-27 — Playwright E2E テスト基盤追加（T7-E2E）
+
+- `playwright.config.js`: Playwright 設定追加（Chromium・`webServer` で `npm run dev` 自動起動・baseURL=localhost:5173）
+- `e2e/title.spec.js`: タイトル画面 E2E テスト（ゲームタイトル表示・セ/パ全12チーム表示・チーム選択→HUB遷移を検証）
+- `SPEC.md`: ディレクトリ構成に `playwright.config.js` / `e2e/` を追記
+- `ROADMAP.md`: 保守性セクションに `T7-E2E`（部分実装）を追記
+- 方針: Tier 8 完了後にコアフロー（HUB・保存/ロード・試合シム）テストを拡充予定
+
+---
+
 ### 2026-03-27 — ㉕ 育成→支配下昇格とFA管理
 
 - `src/constants.js`: `ACTIVE_ROSTER_FA_DAYS_PER_YEAR = 120` を追加
