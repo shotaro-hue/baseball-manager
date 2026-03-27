@@ -35,6 +35,7 @@ function migratePlayer(p) {
     recentPitchingDays: p.recentPitchingDays ?? [],
     careerLog:          p.careerLog          ?? [],
     peakAbilities:      p.peakAbilities      ?? null,
+    stats2:             p.stats2             ?? { PA:0, H:0, HR:0, W:0, IP:0, ER:0, K:0 },
   };
 }
 
