@@ -1,6 +1,6 @@
 # Baseball Manager 2025 — 仕様書
 
-> 最終更新: 2026-03-26（**次フォーカス: Tier 8** — T3（App.jsx分割）・T4（Tabs.jsx分割）✅ 完了済み。次は㉔二軍シミュレーション着手）
+> 最終更新: 2026-03-27（Playwright E2E テスト基盤追加。次フォーカス: Tier 8 ㉖ 支配下70名枠）
 
 > **運用ルール**: コードに改修を加えた際は、仕様への影響を確認し、影響がある場合のみ本文を更新する。
 > 変更の有無にかかわらず `CHANGELOG.md` に日付・内容を追記し、**過去の記録は削除しない**。
@@ -63,6 +63,9 @@ baseball-manager/
 ├── index.html
 ├── package.json
 ├── vite.config.js
+├── playwright.config.js # Playwright E2E テスト設定（Chromium・webServer自動起動）
+├── e2e/                 # Playwright E2E テスト（コアフロー限定）
+│   └── title.spec.js   # タイトル画面テスト（チーム表示・選択→HUB遷移）
 └── src/
     ├── App.jsx              # render coordinator・画面ルーティング（198行）✅ T3分割完了
     ├── main.jsx             # React エントリポイント

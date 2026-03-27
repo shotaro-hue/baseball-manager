@@ -212,6 +212,7 @@
 | # | 課題 | 内容 | 状態 |
 |---|------|------|------|
 | T7 | Vitest ユニットテスト | resolveAtBat / calcEffectiveFatigue / calcOfferScore / FA資格判定 等のエンジン関数から導入 | 🔶 部分実装（純粋関数32件 `src/engine/__tests__/`） |
+| T7-E2E | Playwright E2E テスト | コアフロー（タイトル画面・チーム選択・HUB遷移）の自動テスト基盤。`playwright.config.js` + `e2e/title.spec.js` 追加。Tier 8 完了後に拡充予定 | 🔶 部分実装（タイトル画面 `e2e/title.spec.js` のみ） |
 | T8 | useReducer 移行 | 複数年でstate更新競合が増える前に。dispatch(action) パターンで状態遷移を明示化 | 未着手 |
 
 ---
