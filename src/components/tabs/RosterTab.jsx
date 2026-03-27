@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { MAX_ROSTER, MAX_FARM, MAX_外国人_一軍 } from '../../constants';
+import { MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL } from '../../constants';
 import { fmtAvg, fmtSal } from '../../utils';
 import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
 import { OV, CondBadge, HandBadge } from '../ui';
@@ -35,6 +35,7 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
         ))}
         <span className="chip cy" style={{marginLeft:"auto",alignSelf:"center"}}>一軍 {team.players.length}/{MAX_ROSTER}</span>
         <span className="chip cb" style={{alignSelf:"center"}}>外国人 {team.players.filter(p=>p.isForeign).length}/{MAX_外国人_一軍}</span>
+        {(()=>{const s=team.players.filter(p=>!p.育成).length+team.farm.filter(p=>!p.育成).length;const over=s>=MAX_SHIHAKA_TOTAL;return <span className="chip" style={{alignSelf:"center",background:over?"rgba(248,113,113,.15)":"rgba(52,211,153,.08)",border:`1px solid ${over?"rgba(248,113,113,.4)":"rgba(52,211,153,.25)"}`,color:over?"#f87171":"#94a3b8",fontSize:10}}>支配下 {s}/{MAX_SHIHAKA_TOTAL}</span>;})()}
       </div>
       {view==="batters"&&(
         <div className="card">
@@ -93,41 +94,63 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
         </div>
       )}
       {view==="farm"&&(
-        <div className="card">
-          <div className="card-h">二軍 ({team.farm.length}/{MAX_FARM})</div>
-          <div style={{overflowX:"auto"}}>
-            <table className="tbl">
-              <thead><tr><th>選手名</th><th>守備</th><th>年齢</th><th>育成年</th><th>潜在</th><th>主要能力</th><th>状態</th><th>二軍成績</th><th></th></tr></thead>
-              <tbody>
-                {team.farm.map(p=>{
-                  const s2=p.stats2;
-                  const farmStat=s2&&!p.isPitcher&&s2.PA>0
-                    ?`${fmtAvg(s2.H,s2.PA)} ${s2.HR}HR`
-                    :s2&&p.isPitcher&&s2.IP>0
-                    ?`${s2.W}W ${s2.IP>0?(s2.ER*9/s2.IP).toFixed(2):"--"}`
-                    :"—";
-                  return(
-                  <tr key={p.id}>
-                    <td style={{fontWeight:600,fontSize:12,cursor:"pointer"}} onClick={()=>onPlayerClick?.(p,team.name)}><span style={{color:"#60a5fa"}}>{p.name}</span>{p.育成&&<span style={{fontSize:9,color:"#a78bfa",marginLeft:4}}>[育{p.ikuseiYears||0}年]</span>}</td>
-                    <td style={{fontSize:10,color:"#374151"}}>{p.pos}</td><td className="mono" style={{color:"#374151"}}>{p.age}</td>
-                    <td className="mono" style={{color:p.育成?"#a78bfa":"#1e2d3d",fontSize:10}}>{p.育成?(p.ikuseiYears||0)+"年":"—"}</td>
-                    <td><OV v={p.potential}/></td>
-                    <td><OV v={p.isPitcher?p.pitching.velocity:p.batting.contact}/></td>
-                    <td><CondBadge p={p}/></td>
-                    <td className="mono" style={{fontSize:10,color:"#94a3b8"}}>{farmStat}</td>
-                    <td style={{display:"flex",gap:4}}>
-                      {p.育成
-                        ?<><button className="bsm" style={{background:"rgba(167,139,250,.15)",border:"1px solid rgba(167,139,250,.4)",color:"#a78bfa",fontSize:9,padding:"2px 6px",borderRadius:4,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>handleConvertIkusei(p.id)}>支配下登録</button></>
-                        :<button className="bsm bga" onClick={()=>onPromo(p.id)}>↑一軍</button>
-                      }
-                      {justConverted.has(p.id)&&!p.育成&&<button className="bsm" style={{background:"rgba(52,211,153,.15)",border:"1px solid rgba(52,211,153,.4)",color:"#34d399",fontSize:9,padding:"2px 6px",borderRadius:4,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>{onPromo(p.id);setJustConverted(s=>{const n=new Set(s);n.delete(p.id);return n;});}}>↑一軍昇格</button>}
-                    </td>
-                  </tr>
-                  );
-                })}
-                {team.farm.length===0&&<tr><td colSpan={9} style={{color:"#1e2d3d",padding:"16px",textAlign:"center"}}>二軍選手なし</td></tr>}
-              </tbody>
-            </table>
+        <div>
+          {(()=>{
+            const eligible=team.farm.filter(p=>!p.育成&&(p.injuryDaysLeft??0)===0&&(p.registrationCooldownDays??0)===0);
+            if(team.players.length<MAX_ROSTER&&eligible.length>0){
+              const top=eligible.slice().sort((a,b)=>(b.potential??50)-(a.potential??50)).slice(0,3);
+              return(
+                <div style={{marginBottom:8,padding:"8px 12px",background:"rgba(52,211,153,.08)",border:"1px solid rgba(52,211,153,.25)",borderRadius:6,fontSize:11,color:"#34d399"}}>
+                  💡 一軍枠に空き（{MAX_ROSTER-team.players.length}枠）- 昇格推薦: {top.map(p=>p.name).join('、')}
+                </div>
+              );
+            }
+            return null;
+          })()}
+          <div className="card">
+            <div className="card-h">二軍 ({team.farm.length}/{MAX_FARM})</div>
+            <div style={{overflowX:"auto"}}>
+              <table className="tbl">
+                <thead><tr><th>選手名</th><th>守備</th><th>年齢</th><th>育成年</th><th>潜在</th><th>主要能力</th><th>状態</th><th>二軍成績</th><th></th></tr></thead>
+                <tbody>
+                  {team.farm.map(p=>{
+                    const s2=p.stats2;
+                    const farmStat=s2&&!p.isPitcher&&s2.PA>0
+                      ?`${fmtAvg(s2.H,s2.PA)} ${s2.HR}HR`
+                      :s2&&p.isPitcher&&s2.IP>0
+                      ?`${s2.W}W ${s2.IP>0?(s2.ER*9/s2.IP).toFixed(2):"--"}`
+                      :"—";
+                    const cd=p.registrationCooldownDays??0;
+                    const isInj=(p.injuryDaysLeft??0)>0;
+                    const canPromote=!p.育成&&!isInj&&cd===0;
+                    return(
+                    <tr key={p.id} style={isInj?{opacity:.6}:undefined}>
+                      <td style={{fontWeight:600,fontSize:12,cursor:"pointer"}} onClick={()=>onPlayerClick?.(p,team.name)}>
+                        <span style={{color:"#60a5fa"}}>{p.name}</span>
+                        {p.育成&&<span style={{fontSize:9,color:"#a78bfa",marginLeft:4}}>[育{p.ikuseiYears||0}年]</span>}
+                        {isInj&&<span style={{fontSize:9,color:"#f87171",marginLeft:4}}>🤕{p.injuryDaysLeft}</span>}
+                        {!isInj&&cd>0&&<span style={{fontSize:9,color:"#f5c842",marginLeft:4}}>🔒{cd}日</span>}
+                      </td>
+                      <td style={{fontSize:10,color:"#374151"}}>{p.pos}</td><td className="mono" style={{color:"#374151"}}>{p.age}</td>
+                      <td className="mono" style={{color:p.育成?"#a78bfa":"#1e2d3d",fontSize:10}}>{p.育成?(p.ikuseiYears||0)+"年":"—"}</td>
+                      <td><OV v={p.potential}/></td>
+                      <td><OV v={p.isPitcher?p.pitching.velocity:p.batting.contact}/></td>
+                      <td><CondBadge p={p}/></td>
+                      <td className="mono" style={{fontSize:10,color:"#94a3b8"}}>{farmStat}</td>
+                      <td style={{display:"flex",gap:4}}>
+                        {p.育成
+                          ?<button className="bsm" style={{background:"rgba(167,139,250,.15)",border:"1px solid rgba(167,139,250,.4)",color:"#a78bfa",fontSize:9,padding:"2px 6px",borderRadius:4,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>handleConvertIkusei(p.id)}>支配下登録</button>
+                          :<button className="bsm bga" onClick={()=>canPromote&&onPromo(p.id)} disabled={!canPromote} style={!canPromote?{opacity:.4,cursor:"not-allowed"}:undefined}>{cd>0?`🔒${cd}日`:isInj?`🤕${p.injuryDaysLeft}`:"↑一軍"}</button>
+                        }
+                        {justConverted.has(p.id)&&!p.育成&&<button className="bsm" style={{background:"rgba(52,211,153,.15)",border:"1px solid rgba(52,211,153,.4)",color:"#34d399",fontSize:9,padding:"2px 6px",borderRadius:4,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>{onPromo(p.id);setJustConverted(s=>{const n=new Set(s);n.delete(p.id);return n;});}}>↑一軍昇格</button>}
+                      </td>
+                    </tr>
+                    );
+                  })}
+                  {team.farm.length===0&&<tr><td colSpan={9} style={{color:"#1e2d3d",padding:"16px",textAlign:"center"}}>二軍選手なし</td></tr>}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

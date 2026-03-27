@@ -5,6 +5,17 @@
 
 ---
 
+### 2026-03-27 — ㉖ 怪我降格・登録抹消10日ルール・支配下70人枠
+
+**仕様本文への影響あり（§4.10・§7・§13.2）**
+
+- `src/constants.js`: `INJURY_AUTO_DEMOTE_DAYS = 10`・`REGISTRATION_COOLDOWN_DAYS = 10`・`MAX_SHIHAKA_TOTAL = 70` を追加
+- `src/hooks/useSeasonFlow.js`: `tickCooldowns()`・`autoInjuryDemote()` ヘルパー追加。全3ゲームパス（autoSim / tactical / batch）で ① 一軍クールダウンデクリメント ② 二軍 `tickInjuries` + クールダウンデクリメント ③ 怪我>10日の一軍選手を自動二軍降格 を適用。`useEffect([myTeam])` で自動降格・回復の通知を検知して `notify()` 発火
+- `src/hooks/useGameState.js`: `demote()` で `registrationCooldownDays = 10` セット。`promote()` でクールダウン残りを事前チェック。`convertIkusei()` で支配下70人枠上限チェック
+- `src/components/tabs/RosterTab.jsx`: 「支配下 XX/70」常時表示チップ。二軍行に怪我アイコン(`🤕N`)・クールダウンアイコン(`🔒N日`)表示。クールダウン中・怪我中の昇格ボタン無効化。一軍枠空き時に昇格推薦バナー表示（能力上位3名）
+
+---
+
 ### 2026-03-27 — Playwright E2E テスト基盤追加（T7-E2E）
 
 - `playwright.config.js`: Playwright 設定追加（Chromium・`webServer` で `npm run dev` 自動起動・baseURL=localhost:5173）
