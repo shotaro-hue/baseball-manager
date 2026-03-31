@@ -169,4 +169,24 @@ export const RLABEL = {
 export const IS_HIT = (r) => ["hr", "t", "d", "s"].includes(r);
 export const IS_OUT = (r) => ["k", "go", "fo", "sac", "out"].includes(r);
 
+// 育成目標 (development goals) — devGoal フィールドの選択肢
+export const DEV_GOALS_BATTER = [
+  { key: "", label: "設定なし" },
+  { key: "top_team", label: "一軍レギュラー狙い" },
+  { key: "batting", label: "打撃特化" },
+  { key: "defense", label: "守備強化" },
+  { key: "speed", label: "走力強化" },
+  { key: "promotion", label: "支配下昇格目標" },
+];
+
+export const DEV_GOALS_PITCHER = [
+  { key: "", label: "設定なし" },
+  { key: "rotation", label: "先発ローテ入り" },
+  { key: "velocity", label: "球速強化" },
+  { key: "control", label: "制球強化" },
+  { key: "breaking", label: "変化球強化" },
+  { key: "stamina", label: "スタミナ強化" },
+  { key: "promotion", label: "支配下昇格目標" },
+];
+
 
