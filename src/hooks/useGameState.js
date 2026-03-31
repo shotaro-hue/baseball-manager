@@ -8,7 +8,7 @@ import { NPB2025_ROSTERS } from '../data/npb2025';
 import {
   TEAM_DEFS, POSITIONS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
   MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, MIN_SALARY_SHIHAKA,
-  MAX_SHIHAKA_TOTAL, REGISTRATION_COOLDOWN_DAYS,
+  MAX_SHIHAKA_TOTAL, REGISTRATION_COOLDOWN_DAYS, TALK_COOLDOWN_DAYS,
 } from '../constants';
 
 const INIT_TEAMS = TEAM_DEFS.map(function(d){
@@ -122,6 +122,29 @@ export function useGameState() {
       return { ...t, players: t.players.map(updateP), farm: t.farm.map(updateP) };
     });
   }, [upd, myId]);
+
+  const handlePlayerTalk = useCallback((pid, talkType) => {
+    const p = myTeam?.players.find(x => x.id === pid);
+    if (!p) return;
+    if ((p.lastTalkGameDay ?? 0) > 0 && gameDay - p.lastTalkGameDay < TALK_COOLDOWN_DAYS) {
+      notify(`${p.name}とは今月済みです`, "warn"); return;
+    }
+    const pa = p.stats?.PA ?? 0;
+    const bf = p.stats?.BF ?? 0;
+    let delta = 0;
+    switch (talkType) {
+      case "praise":       delta = rng(5, 15); break;
+      case "playing_time": delta = (p.isPitcher ? bf < 80 : pa < 200) ? rng(8, 15) : rng(3, 8); break;
+      case "contract":     delta = p.salary < 10000000 ? rng(5, 12) : rng(2, 6); break;
+      case "trade_rumor":  delta = (p.personality?.overseas ?? 50) >= 60 ? rng(-5, 3) : rng(2, 8); break;
+      default:             delta = rng(3, 10);
+    }
+    upd(myId, t => ({...t, players: t.players.map(x => x.id === pid
+      ? {...x, morale: clamp((x.morale ?? 70) + delta, 0, 100), lastTalkGameDay: gameDay}
+      : x)}));
+    const TALK_LABELS = { praise:"激励", playing_time:"出場機会", contract:"契約", trade_rumor:"噂否定" };
+    notify(`${p.name}「${TALK_LABELS[talkType]}」— モラル${delta >= 0 ? "+" : ""}${delta}`, delta >= 0 ? "ok" : "warn");
+  }, [myTeam, gameDay, upd, myId, notify]);
 
   const handleInterview = useCallback((newsId,opt)=>{
     upd(myId,t=>({...t,popularity:clamp((t.popularity||50)+opt.popMod,0,100),players:t.players.map(p=>({...p,morale:clamp((p.morale||60)+opt.moraleMod,0,100)}))}));
@@ -258,6 +281,7 @@ export function useGameState() {
     handleSave,
     handleSelect,
     handlePlayerClick,
+    handlePlayerTalk,
     setTrainingFocus,
     setDevGoal,
     handleInterview,

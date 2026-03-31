@@ -5,6 +5,19 @@
 
 ---
 
+### 2026-03-31 — ㉙ 選手個別コミュニケーション + T6 JSDoc 型注釈
+
+**仕様本文への影響あり（§5 データモデル・§13.3・§14 保守性）**
+
+- `src/constants.js`: `TALK_COOLDOWN_DAYS = 18` を追加
+- `src/engine/player.js`: `makePlayer()` に `lastTalkGameDay: 0` を追加。`makePlayer` / `buildTeam` / `developPlayers` / `calcRetireWill` / `rollRetire` に JSDoc (@param/@returns) を追加
+- `src/engine/simulation.js`: `calcEffectiveFatigue` / `initGameState` / `processAtBat` / `quickSimGame` に JSDoc を追加
+- `src/hooks/useGameState.js`: `handlePlayerTalk(pid, talkType)` コールバックを追加。会話タイプ（praise/playing_time/contract/trade_rumor）別のモラル変動ロジック + 18試合クールダウン。`TALK_COOLDOWN_DAYS` を import
+- `src/components/tabs/RosterTab.jsx`: `TALK_OPTIONS` 定数を追加。5番目のサブタブ「💬 会話」を追加。モラル昇順で全一軍選手を列挙し、1選手ごとにインライン4択会話パネルを表示。クールダウン中はカウントダウン表示
+- `src/App.jsx`: `RosterTab` に `onPlayerTalk={gs.handlePlayerTalk}` と `gameDay={gameDay}` を渡すよう更新
+
+---
+
 ### 2026-03-31 — ㉘ フロント目標・信頼度 + U4 ナビゲーション整理
 
 **仕様本文への影響あり（§5 データモデル・§13.3・§15 UI改善計画）**
