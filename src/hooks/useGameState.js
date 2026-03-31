@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { uid, clamp, rng, pname, scoutedValue } from '../utils';
-import { buildTeam, makePlayer } from '../engine/player';
+import { buildTeam, makePlayer, resolveTrainingFocusFromGoal } from '../engine/player';
 import { saveGame, hasSave } from '../engine/saveload';
 import { generateSeasonSchedule } from '../engine/scheduleGen';
 import { buildRealTeam } from '../engine/realplayer';
@@ -8,6 +8,7 @@ import { NPB2025_ROSTERS } from '../data/npb2025';
 import {
   TEAM_DEFS, POSITIONS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
   MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, MIN_SALARY_SHIHAKA,
+  MAX_SHIHAKA_TOTAL, REGISTRATION_COOLDOWN_DAYS,
 } from '../constants';
 
 const INIT_TEAMS = TEAM_DEFS.map(function(d){
@@ -110,6 +111,18 @@ export function useGameState() {
 
   const setTrainingFocus = useCallback((pid,focus)=>upd(myId,t=>({...t,players:t.players.map(p=>p.id===pid?{...p,trainingFocus:focus}:p)})),[upd,myId]);
 
+  const setDevGoal = useCallback((pid, goal) => {
+    upd(myId, t => {
+      const updateP = p => {
+        if (p.id !== pid) return p;
+        const updated = { ...p, devGoal: goal || null };
+        updated.trainingFocus = resolveTrainingFocusFromGoal(updated);
+        return updated;
+      };
+      return { ...t, players: t.players.map(updateP), farm: t.farm.map(updateP) };
+    });
+  }, [upd, myId]);
+
   const handleInterview = useCallback((newsId,opt)=>{
     upd(myId,t=>({...t,popularity:clamp((t.popularity||50)+opt.popMod,0,100),players:t.players.map(p=>({...p,morale:clamp((p.morale||60)+opt.moraleMod,0,100)}))}));
     notify("回答しました！ 人気"+(opt.popMod>=0?"+":"")+opt.popMod+" モラル"+(opt.moraleMod>=0?"+":"")+opt.moraleMod,"ok");
@@ -138,6 +151,7 @@ export function useGameState() {
     if(p.育成){notify("育成選手は一軍出場不可。先に支配下登録してください","warn");return;}
     if(myTeam.players.length>=MAX_ROSTER){notify("一軍枠満杯","warn");return;}
     if(p.isForeign&&myTeam.players.filter(x=>x.isForeign).length>=MAX_外国人_一軍){notify(`外国人枠は${MAX_外国人_一軍}名まで`,"warn");return;}
+    if((p.registrationCooldownDays??0)>0){notify(`登録抹消後10日ルール: あと${p.registrationCooldownDays}日は昇格不可`,"warn");return;}
     upd(myId,t=>({...t,players:[...t.players,p],farm:t.farm.filter(x=>x.id!==pid)}));
     notify(`${p.name}を一軍昇格！`,"ok");
   },[myTeam,upd,myId,notify]);
@@ -146,6 +160,9 @@ export function useGameState() {
     if(!myTeam) return;
     const p=myTeam.farm.find(x=>x.id===pid);
     if(!p||!p.育成) return;
+    // 支配下70人枠チェック
+    const shihakaNow=myTeam.players.filter(x=>!x.育成).length+myTeam.farm.filter(x=>!x.育成).length;
+    if(shihakaNow>=MAX_SHIHAKA_TOTAL){notify(`支配下上限（${MAX_SHIHAKA_TOTAL}人）到達。支配下登録不可`,"warn");return;}
     if(myTeam.players.length>=MAX_ROSTER){notify("支配下枠満杯（最大"+MAX_ROSTER+"名）","warn");return;}
     const minSal=MIN_SALARY_SHIHAKA;
     const newSal=Math.max(p.salary,minSal);
@@ -160,8 +177,10 @@ export function useGameState() {
     const p=myTeam.players.find(x=>x.id===pid);
     if(!p) return;
     if(myTeam.farm.length>=MAX_FARM){notify("二軍満杯","warn");return;}
-    upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),lineup:t.lineup.filter(id=>id!==pid),rotation:t.rotation.filter(id=>id!==pid),farm:[...t.farm,p]}));
-    notify(`${p.name}を二軍降格`,"warn");
+    // 手動降格: 登録抹消クールダウン10日をセット
+    const demotedPlayer={...p,registrationCooldownDays:REGISTRATION_COOLDOWN_DAYS};
+    upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),lineup:t.lineup.filter(id=>id!==pid),rotation:t.rotation.filter(id=>id!==pid),farm:[...t.farm,demotedPlayer]}));
+    notify(`${p.name}を二軍降格（再登録まで${REGISTRATION_COOLDOWN_DAYS}日）`,"warn");
   },[myTeam,upd,myId,notify]);
 
   const hireCoach = useCallback((cd,cg)=>{
@@ -240,6 +259,7 @@ export function useGameState() {
     handleSelect,
     handlePlayerClick,
     setTrainingFocus,
+    setDevGoal,
     handleInterview,
     toggleLineup,
     setStarter,

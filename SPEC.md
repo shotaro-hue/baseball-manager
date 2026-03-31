@@ -744,7 +744,8 @@ base = 0.3% / 試合
   morale,        // モラル (0〜100)
   trust,         // 信頼度 (0〜100)
   condition,     // コンディション (60〜100)
-  trainingFocus, // トレーニング集中対象能力名 (nullable)
+  trainingFocus, // トレーニング集中対象能力名 (nullable) ← devGoal 設定時は自動更新
+  devGoal,       // 育成目標 (nullable string): "top_team"|"batting"|"defense"|"speed"|"promotion" (野手) / "rotation"|"velocity"|"control"|"breaking"|"stamina"|"promotion" (投手)
   retireStyle,   // 引退スタイル (0〜100)
   hometown,      // 出身地（都市名）
   serviceYears,  // 通算在籍年数
@@ -1148,6 +1149,30 @@ export function getFaThreshold(p) {
 - 一軍 + 二軍の支配下選手合計 ≤ `MAX_SHIHAKA_TOTAL = 70`
 - 育成選手は別枠（上限外）
 - 70名到達時は補強・ドラフト指名不可。ロスタータブに「支配下 XX / 70」を常時表示
+
+---
+
+#### ㉗ 選手育成目標設定 ✅ 実装済み
+
+`player.devGoal` フィールドで育成目標を管理。`resolveTrainingFocusFromGoal(player)` が devGoal → trainingFocus を自動変換する。
+
+| devGoal（野手） | trainingFocus |
+|---|---|
+| `"top_team"` / `"promotion"` | 最弱能力（contact/power/eye/speed/arm/defense から自動算出） |
+| `"batting"` | contact と power の低い方 |
+| `"defense"` | defense |
+| `"speed"` | speed |
+
+| devGoal（投手） | trainingFocus |
+|---|---|
+| `"rotation"` / `"promotion"` | 最弱能力（velocity/control/stamina/breaking/variety/sharpness から自動算出） |
+| `"velocity"` | velocity |
+| `"control"` | control |
+| `"breaking"` | breaking |
+| `"stamina"` | stamina |
+
+- UI: RosterTab の二軍タブに「育成目標」列を追加。野手/投手で選択肢が異なるセレクタを表示
+- `setDevGoal(pid, goal)` で設定と同時に trainingFocus を自動更新
 
 ---
 

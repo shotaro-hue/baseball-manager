@@ -5,6 +5,29 @@
 
 ---
 
+### 2026-03-31 — ㉗ 選手育成目標設定（devGoal）
+
+**仕様本文への影響あり（§5 データモデル・§13.2）**
+
+- `src/constants.js`: `DEV_GOALS_BATTER`・`DEV_GOALS_PITCHER` を追加。各6〜7種類の育成目標定数（設定なし／一軍レギュラー狙い／打撃特化／守備強化／走力強化／支配下昇格目標 ほか投手版）
+- `src/engine/player.js`: `makePlayer()` に `devGoal: null` を追加。`resolveTrainingFocusFromGoal(player)` 純粋関数を新規実装（devGoal → trainingFocus 自動マッピング。投手・野手で分岐し、「一軍レギュラー狙い」「支配下昇格目標」では選手の最弱能力を自動算出）
+- `src/hooks/useGameState.js`: `setDevGoal(pid, goal)` コールバック追加。設定時に `resolveTrainingFocusFromGoal` で trainingFocus を自動更新。一軍・二軍両方に適用
+- `src/components/tabs/RosterTab.jsx`: 二軍タブに「育成目標」列を追加。野手/投手で選択肢が異なるセレクタ（DEV_GOALS_BATTER / DEV_GOALS_PITCHER）を表示
+- `src/App.jsx`: `onSetDevGoal={gs.setDevGoal}` を RosterTab に渡すよう追加
+
+---
+
+### 2026-03-27 — ㉖ 怪我降格・登録抹消10日ルール・支配下70人枠
+
+**仕様本文への影響あり（§4.10・§7・§13.2）**
+
+- `src/constants.js`: `INJURY_AUTO_DEMOTE_DAYS = 10`・`REGISTRATION_COOLDOWN_DAYS = 10`・`MAX_SHIHAKA_TOTAL = 70` を追加
+- `src/hooks/useSeasonFlow.js`: `tickCooldowns()`・`autoInjuryDemote()` ヘルパー追加。全3ゲームパス（autoSim / tactical / batch）で ① 一軍クールダウンデクリメント ② 二軍 `tickInjuries` + クールダウンデクリメント ③ 怪我>10日の一軍選手を自動二軍降格 を適用。`useEffect([myTeam])` で自動降格・回復の通知を検知して `notify()` 発火
+- `src/hooks/useGameState.js`: `demote()` で `registrationCooldownDays = 10` セット。`promote()` でクールダウン残りを事前チェック。`convertIkusei()` で支配下70人枠上限チェック
+- `src/components/tabs/RosterTab.jsx`: 「支配下 XX/70」常時表示チップ。二軍行に怪我アイコン(`🤕N`)・クールダウンアイコン(`🔒N日`)表示。クールダウン中・怪我中の昇格ボタン無効化。一軍枠空き時に昇格推薦バナー表示（能力上位3名）
+
+---
+
 ### 2026-03-27 — Playwright E2E テスト基盤追加（T7-E2E）
 
 - `playwright.config.js`: Playwright 設定追加（Chromium・`webServer` で `npm run dev` 自動起動・baseURL=localhost:5173）

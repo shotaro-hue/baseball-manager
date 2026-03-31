@@ -14,6 +14,9 @@ export const ACCEPT_THRESHOLD = 55;
 export const MIN_SALARY_SHIHAKA = 4200000;  // 支配下選手最低年俸 420万円 (NPB協約 第89条)
 export const MIN_SALARY_IKUSEI  = 2400000;  // 育成選手最低年俸  240万円 (NPB協約)
 export const ACTIVE_ROSTER_FA_DAYS_PER_YEAR = 120; // FA権1年分の一軍登録日数（NPB145日→ゲーム換算120日）
+export const INJURY_AUTO_DEMOTE_DAYS = 10;        // この日数を超える怪我は自動二軍降格（NPB登録抹消相当）
+export const REGISTRATION_COOLDOWN_DAYS = 10;     // 登録抹消後の再登録不可日数（NPB10日ルール）
+export const MAX_SHIHAKA_TOTAL = 70;               // 支配下登録選手の球団総数上限（NPB協約第40条）
 export const PITCH_NORM      = 120;  // calcFatigue 正規化分母
 export const PITCH_HARD_CAP  = 130;  // 球数の絶対上限（安全弁）
 export const FATIGUE_WARNING = 83;   // 疲弊度警告閾値（stamina=50, condition=100 時 ≈ 100球相当）
@@ -165,5 +168,25 @@ export const RLABEL = {
 
 export const IS_HIT = (r) => ["hr", "t", "d", "s"].includes(r);
 export const IS_OUT = (r) => ["k", "go", "fo", "sac", "out"].includes(r);
+
+// 育成目標 (development goals) — devGoal フィールドの選択肢
+export const DEV_GOALS_BATTER = [
+  { key: "", label: "設定なし" },
+  { key: "top_team", label: "一軍レギュラー狙い" },
+  { key: "batting", label: "打撃特化" },
+  { key: "defense", label: "守備強化" },
+  { key: "speed", label: "走力強化" },
+  { key: "promotion", label: "支配下昇格目標" },
+];
+
+export const DEV_GOALS_PITCHER = [
+  { key: "", label: "設定なし" },
+  { key: "rotation", label: "先発ローテ入り" },
+  { key: "velocity", label: "球速強化" },
+  { key: "control", label: "制球強化" },
+  { key: "breaking", label: "変化球強化" },
+  { key: "stamina", label: "スタミナ強化" },
+  { key: "promotion", label: "支配下昇格目標" },
+];
 
 
