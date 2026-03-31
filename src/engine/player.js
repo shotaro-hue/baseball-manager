@@ -33,6 +33,7 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
     育成: false, isFA: false, condition: rng(80, 100),
     injury: null, injuryDaysLeft: 0,
     trainingFocus: null,
+    devGoal: null,
     morale: rng(60, 100), trust: 50,
     hometown: CITIES[rng(0, CITIES.length - 1)],
     personality: makePers(age), skills: [],
@@ -159,6 +160,45 @@ export function rollRetire(p) {
 
 const BATTER_KEYS  = ['contact','power','eye','speed','arm','defense','stealSkill','baseRunning','clutch'];
 const PITCHER_KEYS = ['velocity','control','stamina','breaking','variety','sharpness'];
+
+/**
+ * 育成目標 (devGoal) から trainingFocus を解決する純粋関数。
+ * devGoal 未設定時は null を返す（バランス成長）。
+ * @param {Object} player
+ * @returns {string|null}
+ */
+export function resolveTrainingFocusFromGoal(player) {
+  const goal = player.devGoal || null;
+  if (!goal) return null;
+  if (player.isPitcher) {
+    const pit = player.pitching ?? {};
+    switch (goal) {
+      case 'velocity': return 'velocity';
+      case 'control':  return 'control';
+      case 'breaking': return 'breaking';
+      case 'stamina':  return 'stamina';
+      case 'rotation':
+      case 'promotion': {
+        const keys = ['velocity','control','stamina','breaking','variety','sharpness'];
+        return keys.reduce((min, k) => (pit[k] ?? 50) < (pit[min] ?? 50) ? k : min, keys[0]);
+      }
+      default: return null;
+    }
+  } else {
+    const bat = player.batting ?? {};
+    switch (goal) {
+      case 'batting':   return (bat.contact ?? 50) <= (bat.power ?? 50) ? 'contact' : 'power';
+      case 'defense':   return 'defense';
+      case 'speed':     return 'speed';
+      case 'top_team':
+      case 'promotion': {
+        const keys = ['contact','power','eye','speed','arm','defense'];
+        return keys.reduce((min, k) => (bat[k] ?? 50) < (bat[min] ?? 50) ? k : min, keys[0]);
+      }
+      default: return null;
+    }
+  }
+}
 
 // 投手の能力別衰退ウェイト（速球は早く衰え、変化球・制球は長持ち）
 const PITCHER_DECLINE_WEIGHTS = {

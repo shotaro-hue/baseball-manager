@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { uid, clamp, rng, pname, scoutedValue } from '../utils';
-import { buildTeam, makePlayer } from '../engine/player';
+import { buildTeam, makePlayer, resolveTrainingFocusFromGoal } from '../engine/player';
 import { saveGame, hasSave } from '../engine/saveload';
 import { generateSeasonSchedule } from '../engine/scheduleGen';
 import { buildRealTeam } from '../engine/realplayer';
@@ -110,6 +110,18 @@ export function useGameState() {
   const handlePlayerClick = useCallback((player,teamName)=>setPlayerModal({player,teamName}),[]);
 
   const setTrainingFocus = useCallback((pid,focus)=>upd(myId,t=>({...t,players:t.players.map(p=>p.id===pid?{...p,trainingFocus:focus}:p)})),[upd,myId]);
+
+  const setDevGoal = useCallback((pid, goal) => {
+    upd(myId, t => {
+      const updateP = p => {
+        if (p.id !== pid) return p;
+        const updated = { ...p, devGoal: goal || null };
+        updated.trainingFocus = resolveTrainingFocusFromGoal(updated);
+        return updated;
+      };
+      return { ...t, players: t.players.map(updateP), farm: t.farm.map(updateP) };
+    });
+  }, [upd, myId]);
 
   const handleInterview = useCallback((newsId,opt)=>{
     upd(myId,t=>({...t,popularity:clamp((t.popularity||50)+opt.popMod,0,100),players:t.players.map(p=>({...p,morale:clamp((p.morale||60)+opt.moraleMod,0,100)}))}));
@@ -247,6 +259,7 @@ export function useGameState() {
     handleSelect,
     handlePlayerClick,
     setTrainingFocus,
+    setDevGoal,
     handleInterview,
     toggleLineup,
     setStarter,

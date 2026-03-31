@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL } from '../../constants';
+import { MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL, DEV_GOALS_BATTER, DEV_GOALS_PITCHER } from '../../constants';
 import { fmtAvg, fmtSal } from '../../utils';
 import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
 import { OV, CondBadge, HandBadge } from '../ui';
@@ -8,7 +8,7 @@ const TRAINING_OPTIONS=[["","バランス"],["contact","ミート"],["power","�
 
 const MoralBadge=({v})=>{const m=v||70;const icon=m>=75?"😊":m>=50?"😐":"😟";const col=m>=75?"#34d399":m>=50?"#f5c842":"#f87171";return <span style={{fontSize:10,color:col}}>{icon}{m}</span>;};
 
-export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onPlayerClick}){
+export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onPlayerClick,onSetDevGoal}){
   const [view,setView]=useState("batters");
   const [justConverted,setJustConverted]=useState(new Set());
   const handleConvertIkusei=(pid)=>{onConvertIkusei&&onConvertIkusei(pid);setJustConverted(s=>new Set([...s,pid]));};
@@ -111,7 +111,7 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
             <div className="card-h">二軍 ({team.farm.length}/{MAX_FARM})</div>
             <div style={{overflowX:"auto"}}>
               <table className="tbl">
-                <thead><tr><th>選手名</th><th>守備</th><th>年齢</th><th>育成年</th><th>潜在</th><th>主要能力</th><th>状態</th><th>二軍成績</th><th></th></tr></thead>
+                <thead><tr><th>選手名</th><th>守備</th><th>年齢</th><th>育成年</th><th>潜在</th><th>主要能力</th><th>育成目標</th><th>状態</th><th>二軍成績</th><th></th></tr></thead>
                 <tbody>
                   {team.farm.map(p=>{
                     const s2=p.stats2;
@@ -135,6 +135,11 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
                       <td className="mono" style={{color:p.育成?"#a78bfa":"#1e2d3d",fontSize:10}}>{p.育成?(p.ikuseiYears||0)+"年":"—"}</td>
                       <td><OV v={p.potential}/></td>
                       <td><OV v={p.isPitcher?p.pitching.velocity:p.batting.contact}/></td>
+                      <td>
+                        <select style={{fontSize:9,background:"#0d1b2a",color:"#94a3b8",border:"1px solid #1e3a5f",borderRadius:3,padding:"1px 2px",maxWidth:90}} value={p.devGoal||""} onChange={e=>onSetDevGoal&&onSetDevGoal(p.id,e.target.value||null)}>
+                          {(p.isPitcher?DEV_GOALS_PITCHER:DEV_GOALS_BATTER).map(({key,label})=><option key={key} value={key}>{label}</option>)}
+                        </select>
+                      </td>
                       <td><CondBadge p={p}/></td>
                       <td className="mono" style={{fontSize:10,color:"#94a3b8"}}>{farmStat}</td>
                       <td style={{display:"flex",gap:4}}>
@@ -147,7 +152,7 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
                     </tr>
                     );
                   })}
-                  {team.farm.length===0&&<tr><td colSpan={9} style={{color:"#1e2d3d",padding:"16px",textAlign:"center"}}>二軍選手なし</td></tr>}
+                  {team.farm.length===0&&<tr><td colSpan={10} style={{color:"#1e2d3d",padding:"16px",textAlign:"center"}}>二軍選手なし</td></tr>}
                 </tbody>
               </table>
             </div>
