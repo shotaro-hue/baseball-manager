@@ -5,6 +5,21 @@
 
 ---
 
+### 2026-03-31 — ㉘ フロント目標・信頼度 + U4 ナビゲーション整理
+
+**仕様本文への影響あり（§5 データモデル・§13.3・§15 UI改善計画）**
+
+- `src/constants.js`: `OWNER_TRUST_BUDGET_LOW/HIGH`・`OWNER_TRUST_FACTOR_LOW/HIGH` 定数を追加
+- `src/engine/player.js`: `buildTeam()` に `ownerGoal: "cs"`・`ownerTrust: 50` を追加
+- `src/engine/realplayer.js`: `buildRealTeam()` にも同フィールドを追加（`stadiumLevel`・`revenueThisSeason` も補完）
+- `src/hooks/useOffseason.js`: `handleNextYear()` に信頼度ベース予算補正ロジックを追加（trust<30: ×0.8 / trust>80: ×1.15。自チームのみ適用）
+- `src/components/Screens.jsx`: `NewSeasonScreen` に今季目標選択 UI を追加（4種類の目標カード: 日本一/ペナント優勝/CS出場/再建）
+- `src/App.jsx`: `calcOwnerTrustDelta()` ヘルパーを追加。プレーオフ `onFinish` にて目標達成度→信頼度変動を計算・反映し、オーナー評価メールを送信。14タブを「試合」「編成」「球団」3カテゴリのグループ化ナビに変更（`TAB_GROUPS`）
+- `src/components/DashboardTab.jsx`: オーナー目標・信頼度カードを追加（目標ラベル・信頼度ゲージバー・予算影響警告）
+- `src/styles.css`: `.tabs-nav`・`.tab-group`・`.tab-group-label` スタイルを追加
+
+---
+
 ### 2026-03-31 — ㉗ 選手育成目標設定（devGoal）
 
 **仕様本文への影響あり（§5 データモデル・§13.2）**
