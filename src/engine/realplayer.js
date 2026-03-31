@@ -180,5 +180,9 @@ export function buildRealTeam(def, rosterData) {
     scoutMissions: [], scoutResults: [],
     history: [],
     popularity: rng(45, 75),
+    stadiumLevel: 0,
+    revenueThisSeason: 0,
+    ownerGoal: "cs",
+    ownerTrust: 50,
   };
 }

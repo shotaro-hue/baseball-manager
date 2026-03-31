@@ -96,6 +96,8 @@ export function buildTeam(def) {
     popularity: rng(40, 70),
     stadiumLevel: 0,
     revenueThisSeason: 0,
+    ownerGoal: "cs",
+    ownerTrust: 50,
   };
 }
 /* ═══════════════════════════════════════════════

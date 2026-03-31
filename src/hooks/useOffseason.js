@@ -4,7 +4,7 @@ import { emptyStats, rollRetire, developPlayers } from '../engine/player';
 import { calcSeasonAwards, updateRecords, checkHallOfFame } from '../engine/awards';
 import { evalOffer, cpuRenewContracts, processCpuFaBids, getFaThreshold } from '../engine/contract';
 import { initDraftPool } from '../engine/draft';
-import { TEAM_DEFS, ACCEPT_THRESHOLD } from '../constants';
+import { TEAM_DEFS, ACCEPT_THRESHOLD, OWNER_TRUST_BUDGET_LOW, OWNER_TRUST_BUDGET_HIGH, OWNER_TRUST_FACTOR_LOW, OWNER_TRUST_FACTOR_HIGH } from '../constants';
 
 export function useOffseason(gs) {
   const {
@@ -36,7 +36,10 @@ export function useOffseason(gs) {
       const nextIds=new Set(nextPlayers.map(p=>p.id));
       const baseBudget=TEAM_DEFS.find(d=>d.id===t.id)?.budget??t.budget;
       const seasonalPayroll=nextPlayers.reduce((s,p)=>s+(p.salary||0),0)+(t.farm||[]).reduce((s,p)=>s+(p.salary||0),0);
-      const newBudget=Math.max(Math.round(baseBudget*0.5),baseBudget+Math.round((t.revenueThisSeason||0)*0.6)-seasonalPayroll);
+      const rawBudget=baseBudget+Math.round((t.revenueThisSeason||0)*0.6)-seasonalPayroll;
+      const trust=t.ownerTrust??50;
+      const trustFactor=t.id===myId?(trust<OWNER_TRUST_BUDGET_LOW?OWNER_TRUST_FACTOR_LOW:trust>OWNER_TRUST_BUDGET_HIGH?OWNER_TRUST_FACTOR_HIGH:1.0):1.0;
+      const newBudget=Math.max(Math.round(baseBudget*0.5),Math.round(rawBudget*trustFactor));
       return{...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,revenueThisSeason:0,stadiumLevel:t.stadiumLevel??0,budget:newBudget,players:nextPlayers,lineup:(t.lineup||[]).filter(id=>nextIds.has(id)),rotation:(t.rotation||[]).filter(id=>nextIds.has(id)),farm:t.farm.map(p=>({...p,age:p.age+1,stats:emptyStats(),injury:null,serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}))};
     }));
     setScreen("new_season");
