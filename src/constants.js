@@ -19,6 +19,8 @@ export const REGISTRATION_COOLDOWN_DAYS = 10;     // 登録抹消後の再登録
 export const MAX_SHIHAKA_TOTAL = 70;               // 支配下登録選手の球団総数上限（NPB協約第40条）
 export const TALK_COOLDOWN_DAYS = 18;           // 同一選手への会話クールダウン（≈1ヶ月）
 export const PRESS_CONFERENCE_INTERVAL = 15;    // 記者会見インターバル（ゲームDay）
+export const POSTING_FEE_RATE        = 0.20;    // ポスティング移籍金: 落札額の20%
+export const POSTING_OVERSEAS_THRESHOLD = 60;   // ポスティング申請可能最低 overseas 値
 
 // オーナー信頼度（ownerTrust）定数
 export const OWNER_TRUST_BUDGET_LOW  = 30;   // 信頼度がこれ未満: 翌年予算 ×0.8

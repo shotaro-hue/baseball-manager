@@ -43,6 +43,7 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
     trainingFocus: null,
     devGoal: null,
     lastTalkGameDay: 0,
+    postingRequested: false,
     morale: rng(60, 100), trust: 50,
     hometown: CITIES[rng(0, CITIES.length - 1)],
     personality: makePers(age), skills: [],

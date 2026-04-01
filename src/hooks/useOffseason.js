@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { uid, clamp, rng } from '../utils';
+import { uid, clamp, rng, rngf, fmtM } from '../utils';
 import { emptyStats, rollRetire, developPlayers } from '../engine/player';
 import { calcSeasonAwards, updateRecords, checkHallOfFame } from '../engine/awards';
 import { evalOffer, cpuRenewContracts, processCpuFaBids, getFaThreshold } from '../engine/contract';
 import { initDraftPool } from '../engine/draft';
+import { calcPostingRequestProb, calcPostingBid, POSTING_FEE_RATE } from '../engine/posting';
 import { TEAM_DEFS, ACCEPT_THRESHOLD, OWNER_TRUST_BUDGET_LOW, OWNER_TRUST_BUDGET_HIGH, OWNER_TRUST_FACTOR_LOW, OWNER_TRUST_FACTOR_HIGH } from '../constants';
 
 export function useOffseason(gs) {
@@ -32,7 +33,7 @@ export function useOffseason(gs) {
   const handleNextYear = () => {
     setYear(y=>y+1);setGameDay(1);setFaPool([]);setDraftAllocation({pitcher:50,batter:50});
     setTeams(prev=>prev.map(t=>{
-      const nextPlayers=t.players.filter(p=>!p._retireNow).map(p=>({...p,age:p.age+1,stats:emptyStats(),playoffStats:emptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:Math.max(0,p.contractYearsLeft-1),growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlyDecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),careerLog:[...(p.careerLog||[]),mkCareerEntry(p.stats,p.playoffStats,year,t.id,t.name)],serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}));
+      const nextPlayers=t.players.filter(p=>!p._retireNow).map(p=>({...p,age:p.age+1,stats:emptyStats(),playoffStats:emptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:Math.max(0,p.contractYearsLeft-1),postingRequested:false,growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlyDecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),careerLog:[...(p.careerLog||[]),mkCareerEntry(p.stats,p.playoffStats,year,t.id,t.name)],serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}));
       const nextIds=new Set(nextPlayers.map(p=>p.id));
       const baseBudget=TEAM_DEFS.find(d=>d.id===t.id)?.budget??t.budget;
       const seasonalPayroll=nextPlayers.reduce((s,p)=>s+(p.salary||0),0)+(t.farm||[]).reduce((s,p)=>s+(p.salary||0),0);
@@ -92,7 +93,39 @@ export function useOffseason(gs) {
   };
   const handleMailAction = (id, action) => {
     const mail=gs.mailbox.find(m=>m.id===id);
-    if(!mail||!mail.offer) return;
+    if(!mail) return;
+
+    // ポスティング申請の承諾/拒否
+    if(mail.type==="posting_request"){
+      const player=myTeam?.players.find(p=>p.id===mail.playerId);
+      if(player){
+        if(action==="accept"){
+          const bid=calcPostingBid(player);
+          const fee=Math.round(bid*POSTING_FEE_RATE);
+          upd(myId,t=>({...t,
+            budget:t.budget+fee,
+            players:t.players.filter(p=>p.id!==mail.playerId),
+            lineup:(t.lineup||[]).filter(pid=>pid!==mail.playerId),
+            rotation:(t.rotation||[]).filter(pid=>pid!==mail.playerId),
+          }));
+          setMailbox(prev=>[...prev,{id:uid(),type:"posting_result",read:false,
+            title:`【ポスティング成立】${player.name} 入札額${fmtM(bid)}`,
+            from:"MLB事務局",dateLabel:`${year}年`,timestamp:Date.now(),
+            body:`${player.name}のポスティングが成立しました。\n入札額: ${fmtM(bid)}\n球団受取移籍金: ${fmtM(fee)}（落札額の20%）`,
+          }]);
+          addNews({type:"season",headline:`【MLB移籍】${player.name}（${myTeam?.name}）がポスティングで渡米`,source:"野球速報",dateLabel:`${year}年`,body:`${player.name}選手がポスティングを通じてMLBへ移籍。入札額${fmtM(bid)}、球団移籍金収入${fmtM(fee)}。`});
+          notify(`${player.name} MLB移籍承認 — 移籍金+${fmtM(fee)}`,"ok");
+        } else {
+          upd(myId,t=>({...t,players:t.players.map(p=>p.id===mail.playerId
+            ?{...p,morale:Math.max(0,(p.morale??70)-10)}:p)}));
+          notify(`${player.name}のポスティングを拒否（モラル-10）`,"warn");
+        }
+      }
+      setMailbox(prev=>prev.map(m=>m.id===id?{...m,resolved:true,read:true}:m));
+      return;
+    }
+
+    if(!mail.offer) return;
     if(action==="accept"){
       handleTrade(mail.offer.want,mail.offer.offer,mail.offer.from,-(mail.offer.cash||0)/10000);
     } else {
@@ -200,8 +233,26 @@ export function useOffseason(gs) {
         }
         return true;
       });
+
+      // ポスティング申請チェック（自チームのみ・オフシーズン一回判定）
+      let postingPlayers=playersAfterOverseas;
+      if(t.id===myId){
+        postingPlayers=playersAfterOverseas.map(p=>{
+          if(rngf(0,1)<calcPostingRequestProb(p)){
+            setMailbox(prev=>[...prev,{id:uid(),type:"posting_request",read:false,resolved:false,
+              title:`【ポスティング申請】${p.name}がMLB挑戦を希望`,
+              from:p.name,dateLabel:`${year}年`,timestamp:Date.now(),
+              body:`${p.name}（${p.pos}/${p.age}歳、海外志向${p.personality?.overseas??0}）がMLB挑戦を希望しています。ポスティングを承認しますか？\n\n承認すると選手はMLBへ移籍し、球団に移籍金が入ります。拒否すると選手のモラルが低下します。`,
+              playerId:p.id,
+            }]);
+            return{...p,postingRequested:true};
+          }
+          return p;
+        });
+      }
+
       const cpuAlumni=cpuRetiredPlayers.map(p=>({...p,exitYear:year,exitReason:"引退",tenure:p.serviceYears||1}));
-      return{...t,players:playersAfterOverseas,farm:farmAfterIkusei,history:[...(t.history||[]),...cpuAlumni]};
+      return{...t,players:postingPlayers,farm:farmAfterIkusei,history:[...(t.history||[]),...cpuAlumni]};
     });
     const renewResult=cpuRenewContracts(developedTeams,myId,developedTeams);
     const finalTeams=renewResult.updatedTeams;

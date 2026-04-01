@@ -9,8 +9,8 @@ export function MailboxTab({mailbox, onRead, onAction, teams, myTeam, onTrade}){
     if(!m.read) onRead(m.id);
   };
 
-  const typeIcon = t => t==="trade"?"🔄":t==="info"?"📋":t==="scout"?"🔍":"📨";
-  const typeColor = t => t==="trade"?"#f97316":t==="info"?"#60a5fa":t==="scout"?"#a78bfa":"#94a3b8";
+  const typeIcon = t => t==="trade"?"🔄":t==="posting_request"?"✈️":t==="posting_result"?"💰":t==="info"?"📋":t==="scout"?"🔍":"📨";
+  const typeColor = t => t==="trade"?"#f97316":t==="posting_request"?"#34d399":t==="posting_result"?"#f5c842":t==="info"?"#60a5fa":t==="scout"?"#a78bfa":"#94a3b8";
 
   return(
     <div style={{display:"grid", gridTemplateColumns: selected?"1fr 1fr":"1fr", gap:8}}>
@@ -71,6 +71,24 @@ export function MailboxTab({mailbox, onRead, onAction, teams, myTeam, onTrade}){
               </div>
             </div>
           )}
+
+          {/* ポスティング申請の場合は承諾/拒否ボタン */}
+          {selected.type==="posting_request"&&!selected.resolved&&(
+            <div>
+              <div style={{marginBottom:10,padding:"10px",borderRadius:6,background:"rgba(52,211,153,.06)",border:"1px solid rgba(52,211,153,.2)"}}>
+                <div style={{fontSize:10,color:"#34d399",marginBottom:6}}>✈️ ポスティング申請</div>
+                <div style={{fontSize:11,color:"#e2e8f0",lineHeight:1.6}}>
+                  承認 → 選手はMLBへ移籍、球団に移籍金収入<br/>
+                  拒否 → 選手がチームに残留（モラル -10）
+                </div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="bsm bga" style={{flex:1}} onClick={()=>{onAction(selected.id,"accept");setSelected({...selected,resolved:true});}}>✅ 承認する</button>
+                <button className="bsm bgr" style={{flex:1}} onClick={()=>{onAction(selected.id,"decline");setSelected({...selected,resolved:true});}}>❌ 拒否する</button>
+              </div>
+            </div>
+          )}
+
           {selected.resolved&&<div style={{textAlign:"center",fontSize:11,color:"#374151",padding:"8px"}}>対応済み</div>}
         </div>
       )}

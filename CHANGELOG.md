@@ -5,6 +5,23 @@
 
 ---
 
+### 2026-04-01 — ㉜ ポスティングシステム（二段階方式）
+
+**仕様本文への影響あり（§5 データモデル・§13.4 NPB固有システム）**
+
+- `src/engine/posting.js` **新規**: `calcPostingRequestProb(player)` / `calcPostingBid(player)` 純関数。`POSTING_FEE_RATE=0.20` / `POSTING_OVERSEAS_THRESHOLD=60`
+- `src/constants.js`: `POSTING_FEE_RATE` / `POSTING_OVERSEAS_THRESHOLD` を追加
+- `src/engine/player.js`: `makePlayer()` に `postingRequested: false` を追加
+- `src/hooks/useOffseason.js`:
+  - `handleRetirePhaseNext` — 海外FA処理の直後に自チーム選手のポスティング申請確率判定を追加。overseas≥60 の選手がオフシーズン一回判定で申請メール送信（overseas=80で50%、overseas=100で90%）
+  - `handleMailAction` — `type==="posting_request"` を処理するブランチを追加。承諾→`calcPostingBid`で入札額計算・移籍金budget加算・選手ロスター除外・結果メール送信。拒否→モラル-10
+  - `handleNextYear` — `postingRequested: false` リセットを追加
+- `src/components/tabs/MailboxTab.jsx`: `type==="posting_request"` 専用UI（✅承認/❌拒否ボタン）を追加。typeIcon/typeColor に ✈️/💰 を追加
+
+**フロー**: オフシーズン確率判定 → GMがMailboxTabで承認/拒否 → 承認時に即座にMLB移籍・移籍金収入（拒否時はモラル低下）
+
+---
+
 ### 2026-04-01 — ㉚ 記者会見（簡易版）+ T7 Vitest 拡充
 
 **仕様本文への影響あり（§13.3 フロント・メディア関係、§14 保守性）**
