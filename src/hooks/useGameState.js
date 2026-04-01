@@ -8,8 +8,10 @@ import { NPB2025_ROSTERS } from '../data/npb2025';
 import {
   TEAM_DEFS, POSITIONS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
   MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, MIN_SALARY_SHIHAKA,
-  MAX_SHIHAKA_TOTAL, REGISTRATION_COOLDOWN_DAYS,
+  MAX_SHIHAKA_TOTAL, REGISTRATION_COOLDOWN_DAYS, TALK_COOLDOWN_DAYS,
+  PRESS_CONFERENCE_INTERVAL,
 } from '../constants';
+import { pickQuestion, calcPressDelta } from '../engine/pressConference';
 
 const INIT_TEAMS = TEAM_DEFS.map(function(d){
   const t = NPB2025_ROSTERS[d.id] ? buildRealTeam(d, NPB2025_ROSTERS[d.id]) : buildTeam(d);
@@ -37,6 +39,18 @@ export function useGameState() {
   const [mailbox, setMailbox] = useState([]);
   const [recentResults, setRecentResults] = useState([]);
   const [cpuTradeOffers, setCpuTradeOffers] = useState([]);
+  const [pressEvent, setPressEvent] = useState(null);  // 記者会見イベント
+  const [lastPressDay, setLastPressDay] = useState(0); // 最後に記者会見を行ったgameDay
+
+  // gameDay が進んだとき、記者会見インターバルを超えていれば会見イベントをセット
+  useEffect(()=>{
+    if(!myId || gameDay <= 1 || gameDay > 143) return;
+    if(pressEvent) return; // 既にイベント表示中
+    if(gameDay - lastPressDay >= PRESS_CONFERENCE_INTERVAL){
+      setPressEvent(pickQuestion(gameDay));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[gameDay, myId]);
 
   // シーズン日程をyear変更時に再生成（チームID・リーグ構成は不変なのでteams.lengthで十分）
   useEffect(()=>{
@@ -122,6 +136,29 @@ export function useGameState() {
       return { ...t, players: t.players.map(updateP), farm: t.farm.map(updateP) };
     });
   }, [upd, myId]);
+
+  const handlePlayerTalk = useCallback((pid, talkType) => {
+    const p = myTeam?.players.find(x => x.id === pid);
+    if (!p) return;
+    if ((p.lastTalkGameDay ?? 0) > 0 && gameDay - p.lastTalkGameDay < TALK_COOLDOWN_DAYS) {
+      notify(`${p.name}とは今月済みです`, "warn"); return;
+    }
+    const pa = p.stats?.PA ?? 0;
+    const bf = p.stats?.BF ?? 0;
+    let delta = 0;
+    switch (talkType) {
+      case "praise":       delta = rng(5, 15); break;
+      case "playing_time": delta = (p.isPitcher ? bf < 80 : pa < 200) ? rng(8, 15) : rng(3, 8); break;
+      case "contract":     delta = p.salary < 10000000 ? rng(5, 12) : rng(2, 6); break;
+      case "trade_rumor":  delta = (p.personality?.overseas ?? 50) >= 60 ? rng(-5, 3) : rng(2, 8); break;
+      default:             delta = rng(3, 10);
+    }
+    upd(myId, t => ({...t, players: t.players.map(x => x.id === pid
+      ? {...x, morale: clamp((x.morale ?? 70) + delta, 0, 100), lastTalkGameDay: gameDay}
+      : x)}));
+    const TALK_LABELS = { praise:"激励", playing_time:"出場機会", contract:"契約", trade_rumor:"噂否定" };
+    notify(`${p.name}「${TALK_LABELS[talkType]}」— モラル${delta >= 0 ? "+" : ""}${delta}`, delta >= 0 ? "ok" : "warn");
+  }, [myTeam, gameDay, upd, myId, notify]);
 
   const handleInterview = useCallback((newsId,opt)=>{
     upd(myId,t=>({...t,popularity:clamp((t.popularity||50)+opt.popMod,0,100),players:t.players.map(p=>({...p,morale:clamp((p.morale||60)+opt.moraleMod,0,100)}))}));
@@ -213,6 +250,26 @@ export function useGameState() {
     notify(`${p.name}を獲得！`,"ok");
   },[myTeam,upd,myId,notify]);
 
+  const handlePressAnswer = useCallback((choiceIdx) => {
+    if (!pressEvent) return;
+    const choice = pressEvent.choices[choiceIdx];
+    const { popDelta, moraleDelta } = calcPressDelta(choice);
+    upd(myId, t => ({
+      ...t,
+      popularity: Math.min(100, Math.max(0, (t.popularity ?? 50) + popDelta)),
+      players: t.players.map(p => ({
+        ...p,
+        morale: Math.min(100, Math.max(0, (p.morale ?? 70) + moraleDelta)),
+      })),
+    }));
+    notify(
+      `記者会見「${choice.label}」— 人気${popDelta >= 0 ? '+' : ''}${popDelta} チームモラル${moraleDelta >= 0 ? '+' : ''}${moraleDelta}`,
+      popDelta + moraleDelta >= 0 ? 'ok' : 'warn',
+    );
+    setPressEvent(null);
+    setLastPressDay(gameDay);
+  }, [pressEvent, upd, myId, notify, gameDay]);
+
   const handleStadiumUpgrade = useCallback(()=>{
     if(!myTeam) return;
     const lvl=myTeam.stadiumLevel??0;
@@ -246,6 +303,8 @@ export function useGameState() {
     mailbox, setMailbox,
     recentResults, setRecentResults,
     cpuTradeOffers, setCpuTradeOffers,
+    pressEvent, setPressEvent,
+    lastPressDay, setLastPressDay,
     // derived
     myTeam,
     tabBadges,
@@ -258,6 +317,7 @@ export function useGameState() {
     handleSave,
     handleSelect,
     handlePlayerClick,
+    handlePlayerTalk,
     setTrainingFocus,
     setDevGoal,
     handleInterview,
@@ -274,5 +334,6 @@ export function useGameState() {
     sendScout,
     signPlayer,
     handleStadiumUpgrade,
+    handlePressAnswer,
   };
 }

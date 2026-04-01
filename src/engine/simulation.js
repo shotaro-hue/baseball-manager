@@ -275,6 +275,13 @@ function calcFatigue(pitchCount, stamina) {
   return clamp(Math.round(pitchCount / PITCH_NORM * 100 * (1 - (stamina - 50) / 200)), 0, 100);
 }
 
+/**
+ * 投球数・スタミナ・コンディションを合成した実効疲弊度（0〜100+）を返す。
+ * FATIGUE_WARNING(83) 超で交代警告、FATIGUE_LIMIT(100) 超で強制交代。
+ * @param {number} pitchCount - 今試合の投球数
+ * @param {Object} pitcher    - 投手選手オブジェクト（pitching.stamina / condition を参照）
+ * @returns {number} 実効疲弊度（値が大きいほど疲弊）
+ */
 function calcEffectiveFatigue(pitchCount, pitcher) {
   const stamina   = pitcher?.pitching?.stamina ?? 50;
   const condition = pitcher?.condition ?? 70;
@@ -365,6 +372,13 @@ function pickBullpenArm(bullpen, targetRole, pattern = {}) {
   return [...candidates].sort((a, b) => scoreBullpenArm(b, targetRole) - scoreBullpenArm(a, targetRole))[0] || bullpen[0];
 }
 
+/**
+ * 試合開始時のゲーム状態を初期化する。
+ * TacticalGame.jsx のリアルタイム試合とバッチシムの両方で使用される。
+ * @param {Object} myTeam  - 自チームオブジェクト（players / lineup / rotation / rotIdx 等を含む）
+ * @param {Object} oppTeam - 相手チームオブジェクト
+ * @returns {Object} 初期ゲーム状態（inning / score / outs / bases / lineup / bullpen 等）
+ */
 function initGameState(myTeam, oppTeam) {
   const myL = myTeam.lineup.map(id => myTeam.players.find(p => p.id === id)).filter(Boolean);
   const opL = oppTeam.lineup.map(id => oppTeam.players.find(p => p.id === id)).filter(Boolean);
@@ -398,6 +412,13 @@ function initGameState(myTeam, oppTeam) {
   };
 }
 
+/**
+ * 1打席を解決してゲーム状態を返す。
+ * 打撃確率（calcPAProbs）→ 球種/コース演出 → スコア/塁上状態の更新 を行う。
+ * @param {Object} gs       - 現在のゲーム状態（initGameState の返り値）
+ * @param {string} strategy - 作戦（'normal' / 'bunt' / 'steal' / 'hit_and_run' 等）
+ * @returns {Object} 更新後のゲーム状態
+ */
 function processAtBat(gs, strategy = 'normal') {
   if (!gs.myLineup.length || !gs.opLineup.length) return gs; // STEP2安全弁: 空lineup guard
   const isMyAtBat  = !gs.isTop;
@@ -607,6 +628,13 @@ function autoSwapPitcher(gs, side) {
   return { ...gs, opPitcher: nextPitcher, opBullpen: newBullpen, opPitchCount: 0, opPitcherState: resetState };
 }
 
+/**
+ * 試合全体を自動でシミュレートして結果を返す（バッチシム / CPU vs CPU 用）。
+ * processAtBat をループしてイニング進行・自動継投を含む全9回を高速処理する。
+ * @param {Object} myTeam  - 自チームオブジェクト
+ * @param {Object} oppTeam - 相手チームオブジェクト
+ * @returns {{ score: {my:number, opp:number}, won: boolean, log: Object[], inningSummary: Object[] }}
+ */
 function quickSimGame(myTeam, oppTeam) {
   let gs = initGameState(myTeam, oppTeam);
   while (!gs.gameOver) {

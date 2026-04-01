@@ -22,7 +22,15 @@ const makePers = (age) => ({
   overseas: rng(0, 100), // 海外志向 (≥70: 国内FAをスキップして海外FA待ち)
 });
 
-// 選手生成
+/**
+ * 選手オブジェクトを生成する。
+ * @param {string} pos - ポジション（例: "先発" / "捕手"）
+ * @param {number} q   - 能力値ベースライン（25〜99 相当の平均値）
+ * @param {boolean} isPitch - 投手なら true
+ * @param {number|undefined} ageOverride - 指定時は年齢を固定
+ * @param {boolean} isForeign - 外国人選手なら true
+ * @returns {Object} 初期化済み選手オブジェクト
+ */
 export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
   const s = (b = 0) => clamp(rng(q - 18 + b, q + 15 + b), 25, 99);
   const age = ageOverride ?? rng(18, 36);
@@ -34,6 +42,7 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
     injury: null, injuryDaysLeft: 0,
     trainingFocus: null,
     devGoal: null,
+    lastTalkGameDay: 0,
     morale: rng(60, 100), trust: 50,
     hometown: CITIES[rng(0, CITIES.length - 1)],
     personality: makePers(age), skills: [],
@@ -72,7 +81,11 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
   return p;
 }
 
-// チーム構築
+/**
+ * チーム定義から初期チームオブジェクトを構築する（procedural生成）。
+ * @param {{ id:number, name:string, budget:number, league:string }} def - TEAM_DEFS の1エントリ
+ * @returns {Object} 初期化済みチームオブジェクト（players / farm / lineup / rotation / budget 等を含む）
+ */
 export function buildTeam(def) {
   const q = rng(56, 76);
   const players = [];
@@ -96,6 +109,8 @@ export function buildTeam(def) {
     popularity: rng(40, 70),
     stadiumLevel: 0,
     revenueThisSeason: 0,
+    ownerGoal: "cs",
+    ownerTrust: 50,
   };
 }
 /* ═══════════════════════════════════════════════
@@ -103,6 +118,12 @@ export function buildTeam(def) {
 ═══════════════════════════════════════════════ */
 
 // 引退意欲スコア計算（0〜100）
+/**
+ * 選手の引退意欲スコア（0〜100）を計算する。
+ * 35歳未満は常に 0。年齢・出場機会・モラル・契約残年・怪我・引退スタイルが影響する。
+ * @param {Object} p - 選手オブジェクト
+ * @returns {number} 引退意欲スコア（0〜100。30以上で引退候補としてUI表示）
+ */
 export function calcRetireWill(p) {
   if (p.age < 35) return 0;
   let score = 0;
@@ -146,7 +167,12 @@ export function calcRetireWill(p) {
   return Math.min(100, score);
 }
 
-// 引退発生判定
+/**
+ * 引退意欲スコアを使ってモンテカルロ方式で引退を判定する。
+ * CPU チームのオフシーズン処理でのみ使用。自チームは UI での手動決定が優先。
+ * @param {Object} p - 選手オブジェクト
+ * @returns {boolean} 引退する場合 true
+ */
 export function rollRetire(p) {
   const will = calcRetireWill(p);
   return Math.random() * 100 < will;
@@ -267,6 +293,12 @@ function applyGrowthToAbilities(abilities, keys, budget, trainingFocus, potentia
   return result;
 }
 
+/**
+ * シーズン終了後の選手成長・衰退処理。年齢・潜在・trainingFocus・コーチボーナスに基づいて能力値を更新する。
+ * @param {Object[]} players  - 対象選手リスト（一軍 or 二軍）
+ * @param {Object[]} coaches  - チームコーチリスト（batting/pitching コーチのボーナスを加算）
+ * @returns {{ players: Object[], summary: { breakout: Object[], growth: Object[], decline: Object[] } }}
+ */
 export function developPlayers(players, coaches = []) {
   const summary = { breakout: [], growth: [], decline: [] };
 

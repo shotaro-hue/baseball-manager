@@ -46,7 +46,15 @@ export function DashboardTab({ myTeam, teams, schedule, gameDay, year, recentRes
     return list;
   }, [myTeam, mailbox, faPool]);
 
+  const GOAL_LABELS = { champion: "日本一", pennant: "ペナント優勝", cs: "CS出場", rebuild: "再建" };
+  const GOAL_COLORS = { champion: "#f5c842", pennant: "#60a5fa", cs: "#34d399", rebuild: "#a78bfa" };
+
   if (!myTeam) return null;
+
+  const ownerGoal = myTeam.ownerGoal || "cs";
+  const ownerTrust = myTeam.ownerTrust ?? 50;
+  const trustColor = ownerTrust >= 70 ? "#34d399" : ownerTrust >= 40 ? "#f5c842" : "#f87171";
+  const trustLabel = ownerTrust >= 80 ? "全幅の信頼" : ownerTrust >= 60 ? "信頼あり" : ownerTrust >= 40 ? "普通" : ownerTrust >= 30 ? "不安あり" : "危機的";
 
   const winPct = myTeam.wins + myTeam.losses > 0
     ? (myTeam.wins / (myTeam.wins + myTeam.losses)).toFixed(3).replace(/^0/, "")
@@ -113,6 +121,28 @@ export function DashboardTab({ myTeam, teams, schedule, gameDay, year, recentRes
             ) : (
               <div style={{ color: "#9ca3af", fontSize: 12 }}>試合結果なし</div>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* オーナー目標・信頼度 */}
+      <div className="card">
+        <div className="card-h">🎯 オーナー目標・信頼度</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 3 }}>今季目標</div>
+            <span style={{ fontSize: 14, fontWeight: 700, color: GOAL_COLORS[ownerGoal] }}>{GOAL_LABELS[ownerGoal]}</span>
+          </div>
+          <div style={{ flex: 2 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+              <span style={{ fontSize: 11, color: "#9ca3af" }}>オーナー信頼度</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: trustColor }}>{ownerTrust} — {trustLabel}</span>
+            </div>
+            <div style={{ background: "#0d1f35", borderRadius: 4, height: 8, overflow: "hidden" }}>
+              <div style={{ width: `${ownerTrust}%`, height: "100%", background: trustColor, borderRadius: 4, transition: ".3s" }} />
+            </div>
+            {ownerTrust < 30 && <div style={{ fontSize: 10, color: "#f87171", marginTop: 3 }}>⚠ 翌年予算 -20%</div>}
+            {ownerTrust > 80 && <div style={{ fontSize: 10, color: "#34d399", marginTop: 3 }}>✓ 翌年予算 +15%</div>}
           </div>
         </div>
       </div>

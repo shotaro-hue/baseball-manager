@@ -1,6 +1,6 @@
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles.css';
-import { uid, fmtM, fmtSal, gameDayToDate, scoutedValue } from './utils';
+import { uid, fmtM, fmtSal, gameDayToDate, scoutedValue, clamp } from './utils';
 import { loadGame, getSaveMeta, deleteSave } from './engine/saveload';
 import { generateSeasonSchedule } from './engine/scheduleGen';
 import { TacticalGameScreen } from './components/TacticalGame';
@@ -10,12 +10,20 @@ import { DraftPreviewScreen, DraftLotteryScreen, DraftScreen, DraftReviewScreen 
 import { PlayoffScreen } from './components/PlayoffScreen';
 import { RetireModal } from './components/RetireModal';
 import { PlayerModal } from './components/PlayerModal';
+import { PressConferenceModal } from './components/PressConferenceModal';
 import { DashboardTab } from './components/DashboardTab';
 import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab, ScheduleTab } from './components/Tabs';
 import { SEASON_GAMES, BATCH, MAX_外国人_一軍, TEAM_DEFS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS } from './constants';
+import { calcOwnerTrustDelta } from './engine/frontend';
 import { useGameState } from './hooks/useGameState';
 import { useSeasonFlow } from './hooks/useSeasonFlow';
 import { useOffseason } from './hooks/useOffseason';
+
+const TAB_GROUPS = [
+  { label: "試合", tabs: [["dashboard","🏠 概況"],["schedule","🗓️ 日程"],["standings","🏆 順位"],["stats","📊 成績"],["records","🏛 記録"]] },
+  { label: "編成", tabs: [["roster","👥 ロースター"],["trade","🔄 トレード"],["contract","📝 契約"],["fa","🏪 FA"],["scout","🔍 スカウト"]] },
+  { label: "球団", tabs: [["news","📰 ニュース"],["mailbox","📨 メール"],["alumni","📖 歴代"],["finance","💴 財務"]] },
+];
 
 export default function App(){
   const gs = useGameState();
@@ -50,6 +58,7 @@ export default function App(){
     saveExists, setSaveExists, retireModal, setRetireModal,
     playerModal, setPlayerModal, retireRole, setRetireRole,
     notify, upd, addNews, addToHistory, setFaPool, setTeams, setSeasonHistory, setMailbox, setScreen,
+    pressEvent, handlePressAnswer,
   } = gs;
   const { gameResult, currentOpp, batchResults, playoff, setPlayoff } = sf;
   const { developmentSummary, newSeasonInfo, draftPool, setDraftPool, draftResult, setDraftResult, draftAllocation, setDraftAllocation } = os;
@@ -74,13 +83,19 @@ export default function App(){
       setSeasonHistory(prev=>({...prev,championships:[...(prev.championships||[]),{year,championId:playoff.champion.id,championName:playoff.champion.name,opponent:opp?.name||"?",seriesResult}]}));
       if(playoff.champion.id===myId){setMailbox(prev=>[...prev,{id:uid(),type:"championship",read:false,subject:"🏆 "+year+"年 日本一達成！",body:playoff.champion.name+"が"+year+"年の日本シリーズを制覇しました（"+seriesResult+"）。球団史に残る偉業です！"}]);}
     }
+    const trustDelta=calcOwnerTrustDelta(myId,myTeam,playoff);
+    if(trustDelta!==0){
+      gs.upd(myId,t=>({...t,ownerTrust:clamp((t.ownerTrust??50)+trustDelta,0,100)}));
+      const goalLabel={champion:"日本一",pennant:"ペナント優勝",cs:"CS出場",rebuild:"再建"}[myTeam?.ownerGoal||"cs"];
+      setMailbox(prev=>[...prev,{id:uid(),type:"owner_trust",read:false,subject:(trustDelta>0?"✅":"⚠️")+" オーナー評価: 目標「"+goalLabel+"」"+(trustDelta>0?"達成":"未達"),body:"今季の目標「"+goalLabel+"」に対する評価が確定しました。信頼度が"+(trustDelta>0?"+":"")+trustDelta+"変動しました（翌年予算に影響します）。"}]);
+    }
     setScreen("retire_phase");
   }}/></ErrorBoundary></>);
   if(screen==="draft_preview"&&draftPool) return(<><DraftPreviewScreen teams={teams} myId={myId} year={year} pool={draftPool} draftAllocation={draftAllocation} onAllocationChange={setDraftAllocation} onStart={()=>setScreen("draft_lottery")}/></>);
   if(screen==="draft_lottery"&&draftPool) return(<><DraftLotteryScreen teams={teams} myId={myId} year={year} pool={draftPool} onDone={(r1)=>{setDraftPool(prev=>prev.map(p=>{const winner=Object.entries(r1).find(function(e){return e[1]&&e[1].id===p.id;});return{...p,_drafted:winner?true:undefined,_r1winner:winner?winner[0]:undefined};}));setScreen("draft");}}/></>);
   if(screen==="draft"&&draftPool) return(<><DraftScreen teams={teams} myId={myId} year={year} pool={draftPool} draftAllocation={draftAllocation} onDraftDone={(pl,dr)=>{setDraftResult({pool:pl,drafted:dr});setScreen("draft_review");}}/></>);
   if(screen==="draft_review"&&draftResult) return(<><DraftReviewScreen teams={teams} myId={myId} year={year} pool={draftResult.pool} drafted={draftResult.drafted} onEnd={()=>os.handleDraftComplete(draftResult.pool,draftResult.drafted)}/></>);
-  if(screen==="new_season") return(<><NewSeasonScreen year={year} info={newSeasonInfo} developmentSummary={developmentSummary} onStart={()=>{setScreen("hub");setTab("dashboard");notify(`${year}年シーズン開幕！`,"ok");}}/></>);
+  if(screen==="new_season") return(<><NewSeasonScreen year={year} info={newSeasonInfo} developmentSummary={developmentSummary} ownerGoal={myTeam?.ownerGoal||"cs"} onGoalSelect={(goal)=>gs.upd(myId,t=>({...t,ownerGoal:goal}))} onStart={()=>{setScreen("hub");setTab("dashboard");notify(`${year}年シーズン開幕！`,"ok");}}/></>);
 
   // ── HUB ──
   const g=(myTeam?.wins||0)+(myTeam?.losses||0);
@@ -111,17 +126,24 @@ export default function App(){
       </div>
     )}
 
-    <div className="tabs">
-      {[["dashboard","🏠 概況"],["roster","👥 ロースター"],["schedule","🗓️ 日程"],["news","📰 ニュース"],["mailbox","📨 メール"],["trade","🔄 トレード"],["alumni","📖 歴代"],["contract","📝 契約"],["fa","🏪 FA"],["scout","🔍 スカウト"],["finance","💴 財務"],["standings","🏆 順位"],["stats","📊 成績"],["records","🏛 記録"]].map(([id,l])=>(
-        <button key={id} className={`tab ${tab===id?"on":""}`} onClick={()=>setTab(id)}>
-          {l}{tabBadges[id]&&<span style={{marginLeft:4,background:tabBadges[id].color,color:"#fff",borderRadius:8,padding:"0 5px",fontSize:9,fontWeight:700}}>{tabBadges[id].n}</span>}
-        </button>
+    <div className="tabs-nav">
+      {TAB_GROUPS.map(group=>(
+        <div key={group.label} className="tab-group">
+          <div className="tab-group-label">{group.label}</div>
+          <div className="tabs">
+            {group.tabs.map(([id,l])=>(
+              <button key={id} className={`tab ${tab===id?"on":""}`} onClick={()=>setTab(id)}>
+                {l}{tabBadges[id]&&<span style={{marginLeft:4,background:tabBadges[id].color,color:"#fff",borderRadius:8,padding:"0 5px",fontSize:9,fontWeight:700}}>{tabBadges[id].n}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
       ))}
     </div>
 
     <ErrorBoundary key={tab}>
     {tab==="dashboard"&&<DashboardTab myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year} recentResults={gs.recentResults} mailbox={mailbox} faPool={faPool} onTabSwitch={setTab}/>}
-    {tab==="roster"&&<RosterTab team={myTeam} onToggle={gs.toggleLineup} onSetStarter={gs.setStarter} onPromo={gs.promote} onDemo={gs.demote} onSetTrainingFocus={gs.setTrainingFocus} onConvertIkusei={gs.convertIkusei} onMoveRotation={gs.moveRotation} onRemoveFromRotation={gs.removeFromRotation} onSetPitchingPattern={gs.setPitchingPattern} onPlayerClick={gs.handlePlayerClick} onSetDevGoal={gs.setDevGoal}/>}
+    {tab==="roster"&&<RosterTab team={myTeam} onToggle={gs.toggleLineup} onSetStarter={gs.setStarter} onPromo={gs.promote} onDemo={gs.demote} onSetTrainingFocus={gs.setTrainingFocus} onConvertIkusei={gs.convertIkusei} onMoveRotation={gs.moveRotation} onRemoveFromRotation={gs.removeFromRotation} onSetPitchingPattern={gs.setPitchingPattern} onPlayerClick={gs.handlePlayerClick} onSetDevGoal={gs.setDevGoal} onPlayerTalk={gs.handlePlayerTalk} gameDay={gameDay}/>}
     {tab==="schedule"&&<ScheduleTab schedule={schedule} gameDay={gameDay} myTeam={myTeam} teams={teams} year={year}/>}
     {tab==="records"&&<RecordsTab history={gs.seasonHistory}/>}
     {tab==="news"&&<NewsTab news={news} onInterview={gs.handleInterview}/>}
@@ -193,6 +215,7 @@ export default function App(){
     )}
     <RetireModal modal={retireModal} retireRole={retireRole} setRetireRole={setRetireRole} onRetain={()=>os.handleRetain(retireModal.player)} onAccept={()=>os.handleAcceptRetire(retireModal.player)} onStartRetireGame={()=>os.handleStartRetireGame(retireModal.player)} onSkipRetireGame={()=>os.handleSkipRetireGame(retireModal.player)}/>
     {playerModal&&<PlayerModal player={playerModal.player} teamName={playerModal.teamName} onClose={()=>setPlayerModal(null)}/>}
+    {pressEvent&&<PressConferenceModal event={pressEvent} onAnswer={handlePressAnswer}/>}
     </ErrorBoundary>
   </div></div></>);
 }

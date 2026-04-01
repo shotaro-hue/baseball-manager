@@ -329,7 +329,15 @@ export function GrowthSummaryScreen({ summary, year, onNext }) {
    NEW SEASON SCREEN — 年度開幕インタースティシャル
 ═══════════════════════════════════════════════ */
 
-export function NewSeasonScreen({ year, info, developmentSummary, onStart }) {
+const GOAL_DEFS = [
+  { id: "champion", label: "日本一", desc: "日本シリーズ制覇を目指す", color: "#f5c842" },
+  { id: "pennant", label: "ペナント優勝", desc: "リーグ1位・CS Final進出", color: "#60a5fa" },
+  { id: "cs", label: "CS出場", desc: "リーグ上位3位以内に入る", color: "#34d399" },
+  { id: "rebuild", label: "再建", desc: "借金なし・若手育成に専念", color: "#a78bfa" },
+];
+
+export function NewSeasonScreen({ year, info, developmentSummary, ownerGoal, onGoalSelect, onStart }) {
+  const [selectedGoal, setSelectedGoal] = useState(ownerGoal || "cs");
   const retiredNames = info?.retiredNames || [];
   const draftCount = info?.draftCount || 0;
   const draftNames = info?.draftNames || [];
@@ -394,10 +402,31 @@ export function NewSeasonScreen({ year, info, developmentSummary, onStart }) {
           </div>
         )}
 
+        {/* 今季オーナー目標 */}
+        <div className="card" style={{ background: "rgba(245,200,66,.04)", border: "1px solid rgba(245,200,66,.15)" }}>
+          <div className="card-h" style={{ color: "#f5c842" }}>🎯 今季オーナー目標を設定</div>
+          <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 8 }}>目標の達成・未達でオーナー信頼度が変動し、翌年の予算に影響します</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+            {GOAL_DEFS.map(g => (
+              <button key={g.id}
+                onClick={() => setSelectedGoal(g.id)}
+                style={{
+                  background: selectedGoal === g.id ? `${g.color}18` : "rgba(255,255,255,.03)",
+                  border: `1px solid ${selectedGoal === g.id ? g.color : "rgba(255,255,255,.08)"}`,
+                  borderRadius: 6, padding: "8px 10px", cursor: "pointer", textAlign: "left",
+                  transition: ".15s",
+                }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: selectedGoal === g.id ? g.color : "#e5e7eb", marginBottom: 2 }}>{g.label}</div>
+                <div style={{ fontSize: 10, color: "#6b7280" }}>{g.desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <button
           className="btn btn-gold"
           style={{ width: "100%", padding: "16px 0", fontSize: 16, fontWeight: 700, marginTop: 8, letterSpacing: ".1em" }}
-          onClick={onStart}
+          onClick={() => { if (onGoalSelect) onGoalSelect(selectedGoal); onStart(); }}
         >
           ⚾ 開幕！
         </button>

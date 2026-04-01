@@ -1,16 +1,24 @@
 import React, { useState } from "react";
-import { MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL, DEV_GOALS_BATTER, DEV_GOALS_PITCHER } from '../../constants';
+import { MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL, DEV_GOALS_BATTER, DEV_GOALS_PITCHER, TALK_COOLDOWN_DAYS } from '../../constants';
 import { fmtAvg, fmtSal } from '../../utils';
 import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
 import { OV, CondBadge, HandBadge } from '../ui';
+
+const TALK_OPTIONS = [
+  { type: "praise",       label: "💪 激励する",      desc: "モラル +5〜+15（確実）" },
+  { type: "playing_time", label: "⚾ 出場について",   desc: "出場少→+8〜+15 / 多→+3〜+8" },
+  { type: "contract",     label: "💴 契約について",   desc: "低給→+5〜+12 / 適正→+2〜+6" },
+  { type: "trade_rumor",  label: "🤫 噂を否定する",   desc: "海外志向→-5〜+3 / その他→+2〜+8" },
+];
 
 const TRAINING_OPTIONS=[["","バランス"],["contact","ミート"],["power","長打"],["eye","選球"],["speed","走力"],["arm","肩"],["defense","守備"],["velocity","球速"],["control","制球"],["breaking","変化球"],["stamina","スタミナ"]];
 
 const MoralBadge=({v})=>{const m=v||70;const icon=m>=75?"😊":m>=50?"😐":"😟";const col=m>=75?"#34d399":m>=50?"#f5c842":"#f87171";return <span style={{fontSize:10,color:col}}>{icon}{m}</span>;};
 
-export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onPlayerClick,onSetDevGoal}){
+export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onPlayerClick,onSetDevGoal,onPlayerTalk,gameDay}){
   const [view,setView]=useState("batters");
   const [justConverted,setJustConverted]=useState(new Set());
+  const [talkingPid,setTalkingPid]=useState(null);
   const handleConvertIkusei=(pid)=>{onConvertIkusei&&onConvertIkusei(pid);setJustConverted(s=>new Set([...s,pid]));};
   const batters=team.players.filter(p=>!p.isPitcher);
   const pitchers=team.players.filter(p=>p.isPitcher);
@@ -30,7 +38,7 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
         </div>
       )}
       <div style={{display:"flex",gap:6,marginBottom:10}}>
-        {[["batters","🏏 野手"],["pitchers","⚾ 投手"],["farm","🌿 二軍"],["pattern","📋 継投"]].map(([k,l])=>(
+        {[["batters","🏏 野手"],["pitchers","⚾ 投手"],["farm","🌿 二軍"],["pattern","📋 継投"],["talk","💬 会話"]].map(([k,l])=>(
           <button key={k} onClick={()=>setView(k)} className={`tab ${view===k?"on":""}`} style={{flex:0,padding:"6px 14px"}}>{l}</button>
         ))}
         <span className="chip cy" style={{marginLeft:"auto",alignSelf:"center"}}>一軍 {team.players.length}/{MAX_ROSTER}</span>
@@ -268,6 +276,47 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
           </div>
         );
       })()}
+      {view==="talk"&&(
+        <div className="card">
+          <div className="card-h">💬 選手コミュニケーション</div>
+          <div style={{fontSize:10,color:"#6b7280",marginBottom:10}}>月1回（{TALK_COOLDOWN_DAYS}試合に1回）まで同一選手と話せます。モラルが低い選手から優先しましょう。</div>
+          {[...team.players].sort((a,b)=>(a.morale??70)-(b.morale??70)).map(p=>{
+            const gd=gameDay??0;
+            const lastTalk=p.lastTalkGameDay??0;
+            const cooldownLeft=lastTalk>0?Math.max(0,TALK_COOLDOWN_DAYS-(gd-lastTalk)):0;
+            const canTalk=cooldownLeft===0;
+            const isOpen=talkingPid===p.id;
+            return(
+              <div key={p.id} className="card2" style={{marginBottom:6}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{flex:1}}>
+                    <span style={{fontWeight:700,fontSize:12,cursor:"pointer",color:"#60a5fa"}} onClick={()=>onPlayerClick?.(p,team.name)}>{p.name}</span>
+                    <span style={{fontSize:10,color:"#374151",marginLeft:6}}>{p.pos}/{p.age}歳</span>
+                    {p.isForeign&&<span className="chip cb" style={{marginLeft:4,fontSize:8}}>外</span>}
+                  </div>
+                  <MoralBadge v={p.morale}/>
+                  {canTalk
+                    ?<button className={`bsm ${isOpen?"bgb":"bga"}`} style={{fontSize:10}} onClick={()=>setTalkingPid(isOpen?null:p.id)}>💬 話す</button>
+                    :<span style={{fontSize:9,color:"#374151"}}>🔒 あと{cooldownLeft}試合</span>
+                  }
+                </div>
+                {isOpen&&canTalk&&(
+                  <div style={{marginTop:8,display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}}>
+                    {TALK_OPTIONS.map(opt=>(
+                      <button key={opt.type} className="bsm bga" style={{padding:"6px 8px",textAlign:"left",height:"auto"}}
+                        onClick={()=>{onPlayerTalk?.(p.id,opt.type);setTalkingPid(null);}}>
+                        <div style={{fontSize:11,fontWeight:700}}>{opt.label}</div>
+                        <div style={{fontSize:9,color:"#6b7280",marginTop:1}}>{opt.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {team.players.length===0&&<div style={{color:"#374151",fontSize:11}}>一軍選手なし</div>}
+        </div>
+      )}
     </div>
   );
 }

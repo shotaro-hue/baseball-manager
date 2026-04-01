@@ -5,6 +5,50 @@
 
 ---
 
+### 2026-04-01 — ㉚ 記者会見（簡易版）+ T7 Vitest 拡充
+
+**仕様本文への影響あり（§13.3 フロント・メディア関係、§14 保守性）**
+
+- `src/constants.js`: `PRESS_CONFERENCE_INTERVAL = 15` を追加
+- `src/engine/pressConference.js` **新規**: `PRESS_QUESTIONS`（5パターン）、`calcPressDelta(choice)` / `pressCycleIndex(gameDay)` / `pickQuestion(gameDay)` 純関数を実装
+- `src/engine/frontend.js` **新規**: `calcOwnerTrustDelta(myId, myTeam, playoff)` を App.jsx から抽出してエクスポート（テスタビリティ向上）
+- `src/hooks/useGameState.js`: `pressEvent` / `lastPressDay` state を追加。`gameDay` 変化時に `PRESS_CONFERENCE_INTERVAL` チェックして自動発火する `useEffect` を追加。`handlePressAnswer(choiceIdx)` コールバック（人気度・全選手モラルに反映）を追加
+- `src/components/PressConferenceModal.jsx` **新規**: 質問+3択回答モーダル。回答後に効果を表示（人気±/モラル±）
+- `src/App.jsx`: `calcOwnerTrustDelta` を `./engine/frontend` から import に変更。`PressConferenceModal` を HUB に配置し `pressEvent`/`handlePressAnswer` を接続
+- `src/engine/__tests__/frontend.test.js` **新規**: `calcOwnerTrustDelta` の全目標×シナリオ 12 ケース
+- `src/engine/__tests__/pressConference.test.js` **新規**: `calcPressDelta` / `pressCycleIndex` / `pickQuestion` 14 ケース
+- **合計テスト数**: 32 → **58** 件（+26）
+
+---
+
+### 2026-03-31 — ㉙ 選手個別コミュニケーション + T6 JSDoc 型注釈
+
+**仕様本文への影響あり（§5 データモデル・§13.3・§14 保守性）**
+
+- `src/constants.js`: `TALK_COOLDOWN_DAYS = 18` を追加
+- `src/engine/player.js`: `makePlayer()` に `lastTalkGameDay: 0` を追加。`makePlayer` / `buildTeam` / `developPlayers` / `calcRetireWill` / `rollRetire` に JSDoc (@param/@returns) を追加
+- `src/engine/simulation.js`: `calcEffectiveFatigue` / `initGameState` / `processAtBat` / `quickSimGame` に JSDoc を追加
+- `src/hooks/useGameState.js`: `handlePlayerTalk(pid, talkType)` コールバックを追加。会話タイプ（praise/playing_time/contract/trade_rumor）別のモラル変動ロジック + 18試合クールダウン。`TALK_COOLDOWN_DAYS` を import
+- `src/components/tabs/RosterTab.jsx`: `TALK_OPTIONS` 定数を追加。5番目のサブタブ「💬 会話」を追加。モラル昇順で全一軍選手を列挙し、1選手ごとにインライン4択会話パネルを表示。クールダウン中はカウントダウン表示
+- `src/App.jsx`: `RosterTab` に `onPlayerTalk={gs.handlePlayerTalk}` と `gameDay={gameDay}` を渡すよう更新
+
+---
+
+### 2026-03-31 — ㉘ フロント目標・信頼度 + U4 ナビゲーション整理
+
+**仕様本文への影響あり（§5 データモデル・§13.3・§15 UI改善計画）**
+
+- `src/constants.js`: `OWNER_TRUST_BUDGET_LOW/HIGH`・`OWNER_TRUST_FACTOR_LOW/HIGH` 定数を追加
+- `src/engine/player.js`: `buildTeam()` に `ownerGoal: "cs"`・`ownerTrust: 50` を追加
+- `src/engine/realplayer.js`: `buildRealTeam()` にも同フィールドを追加（`stadiumLevel`・`revenueThisSeason` も補完）
+- `src/hooks/useOffseason.js`: `handleNextYear()` に信頼度ベース予算補正ロジックを追加（trust<30: ×0.8 / trust>80: ×1.15。自チームのみ適用）
+- `src/components/Screens.jsx`: `NewSeasonScreen` に今季目標選択 UI を追加（4種類の目標カード: 日本一/ペナント優勝/CS出場/再建）
+- `src/App.jsx`: `calcOwnerTrustDelta()` ヘルパーを追加。プレーオフ `onFinish` にて目標達成度→信頼度変動を計算・反映し、オーナー評価メールを送信。14タブを「試合」「編成」「球団」3カテゴリのグループ化ナビに変更（`TAB_GROUPS`）
+- `src/components/DashboardTab.jsx`: オーナー目標・信頼度カードを追加（目標ラベル・信頼度ゲージバー・予算影響警告）
+- `src/styles.css`: `.tabs-nav`・`.tab-group`・`.tab-group-label` スタイルを追加
+
+---
+
 ### 2026-03-31 — ㉗ 選手育成目標設定（devGoal）
 
 **仕様本文への影響あり（§5 データモデル・§13.2）**
