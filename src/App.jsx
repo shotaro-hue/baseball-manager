@@ -10,29 +10,14 @@ import { DraftPreviewScreen, DraftLotteryScreen, DraftScreen, DraftReviewScreen 
 import { PlayoffScreen } from './components/PlayoffScreen';
 import { RetireModal } from './components/RetireModal';
 import { PlayerModal } from './components/PlayerModal';
+import { PressConferenceModal } from './components/PressConferenceModal';
 import { DashboardTab } from './components/DashboardTab';
 import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab, ScheduleTab } from './components/Tabs';
 import { SEASON_GAMES, BATCH, MAX_外国人_一軍, TEAM_DEFS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS } from './constants';
+import { calcOwnerTrustDelta } from './engine/frontend';
 import { useGameState } from './hooks/useGameState';
 import { useSeasonFlow } from './hooks/useSeasonFlow';
 import { useOffseason } from './hooks/useOffseason';
-
-// オーナー目標の達成度に応じた信頼度変動を計算
-function calcOwnerTrustDelta(myId, myTeam, playoff) {
-  if (!myTeam || !playoff) return 0;
-  const isChampion = playoff.champion?.id === myId;
-  const inJPSeries = playoff.jpSeries?.teams.some(t => t.id === myId);
-  const inCS2 = playoff.cs2_se?.teams.some(t => t.id === myId) || playoff.cs2_pa?.teams.some(t => t.id === myId);
-  const inCS1 = playoff.cs1_se?.teams.some(t => t.id === myId) || playoff.cs1_pa?.teams.some(t => t.id === myId);
-  const inCS = inCS1 || inCS2 || inJPSeries || isChampion;
-  switch (myTeam.ownerGoal || "cs") {
-    case "champion": return isChampion ? 30 : inJPSeries ? -10 : inCS ? -20 : -25;
-    case "pennant":  return inJPSeries ? 20 : inCS ? -5 : -20;
-    case "cs":       return inCS ? 15 : -15;
-    case "rebuild":  return (myTeam.wins >= myTeam.losses) ? 10 : -5;
-    default:         return 0;
-  }
-}
 
 const TAB_GROUPS = [
   { label: "試合", tabs: [["dashboard","🏠 概況"],["schedule","🗓️ 日程"],["standings","🏆 順位"],["stats","📊 成績"],["records","🏛 記録"]] },
@@ -73,6 +58,7 @@ export default function App(){
     saveExists, setSaveExists, retireModal, setRetireModal,
     playerModal, setPlayerModal, retireRole, setRetireRole,
     notify, upd, addNews, addToHistory, setFaPool, setTeams, setSeasonHistory, setMailbox, setScreen,
+    pressEvent, handlePressAnswer,
   } = gs;
   const { gameResult, currentOpp, batchResults, playoff, setPlayoff } = sf;
   const { developmentSummary, newSeasonInfo, draftPool, setDraftPool, draftResult, setDraftResult, draftAllocation, setDraftAllocation } = os;
@@ -229,6 +215,7 @@ export default function App(){
     )}
     <RetireModal modal={retireModal} retireRole={retireRole} setRetireRole={setRetireRole} onRetain={()=>os.handleRetain(retireModal.player)} onAccept={()=>os.handleAcceptRetire(retireModal.player)} onStartRetireGame={()=>os.handleStartRetireGame(retireModal.player)} onSkipRetireGame={()=>os.handleSkipRetireGame(retireModal.player)}/>
     {playerModal&&<PlayerModal player={playerModal.player} teamName={playerModal.teamName} onClose={()=>setPlayerModal(null)}/>}
+    {pressEvent&&<PressConferenceModal event={pressEvent} onAnswer={handlePressAnswer}/>}
     </ErrorBoundary>
   </div></div></>);
 }

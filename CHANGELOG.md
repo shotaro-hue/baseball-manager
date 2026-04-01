@@ -5,6 +5,22 @@
 
 ---
 
+### 2026-04-01 — ㉚ 記者会見（簡易版）+ T7 Vitest 拡充
+
+**仕様本文への影響あり（§13.3 フロント・メディア関係、§14 保守性）**
+
+- `src/constants.js`: `PRESS_CONFERENCE_INTERVAL = 15` を追加
+- `src/engine/pressConference.js` **新規**: `PRESS_QUESTIONS`（5パターン）、`calcPressDelta(choice)` / `pressCycleIndex(gameDay)` / `pickQuestion(gameDay)` 純関数を実装
+- `src/engine/frontend.js` **新規**: `calcOwnerTrustDelta(myId, myTeam, playoff)` を App.jsx から抽出してエクスポート（テスタビリティ向上）
+- `src/hooks/useGameState.js`: `pressEvent` / `lastPressDay` state を追加。`gameDay` 変化時に `PRESS_CONFERENCE_INTERVAL` チェックして自動発火する `useEffect` を追加。`handlePressAnswer(choiceIdx)` コールバック（人気度・全選手モラルに反映）を追加
+- `src/components/PressConferenceModal.jsx` **新規**: 質問+3択回答モーダル。回答後に効果を表示（人気±/モラル±）
+- `src/App.jsx`: `calcOwnerTrustDelta` を `./engine/frontend` から import に変更。`PressConferenceModal` を HUB に配置し `pressEvent`/`handlePressAnswer` を接続
+- `src/engine/__tests__/frontend.test.js` **新規**: `calcOwnerTrustDelta` の全目標×シナリオ 12 ケース
+- `src/engine/__tests__/pressConference.test.js` **新規**: `calcPressDelta` / `pressCycleIndex` / `pickQuestion` 14 ケース
+- **合計テスト数**: 32 → **58** 件（+26）
+
+---
+
 ### 2026-03-31 — ㉙ 選手個別コミュニケーション + T6 JSDoc 型注釈
 
 **仕様本文への影響あり（§5 データモデル・§13.3・§14 保守性）**

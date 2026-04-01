@@ -9,7 +9,9 @@ import {
   TEAM_DEFS, POSITIONS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
   MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, MIN_SALARY_SHIHAKA,
   MAX_SHIHAKA_TOTAL, REGISTRATION_COOLDOWN_DAYS, TALK_COOLDOWN_DAYS,
+  PRESS_CONFERENCE_INTERVAL,
 } from '../constants';
+import { pickQuestion, calcPressDelta } from '../engine/pressConference';
 
 const INIT_TEAMS = TEAM_DEFS.map(function(d){
   const t = NPB2025_ROSTERS[d.id] ? buildRealTeam(d, NPB2025_ROSTERS[d.id]) : buildTeam(d);
@@ -37,6 +39,18 @@ export function useGameState() {
   const [mailbox, setMailbox] = useState([]);
   const [recentResults, setRecentResults] = useState([]);
   const [cpuTradeOffers, setCpuTradeOffers] = useState([]);
+  const [pressEvent, setPressEvent] = useState(null);  // 記者会見イベント
+  const [lastPressDay, setLastPressDay] = useState(0); // 最後に記者会見を行ったgameDay
+
+  // gameDay が進んだとき、記者会見インターバルを超えていれば会見イベントをセット
+  useEffect(()=>{
+    if(!myId || gameDay <= 1 || gameDay > 143) return;
+    if(pressEvent) return; // 既にイベント表示中
+    if(gameDay - lastPressDay >= PRESS_CONFERENCE_INTERVAL){
+      setPressEvent(pickQuestion(gameDay));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[gameDay, myId]);
 
   // シーズン日程をyear変更時に再生成（チームID・リーグ構成は不変なのでteams.lengthで十分）
   useEffect(()=>{
@@ -236,6 +250,26 @@ export function useGameState() {
     notify(`${p.name}を獲得！`,"ok");
   },[myTeam,upd,myId,notify]);
 
+  const handlePressAnswer = useCallback((choiceIdx) => {
+    if (!pressEvent) return;
+    const choice = pressEvent.choices[choiceIdx];
+    const { popDelta, moraleDelta } = calcPressDelta(choice);
+    upd(myId, t => ({
+      ...t,
+      popularity: Math.min(100, Math.max(0, (t.popularity ?? 50) + popDelta)),
+      players: t.players.map(p => ({
+        ...p,
+        morale: Math.min(100, Math.max(0, (p.morale ?? 70) + moraleDelta)),
+      })),
+    }));
+    notify(
+      `記者会見「${choice.label}」— 人気${popDelta >= 0 ? '+' : ''}${popDelta} チームモラル${moraleDelta >= 0 ? '+' : ''}${moraleDelta}`,
+      popDelta + moraleDelta >= 0 ? 'ok' : 'warn',
+    );
+    setPressEvent(null);
+    setLastPressDay(gameDay);
+  }, [pressEvent, upd, myId, notify, gameDay]);
+
   const handleStadiumUpgrade = useCallback(()=>{
     if(!myTeam) return;
     const lvl=myTeam.stadiumLevel??0;
@@ -269,6 +303,8 @@ export function useGameState() {
     mailbox, setMailbox,
     recentResults, setRecentResults,
     cpuTradeOffers, setCpuTradeOffers,
+    pressEvent, setPressEvent,
+    lastPressDay, setLastPressDay,
     // derived
     myTeam,
     tabBadges,
@@ -298,5 +334,6 @@ export function useGameState() {
     sendScout,
     signPlayer,
     handleStadiumUpgrade,
+    handlePressAnswer,
   };
 }
