@@ -48,7 +48,7 @@
 | **目的** | 12球団から1チームを選び、143試合のシーズンを戦って日本一を目指す |
 | **長期目標** | NPB版 OOTP / Football Manager — 複数年フランチャイズ経営・深いシミュレーション |
 | **フレームワーク** | React 18.2 + Vite 5.4 |
-| **状態管理** | React useState / useCallback / useMemo（Context なし）→ **useReducer 移行計画中** |
+| **状態管理** | React useState / useReducer / useCallback / useMemo（Context なし）。コアゲームデータ（teams / gameDay / year / myId）は `gameStateReducer` で管理 |
 | **グラフ** | Recharts 2.12 |
 | **永続化** | ブラウザ localStorage（JSON）→ **IndexedDB 移行計画中**（複数年データ量対策） |
 | **言語** | JavaScript（ES Modules）→ **JSDoc 注釈 / TypeScript 移行計画中** |

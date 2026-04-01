@@ -5,6 +5,15 @@
 
 ---
 
+### 2026-04-01 — T8 useReducer 移行
+
+**仕様本文への影響なし（内部リファクタリング）**
+
+- `src/hooks/gameStateReducer.js` **新規**: `SET_TEAMS` / `UPD_TEAM` / `SET_GAME_DAY` / `SET_YEAR` / `SET_MY_ID` の 5 アクションを持つ純粋 reducer。action.value が関数の場合は functional update として処理
+- `src/hooks/useGameState.js`: `teams` / `gameDay` / `year` / `myId` の 4 つの `useState` を単一の `useReducer(gameStateReducer)` に置き換え。`upd()` も `dispatch({ type: G.UPD_TEAM, id, fn })` 経由に変更。外部 API（返却値）は完全に変わらず
+
+---
+
 ### 2026-04-01 — ㉜ ポスティングシステム（二段階方式）
 
 **仕様本文への影響あり（§5 データモデル・§13.4 NPB固有システム）**

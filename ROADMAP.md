@@ -1,6 +1,6 @@
 # Baseball Manager 2025 — ロードマップ
 
-> 最終更新: 2026-04-01（㉜ ポスティングシステム完了。選手申請→GM承諾の二段階フロー。ユニットテスト 58 件。次フォーカス: ㉛ ファン感情 / ㉝ ドラフト拡張）
+> 最終更新: 2026-04-01（T8 useReducer 移行完了。teams/gameDay/year/myId を gameStateReducer に統合。次フォーカス: ㉛ ファン感情 / ㉝ ドラフト拡張）
 > **ゴール**: NPB版 OOTP / Football Manager — 深いシミュレーションと長期フランチャイズ経営
 > **運用ルール**: 実装完了した項目は ✅ に更新。新規項目は末尾に追記。過去の記録は削除しない。
 
@@ -213,7 +213,7 @@
 |---|------|------|------|
 | T7 | Vitest ユニットテスト | resolveAtBat / calcEffectiveFatigue / calcOfferScore / FA資格判定 等のエンジン関数から導入 | ✅ 完了（58件: `calcOwnerTrustDelta`・`calcPressDelta` など追加、`src/engine/__tests__/` 5ファイル） |
 | T7-E2E | Playwright E2E テスト | コアフロー（タイトル画面・チーム選択・HUB遷移）の自動テスト基盤。`playwright.config.js` + `e2e/title.spec.js` 追加。Tier 8 完了後に拡充予定 | 🔶 部分実装（タイトル画面 `e2e/title.spec.js` のみ） |
-| T8 | useReducer 移行 | 複数年でstate更新競合が増える前に。dispatch(action) パターンで状態遷移を明示化 | 未着手 |
+| T8 | useReducer 移行 | 複数年でstate更新競合が増える前に。dispatch(action) パターンで状態遷移を明示化 | ✅ 完了（`src/hooks/gameStateReducer.js` 新規、`useGameState.js` 内部を `useReducer` に変更。外部 API 不変） |
 
 ---
 
