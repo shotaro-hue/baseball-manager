@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useReducer, useMemo, useCallback, useEffect } from "react";
+import { gameStateReducer, G } from './gameStateReducer';
 import { uid, clamp, rng, pname, scoutedValue } from '../utils';
 import { buildTeam, makePlayer, resolveTrainingFocusFromGoal } from '../engine/player';
 import { saveGame, hasSave } from '../engine/saveload';
@@ -24,11 +25,13 @@ export function useGameState() {
   const [playerModal, setPlayerModal] = useState(null);
   const [retireGamePlayer, setRetireGamePlayer] = useState(null);
   const [retireRole, setRetireRole] = useState(null);
-  const [teams, setTeams] = useState(INIT_TEAMS);
-  const [myId, setMyId] = useState(null);
+  const [gameState, dispatch] = useReducer(gameStateReducer, { teams: INIT_TEAMS, gameDay: 1, year: 2025, myId: null });
+  const { teams, gameDay, year, myId } = gameState;
+  const setTeams   = useCallback((n) => dispatch({ type: G.SET_TEAMS,    teams: n }),    []);
+  const setGameDay = useCallback((n) => dispatch({ type: G.SET_GAME_DAY, day:   n }),    []);
+  const setYear    = useCallback((n) => dispatch({ type: G.SET_YEAR,     year:  n }),    []);
+  const setMyId    = useCallback((id) => dispatch({ type: G.SET_MY_ID,   myId:  id }),   []);
   const [tab, setTab] = useState("dashboard");
-  const [gameDay, setGameDay] = useState(1);
-  const [year, setYear] = useState(2025);
   const [faPool, setFaPool] = useState([]);
   const [faYears, setFaYears] = useState({});
   const [notif, setNotif] = useState(null);
@@ -76,7 +79,7 @@ export function useGameState() {
   },[myTeam,mailbox,faPool]);
 
   const notify = useCallback((msg,type="ok")=>{setNotif({msg,type});setTimeout(()=>setNotif(null),3500);},[]);
-  const upd = useCallback((id,fn)=>setTeams(prev=>prev.map(t=>t.id===id?fn(t):t)),[]);
+  const upd = useCallback((id, fn) => dispatch({ type: G.UPD_TEAM, id, fn }), []);
 
   const pushResult = useCallback((won,drew,oppName,myScore,oppScore,gameNo)=>{
     setRecentResults(prev=>[{won,drew,oppName,myScore,oppScore,gameNo},...prev].slice(0,5));
