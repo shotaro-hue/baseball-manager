@@ -5,7 +5,8 @@ import { calcSeasonAwards, updateRecords, checkHallOfFame } from '../engine/awar
 import { evalOffer, cpuRenewContracts, processCpuFaBids, getFaThreshold } from '../engine/contract';
 import { initDraftPool } from '../engine/draft';
 import { calcPostingRequestProb, calcPostingBid, POSTING_FEE_RATE } from '../engine/posting';
-import { TEAM_DEFS, ACCEPT_THRESHOLD, OWNER_TRUST_BUDGET_LOW, OWNER_TRUST_BUDGET_HIGH, OWNER_TRUST_FACTOR_LOW, OWNER_TRUST_FACTOR_HIGH } from '../constants';
+import { calcOffseasonPopDelta, driftPopularity } from '../engine/fanSentiment';
+import { TEAM_DEFS, ACCEPT_THRESHOLD, OWNER_TRUST_BUDGET_LOW, OWNER_TRUST_BUDGET_HIGH, OWNER_TRUST_FACTOR_LOW, OWNER_TRUST_FACTOR_HIGH, POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD } from '../constants';
 
 export function useOffseason(gs) {
   const {
@@ -41,7 +42,7 @@ export function useOffseason(gs) {
       const trust=t.ownerTrust??50;
       const trustFactor=t.id===myId?(trust<OWNER_TRUST_BUDGET_LOW?OWNER_TRUST_FACTOR_LOW:trust>OWNER_TRUST_BUDGET_HIGH?OWNER_TRUST_FACTOR_HIGH:1.0):1.0;
       const newBudget=Math.max(Math.round(baseBudget*0.5),Math.round(rawBudget*trustFactor));
-      return{...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,revenueThisSeason:0,stadiumLevel:t.stadiumLevel??0,budget:newBudget,players:nextPlayers,lineup:(t.lineup||[]).filter(id=>nextIds.has(id)),rotation:(t.rotation||[]).filter(id=>nextIds.has(id)),farm:t.farm.map(p=>({...p,age:p.age+1,stats:emptyStats(),injury:null,serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}))};
+      return{...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,revenueThisSeason:0,winStreak:0,loseStreak:0,stadiumLevel:t.stadiumLevel??0,budget:newBudget,players:nextPlayers,lineup:(t.lineup||[]).filter(id=>nextIds.has(id)),rotation:(t.rotation||[]).filter(id=>nextIds.has(id)),farm:t.farm.map(p=>({...p,age:p.age+1,stats:emptyStats(),injury:null,serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}))};
     }));
     setScreen("new_season");
   };
@@ -256,7 +257,19 @@ export function useOffseason(gs) {
     });
     const renewResult=cpuRenewContracts(developedTeams,myId,developedTeams);
     const finalTeams=renewResult.updatedTeams;
-    setTeams(finalTeams);
+    // ── オフシーズン人気変動 ──
+    const makeLeagueRanking=(lg)=>[...finalTeams.filter(t=>t.league===lg)].sort((a,b)=>{const pa=a.wins/Math.max(1,a.wins+a.losses);const pb=b.wins/Math.max(1,b.wins+b.losses);return pb-pa||(b.rf-b.ra)-(a.rf-a.ra);});
+    const seRanks=makeLeagueRanking("セ");const paRanks=makeLeagueRanking("パ");
+    const championId=seasonHistory.championships.at(-1)?.championId??null;
+    const csIds=new Set([...seRanks.slice(0,3).map(t=>t.id),...paRanks.slice(0,3).map(t=>t.id)]);
+    const teamsWithPop=finalTeams.map(t=>{
+      const leagueRanks=t.league==="セ"?seRanks:paRanks;
+      const rank=leagueRanks.findIndex(r=>r.id===t.id)+1;
+      const isPennant=rank===1;
+      const delta=calcOffseasonPopDelta(rank,leagueRanks.length,t.id===championId,isPennant,csIds.has(t.id));
+      return{...t,popularity:driftPopularity(Math.min(100,Math.max(0,(t.popularity??50)+delta))),winStreak:0,loseStreak:0};
+    });
+    setTeams(teamsWithPop);
     setFaPool(prev=>[...prev,...renewResult.newFaPlayers]);
     renewResult.news.forEach(n=>addNews(n));
     setDevelopmentSummary(mySummary);
@@ -278,7 +291,7 @@ export function useOffseason(gs) {
   // ウェーバーフェーズ処理（戦力外確定→CPU FA獲得→ドラフトへ）
   const handleWaiverPhaseNext = (markedIds) => {
     const waiverReleased=[];
-    markedIds.forEach(pid=>{const p=myTeam?.players.find(x=>x.id===pid);upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid)}));if(p){addToHistory(myId,p,"戦力外");waiverReleased.push({...p,isFA:true});addNews({type:"season",headline:"【戦力外】"+p.name+"選手に戦力外通告",source:"野球速報",dateLabel:year+"年",body:p.name+"選手（"+p.age+"歳）が戦力外通告を受けた。"});}});
+    markedIds.forEach(pid=>{const p=myTeam?.players.find(x=>x.id===pid);const popPenalty=(p?.salary??0)>POP_RELEASE_SALARY_THRESHOLD?POP_RELEASE_PENALTY:0;upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),popularity:Math.min(100,Math.max(0,(t.popularity??50)+popPenalty))}));if(p){addToHistory(myId,p,"戦力外");waiverReleased.push({...p,isFA:true});addNews({type:"season",headline:"【戦力外】"+p.name+"選手に戦力外通告",source:"野球速報",dateLabel:year+"年",body:p.name+"選手（"+p.age+"歳）が戦力外通告を受けた。"});}});
     const combinedPool=[...faPool,...waiverReleased];
     const faResult=processCpuFaBids(teams,myId,combinedPool,teams);
     setTeams(faResult.updatedTeams);

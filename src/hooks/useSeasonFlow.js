@@ -4,6 +4,7 @@ import { checkForInjuries, tickInjuries, calcRetireWill } from '../engine/player
 import { quickSimGame, runFarmSeason } from '../engine/simulation';
 import { applyGameStatsFromLog, applyPostGameCondition } from '../engine/postGame';
 import { calcRevenue } from '../engine/finance';
+import { applyPopularityDelta } from '../engine/fanSentiment';
 import { generateCpuOffer } from '../engine/trade';
 import { initPlayoff } from '../engine/playoff';
 import { getMyMatchup, getCpuMatchups } from '../engine/scheduleGen';
@@ -177,6 +178,7 @@ export function useSeasonFlow(gs) {
       updated.farm=tickCooldowns(updated.farm??[]);
       // 怪我日数 > 10日の一軍選手を自動二軍降格
       updated=autoInjuryDemote(updated);
+      const popFields=applyPopularityDelta(t,won,drew);updated={...updated,...popFields};
       const rev=calcRevenue(updated);
       const revTotal=rev.ticket+rev.sponsor+rev.merch;
       updated.budget+=revTotal;
@@ -197,6 +199,7 @@ export function useSeasonFlow(gs) {
       updated.players=tickInjuries(updated.players);
       const newInj=checkForInjuries(updated.players);
       if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+      Object.assign(updated,applyPopularityDelta(t,!won&&!drew,drew));
       return updated;
     });
     // Simulate remaining CPU vs CPU games for this day (schedule-based matchups)
@@ -217,6 +220,9 @@ export function useSeasonFlow(gs) {
         if(aWon){a.wins++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.losses++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
         else if(cdrew){a.draws++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.draws++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
         else{b.wins++;b.rf+=cr.score.opp;b.ra+=cr.score.my;a.losses++;a.rf+=cr.score.my;a.ra+=cr.score.opp;}
+        Object.assign(a,applyPopularityDelta(a,aWon,cdrew));Object.assign(b,applyPopularityDelta(b,!aWon&&!cdrew,cdrew));
+        const aRev=calcRevenue(a);a.budget=(a.budget??0)+aRev.ticket+aRev.sponsor+aRev.merch;a.revenueThisSeason=(a.revenueThisSeason??0)+aRev.ticket+aRev.sponsor+aRev.merch;
+        const bRev=calcRevenue(b);b.budget=(b.budget??0)+bRev.ticket+bRev.sponsor+bRev.merch;b.revenueThisSeason=(b.revenueThisSeason??0)+bRev.ticket+bRev.sponsor+bRev.merch;
         a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon);
         a.players=applyPostGameCondition(a.players,cr.log||[],true,gameDay);
         a.players=tickInjuries(a.players);
@@ -308,6 +314,9 @@ export function useSeasonFlow(gs) {
         if(aWon){a.wins++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.losses++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
         else if(cdrew){a.draws++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.draws++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
         else{b.wins++;b.rf+=cr.score.opp;b.ra+=cr.score.my;a.losses++;a.rf+=cr.score.my;a.ra+=cr.score.opp;}
+        Object.assign(a,applyPopularityDelta(a,aWon,cdrew));Object.assign(b,applyPopularityDelta(b,!aWon&&!cdrew,cdrew));
+        const aRevB=calcRevenue(a);a.budget=(a.budget??0)+aRevB.ticket+aRevB.sponsor+aRevB.merch;a.revenueThisSeason=(a.revenueThisSeason??0)+aRevB.ticket+aRevB.sponsor+aRevB.merch;
+        const bRevB=calcRevenue(b);b.budget=(b.budget??0)+bRevB.ticket+bRevB.sponsor+bRevB.merch;b.revenueThisSeason=(b.revenueThisSeason??0)+bRevB.ticket+bRevB.sponsor+bRevB.merch;
         a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon);
         a.players=applyPostGameCondition(a.players,cr.log||[],true,newDay);
         a.players=tickInjuries(a.players);
@@ -330,6 +339,7 @@ export function useSeasonFlow(gs) {
       if(won){myT.wins++;myT.rf+=r.score.my;myT.ra+=r.score.opp;}
       else if(drew){myT.draws++;myT.rf+=r.score.my;myT.ra+=r.score.opp;}
       else{myT.losses++;myT.rf+=r.score.my;myT.ra+=r.score.opp;}
+      Object.assign(myT,applyPopularityDelta(myT,won,drew));
       myT.rotIdx++;
       myT.players=applyGameStatsFromLog(myT.players, r.log||[], true, won);
       myT.players=applyPostGameCondition(myT.players, r.log||[], true, newDay);
@@ -350,6 +360,7 @@ export function useSeasonFlow(gs) {
         if(won){oppT.losses++;oppT.rf+=r.score.opp;oppT.ra+=r.score.my;}
         else if(drew){oppT.draws++;oppT.rf+=r.score.opp;oppT.ra+=r.score.my;}
         else{oppT.wins++;oppT.rf+=r.score.opp;oppT.ra+=r.score.my;}
+        Object.assign(oppT,applyPopularityDelta(oppT,!won&&!drew,drew));
         oppT.players=applyGameStatsFromLog(oppT.players,r.log||[],false,!won&&!drew);
         oppT.players=applyPostGameCondition(oppT.players,r.log||[],false,newDay);
         oppT.players=tickInjuries(oppT.players);
@@ -400,6 +411,7 @@ export function useSeasonFlow(gs) {
       updated.farm=tickCooldowns(updated.farm??[]);
       // 怪我日数 > 10日の一軍選手を自動二軍降格
       updated=autoInjuryDemote(updated);
+      const popFieldsT=applyPopularityDelta(t,won,drew);updated={...updated,...popFieldsT};
       const rev=calcRevenue(updated);
       const revTotal=rev.ticket+rev.sponsor+rev.merch;
       updated.budget+=revTotal;
@@ -419,6 +431,7 @@ export function useSeasonFlow(gs) {
       updated.players=tickInjuries(updated.players);
       const newInj=checkForInjuries(updated.players);
       if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+      Object.assign(updated,applyPopularityDelta(t,!won&&!drew,drew));
       return updated;
     });
     const _tOppId=currentOpp.id;
@@ -438,6 +451,9 @@ export function useSeasonFlow(gs) {
         if(aWon){a.wins++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.losses++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
         else if(cdrew){a.draws++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.draws++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
         else{b.wins++;b.rf+=cr.score.opp;b.ra+=cr.score.my;a.losses++;a.rf+=cr.score.my;a.ra+=cr.score.opp;}
+        Object.assign(a,applyPopularityDelta(a,aWon,cdrew));Object.assign(b,applyPopularityDelta(b,!aWon&&!cdrew,cdrew));
+        const aRevT=calcRevenue(a);a.budget=(a.budget??0)+aRevT.ticket+aRevT.sponsor+aRevT.merch;a.revenueThisSeason=(a.revenueThisSeason??0)+aRevT.ticket+aRevT.sponsor+aRevT.merch;
+        const bRevT=calcRevenue(b);b.budget=(b.budget??0)+bRevT.ticket+bRevT.sponsor+bRevT.merch;b.revenueThisSeason=(b.revenueThisSeason??0)+bRevT.ticket+bRevT.sponsor+bRevT.merch;
         a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon);
         a.players=applyPostGameCondition(a.players,cr.log||[],true,gameDay);
         a.players=tickInjuries(a.players);

@@ -30,6 +30,21 @@ export function FinanceTab({team,onStadiumUpgrade,gameDay,onPlayerClick}){
         </div>
       </div>
       <div className="card">
+        <div className="card-h">📊 ファン感情</div>
+        <div className="fsb" style={{padding:"7px 0"}}>
+          <span style={{fontSize:11,color:"#4b5563"}}>ファン人気</span>
+          <span className="mono" style={{color:"#f5c842"}}>{team.popularity??50}/100</span>
+        </div>
+        <div style={{background:"rgba(255,255,255,.05)",borderRadius:4,height:8,margin:"4px 0 10px"}}>
+          <div style={{width:`${team.popularity??50}%`,height:"100%",borderRadius:4,background:(team.popularity??50)>=70?"#34d399":(team.popularity??50)>=40?"#f5c842":"#f87171"}}/>
+        </div>
+        {(team.winStreak??0)>=2&&<div style={{fontSize:12,color:"#34d399"}}>🔥 {team.winStreak}連勝中</div>}
+        {(team.loseStreak??0)>=2&&<div style={{fontSize:12,color:"#f87171"}}>📉 {team.loseStreak}連敗中</div>}
+        <div style={{fontSize:11,color:"#4b5563",marginTop:6}}>
+          {(team.winStreak??0)>=3?"↑↑ 人気急上昇":(team.winStreak??0)>=1?"↑ 上昇中":(team.loseStreak??0)>=3?"↓↓ 人気急落中":(team.loseStreak??0)>=1?"↓ 下降中":"→ 安定"}
+        </div>
+      </div>
+      <div className="card">
         <div className="card-h">📈 シーズン収益サマリー</div>
         {[["シーズン累計",fmtM(revThisSeason)],["投資済み球場レベル",`Lv${lvl} ${STAR_LABELS[lvl]} (${MULT_LABELS[lvl]})`],["シーズン収入予測",gamesPlayed>0?fmtM(projected):"計算中..."]].map(([l,v])=>(
           <div key={l} className="fsb" style={{padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,.03)"}}><span style={{fontSize:11,color:"#4b5563"}}>{l}</span><span className="mono" style={{color:"#34d399"}}>{v}</span></div>

@@ -108,6 +108,7 @@ export function buildTeam(def) {
     coaches: [], budget: def.budget,
     scoutMissions: [], scoutResults: [],
     popularity: rng(40, 70),
+    winStreak: 0, loseStreak: 0,
     stadiumLevel: 0,
     revenueThisSeason: 0,
     ownerGoal: "cs",

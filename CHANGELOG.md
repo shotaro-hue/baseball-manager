@@ -5,6 +5,25 @@
 
 ---
 
+### 2026-04-01 — ㉛ ファン感情
+
+**仕様本文への影響あり（§4.8 財務システム・§5 データモデル）**
+
+- `src/engine/fanSentiment.js` **新規**: `calcPopularityDelta` / `calcOffseasonPopDelta` / `driftPopularity` / `applyPopularityDelta` の純粋関数。全てテスト可能
+- `src/constants.js`: `POP_WIN_BASE` / `POP_WIN_STREAK` / `POP_LOSS_BASE` / `POP_LOSS_STREAK3` / `POP_LOSS_STREAK5` / `POP_DRIFT_RATE` / `POP_RELEASE_PENALTY` / `POP_RELEASE_SALARY_THRESHOLD` を追加
+- `src/engine/player.js` / `src/engine/realplayer.js`: `buildTeam()` / `buildRealTeam()` に `winStreak: 0, loseStreak: 0` を追加
+- `src/hooks/useSeasonFlow.js`: `handleAutoSimEnd` / `handleTacticalGameEnd` / `runBatchGames` の3経路（myId・opponent・CPU-CPU ループ）すべてに `applyPopularityDelta` を挿入。CPU-CPU ループに `calcRevenue` による CPU 収益計算も追加
+- `src/hooks/useOffseason.js`: `handleRetirePhaseNext` でオフシーズン終了時に全チームの popularity をリーグ順位・優勝結果に基づき補正 → 50へドリフト。`handleNextYear` / `handleWaiverPhaseNext` にも streak リセット・放出ペナルティを追加
+- `src/App.jsx`: `WaiverPhaseScreen.onRelease` / `ContractTab.onRelease` に年俸5000万超の選手放出時 popularity -3 ペナルティを追加
+- `src/components/tabs/FinanceTab.jsx`: 「📊 ファン感情」カード追加（人気バー・連勝連敗バッジ・トレンドテキスト）
+
+**popularity 変動一覧:**
+- 勝利: +1（3連勝以上: +2）/ 敗戦: -1（3連敗: -2 / 5連敗: -3）
+- 優勝: +15 / ペナント: +8 / CS進出: +3 / 最下位: -5 → 50へ10%ドリフト
+- 年俸5000万超の選手放出: -3
+
+---
+
 ### 2026-04-01 — T8 useReducer 移行
 
 **仕様本文への影響なし（内部リファクタリング）**
