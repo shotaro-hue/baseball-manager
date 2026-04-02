@@ -201,8 +201,8 @@ export function WaiverPhaseScreen({teams,myId,year,onRelease,onNext}){
   const myTeam=teams.find(t=>t.id===myId);
   const [marked,setMarked]=useState([]);
   const toggle=(pid)=>setMarked(prev=>prev.includes(pid)?prev.filter(x=>x!==pid):[...prev,pid]);
-  const candidates=myTeam.players.filter(p=>p.contractYearsLeft===0&&!p.isRetired);
-  const others=myTeam.players.filter(p=>p.contractYearsLeft>0&&!p.isRetired);
+  const candidates=myTeam.players.filter(p=>p.contractYearsLeft<=1&&!p.isRetired);
+  const others=myTeam.players.filter(p=>p.contractYearsLeft>1&&!p.isRetired);
   return(
     <div className="app">
       <div style={{padding:"16px 14px 0"}}>
@@ -210,13 +210,14 @@ export function WaiverPhaseScreen({teams,myId,year,onRelease,onNext}){
         <div style={{fontSize:20,fontWeight:700,color:"#f5c842",marginBottom:4}}>✂️ 戦力外フェーズ — {year}年</div>
         <div style={{fontSize:11,color:"#94a3b8",marginBottom:16}}>契約満了・戦力外通告の処遇を決定してください。通告後は他球団と自由に交渉できる自由契約選手になります。</div>
         <div className="card" style={{marginBottom:10}}>
-          <div className="card-h">契約満了選手（{candidates.length}人）</div>
+          <div className="card-h">契約満了・最終年選手（{candidates.length}人）</div>
           {candidates.length===0&&<div style={{fontSize:11,color:"#374151"}}>対象選手なし</div>}
           {candidates.map(p=>(
             <div key={p.id} className="fsb" style={{padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}>
               <div>
                 <span style={{fontSize:12,fontWeight:700}}>{p.name}</span>
                 <span style={{fontSize:10,color:"#374151",marginLeft:6}}>{p.pos} / {p.age}歳</span>
+                <span style={{fontSize:9,color:p.contractYearsLeft===0?"#f87171":"#94a3b8",marginLeft:6}}>{p.contractYearsLeft===0?"満了":"最終年"}</span>
               </div>
               <div style={{display:"flex",gap:6,alignItems:"center"}}>
                 <span style={{fontSize:10,color:"#f5c842"}}>{fmtSal(p.salary)}/年</span>
