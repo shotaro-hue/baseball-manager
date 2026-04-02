@@ -5,6 +5,18 @@
 
 ---
 
+### 2026-04-02 — ㉝ ドラフト拡張（高校生/大学生/社会人区分・即戦力度）
+
+**仕様本文への影響あり（§4.7 ドラフトシステム・§13.4 NPB固有システム）**
+
+- `src/constants.js`: `PROSPECT_TYPE_WEIGHTS` / `PROSPECT_ENTRY_AGE` / `PROSPECT_READINESS_RANGE` を追加
+- `src/engine/draft.js`: `initDraftPool` を `prospectType` → `entryAge` の決定論的フローに変更。`readinessScore`（0〜100）を全候補に付与。`recommendForTeam` が勝ち越しチームの即戦力需要を `readinessScore` で加点評価
+- `src/components/Draft.jsx`: ドラフト展望「おすすめ」タブに即戦力/素材型フィルタボタンと readinessScore バーを追加。ドラフト会議画面の候補一覧に `prospectType` バッジ（社会人=緑/大卒=グレー/高校生=紫）を表示
+
+**旧 → 新**: `makePlayer(pos, q, isPitch, rng(18, 22))` でランダム年齢 → `pickProspectType()` で区分先決定・`entryAgeFromType()` で年齢を導出
+
+---
+
 ### 2026-04-01 — ㉛ ファン感情
 
 **仕様本文への影響あり（§4.8 財務システム・§5 データモデル）**

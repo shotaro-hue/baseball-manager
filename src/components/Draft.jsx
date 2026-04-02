@@ -18,7 +18,9 @@ export function DraftPreviewScreen({teams,myId,year,pool,draftAllocation,onAlloc
     return cands.find(t=>{const n=analyzeTeamNeeds(t);return player.isPitcher?n.some(x=>x.includes("投手")):n.some(x=>x.includes("ミート"));})||cands[0];
   };
   const [tab,setTab]=useState("overview");
+  const [recFilter,setRecFilter]=useState("all");
   const ov=p=>p.isPitcher?Math.round((p.pitching.velocity+p.pitching.control+p.pitching.breaking)/3):Math.round((p.batting.contact+p.batting.power+p.batting.eye)/3);
+  const readinessLabel=score=>score>=65?{label:"⚡ 即戦力",color:"#34d399"}:score>=45?{label:"⚖️ バランス",color:"#94a3b8"}:{label:"🌱 素材型",color:"#a78bfa"};
   return(
     <div className="app"><div style={{maxWidth:700,margin:"0 auto",padding:"16px 12px"}}>
       <div style={{textAlign:"center",marginBottom:14}}>
@@ -50,11 +52,22 @@ export function DraftPreviewScreen({teams,myId,year,pool,draftAllocation,onAlloc
         </div>);})}
       </div>)}
       {tab==="rec"&&(<div className="card"><div className="card-h">⭐ {myTeam?.name} おすすめ候補 TOP5</div>
-        <p style={{fontSize:11,color:"#374151",marginBottom:10}}>チームの現状分析をもとにスカウト陣が選定しました</p>
-        {rec.map((p,i)=>{const rankColor=["#ffd700","#94a3b8","#b45309","#374151","#374151"][i];return(<div key={p.id} style={{padding:"10px",marginBottom:6,borderRadius:6,background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)"}}>
-          <div className="fsb"><div><span style={{fontSize:16,fontWeight:700,color:rankColor,marginRight:8}}>#{i+1}</span><span style={{fontWeight:700,fontSize:13}}>{p.name}</span>{p.isPitcher&&<HandBadge p={p}/>}<span style={{fontSize:10,color:"#374151",marginLeft:6}}>{p.pos}/{p.age}歳</span>{p.spotlight&&<span style={{fontSize:9,color:"#f97316",marginLeft:4}}>{p.spotlight}</span>}</div><OV v={ov(p)}/></div>
+        <p style={{fontSize:11,color:"#374151",marginBottom:8}}>チームの現状分析をもとにスカウト陣が選定しました</p>
+        <div style={{display:"flex",gap:4,marginBottom:10}}>
+          {[["all","全て"],["ready","⚡ 即戦力"],["prospect","🌱 素材型"]].map(([k,l])=>(
+            <button key={k} className={"bsm "+(recFilter===k?"bgb":"bga")} style={{fontSize:10,padding:"3px 10px"}} onClick={()=>setRecFilter(k)}>{l}</button>
+          ))}
+        </div>
+        {rec.filter(p=>recFilter==="all"||(recFilter==="ready"&&(p.readinessScore??50)>=65)||(recFilter==="prospect"&&(p.readinessScore??50)<45))
+          .map((p,i)=>{const rankColor=["#ffd700","#94a3b8","#b45309","#374151","#374151"][i];const rl=readinessLabel(p.readinessScore??50);return(<div key={p.id} style={{padding:"10px",marginBottom:6,borderRadius:6,background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)"}}>
+          <div className="fsb"><div><span style={{fontSize:16,fontWeight:700,color:rankColor,marginRight:8}}>#{i+1}</span><span style={{fontWeight:700,fontSize:13}}>{p.name}</span>{p.isPitcher&&<HandBadge p={p}/>}<span style={{fontSize:10,color:"#374151",marginLeft:6}}>{p.pos}/{p.age}歳</span>{p.prospectType&&<span style={{fontSize:9,padding:"1px 5px",borderRadius:3,background:"rgba(255,255,255,.06)",color:"#94a3b8",marginLeft:4}}>{p.prospectType}</span>}{p.spotlight&&<span style={{fontSize:9,color:"#f97316",marginLeft:4}}>{p.spotlight}</span>}</div><OV v={ov(p)}/></div>
           <div style={{fontSize:9,color:"#374151",marginTop:4}}>{p.isPitcher?`球速${p.pitching.velocity} 制球${p.pitching.control} 変化${p.pitching.breaking}`:`ミート${p.batting.contact} 長打${p.batting.power} 走力${p.batting.speed}`}</div>
-          <div style={{fontSize:9,color:"#a78bfa",marginTop:2}}>ポテンシャル {p.potential} ／ {p.age<=20?"将来の大器":"即戦力候補"}{p.playerType&&<span style={{color:"#60a5fa",marginLeft:6}}>{p.playerType}</span>}</div>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
+            <span style={{fontSize:9,color:"#374151"}}>即戦力度</span>
+            <div style={{flex:1,height:4,borderRadius:2,background:"rgba(255,255,255,.08)"}}><div style={{height:"100%",borderRadius:2,width:`${p.readinessScore??50}%`,background:rl.color}}/></div>
+            <span style={{fontSize:9,fontWeight:700,color:rl.color}}>{rl.label}</span>
+          </div>
+          <div style={{fontSize:9,color:"#a78bfa",marginTop:2}}>ポテンシャル {p.potential}{p.playerType&&<span style={{color:"#60a5fa",marginLeft:6}}>{p.playerType}</span>}</div>
           {p.playerComment&&<div style={{fontSize:8,color:"#374151",marginTop:1,fontStyle:"italic"}}>"{p.playerComment}"</div>}
           {p.fromScout&&<div style={{fontSize:8,color:"#34d399",marginTop:1}}>✅ スカウト済み選手</div>}
         </div>);})}
@@ -488,8 +501,8 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,onDraftDone}){
                 <span style={{color:"#a78bfa"}}>🔍 スカウトPT</span><span style={{fontWeight:700,color:scoutPt>0?"#f5c842":"#f87171"}}>{scoutPt}</span><span style={{color:"#374151",fontSize:10}}>残</span>
               </div>
               <div className="draft-pool">
-                {availPool.slice(0,22).map(p=>{const isSc=scouted.has(p.id);const ov=ovView(p);return(<div key={p.id} className="draft-pick" style={{background:p.spotlight?"rgba(249,115,22,.04)":undefined,borderLeft:p.spotlight?"2px solid #f97316":undefined,opacity:isMyTurn?1:.55}}>
-                  <div className="fsb"><div style={{flex:1}} onClick={()=>isMyTurn&&myPick(p.id)}><span style={{fontWeight:700,fontSize:12}}>{p.name}</span>{p.isPitcher&&<HandBadge p={p}/>}<span style={{fontSize:10,color:"#374151",marginLeft:6}}>{p.pos}/{p.age}歳</span>{p.entryType&&<span style={{fontSize:9,color:"#94a3b8",marginLeft:4,padding:"1px 4px",borderRadius:3,background:"rgba(148,163,184,.1)"}}>{p.entryType}</span>}{p.spotlight&&<span style={{fontSize:9,color:"#f97316",marginLeft:4}}>{p.spotlight}</span>}</div>
+                {availPool.slice(0,22).map(p=>{const isSc=scouted.has(p.id);const ov=ovView(p);const rs=p.readinessScore??50;const rsColor=rs>=65?"#34d399":rs>=45?"#94a3b8":"#a78bfa";return(<div key={p.id} className="draft-pick" style={{background:p.spotlight?"rgba(249,115,22,.04)":undefined,borderLeft:p.spotlight?"2px solid #f97316":undefined,opacity:isMyTurn?1:.55}}>
+                  <div className="fsb"><div style={{flex:1}} onClick={()=>isMyTurn&&myPick(p.id)}><span style={{fontWeight:700,fontSize:12}}>{p.name}</span>{p.isPitcher&&<HandBadge p={p}/>}<span style={{fontSize:10,color:"#374151",marginLeft:6}}>{p.pos}/{p.age}歳</span>{p.prospectType&&<span style={{fontSize:9,color:rsColor,marginLeft:4,padding:"1px 4px",borderRadius:3,background:"rgba(255,255,255,.05)"}}>{p.prospectType}</span>}{p.spotlight&&<span style={{fontSize:9,color:"#f97316",marginLeft:4}}>{p.spotlight}</span>}</div>
                     <div style={{display:"flex",gap:4,alignItems:"center"}}>
                       {!isSc&&<button className="bsm" style={{fontSize:9,padding:"1px 5px",background:"rgba(167,139,250,.15)",color:"#a78bfa",border:"1px solid rgba(167,139,250,.3)",borderRadius:3,opacity:scoutPt>0?1:.4,cursor:scoutPt>0?"pointer":"not-allowed"}} onClick={e=>{e.stopPropagation();doScout(p.id);}}>🔍-1</button>}
                       <span style={{fontSize:9,color:"#374151"}}>総合</span><span style={{fontFamily:"monospace",fontWeight:700,color:ov==="??"?"#374151":ov>=75?"#ffd700":ov>=65?"#34d399":"#94a3b8"}}>{ov}</span>
