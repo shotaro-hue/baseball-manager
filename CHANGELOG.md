@@ -5,6 +5,20 @@
 
 ---
 
+### 2026-04-02 — 日程タブ UI 改善（週グリッドカレンダー・スコア表示・結果モーダル）
+
+**仕様本文への影響なし**
+
+- `src/components/tabs/ScheduleTab.jsx`: 月別カレンダーを chip フラット一覧から月曜始まり7列週グリッドに全面改修。ホーム（緑）/ビジター（青）/交流戦（紫）でセルを色分け。今日セルをゴールドでハイライト
+- `src/hooks/useGameState.js`: `gameResultsMap` state（`{[gameNo]: {won,drew,oppName,myScore,oppScore}}`）と `pushGameResult` callback を追加
+- `src/hooks/useSeasonFlow.js`: シングルシム・バッチシム・タクティカル試合終了の3か所で `pushGameResult` を呼び出し全試合スコアを蓄積
+- `src/App.jsx`: ScheduleTab に `gameResultsMap` prop を追加
+- ScheduleTab: 過去試合セルに ○/●/△ + スコアバッジを表示。クリックすると結果サマリーモーダル（日付・対戦相手・スコア・勝敗）をオーバーレイ表示
+- ScheduleTab: シーズン進捗バー（X/143試合消化・勝敗・勝率）をタブ上部に追加
+- ScheduleTab: 内部変数名の露出（`schedule[X]`等）を自然な日本語ラベルに修正
+
+---
+
 ### 2026-04-02 — ㉝ ドラフト拡張（高校生/大学生/社会人区分・即戦力度）
 
 **仕様本文への影響あり（§4.7 ドラフトシステム・§13.4 NPB固有システム）**
