@@ -153,6 +153,12 @@ export const INTERVIEW_OPTIONS_LOSE = [
 
 // ドラフト関連定数
 export const DRAFT_ROUNDS = 6;
+
+// ドラフト候補区分（prospectType）
+// prospectType を先に決め、そこから entryAge を導出する
+export const PROSPECT_TYPE_WEIGHTS = { 高卒: 40, 大卒: 40, 社会人: 20 }; // 抽選確率(%)
+export const PROSPECT_ENTRY_AGE    = { 高卒: 18, 大卒: 22, 社会人: [24, 25] };
+export const PROSPECT_READINESS_RANGE = { 高卒: [20, 50], 大卒: [45, 70], 社会人: [65, 90] };
 export const DRAFT_POOL_SIZE = 80;
 
 export const PLAYER_TYPES_B = ["天才肌", "ガッツ型", "技巧派", "パワーヒッター", "俊足巧打", "守備の名手", "走塁のスペシャリスト", "勝負強い打者"];
