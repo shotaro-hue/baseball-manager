@@ -101,6 +101,17 @@ node scripts/fetch-spaia.js  # NPB 2025 実選手データ取得 → src/data/np
 | `/game-review` | SPEC.md × ROADMAP.md × コードを照合して乖離を評価・次アクション提案 |
 | `/game-sprint` | ROADMAP から次タスクを選定し実装まで完結（`--review` でフルレビューモード） |
 | `/game-refactor` | 肥大化ファイルを安全に分割・リファクタリング |
+| `/plan-for-codex` | **【Claude 用】** ROADMAP から機能を選び `TASKS/<name>.md` に仕様書を生成（実装しない・トークン節約） |
+| `/implement-from-task` | **【Codex 用】** `TASKS/<name>.md` を読んで実装・テスト・コミットまで完全自動実行 |
+
+### Claude × Codex 分業フロー
+
+```
+Claude セッション: /plan-for-codex   → TASKS/<name>.md を生成（2〜3往復で完了）
+Codex  セッション: /implement-from-task TASKS/<name>.md → 全自動で実装・コミット
+```
+
+Claude のコンテキストを企画・要求定義に集中させ、大型ファイルの精読・実装は Codex に委任することでトークン消費を削減する。
 
 ---
 
