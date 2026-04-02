@@ -24,6 +24,7 @@ export function useOffseason(gs) {
   const [draftPool, setDraftPool] = useState(null);
   const [draftResult, setDraftResult] = useState(null);
   const [draftAllocation, setDraftAllocation] = useState({pitcher:50,batter:50});
+  const [waiverClaimResults, setWaiverClaimResults] = useState(null);
 
   // careerLogをコンパクト形式で保存（evSum/evN等の不要フィールドを除外）
   const mkCareerEntry = (s, ps, yr, teamId, teamName) => {
@@ -292,14 +293,19 @@ export function useOffseason(gs) {
   const handleWaiverPhaseNext = (markedIds) => {
     const waiverReleased=[];
     markedIds.forEach(pid=>{const p=myTeam?.players.find(x=>x.id===pid);const popPenalty=(p?.salary??0)>POP_RELEASE_SALARY_THRESHOLD?POP_RELEASE_PENALTY:0;upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),popularity:Math.min(100,Math.max(0,(t.popularity??50)+popPenalty))}));if(p){addToHistory(myId,p,"戦力外");waiverReleased.push({...p,isFA:true});addNews({type:"season",headline:"【戦力外】"+p.name+"選手に戦力外通告",source:"野球速報",dateLabel:year+"年",body:p.name+"選手（"+p.age+"歳）が戦力外通告を受けた。"});}});
+    const releasedIds=new Set(waiverReleased.map(p=>p.id));
     const combinedPool=[...faPool,...waiverReleased];
     const faResult=processCpuFaBids(teams,myId,combinedPool,teams);
     setTeams(faResult.updatedTeams);
     setFaPool(faResult.remainingFaPool);
     faResult.news.forEach(n=>addNews(n));
+    // 今回の戦力外通告分のみ結果表示（既存FAプールとは分離）
+    const claimedNew=(faResult.claimed||[]).filter(c=>releasedIds.has(c.player.id));
+    const unclaimedNew=faResult.remainingFaPool.filter(p=>releasedIds.has(p.id));
+    setWaiverClaimResults({claimed:claimedNew,unclaimed:unclaimedNew});
     setFaYears({});
     setDraftPool(initDraftPool(myTeam));
-    setScreen("draft_preview");
+    setScreen("waiver_result");
   };
 
   return {
@@ -308,6 +314,7 @@ export function useOffseason(gs) {
     draftPool, setDraftPool,
     draftResult, setDraftResult,
     draftAllocation, setDraftAllocation,
+    waiverClaimResults,
     handleNextYear,
     handleDraftComplete,
     handleContractOffer,

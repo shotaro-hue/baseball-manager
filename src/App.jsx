@@ -5,7 +5,7 @@ import { loadGame, getSaveMeta, deleteSave } from './engine/saveload';
 import { generateSeasonSchedule } from './engine/scheduleGen';
 import { TacticalGameScreen } from './components/TacticalGame';
 import { BatchResultScreen } from './components/BatchResult';
-import { ModeSelectScreen, ResultScreen, RetirePhaseScreen, WaiverPhaseScreen, GrowthSummaryScreen, NewSeasonScreen } from './components/Screens';
+import { ModeSelectScreen, ResultScreen, RetirePhaseScreen, WaiverPhaseScreen, WaiverResultScreen, GrowthSummaryScreen, NewSeasonScreen } from './components/Screens';
 import { DraftPreviewScreen, DraftLotteryScreen, DraftScreen, DraftReviewScreen } from './components/Draft';
 import { PlayoffScreen } from './components/PlayoffScreen';
 import { RetireModal } from './components/RetireModal';
@@ -61,7 +61,7 @@ export default function App(){
     pressEvent, handlePressAnswer,
   } = gs;
   const { gameResult, currentOpp, batchResults, playoff, setPlayoff } = sf;
-  const { developmentSummary, newSeasonInfo, draftPool, setDraftPool, draftResult, setDraftResult, draftAllocation, setDraftAllocation } = os;
+  const { developmentSummary, newSeasonInfo, draftPool, setDraftPool, draftResult, setDraftResult, draftAllocation, setDraftAllocation, waiverClaimResults } = os;
 
   // ── タイトル画面 ──
   if(screen==="title"){const saveMeta=saveExists?getSaveMeta():null;return(<><div className="app"><div className="title"><div className="tlogo">⚾ BASEBALL<br/>MANAGER 2025</div><div className="tsub">NPB SIMULATION v2.1 — TACTICAL MODE</div>{saveMeta&&(<div style={{background:"rgba(74,222,128,.08)",border:"1px solid rgba(74,222,128,.3)",borderRadius:8,padding:"10px 14px",marginBottom:16,textAlign:"left"}}><div style={{fontSize:10,color:"#4ade80",letterSpacing:".1em",marginBottom:6}}>◈ セーブデータ</div><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}><div><div style={{fontWeight:700,fontSize:15}}>{saveMeta.teamEmoji} {saveMeta.teamName}</div><div style={{fontSize:11,color:"#94a3b8"}}>{saveMeta.year}年 第{saveMeta.gameDay}戦 {saveMeta.wins}勝{saveMeta.losses}敗</div><div style={{fontSize:9,color:"#64748b",marginTop:2}}>{saveMeta.savedAt}</div></div><div style={{display:"flex",gap:6,alignItems:"center"}}><button className="sim-btn" style={{margin:0,padding:"8px 18px",fontSize:13,background:"linear-gradient(135deg,#14532d,#166534)",borderColor:"rgba(74,222,128,.6)",color:"#4ade80"}} onClick={handleLoad}>▶ 続きから</button><button className="bsm bgr" style={{padding:"6px 10px"}} onClick={()=>{if(window.confirm('セーブデータを削除しますか？')){deleteSave();setSaveExists(false);}}}>削除</button></div></div></div>)}<div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,marginTop:saveExists?8:0,zIndex:1,position:"relative"}}>◈ 新規ゲーム — チームを選択</div><div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,zIndex:1,position:"relative"}}>◈ セントラルリーグ</div><div className="tgrid" style={{marginBottom:14}}>{TEAM_DEFS.filter(t=>t.league==="セ").map(t=><div key={t.id} className="tcard" style={{"--c":t.color}} onClick={()=>gs.handleSelect(t.id)}><span style={{fontSize:24,display:"block",marginBottom:5}}>{t.emoji}</span><div className="tcard-nm">{t.name}</div></div>)}</div><div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,zIndex:1,position:"relative"}}>◈ パシフィックリーグ</div><div className="tgrid">{TEAM_DEFS.filter(t=>t.league==="パ").map(t=><div key={t.id} className="tcard" style={{"--c":t.color}} onClick={()=>gs.handleSelect(t.id)}><span style={{fontSize:24,display:"block",marginBottom:5}}>{t.emoji}</span><div className="tcard-nm">{t.name}</div></div>)}</div></div></div></>);}
@@ -75,6 +75,7 @@ export default function App(){
   if(screen==="retire_phase") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><RetirePhaseScreen teams={teams} myId={myId} year={year} onNext={os.handleRetirePhaseNext}/></ErrorBoundary></>);
   if(screen==="development_phase") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><GrowthSummaryScreen summary={developmentSummary} year={year} onNext={()=>setScreen("waiver_phase")}/></ErrorBoundary></>);
   if(screen==="waiver_phase") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><WaiverPhaseScreen teams={teams} myId={myId} year={year} onRelease={(pid)=>{const p=myTeam?.players.find(x=>x.id===pid);const popPenalty=(p?.salary??0)>POP_RELEASE_SALARY_THRESHOLD?POP_RELEASE_PENALTY:0;upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),popularity:Math.min(100,Math.max(0,(t.popularity??50)+popPenalty))}));if(p) setFaPool(prev=>[...prev,{...p,isFA:true}]);}} onNext={os.handleWaiverPhaseNext}/></ErrorBoundary></> );
+  if(screen==="waiver_result") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><WaiverResultScreen results={waiverClaimResults} year={year} onNext={()=>setScreen("draft_preview")}/></ErrorBoundary></>);
   if(screen==="playoff"&&playoff) return(<><ErrorBoundary onReset={()=>setScreen("hub")}><PlayoffScreen playoff={playoff} setPlayoff={setPlayoff} teams={teams} myId={myId} year={year} onFinish={()=>{
     if(playoff?.champion){
       const jpS=playoff.jpSeries;
