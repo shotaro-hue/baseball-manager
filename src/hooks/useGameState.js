@@ -41,6 +41,7 @@ export function useGameState() {
   const [news, setNews] = useState([]);
   const [mailbox, setMailbox] = useState([]);
   const [recentResults, setRecentResults] = useState([]);
+  const [gameResultsMap, setGameResultsMap] = useState({});
   const [cpuTradeOffers, setCpuTradeOffers] = useState([]);
   const [pressEvent, setPressEvent] = useState(null);  // 記者会見イベント
   const [lastPressDay, setLastPressDay] = useState(0); // 最後に記者会見を行ったgameDay
@@ -83,6 +84,10 @@ export function useGameState() {
 
   const pushResult = useCallback((won,drew,oppName,myScore,oppScore,gameNo)=>{
     setRecentResults(prev=>[{won,drew,oppName,myScore,oppScore,gameNo},...prev].slice(0,5));
+  },[]);
+
+  const pushGameResult = useCallback((gameNo, result)=>{
+    setGameResultsMap(prev=>({...prev,[gameNo]:result}));
   },[]);
 
   const addNews = useCallback((article)=>{
@@ -305,6 +310,7 @@ export function useGameState() {
     news, setNews,
     mailbox, setMailbox,
     recentResults, setRecentResults,
+    gameResultsMap, setGameResultsMap,
     cpuTradeOffers, setCpuTradeOffers,
     pressEvent, setPressEvent,
     lastPressDay, setLastPressDay,
@@ -315,6 +321,7 @@ export function useGameState() {
     notify,
     upd,
     pushResult,
+    pushGameResult,
     addNews,
     addToHistory,
     handleSave,

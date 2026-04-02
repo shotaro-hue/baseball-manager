@@ -258,6 +258,7 @@ export function useSeasonFlow(gs) {
     }
     const _adrew=r.score.my===r.score.opp;
     pushResult(won,_adrew,currentOpp?.name||"",r.score.my,r.score.opp,gameDay);
+    gs.pushGameResult(gameDay,{won,drew:_adrew,oppName:currentOpp?.name||"",myScore:r.score.my,oppScore:r.score.opp});
     setGameDay(d=>d+1);
     if(gameDay>=SEASON_GAMES){
       // 全setState反映後の teams でinitPlayoffを呼ぶためuseEffectに委譲
@@ -382,6 +383,7 @@ export function useSeasonFlow(gs) {
     setGameDay(newDay);
     setBatchResults(results);
     gs.setRecentResults(prev=>[...results.map(r=>({won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp,gameNo:r.gameNo})).reverse(),...prev].slice(0,5));
+    gs.setGameResultsMap(prev=>{const next={...prev};results.forEach(r=>{next[r.gameNo]={won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp};});return next;});
     if(newDay-1>=SEASON_GAMES){const withFarm=runFarmSeason(newTeams);setTeams(withFarm);setPlayoff(initPlayoff(withFarm));setScreen("playoff");}
     else setScreen("batch_result");
   };
@@ -470,6 +472,7 @@ export function useSeasonFlow(gs) {
     setGameResult({...gsResult,oppTeam:currentOpp,won});
     const _tdrew=gsResult.score.my===gsResult.score.opp;
     pushResult(won,_tdrew,currentOpp?.name||"",gsResult.score.my,gsResult.score.opp,gameDay);
+    gs.pushGameResult(gameDay,{won,drew:_tdrew,oppName:currentOpp?.name||"",myScore:gsResult.score.my,oppScore:gsResult.score.opp});
     setGameDay(d=>d+1);
     if(gameDay>=SEASON_GAMES){
       pendingPlayoffRef.current=true;
