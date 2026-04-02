@@ -197,6 +197,7 @@ export function processCpuFaBids(teams, myId, faPool, allTeams) {
   bids.sort((a, b) => b.score - a.score);
   const signedPlayers = new Set();
   const signedTeams = new Set();
+  const claimed = [];
 
   for (const bid of bids) {
     if (signedPlayers.has(bid.pid) || signedTeams.has(bid.tid)) continue;
@@ -212,6 +213,7 @@ export function processCpuFaBids(teams, myId, faPool, allTeams) {
     remainingPool = remainingPool.filter(p => p.id !== bid.pid);
     signedPlayers.add(bid.pid);
     signedTeams.add(bid.tid);
+    claimed.push({ player, teamName: team.name, teamEmoji: team.emoji });
 
     news.push({
       type: 'season',
@@ -226,5 +228,6 @@ export function processCpuFaBids(teams, myId, faPool, allTeams) {
     updatedTeams: teams.map(t => teamMap.get(t.id) || t),
     remainingFaPool: remainingPool,
     news,
+    claimed,
   };
 }

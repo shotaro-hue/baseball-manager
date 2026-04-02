@@ -208,7 +208,7 @@ export function WaiverPhaseScreen({teams,myId,year,onRelease,onNext}){
       <div style={{padding:"16px 14px 0"}}>
         <div style={{fontSize:11,color:"#94a3b8",letterSpacing:".1em",marginBottom:4}}>OFFSEASON</div>
         <div style={{fontSize:20,fontWeight:700,color:"#f5c842",marginBottom:4}}>✂️ 戦力外フェーズ — {year}年</div>
-        <div style={{fontSize:11,color:"#94a3b8",marginBottom:16}}>契約満了選手の処遇を決定してください</div>
+        <div style={{fontSize:11,color:"#94a3b8",marginBottom:16}}>契約満了・戦力外通告の処遇を決定してください。通告後は他球団と自由に交渉できる自由契約選手になります。</div>
         <div className="card" style={{marginBottom:10}}>
           <div className="card-h">契約満了選手（{candidates.length}人）</div>
           {candidates.length===0&&<div style={{fontSize:11,color:"#374151"}}>対象選手なし</div>}
@@ -227,6 +227,27 @@ export function WaiverPhaseScreen({teams,myId,year,onRelease,onNext}){
             </div>
           ))}
         </div>
+        {others.length>0&&(
+          <div className="card" style={{marginBottom:10}}>
+            <div className="card-h">契約中の選手（任意戦力外通告）</div>
+            <div style={{fontSize:10,color:"#94a3b8",marginBottom:8}}>契約途中でも戦力外通告は可能です。通告後は自由契約（他球団と交渉可）になります。</div>
+            {others.map(p=>(
+              <div key={p.id} className="fsb" style={{padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}>
+                <div>
+                  <span style={{fontSize:12,fontWeight:700}}>{p.name}</span>
+                  <span style={{fontSize:10,color:"#374151",marginLeft:6}}>{p.pos} / {p.age}歳</span>
+                  <span style={{fontSize:9,color:"#4b5563",marginLeft:6}}>残{p.contractYearsLeft}年</span>
+                </div>
+                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                  <span style={{fontSize:10,color:"#f5c842"}}>{fmtSal(p.salary)}/年</span>
+                  <button className={"bsm "+(marked.includes(p.id)?"bgr":"bga")} onClick={()=>toggle(p.id)}>
+                    {marked.includes(p.id)?"✓ 戦力外":"戦力外"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {marked.length>0&&(
           <div className="card" style={{marginBottom:10,background:"rgba(248,113,113,.06)"}}>
             <div style={{fontSize:11,color:"#f87171",marginBottom:6}}>⚠️ 戦力外通告 {marked.length}人</div>
@@ -236,6 +257,60 @@ export function WaiverPhaseScreen({teams,myId,year,onRelease,onNext}){
           </div>
         )}
         <button className="btn btn-gold" style={{width:"100%",padding:"12px 0",marginTop:8}} onClick={()=>onNext(marked)}>
+          自由契約処理へ →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   WAIVER RESULT SCREEN
+   戦力外通告後の自由契約結果を表示
+═══════════════════════════════════════════════ */
+export function WaiverResultScreen({results,year,onNext}){
+  const {claimed=[],unclaimed=[]}=results||{};
+  return(
+    <div className="app">
+      <div style={{padding:"16px 14px 0"}}>
+        <div style={{fontSize:11,color:"#94a3b8",letterSpacing:".1em",marginBottom:4}}>OFFSEASON</div>
+        <div style={{fontSize:20,fontWeight:700,color:"#f5c842",marginBottom:4}}>📋 自由契約結果 — {year}年</div>
+        <div style={{fontSize:11,color:"#94a3b8",marginBottom:16}}>戦力外通告選手の移籍先・FA残留状況</div>
+        {claimed.length>0&&(
+          <div className="card" style={{marginBottom:10,background:"rgba(52,211,153,.05)",border:"1px solid rgba(52,211,153,.2)"}}>
+            <div className="card-h" style={{color:"#34d399"}}>✅ 他球団へ入団（{claimed.length}人）</div>
+            {claimed.map(({player:p,teamName,teamEmoji},i)=>(
+              <div key={p.id} className="fsb" style={{padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}>
+                <div>
+                  <span style={{fontWeight:700,fontSize:12}}>{p.name}</span>
+                  <span style={{fontSize:10,color:"#94a3b8",marginLeft:6}}>{p.pos} / {p.age}歳</span>
+                </div>
+                <div style={{fontSize:11,color:"#34d399"}}>{teamEmoji} {teamName}へ</div>
+              </div>
+            ))}
+          </div>
+        )}
+        {unclaimed.length>0&&(
+          <div className="card" style={{marginBottom:10}}>
+            <div className="card-h" style={{color:"#94a3b8"}}>🔓 FA残留（{unclaimed.length}人）</div>
+            <div style={{fontSize:10,color:"#94a3b8",marginBottom:8}}>FA市場で他球団と交渉できます</div>
+            {unclaimed.map(p=>(
+              <div key={p.id} className="fsb" style={{padding:"5px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}>
+                <div>
+                  <span style={{fontSize:12,color:"#94a3b8"}}>{p.name}</span>
+                  <span style={{fontSize:10,color:"#4b5563",marginLeft:6}}>{p.pos} / {p.age}歳</span>
+                </div>
+                <span style={{fontSize:10,color:"#4b5563"}}>{fmtSal(p.salary)}/年 → FA</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {claimed.length===0&&unclaimed.length===0&&(
+          <div className="card" style={{textAlign:"center",padding:"24px 16px",marginBottom:10}}>
+            <div style={{fontSize:11,color:"#94a3b8"}}>戦力外通告の対象選手はいませんでした</div>
+          </div>
+        )}
+        <button className="btn btn-gold" style={{width:"100%",padding:"12px 0",marginTop:8}} onClick={onNext}>
           ドラフトへ →
         </button>
       </div>
