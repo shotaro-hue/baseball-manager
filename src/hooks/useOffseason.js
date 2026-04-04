@@ -229,7 +229,7 @@ export function useOffseason(gs) {
         }
         return true;
       });
-      if(t.id===myId){updatedPlayers.filter(p=>(p.morale||70)<45).forEach(p=>{setMailbox(prev=>[...prev,{id:uid(),type:"morale_warning",read:false,subject:"【モラル低下】"+p.name+"のモラルが低下しています",body:p.name+"選手（"+p.pos+"）のモラルが"+Math.round(p.morale||70)+"まで低下しています。出場機会や年俸条件を確認してください。",player:p}]);});}
+      if(t.id===myId){updatedPlayers.filter(p=>(p.morale||70)<45).forEach(p=>{setMailbox(prev=>[...prev,{id:uid(),type:"morale_warning",read:false,title:"【モラル低下】"+p.name+"のモラルが低下しています",from:"チーム管理部",dateLabel:year+"年",timestamp:Date.now(),body:p.name+"選手（"+p.pos+"）のモラルが"+Math.round(p.morale||70)+"まで低下しています。出場機会や年俸条件を確認してください。",player:p}]);});}
       const overseasDeparted=new Set();
       const playersAfterOverseas=updatedPlayers.filter(p=>{
         const thresh=getFaThreshold(p);
@@ -237,7 +237,7 @@ export function useOffseason(gs) {
         if(overseas>=70&&(p.daysOnActiveRoster??(p.serviceYears??0)*120)>=thresh.overseas){
           overseasDeparted.add(p.id);
           addNews({type:"season",headline:"【海外FA】"+p.name+"（"+t.name+"）が海外移籍を宣言",source:"野球速報",dateLabel:year+"年",body:p.name+"選手（"+p.age+"歳）が海外FA権を行使し、NPBを離脱した。"});
-          if(t.id===myId) setMailbox(prev=>[...prev,{id:uid(),type:"overseas_fa",read:false,subject:"【海外FA】"+p.name+"が海外移籍を宣言",body:p.name+"選手（"+p.age+"歳）が海外FA権を行使しました。チームを離れます。",player:p}]);
+          if(t.id===myId) setMailbox(prev=>[...prev,{id:uid(),type:"overseas_fa",read:false,title:"【海外FA】"+p.name+"が海外移籍を宣言",from:p.name,dateLabel:year+"年",timestamp:Date.now(),body:p.name+"選手（"+p.age+"歳）が海外FA権を行使しました。チームを離れます。",player:p}]);
           return false;
         }
         return true;
@@ -287,7 +287,7 @@ export function useOffseason(gs) {
     const allAlumni=finalTeams.flatMap(t=>t.history||[]);
     const newInductees=checkHallOfFame(seasonHistory.hallOfFame,allAlumni,year);
     const newHoF=[...seasonHistory.hallOfFame,...newInductees];
-    if(newInductees.length>0){newInductees.forEach(h=>{setMailbox(prev=>[...prev,{id:uid(),type:"hof",read:false,subject:"🏛 殿堂入り: "+h.playerName,body:h.playerName+"選手が"+year+"年度の球団殿堂入りを果たした。"+[h.careerHR>0?"通算"+h.careerHR+"本塁打":"",h.careerW>0?"通算"+h.careerW+"勝":"",h.careerPA>0?"通算"+h.careerPA+"打席":""].filter(Boolean).join(" / ")}]);});}
+    if(newInductees.length>0){newInductees.forEach(h=>{setMailbox(prev=>[...prev,{id:uid(),type:"hof",read:false,title:"🏛 殿堂入り: "+h.playerName,from:"球団殿堂委員会",dateLabel:year+"年",timestamp:Date.now(),body:h.playerName+"選手が"+year+"年度の球団殿堂入りを果たした。"+[h.careerHR>0?"通算"+h.careerHR+"本塁打":"",h.careerW>0?"通算"+h.careerW+"勝":"",h.careerPA>0?"通算"+h.careerPA+"打席":""].filter(Boolean).join(" / ")}]);});}
     const makeRanking=(lg)=>finalTeams.filter(t=>t.league===lg).sort((a,b)=>{const pa=a.wins/Math.max(1,a.wins+a.losses);const pb=b.wins/Math.max(1,b.wins+b.losses);return pb-pa||(b.rf-b.ra)-(a.rf-a.ra);}).map(t=>({id:t.id,name:t.name,emoji:t.emoji,wins:t.wins,losses:t.losses,rf:t.rf,ra:t.ra}));
     const standingsSnap={year,central:makeRanking("セ"),pacific:makeRanking("パ"),titles:awards.titles,playerAwards:{mvpCentral:awards.mvp?.central,mvpPacific:awards.mvp?.pacific,sawamura:awards.sawamura,rookie:awards.rookie}};
     setSeasonHistory(prev=>({...prev,awards:[...prev.awards,awards],records:newRec,hallOfFame:newHoF,standingsHistory:[...(prev.standingsHistory||[]),standingsSnap]}));
