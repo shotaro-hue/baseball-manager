@@ -1,5 +1,5 @@
 import { clamp } from '../utils';
-import { ACCEPT_THRESHOLD, MIN_SALARY_SHIHAKA, MIN_SALARY_IKUSEI, ACTIVE_ROSTER_FA_DAYS_PER_YEAR, MAX_外国人_一軍 } from '../constants';
+import { ACCEPT_THRESHOLD, MIN_SALARY_SHIHAKA, MIN_SALARY_IKUSEI, ACTIVE_ROSTER_FA_DAYS_PER_YEAR } from '../constants';
 import { tradeValue, analyzeTeamNeeds } from './trade';
 
 /* ═══════════════════════════════════════════════
@@ -171,7 +171,7 @@ export function processCpuFaBids(teams, myId, faPool, allTeams) {
 
   const news = [];
   let remainingPool = [...faPool];
-  const teamMap = new Map(teams.map(t => [t.id, { ...t, players: [...t.players], farm: [...(t.farm || [])] }]));
+  const teamMap = new Map(teams.map(t => [t.id, { ...t, players: [...t.players] }]));
 
   // 各 CPU チームが最も欲しい FA 候補に入札
   const bids = [];
@@ -205,21 +205,11 @@ export function processCpuFaBids(teams, myId, faPool, allTeams) {
     const team = teamMap.get(bid.tid);
     if (!player || !team) continue;
 
-    const foreignActiveOnTeam = team.players.filter(p => p.isForeign).length;
-    const goToFarm = player.isForeign && foreignActiveOnTeam >= MAX_外国人_一軍;
-    if (goToFarm) {
-      teamMap.set(bid.tid, {
-        ...team,
-        farm: [...(team.farm || []), { ...player, isFA: false, contractYearsLeft: 1, salary: bid.salary }],
-        budget: team.budget - bid.salary,
-      });
-    } else {
-      teamMap.set(bid.tid, {
-        ...team,
-        players: [...team.players, { ...player, isFA: false, contractYearsLeft: 1, salary: bid.salary }],
-        budget: team.budget - bid.salary,
-      });
-    }
+    teamMap.set(bid.tid, {
+      ...team,
+      players: [...team.players, { ...player, isFA: false, contractYearsLeft: 1, salary: bid.salary }],
+      budget: team.budget - bid.salary,
+    });
     remainingPool = remainingPool.filter(p => p.id !== bid.pid);
     signedPlayers.add(bid.pid);
     signedTeams.add(bid.tid);

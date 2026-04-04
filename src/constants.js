@@ -237,25 +237,3 @@ export const DEV_GOALS_PITCHER = [
   { key: "promotion", label: "支配下昇格目標" },
 ];
 
-// ── 外国人FA市場 ─────────────────────────────────
-export const FOREIGN_FA_COUNT_MIN = 5;
-export const FOREIGN_FA_COUNT_MAX = 10;
-export const FOREIGN_DEADLINE_DAY = 100;
-export const FOREIGN_AGENT_SALARY_RATIO = 1.2;
-export const FOREIGN_AGENT_ACCEPT_PROB = 0.55;
-
-export const FOREIGN_PLAYER_NAMES = [
-  "ロドリゲス","ガルシア","マルティネス","ゴメス","ヘルナンデス",
-  "ウィルソン","ジョンソン","スミス","ブラウン","ジョーンズ",
-  "チェン","キム","パク","リ","ルー",
-  "アルバレス","モレノ","カスティーヨ","フローレス","ペレス",
-  "オコエ","ンウォス","トーレス","ロペス","サンチェス",
-  "ミラー","ダービス","トンプソン","テイラー","アンダーソン",
-  "ディアス","ヒメネス","バルデス","カブレラ","モンテス",
-];
-
-export const FOREIGN_NATIONALITIES = [
-  "ドミニカ","ベネズエラ","キューバ","アメリカ","韓国",
-  "台湾","メキシコ","パナマ","コロンビア","ブラジル",
-  "オーストラリア","プエルトリコ",
-];
