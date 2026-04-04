@@ -81,7 +81,7 @@
 | E1 | **スタミナ連動疲弊度計算** | `calcEffectiveFatigue(pitchCount, pitcher)` を新設。`effectiveStamina = stamina × (condition/100)` でコンディションも加味し疲弊度%で交代判断。`PITCH_WARNING/PITCH_LIMIT` を廃止し `FATIGUE_WARNING=83/FATIGUE_LIMIT=100/PITCH_HARD_CAP=130` に置換。スタミナ高の投手は長く投げられ、低コンディション時は早く疲弊するようになった | — |
 | E2 | **継投パターン設定画面** | RosterTab に「📋 継投」サブタブを追加。①先発ローテーション並び替え・除外・追加、②抑え/セットアッパー指名（重複禁止バリデーション）、③中継ぎ優先順設定。`team.pitchingPattern` フィールドを新設し `pickBullpenArm` に反映。指名投手不在時はスコアベース選択にフォールバック | — |
 | B9 | **[P0] 起動時の黒画面（useState TDZ エラー）** | `App.jsx` で `news` / `mailbox` / `cpuTradeOffers` / `draftPool` / `draftResult` / `playoff` / `draftAllocation` の7つの `useState` がコンポーネント中盤（旧 line 625–631）に後置されており、それより前の `tabBadges` useMemo 依存配列が `mailbox` を宣言前に参照し TDZ `ReferenceError` が発生。React レンダリングがクラッシュして黒画面になっていた。7つの宣言を `schedule` の直後（line 62 以降）に移動して修正 | 1394edd |
-| N1 | **[P1] メール・ニュース通知配信改善** | `subject`→`title` フィールド統一（championship / owner_trust / morale_warning / overseas_fa / hof）・戦術試合後ニュース欠落修正・CPUトレードオファー確率5%→15%・インタビュー確率20%→35%・怪我ニュース追加 | （実装完了） |
+| N1 | **[P1] メール・ニュース通知配信改善** | `subject`→`title` フィールド統一（championship / owner_trust / morale_warning / overseas_fa / hof）・戦術試合後ニュース欠落修正・CPUトレードオファー確率5%→15%・インタビュー確率20%→35%・怪我ニュース追加 | ac0704f |
 
 ---
 
