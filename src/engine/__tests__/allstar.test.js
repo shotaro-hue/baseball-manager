@@ -59,12 +59,16 @@ describe('selectAllStars', () => {
 });
 
 describe('runAllStarGame', () => {
-  it('試合結果のスコアとMVPを返す', () => {
+  it('2試合分のスコアとMVP、開催球場を返す', () => {
     const teams = [...buildLeagueTeams('セ', 0), ...buildLeagueTeams('パ', 6)];
     const rosters = selectAllStars(teams);
     const result = runAllStarGame(rosters);
-    expect(result.score.ce).toBeGreaterThanOrEqual(0);
-    expect(result.score.pa).toBeGreaterThanOrEqual(0);
-    expect(result.mvp).toBeTruthy();
+    expect(result.game1.score.ce).toBeGreaterThanOrEqual(0);
+    expect(result.game1.score.pa).toBeGreaterThanOrEqual(0);
+    expect(result.game1.mvp).toBeTruthy();
+    expect(result.game2.score.ce).toBeGreaterThanOrEqual(0);
+    expect(result.game2.score.pa).toBeGreaterThanOrEqual(0);
+    expect(result.game2.mvp).toBeTruthy();
+    expect(result.venue).toBeTruthy();
   });
 });

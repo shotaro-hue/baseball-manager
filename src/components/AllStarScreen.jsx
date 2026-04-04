@@ -38,12 +38,15 @@ export function AllStarScreen({ year, rosters, gameResult, onEnd }) {
         <div style={{ fontSize: 24, fontWeight: 700, color: '#f5c842', marginBottom: 12 }}>{year}年 プロ野球オールスターゲーム</div>
 
         <div className="card" style={{ marginBottom: 10 }}>
-          <div className="fsb">
-            <div style={{ fontSize: 18, fontWeight: 700 }}>
-              セ・リーグ {gameResult?.score?.ce ?? 0} - {gameResult?.score?.pa ?? 0} パ・リーグ
-            </div>
-            <div style={{ color: '#94a3b8', fontSize: 12 }}>MVP: {gameResult?.mvp?.name || '-'}</div>
+          <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 4 }}>開催球場: {gameResult?.venue || '-'}</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>
+            第1戦 セ・リーグ {gameResult?.game1?.score?.ce ?? 0} - {gameResult?.game1?.score?.pa ?? 0} パ・リーグ
           </div>
+          <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 8 }}>MVP: {gameResult?.game1?.mvp?.name || '-'}</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>
+            第2戦 セ・リーグ {gameResult?.game2?.score?.ce ?? 0} - {gameResult?.game2?.score?.pa ?? 0} パ・リーグ
+          </div>
+          <div style={{ color: '#94a3b8', fontSize: 11 }}>MVP: {gameResult?.game2?.mvp?.name || '-'}</div>
         </div>
 
         <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>ファン投票選出</div>

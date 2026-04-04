@@ -137,10 +137,18 @@ export function useSeasonFlow(gs) {
     if (!asResult) return;
     addNews({
       type: 'allstar',
-      headline: `【オールスター】セ${asResult.score.ce} - パ${asResult.score.pa}`,
+      headline: `【オールスター第1戦】セ${asResult.game1.score.ce} - パ${asResult.game1.score.pa}`,
       source: 'NPB公式',
       dateLabel: `${year}年 ${dayLabel}日目`,
-      body: `セ・リーグ選抜 ${asResult.score.ce} - ${asResult.score.pa} パ・リーグ選抜。MVPは${asResult.mvp?.name || '選手未選出'}。`,
+      body: `開催球場: ${asResult.venue}
+セ・リーグ選抜 ${asResult.game1.score.ce} - ${asResult.game1.score.pa} パ・リーグ選抜。MVP: ${asResult.game1.mvp?.name || '未選出'}。`,
+    });
+    addNews({
+      type: 'allstar',
+      headline: `【オールスター第2戦】セ${asResult.game2.score.ce} - パ${asResult.game2.score.pa}`,
+      source: 'NPB公式',
+      dateLabel: `${year}年 ${dayLabel + 1}日目`,
+      body: `セ・リーグ選抜 ${asResult.game2.score.ce} - ${asResult.game2.score.pa} パ・リーグ選抜。MVP: ${asResult.game2.mvp?.name || '未選出'}。`,
     });
   };
 
@@ -285,7 +293,7 @@ export function useSeasonFlow(gs) {
     setGameDay(d=>d+1);
     if(!allStarDone && gameDay+1===ALL_STAR_GAMEDAY){
       const rosters=selectAllStars(teams);
-      const asResult=runAllStarGame(rosters);
+      const asResult=runAllStarGame(rosters, year);
       setTeams(prev=>applyAllStarSelections(prev, rosters));
       setAllStarDone(true);
       setAllStarResult({ rosters, gameResult: asResult });
@@ -410,7 +418,7 @@ export function useSeasonFlow(gs) {
       results.push({...r,won,oppTeam:opp,gameNo:newDay});
       if(!allStarDoneLocal && newDay===ALL_STAR_GAMEDAY){
         const rosters=selectAllStars(newTeams);
-        const asResult=runAllStarGame(rosters);
+        const asResult=runAllStarGame(rosters, year);
         newTeams=applyAllStarSelections(newTeams, rosters);
         allStarDoneLocal=true;
         publishAllStarNews(asResult, newDay);
@@ -521,7 +529,7 @@ export function useSeasonFlow(gs) {
     setGameDay(d=>d+1);
     if(!allStarDone && gameDay+1===ALL_STAR_GAMEDAY){
       const rosters=selectAllStars(teams);
-      const asResult=runAllStarGame(rosters);
+      const asResult=runAllStarGame(rosters, year);
       setTeams(prev=>applyAllStarSelections(prev, rosters));
       setAllStarDone(true);
       setAllStarResult({ rosters, gameResult: asResult });

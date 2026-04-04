@@ -113,7 +113,25 @@ export function generateSeasonSchedule(year, teams) {
 
   assignRegularCards(postDates);
 
-  // schedule[1..143] が完成（schedule.length - 1 === 143 のはず）
+  const asDates = params.allStarSkipDates || [];
+  if (asDates.length >= 3) {
+    schedule.push({
+      gameNo: null,
+      date: asDates[1],
+      isAllStar: true,
+      allStarGame: 1,
+      matchups: [],
+    });
+    schedule.push({
+      gameNo: null,
+      date: asDates[2],
+      isAllStar: true,
+      allStarGame: 2,
+      matchups: [],
+    });
+  }
+
+  // schedule[1..143] = 公式戦, schedule[144..145] = オールスター
   return schedule;
 }
 

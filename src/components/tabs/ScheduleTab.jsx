@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { gameDayToDate } from '../../utils';
 import { getMyMatchup } from '../../engine/scheduleGen';
-import { SEASON_GAMES, ALL_STAR_GAMEDAY } from '../../constants';
+import { SEASON_GAMES, ALL_STAR_GAMEDAY, ALL_STAR_GAMEDAY_2 } from '../../constants';
 
 const MONTH_LABELS = ['3月','4月','5月','6月','7月','8月','9月','10月'];
 // 月曜始まり: 0=月,1=火,2=水,3=木,4=金,5=土,6=日
@@ -68,8 +68,12 @@ function buildMonthGrid(schedule, year, myId, month, gameResultsMap) {
     const day = schedule[idx];
     if (!day) continue;
     if (day.date.month !== month) continue;
-    const matchup = getMyMatchup(schedule, idx, myId);
-    monthEntries.push({ dayNo: idx, date: day.date, matchup });
+    if (day.isAllStar) {
+      monthEntries.push({ dayNo: idx, date: day.date, matchup: null, isAllStar: true, allStarGame: day.allStarGame });
+    } else {
+      const matchup = getMyMatchup(schedule, idx, myId);
+      monthEntries.push({ dayNo: idx, date: day.date, matchup });
+    }
   }
   if (monthEntries.length === 0) return [];
 
@@ -100,13 +104,15 @@ function buildMonthGrid(schedule, year, myId, month, gameResultsMap) {
     } else {
       const entry = byDate.get(key);
       if (entry) {
-        const result = gameResultsMap?.[entry.dayNo] ?? null;
-        const isAllStar = entry.dayNo === ALL_STAR_GAMEDAY;
-        cells.push({ type: 'game', date: { month: m, day: d }, dayNo: entry.dayNo, matchup: entry.matchup, result, isAllStar });
+        if (entry.isAllStar) {
+          cells.push({ type: 'allstar', date: { month: m, day: d }, dayNo: entry.dayNo, allStarGame: entry.allStarGame });
+        } else {
+          const result = gameResultsMap?.[entry.dayNo] ?? null;
+          cells.push({ type: 'game', date: { month: m, day: d }, dayNo: entry.dayNo, matchup: entry.matchup, result, isAllStar: false });
+        }
       } else {
         const dayNo = schedule.findIndex(sd => sd?.date?.month === m && sd?.date?.day === d);
-        const isAllStar = dayNo === ALL_STAR_GAMEDAY;
-        cells.push({ type: 'off', date: { month: m, day: d }, dayNo, isAllStar });
+        cells.push({ type: 'off', date: { month: m, day: d }, dayNo, isAllStar: false });
       }
     }
     cursor.setDate(cursor.getDate() + 1);
@@ -159,10 +165,37 @@ function ResultModal({ dayNo, result, date, year, opponent, onClose }) {
 }
 
 // 月別週グリッドセル
-function GridCell({ cell, year, teamMap, isToday, isSelected, onSelect, onResultClick }) {
+function GridCell({ cell, year, teamMap, isToday, isSelected, onSelect, onResultClick, allStarResult }) {
   if (cell.type === 'other') {
     return <div style={{ minHeight: 54, background: 'transparent' }} />;
   }
+  if (cell.type === 'allstar') {
+    const asResult = cell.allStarGame === 1
+      ? allStarResult?.gameResult?.game1
+      : allStarResult?.gameResult?.game2;
+    return (
+      <div
+        style={{
+          minHeight: 54,
+          background: 'rgba(245,200,66,.16)',
+          border: '1px solid rgba(245,200,66,.45)',
+          borderRadius: 6,
+          padding: '4px 6px',
+          cursor: 'default',
+        }}
+      >
+        <div style={{ fontSize: 10, color: '#f5c842', fontWeight: 700 }}>{cell.date.day}</div>
+        <div style={{ fontSize: 9, color: '#f5c842', marginTop: 2, fontWeight: 700 }}>⭐ AS第{cell.allStarGame}戦</div>
+        <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 1 }}>セ vs パ</div>
+        {asResult && (
+          <div style={{ fontSize: 9, color: '#f5c842', marginTop: 2, fontWeight: 700 }}>
+            {asResult.score.ce}-{asResult.score.pa}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (cell.type === 'off') {
     return (
       <div style={{ minHeight: 54, background: cell.isAllStar ? 'rgba(245,200,66,.12)' : 'rgba(15,23,42,.2)', border: cell.isAllStar ? '1px solid rgba(245,200,66,.35)' : '1px solid transparent', borderRadius: 6, padding: '4px 6px' }}>
@@ -275,7 +308,7 @@ function SeasonProgressBar({ gameDay, wins, losses }) {
   );
 }
 
-export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResultsMap = {}, allStarDone = false }) {
+export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResultsMap = {}, allStarDone = false, allStarResult = null }) {
   const [selectedDay, setSelectedDay] = useState(gameDay);
   const [resultModal, setResultModal] = useState(null); // dayNo or null
 
@@ -339,7 +372,7 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
       <div className="card" style={{ background: 'rgba(245,200,66,.06)' }}>
         <div className="card-h">⭐ オールスターゲーム</div>
         <div style={{ fontSize: 12, color: '#cbd5e1' }}>
-          第{ALL_STAR_GAMEDAY}戦 ({formatDate(gameDayToDate(ALL_STAR_GAMEDAY, schedule))}) に開催
+          第{ALL_STAR_GAMEDAY}・{ALL_STAR_GAMEDAY_2}戦 ({formatDate(gameDayToDate(ALL_STAR_GAMEDAY, schedule))}) に開催（2試合制）
           <span style={{ marginLeft: 8, color: allStarDone ? '#4ade80' : '#f5c842' }}>{allStarDone ? '実施済み' : '未実施'}</span>
         </div>
       </div>
@@ -359,7 +392,7 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
                   {todayMatchup.isHome ? 'ホーム開催' : 'ビジター'}
                 </span>
                 {todayMatchup.isInterleague && <span className="chip cy">🔄 交流戦</span>}
-                {gameDay===ALL_STAR_GAMEDAY && <span className="chip" style={{ background: 'rgba(245,200,66,.18)', color: '#f5c842' }}>⭐ オールスター開催日</span>}
+                {(gameDay===ALL_STAR_GAMEDAY||gameDay===ALL_STAR_GAMEDAY_2) && <span className="chip" style={{ background: 'rgba(245,200,66,.18)', color: '#f5c842' }}>⭐ オールスター開催日</span>}
                 {todayMatchup.venueNote && <span style={{ fontSize: 10, color: '#f5c842' }}>{venueNoteLabel(todayMatchup.venueNote)}</span>}
               </div>
             </div>
@@ -458,6 +491,7 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
                       isSelected={cell.type === 'game' && cell.dayNo === selectedDay}
                       onSelect={setSelectedDay}
                       onResultClick={setResultModal}
+                      allStarResult={allStarResult}
                     />
                   ))}
                 </div>

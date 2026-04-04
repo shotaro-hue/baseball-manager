@@ -4,6 +4,7 @@
 
 export const SEASON_GAMES = 143;
 export const ALL_STAR_GAMEDAY = 72; // シーズン中盤オールスター発火 gameDay
+export const ALL_STAR_GAMEDAY_2 = 73; // オールスター第2戦
 export const HANSHIN_ID = 3;   // 阪神タイガース（甲子園使用制限の影響チーム）
 export const ORIX_ID    = 11;  // オリックス・バファローズ（京セラドーム共同利用）
 export const KYOCERA_DOME_TEAMS = [3, 11]; // 甲子園制限期間中に京セラを共有するチーム
@@ -43,6 +44,25 @@ export const PITCH_NORM      = 120;  // calcFatigue 正規化分母
 export const PITCH_HARD_CAP  = 130;  // 球数の絶対上限（安全弁）
 export const FATIGUE_WARNING = 83;   // 疲弊度警告閾値（stamina=50, condition=100 時 ≈ 100球相当）
 export const FATIGUE_LIMIT   = 100;  // 疲弊度強制交代閾値（stamina=50, condition=100 時 ≈ 120球相当）
+
+
+
+export const TEAM_STADIUMS = {
+  0:  '明治神宮野球場',
+  1:  '横浜スタジアム',
+  2:  'MAZDA Zoom-Zoom スタジアム広島',
+  3:  '阪神甲子園球場',
+  4:  '東京ドーム',
+  5:  'バンテリンドーム ナゴヤ',
+  6:  'みずほPayPayドーム福岡',
+  7:  '楽天モバイルパーク宮城',
+  8:  'ベルーナドーム',
+  9:  'ZOZOマリンスタジアム',
+  10: 'エスコンフィールドHOKKAIDO',
+  11: '京セラドーム大阪',
+};
+
+export const ALL_STAR_VENUE_ROTATION = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
 export const TEAM_DEFS = [
   { id: 0,  name: "東京ヤクルトスワローズ",         short: "ヤクルト",   league: "セ", emoji: "🦢", color: "#22d3ee", city: "東京",   budget: 500000 },
