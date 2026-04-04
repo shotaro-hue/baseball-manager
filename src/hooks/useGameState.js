@@ -205,7 +205,21 @@ export function useGameState() {
     if(!p) return;
     if(p.育成){notify("育成選手は一軍出場不可。先に支配下登録してください","warn");return;}
     if(myTeam.players.length>=MAX_ROSTER){notify("一軍枠満杯","warn");return;}
-    if(p.isForeign&&myTeam.players.filter(x=>x.isForeign).length>=MAX_外国人_一軍){notify(`外国人枠は${MAX_外国人_一軍}名まで`,"warn");return;}
+    if (p.isForeign) {
+      const foreignPlayers = myTeam.players.filter(x => x.isForeign);
+      if (foreignPlayers.length >= MAX_外国人_一軍) {
+        notify(`外国人枠は${MAX_外国人_一軍}名まで`,"warn");
+        return;
+      }
+      const foreignPitchers = foreignPlayers.filter(x => x.isPitcher).length;
+      const foreignBatters = foreignPlayers.length - foreignPitchers;
+      const wouldBeAllPitchers = p.isPitcher && foreignPlayers.length === MAX_外国人_一軍 - 1 && foreignPitchers === MAX_外国人_一軍 - 1;
+      const wouldBeAllBatters = !p.isPitcher && foreignPlayers.length === MAX_外国人_一軍 - 1 && foreignBatters === MAX_外国人_一軍 - 1;
+      if (wouldBeAllPitchers || wouldBeAllBatters) {
+        notify("外国人登録は投手4名または野手4名のみにはできません", "warn");
+        return;
+      }
+    }
     if((p.registrationCooldownDays??0)>0){notify(`登録抹消後10日ルール: あと${p.registrationCooldownDays}日は昇格不可`,"warn");return;}
     upd(myId,t=>({...t,players:[...t.players,p],farm:t.farm.filter(x=>x.id!==pid)}));
     notify(`${p.name}を一軍昇格！`,"ok");

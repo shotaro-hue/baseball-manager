@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles.css';
-import { uid, fmtM, fmtSal, gameDayToDate, scoutedValue, clamp } from './utils';
+import { uid, fmtM, fmtSal, gameDayToDate, scoutedValue, clamp, rngf } from './utils';
 import { loadGame, getSaveMeta, deleteSave } from './engine/saveload';
 import { generateSeasonSchedule, calcAllStarTriggerDay } from './engine/scheduleGen';
 import { SEASON_PARAMS, getDefaultParams } from './data/scheduleParams.js';
@@ -15,7 +16,11 @@ import { PressConferenceModal } from './components/PressConferenceModal';
 import { AllStarScreen } from './components/AllStarScreen';
 import { DashboardTab } from './components/DashboardTab';
 import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab, ScheduleTab } from './components/Tabs';
-import { SEASON_GAMES, BATCH, MAX_外国人_一軍, TEAM_DEFS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS, POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD } from './constants';
+import {
+  SEASON_GAMES, BATCH, MAX_外国人_一軍, TEAM_DEFS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
+  POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD,
+  FOREIGN_DEADLINE_DAY, FOREIGN_AGENT_SALARY_RATIO, FOREIGN_AGENT_ACCEPT_PROB,
+} from './constants';
 import { calcOwnerTrustDelta } from './engine/frontend';
 import { useGameState } from './hooks/useGameState';
 import { useSeasonFlow } from './hooks/useSeasonFlow';
@@ -68,6 +73,49 @@ export default function App(){
   } = gs;
   const { gameResult, currentOpp, batchResults, playoff, setPlayoff } = sf;
   const { developmentSummary, newSeasonInfo, draftPool, setDraftPool, draftResult, setDraftResult, draftAllocation, setDraftAllocation, waiverClaimResults } = os;
+  const [agentNeg, setAgentNeg] = useState(null);
+
+  const foreignFaPool = faPool.filter(p => p.isForeign);
+  const domesticFaPool = faPool.filter(p => !p.isForeign);
+  const foreignActiveCount = myTeam?.players?.filter(p => p.isForeign).length || 0;
+
+  const startNeg = (player) => {
+    const salaryDemand = Math.ceil((player.salary || 0) * FOREIGN_AGENT_SALARY_RATIO);
+    const minYears = player.age <= 30 ? 2 : 1;
+    setAgentNeg({ player, round: 1, salaryDemand, minYears, salaryOffer: salaryDemand });
+  };
+
+  const signForeignPlayer = (player, salary, years) => {
+    const totalCost = salary * years;
+    if ((myTeam?.budget || 0) < totalCost) { notify("予算不足", "warn"); return; }
+    const foreignPitchers = (myTeam?.players || []).filter(p => p.isForeign && p.isPitcher).length;
+    const foreignBatters = (myTeam?.players || []).filter(p => p.isForeign && !p.isPitcher).length;
+    const wouldBeAllPitchers = player.isPitcher && foreignPitchers === MAX_外国人_一軍 - 1;
+    const wouldBeAllBatters = !player.isPitcher && foreignBatters === MAX_外国人_一軍 - 1;
+    const balanceViolation = foreignActiveCount === MAX_外国人_一軍 - 1 && (wouldBeAllPitchers || wouldBeAllBatters);
+    const goToFarm = foreignActiveCount >= MAX_外国人_一軍 || balanceViolation;
+    if (goToFarm) {
+      upd(myId, t => ({
+        ...t,
+        budget: t.budget - totalCost,
+        farm: [...(t.farm || []), { ...player, isFA: false, contractYearsLeft: years, contractYears: years, salary }],
+      }));
+      const reason = foreignActiveCount >= MAX_外国人_一軍
+        ? "外国人枠満杯"
+        : "投手4名または野手4名は登録不可";
+      notify(`${player.name}と契約（${reason}のため二軍スタート）`, "warn");
+    } else {
+      upd(myId, t => ({
+        ...t,
+        budget: t.budget - totalCost,
+        players: [...t.players, { ...player, isFA: false, contractYearsLeft: years, contractYears: years, salary }],
+      }));
+      notify(`${player.name}を一軍登録で獲得！(${years}年 計${fmtSal(totalCost)})`, "ok");
+    }
+    setFaPool(prev => prev.filter(p => p.id !== player.id));
+    setFaYears(prev => { const n = { ...prev }; delete n[player.id]; return n; });
+    setAgentNeg(null);
+  };
 
   // ── タイトル画面 ──
   if(screen==="title"){const saveMeta=saveExists?getSaveMeta():null;return(<><div className="app"><div className="title"><div className="tlogo">⚾ BASEBALL<br/>MANAGER 2025</div><div className="tsub">NPB SIMULATION v2.1 — TACTICAL MODE</div>{saveMeta&&(<div style={{background:"rgba(74,222,128,.08)",border:"1px solid rgba(74,222,128,.3)",borderRadius:8,padding:"10px 14px",marginBottom:16,textAlign:"left"}}><div style={{fontSize:10,color:"#4ade80",letterSpacing:".1em",marginBottom:6}}>◈ セーブデータ</div><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}><div><div style={{fontWeight:700,fontSize:15}}>{saveMeta.teamEmoji} {saveMeta.teamName}</div><div style={{fontSize:11,color:"#94a3b8"}}>{saveMeta.year}年 第{saveMeta.gameDay}戦 {saveMeta.wins}勝{saveMeta.losses}敗</div><div style={{fontSize:9,color:"#64748b",marginTop:2}}>{saveMeta.savedAt}</div></div><div style={{display:"flex",gap:6,alignItems:"center"}}><button className="sim-btn" style={{margin:0,padding:"8px 18px",fontSize:13,background:"linear-gradient(135deg,#14532d,#166534)",borderColor:"rgba(74,222,128,.6)",color:"#4ade80"}} onClick={handleLoad}>▶ 続きから</button><button className="bsm bgr" style={{padding:"6px 10px"}} onClick={()=>{if(window.confirm('セーブデータを削除しますか？')){deleteSave();setSaveExists(false);}}}>削除</button></div></div></div>)}<div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,marginTop:saveExists?8:0,zIndex:1,position:"relative"}}>◈ 新規ゲーム — チームを選択</div><div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,zIndex:1,position:"relative"}}>◈ セントラルリーグ</div><div className="tgrid" style={{marginBottom:14}}>{TEAM_DEFS.filter(t=>t.league==="セ").map(t=><div key={t.id} className="tcard" style={{"--c":t.color}} onClick={()=>gs.handleSelect(t.id)}><span style={{fontSize:24,display:"block",marginBottom:5}}>{t.emoji}</span><div className="tcard-nm">{t.name}</div></div>)}</div><div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,zIndex:1,position:"relative"}}>◈ パシフィックリーグ</div><div className="tgrid">{TEAM_DEFS.filter(t=>t.league==="パ").map(t=><div key={t.id} className="tcard" style={{"--c":t.color}} onClick={()=>gs.handleSelect(t.id)}><span style={{fontSize:24,display:"block",marginBottom:5}}>{t.emoji}</span><div className="tcard-nm">{t.name}</div></div>)}</div></div></div></>);}
@@ -167,11 +215,69 @@ export default function App(){
     {tab==="trade"&&(()=>{const pendingTrades=mailbox.filter(m=>m.type==="trade"&&!m.resolved);return<TradeTab myTeam={myTeam} teams={teams} onTrade={os.handleTrade} cpuOffers={pendingTrades.map(m=>m.offer)} onAcceptOffer={(idx)=>os.handleMailAction(pendingTrades[idx].id,"accept")} onDeclineOffer={(idx)=>os.handleMailAction(pendingTrades[idx].id,"decline")} deadlinePassed={gameDay>95} onPlayerClick={gs.handlePlayerClick}/>;})()}
     {tab==="contract"&&<ContractTab team={myTeam} allTeams={teams} onOffer={os.handleContractOffer} onRelease={pid=>{const p=myTeam?.players.find(x=>x.id===pid);const popPenalty=(p?.salary??0)>POP_RELEASE_SALARY_THRESHOLD?POP_RELEASE_PENALTY:0;upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),popularity:Math.min(100,Math.max(0,(t.popularity??50)+popPenalty))}));if(p){addToHistory(myId,p,"自由契約");setFaPool(prev=>[...prev,{...p,isFA:true}]);}notify("放出しました","warn");}}/>}
     {tab==="alumni"&&<AlumniTab myTeam={myTeam}/>}
-    {tab==="fa"&&(
+        {tab==="fa"&&(
       <div className="card">
-        <div className="card-h">FA市場 ({faPool.length}人)</div>
-        {faPool.length===0&&<p style={{color:"#2a3a4c",fontSize:12}}>現在FA選手はいません</p>}
-        {faPool.map((p,i)=>{
+        <div className="card-h">FA市場 ({faPool.length}人)
+          <span className="chip cb" style={{marginLeft:8,fontSize:10}}>外国人一軍: {foreignActiveCount}/{MAX_外国人_一軍}</span>
+        </div>
+
+        <div className="card-h" style={{marginTop:8}}>🌏 外国人FA市場 ({foreignFaPool.length}人)</div>
+        {gameDay>FOREIGN_DEADLINE_DAY&&(
+          <div className="card2" style={{borderColor:"rgba(248,113,113,.4)",color:"#fca5a5"}}>交渉期限終了（7月末）</div>
+        )}
+        {foreignFaPool.length===0&&<p style={{color:"#2a3a4c",fontSize:12}}>現在、外国人FA選手はいません</p>}
+        {foreignFaPool.map((p)=>{
+          const active = agentNeg?.player?.id===p.id;
+          return(
+            <div key={p.id} className="card2">
+              <div className="fsb" style={{flexWrap:"wrap",gap:6}}>
+                <div>
+                  <span style={{fontWeight:700,fontSize:13}}>{p.name}</span>
+                  <span style={{fontSize:10,color:"#374151",marginLeft:8}}>{p.pos}/{p.age}歳 {p.hometown} 出身 · 基準{fmtSal(p.salary)}/年</span>
+                </div>
+                <div style={{fontSize:10,color:"#374151"}}>{p.isPitcher?`投: 球速${p.pitching?.velocity||"-"} 制球${p.pitching?.control||"-"}`:`打: ミ${p.batting?.contact||"-"} パ${p.batting?.power||"-"}`}</div>
+              </div>
+              {!active&&(
+                <button className="bsm bga" style={{marginTop:8,opacity:gameDay>FOREIGN_DEADLINE_DAY?0.5:1}} disabled={gameDay>FOREIGN_DEADLINE_DAY} onClick={()=>startNeg(p)}>
+                  代理人交渉
+                </button>
+              )}
+              {active&&agentNeg&&(
+                <div style={{marginTop:8,borderTop:"1px solid rgba(100,116,139,.25)",paddingTop:8,fontSize:11}}>
+                  {agentNeg.round===1&&(
+                    <>
+                      <div style={{marginBottom:6,color:"#cbd5e1"}}>Round 1: 年俸交渉（代理人要求: {fmtSal(agentNeg.salaryDemand)}/年）</div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        <button className="bsm bga" onClick={()=>setAgentNeg(prev=>({...prev,round:2,salaryOffer:prev.salaryDemand}))}>要求を呑む</button>
+                        <button className="bsm bga" onClick={()=>{
+                          const accepted = rngf(0,1) < FOREIGN_AGENT_ACCEPT_PROB;
+                          if(!accepted){ notify("エージェントが交渉を打ち切りました", "warn"); setAgentNeg(null); return; }
+                          setAgentNeg(prev=>({...prev,round:2,salaryOffer:prev.player.salary}));
+                        }}>基準年俸で交渉</button>
+                        <button className="bsm bgr" onClick={()=>setAgentNeg(null)}>交渉打ち切り</button>
+                      </div>
+                    </>
+                  )}
+                  {agentNeg.round===2&&(
+                    <>
+                      <div style={{marginBottom:6,color:"#cbd5e1"}}>Round 2: 契約年数（最低 {agentNeg.minYears} 年）</div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        <button className="bsm bga" onClick={()=>signForeignPlayer(agentNeg.player, agentNeg.salaryOffer, agentNeg.minYears)}>
+                          同意する（{agentNeg.minYears}年 計{fmtSal(agentNeg.salaryOffer*agentNeg.minYears)}）
+                        </button>
+                        <button className="bsm bgr" onClick={()=>setAgentNeg(null)}>交渉打ち切り</button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        <div className="card-h" style={{marginTop:12}}>国内FA・戦力外 ({domesticFaPool.length}人)</div>
+        {domesticFaPool.length===0&&<p style={{color:"#2a3a4c",fontSize:12}}>現在FA選手はいません</p>}
+        {domesticFaPool.map((p)=>{
           const yrs=faYears[p.id]||1;
           const totalCost=p.salary*yrs;
           const canAfford=myTeam.budget>=totalCost;
@@ -182,7 +288,7 @@ export default function App(){
               <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
                 <span style={{fontSize:10,color:"#374151"}}>契約年数:</span>
                 {[1,2,3].map(y=><button key={y} className={"bsm "+(yrs===y?"bgb":"bga")} style={{padding:"2px 8px"}} onClick={()=>setFaYears(prev=>({...prev,[p.id]:y}))}>{y}年</button>)}
-                <button className="bsm bga" style={{marginLeft:4,opacity:canAfford?1:0.4}} onClick={()=>{if(!canAfford){notify("予算不足","warn");return;}if(p.isForeign&&myTeam.players.filter(x=>x.isForeign).length>=MAX_外国人_一軍){notify(`外国人枠は${MAX_外国人_一軍}名まで`,"warn");return;}upd(myId,t=>({...t,budget:t.budget-totalCost,players:[...t.players,{...p,isFA:false,contractYearsLeft:yrs}]}));setFaPool(prev=>prev.filter((_,j)=>j!==i));setFaYears(prev=>{const n={...prev};delete n[p.id];return n;});notify(`${p.name}を獲得！(${yrs}年 計${fmtSal(totalCost)})`,"ok");}}>獲得</button>
+                <button className="bsm bga" style={{marginLeft:4,opacity:canAfford?1:0.4}} onClick={()=>{if(!canAfford){notify("予算不足","warn");return;}upd(myId,t=>({...t,budget:t.budget-totalCost,players:[...t.players,{...p,isFA:false,contractYearsLeft:yrs,contractYears:yrs}]}));setFaPool(prev=>prev.filter(x=>x.id!==p.id));setFaYears(prev=>{const n={...prev};delete n[p.id];return n;});notify(`${p.name}を獲得！(${yrs}年 計${fmtSal(totalCost)})`,"ok");}}>獲得</button>
               </div>
             </div>
           </div>

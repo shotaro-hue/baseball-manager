@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getFaThreshold, evalOffer } from '../contract';
+import { getFaThreshold, evalOffer, processCpuFaBids } from '../contract';
 
 describe('getFaThreshold', () => {
   it('高卒は国内FA 960日 (8年×120)', () => {
@@ -54,5 +54,44 @@ describe('evalOffer', () => {
     const result = evalOffer(basePlayer, { salary: 10000000, years: 1 }, baseTeam, allTeams);
     expect(result.total).toBeGreaterThanOrEqual(0);
     expect(result.total).toBeLessThanOrEqual(100);
+  });
+});
+
+describe('processCpuFaBids foreign roster constraint', () => {
+  const mkPitcher = (id) => ({
+    id, name: `P-${id}`, age: 28, pos: '先発', isPitcher: true, isForeign: true, salary: 5000000,
+    personality: { money: 50, winning: 50, playing: 50, hometown: 30, loyalty: 50, stability: 50, future: 50 },
+    trust: 60, hometown: '東京', pitching: { velocity: 72, control: 70, breaking: 68, stamina: 67, clutchP: 60 }, subtype: '先発',
+  });
+  const mkBatter = (id) => ({
+    id, name: `B-${id}`, age: 28, pos: '一塁手', isPitcher: false, isForeign: true, salary: 5000000,
+    personality: { money: 50, winning: 50, playing: 50, hometown: 30, loyalty: 50, stability: 50, future: 50 },
+    trust: 60, hometown: '東京', batting: { contact: 72, power: 70, eye: 68, speed: 60, clutch: 62 },
+  });
+
+  it('外国人投手4人目になる入札はfarmに配置される', () => {
+    const cpu = {
+      id: 1, name: 'CPU', emoji: '🤖', league: 'セ', wins: 60, losses: 60, city: '東京', budget: 999999999,
+      lineup: [], farm: [], players: [mkPitcher('a'), mkPitcher('b'), mkPitcher('c')],
+    };
+    const my = { id: 0, name: 'ME', league: 'セ', wins: 60, losses: 60, city: '大阪', budget: 999999999, lineup: [], farm: [], players: [] };
+    const target = mkPitcher('target');
+    const res = processCpuFaBids([my, cpu], 0, [target], [my, cpu]);
+    const updatedCpu = res.updatedTeams.find(t => t.id === 1);
+    expect(updatedCpu.players.some(p => p.id === 'target')).toBe(false);
+    expect((updatedCpu.farm || []).some(p => p.id === 'target')).toBe(true);
+  });
+
+  it('4人目でも投打バランスを満たす場合は一軍登録される', () => {
+    const cpu = {
+      id: 1, name: 'CPU', emoji: '🤖', league: 'セ', wins: 60, losses: 60, city: '東京', budget: 999999999,
+      lineup: [], farm: [], players: [mkPitcher('a'), mkPitcher('b'), mkBatter('c')],
+    };
+    const my = { id: 0, name: 'ME', league: 'セ', wins: 60, losses: 60, city: '大阪', budget: 999999999, lineup: [], farm: [], players: [] };
+    const target = mkPitcher('target');
+    const res = processCpuFaBids([my, cpu], 0, [target], [my, cpu]);
+    const updatedCpu = res.updatedTeams.find(t => t.id === 1);
+    expect(updatedCpu.players.some(p => p.id === 'target')).toBe(true);
+    expect((updatedCpu.farm || []).some(p => p.id === 'target')).toBe(false);
   });
 });

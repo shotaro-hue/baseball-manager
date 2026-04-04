@@ -1,5 +1,8 @@
 import { rng, clamp, uid, pname, CITIES } from '../utils';
-import { POSITIONS, PLAYER_TYPES_B, PLAYER_TYPES_P, PLAYER_COMMENTS_B, PLAYER_COMMENTS_P, MIN_SALARY_IKUSEI } from '../constants';
+import {
+  POSITIONS, PLAYER_TYPES_B, PLAYER_TYPES_P, PLAYER_COMMENTS_B, PLAYER_COMMENTS_P, MIN_SALARY_IKUSEI,
+  FOREIGN_PLAYER_NAMES, FOREIGN_NATIONALITIES,
+} from '../constants';
 
 
 /* ═══════════════════════════════════════════════
@@ -81,6 +84,35 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
   p.playerType = types[rng(0, types.length - 1)];
   p.playerComment = comments[rng(0, comments.length - 1)];
   return p;
+}
+
+/**
+ * 毎シーズン開幕時に FA 市場へ追加する外国人選手プールを生成する。
+ * @param {number} count
+ * @returns {Object[]}
+ */
+export function generateForeignFaPool(count) {
+  const pool = [];
+  const batPositions = ["一塁手","左翼手","右翼手","中堅手","指名打者"];
+  const pitPositions = ["先発","先発","先発","抑え","中継ぎ"];
+
+  for (let i = 0; i < count; i++) {
+    const isPitch = i % 2 === 0;
+    const q = rng(62, 82);
+    const age = rng(22, 32);
+    const pos = isPitch
+      ? pitPositions[rng(0, pitPositions.length - 1)]
+      : batPositions[rng(0, batPositions.length - 1)];
+    const p = makePlayer(pos, q, isPitch, age, true);
+    p.name = FOREIGN_PLAYER_NAMES[rng(0, FOREIGN_PLAYER_NAMES.length - 1)];
+    p.hometown = FOREIGN_NATIONALITIES[rng(0, FOREIGN_NATIONALITIES.length - 1)];
+    p.salary = rng(8000, 25000);
+    p.contractYearsLeft = 0;
+    p.contractYears = 0;
+    p.isFA = true;
+    pool.push(p);
+  }
+  return pool;
 }
 
 /**
