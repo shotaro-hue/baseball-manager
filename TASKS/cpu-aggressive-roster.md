@@ -29,6 +29,13 @@ roadmap-item: "㊲ CPU球団の積極的補強 (Tier 11)"
 | `src/engine/trade.js` | `analyzeTeamNeeds`（23〜37行）の全実装と、呼び出し2箇所（44行・61行）を修正 |
 | `src/constants.js` | `MAX_ROSTER`（12行）・`MIN_SALARY_SHIHAKA`（16行）・`MAX_外国人_一軍`（14行）付近に新定数を追加 |
 | `src/engine/__tests__/contract.test.js` | 既存テスト構造（`processCpuFaBids foreign roster constraint` describe）を把握してから新ケース追加 |
+| `src/hooks/useOffseason.js` | `handleWaiverPhaseNext`（~299行）に `cpu_fa_summary` メール生成コードを挿入。`setMailbox` の使用パターンを既存コード（posting_result 等）に合わせること |
+| `src/hooks/useGameState.js` | `handlePlayerClick`（~143行）の直下に `teamModal` state + `handleTeamClick` を追加。return オブジェクトも更新 |
+| `src/components/PlayerModal.jsx` | `TeamModal` の実装ガイド。overlay・Escape ハンドリング・タブ構造の参考として全体を一読 |
+| `src/components/tabs/AlumniTab.jsx` | 移籍履歴の色分けスキームを `TeamModal` の history タブで再利用する |
+| `src/components/tabs/MailboxTab.jsx` | `typeIcon`/`typeColor` の定義行と、既存アクションボタン（trade/posting_request）の分岐構造を把握 |
+| `src/components/tabs/StandingsTab.jsx` | チーム名セルの位置を確認してボタン化 |
+| `src/App.jsx` | PlayerModal のレンダリング位置（`{playerModal && ...}`）と MailboxTab/StandingsTab への props 渡しを確認 |
 
 ## 変更するファイル
 
@@ -36,8 +43,14 @@ roadmap-item: "㊲ CPU球団の積極的補強 (Tier 11)"
 |---|---|---|
 | `src/constants.js` | Modify | 定数2件を末尾の既存ブロック後に追加 |
 | `src/engine/trade.js` | Modify | `analyzeTeamNeeds` 戻り値変更 + 呼び出し2箇所（`.includes(...)` → `.type.includes(...)`） |
-| `src/engine/contract.js` | Modify | `processCpuFaBids` 全面改修、ヘルパー `calcNeedMatch` 追加、import 更新 |
+| `src/engine/contract.js` | Modify | `processCpuFaBids` 全面改修、ヘルパー `calcNeedMatch` 追加、import 更新、`claimed` に `teamId` 追加 |
 | `src/engine/__tests__/contract.test.js` | Modify | 多重獲得テストを `describe("processCpuFaBids multi-signing")` で追加 |
+| `src/hooks/useOffseason.js` | Modify | `handleWaiverPhaseNext` 内で `cpu_fa_summary` メール生成・送信 |
+| `src/hooks/useGameState.js` | Modify | `teamModal` state + `handleTeamClick` コールバック追加 |
+| `src/components/TeamModal.jsx` | Create | チーム詳細モーダル（ロスター表示 + 移籍履歴） |
+| `src/components/tabs/MailboxTab.jsx` | Modify | `cpu_fa_summary` タイプのレンダリング + `onTeamClick` prop 追加 |
+| `src/components/tabs/StandingsTab.jsx` | Modify | チーム名セルをクリッカブルボタン化 |
+| `src/App.jsx` | Modify | `<TeamModal>` レンダリング追加・`onTeamClick` prop の配線 |
 | `ROADMAP.md` | Modify | ㊲ の状態を `未着手` → `✅ 完了` に更新、最終更新行も更新 |
 
 ## 実装ガイダンス
@@ -315,6 +328,183 @@ describe('processCpuFaBids multi-signing', () => {
 });
 ```
 
+---
+
+### Step 5: `claimed` にチームID追加 + 補強サマリーメール送信
+
+#### 5-1. contract.js — `claimed.push` に `teamId` を追加
+
+`processCpuFaBids` 内の `claimed.push(...)` を以下に変更:
+
+```js
+claimed.push({ player, teamName: team.name, teamEmoji: team.emoji, teamId: team.id });
+```
+
+#### 5-2. useOffseason.js — `handleWaiverPhaseNext` でメール生成
+
+`src/hooks/useOffseason.js` の `handleWaiverPhaseNext`（`faResult.news.forEach(...)` の直後に挿入）:
+
+```js
+// CPU球団の補強サマリーメールを生成
+const byTeam = new Map();
+for (const c of (faResult.claimed || [])) {
+  if (!byTeam.has(c.teamId)) {
+    byTeam.set(c.teamId, { teamId: c.teamId, teamName: c.teamName, teamEmoji: c.teamEmoji, players: [] });
+  }
+  byTeam.get(c.teamId).players.push(`${c.player.name}（${c.player.pos}）`);
+}
+if (byTeam.size > 0) {
+  const signings = Array.from(byTeam.values());
+  setMailbox(prev => [...prev, {
+    id: uid(),
+    type: 'cpu_fa_summary',
+    read: false,
+    subject: `【オフシーズン補強情報】${signings.length}球団が補強を完了`,
+    from: 'スカウト部',
+    dateLabel: `${year}年`,
+    timestamp: Date.now(),
+    body: '各球団がFA市場での補強を完了しました。球団名をクリックして詳細ロスターを確認できます。',
+    signings,
+  }]);
+}
+```
+
+`setMailbox` はすでに `useOffseason.js` のスコープ内で参照可能（`useGameState` から受け取るか、直接使用）。使い方は既存の `setMailbox(prev=>[...prev,{...}])` パターンに合わせること。
+
+---
+
+### Step 6: TeamModal コンポーネント新規作成（src/components/TeamModal.jsx）
+
+**参考**: `src/components/PlayerModal.jsx`（37〜177行）のパターンをそのまま踏襲する。
+
+#### 6-1. Props
+
+```jsx
+export function TeamModal({ team, onPlayerClick, onClose }) { ... }
+```
+
+#### 6-2. 表示構造
+
+```
+[オーバーレイ] onClick={背景クリック → onClose}
+  ├── [ヘッダー] {team.emoji} {team.name}（{team.league}）  {wins}勝 {losses}敗  [✕ button]
+  ├── [タブ切り替え] useState('roster' | 'history')
+  │     ├── 「ロスター」
+  │     └── 「移籍履歴」
+  └── [コンテンツ]
+        ├── roster タブ:
+        │     players を以下でグループ化し、小見出し付きで表示:
+        │       先発投手（isPitcher && subtype==='先発'）
+        │       中継ぎ（isPitcher && subtype==='中継ぎ'）
+        │       抑え（isPitcher && subtype==='抑え'）
+        │       捕手（pos==='捕手'）
+        │       内野手（['一塁手','二塁手','三塁手','遊撃手'].includes(pos)）
+        │       外野手（['左翼手','中堅手','右翼手'].includes(pos)）
+        │     各選手行: [名前 button → onPlayerClick(p, team.name)]  [pos]  [age]歳
+        └── history タブ:
+              team.history の最新20件を新→旧順で表示
+              各行: [名前]  [pos]  [exitReason バッジ]  [{exitYear}年]
+              exitReason の色分け（AlumniTab.jsx と同一スキーム）:
+                引退=#94a3b8  トレード=#f97316  戦力外=#f87171  FA移籍=#a78bfa
+```
+
+#### 6-3. クローズ制御（PlayerModal と同一）
+
+```jsx
+useEffect(() => {
+  const handler = (e) => { if (e.key === 'Escape') onClose(); };
+  window.addEventListener('keydown', handler);
+  return () => window.removeEventListener('keydown', handler);
+}, [onClose]);
+```
+
+---
+
+### Step 7: State + App.jsx 配線
+
+#### 7-1. useGameState.js（`handlePlayerClick` と同じ位置の近く、~143行付近）
+
+```js
+const [teamModal, setTeamModal] = useState(null);
+const handleTeamClick = useCallback((team) => setTeamModal(team), []);
+```
+
+`return` オブジェクトに `teamModal, setTeamModal, handleTeamClick` を追加。
+
+#### 7-2. App.jsx
+
+PlayerModal レンダリング（`{playerModal && <PlayerModal .../>}`）の直後に追加:
+
+```jsx
+{gs.teamModal && (
+  <TeamModal
+    team={gs.teamModal}
+    onPlayerClick={gs.handlePlayerClick}
+    onClose={() => gs.setTeamModal(null)}
+  />
+)}
+```
+
+`MailboxTab` の props に `onTeamClick={gs.handleTeamClick}` を追加（既存の `teams={teams}` の隣）。
+`StandingsTab` の props に `onTeamClick={gs.handleTeamClick}` と `teams={teams}` を追加（現状 `teams` が渡っているか確認してから追加）。
+
+---
+
+### Step 8: MailboxTab 更新 + StandingsTab リンク化
+
+#### 8-1. MailboxTab.jsx
+
+**typeIcon / typeColor 追加**（既存の1行定数に追記）:
+```js
+// typeIcon: cpu_fa_summary → '🗞'
+// typeColor: cpu_fa_summary → '#38bdf8'
+```
+
+**props に `onTeamClick` を追加**:
+```jsx
+export function MailboxTab({ mailbox, onRead, onAction, teams, myTeam, onTrade, onTeamClick }) { ... }
+```
+
+**選択メールが `cpu_fa_summary` のとき `signings` を一覧表示**（body テキストの下に追加）:
+```jsx
+{sel.type === 'cpu_fa_summary' && sel.signings?.length > 0 && (
+  <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    {sel.signings.map(s => {
+      const teamObj = teams?.find(t => t.id === s.teamId);
+      return (
+        <div key={s.teamId} style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <button
+            onClick={() => teamObj && onTeamClick?.(teamObj)}
+            style={{ /* チームカラーに合わせた青系ボタン、cursor:pointer */ }}
+          >
+            {s.teamEmoji} {s.teamName}
+          </button>
+          <span style={{ color: '#94a3b8', fontSize: 13 }}>{s.players.join('、')}</span>
+        </div>
+      );
+    })}
+  </div>
+)}
+```
+
+#### 8-2. StandingsTab.jsx
+
+`onTeamClick` prop を追加し、チーム名セルを `<button>` に変更:
+
+```jsx
+export function StandingsTab({ teams, myId, onTeamClick }) { ... }
+
+// テーブル内のチーム名セル（既存の <td> 内）:
+<button
+  onClick={() => onTeamClick?.(t)}
+  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontWeight: 'inherit', padding: 0 }}
+>
+  {t.emoji} {t.name}
+</button>
+```
+
+---
+
 ## データモデル変更
 
 `analyzeTeamNeeds` の戻り値型が変わる:
@@ -330,12 +520,28 @@ analyzeTeamNeeds(team) → Array<{ type: string, score: number }>
 
 ## 受け入れ条件
 
+**エンジン（Step 1〜4）:**
 - [ ] CPU球団が1オフシーズンに複数名の FA 選手を獲得できる（予算が続く限り）
 - [ ] 先発4人未満のチームは先発投手を優先的に獲得する
 - [ ] 抑え不在のチームは抑え投手を優先的に獲得する
 - [ ] ロスター28人満員のチームは獲得を停止する
 - [ ] 外国人枠（4名・バランス）制約が維持されている
 - [ ] `evalTradeForCpu` / `generateCpuOffer` が正常に動作する（既存テスト通過）
+
+**メール通知（Step 5）:**
+- [ ] オフシーズンに CPU 球団が1件以上補強した場合、`cpu_fa_summary` メールが1通届く
+- [ ] メールに全補強球団・獲得選手名が含まれる
+- [ ] CPU 球団の補強がゼロの場合はメールが届かない
+
+**TeamModal + UI（Step 6〜8）:**
+- [ ] メール内の球団名ボタンをクリックすると TeamModal が開く
+- [ ] TeamModal の「ロスター」タブにその球団の全選手がポジション別で表示される
+- [ ] ロスター内の選手名クリックで既存 PlayerModal が開く
+- [ ] TeamModal の「移籍履歴」タブに最新20件が exitReason 色分き付きで表示される
+- [ ] Escape キー・背景クリック・✕ ボタンで TeamModal が閉じる
+- [ ] StandingsTab の球団名クリックで TeamModal が開く
+
+**品質:**
 - [ ] ビルド（`npm run build`）が通過する
 - [ ] 全テスト（`npm test` 相当）が通過する
 
@@ -344,6 +550,8 @@ analyzeTeamNeeds(team) → Array<{ type: string, score: number }>
 `src/engine/__tests__/contract.test.js` に `describe("processCpuFaBids multi-signing")` を追加（Step 4 参照）。
 
 既存の `describe('processCpuFaBids foreign roster constraint')` は変更後も通過すること（外国人ロジック変更なし）。
+
+TeamModal は純粋な表示コンポーネントのため unit test は不要。手動確認で受け入れ条件を満たせば OK。
 
 ## NPB 協約上の制約
 
@@ -368,7 +576,7 @@ analyzeTeamNeeds(team) → Array<{ type: string, score: number }>
 ## CHANGELOG.md エントリ（コミット後に hash を埋めること）
 
 ```
-### YYYY-MM-DD — CPU球団の積極的補強（<コミットハッシュ>）
+### YYYY-MM-DD — CPU球団の積極的補強 + 補強情報 UI（<コミットハッシュ>）
 
 **仕様本文への影響なし（内部実装のみ）**
 
@@ -376,6 +584,9 @@ analyzeTeamNeeds(team) → Array<{ type: string, score: number }>
 - `processCpuFaBids` を多重獲得対応に改修（ラウンド制ループ・予算15%リザーブ）
 - ヘルパー `calcNeedMatch` 追加（先発/抑え/中継ぎ/捕手/若手ニーズ対応）
 - 定数 `CPU_FA_BUDGET_RESERVE_RATIO`・`CPU_FA_MIN_SCORE` を `constants.js` に追加
+- オフシーズン終了後に `cpu_fa_summary` メールで他球団の補強情報をプレイヤーに通知
+- `TeamModal` を新設（球団名クリック → ロスター + 移籍履歴表示）
+- StandingsTab の球団名をクリッカブルに変更
 ```
 
 ## SPEC.md 更新箇所
@@ -384,8 +595,8 @@ analyzeTeamNeeds(team) → Array<{ type: string, score: number }>
 
 ## コミットメッセージ
 
-`feat: CPU球団のFA多重獲得を解禁しポジション特化補強を実装`
+`feat: CPU球団のFA多重獲得を解禁・補強サマリーメール・TeamModal を実装`
 
 ## PR タイトル
 
-`feat: CPU球団のFA多重獲得を解禁しポジション特化補強を実装`
+`feat: CPU球団のFA多重獲得を解禁・補強サマリーメール・TeamModal を実装`
