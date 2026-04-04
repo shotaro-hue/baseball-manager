@@ -1,7 +1,6 @@
 import { saberBatter, saberPitcher } from './sabermetrics';
 import { quickSimGame } from './simulation';
 import { rng } from '../utils';
-import { TEAM_DEFS } from '../constants';
 
 const FAN_POSITIONS = ['捕手', '一塁手', '二塁手', '三塁手', '遊撃手', '左翼手', '中堅手', '右翼手'];
 
@@ -155,52 +154,16 @@ function buildAllStarTeam(id, name, league, roster) {
  * @param {{ ce: Object[], pa: Object[] }} rosters
  * @returns {{ score: {ce:number, pa:number}, mvp: Object }}
  */
-function simulateAllStarGame(rosters, ceHome = true) {
+export function runAllStarGame(rosters) {
   const ceTeam = buildAllStarTeam('allstar_ce', 'セ・リーグ選抜', 'セ', rosters.ce || []);
   const paTeam = buildAllStarTeam('allstar_pa', 'パ・リーグ選抜', 'パ', rosters.pa || []);
-  const result = ceHome ? quickSimGame(ceTeam, paTeam) : quickSimGame(paTeam, ceTeam);
+
+  const result = quickSimGame(ceTeam, paTeam);
   const pool = [...(rosters.ce || []), ...(rosters.pa || [])].filter(p => !p.isPitcher);
   const mvp = pool.length ? pool[rng(0, pool.length - 1)] : (rosters.ce?.[0] || rosters.pa?.[0] || null);
 
-  const ceScore = ceHome ? result.score.my : result.score.opp;
-  const paScore = ceHome ? result.score.opp : result.score.my;
-
   return {
-    score: { ce: ceScore, pa: paScore },
+    score: { ce: result.score.my, pa: result.score.opp },
     mvp,
   };
-}
-
-/**
- * 12球団本拠地の持ち回りで当年のオールスター開催地（2試合分）を返す
- */
-export function getAllStarVenues(year) {
-  const teams = TEAM_DEFS || [];
-  const n = teams.length || 12;
-  const base = ((year - 2025) * 2) % n;
-  const start = (base + n) % n;
-  const v1 = teams[start];
-  const v2 = teams[(start + 1) % n];
-  return [v1, v2].map(v => ({
-    teamId: v?.id,
-    teamName: v?.name || '未設定球場',
-    stadiumLabel: v?.short || v?.name || '未設定球場',
-  }));
-}
-
-/**
- * 後方互換: 単発実行API
- */
-export function runAllStarGame(rosters) {
-  return simulateAllStarGame(rosters, true);
-}
-
-/**
- * オールスター2試合を実行して返す
- */
-export function runAllStarGames(rosters, year) {
-  const venues = getAllStarVenues(year);
-  const game1 = { ...simulateAllStarGame(rosters, true), gameNo: 1, venue: venues[0] };
-  const game2 = { ...simulateAllStarGame(rosters, false), gameNo: 2, venue: venues[1] };
-  return [game1, game2];
 }

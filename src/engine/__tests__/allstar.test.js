@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { selectAllStars, runAllStarGame, runAllStarGames, getAllStarVenues } from '../allstar';
+import { selectAllStars, runAllStarGame } from '../allstar';
 
 function mkPlayer(id, league, teamId, isPitcher, pos, stats = {}, subtype) {
   return {
@@ -66,28 +66,5 @@ describe('runAllStarGame', () => {
     expect(result.score.ce).toBeGreaterThanOrEqual(0);
     expect(result.score.pa).toBeGreaterThanOrEqual(0);
     expect(result.mvp).toBeTruthy();
-  });
-});
-
-describe('runAllStarGames', () => {
-  it('2試合分の結果と持ち回り会場を返す', () => {
-    const teams = [...buildLeagueTeams('セ', 0), ...buildLeagueTeams('パ', 6)];
-    const rosters = selectAllStars(teams);
-    const results = runAllStarGames(rosters, 2025);
-    expect(results.length).toBe(2);
-    expect(results[0].gameNo).toBe(1);
-    expect(results[1].gameNo).toBe(2);
-    expect(results[0].venue).toBeTruthy();
-    expect(results[1].venue).toBeTruthy();
-  });
-});
-
-describe('getAllStarVenues', () => {
-  it('年ごとに開催地が持ち回りで進む', () => {
-    const v2025 = getAllStarVenues(2025);
-    const v2026 = getAllStarVenues(2026);
-    expect(v2025[0].teamId).not.toBe(v2026[0].teamId);
-    expect(v2025.length).toBe(2);
-    expect(v2026.length).toBe(2);
   });
 });

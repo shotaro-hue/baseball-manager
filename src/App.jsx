@@ -79,7 +79,6 @@ export default function App(){
       year={year}
       rosters={allStarResult.rosters}
       gameResult={allStarResult.gameResult}
-      gameResults={allStarResult.gameResults}
       onEnd={()=>setScreen("hub")}
     />
   </>);
