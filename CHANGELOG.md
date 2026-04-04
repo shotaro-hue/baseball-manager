@@ -5,6 +5,15 @@
 
 ---
 
+### 2026-04-04 — バグ修正: 「ドラフトへ」ボタン押下でドラフト画面へ遷移しない（TBD）
+
+**仕様本文への影響なし（内部バグ修正のみ）**
+
+- 根本原因: PR #83 で `analyzeTeamNeeds` の戻り値が文字列配列 → `{type, score}` オブジェクト配列に変わったが `Draft.jsx` が未更新だった。`DraftPreviewScreen` レンダー時に `x.includes(...)` が `TypeError` を投げ画面がクラッシュしていた
+- 修正内容: `Draft.jsx` 内の `analyzeTeamNeeds` 呼び出し箇所 3 箇所を `.type` プロパティ経由へ修正（`predictTeam`・overview tab の指名予想表示・teams tab のニーズラベル）
+
+---
+
 ### 2026-04-04 — CPU球団の積極的補強 + 補強情報 UI（cfdc431）
 
 **仕様本文への影響なし（内部実装のみ）**

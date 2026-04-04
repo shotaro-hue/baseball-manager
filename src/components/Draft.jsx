@@ -15,7 +15,7 @@ export function DraftPreviewScreen({teams,myId,year,pool,draftAllocation,onAlloc
   const alloc=draftAllocation??{pitcher:50,batter:50};
   const predictTeam=player=>{
     const cands=[...teams].sort((a,b)=>a.wins-b.wins).slice(0,4);
-    return cands.find(t=>{const n=analyzeTeamNeeds(t);return player.isPitcher?n.some(x=>x.includes("投手")):n.some(x=>x.includes("ミート"));})||cands[0];
+    return cands.find(t=>{const n=analyzeTeamNeeds(t);return player.isPitcher?n.some(x=>x.type.includes("投手")):n.some(x=>x.type.includes("ミート"));})||cands[0];
   };
   const [tab,setTab]=useState("overview");
   const [recFilter,setRecFilter]=useState("all");
@@ -41,14 +41,14 @@ export function DraftPreviewScreen({teams,myId,year,pool,draftAllocation,onAlloc
           {spots.map(p=>{const pred=predictTeam(p);return(<div key={p.id} style={{padding:"10px",marginBottom:8,borderRadius:6,background:"rgba(245,200,66,.05)",border:"1px solid rgba(245,200,66,.15)"}}>
             <div className="fsb"><div><span style={{fontSize:9,color:"#f97316",fontWeight:700}}>{p.spotlight} </span><span style={{fontWeight:700,fontSize:14}}>{p.name}</span>{p.isPitcher&&<HandBadge p={p}/>}<span style={{fontSize:10,color:"#374151",marginLeft:6}}>{p.pos}/{p.age}歳</span></div><OV v={ov(p)}/></div>
             <div style={{fontSize:10,color:"#374151",marginTop:4}}>{p.isPitcher?`球速${p.pitching.velocity} 制球${p.pitching.control} 変化${p.pitching.breaking}`:`ミート${p.batting.contact} 長打${p.batting.power} 走力${p.batting.speed}`}</div>
-            <div style={{marginTop:6,fontSize:10,color:"#60a5fa"}}>📡 指名予想: <span style={{fontWeight:700,color:pred.color}}>{pred.emoji}{pred.name}</span><span style={{color:"#374151",marginLeft:6}}>({analyzeTeamNeeds(pred)[0]})</span></div>
+            <div style={{marginTop:6,fontSize:10,color:"#60a5fa"}}>📡 指名予想: <span style={{fontWeight:700,color:pred.color}}>{pred.emoji}{pred.name}</span><span style={{color:"#374151",marginLeft:6}}>({analyzeTeamNeeds(pred)[0]?.type})</span></div>
           </div>);})}
         </div>
       </>)}
       {tab==="teams"&&(<div className="card"><div className="card-h">🏟️ 各球団の補強ポイント</div>
         {[...teams].sort((a,b)=>a.wins-b.wins).map((t,i)=>{const needs=analyzeTeamNeeds(t);const isMe=t.id===myId;return(<div key={t.id} style={{padding:"8px 10px",marginBottom:6,borderRadius:6,background:isMe?"rgba(245,200,66,.06)":"rgba(255,255,255,.02)",border:isMe?"1px solid rgba(245,200,66,.2)":"1px solid rgba(255,255,255,.04)"}}>
           <div className="fsb"><div><span style={{fontSize:10,color:"#374151",marginRight:6}}>{i+1}位指名</span><span style={{color:t.color,fontWeight:700}}>{t.emoji} {t.name}</span>{isMe&&<span style={{fontSize:9,color:"#f5c842",marginLeft:6}}>← あなた</span>}</div><span style={{fontSize:10,color:"#374151"}}>{t.wins}勝{t.losses}敗</span></div>
-          <div style={{marginTop:4,display:"flex",gap:6,flexWrap:"wrap"}}>{needs.map((n,j)=>(<span key={j} style={{fontSize:9,background:"rgba(96,165,250,.1)",color:"#60a5fa",padding:"2px 7px",borderRadius:10}}>📌 {n}</span>))}</div>
+          <div style={{marginTop:4,display:"flex",gap:6,flexWrap:"wrap"}}>{needs.map((n,j)=>(<span key={j} style={{fontSize:9,background:"rgba(96,165,250,.1)",color:"#60a5fa",padding:"2px 7px",borderRadius:10}}>📌 {n.type}</span>))}</div>
         </div>);})}
       </div>)}
       {tab==="rec"&&(<div className="card"><div className="card-h">⭐ {myTeam?.name} おすすめ候補 TOP5</div>
