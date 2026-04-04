@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateSeasonSchedule, getAllStarBreakInfo } from '../scheduleGen';
+import { generateSeasonSchedule } from '../scheduleGen';
 
 const teams = [
   { id: 0, league: 'セ' },
