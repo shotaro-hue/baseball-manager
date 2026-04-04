@@ -122,7 +122,7 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
       const avail=availPool.filter(p=>!used.has(p.id));
       if(!avail.length) return;
       const needs=analyzeTeamNeeds(t);
-      const needsPitcher=needs.some(n=>n.includes("投手"));
+      const needsPitcher=needs.some(n=>n.type.includes("投手"));
       const scored=avail.map((p,i)=>{
         let s=100-i*3;
         if(needsPitcher&&p.isPitcher) s+=30;
@@ -426,8 +426,8 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,onDraftDone}){
     if(!avail.length){setDone(true);return;}
     // CPU戦略：補強ニーズに合う選手を優先
     const needs=analyzeTeamNeeds(current.team);
-    const needsPitcher=needs.some(n=>n.includes("投手"));
-    const needsPower=needs.some(n=>n.includes("長打"));
+    const needsPitcher=needs.some(n=>n.type.includes("投手"));
+    const needsPower=needs.some(n=>n.type.includes("長打"));
     const scored=avail.map((p,i)=>{
       let score=100-i*2; // ポテンシャル順の基礎点
       if(needsPitcher&&p.isPitcher) score+=25;

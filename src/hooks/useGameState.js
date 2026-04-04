@@ -79,14 +79,16 @@ export function useGameState() {
     const expiringCount=myTeam.players.filter(p=>!p.isIkusei&&(p.contractYearsLeft??99)<=1).length;
     const pendingTrades=mailbox.filter(m=>m.type==="trade"&&!m.resolved&&!m.read).length;
     const unreadMail=mailbox.filter(m=>!m.read).length;
+    const unreadInterviews=news.filter(n=>n.type==="interview"&&!n.answered).length;
     return {
       roster: myTeam.players.filter(p=>!p.isIkusei).length>MAX_ROSTER?{n:myTeam.players.filter(p=>!p.isIkusei).length-MAX_ROSTER,color:"#f87171"}:null,
       contract: expiringCount>0?{n:expiringCount,color:"#f5c842"}:null,
       trade: pendingTrades>0?{n:pendingTrades,color:"#f97316"}:null,
       mailbox: unreadMail>0?{n:unreadMail,color:pendingTrades>0?"#f97316":"#f5c842"}:null,
       fa: faPool.length>0?{n:faPool.length,color:"#94a3b8"}:null,
+      news: unreadInterviews>0?{n:unreadInterviews,color:"#f5c842"}:null,
     };
-  },[myTeam,mailbox,faPool]);
+  },[myTeam,mailbox,faPool,news]);
 
   const notify = useCallback((msg,type="ok")=>{setNotif({msg,type});setTimeout(()=>setNotif(null),3500);},[]);
   const upd = useCallback((id, fn) => dispatch({ type: G.UPD_TEAM, id, fn }), []);
@@ -183,8 +185,9 @@ export function useGameState() {
 
   const handleInterview = useCallback((newsId,opt)=>{
     upd(myId,t=>({...t,popularity:clamp((t.popularity||50)+opt.popMod,0,100),players:t.players.map(p=>({...p,morale:clamp((p.morale||60)+opt.moraleMod,0,100)}))}));
+    setNews(prev=>prev.map(n=>n.id===newsId?{...n,answered:true}:n));
     notify("回答しました！ 人気"+(opt.popMod>=0?"+":"")+opt.popMod+" モラル"+(opt.moraleMod>=0?"+":"")+opt.moraleMod,"ok");
-  },[upd,myId,notify]);
+  },[upd,myId,notify,setNews]);
 
   const toggleLineup = useCallback((pid)=>{
     if(!myTeam) return;

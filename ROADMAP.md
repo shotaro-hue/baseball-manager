@@ -1,6 +1,6 @@
 # Baseball Manager 2025 — ロードマップ
 
-> 最終更新: 2026-04-04（メール・ニュース通知配信改善 完了）
+> 最終更新: 2026-04-04（ドラフト1位指名クラッシュ・ニュースバッジ修正 完了）
 > **ゴール**: NPB版 OOTP / Football Manager — 深いシミュレーションと長期フランチャイズ経営
 > **運用ルール**: 実装完了した項目は ✅ に更新。新規項目は末尾に追記。過去の記録は削除しない。
 
@@ -82,6 +82,8 @@
 | E2 | **継投パターン設定画面** | RosterTab に「📋 継投」サブタブを追加。①先発ローテーション並び替え・除外・追加、②抑え/セットアッパー指名（重複禁止バリデーション）、③中継ぎ優先順設定。`team.pitchingPattern` フィールドを新設し `pickBullpenArm` に反映。指名投手不在時はスコアベース選択にフォールバック | — |
 | B9 | **[P0] 起動時の黒画面（useState TDZ エラー）** | `App.jsx` で `news` / `mailbox` / `cpuTradeOffers` / `draftPool` / `draftResult` / `playoff` / `draftAllocation` の7つの `useState` がコンポーネント中盤（旧 line 625–631）に後置されており、それより前の `tabBadges` useMemo 依存配列が `mailbox` を宣言前に参照し TDZ `ReferenceError` が発生。React レンダリングがクラッシュして黒画面になっていた。7つの宣言を `schedule` の直後（line 62 以降）に移動して修正 | 1394edd |
 | N1 | **[P1] メール・ニュース通知配信改善** | `subject`→`title` フィールド統一（championship / owner_trust / morale_warning / overseas_fa / hof）・戦術試合後ニュース欠落修正・CPUトレードオファー確率5%→15%・インタビュー確率20%→35%・怪我ニュース追加 | ac0704f |
+| B10 | **[P0] ドラフト1位指名クラッシュ（analyzeTeamNeeds戻り値型誤用）** | `buildCpuPicks()` / `cpuPick()` で `needs.some(n=>n.includes(...))` が TypeError。`n.type.includes(...)` に修正 | 3e2f4c4 |
+| B11 | **[P1] ニュースタブ未読バッジ欠落・インタビュー回答リセット** | `tabBadges` に `news` キー追加。`handleInterview` で `answered:true` フラグを付与し再マウント後も維持 | 3e2f4c4 |
 
 ---
 
