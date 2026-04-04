@@ -25,11 +25,16 @@ function SelectionTable({ players }) {
   );
 }
 
-export function AllStarScreen({ year, rosters, gameResult, onEnd }) {
+export function AllStarScreen({ year, rosters, gameResult, gameResults, onEnd }) {
   const ceFan = (rosters?.ce || []).filter(p => p.allStarSource === 'fan');
   const paFan = (rosters?.pa || []).filter(p => p.allStarSource === 'fan');
   const ceMgr = (rosters?.ce || []).filter(p => p.allStarSource === 'manager');
   const paMgr = (rosters?.pa || []).filter(p => p.allStarSource === 'manager');
+  const results = (gameResults && gameResults.length > 0)
+    ? gameResults
+    : (gameResult ? [{ ...gameResult, gameNo: 1, venue: { stadiumLabel: '未設定球場' } }] : []);
+  const totalCe = results.reduce((s, g) => s + (g?.score?.ce || 0), 0);
+  const totalPa = results.reduce((s, g) => s + (g?.score?.pa || 0), 0);
 
   return (
     <div className="app">
@@ -38,11 +43,16 @@ export function AllStarScreen({ year, rosters, gameResult, onEnd }) {
         <div style={{ fontSize: 24, fontWeight: 700, color: '#f5c842', marginBottom: 12 }}>{year}年 プロ野球オールスターゲーム</div>
 
         <div className="card" style={{ marginBottom: 10 }}>
-          <div className="fsb">
-            <div style={{ fontSize: 18, fontWeight: 700 }}>
-              セ・リーグ {gameResult?.score?.ce ?? 0} - {gameResult?.score?.pa ?? 0} パ・リーグ
-            </div>
-            <div style={{ color: '#94a3b8', fontSize: 12 }}>MVP: {gameResult?.mvp?.name || '-'}</div>
+          <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
+            セ・リーグ {totalCe} - {totalPa} パ・リーグ
+          </div>
+          <div style={{ display: 'grid', gap: 6 }}>
+            {results.map((g) => (
+              <div key={g.gameNo} className="fsb" style={{ fontSize: 12, color: '#cbd5e1' }}>
+                <div>第{g.gameNo}戦（{g.venue?.stadiumLabel || '-'}） セ {g.score?.ce ?? 0} - {g.score?.pa ?? 0} パ</div>
+                <div style={{ color: '#94a3b8', fontSize: 11 }}>MVP: {g.mvp?.name || '-'}</div>
+              </div>
+            ))}
           </div>
         </div>
 
