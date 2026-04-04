@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { generateSeasonSchedule } from '../scheduleGen';
+import { generateSeasonSchedule, calcAllStarTriggerDay } from '../scheduleGen';
+import { SEASON_PARAMS } from '../../data/scheduleParams';
 
 const teams = [
   { id: 0, league: 'セ' },
@@ -51,5 +52,28 @@ describe('scheduleGen regular league cards', () => {
       }
       expect([2, 3]).toContain(streak);
     }
+  });
+});
+
+describe('calcAllStarTriggerDay', () => {
+  it('2025年のトリガー日がスキップ日7/22より前の最終試合になる', () => {
+    const schedule = generateSeasonSchedule(2025, teams);
+    const triggerDay = calcAllStarTriggerDay(schedule, SEASON_PARAMS[2025].allStarSkipDates);
+    const triggerDate = schedule[triggerDay]?.date;
+    expect(triggerDate).toBeDefined();
+    const triggerNum = triggerDate.month * 100 + triggerDate.day;
+    expect(triggerNum).toBeLessThan(722);
+  });
+
+  it('72ではなく実際の試合日が返る', () => {
+    const schedule = generateSeasonSchedule(2025, teams);
+    const triggerDay = calcAllStarTriggerDay(schedule, SEASON_PARAMS[2025].allStarSkipDates);
+    expect(triggerDay).not.toBe(72);
+    expect(triggerDay).toBeGreaterThan(80);
+  });
+
+  it('allStarSkipDates が空なら 72 を返す', () => {
+    const schedule = generateSeasonSchedule(2025, teams);
+    expect(calcAllStarTriggerDay(schedule, [])).toBe(72);
   });
 });

@@ -1222,7 +1222,7 @@ export function getFaThreshold(p) {
 - 出場選手: 各リーグ上位 wOBA / FIP から自動選出（2名 + 監督推薦3名）
 - 試合結果: 簡易シミュ（スターター3回、その後リリーフ）
 - 記録: `player.allStarSelections++`（当該シーズンの選出全58名）
-- 発火タイミング: `ALL_STAR_GAMEDAY = 72` 到達時。通常進行では専用 `allstar` 画面を表示、バッチシム中はニュース追記のみで1回実行
+- 発火タイミング: `calcAllStarTriggerDay(schedule, allStarSkipDates)` が返す gameDay 到達時（allStarSkipDates の最初の日直前の最終公式戦）。通常進行では専用 `allstar` 画面を表示、バッチシム中はニュース追記のみで1回実行
 - 選出ルール（各リーグ29名）:
   - ファン投票: 野手8枠（各守備位置wOBA1位）＋投手5枠（先発3名FIP順・中継ぎ1名HLD順・抑え1名SV順）
   - パ・リーグのみDH1枠を追加（wOBA順）
