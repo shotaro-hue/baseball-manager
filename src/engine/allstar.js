@@ -1,6 +1,7 @@
 import { saberBatter, saberPitcher } from './sabermetrics';
 import { quickSimGame } from './simulation';
 import { rng } from '../utils';
+import { ALL_STAR_VENUE_ROTATION, TEAM_STADIUMS } from '../constants';
 
 const FAN_POSITIONS = ['捕手', '一塁手', '二塁手', '三塁手', '遊撃手', '左翼手', '中堅手', '右翼手'];
 
@@ -152,18 +153,29 @@ function buildAllStarTeam(id, name, league, roster) {
 /**
  * selectAllStars の結果を受け取り簡易試合をシミュする。
  * @param {{ ce: Object[], pa: Object[] }} rosters
- * @returns {{ score: {ce:number, pa:number}, mvp: Object }}
+ * @returns {{ game1:{score:{ce:number,pa:number},mvp:Object|null}, game2:{score:{ce:number,pa:number},mvp:Object|null}, venue:string }}
  */
-export function runAllStarGame(rosters) {
+export function runAllStarGame(rosters, year = 2025) {
   const ceTeam = buildAllStarTeam('allstar_ce', 'セ・リーグ選抜', 'セ', rosters.ce || []);
   const paTeam = buildAllStarTeam('allstar_pa', 'パ・リーグ選抜', 'パ', rosters.pa || []);
 
-  const result = quickSimGame(ceTeam, paTeam);
-  const pool = [...(rosters.ce || []), ...(rosters.pa || [])].filter(p => !p.isPitcher);
-  const mvp = pool.length ? pool[rng(0, pool.length - 1)] : (rosters.ce?.[0] || rosters.pa?.[0] || null);
+  const result1 = quickSimGame(ceTeam, paTeam);
+  const pool1 = [...(rosters.ce || []), ...(rosters.pa || [])].filter(p => !p.isPitcher);
+  const mvp1 = pool1.length ? pool1[rng(0, pool1.length - 1)] : (rosters.ce?.[0] || rosters.pa?.[0] || null);
+
+  const ceTeam2 = buildAllStarTeam('allstar_ce', 'セ・リーグ選抜', 'セ', rosters.ce || []);
+  const paTeam2 = buildAllStarTeam('allstar_pa', 'パ・リーグ選抜', 'パ', rosters.pa || []);
+  const result2 = quickSimGame(ceTeam2, paTeam2);
+  const pool2 = [...(rosters.ce || []), ...(rosters.pa || [])].filter(p => !p.isPitcher);
+  const mvp2 = pool2.length ? pool2[rng(0, pool2.length - 1)] : (rosters.ce?.[0] || rosters.pa?.[0] || null);
+
+  const rotationIndex = (year - 2025) % ALL_STAR_VENUE_ROTATION.length;
+  const venueTeamId = ALL_STAR_VENUE_ROTATION[(rotationIndex + ALL_STAR_VENUE_ROTATION.length) % ALL_STAR_VENUE_ROTATION.length];
+  const venue = TEAM_STADIUMS[venueTeamId] || '未定';
 
   return {
-    score: { ce: result.score.my, pa: result.score.opp },
-    mvp,
+    game1: { score: { ce: result1.score.my, pa: result1.score.opp }, mvp: mvp1 },
+    game2: { score: { ce: result2.score.my, pa: result2.score.opp }, mvp: mvp2 },
+    venue,
   };
 }
