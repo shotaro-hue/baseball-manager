@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { gameDayToDate } from '../../utils';
 import { getMyMatchup } from '../../engine/scheduleGen';
-import { SEASON_GAMES } from '../../constants';
+import { SEASON_GAMES, ALL_STAR_GAMEDAY } from '../../constants';
 
 const MONTH_LABELS = ['3月','4月','5月','6月','7月','8月','9月','10月'];
 // 月曜始まり: 0=月,1=火,2=水,3=木,4=金,5=土,6=日
@@ -71,9 +71,12 @@ function buildMonthGrid(schedule, year, myId, month, gameResultsMap) {
       const entry = byDate.get(key);
       if (entry) {
         const result = gameResultsMap?.[entry.dayNo] ?? null;
-        cells.push({ type: 'game', date: { month: m, day: d }, dayNo: entry.dayNo, matchup: entry.matchup, result });
+        const isAllStar = entry.dayNo === ALL_STAR_GAMEDAY;
+        cells.push({ type: 'game', date: { month: m, day: d }, dayNo: entry.dayNo, matchup: entry.matchup, result, isAllStar });
       } else {
-        cells.push({ type: 'off', date: { month: m, day: d } });
+        const dayNo = schedule.findIndex(sd => sd?.date?.month === m && sd?.date?.day === d);
+        const isAllStar = dayNo === ALL_STAR_GAMEDAY;
+        cells.push({ type: 'off', date: { month: m, day: d }, dayNo, isAllStar });
       }
     }
     cursor.setDate(cursor.getDate() + 1);
@@ -132,9 +135,9 @@ function GridCell({ cell, year, teamMap, isToday, isSelected, onSelect, onResult
   }
   if (cell.type === 'off') {
     return (
-      <div style={{ minHeight: 54, background: 'rgba(15,23,42,.2)', borderRadius: 6, padding: '4px 6px' }}>
+      <div style={{ minHeight: 54, background: cell.isAllStar ? 'rgba(245,200,66,.12)' : 'rgba(15,23,42,.2)', border: cell.isAllStar ? '1px solid rgba(245,200,66,.35)' : '1px solid transparent', borderRadius: 6, padding: '4px 6px' }}>
         <div style={{ fontSize: 10, color: '#374151' }}>{cell.date.day}</div>
-        <div style={{ fontSize: 9, color: '#2e4055', marginTop: 2 }}>休</div>
+        <div style={{ fontSize: 9, color: cell.isAllStar ? '#f5c842' : '#2e4055', marginTop: 2 }}>{cell.isAllStar ? 'AS' : '休'}</div>
       </div>
     );
   }
@@ -153,7 +156,9 @@ function GridCell({ cell, year, teamMap, isToday, isSelected, onSelect, onResult
   const isHome = matchup.isHome;
   const isInterleague = matchup.isInterleague;
 
-  let bg = isInterleague
+  let bg = cell.isAllStar
+    ? 'rgba(245,200,66,.14)'
+    : isInterleague
     ? 'rgba(167,139,250,.12)'
     : isHome
     ? 'rgba(74,222,128,.1)'
@@ -190,6 +195,7 @@ function GridCell({ cell, year, teamMap, isToday, isSelected, onSelect, onResult
         {opp?.short || opp?.name?.slice(0,4) || '?'}
       </div>
       {isInterleague && <div style={{ fontSize: 8, color: '#c4b5fd', marginTop: 1 }}>交流</div>}
+      {cell.isAllStar && <div style={{ fontSize: 8, color: '#f5c842', marginTop: 1, fontWeight: 700 }}>AS</div>}
       {hasResult && (
         <button
           onClick={e => { e.stopPropagation(); onResultClick(dayNo); }}
@@ -239,7 +245,7 @@ function SeasonProgressBar({ gameDay, wins, losses }) {
   );
 }
 
-export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResultsMap = {} }) {
+export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResultsMap = {}, allStarDone = false }) {
   const [selectedDay, setSelectedDay] = useState(gameDay);
   const [resultModal, setResultModal] = useState(null); // dayNo or null
 
@@ -299,6 +305,14 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
       {/* シーズン進捗バー */}
       <SeasonProgressBar gameDay={gameDay} wins={myTeam.wins || 0} losses={myTeam.losses || 0} />
 
+      <div className="card" style={{ background: 'rgba(245,200,66,.06)' }}>
+        <div className="card-h">⭐ オールスターゲーム</div>
+        <div style={{ fontSize: 12, color: '#cbd5e1' }}>
+          第{ALL_STAR_GAMEDAY}戦 ({formatDate(gameDayToDate(ALL_STAR_GAMEDAY, schedule))}) に開催
+          <span style={{ marginLeft: 8, color: allStarDone ? '#4ade80' : '#f5c842' }}>{allStarDone ? '実施済み' : '未実施'}</span>
+        </div>
+      </div>
+
       {/* 今日のカード */}
       <div className="card">
         <div className="card-h">🗓️ 今日のカード</div>
@@ -314,6 +328,7 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
                   {todayMatchup.isHome ? 'ホーム開催' : 'ビジター'}
                 </span>
                 {todayMatchup.isInterleague && <span className="chip cy">🔄 交流戦</span>}
+                {gameDay===ALL_STAR_GAMEDAY && <span className="chip" style={{ background: 'rgba(245,200,66,.18)', color: '#f5c842' }}>⭐ オールスター開催日</span>}
                 {todayMatchup.venueNote && <span style={{ fontSize: 10, color: '#f5c842' }}>{venueNoteLabel(todayMatchup.venueNote)}</span>}
               </div>
             </div>
@@ -381,6 +396,7 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
           <span style={{ color: '#4ade80' }}>○勝</span>
           <span style={{ color: '#f87171', marginLeft: 4 }}>●負</span>
           <span style={{ color: '#6b7280', marginLeft: 4 }}>△分</span>
+          <span style={{ color: '#f5c842', marginLeft: 4 }}>AS: オールスター</span>
           <span style={{ color: '#374151', marginLeft: 4 }}>— スコアをクリックで詳細表示</span>
         </div>
         <div style={{ display: 'grid', gap: 16 }}>
