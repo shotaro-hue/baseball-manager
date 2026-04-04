@@ -11,6 +11,7 @@ import { PlayoffScreen } from './components/PlayoffScreen';
 import { RetireModal } from './components/RetireModal';
 import { PlayerModal } from './components/PlayerModal';
 import { PressConferenceModal } from './components/PressConferenceModal';
+import { AllStarScreen } from './components/AllStarScreen';
 import { DashboardTab } from './components/DashboardTab';
 import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab, ScheduleTab } from './components/Tabs';
 import { SEASON_GAMES, BATCH, MAX_外国人_一軍, TEAM_DEFS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS, POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD } from './constants';
@@ -59,6 +60,7 @@ export default function App(){
     playerModal, setPlayerModal, retireRole, setRetireRole,
     notify, upd, addNews, addToHistory, setFaPool, setTeams, setSeasonHistory, setMailbox, setScreen,
     pressEvent, handlePressAnswer,
+    allStarResult,
   } = gs;
   const { gameResult, currentOpp, batchResults, playoff, setPlayoff } = sf;
   const { developmentSummary, newSeasonInfo, draftPool, setDraftPool, draftResult, setDraftResult, draftAllocation, setDraftAllocation, waiverClaimResults } = os;
@@ -71,6 +73,15 @@ export default function App(){
   if(screen==="batch_result") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><BatchResultScreen results={batchResults} myTeam={myTeam} onEnd={()=>setScreen("hub")}/></ErrorBoundary></>);
 
   if(screen==="result"&&gameResult) return(<><ResultScreen gsResult={gameResult} myTeam={myTeam} oppTeam={gameResult.oppTeam} gameDay={gameDay-1} onNext={()=>setScreen("hub")}/></>);
+
+  if(screen==="allstar"&&allStarResult) return(<>
+    <AllStarScreen
+      year={year}
+      rosters={allStarResult.rosters}
+      gameResult={allStarResult.gameResult}
+      onEnd={()=>setScreen("hub")}
+    />
+  </>);
 
   if(screen==="retire_phase") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><RetirePhaseScreen teams={teams} myId={myId} year={year} onNext={os.handleRetirePhaseNext}/></ErrorBoundary></>);
   if(screen==="development_phase") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><GrowthSummaryScreen summary={developmentSummary} year={year} onNext={()=>setScreen("waiver_phase")}/></ErrorBoundary></>);

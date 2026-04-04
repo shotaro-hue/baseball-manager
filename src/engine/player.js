@@ -53,6 +53,7 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
     serviceYears: 0, entryAge: age, recentPitchingDays: [],
     entryType: isForeign ? '外国人' : age <= 19 ? '高卒' : age <= 22 ? '大卒' : '社会人',
     daysOnActiveRoster: 0,
+    allStarSelections: 0,
   };
 
   if (isPitch) {
