@@ -1,6 +1,6 @@
 # Baseball Manager 2025 — 仕様書
 
-> 最終更新: 2026-03-27（Playwright E2E テスト基盤追加。次フォーカス: Tier 8 ㉖ 支配下70名枠）
+> 最終更新: 2026-04-04（㊱ 外国人選手獲得を反映）
 
 > **運用ルール**: コードに改修を加えた際は、仕様への影響を確認し、影響がある場合のみ本文を更新する。
 > 変更の有無にかかわらず `CHANGELOG.md` に日付・内容を追記し、**過去の記録は削除しない**。
@@ -1228,6 +1228,17 @@ export function getFaThreshold(p) {
   - パ・リーグのみDH1枠を追加（wOBA順）
   - 監督推薦: セ=投手9+野手7、パ=投手9+野手6（既選出除外。投手FIP順/野手wOBA順）
 - 重複防止: `allStarDone` フラグで同シーズン多重実行を防止し、`handleNextYear` でリセット
+
+#### 外国人選手獲得
+- 開幕時に `generateForeignFaPool(count)` を実行し、`FOREIGN_FA_COUNT_MIN〜MAX`（5〜10）名の外国人FA選手を市場へ追加
+- 生成仕様: `isForeign=true` / `entryType="外国人"`、能力レンジは即戦力帯（q=62〜82）、年齢22〜32、年俸8,000〜25,000（万円）
+- 名前・出身地は `FOREIGN_PLAYER_NAMES` / `FOREIGN_NATIONALITIES` から抽選
+- FAタブに「外国人FA市場」を分離表示し、`FOREIGN_DEADLINE_DAY=100` 超過後は交渉不可（7月末相当）
+- 代理人交渉は2ラウンド制:
+  - Round 1（年俸）: 代理人要求 `salary × FOREIGN_AGENT_SALARY_RATIO(1.2)`。基準年俸交渉は `FOREIGN_AGENT_ACCEPT_PROB(0.55)` で成否判定
+  - Round 2（年数）: `age<=30` は2年、`age>30` は1年の最低年数要求
+- 契約成立時は外国人枠を「一軍登録上限」として扱い、上限4名超過なら獲得自体は許可し二軍（farm）配置
+- CPU の `processCpuFaBids` でも外国人獲得を許可し、同様に一軍枠超過時は farm 配置
 
 ---
 
