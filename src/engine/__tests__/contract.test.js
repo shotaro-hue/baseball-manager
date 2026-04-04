@@ -95,3 +95,63 @@ describe('processCpuFaBids foreign roster constraint', () => {
     expect((updatedCpu.farm || []).some(p => p.id === 'target')).toBe(false);
   });
 });
+
+
+describe('processCpuFaBids multi-signing', () => {
+  const mkBatter = (id, salary = 4200000, age = 25) => ({
+    id, name: `B-${id}`, age, pos: '左翼手', isPitcher: false, isForeign: false, salary,
+    batting: { contact: 65, power: 60, eye: 55, speed: 50, arm: 50, defense: 50,
+      catching: 0, stealSkill: 0, baseRunning: 0, clutch: 50, vsLeft: 50, breakingBall: 50, stamina: 50, recovery: 50 },
+    personality: { money: 50, winning: 50, playing: 50, hometown: 30, loyalty: 50, stability: 50, future: 50 },
+    trust: 60, hometown: '東京',
+  });
+  const mkStarter = (id, salary = 4200000) => ({
+    id, name: `P-${id}`, age: 28, pos: '先発', isPitcher: true, subtype: '先発', isForeign: false, salary,
+    pitching: { velocity: 65, control: 60, stamina: 60, breaking: 55, variety: 50,
+      sharpness: 50, tempo: 50, clutchP: 50, recovery: 50, durability: 50 },
+    personality: { money: 50, winning: 50, playing: 50, hometown: 30, loyalty: 50, stability: 50, future: 50 },
+    trust: 60, hometown: '東京',
+  });
+
+  it('CPU チームが予算内で2名を獲得できる', () => {
+    const cpu = {
+      id: 1, name: 'CPU', league: 'セ', wins: 70, losses: 70, city: '東京',
+      budget: 20000000, lineup: [], farm: [],
+      players: [mkStarter('s1'), mkStarter('s2'), mkStarter('s3')],
+    };
+    const my = { id: 0, name: 'ME', league: 'セ', wins: 60, losses: 60, city: '大阪', budget: 0, lineup: [], farm: [], players: [] };
+    const fa1 = mkStarter('fa1', 4200000);
+    const fa2 = mkBatter('fa2', 4200000);
+    const res = processCpuFaBids([my, cpu], 0, [fa1, fa2], [my, cpu]);
+    const updatedCpu = res.updatedTeams.find((t) => t.id === 1);
+    expect(updatedCpu.players.length).toBeGreaterThanOrEqual(5);
+    expect(res.news.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('ロスター MAX_ROSTER(28) 到達で獲得を停止する', () => {
+    const players = Array.from({ length: 28 }, (_, i) => mkBatter(`p${i}`));
+    const cpu = {
+      id: 1, name: 'CPU', league: 'セ', wins: 70, losses: 70, city: '東京',
+      budget: 99999999, lineup: [], farm: [], players,
+    };
+    const my = { id: 0, name: 'ME', league: 'セ', wins: 60, losses: 60, city: '大阪', budget: 0, lineup: [], farm: [], players: [] };
+    const res = processCpuFaBids([my, cpu], 0, [mkBatter('faX')], [my, cpu]);
+    const updatedCpu = res.updatedTeams.find((t) => t.id === 1);
+    expect(updatedCpu.players.length).toBe(28);
+  });
+
+  it('先発不足チームが先発投手を野手より優先して獲得する', () => {
+    const cpu = {
+      id: 1, name: 'CPU', league: 'セ', wins: 50, losses: 50, city: '東京',
+      budget: 10000000, lineup: [], farm: [],
+      players: [mkStarter('s1'), mkStarter('s2')],
+    };
+    const my = { id: 0, name: 'ME', league: 'セ', wins: 60, losses: 60, city: '大阪', budget: 0, lineup: [], farm: [], players: [] };
+    const starter = mkStarter('faS', 5000000);
+    const batter = mkBatter('faB', 4200000);
+    const res = processCpuFaBids([my, cpu], 0, [batter, starter], [my, cpu]);
+    const updatedCpu = res.updatedTeams.find((t) => t.id === 1);
+    const signedIds = updatedCpu.players.map((p) => p.id);
+    expect(signedIds).toContain('faS');
+  });
+});

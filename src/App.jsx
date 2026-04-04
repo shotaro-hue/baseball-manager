@@ -12,6 +12,7 @@ import { DraftPreviewScreen, DraftLotteryScreen, DraftScreen, DraftReviewScreen 
 import { PlayoffScreen } from './components/PlayoffScreen';
 import { RetireModal } from './components/RetireModal';
 import { PlayerModal } from './components/PlayerModal';
+import { TeamModal } from './components/TeamModal';
 import { PressConferenceModal } from './components/PressConferenceModal';
 import { AllStarScreen } from './components/AllStarScreen';
 import { DashboardTab } from './components/DashboardTab';
@@ -214,7 +215,7 @@ export default function App(){
     {tab==="schedule"&&<ScheduleTab schedule={schedule} gameDay={gameDay} myTeam={myTeam} teams={teams} year={year} gameResultsMap={gs.gameResultsMap} allStarDone={gs.allStarDone} allStarResult={gs.allStarResult} allStarTriggerDay={gs.allStarTriggerDay}/>}
     {tab==="records"&&<RecordsTab history={gs.seasonHistory}/>}
     {tab==="news"&&<NewsTab news={news} onInterview={gs.handleInterview}/>}
-    {tab==="mailbox"&&<MailboxTab mailbox={mailbox} onRead={os.handleMailRead} onAction={os.handleMailAction} teams={teams} myTeam={myTeam} onTrade={os.handleTrade}/>}
+    {tab==="mailbox"&&<MailboxTab mailbox={mailbox} onRead={os.handleMailRead} onAction={os.handleMailAction} teams={teams} myTeam={myTeam} onTrade={os.handleTrade} onTeamClick={gs.handleTeamClick}/>}
     {tab==="trade"&&(()=>{const pendingTrades=mailbox.filter(m=>m.type==="trade"&&!m.resolved);return<TradeTab myTeam={myTeam} teams={teams} onTrade={os.handleTrade} cpuOffers={pendingTrades.map(m=>m.offer)} onAcceptOffer={(idx)=>os.handleMailAction(pendingTrades[idx].id,"accept")} onDeclineOffer={(idx)=>os.handleMailAction(pendingTrades[idx].id,"decline")} deadlinePassed={gameDay>95} onPlayerClick={gs.handlePlayerClick}/>;})()}
     {tab==="contract"&&<ContractTab team={myTeam} allTeams={teams} onOffer={os.handleContractOffer} onRelease={pid=>{const p=myTeam?.players.find(x=>x.id===pid);const popPenalty=(p?.salary??0)>POP_RELEASE_SALARY_THRESHOLD?POP_RELEASE_PENALTY:0;upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),popularity:Math.min(100,Math.max(0,(t.popularity??50)+popPenalty))}));if(p){addToHistory(myId,p,"自由契約");setFaPool(prev=>[...prev,{...p,isFA:true}]);}notify("放出しました","warn");}}/>}
     {tab==="alumni"&&<AlumniTab myTeam={myTeam}/>}
@@ -328,7 +329,7 @@ export default function App(){
       </div>
     )}
     {tab==="finance"&&<FinanceTab team={myTeam} onStadiumUpgrade={gs.handleStadiumUpgrade} gameDay={gameDay} onPlayerClick={gs.handlePlayerClick}/>}
-    {tab==="standings"&&<StandingsTab teams={teams} myId={myId}/>}
+    {tab==="standings"&&<StandingsTab teams={teams} myId={myId} onTeamClick={gs.handleTeamClick}/>}
     {tab==="stats"&&<StatsTab teams={teams} myId={myId}/>}
 
     {tab==="roster"&&(
@@ -340,6 +341,8 @@ export default function App(){
     )}
     <RetireModal modal={retireModal} retireRole={retireRole} setRetireRole={setRetireRole} onRetain={()=>os.handleRetain(retireModal.player)} onAccept={()=>os.handleAcceptRetire(retireModal.player)} onStartRetireGame={()=>os.handleStartRetireGame(retireModal.player)} onSkipRetireGame={()=>os.handleSkipRetireGame(retireModal.player)}/>
     {playerModal&&<PlayerModal player={playerModal.player} teamName={playerModal.teamName} onClose={()=>setPlayerModal(null)}/>}
+
+    {gs.teamModal&&(<TeamModal team={gs.teamModal} onPlayerClick={gs.handlePlayerClick} onClose={()=>gs.setTeamModal(null)}/>)}
     {pressEvent&&<PressConferenceModal event={pressEvent} onAnswer={handlePressAnswer}/>}
     </ErrorBoundary>
   </div></div></>);

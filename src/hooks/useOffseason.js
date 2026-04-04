@@ -306,6 +306,28 @@ export function useOffseason(gs) {
     setTeams(faResult.updatedTeams);
     setFaPool(faResult.remainingFaPool);
     faResult.news.forEach(n=>addNews(n));
+
+    // CPU球団の補強サマリーメール
+    const byTeam=new Map();
+    for(const c of (faResult.claimed||[])){
+      if(!byTeam.has(c.teamId)) byTeam.set(c.teamId,{teamId:c.teamId,teamName:c.teamName,teamEmoji:c.teamEmoji,players:[]});
+      byTeam.get(c.teamId).players.push(`${c.player.name}（${c.player.pos}）`);
+    }
+    if(byTeam.size>0){
+      const signings=Array.from(byTeam.values());
+      setMailbox(prev=>[...prev,{
+        id:uid(),
+        type:'cpu_fa_summary',
+        read:false,
+        title:`【オフシーズン補強情報】${signings.length}球団が補強を完了`,
+        subject:`【オフシーズン補強情報】${signings.length}球団が補強を完了`,
+        from:'スカウト部',
+        dateLabel:`${year}年`,
+        timestamp:Date.now(),
+        body:'各球団がFA市場での補強を完了しました。球団名をクリックして詳細ロスターを確認できます。',
+        signings,
+      }]);
+    }
     // 今回の戦力外通告分のみ結果表示（既存FAプールとは分離）
     const claimedNew=(faResult.claimed||[]).filter(c=>releasedIds.has(c.player.id));
     const unclaimedNew=faResult.remainingFaPool.filter(p=>releasedIds.has(p.id));

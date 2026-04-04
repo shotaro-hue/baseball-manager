@@ -25,6 +25,7 @@ export function useGameState() {
   const [screen, setScreen] = useState("title");
   const [retireModal, setRetireModal] = useState(null);
   const [playerModal, setPlayerModal] = useState(null);
+  const [teamModal, setTeamModal] = useState(null);
   const [retireGamePlayer, setRetireGamePlayer] = useState(null);
   const [retireRole, setRetireRole] = useState(null);
   const [gameState, dispatch] = useReducer(gameStateReducer, { teams: INIT_TEAMS, gameDay: 1, year: 2025, myId: null });
@@ -141,6 +142,7 @@ export function useGameState() {
   },[year,teams]);
 
   const handlePlayerClick = useCallback((player,teamName)=>setPlayerModal({player,teamName}),[]);
+  const handleTeamClick = useCallback((team)=>setTeamModal(team),[]);
 
   const setTrainingFocus = useCallback((pid,focus)=>upd(myId,t=>({...t,players:t.players.map(p=>p.id===pid?{...p,trainingFocus:focus}:p)})),[upd,myId]);
 
@@ -319,6 +321,7 @@ export function useGameState() {
     screen, setScreen,
     retireModal, setRetireModal,
     playerModal, setPlayerModal,
+    teamModal, setTeamModal,
     retireGamePlayer, setRetireGamePlayer,
     retireRole, setRetireRole,
     teams, setTeams,
@@ -355,6 +358,7 @@ export function useGameState() {
     handleSave,
     handleSelect,
     handlePlayerClick,
+    handleTeamClick,
     handlePlayerTalk,
     setTrainingFocus,
     setDevGoal,
