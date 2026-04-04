@@ -1,5 +1,9 @@
 import { clamp } from '../utils';
-import { ACCEPT_THRESHOLD, MIN_SALARY_SHIHAKA, MIN_SALARY_IKUSEI, ACTIVE_ROSTER_FA_DAYS_PER_YEAR, MAX_外国人_一軍 } from '../constants';
+import {
+  ACCEPT_THRESHOLD, MIN_SALARY_SHIHAKA, MIN_SALARY_IKUSEI,
+  ACTIVE_ROSTER_FA_DAYS_PER_YEAR, MAX_外国人_一軍,
+  MAX_ROSTER, CPU_FA_BUDGET_RESERVE_RATIO, CPU_FA_MIN_SCORE,
+} from '../constants';
 import { tradeValue, analyzeTeamNeeds } from './trade';
 
 /* ═══════════════════════════════════════════════
@@ -166,82 +170,116 @@ export function cpuRenewContracts(teams, myId, allTeams) {
    ウェーバー後に CPU 球団が FA 市場で獲得する
 ═══════════════════════════════════════════════ */
 
+/**
+ * 選手がチームの補強ニーズにどれだけ合致するかをスコア化する。
+ * @param {object} player
+ * @param {Array<{type: string, score: number}>} needs
+ * @returns {number}
+ */
+function calcNeedMatch(player, needs) {
+  let bonus = 0;
+  for (const n of needs) {
+    if (n.type.includes('先発') && player.isPitcher && player.subtype === '先発') bonus += n.score;
+    else if (n.type.includes('抑え') && player.isPitcher && player.subtype === '抑え') bonus += n.score;
+    else if (n.type.includes('中継ぎ') && player.isPitcher && player.subtype === '中継ぎ') bonus += n.score;
+    else if (n.type.includes('球威') && player.isPitcher) bonus += n.score * 0.5;
+    else if (n.type.includes('捕手') && !player.isPitcher && player.pos === '捕手') bonus += n.score;
+    else if (n.type.includes('ミート') && !player.isPitcher) bonus += n.score * 0.5;
+    else if (n.type.includes('若手') && (player.age || 25) <= 26) bonus += n.score * 0.5;
+    else if (n.type.includes('バランス')) bonus += 5;
+  }
+  return bonus;
+}
+
 export function processCpuFaBids(teams, myId, faPool, allTeams) {
   if (!faPool.length) return { updatedTeams: teams, remainingFaPool: faPool, news: [] };
 
   const news = [];
   let remainingPool = [...faPool];
-  const teamMap = new Map(teams.map(t => [t.id, { ...t, players: [...t.players], farm: [...(t.farm || [])] }]));
-
-  // 各 CPU チームが最も欲しい FA 候補に入札
-  const bids = [];
-  for (const t of teams.filter(t => t.id !== myId)) {
-    const needs = analyzeTeamNeeds(t);
-    const wantPitcher = needs.some(n => n.includes('投手'));
-
-    const candidates = remainingPool
-      .filter(p => wantPitcher ? p.isPitcher : !p.isPitcher)
-      .map(p => ({ ...p, salary: Math.max(MIN_SALARY_SHIHAKA, p.salary) }))
-      .filter(p => t.budget >= p.salary)
-      .map(p => {
-        const r = evalOffer(p, { salary: p.salary, years: 1 }, t, allTeams);
-        return { pid: p.id, tid: t.id, score: r.total, salary: p.salary };
-      })
-      .filter(c => c.score >= 50)
-      .sort((a, b) => b.score - a.score);
-
-    if (candidates[0]) bids.push(candidates[0]);
-  }
-
-  // スコア降順に処理（同一選手は最高入札チームが獲得）
-  bids.sort((a, b) => b.score - a.score);
-  const signedPlayers = new Set();
-  const signedTeams = new Set();
+  const teamMap = new Map(
+    teams.map((t) => [t.id, { ...t, players: [...t.players], farm: [...(t.farm || [])] }]),
+  );
   const claimed = [];
+  const signedPlayers = new Set();
 
-  for (const bid of bids) {
-    if (signedPlayers.has(bid.pid) || signedTeams.has(bid.tid)) continue;
-    const player = remainingPool.find(p => p.id === bid.pid);
-    const team = teamMap.get(bid.tid);
-    if (!player || !team) continue;
+  const cpuTeams = teams
+    .filter((t) => t.id !== myId)
+    .sort((a, b) => b.budget - a.budget);
 
-    const foreignPlayers = team.players.filter(p => p.isForeign);
-    const foreignActiveOnTeam = foreignPlayers.length;
-    const foreignPitchers = foreignPlayers.filter(p => p.isPitcher).length;
-    const foreignBatters = foreignPlayers.length - foreignPitchers;
-    const wouldBeAllPitchers = player.isPitcher && foreignPitchers === MAX_外国人_一軍 - 1;
-    const wouldBeAllBatters = !player.isPitcher && foreignBatters === MAX_外国人_一軍 - 1;
-    const balanceViolation = foreignActiveOnTeam === MAX_外国人_一軍 - 1 && (wouldBeAllPitchers || wouldBeAllBatters);
-    const goToFarm = player.isForeign && (foreignActiveOnTeam >= MAX_外国人_一軍 || balanceViolation);
-    if (goToFarm) {
-      teamMap.set(bid.tid, {
-        ...team,
-        farm: [...(team.farm || []), { ...player, isFA: false, contractYearsLeft: 1, salary: bid.salary }],
-        budget: team.budget - bid.salary,
-      });
-    } else {
-      teamMap.set(bid.tid, {
-        ...team,
-        players: [...team.players, { ...player, isFA: false, contractYearsLeft: 1, salary: bid.salary }],
-        budget: team.budget - bid.salary,
+  let changed = true;
+  while (changed && remainingPool.length > 0) {
+    changed = false;
+
+    for (const origTeam of cpuTeams) {
+      const team = teamMap.get(origTeam.id);
+      if (!team) continue;
+      if (team.players.length >= MAX_ROSTER) continue;
+
+      const reserve = team.budget * CPU_FA_BUDGET_RESERVE_RATIO;
+      if (team.budget - reserve < MIN_SALARY_SHIHAKA) continue;
+
+      const needs = analyzeTeamNeeds(team);
+      const candidates = remainingPool
+        .filter((p) => !signedPlayers.has(p.id))
+        .map((p) => {
+          const salary = Math.max(MIN_SALARY_SHIHAKA, p.salary);
+          if (team.budget - reserve < salary) return null;
+          const r = evalOffer(p, { salary, years: 1 }, team, allTeams);
+          const needBonus = calcNeedMatch(p, needs);
+          return { pid: p.id, score: r.total + needBonus * 0.3, salary };
+        })
+        .filter((c) => c && c.score >= CPU_FA_MIN_SCORE)
+        .sort((a, b) => b.score - a.score);
+
+      if (!candidates.length) continue;
+
+      const best = candidates[0];
+      const player = remainingPool.find((p) => p.id === best.pid);
+      if (!player) continue;
+
+      const foreignPlayers = team.players.filter((p) => p.isForeign);
+      const foreignActiveOnTeam = foreignPlayers.length;
+      const foreignPitchers = foreignPlayers.filter((p) => p.isPitcher).length;
+      const foreignBatters = foreignPlayers.length - foreignPitchers;
+      const wouldBeAllPitchers = player.isPitcher && foreignPitchers === MAX_外国人_一軍 - 1;
+      const wouldBeAllBatters = !player.isPitcher && foreignBatters === MAX_外国人_一軍 - 1;
+      const balanceViolation =
+        foreignActiveOnTeam === MAX_外国人_一軍 - 1 && (wouldBeAllPitchers || wouldBeAllBatters);
+      const goToFarm = player.isForeign && (foreignActiveOnTeam >= MAX_外国人_一軍 || balanceViolation);
+
+      const newPlayerEntry = { ...player, isFA: false, contractYearsLeft: 1, salary: best.salary };
+
+      if (goToFarm) {
+        teamMap.set(team.id, {
+          ...team,
+          farm: [...(team.farm || []), newPlayerEntry],
+          budget: team.budget - best.salary,
+        });
+      } else {
+        teamMap.set(team.id, {
+          ...team,
+          players: [...team.players, newPlayerEntry],
+          budget: team.budget - best.salary,
+        });
+      }
+
+      remainingPool = remainingPool.filter((p) => p.id !== best.pid);
+      signedPlayers.add(best.pid);
+      claimed.push({ player, teamName: team.name, teamEmoji: team.emoji, teamId: team.id });
+      changed = true;
+
+      news.push({
+        type: 'season',
+        headline: `【入団】${player.name}が${team.name}と契約`,
+        source: '野球速報',
+        dateLabel: '',
+        body: `${player.name}選手（${player.age}歳）が${team.name}と契約した。`,
       });
     }
-    remainingPool = remainingPool.filter(p => p.id !== bid.pid);
-    signedPlayers.add(bid.pid);
-    signedTeams.add(bid.tid);
-    claimed.push({ player, teamName: team.name, teamEmoji: team.emoji });
-
-    news.push({
-      type: 'season',
-      headline: `【入団】${player.name}が${team.name}と契約`,
-      source: '野球速報',
-      dateLabel: '',
-      body: `${player.name}選手（${player.age}歳）が${team.name}と契約した。`,
-    });
   }
 
   return {
-    updatedTeams: teams.map(t => teamMap.get(t.id) || t),
+    updatedTeams: teams.map((t) => teamMap.get(t.id) || t),
     remainingFaPool: remainingPool,
     news,
     claimed,

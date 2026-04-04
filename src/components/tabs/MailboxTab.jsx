@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-export function MailboxTab({mailbox, onRead, onAction, teams, myTeam, onTrade}){
+export function MailboxTab({mailbox, onRead, onAction, teams, myTeam, onTrade, onTeamClick}){
   const [selected, setSelected] = useState(null);
   const unread = mailbox.filter(m=>!m.read).length;
 
@@ -9,8 +9,8 @@ export function MailboxTab({mailbox, onRead, onAction, teams, myTeam, onTrade}){
     if(!m.read) onRead(m.id);
   };
 
-  const typeIcon = t => t==="trade"?"🔄":t==="posting_request"?"✈️":t==="posting_result"?"💰":t==="info"?"📋":t==="scout"?"🔍":"📨";
-  const typeColor = t => t==="trade"?"#f97316":t==="posting_request"?"#34d399":t==="posting_result"?"#f5c842":t==="info"?"#60a5fa":t==="scout"?"#a78bfa":"#94a3b8";
+  const typeIcon = t => t==="trade"?"🔄":t==="posting_request"?"✈️":t==="posting_result"?"💰":t==="cpu_fa_summary"?"🗞":t==="info"?"📋":t==="scout"?"🔍":"📨";
+  const typeColor = t => t==="trade"?"#f97316":t==="posting_request"?"#34d399":t==="posting_result"?"#f5c842":t==="cpu_fa_summary"?"#38bdf8":t==="info"?"#60a5fa":t==="scout"?"#a78bfa":"#94a3b8";
 
   return(
     <div style={{display:"grid", gridTemplateColumns: selected?"1fr 1fr":"1fr", gap:8}}>
@@ -86,6 +86,26 @@ export function MailboxTab({mailbox, onRead, onAction, teams, myTeam, onTrade}){
                 <button className="bsm bga" style={{flex:1}} onClick={()=>{onAction(selected.id,"accept");setSelected({...selected,resolved:true});}}>✅ 承認する</button>
                 <button className="bsm bgr" style={{flex:1}} onClick={()=>{onAction(selected.id,"decline");setSelected({...selected,resolved:true});}}>❌ 拒否する</button>
               </div>
+            </div>
+          )}
+
+
+          {selected.type==="cpu_fa_summary"&&selected.signings?.length>0&&(
+            <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:8}}>
+              {selected.signings.map(s=>{
+                const teamObj=teams?.find(t=>t.id===s.teamId);
+                return(
+                  <div key={s.teamId} style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap"}}>
+                    <button
+                      onClick={()=>teamObj&&onTeamClick?.(teamObj)}
+                      style={{background:"rgba(56,189,248,.12)",border:"1px solid rgba(56,189,248,.35)",color:"#7dd3fc",borderRadius:6,padding:"3px 8px",cursor:"pointer",fontSize:12,fontWeight:700}}
+                    >
+                      {s.teamEmoji} {s.teamName}
+                    </button>
+                    <span style={{color:"#94a3b8",fontSize:13}}>{s.players.join('、')}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
 

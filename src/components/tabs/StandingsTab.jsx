@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-export function StandingsTab({teams,myId}){
+export function StandingsTab({teams,myId,onTeamClick}){
   const myLeague=teams.find(t=>t.id===myId)?.league;
   const [lg,setLg]=useState(myLeague||"セ");
   const sorted=[...teams.filter(t=>t.league===lg)].sort((a,b)=>{const pa=a.wins/Math.max(1,a.wins+a.losses),pb=b.wins/Math.max(1,b.wins+b.losses);return pb-pa||(b.rf-b.ra)-(a.rf-a.ra);});
@@ -17,7 +17,10 @@ export function StandingsTab({teams,myId}){
             const isMe=t.id===myId;
             return(<tr key={t.id} style={{background:isMe?"rgba(245,200,66,.04)":undefined}}>
               <td><span className="mono" style={{color:i===0?"#ffd700":i===1?"#94a3b8":i===2?"#b45309":"#1e2d3d",fontWeight:700,fontSize:15}}>{i+1}</span></td>
-              <td><span style={{color:t.color,marginRight:5}}>{t.emoji}</span><span style={{fontWeight:isMe?700:400,color:isMe?"#f5c842":undefined}}>{t.name}{isMe&&" ★"}</span></td>
+              <td><button
+                onClick={()=>onTeamClick?.(t)}
+                style={{background:"none",border:"none",cursor:"pointer",color:"inherit",fontWeight:"inherit",padding:0}}
+              ><span style={{color:t.color,marginRight:5}}>{t.emoji}</span><span style={{fontWeight:isMe?700:400,color:isMe?"#f5c842":undefined}}>{t.name}{isMe&&" ★"}</span></button></td>
               <td className="mono">{g}</td><td className="mono" style={{color:"#34d399"}}>{t.wins}</td><td className="mono" style={{color:"#f87171"}}>{t.losses}</td>
               <td className="mono">{t.wins+t.losses>0?"."+String(Math.round(t.wins/(t.wins+t.losses)*1000)).padStart(3,"0"):"---"}</td>
               <td className="mono" style={{color:"#374151"}}>{gb}</td>
