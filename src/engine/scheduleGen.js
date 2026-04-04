@@ -47,9 +47,9 @@ export function generateSeasonSchedule(year, teams) {
   const { preDates, ilDates, postDates } = buildCalendarSections(year, params);
   // preDates + postDates = 125日、ilDates = 18日
 
-  // 2. リーグ内ラウンド生成（各リーグ125ラウンド×3試合）
-  const ceRounds = buildLeagueRounds(ceIds);   // length=125
-  const rawPaRounds = buildLeagueRounds(paIds); // length=125
+  // 2. リーグ内カード生成（各リーグ42カード前後 × 各カード3試合固定）
+  const ceCards = buildLeagueRounds(ceIds, preDates.length + postDates.length);
+  const rawPaCards = buildLeagueRounds(paIds, preDates.length + postDates.length);
 
   // 3. 交流戦ラウンド生成（18ラウンド×6試合）
   const ilRounds = buildInterleagueRounds(ceIds, paIds, params);
@@ -60,33 +60,46 @@ export function generateSeasonSchedule(year, teams) {
   // PAラウンドを甲子園ブラックアウト対策で並び替え:
   // オリックスアウェイラウンドをブラックアウト日付に優先配置し、
   // ホーム試合数の減少を防ぐ（57→約69試合に改善）
-  const regularDates = [...preDates, ...postDates]; // 125日
-  const paRounds = reorderPaRoundsForOrix(rawPaRounds, regularDates, params.koshienBlackout);
+  const regularDates = [...preDates, ...postDates];
+  const paCards = reorderPaRoundsForOrix(rawPaCards, regularDates, params.koshienBlackout);
 
-  let ceIdx = 0;
-  let paIdx = 0;
+  const regularState = { ceIdx: 0, paIdx: 0 };
 
-  const assignRegular = (dates) => {
-    for (const date of dates) {
-      const isBlackout = isKoshienBlackout(date, params.koshienBlackout);
-      const ceRound = ceRounds[ceIdx++];
-      const paRound = paRounds[paIdx++];
+  /**
+   * 仕様:
+   * - レギュラーシーズンは「カード単位」で割り当てる（同一対戦を連続3試合）。
+   * - 月曜休み/オールスター休止日は buildCalendarSections で除外済みなので、
+   *   カードは「連続するゲーム日」に展開される（暦日連続は保証しない）。
+   * - 甲子園制約はカードを分断せず、各ゲーム日に制約適用のみ行う。
+   * - レギュラー125日のように3で割り切れない端数日は末尾カードのみ2試合になる。
+   */
+  const assignRegularCards = (dates) => {
+    let dateIdx = 0;
+    while (dateIdx < dates.length) {
+      const ceCard = ceCards[regularState.ceIdx++];
+      const paCard = paCards[regularState.paIdx++];
+      if (!ceCard || !paCard) break;
 
-      const matchups = [
-        ...ceRound.map(m => applyHanshinConstraint(m, isBlackout)),
-        ...paRound.map(m => applyOrixConstraint(m, isBlackout)),
-      ];
+      const games = Math.min(ceCard.games, paCard.games, dates.length - dateIdx);
+      for (let g = 0; g < games; g++) {
+        const date = dates[dateIdx++];
+        const isBlackout = isKoshienBlackout(date, params.koshienBlackout);
+        const matchups = [
+          ...ceCard.matchups.map(m => applyHanshinConstraint(m, isBlackout)),
+          ...paCard.matchups.map(m => applyOrixConstraint(m, isBlackout)),
+        ];
 
-      schedule.push({
-        gameNo: schedule.length,
-        date,
-        isInterleague: false,
-        matchups,
-      });
+        schedule.push({
+          gameNo: schedule.length,
+          date,
+          isInterleague: false,
+          matchups,
+        });
+      }
     }
   };
 
-  assignRegular(preDates);
+  assignRegularCards(preDates);
 
   // 交流戦ラウンドを挿入
   for (let i = 0; i < 18; i++) {
@@ -98,7 +111,7 @@ export function generateSeasonSchedule(year, teams) {
     });
   }
 
-  assignRegular(postDates);
+  assignRegularCards(postDates);
 
   // schedule[1..143] が完成（schedule.length - 1 === 143 のはず）
   return schedule;
@@ -162,41 +175,57 @@ function buildCalendarSections(year, params) {
  * これにより applyOrixConstraint によるスワップ回数を最小化し、
  * オリックスのシーズンホーム試合数を約69試合（57→+12改善）に近づける。
  */
-function reorderPaRoundsForOrix(paRounds, regularDates, koshienBlackout) {
-  if (!koshienBlackout) return paRounds;
+function reorderPaRoundsForOrix(paCards, regularDates, koshienBlackout) {
+  if (!koshienBlackout) return paCards;
 
-  // ラウンドをオリックスホーム/アウェイで分類
+  // カードをオリックスホーム/アウェイで分類
+  const cardDateRanges = [];
+  let dateIdx = 0;
+  paCards.forEach(card => {
+    const start = dateIdx;
+    const end = Math.min(regularDates.length - 1, dateIdx + card.games - 1);
+    cardDateRanges.push({ start, end });
+    dateIdx += card.games;
+  });
+
   const orixAwayIdx = [];
   const orixHomeIdx = [];
-  paRounds.forEach((round, i) => {
-    const m = round.find(r => r.homeId === ORIX_ID || r.awayId === ORIX_ID);
+  paCards.forEach((card, i) => {
+    const m = card.matchups.find(r => r.homeId === ORIX_ID || r.awayId === ORIX_ID);
     if (m && m.homeId === ORIX_ID) orixHomeIdx.push(i);
     else orixAwayIdx.push(i);
   });
 
-  // ブラックアウト/非ブラックアウト日付インデックスを抽出
-  const blackoutPos    = [];
-  const nonBlackoutPos = [];
-  regularDates.forEach((d, i) => {
-    if (isKoshienBlackout(d, koshienBlackout)) blackoutPos.push(i);
-    else nonBlackoutPos.push(i);
+  // ブラックアウトに触れるカード/触れないカードを抽出
+  const blackoutCardPos = [];
+  const nonBlackoutCardPos = [];
+  cardDateRanges.forEach(({ start, end }, i) => {
+    let hasBlackout = false;
+    for (let d = start; d <= end; d++) {
+      if (isKoshienBlackout(regularDates[d], koshienBlackout)) {
+        hasBlackout = true;
+        break;
+      }
+    }
+    if (hasBlackout) blackoutCardPos.push(i);
+    else nonBlackoutCardPos.push(i);
   });
 
-  const reordered = new Array(paRounds.length);
+  const reordered = new Array(paCards.length);
 
-  // ブラックアウト日付にオリックスアウェイラウンドを優先割り当て
+  // ブラックアウトに触れるカードへオリックスアウェイカードを優先割り当て
   const awayQ = [...orixAwayIdx];
   const homeQ = [...orixHomeIdx];
 
-  for (const pos of blackoutPos) {
+  for (const pos of blackoutCardPos) {
     const srcIdx = awayQ.length > 0 ? awayQ.shift() : homeQ.shift();
-    reordered[pos] = paRounds[srcIdx];
+    reordered[pos] = paCards[srcIdx];
   }
 
-  // 非ブラックアウト日付に残りのラウンドを割り当て（ホーム優先）
+  // 非ブラックアウトカードに残りを割り当て（ホーム優先）
   const remainingQ = [...homeQ, ...awayQ];
-  for (const pos of nonBlackoutPos) {
-    reordered[pos] = paRounds[remainingQ.shift()];
+  for (const pos of nonBlackoutCardPos) {
+    reordered[pos] = paCards[remainingQ.shift()];
   }
 
   return reordered;
@@ -267,55 +296,34 @@ function bergerRounds(ids) {
 /* ─── リーグ内日程生成 ───────────────────────── */
 
 /**
- * 1リーグ（6チーム）の125ラウンドを生成
- * 各ペアが25試合（13H/12A）
+ * 1リーグ（6チーム）のカード配列を生成
+ * - 1カード = 同一対戦3試合固定（末尾のみ2試合になる場合あり）
+ * - return: [{ matchups: Matchup[3], games: 2|3 }, ...]
  */
-function buildLeagueRounds(teamIds) {
+function buildLeagueRounds(teamIds, totalGames = 125) {
   const berger = bergerRounds(teamIds); // 5ラウンド
+  const totalCards = Math.ceil(totalGames / 3);
 
-  // 全ペアの25試合スケジュールを生成
-  // 各ペア (a,b): aが「Berger上の先側」→ 奇数ゲームでaがホーム（13回）、偶数でbがホーム（12回）
-  const pairGames = {};
-  const pairOrder = {};
-  let pairCount = 0;
-  berger.forEach(round => {
-    round.forEach(([a, b]) => {
+  // ペアごとのカード出現回数（ホーム交互にする）
+  const pairCardCount = {};
+  const cards = [];
+
+  for (let cardIdx = 0; cardIdx < totalCards; cardIdx++) {
+    const round = berger[cardIdx % berger.length];
+    const matchups = round.map(([a, b]) => {
       const key = `${Math.min(a, b)}-${Math.max(a, b)}`;
-      if (!pairGames[key]) {
-        const firstHome = a; // Bergerの先側をfirstHomeとする
-        const secondHome = b;
-        const games = [];
-        for (let g = 0; g < 25; g++) {
-          // 偶数g: firstHome がホーム（0,2,4,...,24 → 13回）
-          // 奇数g: secondHome がホーム（1,3,...,23 → 12回）
-          games.push(g % 2 === 0
-            ? { homeId: firstHome, awayId: secondHome }
-            : { homeId: secondHome, awayId: firstHome }
-          );
-        }
-        pairGames[key] = games;
-        pairOrder[key] = pairCount++;
-      }
+      const count = pairCardCount[key] || 0;
+      pairCardCount[key] = count + 1;
+      return count % 2 === 0
+        ? { homeId: a, awayId: b }
+        : { homeId: b, awayId: a };
     });
-  });
 
-  // 各ペアの消費インデックス
-  const pairIdx = {};
-  Object.keys(pairGames).forEach(k => { pairIdx[k] = 0; });
-
-  // 125ラウンドを生成（25 repetitions × 5 Berger rounds）
-  const rounds = [];
-  for (let rep = 0; rep < 25; rep++) {
-    for (const round of berger) {
-      const matchups = round.map(([a, b]) => {
-        const key = `${Math.min(a, b)}-${Math.max(a, b)}`;
-        return { ...pairGames[key][pairIdx[key]++] };
-      });
-      rounds.push(matchups);
-    }
+    const remaining = totalGames - cardIdx * 3;
+    cards.push({ matchups, games: Math.min(3, remaining) });
   }
 
-  return rounds; // 125ラウンド × 3マッチアップ
+  return cards;
 }
 
 /* ─── 交流戦日程生成 ─────────────────────────── */
@@ -395,4 +403,38 @@ export function getCpuMatchups(schedule, gameDay, myId, oppId) {
     m => m.homeId !== myId && m.awayId !== myId &&
          m.homeId !== oppId && m.awayId !== oppId
   );
+}
+
+/**
+ * オールスター実施タイミング（「休止明け最初のゲーム日」）を返す
+ * - useSeasonFlow 側は gameDay+1 と比較して発火するため、
+ *   この値は「休止明け再開日の gameDay」を返す。
+ */
+export function getAllStarBreakInfo(year, schedule) {
+  const params = SEASON_PARAMS[year] || getDefaultParams(year);
+  const skips = params.allStarSkipDates || [];
+  if (!schedule?.length || skips.length === 0) {
+    return { triggerGameDay: 72, restDates: [], gameDates: [], breakDates: [] };
+  }
+
+  const toNum = (d) => d.month * 100 + d.day;
+  const sorted = [...skips].sort((a, b) => toNum(a) - toNum(b));
+  const breakDates = sorted;
+  const restDates = [sorted[0], sorted[sorted.length - 1]].filter(Boolean);
+  const gameDates = sorted.slice(1, 3); // 前後1休み・中2試合
+
+  for (let dayNo = 1; dayNo < schedule.length; dayNo++) {
+    const d = schedule[dayNo]?.date;
+    if (d && toNum(d) > toNum(sorted[sorted.length - 1])) {
+      return { triggerGameDay: dayNo, restDates, gameDates, breakDates };
+    }
+  }
+  return { triggerGameDay: 72, restDates, gameDates, breakDates };
+}
+
+/**
+ * 後方互換: 旧API（オールスター発火gameDayのみ）
+ */
+export function getAllStarGameDay(year, schedule) {
+  return getAllStarBreakInfo(year, schedule).triggerGameDay;
 }
