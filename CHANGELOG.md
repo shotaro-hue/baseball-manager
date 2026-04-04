@@ -5,6 +5,16 @@
 
 ---
 
+### 2026-04-04 — ドラフト1位指名クラッシュ＋ニュースバッジ修正（3e2f4c4）
+
+**仕様本文への影響なし（内部実装のみ）**
+
+- Draft.jsx `buildCpuPicks()` / `cpuPick()` で analyzeTeamNeeds 戻り値のオブジェクトを文字列として .includes() していた TypeError を修正（n.type.includes に変更）
+- useGameState.js `tabBadges` に `news` キーを追加し、未回答インタビューがあるときニュースタブにバッジ表示
+- handleInterview 呼び出し時にニュースアイテムへ `answered: true` フラグを付与し、タブ再訪後もバッジが消えたまま維持
+
+---
+
 ### 2026-04-04 — メール・ニュース通知配信改善（ac0704f）
 
 **仕様本文への影響なし（内部実装のみ）**
