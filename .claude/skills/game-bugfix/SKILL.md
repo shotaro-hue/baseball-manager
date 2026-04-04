@@ -26,27 +26,33 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 `ROADMAP.md` を読み、既知のバグリスト（B* タグ）に記載がないか確認する。
 同様の症状の修正履歴があれば、そのアプローチを参考にする。
 
-### 3. 関連コードを調査
+### 3. 関連コードを調査（Grep ファースト）
 
-症状から影響範囲を推測し、該当ファイルを読み込む:
+**原則: ファイル全体を読まない。症状から検索キーワードを決め、Grep で行番号を特定 → 前後 50〜100 行のみ Read する。**
 
-**シミュレーション系のバグ**:
-- `src/engine/simulation.js` — ピッチ解決・打席結果・イニング進行
-- `src/engine/postGame.js` — 試合後の成績集計
+#### 調査手順
 
-**選手・チーム管理系のバグ**:
-- `src/engine/player.js` — 選手生成・老化・引退
-- `src/engine/contract.js` — 契約処理
-- `src/engine/trade.js` — トレード処理
+1. **症状から検索キーワードを決める**  
+   エラーメッセージ・関数名・UI ラベル等で `Grep` し、問題箇所の候補を絞り込む。
 
-**UI 系のバグ**:
-- `src/components/tabs/` — 各タブコンポーネント（RosterTab / StatsTab 等）
-- `src/components/TacticalGame.jsx` — 試合操作
-- `src/hooks/useGameState.js` / `useSeasonFlow.js` / `useOffseason.js` — state 管理・game flow
+2. **行番号を特定して部分 Read**  
+   Grep で得た行番号の前後 50〜100 行のみ Read する。ファイル全体は読まない。
 
-**データ・永続化系のバグ**:
-- `src/engine/saveload.js` — localStorage 読み書き
-- `src/constants.js` — 定数・初期値
+3. **影響範囲の確認も Grep で**  
+   修正候補の関数名・変数名を Grep し、他ファイルへの影響箇所を確認する。
+
+症状別の主要 Grep キーワード:
+
+| 症状カテゴリ | Grep キーワード例 | 確認候補ファイル |
+|---|---|---|
+| シミュレーション系 | `resolveAtBat\|calcFatigue\|inning` | `src/engine/simulation.js` |
+| 成績集計・W/L | `postGame\|updateStats\|winLoss` | `src/engine/postGame.js` |
+| 選手・チーム管理 | `generatePlayer\|aging\|retire` | `src/engine/player.js` |
+| 契約・年俸 | `faEligible\|salary\|contract` | `src/engine/contract.js` |
+| トレード | `tradeValue\|cpuTrade` | `src/engine/trade.js` |
+| UI 表示系 | コンポーネント名・props 名 | `src/components/tabs/` |
+| state・game flow | `gameDay\|roster\|schedule` | `src/hooks/` |
+| セーブ・ロード | `saveGame\|loadGame\|localStorage` | `src/engine/saveload.js` |
 
 コードを読む際は、バグが起きうる条件分岐・境界値・null チェックに注目する。
 
