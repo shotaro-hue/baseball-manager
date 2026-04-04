@@ -5,6 +5,7 @@
 ═══════════════════════════════════════════════ */
 
 import { SEASON_PARAMS, getDefaultParams } from '../data/scheduleParams.js';
+import { cloneSchedule2025 } from '../data/schedule2025.js';
 
 const HANSHIN_ID = 3;
 const ORIX_ID    = 11;
@@ -31,6 +32,10 @@ const ORIX_ID    = 11;
  * @returns {Array} schedule - インデックス0はnull、1〜143がScheduleDay
  */
 export function generateSeasonSchedule(year, teams) {
+  if (year === 2025) {
+    return cloneSchedule2025();
+  }
+
   const params = SEASON_PARAMS[year] || getDefaultParams(year);
 
   const ceIds = teams
