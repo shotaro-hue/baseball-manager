@@ -778,6 +778,7 @@ base = 0.3% / 試合
 
   injury,        // 怪我名称（文字列）または null
   injuryDaysLeft,// 残怪我日数
+  allStarSelections, // 通算オールスター選出回数（キャリア累積）
 
   playerType,    // フレーバータイプ名
   playerComment, // フレーバーコメント
@@ -1220,7 +1221,13 @@ export function getFaThreshold(p) {
 - ゲームDay 70〜75 の月曜〜水曜（3日間）を休止日に設定
 - 出場選手: 各リーグ上位 wOBA / FIP から自動選出（2名 + 監督推薦3名）
 - 試合結果: 簡易シミュ（スターター3回、その後リリーフ）
-- 記録: `player.allStarSelections++`
+- 記録: `player.allStarSelections++`（当該シーズンの選出全58名）
+- 発火タイミング: `ALL_STAR_GAMEDAY = 72` 到達時。通常進行では専用 `allstar` 画面を表示、バッチシム中はニュース追記のみで1回実行
+- 選出ルール（各リーグ29名）:
+  - ファン投票: 野手8枠（各守備位置wOBA1位）＋投手5枠（先発3名FIP順・中継ぎ1名HLD順・抑え1名SV順）
+  - パ・リーグのみDH1枠を追加（wOBA順）
+  - 監督推薦: セ=投手9+野手7、パ=投手9+野手6（既選出除外。投手FIP順/野手wOBA順）
+- 重複防止: `allStarDone` フラグで同シーズン多重実行を防止し、`handleNextYear` でリセット
 
 ---
 

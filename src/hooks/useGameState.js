@@ -45,6 +45,8 @@ export function useGameState() {
   const [cpuTradeOffers, setCpuTradeOffers] = useState([]);
   const [pressEvent, setPressEvent] = useState(null);  // 記者会見イベント
   const [lastPressDay, setLastPressDay] = useState(0); // 最後に記者会見を行ったgameDay
+  const [allStarDone, setAllStarDone] = useState(false);
+  const [allStarResult, setAllStarResult] = useState(null);
 
   // gameDay が進んだとき、記者会見インターバルを超えていれば会見イベントをセット
   useEffect(()=>{
@@ -314,6 +316,8 @@ export function useGameState() {
     cpuTradeOffers, setCpuTradeOffers,
     pressEvent, setPressEvent,
     lastPressDay, setLastPressDay,
+    allStarDone, setAllStarDone,
+    allStarResult, setAllStarResult,
     // derived
     myTeam,
     tabBadges,
