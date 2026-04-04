@@ -1,16 +1,12 @@
 import { useState } from "react";
 import { uid, clamp, rng, rngf, fmtM } from '../utils';
-import { emptyStats, rollRetire, developPlayers, generateForeignFaPool } from '../engine/player';
+import { emptyStats, rollRetire, developPlayers } from '../engine/player';
 import { calcSeasonAwards, updateRecords, checkHallOfFame } from '../engine/awards';
 import { evalOffer, cpuRenewContracts, processCpuFaBids, getFaThreshold } from '../engine/contract';
 import { initDraftPool } from '../engine/draft';
 import { calcPostingRequestProb, calcPostingBid, POSTING_FEE_RATE } from '../engine/posting';
 import { calcOffseasonPopDelta, driftPopularity } from '../engine/fanSentiment';
-import {
-  TEAM_DEFS, ACCEPT_THRESHOLD, OWNER_TRUST_BUDGET_LOW, OWNER_TRUST_BUDGET_HIGH,
-  OWNER_TRUST_FACTOR_LOW, OWNER_TRUST_FACTOR_HIGH, POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD,
-  FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX,
-} from '../constants';
+import { TEAM_DEFS, ACCEPT_THRESHOLD, OWNER_TRUST_BUDGET_LOW, OWNER_TRUST_BUDGET_HIGH, OWNER_TRUST_FACTOR_LOW, OWNER_TRUST_FACTOR_HIGH, POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD } from '../constants';
 
 export function useOffseason(gs) {
   const {
@@ -38,8 +34,7 @@ export function useOffseason(gs) {
   };
 
   const handleNextYear = () => {
-    const foreignPool = generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX));
-    setYear(y=>y+1);setGameDay(1);setFaPool(foreignPool);setDraftAllocation({pitcher:50,batter:50});
+    setYear(y=>y+1);setGameDay(1);setFaPool([]);setDraftAllocation({pitcher:50,batter:50});
     setAllStarDone(false);
     setTeams(prev=>prev.map(t=>{
       const nextPlayers=t.players.filter(p=>!p._retireNow).map(p=>({...p,age:p.age+1,stats:emptyStats(),playoffStats:emptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:Math.max(0,p.contractYearsLeft-1),postingRequested:false,growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlyDecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),careerLog:[...(p.careerLog||[]),mkCareerEntry(p.stats,p.playoffStats,year,t.id,t.name)],serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}));
