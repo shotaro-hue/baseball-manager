@@ -9,12 +9,11 @@ export const SEASON_PARAMS = {
     // 2025年度 実績値
     openingDate: { month: 3, day: 28 },          // 金曜開幕
     interleagueStart: { month: 6, day: 3 },       // 6/3(火)〜6/22(日) 18日
-    // AllStar休止4日: 7/22(火)休み, 7/23(水)第1戦, 7/24(木)第2戦, 7/25(金)休み
+    // AllStar: 7/23(水)・7/24(木)。7/22(火)〜7/24(木) の3日を追加スキップ
     allStarSkipDates: [
       { month: 7, day: 22 },
       { month: 7, day: 23 },
       { month: 7, day: 24 },
-      { month: 7, day: 25 },
     ],
     koshienBlackout: {
       // センバツ期間（3月下旬〜4月上旬）: 阪神は京セラ、オリックスはアウェイ
@@ -72,18 +71,17 @@ function getFirstTuesdayOfJune(year) {
 
 /**
  * AllStar休暇の追加スキップ日（月曜以外）
- * 4日間（前後1日休み + 中2日がオールスター試合日）
+ * 7月中旬〜下旬の火〜木の3日間
  */
 function getDefaultAllStarSkip(year) {
-  // 7/18付近で火曜日を探す（火〜金の4日間を休止ウィンドウ化）
+  // 7/18付近で火曜日を探す
   for (let day = 14; day <= 25; day++) {
     const dow = new Date(year, 6, day).getDay(); // 7月
     if (dow === 2) { // 火曜日
       return [
-        { month: 7, day },          // 休み
-        { month: 7, day: day + 1 }, // AS第1戦
-        { month: 7, day: day + 2 }, // AS第2戦
-        { month: 7, day: day + 3 }, // 休み
+        { month: 7, day },
+        { month: 7, day: day + 1 }, // 水曜
+        { month: 7, day: day + 2 }, // 木曜
       ];
     }
   }

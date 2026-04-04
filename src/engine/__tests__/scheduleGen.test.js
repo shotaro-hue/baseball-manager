@@ -52,14 +52,4 @@ describe('scheduleGen regular league cards', () => {
       expect([2, 3]).toContain(streak);
     }
   });
-
-  it('オールスター休止は4日で中2日が試合日に設定される', () => {
-    const schedule = generateSeasonSchedule(2025, teams);
-    const info = getAllStarBreakInfo(2025, schedule);
-    expect(info.breakDates.length).toBe(4);
-    expect(info.gameDates.length).toBe(2);
-    expect(info.restDates.length).toBe(2);
-    expect(info.gameDates[0].month).toBe(7);
-    expect(info.gameDates[1].month).toBe(7);
-  });
 });

@@ -7,10 +7,10 @@ import { calcRevenue } from '../engine/finance';
 import { applyPopularityDelta } from '../engine/fanSentiment';
 import { generateCpuOffer } from '../engine/trade';
 import { initPlayoff } from '../engine/playoff';
-import { selectAllStars, runAllStarGames } from '../engine/allstar';
-import { getMyMatchup, getCpuMatchups, getAllStarBreakInfo } from '../engine/scheduleGen';
+import { selectAllStars, runAllStarGame } from '../engine/allstar';
+import { getMyMatchup, getCpuMatchups } from '../engine/scheduleGen';
 import { saveGame } from '../engine/saveload';
-import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, MAX_FARM } from '../constants';
+import { SEASON_GAMES, BATCH, ALL_STAR_GAMEDAY, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, MAX_FARM } from '../constants';
 
 // 守備コーチボーナス: 怪我回復速度 UP
 function applyDefenseCoachRecovery(players, coaches) {
@@ -58,8 +58,6 @@ export function useSeasonFlow(gs) {
   const pendingPlayoffRef = useRef(false);
   const prevMyPlayersRef = useRef(null);
   const prevMyFarmRef = useRef(null);
-  const allStarBreak = getAllStarBreakInfo(year, schedule);
-  const allStarGameDay = allStarBreak.triggerGameDay;
 
   // 最終戦終了後: 全setState（対戦相手記録・CPU試合）が反映された teams でプレーオフ初期化
   useEffect(()=>{
@@ -135,19 +133,14 @@ export function useSeasonFlow(gs) {
     }));
   };
 
-  const publishAllStarNews = (asResults, dayLabel) => {
-    if (!asResults || asResults.length === 0) return;
-    const totalCe = asResults.reduce((s, g) => s + (g?.score?.ce || 0), 0);
-    const totalPa = asResults.reduce((s, g) => s + (g?.score?.pa || 0), 0);
-    const lines = asResults.map(g =>
-      `第${g.gameNo}戦 ${g.date ? `${g.date.month}/${g.date.day}` : ''} @${g.venue?.stadiumLabel || '未設定'}: セ${g.score.ce} - パ${g.score.pa}（MVP: ${g.mvp?.name || '未選出'}）`
-    );
+  const publishAllStarNews = (asResult, dayLabel) => {
+    if (!asResult) return;
     addNews({
       type: 'allstar',
-      headline: `【オールスター2連戦】セ${totalCe} - パ${totalPa}`,
+      headline: `【オールスター】セ${asResult.score.ce} - パ${asResult.score.pa}`,
       source: 'NPB公式',
       dateLabel: `${year}年 ${dayLabel}日目`,
-      body: lines.join('\n'),
+      body: `セ・リーグ選抜 ${asResult.score.ce} - ${asResult.score.pa} パ・リーグ選抜。MVPは${asResult.mvp?.name || '選手未選出'}。`,
     });
   };
 
@@ -290,13 +283,13 @@ export function useSeasonFlow(gs) {
     pushResult(won,_adrew,currentOpp?.name||"",r.score.my,r.score.opp,gameDay);
     gs.pushGameResult(gameDay,{won,drew:_adrew,oppName:currentOpp?.name||"",myScore:r.score.my,oppScore:r.score.opp});
     setGameDay(d=>d+1);
-    if(!allStarDone && gameDay+1===allStarGameDay){
+    if(!allStarDone && gameDay+1===ALL_STAR_GAMEDAY){
       const rosters=selectAllStars(teams);
-      const asResults=runAllStarGames(rosters, year, allStarBreak.gameDates);
+      const asResult=runAllStarGame(rosters);
       setTeams(prev=>applyAllStarSelections(prev, rosters));
       setAllStarDone(true);
-      setAllStarResult({ rosters, gameResults: asResults });
-      publishAllStarNews(asResults, gameDay+1);
+      setAllStarResult({ rosters, gameResult: asResult });
+      publishAllStarNews(asResult, gameDay+1);
       setScreen("allstar");
       return;
     }
@@ -415,14 +408,14 @@ export function useSeasonFlow(gs) {
       myT.budget+=revTotal;
       myT.revenueThisSeason=(myT.revenueThisSeason??0)+revTotal;
       results.push({...r,won,oppTeam:opp,gameNo:newDay});
-      if(!allStarDoneLocal && newDay+1===allStarGameDay){
+      if(!allStarDoneLocal && newDay===ALL_STAR_GAMEDAY){
         const rosters=selectAllStars(newTeams);
-        const asResults=runAllStarGames(rosters, year, allStarBreak.gameDates);
+        const asResult=runAllStarGame(rosters);
         newTeams=applyAllStarSelections(newTeams, rosters);
         allStarDoneLocal=true;
-        publishAllStarNews(asResults, newDay);
+        publishAllStarNews(asResult, newDay);
         if(myId){
-          setAllStarResult({ rosters, gameResults: asResults });
+          setAllStarResult({ rosters, gameResult: asResult });
         }
       }
       newDay++;
@@ -526,13 +519,13 @@ export function useSeasonFlow(gs) {
     pushResult(won,_tdrew,currentOpp?.name||"",gsResult.score.my,gsResult.score.opp,gameDay);
     gs.pushGameResult(gameDay,{won,drew:_tdrew,oppName:currentOpp?.name||"",myScore:gsResult.score.my,oppScore:gsResult.score.opp});
     setGameDay(d=>d+1);
-    if(!allStarDone && gameDay+1===allStarGameDay){
+    if(!allStarDone && gameDay+1===ALL_STAR_GAMEDAY){
       const rosters=selectAllStars(teams);
-      const asResults=runAllStarGames(rosters, year, allStarBreak.gameDates);
+      const asResult=runAllStarGame(rosters);
       setTeams(prev=>applyAllStarSelections(prev, rosters));
       setAllStarDone(true);
-      setAllStarResult({ rosters, gameResults: asResults });
-      publishAllStarNews(asResults, gameDay+1);
+      setAllStarResult({ rosters, gameResult: asResult });
+      publishAllStarNews(asResult, gameDay+1);
       setScreen("allstar");
       return;
     }

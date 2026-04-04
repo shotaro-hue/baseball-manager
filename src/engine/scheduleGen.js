@@ -404,37 +404,3 @@ export function getCpuMatchups(schedule, gameDay, myId, oppId) {
          m.homeId !== oppId && m.awayId !== oppId
   );
 }
-
-/**
- * オールスター実施タイミング（「休止明け最初のゲーム日」）を返す
- * - useSeasonFlow 側は gameDay+1 と比較して発火するため、
- *   この値は「休止明け再開日の gameDay」を返す。
- */
-export function getAllStarBreakInfo(year, schedule) {
-  const params = SEASON_PARAMS[year] || getDefaultParams(year);
-  const skips = params.allStarSkipDates || [];
-  if (!schedule?.length || skips.length === 0) {
-    return { triggerGameDay: 72, restDates: [], gameDates: [], breakDates: [] };
-  }
-
-  const toNum = (d) => d.month * 100 + d.day;
-  const sorted = [...skips].sort((a, b) => toNum(a) - toNum(b));
-  const breakDates = sorted;
-  const restDates = [sorted[0], sorted[sorted.length - 1]].filter(Boolean);
-  const gameDates = sorted.slice(1, 3); // 前後1休み・中2試合
-
-  for (let dayNo = 1; dayNo < schedule.length; dayNo++) {
-    const d = schedule[dayNo]?.date;
-    if (d && toNum(d) > toNum(sorted[sorted.length - 1])) {
-      return { triggerGameDay: dayNo, restDates, gameDates, breakDates };
-    }
-  }
-  return { triggerGameDay: 72, restDates, gameDates, breakDates };
-}
-
-/**
- * 後方互換: 旧API（オールスター発火gameDayのみ）
- */
-export function getAllStarGameDay(year, schedule) {
-  return getAllStarBreakInfo(year, schedule).triggerGameDay;
-}

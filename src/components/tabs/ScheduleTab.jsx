@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { gameDayToDate } from '../../utils';
-import { getAllStarBreakInfo, getMyMatchup } from '../../engine/scheduleGen';
-import { SEASON_GAMES } from '../../constants';
+import { getMyMatchup } from '../../engine/scheduleGen';
+import { SEASON_GAMES, ALL_STAR_GAMEDAY } from '../../constants';
 
 const MONTH_LABELS = ['3月','4月','5月','6月','7月','8月','9月','10月'];
 // 月曜始まり: 0=月,1=火,2=水,3=木,4=金,5=土,6=日
@@ -59,7 +59,7 @@ function getCardMarker(schedule, day, myId) {
 }
 
 // 月別週グリッドデータを構築する
-function buildMonthGrid(schedule, year, myId, month, gameResultsMap, allStarGameDay) {
+function buildMonthGrid(schedule, year, myId, month, gameResultsMap) {
   if (!schedule || myId === null || myId === undefined) return [];
 
   // その月のすべての gameDay エントリを収集
@@ -101,11 +101,11 @@ function buildMonthGrid(schedule, year, myId, month, gameResultsMap, allStarGame
       const entry = byDate.get(key);
       if (entry) {
         const result = gameResultsMap?.[entry.dayNo] ?? null;
-        const isAllStar = entry.dayNo === allStarGameDay;
+        const isAllStar = entry.dayNo === ALL_STAR_GAMEDAY;
         cells.push({ type: 'game', date: { month: m, day: d }, dayNo: entry.dayNo, matchup: entry.matchup, result, isAllStar });
       } else {
         const dayNo = schedule.findIndex(sd => sd?.date?.month === m && sd?.date?.day === d);
-        const isAllStar = dayNo === allStarGameDay;
+        const isAllStar = dayNo === ALL_STAR_GAMEDAY;
         cells.push({ type: 'off', date: { month: m, day: d }, dayNo, isAllStar });
       }
     }
@@ -304,9 +304,6 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
     return days;
   }, [schedule, myTeam?.id, gameDay, maxDay, teamMap]);
 
-  const allStarBreak = useMemo(() => getAllStarBreakInfo(year, schedule), [year, schedule]);
-  const allStarGameDay = allStarBreak.triggerGameDay;
-
   // 月別グリッドデータ
   const monthGrids = useMemo(() => {
     if (!schedule || myTeam?.id === null || myTeam?.id === undefined) return [];
@@ -314,10 +311,10 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
       .map(label => Number(label.replace('月', '')))
       .map(month => ({
         month,
-        weeks: buildMonthGrid(schedule, year, myTeam.id, month, gameResultsMap, allStarGameDay),
+        weeks: buildMonthGrid(schedule, year, myTeam.id, month, gameResultsMap),
       }))
       .filter(m => m.weeks.length > 0);
-  }, [schedule, year, myTeam?.id, gameResultsMap, allStarGameDay]);
+  }, [schedule, year, myTeam?.id, gameResultsMap]);
 
   if (!schedule || !myTeam) {
     return (
@@ -342,9 +339,7 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
       <div className="card" style={{ background: 'rgba(245,200,66,.06)' }}>
         <div className="card-h">⭐ オールスターゲーム</div>
         <div style={{ fontSize: 12, color: '#cbd5e1' }}>
-          休止4日（前後休み + 中2試合）: {allStarBreak.breakDates?.map(d => formatDate(d)).join(' / ')}
-          <br />
-          試合日: {allStarBreak.gameDates?.map(d => formatDate(d)).join('・')}（再開: 第{allStarGameDay}戦）
+          第{ALL_STAR_GAMEDAY}戦 ({formatDate(gameDayToDate(ALL_STAR_GAMEDAY, schedule))}) に開催
           <span style={{ marginLeft: 8, color: allStarDone ? '#4ade80' : '#f5c842' }}>{allStarDone ? '実施済み' : '未実施'}</span>
         </div>
       </div>
@@ -364,7 +359,7 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
                   {todayMatchup.isHome ? 'ホーム開催' : 'ビジター'}
                 </span>
                 {todayMatchup.isInterleague && <span className="chip cy">🔄 交流戦</span>}
-                {gameDay===allStarGameDay && <span className="chip" style={{ background: 'rgba(245,200,66,.18)', color: '#f5c842' }}>⭐ オールスター開催日</span>}
+                {gameDay===ALL_STAR_GAMEDAY && <span className="chip" style={{ background: 'rgba(245,200,66,.18)', color: '#f5c842' }}>⭐ オールスター開催日</span>}
                 {todayMatchup.venueNote && <span style={{ fontSize: 10, color: '#f5c842' }}>{venueNoteLabel(todayMatchup.venueNote)}</span>}
               </div>
             </div>
