@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { gameDayToDate } from '../../utils';
 import { getMyMatchup } from '../../engine/scheduleGen';
-import { SEASON_GAMES, ALL_STAR_GAMEDAY, ALL_STAR_GAMEDAY_2 } from '../../constants';
+import { SEASON_GAMES } from '../../constants';
 
 const MONTH_LABELS = ['3月','4月','5月','6月','7月','8月','9月','10月'];
 // 月曜始まり: 0=月,1=火,2=水,3=木,4=金,5=土,6=日
@@ -308,7 +308,7 @@ function SeasonProgressBar({ gameDay, wins, losses }) {
   );
 }
 
-export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResultsMap = {}, allStarDone = false, allStarResult = null }) {
+export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResultsMap = {}, allStarDone = false, allStarResult = null, allStarTriggerDay = 72 }) {
   const [selectedDay, setSelectedDay] = useState(gameDay);
   const [resultModal, setResultModal] = useState(null); // dayNo or null
 
@@ -369,14 +369,6 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
       {/* シーズン進捗バー */}
       <SeasonProgressBar gameDay={gameDay} wins={myTeam.wins || 0} losses={myTeam.losses || 0} />
 
-      <div className="card" style={{ background: 'rgba(245,200,66,.06)' }}>
-        <div className="card-h">⭐ オールスターゲーム</div>
-        <div style={{ fontSize: 12, color: '#cbd5e1' }}>
-          第{ALL_STAR_GAMEDAY}・{ALL_STAR_GAMEDAY_2}戦 ({formatDate(gameDayToDate(ALL_STAR_GAMEDAY, schedule))}) に開催（2試合制）
-          <span style={{ marginLeft: 8, color: allStarDone ? '#4ade80' : '#f5c842' }}>{allStarDone ? '実施済み' : '未実施'}</span>
-        </div>
-      </div>
-
       {/* 今日のカード */}
       <div className="card">
         <div className="card-h">🗓️ 今日のカード</div>
@@ -392,7 +384,7 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
                   {todayMatchup.isHome ? 'ホーム開催' : 'ビジター'}
                 </span>
                 {todayMatchup.isInterleague && <span className="chip cy">🔄 交流戦</span>}
-                {(gameDay===ALL_STAR_GAMEDAY||gameDay===ALL_STAR_GAMEDAY_2) && <span className="chip" style={{ background: 'rgba(245,200,66,.18)', color: '#f5c842' }}>⭐ オールスター開催日</span>}
+                {(gameDay===allStarTriggerDay||gameDay===allStarTriggerDay+1) && <span className="chip" style={{ background: 'rgba(245,200,66,.18)', color: '#f5c842' }}>⭐ オールスター開催日</span>}
                 {todayMatchup.venueNote && <span style={{ fontSize: 10, color: '#f5c842' }}>{venueNoteLabel(todayMatchup.venueNote)}</span>}
               </div>
             </div>

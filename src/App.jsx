@@ -2,7 +2,8 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles.css';
 import { uid, fmtM, fmtSal, gameDayToDate, scoutedValue, clamp } from './utils';
 import { loadGame, getSaveMeta, deleteSave } from './engine/saveload';
-import { generateSeasonSchedule } from './engine/scheduleGen';
+import { generateSeasonSchedule, calcAllStarTriggerDay } from './engine/scheduleGen';
+import { SEASON_PARAMS, getDefaultParams } from './data/scheduleParams.js';
 import { TacticalGameScreen } from './components/TacticalGame';
 import { BatchResultScreen } from './components/BatchResult';
 import { ModeSelectScreen, ResultScreen, RetirePhaseScreen, WaiverPhaseScreen, WaiverResultScreen, GrowthSummaryScreen, NewSeasonScreen } from './components/Screens';
@@ -38,7 +39,10 @@ export default function App(){
     gs.setMyId(saved.myId);
     gs.setGameDay(saved.gameDay);
     gs.setYear(saved.year);
-    gs.setSchedule(generateSeasonSchedule(saved.year, saved.teams));
+    const loadedSchedule = generateSeasonSchedule(saved.year, saved.teams);
+    gs.setSchedule(loadedSchedule);
+    const loadedParams = SEASON_PARAMS[saved.year] || getDefaultParams(saved.year);
+    gs.setAllStarTriggerDay(calcAllStarTriggerDay(loadedSchedule, loadedParams.allStarSkipDates));
     gs.setFaPool(saved.faPool||[]);
     gs.setFaYears(saved.faYears||{});
     gs.setSeasonHistory(saved.seasonHistory||{awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[]});
@@ -156,7 +160,7 @@ export default function App(){
     <ErrorBoundary key={tab}>
     {tab==="dashboard"&&<DashboardTab myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year} recentResults={gs.recentResults} mailbox={mailbox} faPool={faPool} onTabSwitch={setTab}/>}
     {tab==="roster"&&<RosterTab team={myTeam} onToggle={gs.toggleLineup} onSetStarter={gs.setStarter} onPromo={gs.promote} onDemo={gs.demote} onSetTrainingFocus={gs.setTrainingFocus} onConvertIkusei={gs.convertIkusei} onMoveRotation={gs.moveRotation} onRemoveFromRotation={gs.removeFromRotation} onSetPitchingPattern={gs.setPitchingPattern} onPlayerClick={gs.handlePlayerClick} onSetDevGoal={gs.setDevGoal} onPlayerTalk={gs.handlePlayerTalk} gameDay={gameDay}/>}
-    {tab==="schedule"&&<ScheduleTab schedule={schedule} gameDay={gameDay} myTeam={myTeam} teams={teams} year={year} gameResultsMap={gs.gameResultsMap} allStarDone={gs.allStarDone} allStarResult={gs.allStarResult}/>}
+    {tab==="schedule"&&<ScheduleTab schedule={schedule} gameDay={gameDay} myTeam={myTeam} teams={teams} year={year} gameResultsMap={gs.gameResultsMap} allStarDone={gs.allStarDone} allStarResult={gs.allStarResult} allStarTriggerDay={gs.allStarTriggerDay}/>}
     {tab==="records"&&<RecordsTab history={gs.seasonHistory}/>}
     {tab==="news"&&<NewsTab news={news} onInterview={gs.handleInterview}/>}
     {tab==="mailbox"&&<MailboxTab mailbox={mailbox} onRead={os.handleMailRead} onAction={os.handleMailAction} teams={teams} myTeam={myTeam} onTrade={os.handleTrade}/>}

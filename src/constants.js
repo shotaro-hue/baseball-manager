@@ -3,7 +3,7 @@
 ═══════════════════════════════════════════════ */
 
 export const SEASON_GAMES = 143;
-export const ALL_STAR_GAMEDAY = 72; // シーズン中盤オールスター発火 gameDay
+// export const ALL_STAR_GAMEDAY = 72; // 動的計算に移行（calcAllStarTriggerDay を使用）。後方互換メモとして保持。
 export const ALL_STAR_GAMEDAY_2 = 73; // オールスター第2戦
 export const HANSHIN_ID = 3;   // 阪神タイガース（甲子園使用制限の影響チーム）
 export const ORIX_ID    = 11;  // オリックス・バファローズ（京セラドーム共同利用）
@@ -236,5 +236,4 @@ export const DEV_GOALS_PITCHER = [
   { key: "stamina", label: "スタミナ強化" },
   { key: "promotion", label: "支配下昇格目標" },
 ];
-
 

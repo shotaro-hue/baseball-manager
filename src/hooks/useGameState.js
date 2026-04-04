@@ -3,9 +3,10 @@ import { gameStateReducer, G } from './gameStateReducer';
 import { uid, clamp, rng, pname, scoutedValue } from '../utils';
 import { buildTeam, makePlayer, resolveTrainingFocusFromGoal } from '../engine/player';
 import { saveGame, hasSave } from '../engine/saveload';
-import { generateSeasonSchedule } from '../engine/scheduleGen';
+import { generateSeasonSchedule, calcAllStarTriggerDay } from '../engine/scheduleGen';
 import { buildRealTeam } from '../engine/realplayer';
 import { NPB2025_ROSTERS } from '../data/npb2025';
+import { SEASON_PARAMS, getDefaultParams } from '../data/scheduleParams.js';
 import {
   TEAM_DEFS, POSITIONS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
   MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, MIN_SALARY_SHIHAKA,
@@ -47,6 +48,7 @@ export function useGameState() {
   const [lastPressDay, setLastPressDay] = useState(0); // 最後に記者会見を行ったgameDay
   const [allStarDone, setAllStarDone] = useState(false);
   const [allStarResult, setAllStarResult] = useState(null);
+  const [allStarTriggerDay, setAllStarTriggerDay] = useState(72);
 
   // gameDay が進んだとき、記者会見インターバルを超えていれば会見イベントをセット
   useEffect(()=>{
@@ -61,7 +63,10 @@ export function useGameState() {
   // シーズン日程をyear変更時に再生成（チームID・リーグ構成は不変なのでteams.lengthで十分）
   useEffect(()=>{
     if(teams.length===12){
-      setSchedule(generateSeasonSchedule(year,teams));
+      const newSchedule = generateSeasonSchedule(year,teams);
+      setSchedule(newSchedule);
+      const params = SEASON_PARAMS[year] || getDefaultParams(year);
+      setAllStarTriggerDay(calcAllStarTriggerDay(newSchedule, params.allStarSkipDates));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[year,teams.length]);
@@ -127,7 +132,10 @@ export function useGameState() {
     setMyId(id);
     setScreen("hub");
     setTab("dashboard");
-    setSchedule(generateSeasonSchedule(year,teams));
+    const newSchedule = generateSeasonSchedule(year,teams);
+    setSchedule(newSchedule);
+    const params = SEASON_PARAMS[year] || getDefaultParams(year);
+    setAllStarTriggerDay(calcAllStarTriggerDay(newSchedule, params.allStarSkipDates));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[year,teams]);
 
@@ -318,6 +326,7 @@ export function useGameState() {
     lastPressDay, setLastPressDay,
     allStarDone, setAllStarDone,
     allStarResult, setAllStarResult,
+    allStarTriggerDay, setAllStarTriggerDay,
     // derived
     myTeam,
     tabBadges,

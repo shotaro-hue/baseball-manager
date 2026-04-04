@@ -10,7 +10,7 @@ import { initPlayoff } from '../engine/playoff';
 import { selectAllStars, runAllStarGame } from '../engine/allstar';
 import { getMyMatchup, getCpuMatchups } from '../engine/scheduleGen';
 import { saveGame } from '../engine/saveload';
-import { SEASON_GAMES, BATCH, ALL_STAR_GAMEDAY, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, MAX_FARM } from '../constants';
+import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, MAX_FARM } from '../constants';
 
 // 守備コーチボーナス: 怪我回復速度 UP
 function applyDefenseCoachRecovery(players, coaches) {
@@ -48,6 +48,7 @@ export function useSeasonFlow(gs) {
     faPool, faYears, seasonHistory, news, mailbox,
     setSaveExists, cpuTradeOffers,
     allStarDone, setAllStarDone, allStarResult, setAllStarResult,
+    allStarTriggerDay,
   } = gs;
 
   const [gameResult, setGameResult] = useState(null);
@@ -291,7 +292,7 @@ export function useSeasonFlow(gs) {
     pushResult(won,_adrew,currentOpp?.name||"",r.score.my,r.score.opp,gameDay);
     gs.pushGameResult(gameDay,{won,drew:_adrew,oppName:currentOpp?.name||"",myScore:r.score.my,oppScore:r.score.opp});
     setGameDay(d=>d+1);
-    if(!allStarDone && gameDay+1===ALL_STAR_GAMEDAY){
+    if(!allStarDone && gameDay+1===allStarTriggerDay){
       const rosters=selectAllStars(teams);
       const asResult=runAllStarGame(rosters, year);
       setTeams(prev=>applyAllStarSelections(prev, rosters));
@@ -416,7 +417,7 @@ export function useSeasonFlow(gs) {
       myT.budget+=revTotal;
       myT.revenueThisSeason=(myT.revenueThisSeason??0)+revTotal;
       results.push({...r,won,oppTeam:opp,gameNo:newDay});
-      if(!allStarDoneLocal && newDay===ALL_STAR_GAMEDAY){
+      if(!allStarDoneLocal && newDay===allStarTriggerDay){
         const rosters=selectAllStars(newTeams);
         const asResult=runAllStarGame(rosters, year);
         newTeams=applyAllStarSelections(newTeams, rosters);
@@ -527,7 +528,7 @@ export function useSeasonFlow(gs) {
     pushResult(won,_tdrew,currentOpp?.name||"",gsResult.score.my,gsResult.score.opp,gameDay);
     gs.pushGameResult(gameDay,{won,drew:_tdrew,oppName:currentOpp?.name||"",myScore:gsResult.score.my,oppScore:gsResult.score.opp});
     setGameDay(d=>d+1);
-    if(!allStarDone && gameDay+1===ALL_STAR_GAMEDAY){
+    if(!allStarDone && gameDay+1===allStarTriggerDay){
       const rosters=selectAllStars(teams);
       const asResult=runAllStarGame(rosters, year);
       setTeams(prev=>applyAllStarSelections(prev, rosters));

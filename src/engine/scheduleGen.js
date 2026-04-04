@@ -422,3 +422,26 @@ export function getCpuMatchups(schedule, gameDay, myId, oppId) {
          m.homeId !== oppId && m.awayId !== oppId
   );
 }
+
+/**
+ * allStarSkipDates の最初のスキップ日直前にある最終公式戦の gameDay を返す。
+ * @param {Array} schedule - generateSeasonSchedule の戻り値（index 0=null, 1〜143=ScheduleDay）
+ * @param {Array<{month:number,day:number}>} allStarSkipDates
+ * @returns {number}
+ */
+export function calcAllStarTriggerDay(schedule, allStarSkipDates) {
+  if (!Array.isArray(schedule) || !Array.isArray(allStarSkipDates) || allStarSkipDates.length === 0) return 72;
+  const firstSkip = allStarSkipDates[0];
+  if (!firstSkip) return 72;
+  const firstSkipNum = firstSkip.month * 100 + firstSkip.day;
+  let triggerDay = 72;
+
+  for (let i = 1; i < schedule.length; i++) {
+    const day = schedule[i];
+    if (!day || day.isAllStar || !day.date) continue;
+    const dateNum = day.date.month * 100 + day.date.day;
+    if (dateNum < firstSkipNum) triggerDay = i;
+  }
+
+  return triggerDay;
+}
