@@ -149,13 +149,13 @@ export default function App(){
       const opp=jpS?jpS.teams.find(t=>t.id!==playoff.champion.id):null;
       const seriesResult=jpS?jpS.wins[0]+"-"+jpS.wins[1]:"4-?";
       setSeasonHistory(prev=>({...prev,championships:[...(prev.championships||[]),{year,championId:playoff.champion.id,championName:playoff.champion.name,opponent:opp?.name||"?",seriesResult}]}));
-      if(playoff.champion.id===myId){setMailbox(prev=>[...prev,{id:uid(),type:"championship",read:false,subject:"🏆 "+year+"年 日本一達成！",body:playoff.champion.name+"が"+year+"年の日本シリーズを制覇しました（"+seriesResult+"）。球団史に残る偉業です！"}]);}
+      if(playoff.champion.id===myId){setMailbox(prev=>[...prev,{id:uid(),type:"championship",read:false,title:"🏆 "+year+"年 日本一達成！",from:"NPB本部",dateLabel:year+"年",timestamp:Date.now(),body:playoff.champion.name+"が"+year+"年の日本シリーズを制覇しました（"+seriesResult+"）。球団史に残る偉業です！"}]);}
     }
     const trustDelta=calcOwnerTrustDelta(myId,myTeam,playoff);
     if(trustDelta!==0){
       gs.upd(myId,t=>({...t,ownerTrust:clamp((t.ownerTrust??50)+trustDelta,0,100)}));
       const goalLabel={champion:"日本一",pennant:"ペナント優勝",cs:"CS出場",rebuild:"再建"}[myTeam?.ownerGoal||"cs"];
-      setMailbox(prev=>[...prev,{id:uid(),type:"owner_trust",read:false,subject:(trustDelta>0?"✅":"⚠️")+" オーナー評価: 目標「"+goalLabel+"」"+(trustDelta>0?"達成":"未達"),body:"今季の目標「"+goalLabel+"」に対する評価が確定しました。信頼度が"+(trustDelta>0?"+":"")+trustDelta+"変動しました（翌年予算に影響します）。"}]);
+      setMailbox(prev=>[...prev,{id:uid(),type:"owner_trust",read:false,title:(trustDelta>0?"✅":"⚠️")+" オーナー評価: 目標「"+goalLabel+"」"+(trustDelta>0?"達成":"未達"),from:"球団オーナー",dateLabel:year+"年",timestamp:Date.now(),body:"今季の目標「"+goalLabel+"」に対する評価が確定しました。信頼度が"+(trustDelta>0?"+":"")+trustDelta+"変動しました（翌年予算に影響します）。"}]);
     }
     setScreen("retire_phase");
   }}/></ErrorBoundary></>);

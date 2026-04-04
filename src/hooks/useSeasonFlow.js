@@ -100,7 +100,7 @@ export function useSeasonFlow(gs) {
   },[myTeam]);
 
   const tryGenerateCpuOffer = () => {
-    if(Math.random()>0.05||cpuTradeOffers.length>=2||!myTeam) return;
+    if(Math.random()>0.15||cpuTradeOffers.length>=2||!myTeam) return;
     const others=teams.filter(t=>t.id!==myId);
     if(!others.length) return;
     const cpuTeam=others[rng(0,others.length-1)];
@@ -202,7 +202,11 @@ export function useSeasonFlow(gs) {
       updated.players=updated.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
       updated.players=applyDefenseCoachRecovery(updated.players,t.coaches);
       const newInj=checkForInjuries(updated.players);
-      if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+      if(newInj.length>0){
+        const injNames=newInj.reduce((acc,i)=>{const p=updated.players.find(x=>x.id===i.id);if(p)acc.push({name:p.name,...i});return acc;},[]);
+        updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+        injNames.filter(i=>i.days>=7).forEach(i=>{addNews({type:"season",headline:`🤕 【怪我】${i.name}が負傷`,source:"チーム広報",dateLabel:`${year}年 ${gameDay}日目`,body:`${i.name}が${i.type}により${i.days}試合の戦線離脱が見込まれる。チームはロスター調整を余儀なくされる。`});});
+      }
       // 登録クールダウンデクリメント
       updated.players=tickCooldowns(updated.players);
       // 二軍: 怪我回復 + クールダウンデクリメント
@@ -283,7 +287,7 @@ export function useSeasonFlow(gs) {
     const _scoreStr=r.score.my+"-"+r.score.opp;
     const _hl=_tmpl[rng(0,_tmpl.length-1)].replace("{team}",myTeam?.name||"自チーム").replace("{opp}",currentOpp?.name||"相手").replace("{score}",_scoreStr);
     addNews({type:"game",headline:_hl,source:"スポーツ報知",dateLabel:year+"年 "+gameDay+"日目",body:(won?myTeam?.name+"が"+currentOpp?.name+"に"+_scoreStr+"で勝利した。\n\n投打ともに噛み合い、理想的な試合運びで勝点を積み上げた。":myTeam?.name+"は"+currentOpp?.name+"に"+_scoreStr+"で敗れた。\n\n流れを引き戻せず、次戦での巻き返しが期待される。")});
-    if(Math.random()<0.2){
+    if(Math.random()<0.35){
       const _qs=won?INTERVIEW_QUESTIONS_WIN:INTERVIEW_QUESTIONS_LOSE;
       const _opts=won?INTERVIEW_OPTIONS_WIN:INTERVIEW_OPTIONS_LOSE;
       addNews({type:"interview",headline:"【インタビュー】"+(myTeam?.name||"")+"監督に直撃！",source:"野球速報",dateLabel:year+"年 "+gameDay+"日目",body:"試合後、記者団が監督にコメントを求めた。",question:_qs[rng(0,_qs.length-1)],options:_opts});
@@ -524,6 +528,17 @@ export function useSeasonFlow(gs) {
       return newTeams;
     });
     setGameResult({...gsResult,oppTeam:currentOpp,won});
+    // 試合ニュース（手動試合も同様に生成）
+    const _tmpl=won?NEWS_TEMPLATES_WIN:NEWS_TEMPLATES_LOSE;
+    const _scoreStr=gsResult.score.my+"-"+gsResult.score.opp;
+    const _hl=_tmpl[rng(0,_tmpl.length-1)].replace("{team}",myTeam?.name||"自チーム").replace("{opp}",currentOpp?.name||"相手").replace("{score}",_scoreStr);
+    addNews({type:"game",headline:_hl,source:"スポーツ報知",dateLabel:year+"年 "+gameDay+"日目",body:(won?myTeam?.name+"が"+currentOpp?.name+"に"+_scoreStr+"で勝利した。\n\n投打ともに噛み合い、理想的な試合運びで勝点を積み上げた。":myTeam?.name+"は"+currentOpp?.name+"に"+_scoreStr+"で敗れた。\n\n流れを引き戻せず、次戦での巻き返しが期待される。")});
+    if(Math.random()<0.35){
+      const _qs=won?INTERVIEW_QUESTIONS_WIN:INTERVIEW_QUESTIONS_LOSE;
+      const _opts=won?INTERVIEW_OPTIONS_WIN:INTERVIEW_OPTIONS_LOSE;
+      addNews({type:"interview",headline:"【インタビュー】"+(myTeam?.name||"")+"監督に直撃！",source:"野球速報",dateLabel:year+"年 "+gameDay+"日目",body:"試合後、記者団が監督にコメントを求めた。",question:_qs[rng(0,_qs.length-1)],options:_opts});
+    }
+    tryGenerateCpuOffer();
     const _tdrew=gsResult.score.my===gsResult.score.opp;
     pushResult(won,_tdrew,currentOpp?.name||"",gsResult.score.my,gsResult.score.opp,gameDay);
     gs.pushGameResult(gameDay,{won,drew:_tdrew,oppName:currentOpp?.name||"",myScore:gsResult.score.my,oppScore:gsResult.score.opp});
