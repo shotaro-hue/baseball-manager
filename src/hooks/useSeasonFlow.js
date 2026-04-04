@@ -7,9 +7,10 @@ import { calcRevenue } from '../engine/finance';
 import { applyPopularityDelta } from '../engine/fanSentiment';
 import { generateCpuOffer } from '../engine/trade';
 import { initPlayoff } from '../engine/playoff';
+import { selectAllStars, runAllStarGame } from '../engine/allstar';
 import { getMyMatchup, getCpuMatchups } from '../engine/scheduleGen';
 import { saveGame } from '../engine/saveload';
-import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, MAX_FARM } from '../constants';
+import { SEASON_GAMES, BATCH, ALL_STAR_GAMEDAY, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, MAX_FARM } from '../constants';
 
 // 守備コーチボーナス: 怪我回復速度 UP
 function applyDefenseCoachRecovery(players, coaches) {
@@ -46,6 +47,7 @@ export function useSeasonFlow(gs) {
     setMailbox, setRetireModal,
     faPool, faYears, seasonHistory, news, mailbox,
     setSaveExists, cpuTradeOffers,
+    allStarDone, setAllStarDone, allStarResult, setAllStarResult,
   } = gs;
 
   const [gameResult, setGameResult] = useState(null);
@@ -121,6 +123,27 @@ export function useSeasonFlow(gs) {
   };
 
   // スケジュールから対戦相手を取得（フォールバック: ランダム同リーグ選択）
+  const applyAllStarSelections = (baseTeams, rosters) => {
+    const pickedIds = new Set([...(rosters?.ce || []), ...(rosters?.pa || [])].map(p => p.id));
+    return baseTeams.map(t => ({
+      ...t,
+      players: (t.players || []).map(p => pickedIds.has(p.id)
+        ? { ...p, allStarSelections: (p.allStarSelections || 0) + 1 }
+        : p),
+    }));
+  };
+
+  const publishAllStarNews = (asResult, dayLabel) => {
+    if (!asResult) return;
+    addNews({
+      type: 'allstar',
+      headline: `【オールスター】セ${asResult.score.ce} - パ${asResult.score.pa}`,
+      source: 'NPB公式',
+      dateLabel: `${year}年 ${dayLabel}日目`,
+      body: `セ・リーグ選抜 ${asResult.score.ce} - ${asResult.score.pa} パ・リーグ選抜。MVPは${asResult.mvp?.name || '選手未選出'}。`,
+    });
+  };
+
   const pickOpponentFromSchedule = (day) => {
     const matchup=getMyMatchup(schedule,day,myId);
     if(matchup){
@@ -260,6 +283,16 @@ export function useSeasonFlow(gs) {
     pushResult(won,_adrew,currentOpp?.name||"",r.score.my,r.score.opp,gameDay);
     gs.pushGameResult(gameDay,{won,drew:_adrew,oppName:currentOpp?.name||"",myScore:r.score.my,oppScore:r.score.opp});
     setGameDay(d=>d+1);
+    if(!allStarDone && gameDay+1===ALL_STAR_GAMEDAY){
+      const rosters=selectAllStars(teams);
+      const asResult=runAllStarGame(rosters);
+      setTeams(prev=>applyAllStarSelections(prev, rosters));
+      setAllStarDone(true);
+      setAllStarResult({ rosters, gameResult: asResult });
+      publishAllStarNews(asResult, gameDay+1);
+      setScreen("allstar");
+      return;
+    }
     if(gameDay>=SEASON_GAMES){
       // 全setState反映後の teams でinitPlayoffを呼ぶためuseEffectに委譲
       pendingPlayoffRef.current=true;
@@ -289,6 +322,7 @@ export function useSeasonFlow(gs) {
     let newTeams=[...teams.map(t=>({...t,players:[...t.players.map(p=>({...p,stats:{...p.stats}}))],...(t.id===myId?{}:{})}))];
     const results=[];
     let newDay=gameDay;
+    let allStarDoneLocal=allStarDone;
 
     for(let g=0;g<count;g++){
       const scheduleMatchup=getMyMatchup(schedule,newDay,myId);
@@ -374,6 +408,16 @@ export function useSeasonFlow(gs) {
       myT.budget+=revTotal;
       myT.revenueThisSeason=(myT.revenueThisSeason??0)+revTotal;
       results.push({...r,won,oppTeam:opp,gameNo:newDay});
+      if(!allStarDoneLocal && newDay===ALL_STAR_GAMEDAY){
+        const rosters=selectAllStars(newTeams);
+        const asResult=runAllStarGame(rosters);
+        newTeams=applyAllStarSelections(newTeams, rosters);
+        allStarDoneLocal=true;
+        publishAllStarNews(asResult, newDay);
+        if(myId){
+          setAllStarResult({ rosters, gameResult: asResult });
+        }
+      }
       newDay++;
     }
 
@@ -381,6 +425,7 @@ export function useSeasonFlow(gs) {
     if(batchSaveResult.ok) setSaveExists(true);
     setTeams(newTeams);
     setGameDay(newDay);
+    if(allStarDoneLocal) setAllStarDone(true);
     setBatchResults(results);
     gs.setRecentResults(prev=>[...results.map(r=>({won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp,gameNo:r.gameNo})).reverse(),...prev].slice(0,5));
     gs.setGameResultsMap(prev=>{const next={...prev};results.forEach(r=>{next[r.gameNo]={won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp};});return next;});
@@ -474,6 +519,16 @@ export function useSeasonFlow(gs) {
     pushResult(won,_tdrew,currentOpp?.name||"",gsResult.score.my,gsResult.score.opp,gameDay);
     gs.pushGameResult(gameDay,{won,drew:_tdrew,oppName:currentOpp?.name||"",myScore:gsResult.score.my,oppScore:gsResult.score.opp});
     setGameDay(d=>d+1);
+    if(!allStarDone && gameDay+1===ALL_STAR_GAMEDAY){
+      const rosters=selectAllStars(teams);
+      const asResult=runAllStarGame(rosters);
+      setTeams(prev=>applyAllStarSelections(prev, rosters));
+      setAllStarDone(true);
+      setAllStarResult({ rosters, gameResult: asResult });
+      publishAllStarNews(asResult, gameDay+1);
+      setScreen("allstar");
+      return;
+    }
     if(gameDay>=SEASON_GAMES){
       pendingPlayoffRef.current=true;
     }

@@ -17,6 +17,7 @@ export function useOffseason(gs) {
     setMailbox, setScreen,
     notify, upd, addNews, addToHistory,
     setRetireModal, setRetireGamePlayer, retireRole,
+    setAllStarDone,
   } = gs;
 
   const [developmentSummary, setDevelopmentSummary] = useState(null);
@@ -34,6 +35,7 @@ export function useOffseason(gs) {
 
   const handleNextYear = () => {
     setYear(y=>y+1);setGameDay(1);setFaPool([]);setDraftAllocation({pitcher:50,batter:50});
+    setAllStarDone(false);
     setTeams(prev=>prev.map(t=>{
       const nextPlayers=t.players.filter(p=>!p._retireNow).map(p=>({...p,age:p.age+1,stats:emptyStats(),playoffStats:emptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:Math.max(0,p.contractYearsLeft-1),postingRequested:false,growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlyDecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),careerLog:[...(p.careerLog||[]),mkCareerEntry(p.stats,p.playoffStats,year,t.id,t.name)],serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}));
       const nextIds=new Set(nextPlayers.map(p=>p.id));
