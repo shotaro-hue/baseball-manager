@@ -48,33 +48,39 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 - SPEC 未定義の点があれば方針を決める
 - NPB 協約との整合に懸念があれば方針を決める
 
-### 3. 関連コードを調査
+### 3. 関連コードを調査（Grep ファースト）
 
-実装に必要なファイルを特定して読み込む:
+**原則: 全ファイルを網羅的に読まない。Grep/Glob で関連箇所を絞り込んでから、必要なファイルのみ部分 Read（50〜100行）する。**
 
-**エンジン層** (`src/engine/`):
-- `simulation.js` — ゲーム内シミュレーション
-- `player.js` — 選手生成・老化・引退
-- `contract.js` — 契約ロジック
-- `trade.js` — トレードロジック
-- `draft.js` — ドラフトロジック
-- `sabermetrics.js` — セイバーメトリクス計算
-- `awards.js` — 表彰・記録
+#### 調査手順
 
-**UI 層** (`src/components/`):
-- `tabs/` — 各タブコンポーネント（RosterTab / StatsTab / TradeTab 等）
-- `TacticalGame.jsx` — 試合操作 UI
-- `Screens.jsx` — 画面切り替え
+1. **Grep で挿入ポイントを特定する**  
+   機能名・関連するキーワードで検索し、どのファイルの何行目に修正が必要かを把握する。  
+   例: `Grep "useOffseason\|faEligible" src/hooks/` → 関連フックを特定
 
-**状態管理** (`src/hooks/`):
-- `useGameState.js` — チーム・選手・schedule の state
-- `useSeasonFlow.js` — 試合進行・gameDay・プレーオフ
-- `useOffseason.js` — FA・トレード・ドラフト・契約
+2. **特定したファイルを部分 Read する**  
+   Grep で得た行番号の前後 50〜100 行のみ Read する。ファイル全体は読まない。
 
-**定数**:
-- `src/constants.js` — チーム定義・ゲームバランス定数
+3. **定数・ユーティリティの確認**  
+   `Grep "RELEVANT_CONSTANT" src/constants.js` で定数の存在と値を確認。  
+   `Grep "function rng\|export" src/utils.js` で利用可能なユーティリティを確認。
 
-既存の類似実装パターンを確認し、再利用できる関数・ユーティリティを把握する。
+4. **類似実装のパターン確認（必要な場合のみ）**  
+   類似機能の実装パターンを参照したい場合は `Grep` で該当箇所を特定し、部分 Read する。
+
+下記は調査候補ファイルの一覧（全て読む必要はない。Grep で関係するものだけ読む）:
+
+| 層 | 候補ファイル | 主なキーワード例 |
+|---|---|---|
+| エンジン | `src/engine/simulation.js` | `resolveAtBat`, `inning` |
+| エンジン | `src/engine/player.js` | `generatePlayer`, `aging` |
+| エンジン | `src/engine/contract.js` | `faEligible`, `salary` |
+| エンジン | `src/engine/trade.js` | `tradeValue` |
+| hooks | `src/hooks/useGameState.js` | `roster`, `schedule` |
+| hooks | `src/hooks/useSeasonFlow.js` | `gameDay`, `playoff` |
+| hooks | `src/hooks/useOffseason.js` | `draft`, `retire` |
+| UI | `src/components/tabs/` | タブ名で Glob |
+| 定数 | `src/constants.js` | 定数名で Grep |
 
 ### 4. 実装
 

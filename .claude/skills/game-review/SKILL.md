@@ -14,7 +14,12 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 
 ### 1. SPEC.md を読み込む
 
-`SPEC.md` を読み込み、以下を把握する:
+`SPEC.md` を **全体一括読みしない**。以下の順で部分 Read する:
+1. 先頭 200 行（目次・設計目標・コンセプト）を Read で把握する
+2. ROADMAP.md を読んだ後、現在の Tier に関係するセクション番号を特定し、該当箇所のみ部分 Read する
+3. NPB 協約チェックに必要な §4（ゲームシステム）・§5（データモデル）を都度部分 Read する
+
+把握すべき内容:
 - ゲームの設計目標・コンセプト
 - 全機能の一覧と詳細仕様
 - 数値バランスの設計意図
@@ -29,26 +34,28 @@ Make a todo list for all the tasks in this workflow and work on them one after a
 - 既知のバグ（B* タグ）
 - 計画中の改善（E* タグ）
 
-### 3. 実際のコードを確認
+### 3. 実際のコードを確認（Grep ファースト）
 
-ROADMAP と SPEC を照合しながら、主要ファイルを確認する:
+**原則: ファイル全体を読まない。Grep で存在・パターンを確認 → 必要な箇所のみ部分 Read（50〜100行）。**
 
-**エンジン層** (`src/engine/`):
-- `simulation.js` — シミュレーションロジックが SPEC の仕様を満たしているか
-- `player.js` — 選手老化・引退が実装されているか
-- `sabermetrics.js` — セイバーメトリクスが正しく計算されているか
-- `awards.js` — 表彰・記録システムが機能しているか
+以下の確認項目を Grep で検索し、実装の有無・パターンを把握する:
 
-**UI 層** (`src/components/`):
-- `src/components/tabs/` — 各タブの機能が SPEC 通りか
-- `TacticalGame.jsx` — 試合操作の UI が完成しているか
-- `DashboardTab.jsx` — ダッシュボードに必要な情報が揃っているか
+| 確認内容 | Grep パターン例 | 確認先 |
+|---|---|---|
+| シミュレーション主要関数の存在 | `resolveAtBat\|calcEffectiveFatigue` | `src/engine/simulation.js` |
+| 選手老化・引退ロジック | `aging\|retire\|引退` | `src/engine/player.js` |
+| セイバーメトリクス計算 | `calcOPS\|calcERA\|OBP` | `src/engine/sabermetrics.js` |
+| 表彰・記録システム | `MVP\|沢村\|殿堂` | `src/engine/awards.js` |
+| ゲームバランス定数 | `MIN_SALARY\|FOREIGN_PLAYER\|ROSTER_LIMIT` | `src/constants.js` |
+| FA・契約ロジック | `faEligible\|postingSys` | `src/engine/contract.js` |
+| スケジュール生成 | `GAMES_PER_SEASON\|interleague` | `src/engine/scheduleGen.js` |
+| state 管理の主要フック | `useGameState\|useSeasonFlow\|useOffseason` | `src/hooks/` |
 
-**状態管理**:
-- `src/App.jsx` — game flow が SPEC の設計に沿っているか
+Grep 結果で実装の有無を判定し、**詳細確認が必要な箇所のみ** 行番号を特定して部分 Read する。
+例: `Grep "resolveAtBat" src/engine/simulation.js` で行番号を確認 → その前後 50 行のみ Read。
 
-**定数**:
-- `src/constants.js` — バランス数値が SPEC の設計意図に沿っているか
+タブ・UI の確認は `Glob "src/components/tabs/*.jsx"` でファイル一覧を把握するにとどめ、
+問題が疑われる特定コンポーネントのみ部分 Read する。
 
 ### 4. NPB 協約適合チェック
 
