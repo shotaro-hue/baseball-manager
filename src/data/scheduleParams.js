@@ -6,20 +6,31 @@
 
 export const SEASON_PARAMS = {
   2025: {
-    // NOTE: 2025 は src/data/schedule2025.js の実日程を最優先で利用する。
-    // この設定は実日程ファイル未使用時のフォールバック用途のみ。
-    openingDate: { month: 3, day: 28 },
-    interleagueStart: { month: 6, day: 3 },
+    // 2025年度 実績値
+    openingDate: { month: 3, day: 28 },          // 金曜開幕
+    interleagueStart: { month: 6, day: 3 },       // 6/3(火)〜6/22(日) 18日
+    // AllStar: 7/23(水)・7/24(木)。7/22(火)〜7/24(木) の3日を追加スキップ
     allStarSkipDates: [
       { month: 7, day: 22 },
       { month: 7, day: 23 },
       { month: 7, day: 24 },
     ],
     koshienBlackout: {
+      // センバツ期間（3月下旬〜4月上旬）: 阪神は京セラ、オリックスはアウェイ
       spring: { start: { month: 3, day: 20 }, end: { month: 4, day: 6 } },
+      // 夏の甲子園（8月上旬〜中旬）
       summer: { start: { month: 8, day: 4 }, end: { month: 8, day: 24 } },
     },
-    interleagueRound1PaHosts: null,
+    // 交流戦ラウンド1の先攻カード: paId → [ceIds...] で「パがホスト」
+    // 2025年実績: 日本ハム-阪神, 楽天-DeNA, 西武-ヤクルト, ロッテ-巨人, オリックス-広島, SB-中日
+    interleagueRound1PaHosts: {
+      10: [3],  // 日本ハム(10)が阪神(3)をホスト
+      7:  [1],  // 楽天(7)がDeNA(1)をホスト
+      8:  [0],  // 西武(8)がヤクルト(0)をホスト
+      9:  [4],  // ロッテ(9)が巨人(4)をホスト
+      11: [2],  // オリックス(11)が広島(2)をホスト
+      6:  [5],  // ソフトバンク(6)が中日(5)をホスト
+    },
   },
 };
 
