@@ -404,24 +404,3 @@ export function getCpuMatchups(schedule, gameDay, myId, oppId) {
          m.homeId !== oppId && m.awayId !== oppId
   );
 }
-
-/**
- * オールスター実施タイミング（「休止明け最初のゲーム日」）を返す
- * - useSeasonFlow 側は gameDay+1 と比較して発火するため、
- *   この値は「休止明け再開日の gameDay」を返す。
- */
-export function getAllStarGameDay(year, schedule) {
-  if (!schedule?.length) return 72;
-  const params = SEASON_PARAMS[year] || getDefaultParams(year);
-  const skips = params.allStarSkipDates || [];
-  if (skips.length === 0) return 72;
-
-  const toNum = (d) => d.month * 100 + d.day;
-  const lastSkip = Math.max(...skips.map(toNum));
-
-  for (let dayNo = 1; dayNo < schedule.length; dayNo++) {
-    const d = schedule[dayNo]?.date;
-    if (d && toNum(d) > lastSkip) return dayNo;
-  }
-  return 72;
-}
