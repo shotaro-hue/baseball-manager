@@ -28,6 +28,36 @@ function venueNoteLabel(note) {
   return `代替: ${note}`;
 }
 
+function isSameCardMatchup(a, b) {
+  if (!a || !b) return false;
+  return (
+    a.oppId === b.oppId &&
+    a.isHome === b.isHome &&
+    a.isInterleague === b.isInterleague
+  );
+}
+
+function getCardMarker(schedule, day, myId) {
+  const cur = getMyMatchup(schedule, day, myId);
+  if (!cur) return null;
+
+  let start = day;
+  while (start > 1) {
+    const prev = getMyMatchup(schedule, start - 1, myId);
+    if (!isSameCardMatchup(cur, prev)) break;
+    start--;
+  }
+
+  let end = day;
+  while (end + 1 < (schedule?.length || 0)) {
+    const next = getMyMatchup(schedule, end + 1, myId);
+    if (!isSameCardMatchup(cur, next)) break;
+    end++;
+  }
+
+  return { index: day - start + 1, total: end - start + 1 };
+}
+
 // 月別週グリッドデータを構築する
 function buildMonthGrid(schedule, year, myId, month, gameResultsMap) {
   if (!schedule || myId === null || myId === undefined) return [];
@@ -268,7 +298,8 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
       const matchup = getMyMatchup(schedule, day, myTeam.id);
       if (!matchup) continue;
       const date = gameDayToDate(day, schedule);
-      days.push({ day, date, matchup, opponent: teamMap.get(matchup.oppId) });
+      const card = getCardMarker(schedule, day, myTeam.id);
+      days.push({ day, date, matchup, opponent: teamMap.get(matchup.oppId), card });
     }
     return days;
   }, [schedule, myTeam?.id, gameDay, maxDay, teamMap]);
@@ -370,6 +401,11 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
                   <span style={{ fontSize: 11, color: '#94a3b8' }}>
                     第{item.day}戦 {formatDate(item.date)}({weekdayName(year, item.date)})
                   </span>
+                  {item.card && (
+                    <span style={{ fontSize: 10, color: '#f5c842', marginLeft: 8, fontWeight: 700 }}>
+                      CARD {item.card.index}/{item.card.total}
+                    </span>
+                  )}
                   <span style={{ fontSize: 13, color: '#f8fafc', marginLeft: 10, fontWeight: 600 }}>
                     vs {item.opponent?.name}
                   </span>
