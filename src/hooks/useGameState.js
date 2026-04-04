@@ -1,7 +1,7 @@
 import { useState, useReducer, useMemo, useCallback, useEffect } from "react";
 import { gameStateReducer, G } from './gameStateReducer';
 import { uid, clamp, rng, pname, scoutedValue } from '../utils';
-import { buildTeam, makePlayer, resolveTrainingFocusFromGoal } from '../engine/player';
+import { buildTeam, makePlayer, resolveTrainingFocusFromGoal, generateForeignFaPool } from '../engine/player';
 import { saveGame, hasSave } from '../engine/saveload';
 import { generateSeasonSchedule, calcAllStarTriggerDay } from '../engine/scheduleGen';
 import { buildRealTeam } from '../engine/realplayer';
@@ -12,6 +12,7 @@ import {
   MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, MIN_SALARY_SHIHAKA,
   MAX_SHIHAKA_TOTAL, REGISTRATION_COOLDOWN_DAYS, TALK_COOLDOWN_DAYS,
   PRESS_CONFERENCE_INTERVAL,
+  FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX,
 } from '../constants';
 import { pickQuestion, calcPressDelta } from '../engine/pressConference';
 
@@ -33,7 +34,7 @@ export function useGameState() {
   const setYear    = useCallback((n) => dispatch({ type: G.SET_YEAR,     year:  n }),    []);
   const setMyId    = useCallback((id) => dispatch({ type: G.SET_MY_ID,   myId:  id }),   []);
   const [tab, setTab] = useState("dashboard");
-  const [faPool, setFaPool] = useState([]);
+  const [faPool, setFaPool] = useState(() => generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX)));
   const [faYears, setFaYears] = useState({});
   const [notif, setNotif] = useState(null);
   const [seasonHistory, setSeasonHistory] = useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[]});

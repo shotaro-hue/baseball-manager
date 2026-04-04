@@ -19,9 +19,10 @@ import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, Alumn
 import {
   SEASON_GAMES, BATCH, MAX_外国人_一軍, TEAM_DEFS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
   POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD,
-  FOREIGN_DEADLINE_DAY, FOREIGN_AGENT_SALARY_RATIO, FOREIGN_AGENT_ACCEPT_PROB,
+  FOREIGN_DEADLINE_DAY, FOREIGN_AGENT_SALARY_RATIO, FOREIGN_AGENT_ACCEPT_PROB, FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX,
 } from './constants';
 import { calcOwnerTrustDelta } from './engine/frontend';
+import { generateForeignFaPool } from './engine/player';
 import { useGameState } from './hooks/useGameState';
 import { useSeasonFlow } from './hooks/useSeasonFlow';
 import { useOffseason } from './hooks/useOffseason';
@@ -48,7 +49,9 @@ export default function App(){
     gs.setSchedule(loadedSchedule);
     const loadedParams = SEASON_PARAMS[saved.year] || getDefaultParams(saved.year);
     gs.setAllStarTriggerDay(calcAllStarTriggerDay(loadedSchedule, loadedParams.allStarSkipDates));
-    gs.setFaPool(saved.faPool||[]);
+    const openingForeignPool = generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX));
+    const shouldBackfillForeignFa = (saved.faPool?.length ?? 0) === 0 && saved.gameDay === 1;
+    gs.setFaPool(shouldBackfillForeignFa ? openingForeignPool : (saved.faPool || []));
     gs.setFaYears(saved.faYears||{});
     gs.setSeasonHistory(saved.seasonHistory||{awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[]});
     gs.setNews(saved.news||[]);
