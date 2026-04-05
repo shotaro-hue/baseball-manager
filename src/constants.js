@@ -242,6 +242,11 @@ export const DEV_GOALS_PITCHER = [
 // ── 外国人FA市場 ─────────────────────────────────
 export const FOREIGN_FA_COUNT_MIN = 5;
 export const FOREIGN_FA_COUNT_MAX = 10;
+// ── トレードデッドライン ──────────────────────────
+export const TRADE_DEADLINE_MONTH = 7;
+export const TRADE_DEADLINE_PROB_EARLY = 0.25;
+export const TRADE_DEADLINE_PROB_PEAK = 0.40;
+export const TRADE_DEADLINE_CPU_CPU_PROB = 0.12;
 export const FOREIGN_DEADLINE_DAY = 100;
 export const FOREIGN_AGENT_SALARY_RATIO = 1.2;
 export const FOREIGN_AGENT_ACCEPT_PROB = 0.55;

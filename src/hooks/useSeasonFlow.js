@@ -1,16 +1,16 @@
 import { useState, useRef, useEffect } from "react";
-import { uid, rng } from '../utils';
+import { uid, rng, rngf, gameDayToDate } from '../utils';
 import { checkForInjuries, tickInjuries, calcRetireWill } from '../engine/player';
 import { quickSimGame, runFarmSeason } from '../engine/simulation';
 import { applyGameStatsFromLog, applyPostGameCondition } from '../engine/postGame';
 import { calcRevenue } from '../engine/finance';
 import { applyPopularityDelta } from '../engine/fanSentiment';
-import { generateCpuOffer } from '../engine/trade';
+import { generateCpuOffer, generateCpuCpuTrade, classifyTeam } from '../engine/trade';
 import { initPlayoff } from '../engine/playoff';
 import { selectAllStars, runAllStarGame } from '../engine/allstar';
 import { getMyMatchup, getCpuMatchups } from '../engine/scheduleGen';
 import { saveGame } from '../engine/saveload';
-import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, MAX_FARM } from '../constants';
+import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, MAX_FARM, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB } from '../constants';
 
 // 守備コーチボーナス: 怪我回復速度 UP
 function applyDefenseCoachRecovery(players, coaches) {
@@ -100,10 +100,23 @@ export function useSeasonFlow(gs) {
   },[myTeam]);
 
   const tryGenerateCpuOffer = () => {
-    if(Math.random()>0.15||cpuTradeOffers.length>=2||!myTeam) return;
+    if (!myTeam) return;
+    const currentDate = gameDayToDate(gameDay, schedule);
+    if (currentDate && currentDate.month > TRADE_DEADLINE_MONTH) return;
+    let prob = 0.15;
+    if (currentDate && currentDate.month === TRADE_DEADLINE_MONTH) {
+      prob = currentDate.day > 15 ? TRADE_DEADLINE_PROB_PEAK : TRADE_DEADLINE_PROB_EARLY;
+    }
+    if (rngf(0, 1) > prob || cpuTradeOffers.length >= 2) return;
     const others=teams.filter(t=>t.id!==myId);
     if(!others.length) return;
-    const cpuTeam=others[rng(0,others.length-1)];
+    let cpuTeam;
+    if (currentDate && currentDate.month === TRADE_DEADLINE_MONTH) {
+      const buyers = others.filter((t) => classifyTeam(t, teams) === "buyer");
+      cpuTeam = buyers.length ? buyers[rng(0, buyers.length - 1)] : others[rng(0, others.length - 1)];
+    } else {
+      cpuTeam = others[rng(0, others.length - 1)];
+    }
     const offer=generateCpuOffer(cpuTeam,myTeam);
     if(offer){
       const mail={
@@ -121,6 +134,34 @@ export function useSeasonFlow(gs) {
       setMailbox(prev=>[...prev,mail]);
       notify(offer.from.name+'からトレードオファーが届きました！','ok');
     }
+  };
+
+  /**
+   * 7月のバッチシム中にCPU vs CPU デッドライントレードを試みる。
+   * @param {object[]} teamsArr
+   * @param {number} currentGameDay
+   * @returns {{ headline: string, body: string } | null}
+   */
+  const tryCpuCpuDeadlineTrade = (teamsArr, currentGameDay) => {
+    const currentDate = gameDayToDate(currentGameDay, schedule);
+    if (!currentDate || currentDate.month !== TRADE_DEADLINE_MONTH) return null;
+    if (rngf(0, 1) > TRADE_DEADLINE_CPU_CPU_PROB) return null;
+
+    const result = generateCpuCpuTrade(teamsArr);
+    if (!result) return null;
+
+    const { buyerId, sellerId, buyerGets, sellerGets, buyerName, sellerName } = result;
+    const buyer = teamsArr.find((t) => t.id === buyerId);
+    const seller = teamsArr.find((t) => t.id === sellerId);
+    if (!buyer || !seller) return null;
+
+    buyer.players = [...buyer.players.filter((p) => p.id !== sellerGets.id), buyerGets];
+    seller.players = [...seller.players.filter((p) => p.id !== buyerGets.id), sellerGets];
+
+    return {
+      headline: `【移籍情報】${buyerGets.name}が${buyerName}へ`,
+      body: `${sellerName}と${buyerName}の間でトレードが成立。${buyerName}は${buyerGets.name}を獲得し、${sellerGets.name}を放出した。`,
+    };
   };
 
   // スケジュールから対戦相手を取得（フォールバック: ランダム同リーグ選択）
@@ -274,6 +315,15 @@ export function useSeasonFlow(gs) {
     });
     setGameResult({score:r.score,won,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:currentOpp});
     tryGenerateCpuOffer();
+    const autoDate = gameDayToDate(gameDay, schedule);
+    if (autoDate && autoDate.month === TRADE_DEADLINE_MONTH) {
+      const liveTeams = teams.map((t) => ({ ...t, players: [...(t.players || [])] }));
+      const newsItem = tryCpuCpuDeadlineTrade(liveTeams, gameDay);
+      if (newsItem) {
+        setTeams(liveTeams);
+        addNews({ type: 'trade', headline: newsItem.headline, source: 'Baseball Times', dateLabel: `${year}年 ${gameDay}日目`, body: newsItem.body });
+      }
+    }
     // 引退表明ランダム発生
     if(Math.random()<0.04&&myTeam){
       const cands=myTeam.players.filter(p=>p.age>=35&&!p._retireNow&&calcRetireWill(p)>=40);
@@ -380,6 +430,10 @@ export function useSeasonFlow(gs) {
         a.rotIdx=(a.rotIdx||0)+1;
         b.rotIdx=(b.rotIdx||0)+1;
       }
+      const cpuCpuTradeNews = tryCpuCpuDeadlineTrade(newTeams, newDay);
+      if (cpuCpuTradeNews) {
+        results.push({ type: 'trade_news', ...cpuCpuTradeNews, day: newDay });
+      }
       const myT=newTeams.find(t=>t.id===myId);
       const r=quickSimGame(myT,opp);
       const won=r.score.my>r.score.opp;
@@ -436,6 +490,15 @@ export function useSeasonFlow(gs) {
 
     const batchSaveResult=saveGame({teams:newTeams,myId,gameDay:newDay,year,faPool,faYears,seasonHistory,news,mailbox});
     if(batchSaveResult.ok) setSaveExists(true);
+    results.filter(r=>r.type==='trade_news').forEach(r=>{
+      addNews({
+        type:'trade',
+        headline:r.headline,
+        source:'Baseball Times',
+        dateLabel:`${year}年 ${r.day}日目`,
+        body:r.body,
+      });
+    });
     setTeams(newTeams);
     setGameDay(newDay);
     if(allStarDoneLocal) setAllStarDone(true);
@@ -539,6 +602,15 @@ export function useSeasonFlow(gs) {
       addNews({type:"interview",headline:"【インタビュー】"+(myTeam?.name||"")+"監督に直撃！",source:"野球速報",dateLabel:year+"年 "+gameDay+"日目",body:"試合後、記者団が監督にコメントを求めた。",question:_qs[rng(0,_qs.length-1)],options:_opts});
     }
     tryGenerateCpuOffer();
+    const tacticalDate = gameDayToDate(gameDay, schedule);
+    if (tacticalDate && tacticalDate.month === TRADE_DEADLINE_MONTH) {
+      const liveTeams = teams.map((t) => ({ ...t, players: [...(t.players || [])] }));
+      const newsItem = tryCpuCpuDeadlineTrade(liveTeams, gameDay);
+      if (newsItem) {
+        setTeams(liveTeams);
+        addNews({ type: 'trade', headline: newsItem.headline, source: 'Baseball Times', dateLabel: `${year}年 ${gameDay}日目`, body: newsItem.body });
+      }
+    }
     const _tdrew=gsResult.score.my===gsResult.score.opp;
     pushResult(won,_tdrew,currentOpp?.name||"",gsResult.score.my,gsResult.score.opp,gameDay);
     gs.pushGameResult(gameDay,{won,drew:_tdrew,oppName:currentOpp?.name||"",myScore:gsResult.score.my,oppScore:gsResult.score.opp});

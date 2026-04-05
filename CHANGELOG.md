@@ -5,6 +5,17 @@
 
 ---
 
+### 2026-04-05 — トレードデッドライン（84eb867）
+
+**仕様本文への影響あり（§4.6 トレードシステム）**
+
+- TRADE_DEADLINE_MONTH=7 定数を追加し、8月以降トレード不可の判定を gameDayToDate() ベースに変更
+- classifyTeam() で球団を buyer/seller/neutral に分類
+- tryGenerateCpuOffer() のデッドライン期間（7月）確率を最大40%に引き上げ
+- CPU vs CPU デッドライントレード（generateCpuCpuTrade）を実装し runBatchGames / handleAutoSimEnd / handleTacticalGameEnd に組み込み
+
+---
+
 ### 2026-04-04 — ドラフト1位指名クラッシュ＋ニュースバッジ修正（3e2f4c4）
 
 **仕様本文への影響なし（内部実装のみ）**
