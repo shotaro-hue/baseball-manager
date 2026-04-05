@@ -80,3 +80,62 @@ export function generateCpuOffer(cpuTeam, myTeam) {
   const vd = tradeValue(offer) - wv;
   return { from: cpuTeam, want: [want], offer: [offer], cash: vd < -10 ? Math.abs(vd) * 500000 : 0 };
 }
+
+/**
+ * 球団をトレードデッドラインでの立場に分類する。
+ * @param {object} team - 対象球団
+ * @param {object[]} allTeams - 全球団
+ * @returns {"buyer" | "seller" | "neutral"}
+ */
+export function classifyTeam(team, allTeams) {
+  const leagueTeams = allTeams
+    .filter((t) => t.league === team.league)
+    .sort((a, b) => b.wins - a.wins);
+  const rank = leagueTeams.findIndex((t) => t.id === team.id) + 1;
+  const g = (team.wins || 0) + (team.losses || 0);
+  const winPct = g > 0 ? team.wins / g : 0.5;
+
+  if (rank <= 2 || winPct >= 0.56) return "buyer";
+  if (rank >= 5 || winPct <= 0.44) return "seller";
+  return "neutral";
+}
+
+/**
+ * CPU vs CPU のトレードを1件生成する。
+ * 買い手チームが売り手チームからベテランを獲得し、若手を対価として提示する。
+ * @param {object[]} allTeams - 全球団（myTeam含む）
+ * @returns {{ buyerId: string, sellerId: string, buyerGets: object, sellerGets: object, buyerName: string, sellerName: string } | null}
+ */
+export function generateCpuCpuTrade(allTeams) {
+  const buyers = allTeams.filter((t) => classifyTeam(t, allTeams) === "buyer");
+  const sellers = allTeams.filter((t) => classifyTeam(t, allTeams) === "seller");
+  if (!buyers.length || !sellers.length) return null;
+
+  const buyer = buyers[rng(0, buyers.length - 1)];
+  const sellerCandidates = sellers.filter((t) => t.id !== buyer.id);
+  if (!sellerCandidates.length) return null;
+  const seller = sellerCandidates[rng(0, sellerCandidates.length - 1)];
+
+  const sellerVets = seller.players
+    .filter((p) => !p.injury && (p.age || 25) >= 28)
+    .sort((a, b) => tradeValue(b) - tradeValue(a));
+  const buyerProspects = buyer.players
+    .filter((p) => !p.injury && (p.age || 25) <= 25)
+    .sort((a, b) => tradeValue(b) - tradeValue(a));
+
+  if (!sellerVets.length || !buyerProspects.length) return null;
+
+  const buyerGets = sellerVets[0];
+  const sellerGets = buyerProspects[0];
+  const valueDiff = Math.abs(tradeValue(buyerGets) - tradeValue(sellerGets));
+  if (valueDiff > 30) return null;
+
+  return {
+    buyerId: buyer.id,
+    sellerId: seller.id,
+    buyerGets,
+    sellerGets,
+    buyerName: buyer.name,
+    sellerName: seller.name,
+  };
+}
