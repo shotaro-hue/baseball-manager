@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles.css';
-import { uid, fmtM, fmtSal, gameDayToDate, scoutedValue, clamp, rngf } from './utils';
+import { uid, fmtM, fmtSal, gameDayToDate, scoutedValue, clamp, rng, rngf } from './utils';
 import { loadGame, getSaveMeta, deleteSave } from './engine/saveload';
 import { generateSeasonSchedule, calcAllStarTriggerDay } from './engine/scheduleGen';
 import { SEASON_PARAMS, getDefaultParams } from './data/scheduleParams.js';
