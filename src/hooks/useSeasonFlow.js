@@ -10,13 +10,33 @@ import { initPlayoff } from '../engine/playoff';
 import { selectAllStars, runAllStarGame } from '../engine/allstar';
 import { getMyMatchup, getCpuMatchups } from '../engine/scheduleGen';
 import { saveGame } from '../engine/saveload';
-import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, MAX_FARM, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB } from '../constants';
+import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, MAX_FARM, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX } from '../constants';
 
 // 守備コーチボーナス: 怪我回復速度 UP
 function applyDefenseCoachRecovery(players, coaches) {
   const defBonus=(coaches||[]).filter(c=>c.type==='defense').reduce((s,c)=>s+(c.bonus||0),0);
   if(!defBonus) return players;
-  return players.map(p=>{if(!p.injuryDaysLeft) return p;const extra=Math.random()<(defBonus*0.1)?1:0;if(!extra) return p;const next=Math.max(0,p.injuryDaysLeft-extra);return{...p,injuryDaysLeft:next,injury:next>0?p.injury:null};});
+  return players.map(p=>{if(!p.injuryDaysLeft) return p;const extra=rngf(0,1)<(defBonus*0.1)?1:0;if(!extra) return p;const next=Math.max(0,p.injuryDaysLeft-extra);return{...p,injuryDaysLeft:next,injury:next>0?p.injury:null,injuryPart:next>0?p.injuryPart:null};});
+}
+
+
+function applyInjuriesToPlayers(players, injuries, year) {
+  if (!injuries.length) return players;
+  return players.map((p) => {
+    const inj = injuries.find((i) => i.id === p.id);
+    if (!inj) return p;
+    const history = [
+      ...(p.injuryHistory ?? []),
+      { part: inj.part, year },
+    ].slice(-INJURY_HISTORY_MAX);
+    return {
+      ...p,
+      injury: inj.type,
+      injuryDaysLeft: inj.days,
+      injuryPart: inj.part,
+      injuryHistory: history,
+    };
+  });
 }
 
 // 登録クールダウンを1日デクリメント
@@ -242,10 +262,10 @@ export function useSeasonFlow(gs) {
       updated.players=tickInjuries(updated.players);
       updated.players=updated.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
       updated.players=applyDefenseCoachRecovery(updated.players,t.coaches);
-      const newInj=checkForInjuries(updated.players);
+      const newInj=checkForInjuries(updated.players, year);
       if(newInj.length>0){
         const injNames=newInj.reduce((acc,i)=>{const p=updated.players.find(x=>x.id===i.id);if(p)acc.push({name:p.name,...i});return acc;},[]);
-        updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+        updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
         injNames.filter(i=>i.days>=7).forEach(i=>{addNews({type:"season",headline:`🤕 【怪我】${i.name}が負傷`,source:"チーム広報",dateLabel:`${year}年 ${gameDay}日目`,body:`${i.name}が${i.type}により${i.days}試合の戦線離脱が見込まれる。チームはロスター調整を余儀なくされる。`});});
       }
       // 登録クールダウンデクリメント
@@ -274,8 +294,8 @@ export function useSeasonFlow(gs) {
       updated.players=applyGameStatsFromLog(updated.players,r.log||[],false,!won&&!drew);
       updated.players=applyPostGameCondition(updated.players,r.log||[],false,gameDay);
       updated.players=tickInjuries(updated.players);
-      const newInj=checkForInjuries(updated.players);
-      if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+      const newInj=checkForInjuries(updated.players, year);
+      updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
       Object.assign(updated,applyPopularityDelta(t,!won&&!drew,drew));
       return updated;
     });
@@ -303,13 +323,13 @@ export function useSeasonFlow(gs) {
         a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon);
         a.players=applyPostGameCondition(a.players,cr.log||[],true,gameDay);
         a.players=tickInjuries(a.players);
-        const aInj=checkForInjuries(a.players);
-        if(aInj.length>0)a.players=a.players.map(p=>{const inj=aInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+        const aInj=checkForInjuries(a.players, year);
+        a.players=applyInjuriesToPlayers(a.players, aInj, year);
         b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew);
         b.players=applyPostGameCondition(b.players,cr.log||[],false,gameDay);
         b.players=tickInjuries(b.players);
-        const bInj=checkForInjuries(b.players);
-        if(bInj.length>0)b.players=b.players.map(p=>{const inj=bInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+        const bInj=checkForInjuries(b.players, year);
+        b.players=applyInjuriesToPlayers(b.players, bInj, year);
       }
       return newTeams;
     });
@@ -419,14 +439,14 @@ export function useSeasonFlow(gs) {
         a.players=applyPostGameCondition(a.players,cr.log||[],true,newDay);
         a.players=tickInjuries(a.players);
         a.players=a.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
-        const aInj=checkForInjuries(a.players);
-        if(aInj.length>0)a.players=a.players.map(p=>{const inj=aInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+        const aInj=checkForInjuries(a.players, year);
+        a.players=applyInjuriesToPlayers(a.players, aInj, year);
         b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew);
         b.players=applyPostGameCondition(b.players,cr.log||[],false,newDay);
         b.players=tickInjuries(b.players);
         b.players=b.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
-        const bInj=checkForInjuries(b.players);
-        if(bInj.length>0)b.players=b.players.map(p=>{const inj=bInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+        const bInj=checkForInjuries(b.players, year);
+        b.players=applyInjuriesToPlayers(b.players, bInj, year);
         a.rotIdx=(a.rotIdx||0)+1;
         b.rotIdx=(b.rotIdx||0)+1;
       }
@@ -448,8 +468,8 @@ export function useSeasonFlow(gs) {
       myT.players=tickInjuries(myT.players);
       myT.players=myT.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
       myT.players=applyDefenseCoachRecovery(myT.players,myT.coaches);
-      const _inj=checkForInjuries(myT.players);
-      if(_inj.length>0)myT.players=myT.players.map(p=>{const inj=_inj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+      const _inj=checkForInjuries(myT.players, year);
+      myT.players=applyInjuriesToPlayers(myT.players, _inj, year);
       // 登録クールダウンデクリメント
       myT.players=tickCooldowns(myT.players);
       // 二軍: 怪我回復 + クールダウンデクリメント
@@ -466,8 +486,8 @@ export function useSeasonFlow(gs) {
         oppT.players=applyGameStatsFromLog(oppT.players,r.log||[],false,!won&&!drew);
         oppT.players=applyPostGameCondition(oppT.players,r.log||[],false,newDay);
         oppT.players=tickInjuries(oppT.players);
-        const oppInj=checkForInjuries(oppT.players);
-        if(oppInj.length>0)oppT.players=oppT.players.map(p=>{const inj=oppInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+        const oppInj=checkForInjuries(oppT.players, year);
+        oppT.players=applyInjuriesToPlayers(oppT.players, oppInj, year);
         oppT.rotIdx=(oppT.rotIdx||0)+1;
       }
       const rev=calcRevenue(myT);
@@ -525,8 +545,8 @@ export function useSeasonFlow(gs) {
       updated.players=tickInjuries(updated.players);
       updated.players=updated.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
       updated.players=applyDefenseCoachRecovery(updated.players,t.coaches);
-      const newInj=checkForInjuries(updated.players);
-      if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+      const newInj=checkForInjuries(updated.players, year);
+      updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
       // 登録クールダウンデクリメント
       updated.players=tickCooldowns(updated.players);
       // 二軍: 怪我回復 + クールダウンデクリメント
@@ -552,8 +572,8 @@ export function useSeasonFlow(gs) {
       updated.players=applyGameStatsFromLog(updated.players,gsResult.log,false,!won&&!drew);
       updated.players=applyPostGameCondition(updated.players,gsResult.log,false,gameDay);
       updated.players=tickInjuries(updated.players);
-      const newInj=checkForInjuries(updated.players);
-      if(newInj.length>0)updated.players=updated.players.map(p=>{const inj=newInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+      const newInj=checkForInjuries(updated.players, year);
+      updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
       Object.assign(updated,applyPopularityDelta(t,!won&&!drew,drew));
       return updated;
     });
@@ -580,13 +600,13 @@ export function useSeasonFlow(gs) {
         a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon);
         a.players=applyPostGameCondition(a.players,cr.log||[],true,gameDay);
         a.players=tickInjuries(a.players);
-        const aInj=checkForInjuries(a.players);
-        if(aInj.length>0)a.players=a.players.map(p=>{const inj=aInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+        const aInj=checkForInjuries(a.players, year);
+        a.players=applyInjuriesToPlayers(a.players, aInj, year);
         b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew);
         b.players=applyPostGameCondition(b.players,cr.log||[],false,gameDay);
         b.players=tickInjuries(b.players);
-        const bInj=checkForInjuries(b.players);
-        if(bInj.length>0)b.players=b.players.map(p=>{const inj=bInj.find(i=>i.id===p.id);return inj?{...p,injury:inj.type,injuryDaysLeft:inj.days}:p;});
+        const bInj=checkForInjuries(b.players, year);
+        b.players=applyInjuriesToPlayers(b.players, bInj, year);
       }
       return newTeams;
     });
