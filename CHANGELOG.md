@@ -5,6 +5,15 @@
 
 ---
 
+### 2026-04-06 — バグ修正: 残り全試合シムで黒画面（B12）
+
+**仕様本文への影響なし（内部バグ修正のみ）**
+
+- 根本原因: `runBatchGames` 内の `results` 配列に CPU 間トレード通知（`trade_news` 型）が混在していたにもかかわらず、`setRecentResults` / `setGameResultsMap` の functional updater が全エントリに対して `r.score.my` を参照。`trade_news` エントリは `score` フィールドを持たないため `TypeError` が発生し、React レンダーフェーズでクラッシュして黒画面になっていた
+- 修正内容: `gameResults = results.filter(r => r.type !== 'trade_news')` で除外変数を作成し、`setBatchResults` / `setRecentResults` / `setGameResultsMap` の3か所すべてをゲーム結果のみに変更
+
+---
+
 ### 2026-04-06 — 怪我の詳細化（コミットハッシュ）
 
 **仕様本文への影響あり（§4.10）**
