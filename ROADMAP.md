@@ -84,6 +84,7 @@
 | N1 | **[P1] メール・ニュース通知配信改善** | `subject`→`title` フィールド統一（championship / owner_trust / morale_warning / overseas_fa / hof）・戦術試合後ニュース欠落修正・CPUトレードオファー確率5%→15%・インタビュー確率20%→35%・怪我ニュース追加 | ac0704f |
 | B10 | **[P0] ドラフト1位指名クラッシュ（analyzeTeamNeeds戻り値型誤用）** | `buildCpuPicks()` / `cpuPick()` で `needs.some(n=>n.includes(...))` が TypeError。`n.type.includes(...)` に修正 | 3e2f4c4 |
 | B11 | **[P1] ニュースタブ未読バッジ欠落・インタビュー回答リセット** | `tabBadges` に `news` キー追加。`handleInterview` で `answered:true` フラグを付与し再マウント後も維持 | 3e2f4c4 |
+| B12 | **[P0] 残り全試合シムで黒画面（trade_news エントリの score 参照 TypeError）** | `runBatchGames` の `results` 配列に `trade_news` 型エントリ（CPU同士トレード通知）が混在するにもかかわらず、`setRecentResults` / `setGameResultsMap` の functional updater 内で `r.score.my` を全エントリに対して参照していた。`trade_news` エントリは `score` フィールドを持たないため `TypeError` が発生し React のレンダーフェーズでクラッシュ → 黒画面。`gameResults = results.filter(r=>r.type!=='trade_news')` で除外してから `setBatchResults` / `setRecentResults` / `setGameResultsMap` に渡すよう修正 | — |
 
 ---
 
