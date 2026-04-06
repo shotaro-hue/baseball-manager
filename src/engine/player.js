@@ -1,7 +1,8 @@
 import { rng, clamp, uid, pname, CITIES } from '../utils';
 import {
   POSITIONS, PLAYER_TYPES_B, PLAYER_TYPES_P, PLAYER_COMMENTS_B, PLAYER_COMMENTS_P, MIN_SALARY_IKUSEI,
-  FOREIGN_PLAYER_NAMES, FOREIGN_NATIONALITIES,
+  FOREIGN_PLAYER_NAMES, FOREIGN_NATIONALITIES, INJURY_BODY_PARTS, INJURY_RECURRENCE_MULTIPLIER,
+  INJURY_RECURRENCE_WINDOW_YEARS,
 } from '../constants';
 
 
@@ -42,7 +43,7 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
     isPitcher: isPitch, isForeign, salary: 0,
     contractYears: rng(1, 3), contractYearsLeft: rng(1, 3),
     育成: false, isFA: false, condition: rng(80, 100),
-    injury: null, injuryDaysLeft: 0,
+    injury: null, injuryDaysLeft: 0, injuryPart: null, injuryHistory: [],
     trainingFocus: null,
     devGoal: null,
     lastTalkGameDay: 0,
@@ -393,18 +394,30 @@ const INJURY_TYPES = [
   { label: 'シーズンエンド', days: [143, 143], weight: 3  },
 ];
 
-export function checkForInjuries(players) {
+export function checkForInjuries(players, currentYear = 0) {
   const injured = [];
   for (const p of players) {
     if ((p.injuryDaysLeft ?? 0) > 0) continue;
+    const recentHistory = (p.injuryHistory ?? []).filter(
+      h => currentYear - h.year <= INJURY_RECURRENCE_WINDOW_YEARS
+    );
+    const recurrenceMod = recentHistory.length > 0 ? INJURY_RECURRENCE_MULTIPLIER : 1.0;
     const ageMod  = p.age > 33 ? 2.0 : p.age > 29 ? 1.4 : 1.0;
     const condMod = (p.condition || 100) < 70 ? 1.6 : 1.0;
-    if (Math.random() < 0.003 * ageMod * condMod) { // 0.3%/試合が基準（過去0.7%は多すぎた）
-      const roll = Math.random() * 100;
+    if (rng(0, 9999) < Math.round(0.003 * ageMod * condMod * recurrenceMod * 10000)) {
+      const roll = rng(0, 99);
       let cum = 0, type = INJURY_TYPES[0];
       for (const t of INJURY_TYPES) { cum += t.weight; if (roll < cum) { type = t; break; } }
       const days = rng(type.days[0], type.days[1]);
-      injured.push({ id: p.id, type: type.label, days });
+      const partWeights = INJURY_BODY_PARTS.map(bp => {
+        const hasHistory = recentHistory.some(h => h.part === bp.part);
+        return { ...bp, weight: hasHistory ? bp.weight * 2 : bp.weight };
+      });
+      const totalW = partWeights.reduce((s, b) => s + b.weight, 0);
+      const partRoll = rng(0, totalW - 1);
+      let pcum = 0, chosenPart = partWeights[0].part;
+      for (const bp of partWeights) { pcum += bp.weight; if (partRoll < pcum) { chosenPart = bp.part; break; } }
+      injured.push({ id: p.id, type: type.label, days, part: chosenPart });
     }
   }
   return injured;
@@ -414,6 +427,6 @@ export function tickInjuries(players) {
   return players.map(p => {
     if (!p.injuryDaysLeft) return p;
     const next = Math.max(0, p.injuryDaysLeft - 1);
-    return { ...p, injuryDaysLeft: next, injury: next > 0 ? p.injury : null };
+    return { ...p, injuryDaysLeft: next, injury: next > 0 ? p.injury : null, injuryPart: next > 0 ? p.injuryPart : null };
   });
 }

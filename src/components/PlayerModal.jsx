@@ -94,7 +94,7 @@ export function PlayerModal({player:p, teamName, onClose}){
           <span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(255,255,255,.05)",color:"#94a3b8"}}>在籍 {Math.floor(days/FA_DAYS)||p.serviceYears||0} 年目</span>
           <span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(255,255,255,.05)",color:p.isFA?"#f5c842":"#94a3b8"}}>{faLabel}</span>
           {foreignExemptDays>0&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(96,165,250,.08)",color:"#60a5fa",border:"1px solid rgba(96,165,250,.25)"}}>外国人枠免除まで {foreignExemptDays}日</span>}
-          {(p.injuryDaysLeft??0)>0&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(248,113,113,.1)",color:"#f87171",border:"1px solid rgba(248,113,113,.3)"}}>🤕 {p.injury} 残{p.injuryDaysLeft}試合</span>}
+          {(p.injuryDaysLeft??0)>0&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(248,113,113,.1)",color:"#f87171",border:"1px solid rgba(248,113,113,.3)"}}>🤕 {p.injury}{p.injuryPart ? ` [${p.injuryPart}]` : ''} 残{p.injuryDaysLeft}試合</span>}
         </div>
 
         {/* 2カラムレイアウト */}

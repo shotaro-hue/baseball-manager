@@ -10,7 +10,7 @@ export function OV({ v }) {
 }
 
 export function CondBadge({ p }) {
-  if (p?.injury) return <span className="inj-badge">🤕{p.injury}</span>;
+  if (p?.injury) return <span className="inj-badge">🤕{p.injury}{p.injuryPart ? ` [${p.injuryPart}]` : ''}</span>;
   const c = (p?.condition || 100) >= 80 ? "#34d399" : (p?.condition || 100) >= 60 ? "#f5c842" : "#f87171";
   return <span style={{ fontSize: 9, color: c }}>●{p?.condition || 100}</span>;
 }
