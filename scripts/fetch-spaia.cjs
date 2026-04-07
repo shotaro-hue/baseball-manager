@@ -77,6 +77,16 @@ function pick(obj, ...keys) {
   return undefined;
 }
 
+/** --debug 時のみ、見つからなかったフィールドと利用可能なキーを警告出力する */
+function pickDebug(label, obj, ...keys) {
+  const val = pick(obj, ...keys);
+  if (val === undefined && DEBUG) {
+    console.warn(`  [FIELD NOT FOUND] ${label}: tried [${keys.join(', ')}]`);
+    console.warn(`  Available keys: ${Object.keys(obj).join(', ')}`);
+  }
+  return val;
+}
+
 /** 数値化（'-' や null → fallback） */
 function num(v, fallback = 0) {
   if (v === '-' || v === null || v === undefined) return fallback;
@@ -168,11 +178,11 @@ function convertBatter(info, stats, history, cityFallback) {
   const name = pick(info, 'Name', 'name', 'player_name', '選手名');
   if (!name) return null;
 
-  const age  = num(pick(info, 'Age', 'age', '年齢'), 25);
-  const pos  = normalizePos(pick(info, 'Position', 'DefensePosition', 'position', '守備')) ?? '一塁手';
-  const city = pick(info, 'BirthPlace', 'birth_place', 'hometown', '出身地') ?? cityFallback;
+  const age  = num(pickDebug('age', info, 'Age', 'age', '年齢', 'PlayerAge', 'player_age', 'BirthAge', 'birth_age'), 25);
+  const pos  = normalizePos(pickDebug('pos', info, 'Position', 'DefensePosition', 'defense_position', 'DefensePos', 'DefPos', 'position', 'pos', '守備', '守備位置')) ?? '一塁手';
+  const city = pick(info, 'BirthPlace', 'birth_place', 'hometown', 'BirthPref', 'birth_pref', '出身地', '出身') ?? cityFallback;
   const salary = (() => {
-    const raw = num(pick(info, 'Salary', 'salary', '年俸'), 0);
+    const raw = num(pickDebug('salary', info, 'Salary', 'salary', '年俸', 'AnnualSalary', 'annual_salary', 'Contract', 'contract', '契約金'), 0);
     if (raw > 0 && raw < 1000) return raw * 10000;  // 万円 → 円
     return raw || 5000;
   })();
@@ -207,16 +217,16 @@ function convertPitcher(info, stats, history, cityFallback) {
   const name = pick(info, 'Name', 'name', 'player_name', '選手名');
   if (!name) return null;
 
-  const age     = num(pick(info, 'Age', 'age', '年齢'), 27);
+  const age     = num(pickDebug('age', info, 'Age', 'age', '年齢', 'PlayerAge', 'player_age', 'BirthAge', 'birth_age'), 27);
   const subtype = inferPitcherSubtype(info);  // info から推定（stats で上書きしない）
   const hand    = (() => {
-    const raw = pick(info, 'ThrowHand', 'PitchHand', 'throw_hand', 'pitch_hand', 'hand', '投球腕');
+    const raw = pick(info, 'ThrowHand', 'PitchHand', 'throw_hand', 'pitch_hand', 'hand', '投球腕', '投球の手');
     if (!raw) return 'right';
     return String(raw).includes('左') || raw === 'L' || raw === 1 ? 'left' : 'right';
   })();
-  const city    = pick(info, 'BirthPlace', 'birth_place', 'hometown', '出身地') ?? cityFallback;
+  const city    = pick(info, 'BirthPlace', 'birth_place', 'hometown', 'BirthPref', 'birth_pref', '出身地', '出身') ?? cityFallback;
   const salary  = (() => {
-    const raw = num(pick(info, 'Salary', 'salary', '年俸'), 0);
+    const raw = num(pickDebug('salary', info, 'Salary', 'salary', '年俸', 'AnnualSalary', 'annual_salary', 'Contract', 'contract', '契約金'), 0);
     if (raw > 0 && raw < 1000) return raw * 10000;  // 万円 → 円
     return raw || 5000;
   })();
@@ -438,6 +448,7 @@ function buildFileContent(rosters) {
       const bl = extractList(bd);
       console.log('\n[batter_list] 先頭3件:');
       console.log(JSON.stringify(bl.slice(0, 3), null, 2));
+      if (bl[0]) console.log('\n[batter_list] フィールド一覧:', Object.keys(bl[0]));
 
       // 最初の選手の年度別成績も確認
       const firstPlayerCD = pick(bl[0] ?? {}, 'PlayerCD', 'player_cd', 'player_id', 'id');
@@ -462,6 +473,7 @@ function buildFileContent(rosters) {
       const pl = extractList(pd);
       console.log('\n[pitcher_list] 先頭3件:');
       console.log(JSON.stringify(pl.slice(0, 3), null, 2));
+      if (pl[0]) console.log('\n[pitcher_list] フィールド一覧:', Object.keys(pl[0]));
 
       const firstPitcherCD = pick(pl[0] ?? {}, 'PlayerCD', 'player_cd', 'player_id', 'id');
       if (firstPitcherCD) {
