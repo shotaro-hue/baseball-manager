@@ -45,9 +45,43 @@ function makePers(age) {
   };
 }
 
+/* ─── 過去成績 → careerLog エントリ変換 ─── */
+
+function historyBatterEntry(h, teamId, teamName) {
+  const { year, AVG = 0.250, HR = 0, RBI = 0, SB = 0, BB = 0, PA = 0 } = h;
+  const AB  = Math.max(0, Math.round(PA - BB - PA * 0.01));
+  const H   = Math.round(AVG * AB);
+  const K   = Math.round(PA * 0.185); // NPB平均K%で推定
+  const HBP = Math.round(PA * 0.010);
+  const SF  = Math.round(PA * 0.010);
+  const R   = Math.round(RBI * 0.85);
+  const CS  = Math.round(SB * 0.25);
+  const empty = { PA:0,AB:0,H:0,D:0,T:0,HR:0,RBI:0,BB:0,K:0,HBP:0,SF:0,SB:0,CS:0,R:0,
+                  IP:0,ER:0,BBp:0,HBPp:0,Kp:0,HRp:0,Hp:0,BF:0,W:0,L:0,SV:0,HLD:0,QS:0,BS:0 };
+  return {
+    year, teamId, teamName,
+    stats: { ...empty, PA, AB, H, D:0, T:0, HR, RBI, BB, K, HBP, SF, SB, CS, R },
+    playoffStats: { ...empty },
+  };
+}
+
+function historyPitcherEntry(h, teamId, teamName) {
+  const { year, ERA = 4.0, W = 0, L = 0, IP = 0, K = 0, BB = 0, WHIP = 1.4, SV = 0 } = h;
+  const ER  = Math.round(ERA * IP / 9);
+  const Hp  = Math.max(0, Math.round(WHIP * IP - BB));
+  const BF  = Math.round(IP * 3.8);
+  const empty = { PA:0,AB:0,H:0,D:0,T:0,HR:0,RBI:0,BB:0,K:0,HBP:0,SF:0,SB:0,CS:0,R:0,
+                  IP:0,ER:0,BBp:0,HBPp:0,Kp:0,HRp:0,Hp:0,BF:0,W:0,L:0,SV:0,HLD:0,QS:0,BS:0 };
+  return {
+    year, teamId, teamName,
+    stats: { ...empty, IP, ER, BBp:BB, Kp:K, Hp, BF, W, L, SV },
+    playoffStats: { ...empty },
+  };
+}
+
 /* ─── 打者変換 ─── */
 export function realBatterToPlayer(b, teamDef) {
-  const { name, age, pos, hometown = teamDef.city, isForeign = false, salary, stats } = b;
+  const { name, age, pos, hometown = teamDef.city, isForeign = false, salary, stats, history } = b;
   const { AVG = 0.250, HR = 5, RBI = 30, SB = 5, BB = 30, PA = 300, OPS = 0.680 } = stats;
 
   const bbPct = PA > 0 ? BB / PA : 0.08;
@@ -72,6 +106,16 @@ export function realBatterToPlayer(b, teamDef) {
 
   const growthPhase = age <= 24 ? 'growth' : age <= 29 ? 'peak' : age <= 33 ? 'earlyDecline' : 'decline';
 
+  // careerLog: 実際の過去成績から生成（なければ空配列）
+  const careerLog = (history ?? []).map(h =>
+    historyBatterEntry(h, teamDef.gameId, teamDef.name)
+  );
+  // serviceYears: 実績年数優先、なければ年齢から推定
+  const serviceYears = careerLog.length > 0
+    ? careerLog.length
+    : rng(0, Math.max(0, age - 18));
+  const entryAge = age - serviceYears;
+
   return {
     id: uid(), name, pos, age,
     potential: clamp(sc(OPS, 0.60, 1.05, 55, 96) + rng(-5, 8), 55, 99),
@@ -89,10 +133,11 @@ export function realBatterToPlayer(b, teamDef) {
     growthPhase,
     stats: emptyStats(),
     batting,
-    serviceYears: rng(0, Math.max(0, age - 18)),
-    entryAge: age - rng(0, Math.max(0, age - 18)),
+    careerLog,
+    serviceYears,
+    entryAge,
     entryType: isForeign ? '外国人' : age <= 19 ? '高卒' : age <= 22 ? '大卒' : '社会人',
-    daysOnActiveRoster: rng(0, Math.max(0, age - 18)) * 120,
+    daysOnActiveRoster: serviceYears * rng(100, 140),
     ikuseiYears: 0,
     playerType: '',
     playerComment: '',
@@ -101,7 +146,7 @@ export function realBatterToPlayer(b, teamDef) {
 
 /* ─── 投手変換 ─── */
 export function realPitcherToPlayer(p, teamDef) {
-  const { name, age, pos, hand = 'right', hometown = teamDef.city, isForeign = false, salary, stats } = p;
+  const { name, age, pos, hand = 'right', hometown = teamDef.city, isForeign = false, salary, stats, history } = p;
   const { ERA = 4.00, W = 5, L = 8, IP = 80, K = 70, BB = 35, WHIP = 1.40 } = stats;
 
   const k9  = IP > 0 ? K  / IP * 9 : 7;
@@ -123,6 +168,14 @@ export function realPitcherToPlayer(p, teamDef) {
   const subtype = pos === '抑え' ? '抑え' : pos === '中継ぎ' ? '中継ぎ' : '先発';
   const growthPhase = age <= 24 ? 'growth' : age <= 29 ? 'peak' : age <= 33 ? 'earlyDecline' : 'decline';
 
+  const careerLog = (history ?? []).map(h =>
+    historyPitcherEntry(h, teamDef.gameId, teamDef.name)
+  );
+  const serviceYears = careerLog.length > 0
+    ? careerLog.length
+    : rng(0, Math.max(0, age - 18));
+  const entryAge = age - serviceYears;
+
   return {
     id: uid(), name, pos, age,
     potential: clamp(sc(ERA, 5.5, 1.8, 55, 97) + rng(-5, 8), 55, 99),
@@ -142,10 +195,11 @@ export function realPitcherToPlayer(p, teamDef) {
     growthPhase,
     stats: { ...emptyStats(), W: 0, L: 0, SV: 0 },
     pitching,
-    serviceYears: rng(0, Math.max(0, age - 18)),
-    entryAge: age - rng(0, Math.max(0, age - 18)),
+    careerLog,
+    serviceYears,
+    entryAge,
     entryType: isForeign ? '外国人' : age <= 19 ? '高卒' : age <= 22 ? '大卒' : '社会人',
-    daysOnActiveRoster: rng(0, Math.max(0, age - 18)) * 120,
+    daysOnActiveRoster: serviceYears * rng(100, 140),
     ikuseiYears: 0,
     playerType: '',
     playerComment: '',
