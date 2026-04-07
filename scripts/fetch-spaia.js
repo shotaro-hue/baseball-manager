@@ -72,7 +72,7 @@ async function fetchJSON(url) {
 /** 複数フィールド候補から最初に存在する値を返す */
 function pick(obj, ...keys) {
   for (const k of keys) {
-    if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '-') return obj[k];
+    if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '-' && obj[k] !== '') return obj[k];
   }
   return undefined;
 }
@@ -162,31 +162,31 @@ function normalizeHistoryPitcher(history) {
 
 // ── 打者データ変換 ────────────────────────────────────────
 function convertBatter(info, stats, history, cityFallback) {
-  // info = batter_list の1レコード、stats = hitting_stats_by_year の最新年度レコード
-  const merged = { ...info, ...stats };
-
-  const name = pick(merged, 'Name', 'name', 'player_name', '選手名');
+  // ── プロフィール: batter_list (info) から取得 ──────────
+  // ※ hitting_stats_by_year (stats) には年齢・守備位置・年俸・出身地が
+  //    古い値や空値で入るため stats で上書きしてはいけない
+  const name = pick(info, 'Name', 'name', 'player_name', '選手名');
   if (!name) return null;
 
-  const age  = num(pick(merged, 'Age', 'age', '年齢'), 25);
-  const pos  = normalizePos(pick(merged, 'Position', 'DefensePosition', 'position', '守備')) ?? '一塁手';
-  const city = pick(merged, 'BirthPlace', 'birth_place', 'hometown', '出身地') ?? cityFallback;
+  const age  = num(pick(info, 'Age', 'age', '年齢'), 25);
+  const pos  = normalizePos(pick(info, 'Position', 'DefensePosition', 'position', '守備')) ?? '一塁手';
+  const city = pick(info, 'BirthPlace', 'birth_place', 'hometown', '出身地') ?? cityFallback;
   const salary = (() => {
-    const raw = num(pick(merged, 'Salary', 'salary', '年俸'), 0);
-    // spaia.jp は年俸を万円単位で返す場合がある
-    if (raw > 0 && raw < 1000) return raw * 10000;  // 万円 → 円（千円単位に不要）
+    const raw = num(pick(info, 'Salary', 'salary', '年俸'), 0);
+    if (raw > 0 && raw < 1000) return raw * 10000;  // 万円 → 円
     return raw || 5000;
   })();
-  const foreign = !!(pick(merged, 'IsForeign', 'is_foreign', 'isForeign'));
+  const foreign = !!(pick(info, 'IsForeign', 'is_foreign', 'isForeign'));
 
-  // 統計（PascalCase が正式、snake_case はフォールバック）
-  const AVG = num(pick(merged, 'BattingAverage', 'batting_average', 'AVG'), 0.250);
-  const HR  = num(pick(merged, 'Homerun', 'home_run', 'HR'), 5);
-  const RBI = num(pick(merged, 'RunsBattingIn', 'runs_batted_in', 'RBI'), 30);
-  const SB  = num(pick(merged, 'StolenBase', 'stolen_base', 'SB'), 5);
-  const BB  = num(pick(merged, 'BaseOnBall', 'base_on_balls', 'BB'), 30);
-  const PA  = num(pick(merged, 'PlateAppearance', 'plate_appearance', 'PA'), 300);
-  const OPS = num(pick(merged, 'Ops', 'ops', 'OPS'), 0.680);
+  // ── 成績: hitting_stats_by_year (stats) から取得 ────────
+  // playerCD が見つからない場合 stats = info なので引き続き機能する
+  const AVG = num(pick(stats, 'BattingAverage', 'batting_average', 'AVG'), 0.250);
+  const HR  = num(pick(stats, 'Homerun', 'home_run', 'HR'), 5);
+  const RBI = num(pick(stats, 'RunsBattingIn', 'runs_batted_in', 'RBI'), 30);
+  const SB  = num(pick(stats, 'StolenBase', 'stolen_base', 'SB'), 5);
+  const BB  = num(pick(stats, 'BaseOnBall', 'base_on_balls', 'BB'), 30);
+  const PA  = num(pick(stats, 'PlateAppearance', 'plate_appearance', 'PA'), 300);
+  const OPS = num(pick(stats, 'Ops', 'ops', 'OPS'), 0.680);
 
   const hist = normalizeHistoryBatter(history);
   return {
@@ -203,30 +203,35 @@ function convertBatter(info, stats, history, cityFallback) {
 
 // ── 投手データ変換 ────────────────────────────────────────
 function convertPitcher(info, stats, history, cityFallback) {
-  const merged = { ...info, ...stats };
-
-  const name = pick(merged, 'Name', 'name', 'player_name', '選手名');
+  // ── プロフィール: pitcher_list (info) から取得 ──────────
+  const name = pick(info, 'Name', 'name', 'player_name', '選手名');
   if (!name) return null;
 
-  const age     = num(pick(merged, 'Age', 'age', '年齢'), 27);
-  const subtype = inferPitcherSubtype(merged);
+  const age     = num(pick(info, 'Age', 'age', '年齢'), 27);
+  const subtype = inferPitcherSubtype(info);  // info から推定（stats で上書きしない）
   const hand    = (() => {
-    const raw = pick(merged, 'ThrowHand', 'PitchHand', 'throw_hand', 'pitch_hand', 'hand', '投球腕');
+    const raw = pick(info, 'ThrowHand', 'PitchHand', 'throw_hand', 'pitch_hand', 'hand', '投球腕');
     if (!raw) return 'right';
     return String(raw).includes('左') || raw === 'L' || raw === 1 ? 'left' : 'right';
   })();
-  const city    = pick(merged, 'BirthPlace', 'birth_place', 'hometown', '出身地') ?? cityFallback;
-  const salary  = num(pick(merged, 'Salary', 'salary', '年俸'), 5000) || 5000;
-  const foreign = !!(pick(merged, 'IsForeign', 'is_foreign', 'isForeign'));
+  const city    = pick(info, 'BirthPlace', 'birth_place', 'hometown', '出身地') ?? cityFallback;
+  const salary  = (() => {
+    const raw = num(pick(info, 'Salary', 'salary', '年俸'), 0);
+    if (raw > 0 && raw < 1000) return raw * 10000;  // 万円 → 円
+    return raw || 5000;
+  })();
+  const foreign = !!(pick(info, 'IsForeign', 'is_foreign', 'isForeign'));
 
-  const ERA  = num(pick(merged, 'EarnedRunAverage', 'earned_run_average', 'ERA'), 4.00);
-  const W    = num(pick(merged, 'Win', 'win', 'W'), 5);
-  const L    = num(pick(merged, 'Loss', 'loss', 'L'), 8);
-  const IP   = num(pick(merged, 'InningsPitched', 'innings_pitched', 'IP'), 80);
-  const K    = num(pick(merged, 'StrikeOut', 'strikeout', 'SO', 'K'), 70);
-  const BB   = num(pick(merged, 'BaseOnBall', 'base_on_balls', 'BB'), 35);
-  const WHIP = num(pick(merged, 'Whip', 'whip', 'WHIP'), 1.40);
-  const SV   = num(pick(merged, 'Save', 'save', 'SV'), 0);
+  // ── 成績: pitching_stats_by_year (stats) から取得 ────────
+  const ERA  = num(pick(stats, 'EarnedRunAverage', 'earned_run_average', 'ERA'), 4.00);
+  const W    = num(pick(stats, 'Win', 'win', 'W'), 5);
+  const L    = num(pick(stats, 'Loss', 'loss', 'L'), 8);
+  const IP   = num(pick(stats, 'InningsPitched', 'innings_pitched', 'IP'), 80);
+  // K: APIフィールド名が不明のため多めに候補を列挙
+  const K    = num(pick(stats, 'StrikeOut', 'Strikeout', 'Strikeouts', 'strikeout', 'strikeouts', 'SO', 'K', 'KO'), 70);
+  const BB   = num(pick(stats, 'BaseOnBall', 'base_on_balls', 'BB', 'Walk', 'walks'), 35);
+  const WHIP = num(pick(stats, 'Whip', 'whip', 'WHIP'), 1.40);
+  const SV   = num(pick(stats, 'Save', 'save', 'SV'), 0);
 
   const hist = normalizeHistoryPitcher(history);
   return {
@@ -444,6 +449,7 @@ function buildFileContent(rosters) {
         console.log('\n[hitting_stats_by_year] 先頭3件:');
         const sl = Array.isArray(sd) ? sd : (sd.stats ?? sd.data ?? []);
         console.log(JSON.stringify(sl.slice(0, 3), null, 2));
+        if (sl[0]) console.log('\n[hitting_stats_by_year] フィールド一覧:', Object.keys(sl[0]));
       }
     } catch (e) {
       console.error('打者取得失敗:', e.message);
@@ -466,6 +472,7 @@ function buildFileContent(rosters) {
         console.log('\n[pitching_stats_by_year] 先頭3件:');
         const sl = Array.isArray(sd) ? sd : (sd.stats ?? sd.data ?? []);
         console.log(JSON.stringify(sl.slice(0, 3), null, 2));
+        if (sl[0]) console.log('\n[pitching_stats_by_year] フィールド一覧:', Object.keys(sl[0]));
       }
     } catch (e) {
       console.error('投手取得失敗:', e.message);
