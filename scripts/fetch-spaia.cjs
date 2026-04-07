@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
- * fetch-spaia.js
+ * fetch-spaia.cjs
  * spaia.jp の非公式 JSON API から NPB 成績を取得し、
  * src/data/npb2025.js を生成するスクリプト。
  *
  * 使い方:
- *   node scripts/fetch-spaia.js                    # 2024年データ取得・書き込み
- *   node scripts/fetch-spaia.js --year=2023         # 年度指定
- *   node scripts/fetch-spaia.js --dry-run           # ファイル書き込みなしで確認
- *   node scripts/fetch-spaia.js --debug             # 1チーム分の生JSONを出力して終了
- *   node scripts/fetch-spaia.js --debug --team=2    # デバッグ対象チーム指定(SPAIA ID)
+ *   node scripts/fetch-spaia.cjs                    # 2024年データ取得・書き込み
+ *   node scripts/fetch-spaia.cjs --year=2023         # 年度指定
+ *   node scripts/fetch-spaia.cjs --dry-run           # ファイル書き込みなしで確認
+ *   node scripts/fetch-spaia.cjs --debug             # 1チーム分の生JSONを出力して終了
+ *   node scripts/fetch-spaia.cjs --debug --team=2    # デバッグ対象チーム指定(SPAIA ID)
  *
  * 動作確認済み Node.js バージョン: v18 以上（fetch が組み込み）
  * v16 以下: npm install node-fetch  してから先頭に追記:
@@ -40,7 +40,7 @@ const TEAM_MAP = [
   { gameId:  0, name: '東京ヤクルトスワローズ',     spaia:   2, city: '東京'   },
   { gameId:  1, name: '横浜DeNAベイスターズ',       spaia:   3, city: '横浜'   },
   { gameId:  2, name: '広島東洋カープ',              spaia:   6, city: '広島'   },
-  { gameId:  3, name: '阪神タイガース',              spaia:  34, city: '大阪'   },
+  { gameId:  3, name: '阪神タイガース',              spaia:  5, city: '兵庫'   },
   { gameId:  4, name: '読売ジャイアンツ',            spaia:   1, city: '東京'   },
   { gameId:  5, name: '中日ドラゴンズ',              spaia:   4, city: '名古屋' },
   { gameId:  6, name: '福岡ソフトバンクホークス',   spaia:  12, city: '福岡'   },
@@ -119,7 +119,7 @@ function inferPitcherSubtype(p) {
 }
 
 // ── history 正規化（打者） ────────────────────────────────
-const HISTORY_YEARS = 5;
+const HISTORY_YEARS = 999;
 function normalizeHistoryBatter(history) {
   if (!Array.isArray(history) || history.length === 0) return undefined;
   const minYear = YEAR - HISTORY_YEARS;
