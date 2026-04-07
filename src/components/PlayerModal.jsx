@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { fmtSal, fmtAvg, fmtIP } from '../utils';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
+import { CareerTable } from './tabs/CareerTable';
 
 /* ═══════════════════════════════════════════════
    PLAYER DETAIL MODAL
@@ -98,7 +99,7 @@ export function PlayerModal({player:p, teamName, onClose}){
         </div>
 
         {/* 2カラムレイアウト */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12,minWidth:0}}>
 
           {/* 能力値 */}
           <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}>
@@ -171,6 +172,9 @@ export function PlayerModal({player:p, teamName, onClose}){
             </div>
           </div>
         </div>
+
+        {/* 年度別・通算成績 */}
+        <CareerTable player={p}/>
 
       </div>
     </div>
