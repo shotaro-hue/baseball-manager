@@ -118,8 +118,50 @@ function inferPitcherSubtype(p) {
   return '中継ぎ';
 }
 
+// ── history 正規化（打者） ────────────────────────────────
+const HISTORY_YEARS = 5;
+function normalizeHistoryBatter(history) {
+  if (!Array.isArray(history) || history.length === 0) return undefined;
+  const minYear = YEAR - HISTORY_YEARS;
+  const entries = history
+    .map(r => ({
+      year: num(r.Year ?? r.year, 0),
+      AVG:  num(pick(r, 'BattingAverage', 'batting_average', 'AVG'), 0),
+      HR:   num(pick(r, 'Homerun', 'home_run', 'HR'), 0),
+      RBI:  num(pick(r, 'RunsBattingIn', 'runs_batted_in', 'RBI'), 0),
+      SB:   num(pick(r, 'StolenBase', 'stolen_base', 'SB'), 0),
+      BB:   num(pick(r, 'BaseOnBall', 'base_on_balls', 'BB'), 0),
+      PA:   num(pick(r, 'PlateAppearance', 'plate_appearance', 'PA'), 0),
+      OPS:  num(pick(r, 'Ops', 'ops', 'OPS'), 0),
+    }))
+    .filter(r => r.year > minYear && r.year < YEAR && r.PA >= 10)
+    .sort((a, b) => a.year - b.year);
+  return entries.length > 0 ? entries : undefined;
+}
+
+// ── history 正規化（投手） ────────────────────────────────
+function normalizeHistoryPitcher(history) {
+  if (!Array.isArray(history) || history.length === 0) return undefined;
+  const minYear = YEAR - HISTORY_YEARS;
+  const entries = history
+    .map(r => ({
+      year: num(r.Year ?? r.year, 0),
+      ERA:  num(pick(r, 'EarnedRunAverage', 'earned_run_average', 'ERA'), 0),
+      W:    num(pick(r, 'Win', 'win', 'W'), 0),
+      L:    num(pick(r, 'Loss', 'loss', 'L'), 0),
+      IP:   num(pick(r, 'InningsPitched', 'innings_pitched', 'IP'), 0),
+      K:    num(pick(r, 'StrikeOut', 'strikeout', 'SO', 'K'), 0),
+      BB:   num(pick(r, 'BaseOnBall', 'base_on_balls', 'BB'), 0),
+      WHIP: num(pick(r, 'Whip', 'whip', 'WHIP'), 0),
+      SV:   num(pick(r, 'Save', 'save', 'SV'), 0),
+    }))
+    .filter(r => r.year > minYear && r.year < YEAR && r.IP >= 5)
+    .sort((a, b) => a.year - b.year);
+  return entries.length > 0 ? entries : undefined;
+}
+
 // ── 打者データ変換 ────────────────────────────────────────
-function convertBatter(info, stats, cityFallback) {
+function convertBatter(info, stats, history, cityFallback) {
   // info = batter_list の1レコード、stats = hitting_stats_by_year の最新年度レコード
   const merged = { ...info, ...stats };
 
@@ -146,6 +188,7 @@ function convertBatter(info, stats, cityFallback) {
   const PA  = num(pick(merged, 'PlateAppearance', 'plate_appearance', 'PA'), 300);
   const OPS = num(pick(merged, 'Ops', 'ops', 'OPS'), 0.680);
 
+  const hist = normalizeHistoryBatter(history);
   return {
     name,
     age,
@@ -154,11 +197,12 @@ function convertBatter(info, stats, cityFallback) {
     ...(foreign ? { isForeign: true } : {}),
     salary,
     stats: { AVG, HR, RBI, SB, BB, PA, OPS },
+    ...(hist ? { history: hist } : {}),
   };
 }
 
 // ── 投手データ変換 ────────────────────────────────────────
-function convertPitcher(info, stats, cityFallback) {
+function convertPitcher(info, stats, history, cityFallback) {
   const merged = { ...info, ...stats };
 
   const name = pick(merged, 'Name', 'name', 'player_name', '選手名');
@@ -184,6 +228,7 @@ function convertPitcher(info, stats, cityFallback) {
   const WHIP = num(pick(merged, 'Whip', 'whip', 'WHIP'), 1.40);
   const SV   = num(pick(merged, 'Save', 'save', 'SV'), 0);
 
+  const hist = normalizeHistoryPitcher(history);
   return {
     name,
     age,
@@ -193,6 +238,7 @@ function convertPitcher(info, stats, cityFallback) {
     ...(foreign ? { isForeign: true } : {}),
     salary,
     stats: { ERA, W, L, IP, K, BB, WHIP, ...(SV > 0 ? { SV } : {}) },
+    ...(hist ? { history: hist } : {}),
   };
 }
 
@@ -202,21 +248,26 @@ function extractList(data) {
   return data.players ?? data.data ?? data.batters ?? data.pitchers ?? [];
 }
 
-// ── 年度別成績取得（1選手） ─────────────────────────────
+// ── 年度別成績取得（1選手・指定年度のみ） ────────────────
 async function fetchPlayerStats(playerCD, isBatter) {
+  const list = await fetchPlayerHistory(playerCD, isBatter);
+  // 指定年度 → なければ最新年度を使用
+  const byYear = list.find(r => num(r.Year ?? r.year, 0) === YEAR)
+              ?? list.sort((a, b) => num(b.Year ?? b.year) - num(a.Year ?? a.year))[0]
+              ?? {};
+  return byYear;
+}
+
+// ── 年度別成績取得（1選手・全年度） ──────────────────────
+async function fetchPlayerHistory(playerCD, isBatter) {
   const endpoint = isBatter ? 'hitting_stats_by_year' : 'pitching_stats_by_year';
   const url = `${BASE}/${endpoint}?player_id=${playerCD}`;
   await sleep(DELAY_MS);
   try {
     const data = await fetchJSON(url);
-    const list = Array.isArray(data) ? data : (data.stats ?? data.data ?? []);
-    // 指定年度 → なければ最新年度を使用
-    const byYear = list.find(r => num(r.Year ?? r.year, 0) === YEAR)
-                ?? list.sort((a, b) => num(b.Year ?? b.year) - num(a.Year ?? a.year))[0]
-                ?? {};
-    return byYear;
+    return Array.isArray(data) ? data : (data.stats ?? data.data ?? []);
   } catch {
-    return {};
+    return [];
   }
 }
 
@@ -246,17 +297,22 @@ async function fetchTeam(teamDef) {
     for (const info of targets) {
       const playerCD = pick(info, 'PlayerCD', 'player_cd', 'player_id', 'id');
       let stats = {};
+      let history = [];
       if (playerCD) {
-        stats = await fetchPlayerStats(playerCD, true);
+        history = await fetchPlayerHistory(playerCD, true);
+        // 指定年度 or 最新年度を現行成績として使用
+        stats = history.find(r => num(r.Year ?? r.year, 0) === YEAR)
+             ?? history.sort((a, b) => num(b.Year ?? b.year) - num(a.Year ?? a.year))[0]
+             ?? {};
         if (DEBUG && !DEBUG_TEAM) {
           console.log('\n[DEBUG] hitting_stats_by_year 生レスポンス:');
-          console.log(JSON.stringify(stats, null, 2));
+          console.log(JSON.stringify(history.slice(0, 3), null, 2));
         }
       } else {
         // PlayerCD がない場合は batter_list の情報だけで変換
         stats = info;
       }
-      const converted = convertBatter(info, stats, city);
+      const converted = convertBatter(info, stats, history, city);
       if (converted) batters.push(converted);
     }
     console.log(`    → 打者 ${batters.length} 名`);
@@ -281,16 +337,20 @@ async function fetchTeam(teamDef) {
     for (const info of targets) {
       const playerCD = pick(info, 'PlayerCD', 'player_cd', 'player_id', 'id');
       let stats = {};
+      let history = [];
       if (playerCD) {
-        stats = await fetchPlayerStats(playerCD, false);
+        history = await fetchPlayerHistory(playerCD, false);
+        stats = history.find(r => num(r.Year ?? r.year, 0) === YEAR)
+             ?? history.sort((a, b) => num(b.Year ?? b.year) - num(a.Year ?? a.year))[0]
+             ?? {};
         if (DEBUG && !DEBUG_TEAM) {
           console.log('\n[DEBUG] pitching_stats_by_year 生レスポンス:');
-          console.log(JSON.stringify(stats, null, 2));
+          console.log(JSON.stringify(history.slice(0, 3), null, 2));
         }
       } else {
         stats = info;
       }
-      const converted = convertPitcher(info, stats, city);
+      const converted = convertPitcher(info, stats, history, city);
       if (converted) pitchers.push(converted);
     }
     console.log(`    → 投手 ${pitchers.length} 名`);
@@ -324,25 +384,27 @@ function buildFileContent(rosters) {
 
     lines.push('    batters: [');
     for (const b of batters) {
-      const { name, age, pos, hometown, isForeign, salary, stats } = b;
+      const { name, age, pos, hometown, isForeign, salary, stats, history } = b;
       const { AVG, HR, RBI, SB, BB, PA, OPS } = stats;
       const foreignStr = isForeign ? ', isForeign:true' : '';
+      const histStr = history?.length ? `, history:${JSON.stringify(history)}` : '';
       lines.push(
         `      { name:'${name}', age:${age}, pos:'${pos}', hometown:'${hometown}'${foreignStr}, salary:${salary},` +
-        ` stats:{ AVG:${AVG.toFixed(3)}, HR:${HR}, RBI:${RBI}, SB:${SB}, BB:${BB}, PA:${PA}, OPS:${OPS.toFixed(3)} } },`
+        ` stats:{ AVG:${AVG.toFixed(3)}, HR:${HR}, RBI:${RBI}, SB:${SB}, BB:${BB}, PA:${PA}, OPS:${OPS.toFixed(3)} }${histStr} },`
       );
     }
     lines.push('    ],');
 
     lines.push('    pitchers: [');
     for (const p of pitchers) {
-      const { name, age, pos, hand, hometown, isForeign, salary, stats } = p;
+      const { name, age, pos, hand, hometown, isForeign, salary, stats, history } = p;
       const { ERA, W, L, IP, K, BB, WHIP, SV } = stats;
       const foreignStr = isForeign ? ', isForeign:true' : '';
       const svStr = SV > 0 ? `, SV:${SV}` : '';
+      const histStr = history?.length ? `, history:${JSON.stringify(history)}` : '';
       lines.push(
         `      { name:'${name}', age:${age}, pos:'${pos}', hand:'${hand}', hometown:'${hometown}'${foreignStr}, salary:${salary},` +
-        ` stats:{ ERA:${ERA.toFixed(2)}, W:${W}, L:${L}, IP:${IP.toFixed(1)}, K:${K}, BB:${BB}, WHIP:${WHIP.toFixed(2)}${svStr} } },`
+        ` stats:{ ERA:${ERA.toFixed(2)}, W:${W}, L:${L}, IP:${IP.toFixed(1)}, K:${K}, BB:${BB}, WHIP:${WHIP.toFixed(2)}${svStr} }${histStr} },`
       );
     }
     lines.push('    ],');
