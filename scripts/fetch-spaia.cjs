@@ -26,7 +26,7 @@ const DRY_RUN = args.includes('--dry-run');
 const DEBUG   = args.includes('--debug');
 const YEAR    = (() => {
   const y = args.find(a => a.startsWith('--year='));
-  return y ? parseInt(y.split('=')[1], 10) : 2024;
+  return y ? parseInt(y.split('=')[1], 10) : 2025;
 })();
 const DEBUG_TEAM = (() => {
   const t = args.find(a => a.startsWith('--team='));
@@ -122,8 +122,7 @@ function inferPitcherSubtype(p) {
   if (pos && ['先発', '中継ぎ', '抑え'].includes(pos)) return pos;
   const sv = num(pick(p, 'Save', 'save', 'SV'), 0);
   const ip = num(pick(p, 'InningsPitched', 'innings_pitched', 'IP'), 0);
-  // API の実フィールド名は 'Started'（GamesStarted は不存在）
-  const gs = num(pick(p, 'Started', 'GamesStarted', 'games_started', 'GS'), 0);
+  const gs = num(pick(p, 'GamesStarted', 'games_started', 'GS'), 0);
   if (sv >= 10) return '抑え';
   if (gs >= 10 || ip >= 100) return '先発';
   return '中継ぎ';
@@ -221,10 +220,9 @@ function convertPitcher(info, stats, history, cityFallback) {
   const age     = num(pickDebug('age', info, 'Age', 'age', '年齢', 'PlayerAge', 'player_age', 'BirthAge', 'birth_age'), 27);
   const subtype = inferPitcherSubtype(info);  // info から推定（stats で上書きしない）
   const hand    = (() => {
-    // API実フィールド名: PitchingArm (1=左投, 2=右投)
-    const raw = pick(info, 'PitchingArm', 'ThrowHand', 'PitchHand', 'throw_hand', 'pitch_hand', 'hand', '投球腕', '投球の手');
+    const raw = pick(info, 'ThrowHand', 'PitchHand', 'throw_hand', 'pitch_hand', 'hand', '投球腕', '投球の手');
     if (!raw) return 'right';
-    return String(raw).includes('左') || raw === 'L' || raw === 1 || raw === '1' ? 'left' : 'right';
+    return String(raw).includes('左') || raw === 'L' || raw === 1 ? 'left' : 'right';
   })();
   const city    = pick(info, 'BirthPlace', 'birth_place', 'hometown', 'BirthPref', 'birth_pref', '出身地', '出身') ?? cityFallback;
   const salary  = (() => {
@@ -237,26 +235,12 @@ function convertPitcher(info, stats, history, cityFallback) {
   // ── 成績: pitching_stats_by_year (stats) から取得 ────────
   const ERA  = num(pick(stats, 'EarnedRunAverage', 'earned_run_average', 'ERA'), 4.00);
   const W    = num(pick(stats, 'Win', 'win', 'W'), 5);
-  // API実フィールド名: 'Lost'（'Loss'は不存在）
-  const L    = num(pick(stats, 'Lost', 'Loss', 'loss', 'L'), 8);
-  // IP = 整数イニング + 1/3イニング (InningsPitched3rd) で正確な値を計算
-  const IP   = (() => {
-    const whole = num(pick(stats, 'InningsPitched', 'innings_pitched'), 0);
-    const thirds = num(pick(stats, 'InningsPitched3rd'), 0);
-    if (whole > 0 || thirds > 0) return Math.round((whole + thirds / 3) * 10) / 10;
-    return num(pick(stats, 'IP'), 80);  // フォールバック
-  })();
-  const K    = num(pick(stats, 'Strikeout', 'StrikeOut', 'Strikeouts', 'strikeout', 'strikeouts', 'SO', 'K', 'KO'), 70);
-  // API実フィールド名: 'BasesOnBall'（'BaseOnBall'は投手APIに不存在）
-  const BB   = num(pick(stats, 'BasesOnBall', 'BaseOnBall', 'base_on_balls', 'BB', 'Walk', 'walks'), 35);
-  // WHIP は API に存在しないため (被安打 + 与四球) / IP で計算
-  const WHIP = (() => {
-    const raw = num(pick(stats, 'Whip', 'whip', 'WHIP'), 0);
-    if (raw > 0) return raw;
-    const h  = num(pick(stats, 'Hit'), 0);
-    const bb = num(pick(stats, 'BasesOnBall', 'BaseOnBall'), 0);
-    return IP > 0 ? Math.round((h + bb) / IP * 100) / 100 : 1.40;
-  })();
+  const L    = num(pick(stats, 'Loss', 'loss', 'L'), 8);
+  const IP   = num(pick(stats, 'InningsPitched', 'innings_pitched', 'IP'), 80);
+  // K: APIフィールド名が不明のため多めに候補を列挙
+  const K    = num(pick(stats, 'StrikeOut', 'Strikeout', 'Strikeouts', 'strikeout', 'strikeouts', 'SO', 'K', 'KO'), 70);
+  const BB   = num(pick(stats, 'BaseOnBall', 'base_on_balls', 'BB', 'Walk', 'walks'), 35);
+  const WHIP = num(pick(stats, 'Whip', 'whip', 'WHIP'), 1.40);
   const SV   = num(pick(stats, 'Save', 'save', 'SV'), 0);
 
   const hist = normalizeHistoryPitcher(history);
@@ -321,9 +305,7 @@ async function fetchTeam(teamDef) {
       console.log(JSON.stringify(batList.slice(0, 2), null, 2));
     }
 
-    // PA ≥ 50 の選手のみ対象（試合出場が少ない選手を除外）
-    const mainBatters = batList.filter(p => num(pick(p, 'PlateAppearance', 'PA'), 0) >= 50);
-    const targets = mainBatters.length > 0 ? mainBatters : batList.slice(0, 15);
+    const targets = batList;
 
     for (const info of targets) {
       const playerCD = pick(info, 'PlayerCD', 'player_cd', 'player_id', 'id');
@@ -362,8 +344,7 @@ async function fetchTeam(teamDef) {
       console.log(JSON.stringify(pitList.slice(0, 2), null, 2));
     }
 
-    const mainPitchers = pitList.filter(p => num(pick(p, 'InningsPitched', 'PlateAppearance', 'IP'), 0) >= 10);
-    const targets = mainPitchers.length > 0 ? mainPitchers : pitList.slice(0, 12);
+    const targets = pitList;
 
     for (const info of targets) {
       const playerCD = pick(info, 'PlayerCD', 'player_cd', 'player_id', 'id');
