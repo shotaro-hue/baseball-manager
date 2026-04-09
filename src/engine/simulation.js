@@ -451,10 +451,11 @@ function processAtBat(gs, strategy = 'normal') {
   const fieldingLevel = ftl.length > 0 ? ftl.reduce((s,p) => s+(p.batting?.defense||50),0)/ftl.length : 50;
   const situation     = { runnersOnBase: gs.bases.some(Boolean), runnersInScoring: gs.bases[1]||gs.bases[2], lateGame: gs.inning>=7, closeGame: Math.abs((gs.score?.my||0)-(gs.score?.opp||0))<=2, fieldingLevel, pitchCount, teamMorale: gs.teamMorale||60, stadium: gs.stadium, pitcherHand: pitcher?.hand || 'right', pitchingPolicy: isMyAtBat ? 'normal' : (gs.pitchingPolicy || 'normal'), coachBonuses: isMyAtBat ? {} : (gs.coachBonuses || {}) };
 
-  const { result, pitches, pitchType, zone, isIntentional, pitchLog } = simAtBat(batter, pitcher, strategy, pitchCount, situation, gs.leagueEnv);
+  let { result, pitches, pitchType, zone, isIntentional, pitchLog } = simAtBat(batter, pitcher, strategy, pitchCount, situation, gs.leagueEnv);
 
   let newBases = [...gs.bases];
   let runs = 0, rbi = 0, outs = gs.outs, momentumDelta = 0;
+  const scorers = [];
   const isOut = ['k','go','fo','out','sac'].includes(result);
   const runnerOf    = i => { const rid = newBases[i]; if (!rid) return null; return (isMyAtBat?gs.myLineup:gs.opLineup).find(p=>p.id===rid)||null; };
   const advanceProb = (runner, base=0.5) => !runner ? base : clamp(base + ((runner.batting?.speed||50)-50)/400 + ((runner.batting?.baseRunning||50)-50)/600, base-0.15, base+0.20);
@@ -462,8 +463,19 @@ function processAtBat(gs, strategy = 'normal') {
   if (isOut) {
     outs++; momentumDelta = isMyAtBat ? -3 : 3;
     if (result === 'sac' && newBases[0]) newBases = [null, newBases[0], null];
+    // 犠牲フライ: 2アウト未満でランナー3塁あり、フライアウト確率
+    if (result === 'out' && gs.outs < 2 && newBases[2]) {
+      const sfRate = clamp(0.25 + ((runnerOf(2)?.batting?.speed || 50) - 50) / 400, 0.15, 0.40);
+      if (Math.random() < sfRate) {
+        result = 'sf';
+        runs = 1; rbi = 1;
+        scorers.push(newBases[2]);
+        newBases[2] = null;
+      }
+    }
   } else if (result === 'bb' || result === 'hbp') {
     if (newBases[0]&&newBases[1]&&newBases[2]) {
+      scorers.push(newBases[2]); // r3得点
       runs++; rbi=1;
       newBases=[batter?.id||'r', newBases[0], newBases[1]]; // r3得点, r2→3塁, r1→2塁, 打者→1塁
     } else {
@@ -473,14 +485,21 @@ function processAtBat(gs, strategy = 'normal') {
     }
     momentumDelta=isMyAtBat?2:-2;
   } else if (result === 'hr') {
+    scorers.push(...[batter?.id, ...newBases.filter(Boolean)].filter(Boolean));
     rbi=1+newBases.filter(Boolean).length; runs=rbi; newBases=[null,null,null]; momentumDelta=isMyAtBat?18:-18;
   } else if (result === 't') {
+    scorers.push(...newBases.filter(Boolean));
     rbi=newBases.filter(Boolean).length; runs=rbi; newBases=[null,null,batter?.id||'r']; momentumDelta=isMyAtBat?12:-12;
   } else if (result === 'd') {
     const r3=newBases[2]?1:0, r2=newBases[1]?1:0, r1=newBases[0]&&Math.random()<advanceProb(runnerOf(0),0.40)?1:0;
+    if (newBases[2]) scorers.push(newBases[2]);
+    if (newBases[1]) scorers.push(newBases[1]);
+    if (r1 && newBases[0]) scorers.push(newBases[0]);
     runs=r3+r2+r1; rbi=runs; newBases=[null,batter?.id||'r',r1?null:newBases[0]]; momentumDelta=isMyAtBat?8:-8;
   } else if (result === 's') {
     const r3=newBases[2]?1:0, r2=newBases[1]&&Math.random()<advanceProb(runnerOf(1),0.55)?1:0;
+    if (newBases[2]) scorers.push(newBases[2]);
+    if (r2 && newBases[1]) scorers.push(newBases[1]);
     runs=r3+r2; rbi=runs; newBases=[batter?.id||'r',newBases[0],r2?null:newBases[1]]; momentumDelta=isMyAtBat?5:-5;
   }
 
@@ -492,7 +511,7 @@ function processAtBat(gs, strategy = 'normal') {
       newBases[2] = r1id; newBases[1] = null;
     } else if (result === 'd' && newBases[2] === r1id) {
       // 2塁打: 1塁走者が生還（3塁で止まらず生還）
-      runs++; rbi++; newBases[2] = null;
+      runs++; rbi++; newBases[2] = null; scorers.push(r1id);
     } else if (result === 'k') {
       // 三振: 走者が走っているため50%でCS
       if (Math.random() < 0.50) { outs++; newBases[0] = null; }
@@ -514,7 +533,19 @@ function processAtBat(gs, strategy = 'normal') {
   let newMyPC=gs.myPitchCount, newOpPC=gs.opPitchCount;
   if (isMyAtBat) newOpPC+=pitches; else newMyPC+=pitches;
 
-  const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, pitcherId:pitcher?.id, result, ev:0, la:0, dist:0, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog, pitchType, zone };
+  // 打球指標 (EV / 打球角度) — インプレー結果のみ計算
+  let ev = 0, la = 0;
+  if (!['k', 'bb', 'hbp'].includes(result)) {
+    const power = batter?.batting?.power || 50;
+    const evBase = 65 + (power / 99) * 45;
+    ev = Math.round((evBase + rngf(-8, 8)) * 10) / 10;
+    if      (result === 'hr') la = Math.round(rngf(22, 38) * 10) / 10;
+    else if (result === 'd')  la = Math.round(rngf(10, 28) * 10) / 10;
+    else if (result === 't')  la = Math.round(rngf(5, 22)  * 10) / 10;
+    else if (result === 's')  la = Math.round(rngf(3, 22)  * 10) / 10;
+    else                      la = Math.round(rngf(-8, 35)  * 10) / 10; // out/sf/sac
+  }
+  const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, pitcherId:pitcher?.id, result, ev, la, dist:0, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog, pitchType, zone, scorers };
   const nextMyPitcherState = isMyAtBat
     ? gs.myPitcherState
     : { ...(gs.myPitcherState || makePitcherState(gs.inning, gs.isTop)), battersFaced: (gs.myPitcherState?.battersFaced || 0) + 1 };

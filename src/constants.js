@@ -229,7 +229,7 @@ export const RLABEL = {
 };
 
 export const IS_HIT = (r) => ["hr", "t", "d", "s"].includes(r);
-export const IS_OUT = (r) => ["k", "go", "fo", "sac", "out"].includes(r);
+export const IS_OUT = (r) => ["k", "go", "fo", "sac", "out", "sf"].includes(r);
 
 // 育成目標 (development goals) — devGoal フィールドの選択肢
 export const DEV_GOALS_BATTER = [
