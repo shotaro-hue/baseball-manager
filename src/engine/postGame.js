@@ -52,17 +52,24 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won) {
       s.PA++;
       const isBB = e.result === "bb";
       const isHBP = e.result === "hbp";
-      if (!isBB && !isHBP) s.AB++;
+      const isSF = e.result === "sf";
+      if (!isBB && !isHBP && !isSF) s.AB++;
       if (IS_HIT(e.result)) s.H++;
       if (e.result === "d") s.D++;
       if (e.result === "t") s.T++;
       if (e.result === "hr") s.HR++;
       if (isBB) s.BB++;
       if (isHBP) s.HBP++;
+      if (isSF) s.SF++;
       if (e.result === "k") s.K++;
       s.RBI += (e.rbi || 0);
       if (e.ev > 0) { s.evSum += e.ev; s.evN++; }
       if (e.ev > 0 && e.la !== undefined) { s.laSum += e.la; s.laN++; }
+    });
+
+    // 得点（R）: scorersに自分のIDが含まれるイベントをカウント
+    log.forEach((e) => {
+      if (e.scorer === isMyTeam && e.scorers?.includes(p.id)) s.R++;
     });
 
     if (pm) {

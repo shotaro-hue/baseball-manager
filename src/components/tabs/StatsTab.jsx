@@ -44,7 +44,7 @@ export function StatsTab({teams,myId}){
           <div className="g2">
             <ResponsiveContainer width="100%" height={170}><RadarChart data={radar}><PolarGrid stroke="rgba(255,255,255,.07)"/><PolarAngleAxis dataKey="s" tick={{fill:"#374151",fontSize:10}}/><Radar dataKey="v" stroke="#f5c842" fill="#f5c842" fillOpacity={0.13}/></RadarChart></ResponsiveContainer>
             <div style={{fontSize:11}}>
-              {sel.isPitcher?(()=>{const sp=saberPitcher(sel.stats);return[["防御率",sp.ERA],["WHIP",sp.WHIP],["FIP",sp.FIP],["xFIP",sp.xFIP],["三振率",fmtPct(sp.Kpct)],["四球率",fmtPct(sp.BBpct)],["WAR",sp.WAR]].map(([l,v])=><div key={l} className="fsb" style={{padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.03)"}}><span style={{color:"#374151"}}>{l}</span><span className="mono" style={{color:"#94a3b8"}}>{v}</span></div>);})():(()=>{const sb=saberBatter(sel.stats);return[["打率",fmtAvg(sel.stats.H,sel.stats.AB)],["OPS",sb.OPS.toFixed(3)],["wOBA",sb.wOBA.toFixed(3)],["wRC+",sb.wRCp],["ISO",sb.ISO.toFixed(3)],["四球率",fmtPct(sb.BBpct)],["三振率",fmtPct(sb.Kpct)],["打球速度",sb.EVavg>0?sb.EVavg+"km/h":"---"],["WAR",sb.WAR]].map(([l,v])=><div key={l} className="fsb" style={{padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.03)"}}><span style={{color:"#374151"}}>{l}</span><span className="mono" style={{color:"#94a3b8"}}>{v}</span></div>);})()}
+              {sel.isPitcher?(()=>{const sp=saberPitcher(sel.stats);return[["防御率",sp.ERA],["奪三振",sel.stats.Kp],["WHIP",sp.WHIP],["FIP",sp.FIP],["xFIP",sp.xFIP],["三振率",fmtPct(sp.Kpct)],["四球率",fmtPct(sp.BBpct)],["WAR",sp.WAR]].map(([l,v])=><div key={l} className="fsb" style={{padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.03)"}}><span style={{color:"#374151"}}>{l}</span><span className="mono" style={{color:"#94a3b8"}}>{v}</span></div>);})():(()=>{const sb=saberBatter(sel.stats);return[["打率",fmtAvg(sel.stats.H,sel.stats.AB)],["OPS",sb.OPS.toFixed(3)],["wOBA",sb.wOBA.toFixed(3)],["wRC+",sb.wRCp],["ISO",sb.ISO.toFixed(3)],["四球率",fmtPct(sb.BBpct)],["三振率",fmtPct(sb.Kpct)],["打球速度",sb.EVavg>0?sb.EVavg+"km/h":"---"],["WAR",sb.WAR]].map(([l,v])=><div key={l} className="fsb" style={{padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.03)"}}><span style={{color:"#374151"}}>{l}</span><span className="mono" style={{color:"#94a3b8"}}>{v}</span></div>);})()}
             </div>
           </div>
           <CareerTable player={sel}/>
@@ -114,6 +114,7 @@ export function StatsTab({teams,myId}){
   <th title="クオリティスタート">QS</th>
   <ThCell label="投球回"  openLabel={openTip} onOpen={setOpenTip}/>
   <ThCell label="防御率"  openLabel={openTip} onOpen={setOpenTip}/>
+  <th title="奪三振">K</th>
   <ThCell label="WHIP"   openLabel={openTip} onOpen={setOpenTip}/>
   <ThCell label="FIP"    openLabel={openTip} onOpen={setOpenTip}/>
   <ThCell label="xFIP"   openLabel={openTip} onOpen={setOpenTip}/>
@@ -131,6 +132,8 @@ export function StatsTab({teams,myId}){
                     <td className="mono" style={{color:p.stats.HLD>0?"#60a5fa":undefined}}>{p.stats.HLD||"-"}</td>
                     <td className="mono" style={{color:p.stats.QS>0?"#f5c842":undefined}}>{p.stats.QS||"-"}</td>
                     <td className="mono">{p.stats.IP>0?fmtIP(p.stats.IP):"---"}</td>
+                    <td className="mono" style={{color:sp.ERA>0&&sp.ERA<2.5?"#34d399":sp.ERA<3.5?"#f5c842":sp.ERA>0?"#f87171":undefined}}>{sp.ERA>0?sp.ERA:"---"}</td>
+                    <td className="mono" style={{color:p.stats.Kp>=150?"#34d399":p.stats.Kp>=100?"#f5c842":undefined}}>{p.stats.Kp||"-"}</td>
                     <td className="mono" style={{color:sp.WHIP>0&&sp.WHIP<1.0?"#34d399":sp.WHIP<1.3?"#f5c842":sp.WHIP<1.5?"#94a3b8":"#f87171"}}>{sp.WHIP>0?sp.WHIP:"---"}</td>
                     <td className="mono" style={{color:sp.FIP<3?"#34d399":sp.FIP<4?"#f5c842":sp.FIP>0?"#f87171":undefined}}>{sp.FIP>0?sp.FIP:"---"}</td>
                     <td className="mono">{sp.xFIP>0?sp.xFIP:"---"}</td>
