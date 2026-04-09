@@ -5,6 +5,15 @@
 
 ---
 
+### 2026-04-09 — バグ修正: 成績タブ・投手ビューで ReferenceError
+
+**仕様本文への影響なし（内部バグ修正のみ）**
+
+- 根本原因: `StatsTab.jsx` で `fmtIP` を使用していたがインポートに含まれておらず、投手タブ切り替え時に `ReferenceError: fmtIP is not defined` が発生
+- 修正内容: `import { fmtAvg, fmtPct } from '../../utils'` に `fmtIP` を追加
+
+---
+
 ### 2026-04-06 — バグ修正: 残り全試合シムで黒画面（B12）
 
 **仕様本文への影響なし（内部バグ修正のみ）**

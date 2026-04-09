@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis } from "recharts";
-import { fmtAvg, fmtPct } from '../../utils';
+import { fmtAvg, fmtPct, fmtIP } from '../../utils';
 import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
 import { ThCell, HandBadge } from '../ui';
 import { CareerTable } from './CareerTable';
