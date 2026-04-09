@@ -226,9 +226,10 @@ function convertBatter(info, stats, history, cityFallback, profile) {
     const raw = pick(info, 'BattingType', 'batting_type', 'BatType', 'bat_type');
     if (!raw) return 'right';
     const s = String(raw);
-    if (s === '2') return 'left';
+    // 1=左打, 2=右打, 3=両打（PitchingArm と同規則で確認済み）
+    if (s === '1') return 'left';
     if (s === '3') return 'switch';
-    return 'right'; // '1' or unknown
+    return 'right'; // '2' or unknown
   })();
 
   // ── 成績: hitting_stats_by_year (stats) から取得 ────────
