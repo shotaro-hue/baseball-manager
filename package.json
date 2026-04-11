@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:mobile": "vite --host",
+    "tunnel": "npx localtunnel --port 5173",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run"
