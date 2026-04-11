@@ -225,10 +225,15 @@ grep -n "次の試合\|試合開始\|オート\|バッチ\|5試合\|続ける" s
 
 ## 受け入れ条件
 
-- [ ] `npx playwright test` で全 E2E テスト（title + hub + game + batch）がパスする
-- [ ] 各テストが独立して実行可能（`localStorage.clear()` によるステート分離）
-- [ ] CI（`process.env.CI` 時）で retries:2 設定が有効に機能する（`playwright.config.js` 既存設定）
-- [ ] `npm run build` でビルドエラーなし
+> **⚠️ Codex 環境での制約**: Playwright はブラウザバイナリのダウンロードとシステム依存ライブラリが必要なため、
+> Codex の sandboxed 環境では `npx playwright test` の実行が失敗する場合がある。
+> Codex の責務は **テストファイルの作成と構文的な正しさ** に限定する。
+> テスト実行の検証はローカル開発環境（Claude Code Web / IDE）で行うこと。
+
+- [ ] `e2e/hub.spec.js`, `e2e/game.spec.js`, `e2e/batch.spec.js` の 3 ファイルが作成されている
+- [ ] 各ファイルが `import { test, expect } from '@playwright/test'` を正しく使用している
+- [ ] `npm run build` でビルドエラーなし（本体コードを変更しないため自明）
+- [ ] （ローカルのみ）`npx playwright install chromium && npx playwright test` で全テストがパスする
 
 ## テストケース
 
@@ -282,6 +287,19 @@ grep -n "次の試合\|試合開始\|オート\|バッチ\|5試合\|続ける" s
 ## SPEC.md 更新箇所
 
 なし
+
+## Codex 実行上の注意
+
+Playwright テストの **実行** は Codex 環境では行わないこと。
+次のコマンドで構文チェックのみ実施する:
+
+```bash
+node --input-type=module < e2e/hub.spec.js 2>&1 || true   # import エラーがないことを確認
+node --input-type=module < e2e/game.spec.js 2>&1 || true
+node --input-type=module < e2e/batch.spec.js 2>&1 || true
+```
+
+または単に `npm run build` が通ればファイル作成成功とみなす。
 
 ## コミットメッセージ
 
