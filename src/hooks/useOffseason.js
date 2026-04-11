@@ -67,8 +67,16 @@ export function useOffseason(gs) {
   };
 
   const handleDraftComplete = (pl, dr) => {
-    const myPicks=pl.filter(p=>dr[p.id]===myId);
-    setTeams(prev=>prev.map(t=>{if(t.id!==myId) return t;return{...t,farm:[...t.farm,...myPicks.map(p=>({...p,育成:true}))]};}));
+    const picksFor=teamId=>[
+      ...pl.filter(p=>p._drafted&&p._r1winner===teamId),
+      ...pl.filter(p=>dr[p.id]===teamId),
+    ];
+    const myPicks=picksFor(myId);
+    setTeams(prev=>prev.map(t=>{
+      const picks=picksFor(t.id);
+      if(!picks.length) return t;
+      return{...t,farm:[...t.farm,...picks.map(p=>({...p,育成:true}))]};
+    }));
     setNewSeasonInfo(prev=>({...(prev||{}),draftCount:myPicks.length,draftNames:myPicks.slice(0,3).map(p=>p.name)}));
     handleNextYear();
   };

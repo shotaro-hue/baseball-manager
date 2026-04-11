@@ -188,6 +188,7 @@ export const INTERVIEW_OPTIONS_LOSE = [
 
 // ドラフト関連定数
 export const DRAFT_ROUNDS = 6;
+export const DRAFT_LOTTERY_MAX_ROUNDS = 3;
 
 // ドラフト候補区分（prospectType）
 // prospectType を先に決め、そこから entryAge を導出する
