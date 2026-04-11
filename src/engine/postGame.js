@@ -10,7 +10,7 @@ import { emptyStats } from './player';
 // 試合ログから選手成績を反映
 export function applyGameStatsFromLog(players, log, isMyTeam, won) {
   const myAtBats = log.filter((e) => e.scorer === isMyTeam && e.batId && e.result && e.result !== "change");
-  const myPitchABs = log.filter((e) => e.scorer === !isMyTeam && e.pitcherId && e.result && e.result !== "change");
+  const myPitchABs = log.filter((e) => e.scorer === !isMyTeam && e.pitcherId && e.result && e.result !== "change" && !e.isStolenBase);
 
   const pitcherMap = {};
   myPitchABs.forEach((e) => {

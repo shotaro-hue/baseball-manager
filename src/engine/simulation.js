@@ -142,7 +142,7 @@ function calcPAProbs(bat, pit, leagueEnv = DEFAULT_LEAGUE_ENV) {
 // ═══════════════════════════════════════════════════════════════
 
 function sampleResult(probs) {
-  let r = Math.random(), cum = 0;
+  let r = rngf(0, 1), cum = 0;
   for (const [key, p] of Object.entries(probs)) {
     cum += p;
     if (r < cum) return key;
@@ -177,8 +177,8 @@ function selectPitchForResult(result, pit) {
 
 function selectZoneForResult(result, bat) {
   const power = bat?.batting?.power || 50;
-  if (result === 'hr') return power > 65 ? (Math.random() < 0.6 ? 'inner_mid' : 'mid_mid') : 'outer_mid';
-  if (result === 'k')  return Math.random() < 0.5 ? 'outer_low' : 'mid_low';
+  if (result === 'hr') return power > 65 ? (rngf(0, 1) < 0.6 ? 'inner_mid' : 'mid_mid') : 'outer_mid';
+  if (result === 'k')  return rngf(0, 1) < 0.5 ? 'outer_low' : 'mid_low';
   if (result === 'bb') return 'outer_low';
   return ['inner_mid','mid_mid','outer_mid','inner_low','mid_low','outer_low'][rng(0, 5)];
 }
@@ -190,8 +190,8 @@ function selectZoneForResult(result, bat) {
 
 function applyStadiumFactor(result, bat, stadium) {
   if (!stadium) return result;
-  if (result === 'hr') return Math.random() > stadium.hrMod ? 'd' : 'hr';
-  if (result === 'd'  && Math.random() < (stadium.hrMod - 1) * 0.3) return 'hr';
+  if (result === 'hr') return rngf(0, 1) > stadium.hrMod ? 'd' : 'hr';
+  if (result === 'd'  && rngf(0, 1) < (stadium.hrMod - 1) * 0.3) return 'hr';
   return result;
 }
 
@@ -217,7 +217,7 @@ function simAtBat(bat, pit, strategy = 'normal', pitchCount = 0, situation = {},
   result = applyStadiumFactor(result, bat, stadium);
 
   if (strategy === 'bunt' && (result === 's' || result === 'out')) {
-    result = Math.random() < 0.65 ? 'sac' : 'out';
+    result = rngf(0, 1) < 0.65 ? 'sac' : 'out';
   }
 
   const pitchType = selectPitchForResult(result, pit);
@@ -290,7 +290,7 @@ function calcEffectiveFatigue(pitchCount, pitcher) {
 
 function weightedRandom(weights) {
   const total = Object.values(weights).reduce((a, b) => a + b, 0);
-  let r = Math.random() * total;
+  let r = rngf(0, 1) * total;
   for (const [key, w] of Object.entries(weights)) { r -= w; if (r <= 0) return key; }
   return Object.keys(weights)[0];
 }
@@ -382,7 +382,7 @@ function pickBullpenArm(bullpen, targetRole, pattern = {}) {
 function initGameState(myTeam, oppTeam) {
   const myL = myTeam.lineup.map(id => myTeam.players.find(p => p.id === id)).filter(Boolean);
   const opL = oppTeam.lineup.map(id => oppTeam.players.find(p => p.id === id)).filter(Boolean);
-  const myStarter = myTeam.players.find(p => p.id === myTeam.rotation[myTeam.rotIdx % Math.max(myTeam.rotation.length,1)]) || myTeam.players.find(p => p.isPitcher && p.subtype === '先発');
+  const myStarter = myTeam.players.find(p => p.id === myTeam.rotation[myTeam.rotIdx % Math.max(myTeam.rotation.length,1)]) || myTeam.players.find(p => p.isPitcher);
   const opStarter = oppTeam.players.find(p => p.id === oppTeam.rotation[oppTeam.rotIdx % Math.max(oppTeam.rotation.length,1)]) || oppTeam.players.find(p => p.isPitcher);
   const stadiumKey = TEAM_STADIUM[oppTeam.id] || 'tokyo_dome';
 
@@ -434,7 +434,7 @@ function processAtBat(gs, strategy = 'normal') {
       const runner       = lineup.find(p => p.id === newBases[stealBase]) || batter;
       const runningBonus = gs.coachBonuses?.running || 0;
       const successRate  = clamp(0.65 + (runner?.batting?.speed||50)/500 + (runner?.batting?.stealSkill||50)/600 - (pitcher?.pitching?.control||60)/600 + runningBonus * 0.025, 0.35, 0.92);
-      const success     = Math.random() < successRate;
+      const success     = rngf(0, 1) < successRate;
       if (success) { newBases[stealBase+1] = newBases[stealBase]; newBases[stealBase] = null; }
       else          { newBases[stealBase] = null; }
       const result      = success ? 'sb' : 'cs';
@@ -466,7 +466,7 @@ function processAtBat(gs, strategy = 'normal') {
     // 犠牲フライ: 2アウト未満でランナー3塁あり、フライアウト確率
     if (result === 'out' && gs.outs < 2 && newBases[2]) {
       const sfRate = clamp(0.25 + ((runnerOf(2)?.batting?.speed || 50) - 50) / 400, 0.15, 0.40);
-      if (Math.random() < sfRate) {
+      if (rngf(0, 1) < sfRate) {
         result = 'sf';
         runs = 1; rbi = 1;
         scorers.push(newBases[2]);
@@ -491,13 +491,13 @@ function processAtBat(gs, strategy = 'normal') {
     scorers.push(...newBases.filter(Boolean));
     rbi=newBases.filter(Boolean).length; runs=rbi; newBases=[null,null,batter?.id||'r']; momentumDelta=isMyAtBat?12:-12;
   } else if (result === 'd') {
-    const r3=newBases[2]?1:0, r2=newBases[1]?1:0, r1=newBases[0]&&Math.random()<advanceProb(runnerOf(0),0.40)?1:0;
+    const r3=newBases[2]?1:0, r2=newBases[1]?1:0, r1=newBases[0]&&rngf(0, 1)<advanceProb(runnerOf(0),0.40)?1:0;
     if (newBases[2]) scorers.push(newBases[2]);
     if (newBases[1]) scorers.push(newBases[1]);
     if (r1 && newBases[0]) scorers.push(newBases[0]);
     runs=r3+r2+r1; rbi=runs; newBases=[null,batter?.id||'r',r1?null:newBases[0]]; momentumDelta=isMyAtBat?8:-8;
   } else if (result === 's') {
-    const r3=newBases[2]?1:0, r2=newBases[1]&&Math.random()<advanceProb(runnerOf(1),0.55)?1:0;
+    const r3=newBases[2]?1:0, r2=newBases[1]&&rngf(0, 1)<advanceProb(runnerOf(1),0.55)?1:0;
     if (newBases[2]) scorers.push(newBases[2]);
     if (r2 && newBases[1]) scorers.push(newBases[1]);
     runs=r3+r2; rbi=runs; newBases=[batter?.id||'r',newBases[0],r2?null:newBases[1]]; momentumDelta=isMyAtBat?5:-5;
@@ -514,15 +514,15 @@ function processAtBat(gs, strategy = 'normal') {
       runs++; rbi++; newBases[2] = null; scorers.push(r1id);
     } else if (result === 'k') {
       // 三振: 走者が走っているため50%でCS
-      if (Math.random() < 0.50) { outs++; newBases[0] = null; }
+      if (rngf(0, 1) < 0.50) { outs++; newBases[0] = null; }
     } else if (result === 'out' && newBases[0] === r1id) {
       // ゴロ/フライ判定（50/50）
-      if (Math.random() < 0.50) {
+      if (rngf(0, 1) < 0.50) {
         // ゴロ想定: 走者が2塁へ進塁
         if (!newBases[1]) { newBases[1] = r1id; newBases[0] = null; }
       } else {
         // フライ想定: タッグアップ 70%でCS
-        if (Math.random() < 0.70) { outs++; newBases[0] = null; }
+        if (rngf(0, 1) < 0.70) { outs++; newBases[0] = null; }
       }
     }
   }
@@ -678,7 +678,7 @@ function quickSimGame(myTeam, oppTeam) {
       const runner=lineup.find(p=>p.id===gs.bases[0]);
       const sp=runner?.batting?.speed||50, sk=runner?.batting?.stealSkill||50;
       const prob=sp>=80&&sk>=70?0.28:sp>=70&&sk>=60?0.18:sp>=60&&sk>=50?0.08:0;
-      if (Math.random()<prob) autoStrategy='steal';
+      if (rngf(0, 1)<prob) autoStrategy='steal';
     }
     gs=processAtBat(gs, autoStrategy);
     if (gs.outs>=3) gs=endHalfInning(gs);

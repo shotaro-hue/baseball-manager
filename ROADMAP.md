@@ -1,6 +1,6 @@
 # Baseball Manager 2025 — ロードマップ
 
-> 最終更新: 2026-04-06（怪我詳細化 完了）
+> 最終更新: 2026-04-11（選手成績集計バグ修正 完了）
 > **ゴール**: NPB版 OOTP / Football Manager — 深いシミュレーションと長期フランチャイズ経営
 > **運用ルール**: 実装完了した項目は ✅ に更新。新規項目は末尾に追記。過去の記録は削除しない。
 
@@ -85,6 +85,7 @@
 | B10 | **[P0] ドラフト1位指名クラッシュ（analyzeTeamNeeds戻り値型誤用）** | `buildCpuPicks()` / `cpuPick()` で `needs.some(n=>n.includes(...))` が TypeError。`n.type.includes(...)` に修正 | 3e2f4c4 |
 | B11 | **[P1] ニュースタブ未読バッジ欠落・インタビュー回答リセット** | `tabBadges` に `news` キー追加。`handleInterview` で `answered:true` フラグを付与し再マウント後も維持 | 3e2f4c4 |
 | B12 | **[P0] 残り全試合シムで黒画面（trade_news エントリの score 参照 TypeError）** | `runBatchGames` の `results` 配列に `trade_news` 型エントリ（CPU同士トレード通知）が混在するにもかかわらず、`setRecentResults` / `setGameResultsMap` の functional updater 内で `r.score.my` を全エントリに対して参照していた。`trade_news` エントリは `score` フィールドを持たないため `TypeError` が発生し React のレンダーフェーズでクラッシュ → 黒画面。`gameResults = results.filter(r=>r.type!=='trade_news')` で除外してから `setBatchResults` / `setRecentResults` / `setGameResultsMap` に渡すよう修正 | — |
+| B13 | **[P1] 投手成績集計バグ（BF過剰計上・キャリアWHIP崩壊・starter undefined）** | postGame.js の盗塁BF除外漏れ・CareerTable totals の投手フィールド名誤り（BB→BBp / HRA→HRp, Hp・HBPp追加）・initGameState の myStarter フォールバック条件を緩和（先発限定→全投手） + simulation.js の Math.random() → rngf() 置換 | TBD |
 
 ---
 
