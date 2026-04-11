@@ -176,7 +176,7 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
       setLotteryRound(1);
       const first=conflicts[0];
       setLotteryTarget(pool.find(p=>p.id===first.pid));
-      setLotteryTeams(first.tids.map(tid=>teams.find(t=>t.id===tid)).filter(Boolean));
+      setLotteryTeams(first.tids.map(tid=>teams.find(t=>String(t.id)===tid)).filter(Boolean));
       setResolvedPicks(existingResolved);
       setLotteryResult(null);
       setPhase("lottery");
@@ -209,7 +209,7 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
       setCurrentConflictIdx(nextIdx);
       setLotteryRound(r=>r+1);
       setLotteryTarget(pool.find(p=>p.id===next.pid));
-      setLotteryTeams(next.tids.map(tid=>teams.find(t=>t.id===tid)).filter(Boolean));
+      setLotteryTeams(next.tids.map(tid=>teams.find(t=>String(t.id)===tid)).filter(Boolean));
       setLotteryResult(null);
       setResolvedPicks(resolved);
       setPhase("lottery");
