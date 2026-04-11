@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import React from "react";
-import { POSITIONS, DRAFT_ROUNDS, DRAFT_COMMENTS_MY, DRAFT_COMMENTS_CPU } from '../constants';
+import { POSITIONS, DRAFT_ROUNDS, DRAFT_COMMENTS_MY, DRAFT_COMMENTS_CPU, DRAFT_LOTTERY_MAX_ROUNDS } from '../constants';
 import { rng, clamp, scoutedValue } from '../utils';
 import { analyzeTeamNeeds } from '../engine/trade';
 import { draftOverallComment, recommendForTeam } from '../engine/draft';
@@ -109,6 +109,10 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
   const [myHazure,setMyHazure]=React.useState(false); // 自チームが外れたか
   const [round1Result,setRound1Result]=React.useState({}); // {teamId: player} 最終結果
   const [animStep,setAnimStep]=React.useState(0);
+  const [lotteryRound,setLotteryRound]=React.useState(0); // くじ引きループ回数
+  const [pendingConflicts,setPendingConflicts]=React.useState([]); // 未解決競合
+  const [currentConflictIdx,setCurrentConflictIdx]=React.useState(0);
+  const [resolvedPicks,setResolvedPicks]=React.useState({});
   const allSorted=[...teams].sort((a,b)=>a.wins-b.wins);
   const availPool=pool.filter(p=>!p._drafted);
   const myTeam=teams.find(t=>t.id===myId);
@@ -116,10 +120,9 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
   // CPU1巡目指名ロジック
   const buildCpuPicks=()=>{
     const picks={};
-    const used=new Set(myPick?[myPick.id]:[]);
     allSorted.forEach(t=>{
       if(t.id===myId) return;
-      const avail=availPool.filter(p=>!used.has(p.id));
+      const avail=availPool.filter(p=>!p._drafted);
       if(!avail.length) return;
       const needs=analyzeTeamNeeds(t);
       const needsPitcher=needs.some(n=>n.type.includes("投手"));
@@ -129,10 +132,9 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
         if(!needsPitcher&&!p.isPitcher) s+=20;
         return{p,s};
       }).sort((a,b)=>b.s-a.s);
-      // 30%で2位以下から指名（競合を避ける戦略）
-      const pick=Math.random()<0.3&&scored.length>1?scored[rng(1,Math.min(3,scored.length-1))].p:scored[0].p;
+      // 30%で2位以下から指名
+      const pick=rng(0,9)<3&&scored.length>1?scored[rng(1,Math.min(3,scored.length-1))].p:scored[0].p;
       picks[t.id]=pick;
-      used.add(pick.id); // 競合を防ぐ（くじ引きで競合を演出する必要はない）
     });
     return picks;
   };
@@ -157,26 +159,64 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
   };
 
   // 競合処理
-  const processLottery=(cpu)=>{
-    const allPicks={...cpu,[myId]:myPick};
-    // 競合チェック
+  const processLottery=(cpu,existingResolved={})=>{
+    const allPicks={...cpu,[myId]:myPick,...existingResolved};
     const byPlayer={};
     Object.entries(allPicks).forEach(([tid,p])=>{
       if(!p) return;
       if(!byPlayer[p.id]) byPlayer[p.id]=[];
       byPlayer[p.id].push(tid);
     });
-    const contestedEntry=Object.entries(byPlayer).find(function(e){return e[1].length>1;});const contested=contestedEntry?[contestedEntry[0],contestedEntry[1]]:null;
-    if(contested){
-      const pid=contested[0];const tids=contested[1];
-      const target=pool.find(p=>p.id===pid);
-      setLotteryTarget(target);
-      setLotteryTeams(tids.map(tid=>teams.find(t=>t.id===tid)).filter(t=>t!==undefined));
+    const conflicts=Object.entries(byPlayer)
+      .filter(([,tids])=>tids.length>1)
+      .map(([pid,tids])=>({pid,tids}));
+    if(conflicts.length){
+      setPendingConflicts(conflicts);
+      setCurrentConflictIdx(0);
+      setLotteryRound(1);
+      const first=conflicts[0];
+      setLotteryTarget(pool.find(p=>p.id===first.pid));
+      setLotteryTeams(first.tids.map(tid=>teams.find(t=>t.id===tid)).filter(Boolean));
+      setResolvedPicks(existingResolved);
+      setLotteryResult(null);
       setPhase("lottery");
     } else {
-      // 競合なし → そのまま確定
       finalizeRound1(allPicks,{});
     }
+  };
+
+  const autoResolveRemaining=(resolved)=>{
+    const result={...resolved};
+    const usedIds=new Set(Object.values(result).filter(Boolean).map(p=>p.id));
+    pendingConflicts.slice(currentConflictIdx+1).forEach(({pid,tids})=>{
+      tids.forEach(tid=>{
+        if(result[tid]) return;
+        const avail=availPool.filter(p=>!usedIds.has(p.id)&&p.id!==pid);
+        if(avail.length){
+          const pick=avail[rng(0,avail.length-1)];
+          result[tid]=pick;
+          usedIds.add(pick.id);
+        }
+      });
+    });
+    return result;
+  };
+
+  const advanceToNextConflict=(resolved,cpu)=>{
+    const nextIdx=currentConflictIdx+1;
+    if(nextIdx<pendingConflicts.length&&lotteryRound<DRAFT_LOTTERY_MAX_ROUNDS){
+      const next=pendingConflicts[nextIdx];
+      setCurrentConflictIdx(nextIdx);
+      setLotteryRound(r=>r+1);
+      setLotteryTarget(pool.find(p=>p.id===next.pid));
+      setLotteryTeams(next.tids.map(tid=>teams.find(t=>t.id===tid)).filter(Boolean));
+      setLotteryResult(null);
+      setResolvedPicks(resolved);
+      setPhase("lottery");
+      return;
+    }
+    const finalResolved=nextIdx<pendingConflicts.length?autoResolveRemaining(resolved):resolved;
+    finalizeRound1({...cpu,[myId]:myPick,...finalResolved},{});
   };
 
   // くじ引き実行
@@ -185,36 +225,45 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
     setLotteryResult(winner);
     setTimeout(()=>{
       const losers=lotteryTeams.filter(t=>t.id!==winner.id);
+      const newResolved={...resolvedPicks,[winner.id]:lotteryTarget};
       if(losers.length>0){
+        // CPU外れ球団は自動で外れ1位を決める
         setHazureTeams(losers);
         setMyHazure(losers.some(t=>t.id===myId));
-        // CPU外れ球団は自動で外れ1位を決める
         const hPicks={};
+        const usedIds=new Set([
+          lotteryTarget.id,
+          ...Object.values(cpuPicks||{}).filter(Boolean).map(p=>p.id),
+          ...Object.values(newResolved).filter(Boolean).map(p=>p.id),
+        ]);
         losers.forEach(t=>{
           if(t.id===myId) return;
-          const used=new Set([lotteryTarget.id,...Object.values(cpuPicks).filter(p=>p).map(p=>p.id)]);
-          const avail=availPool.filter(p=>!used.has(p.id));
-          if(avail.length) hPicks[t.id]=avail[rng(0,Math.min(2,avail.length-1))];
+          const avail=availPool.filter(p=>!usedIds.has(p.id));
+          if(avail.length){
+            const pick=avail[rng(0,Math.min(2,avail.length-1))];
+            hPicks[t.id]=pick;
+            usedIds.add(pick.id);
+          }
         });
         setHazurePicks(hPicks);
+        setResolvedPicks(newResolved);
         setPhase("hazure");
       } else {
-        const allPicks={...cpuPicks,[myId]:myPick};
-        finalizeRound1(allPicks,{});
+        advanceToNextConflict(newResolved,cpuPicks||{});
       }
     },1500);
   };
 
   // 外れ1位確定
   const confirmHazure=(myHazurePick)=>{
-    const allPicks={...cpuPicks,[myId]:myPick};
     const allHazure={...hazurePicks};
     if(myHazurePick) allHazure[myId]=myHazurePick;
-    // 外れ球団からlotteryTargetを除いて確定
-    Object.entries(allPicks).forEach(([tid])=>{
-      if(hazureTeams.find(t=>t.id===tid)) allPicks[tid]=null;
+    const newResolved={...resolvedPicks};
+    hazureTeams.forEach(t=>{
+      if(allHazure[t.id]) newResolved[t.id]=allHazure[t.id];
     });
-    finalizeRound1(allPicks,allHazure);
+    setMyHazurePick(null);
+    advanceToNextConflict(newResolved,cpuPicks||{});
   };
 
   const finalizeRound1=(picks,hazure)=>{
@@ -229,7 +278,12 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
 
   // 外れ1位自チーム選択画面
   const [myHazurePick,setMyHazurePick]=React.useState(null);
-  const hazurePool=availPool.filter(p=>p.id!==lotteryTarget?.id&&!Object.values(hazurePicks).find(x=>x&&x.id===p.id));
+  const hazurePool=availPool.filter(p=>{
+    if(p.id===lotteryTarget?.id) return false;
+    if(Object.values(hazurePicks).find(x=>x&&x.id===p.id)) return false;
+    if(Object.values(resolvedPicks).find(x=>x&&x.id===p.id)) return false;
+    return true;
+  });
 
   if(phase==="select") return(
     <div className="app"><div style={{padding:"14px"}}>
@@ -284,6 +338,11 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
   if(phase==="lottery") return(
     <div className="app"><div style={{padding:"14px"}}>
       <div style={{fontSize:22,fontWeight:700,color:"#f5c842",marginBottom:4,textAlign:"center"}}>🎰 競合！くじ引き</div>
+      {pendingConflicts.length>1&&(
+        <div style={{fontSize:10,color:"#94a3b8",textAlign:"center",marginBottom:8}}>
+          競合 {currentConflictIdx+1} / {pendingConflicts.length} 件目（第{lotteryRound}回戦）
+        </div>
+      )}
       <div style={{textAlign:"center",fontSize:13,color:"#94a3b8",marginBottom:14}}>{lotteryTarget?.name} に {lotteryTeams.length}球団が競合</div>
       <div className="card" style={{textAlign:"center",padding:24,marginBottom:12}}>
         <div style={{fontSize:40,marginBottom:8}}>📋</div>
@@ -394,7 +453,10 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,onDraftDone}){
   // 1巡目で指名済みの選手を除外
   const predrafted=pool.filter(p=>p._drafted).reduce((a,p)=>{a[p.id]=p._r1winner;return a;},{});
   const availPool=pool.filter(p=>!drafted[p.id]&&!p._drafted);
-  const myPicks=pool.filter(p=>drafted[p.id]===myId);
+  const myPicks=[
+    ...pool.filter(p=>p._drafted&&p._r1winner===myId),
+    ...pool.filter(p=>drafted[p.id]===myId),
+  ];
   const doScout=pid=>{if(scoutPt<=0||scouted.has(pid)) return;setScouted(prev=>new Set([...prev,pid]));setScoutPt(n=>n-1);};
   const announce=(msg,color="#f5c842")=>{setAnnouncement({msg,color});setTimeout(()=>setAnnouncement(null),2200);};
   const doPick=(pick,isMe)=>{
@@ -422,7 +484,7 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,onDraftDone}){
   };
   const cpuPick=()=>{
     if(!current||done) return;
-    const avail=pool.filter(p=>!drafted[p.id]);
+    const avail=pool.filter(p=>!drafted[p.id]&&!p._drafted);
     if(!avail.length){setDone(true);return;}
     // CPU戦略：補強ニーズに合う選手を優先
     const needs=analyzeTeamNeeds(current.team);

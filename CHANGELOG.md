@@ -5,6 +5,19 @@
 
 ---
 
+### 2026-04-11 — ドラフト指名結果バグ修正＋くじ引きループ演出（04925a0）
+
+**仕様本文への影響あり（§4.7 ドラフトシステム）**
+
+- [fix] handleDraftComplete: 全12球団の1〜6巡目指名を farm に反映（B-A）
+- [fix] DraftScreen.cpuPick: _drafted 選手を avail から除外し2巡目以降の重複指名を防止（B-B）
+- [fix] DraftScreen.myPicks: 1巡目指名（_r1winner）を自チーム指名済みリストに追加（B-C）
+- [feat] DraftLotteryScreen: CPU間の重複排除を廃止し実際の競合が発生するよう変更
+- [feat] DraftLotteryScreen: 複数競合を順番にくじ引き解決するループ（最大3回）を実装
+- [feat] くじ引き画面に「競合N/M件目」インジケーターを追加
+
+---
+
 ### 2026-04-11 — 翌年開幕時の日程タブ旧スケジュール表示バグ修正（a3d84b3）
 
 **仕様本文への影響なし（内部実装のみ）**
