@@ -12,6 +12,7 @@ const TALK_OPTIONS = [
 ];
 
 const TRAINING_OPTIONS=[["","バランス"],["contact","ミート"],["power","長打"],["eye","選球"],["speed","走力"],["arm","肩"],["defense","守備"],["velocity","球速"],["control","制球"],["breaking","変化球"],["stamina","スタミナ"]];
+const LINEUP_SLOTS = [1,2,3,4,5,6,7,8,9];
 
 const MoralBadge=({v})=>{const m=v||70;const icon=m>=75?"😊":m>=50?"😐":"😟";const col=m>=75?"#34d399":m>=50?"#f5c842":"#f87171";return <span style={{fontSize:10,color:col}}>{icon}{m}</span>;};
 
@@ -23,7 +24,18 @@ export function RosterTab({team,onToggle,onSetLineupOrder,onSetPlayerPosition,on
   const batters=team.players.filter(p=>!p.isPitcher);
   const pitchers=team.players.filter(p=>p.isPitcher);
   const liMap={};team.lineup.forEach((id,i)=>liMap[id]=i+1);
+  const lineupPlayers=team.lineup.map(id=>batters.find(p=>p.id===id)).filter(Boolean);
+  const posCountInLineup=lineupPlayers.reduce((acc,p)=>{acc[p.pos]=(acc[p.pos]??0)+1;return acc;},{});
   const injured=team.players.filter(p=>(p.injuryDaysLeft??0)>0);
+  const autoSetLineup=()=>{
+    const candidate=batters.filter(p=>(p.injuryDaysLeft??0)===0).slice().sort((a,b)=>{
+      const sa=saberBatter(a.stats), sb=saberBatter(b.stats);
+      const scoreA=(sa.OPS||0)*1000+a.batting.contact*1.6+a.batting.eye*1.1+a.batting.power*1.2+a.batting.speed*0.7;
+      const scoreB=(sb.OPS||0)*1000+b.batting.contact*1.6+b.batting.eye*1.1+b.batting.power*1.2+b.batting.speed*0.7;
+      return scoreB-scoreA;
+    }).slice(0,9);
+    candidate.forEach((p,idx)=>onSetLineupOrder&&onSetLineupOrder(p.id,idx+1));
+  };
   return(
     <div>
       {injured.length>0&&(
@@ -47,7 +59,11 @@ export function RosterTab({team,onToggle,onSetLineupOrder,onSetPlayerPosition,on
       </div>
       {view==="batters"&&(
         <div className="card">
-          <div className="card-h">打線設定 ({team.lineup.length}/9)</div>
+          <div className="card-h" style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <span>打線設定 ({team.lineup.length}/9)</span>
+            <span style={{fontSize:10,color:"#6b7280",fontWeight:400}}>守備配置: {POSITIONS.map(pos=>`${pos.replace("手","")}:${posCountInLineup[pos]??0}`).join(" / ")}</span>
+            <button className="bsm bgb" style={{marginLeft:"auto"}} onClick={autoSetLineup}>自動編成</button>
+          </div>
           <div style={{overflowX:"auto"}}>
             <table className="tbl">
               <thead><tr><th>#</th><th>選手名</th><th>守備</th><th>年齢</th><th>ミート</th><th>長打</th><th>走力</th><th>選球</th><th>クラッチ</th><th>変化球</th><th>状態</th><th>モラル</th><th>打率</th><th>HR</th><th>OPS</th><th>強化</th><th></th></tr></thead>
@@ -73,10 +89,16 @@ export function RosterTab({team,onToggle,onSetLineupOrder,onSetPlayerPosition,on
                         }}
                       >
                         <option value={0}>—</option>
-                        {[1,2,3,4,5,6,7,8,9].map(n => (
+                        {LINEUP_SLOTS.map(n => (
                           <option key={n} value={n}>{n}番</option>
                         ))}
                       </select>
+                      {inL&&(
+                        <div style={{display:"flex",gap:2,marginTop:2}}>
+                          <button className="bsm" style={{fontSize:9,padding:"1px 4px"}} onClick={()=>onSetLineupOrder&&onSetLineupOrder(p.id,Math.max(1,(liMap[p.id]??1)-1))}>↑</button>
+                          <button className="bsm" style={{fontSize:9,padding:"1px 4px"}} onClick={()=>onSetLineupOrder&&onSetLineupOrder(p.id,Math.min(9,(liMap[p.id]??1)+1))}>↓</button>
+                        </div>
+                      )}
                     </td>
                     <td style={{fontWeight:inL?700:400,cursor:"pointer"}} onClick={()=>onPlayerClick?.(p,team.name)}><span style={{color:inL?"#93c5fd":"#60a5fa"}}>{p.name}</span>{p.isForeign&&<span className="chip cb" style={{marginLeft:4,fontSize:8}}>外</span>}{isInj&&<span style={{marginLeft:4,fontSize:9,color:"#f87171"}}>🤕{p.injuryDaysLeft}</span>}</td>
                     <td>
@@ -94,10 +116,15 @@ export function RosterTab({team,onToggle,onSetLineupOrder,onSetPlayerPosition,on
                           if (onSetPlayerPosition) onSetPlayerPosition(p.id, e.target.value);
                         }}
                       >
-                        {POSITIONS.map(pos => (
-                          <option key={pos} value={pos}>{pos}</option>
-                        ))}
+                        {POSITIONS.map(pos => {
+                          const n=posCountInLineup[pos]??0;
+                          return (
+                          <option key={pos} value={pos}>{pos}{n>0?` (${n})`:""}</option>
+                        );})}
                       </select>
+                      <div style={{fontSize:9,color:"#6b7280",marginTop:2}}>
+                        {posCountInLineup[p.pos]>1&&team.lineup.includes(p.id)?"⚠ 同守備が重複":" "}
+                      </div>
                     </td><td className="mono" style={{color:"#374151"}}>{p.age}</td>
                     <td><OV v={p.batting.contact}/></td><td><OV v={p.batting.power}/></td><td><OV v={p.batting.speed}/></td><td><OV v={p.batting.eye}/></td>
                     <td><OV v={p.batting.clutch}/></td><td><OV v={p.batting.breakingBall}/></td>
