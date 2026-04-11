@@ -1,6 +1,6 @@
 # Baseball Manager 2025 — ロードマップ
 
-> 最終更新: 2026-04-11（E2E テスト拡充 完了）
+> 最終更新: 2026-04-11（翌年日程タブ表示バグ修正 完了）
 > **ゴール**: NPB版 OOTP / Football Manager — 深いシミュレーションと長期フランチャイズ経営
 > **運用ルール**: 実装完了した項目は ✅ に更新。新規項目は末尾に追記。過去の記録は削除しない。
 
@@ -74,7 +74,7 @@
 | S2 | **交流戦バグ修正（対戦相手重複）** | 旧実装で `paHostsMap` 適用後も `(ceIdx+r)%6` 回転でラウンド0と同一PAチームがラウンド2で再マッチした（ヤクルト vs 西武が6試合）を offset-based rotation で修正 → 全CEチームが各PAチームと正確に3試合ずつ対戦 | 8d3b00b |
 | S3 | **オリックスホーム試合数改善** | 甲子園ブラックアウト制約でオリックスホームが57試合に低下（目標71〜72）。PAラウンドを並び替えてブラックアウト日付にオリックスアウェイラウンドを優先配置 → 69試合に改善（±3は Berger 固定チームの構造的制約） | 8d3b00b |
 | B4 | **[P1] 日程タブが常に「読み込み中」表示** | `schedule` を `useEffect([year, teams.length])` のみで生成していたため、同年セーブのロード時（year・teams.length 不変）と新規チーム選択時にスケジュールが再生成されず `null` のまま ScheduleTab が「読み込み中…」固定になるバグを修正。`handleLoad` と `handleSelect` でそれぞれ `setSchedule(generateSeasonSchedule(...))` を明示呼び出しするよう変更 | e1b5273 |
-| B5 | **[P1] 翌年開幕時に日程タブが旧年スケジュール表示** | `handleNextYear` が `setSchedule` を呼ばずに `setYear(y=>y+1)` + `setScreen("hub")` のみ発火させていたため、翌年ハブ画面の初期レンダリング時点でスケジュールが前年分のままになるバグを修正。`handleNextYear` に `setSchedule(generateSeasonSchedule(year+1, teams))` を追加 | — |
+| B5 | **[P1] 翌年開幕時に日程タブが旧年スケジュール表示** | `handleNextYear` が `setSchedule` を呼ばずに `setYear(y=>y+1)` + `setScreen("hub")` のみ発火させていたため、翌年ハブ画面の初期レンダリング時点でスケジュールが前年分のままになるバグを修正。`handleNextYear` に `setSchedule(generateSeasonSchedule(year+1, teams))` を追加 | a3d84b3 |
 | B6 | **[P0] エントリーポイント誤設定による日程タブ完全未表示** | `src/main.jsx` の import が `'../combined-artifact'`（旧全結合ファイル）を参照しており `src/App.jsx` が一切使われていなかった。B4/B5 を含む全修正が未反映だった。import を `'./App'` に変更して修正 | — |
 | B7 | **[P1] バッチシムで中継ぎが起用されず先発が常に完投** | `checkStopCondition()` のピッチカウント閾値条件が `!gs.isTop`（自チームが打席の回）を見ていたため、自チーム投手が投球中（`isTop=true`）に閾値に達しても交代条件が発火しなかった。`!gs.isTop` → `gs.isTop` に修正 | bce22ba |
 | B8 | **[P0] 相手チーム投手が全試合で絶対に交代しない（本当の根本原因）** | `initGameState` に `opBullpen` が存在せず `quickSimGame` に相手投手の疲労チェックが一切なかった。全オートシム・バッチシム・CPU vs CPU で相手先発は常に完投していた。`opBullpen` フィールドを追加し `quickSimGame` に相手投手の自動交代ロジックを追加 | — |

@@ -6,6 +6,8 @@ import { evalOffer, cpuRenewContracts, processCpuFaBids, getFaThreshold } from '
 import { initDraftPool } from '../engine/draft';
 import { calcPostingRequestProb, calcPostingBid, POSTING_FEE_RATE } from '../engine/posting';
 import { calcOffseasonPopDelta, driftPopularity } from '../engine/fanSentiment';
+import { generateSeasonSchedule, calcAllStarTriggerDay } from '../engine/scheduleGen';
+import { SEASON_PARAMS, getDefaultParams } from '../data/scheduleParams.js';
 import {
   TEAM_DEFS, ACCEPT_THRESHOLD, OWNER_TRUST_BUDGET_LOW, OWNER_TRUST_BUDGET_HIGH,
   OWNER_TRUST_FACTOR_LOW, OWNER_TRUST_FACTOR_HIGH, POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD,
@@ -22,6 +24,9 @@ export function useOffseason(gs) {
     notify, upd, addNews, addToHistory,
     setRetireModal, setRetireGamePlayer, retireRole,
     setAllStarDone,
+    setSchedule,
+    setGameResultsMap,
+    setAllStarTriggerDay,
   } = gs;
 
   const [developmentSummary, setDevelopmentSummary] = useState(null);
@@ -52,6 +57,12 @@ export function useOffseason(gs) {
       const newBudget=Math.max(Math.round(baseBudget*0.5),Math.round(rawBudget*trustFactor));
       return{...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,revenueThisSeason:0,winStreak:0,loseStreak:0,stadiumLevel:t.stadiumLevel??0,budget:newBudget,players:nextPlayers,lineup:(t.lineup||[]).filter(id=>nextIds.has(id)),rotation:(t.rotation||[]).filter(id=>nextIds.has(id)),farm:t.farm.map(p=>({...p,age:p.age+1,stats:emptyStats(),injury:null,serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}))};
     }));
+    const nextYear=year+1;
+    const newSchedule=generateSeasonSchedule(nextYear, teams);
+    setSchedule(newSchedule);
+    setGameResultsMap({});
+    const params=SEASON_PARAMS[nextYear]||getDefaultParams(nextYear);
+    setAllStarTriggerDay(calcAllStarTriggerDay(newSchedule, params.allStarSkipDates));
     setScreen("new_season");
   };
 
