@@ -450,12 +450,13 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,onDraftDone}){
   const [autoRunning,setAutoRunning]=useState(false);
   const current=draftOrderFiltered[pickIdx];
   const isMyTurn=current&&current.team.id===myId&&!done;
+  const isPickedAfterRound1=pid=>Object.prototype.hasOwnProperty.call(drafted,pid);
   // 1巡目で指名済みの選手を除外
   const predrafted=pool.filter(p=>p._drafted).reduce((a,p)=>{a[p.id]=p._r1winner;return a;},{});
-  const availPool=pool.filter(p=>!drafted[p.id]&&!p._drafted);
+  const availPool=pool.filter(p=>!isPickedAfterRound1(p.id)&&!p._drafted);
   const myPicks=[
-    ...pool.filter(p=>p._drafted&&p._r1winner===myId),
-    ...pool.filter(p=>drafted[p.id]===myId),
+    ...pool.filter(p=>p._drafted&&Number(p._r1winner)===Number(myId)),
+    ...pool.filter(p=>Number(drafted[p.id])===Number(myId)),
   ];
   const doScout=pid=>{if(scoutPt<=0||scouted.has(pid)) return;setScouted(prev=>new Set([...prev,pid]));setScoutPt(n=>n-1);};
   const announce=(msg,color="#f5c842")=>{setAnnouncement({msg,color});setTimeout(()=>setAnnouncement(null),2200);};
@@ -484,7 +485,7 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,onDraftDone}){
   };
   const cpuPick=()=>{
     if(!current||done) return;
-    const avail=pool.filter(p=>!drafted[p.id]&&!p._drafted);
+    const avail=pool.filter(p=>!isPickedAfterRound1(p.id)&&!p._drafted);
     if(!avail.length){setDone(true);return;}
     // CPU戦略：補強ニーズに合う選手を優先
     const needs=analyzeTeamNeeds(current.team);
@@ -502,12 +503,12 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,onDraftDone}){
     const pick=surprise?avail[rng(4,Math.min(8,avail.length-1))]:scored[0].p;
     doPick(pick,false);
   };
-  const myPick=pid=>{const pick=pool.find(p=>p.id===pid);if(!pick||drafted[pick.id]||!isMyTurn) return;doPick(pick,true);};
+  const myPick=pid=>{const pick=pool.find(p=>p.id===pid);if(!pick||isPickedAfterRound1(pick.id)||!isMyTurn) return;doPick(pick,true);};
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(()=>{if(isMyTurn||done||pickIdx>=draftOrderFiltered.length) return;const t=setTimeout(cpuPick,350);return()=>clearTimeout(t);},[pickIdx,isMyTurn,done]);
   const getBudgetFactor=p=>1.0-(p.isPitcher?alloc.pitcher:alloc.batter)/100*0.5;
   const statView=p=>{
-    const sc=scouted.has(p.id)||drafted[p.id]===myId||p.fromScout;
+    const sc=scouted.has(p.id)||Number(drafted[p.id])===Number(myId)||p.fromScout;
     if(!sc) return p.isPitcher?"球速??? 制球??? 変化??? スタ???":"ミート??? 長打??? 走力??? 選球???";
     if(p.fromScout){return p.isPitcher?`球速${p.pitching.velocity} 制球${p.pitching.control} 変化${p.pitching.breaking} スタ${p.pitching.stamina}`:`ミート${p.batting.contact} 長打${p.batting.power} 走力${p.batting.speed} 選球${p.batting.eye}`;}
     const bf=getBudgetFactor(p);
@@ -515,7 +516,7 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,onDraftDone}){
     return p.isPitcher?`球速${sv(p.pitching,"velocity")} 制球${sv(p.pitching,"control")} 変化${sv(p.pitching,"breaking")} スタ${sv(p.pitching,"stamina")}`:`ミート${sv(p.batting,"contact")} 長打${sv(p.batting,"power")} 走力${sv(p.batting,"speed")} 選球${sv(p.batting,"eye")}`;
   };
   const ovView=p=>{
-    if(!scouted.has(p.id)&&drafted[p.id]!==myId&&!p.fromScout) return "??";
+    if(!scouted.has(p.id)&&Number(drafted[p.id])!==Number(myId)&&!p.fromScout) return "??";
     if(p.fromScout) return p.isPitcher?Math.round((p.pitching.velocity+p.pitching.control+p.pitching.breaking)/3):Math.round((p.batting.contact+p.batting.power+p.batting.eye+p.batting.speed)/4);
     const bf=getBudgetFactor(p);
     const sv=(obj,k)=>scoutedValue(obj[k],p.id,k,10,bf).value;
@@ -531,9 +532,9 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,onDraftDone}){
           <div style={{fontSize:10,color:"#374151"}}>2巡目以降 · {pickIdx}/{draftOrderFiltered.length}指名完了</div>
           <div style={{background:"rgba(255,255,255,.05)",borderRadius:4,height:5,margin:"8px 0",overflow:"hidden"}}><div style={{height:"100%",background:"linear-gradient(90deg,#f5c842,#f97316)",width:progress+"%",transition:".4s"}}/></div>
         </div>
-        {pool.filter(p=>p.spotlight&&!drafted[p.id]).length>0&&(
+        {pool.filter(p=>p.spotlight&&!isPickedAfterRound1(p.id)).length>0&&(
           <div style={{display:"flex",gap:6,marginBottom:10,overflowX:"auto",paddingBottom:4}}>
-            {pool.filter(p=>p.spotlight&&!drafted[p.id]).map(p=>(<div key={p.id} style={{minWidth:160,background:"linear-gradient(135deg,rgba(245,200,66,.12),rgba(249,115,22,.08))",border:"1px solid rgba(245,200,66,.3)",borderRadius:8,padding:"8px 10px",flexShrink:0}}>
+            {pool.filter(p=>p.spotlight&&!isPickedAfterRound1(p.id)).map(p=>(<div key={p.id} style={{minWidth:160,background:"linear-gradient(135deg,rgba(245,200,66,.12),rgba(249,115,22,.08))",border:"1px solid rgba(245,200,66,.3)",borderRadius:8,padding:"8px 10px",flexShrink:0}}>
               <div style={{fontSize:10,color:"#f97316",fontWeight:700,marginBottom:2}}>{p.spotlight}</div>
               <div style={{fontWeight:700,fontSize:13}}>{p.name}</div>
               <div style={{fontSize:10,color:"#374151"}}>{p.pos}/{p.age}歳{p.isPitcher&&<HandBadge p={p}/>}</div>
