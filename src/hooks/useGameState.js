@@ -200,6 +200,34 @@ export function useGameState() {
     upd(myId,t=>({...t,lineup:inL?t.lineup.filter(id=>id!==pid):[...t.lineup,pid]}));
   },[myTeam,upd,myId,notify]);
 
+  const setLineupOrder = useCallback((pid, order) => {
+    if (!myTeam) return;
+    const p = myTeam.players.find(x => x.id === pid);
+    if (p?.isPitcher) { notify("投手は打線に入れられません", "warn"); return; }
+    if ((p?.injuryDaysLeft ?? 0) > 0) { notify("故障中は出場不可", "warn"); return; }
+
+    upd(myId, t => {
+      if (order === 0) {
+        if (t.lineup.length <= 4) { notify("最低4人必要です", "warn"); return t; }
+        return { ...t, lineup: t.lineup.filter(id => id !== pid) };
+      }
+
+      const targetIdx = order - 1;
+      const isInLineup = t.lineup.includes(pid);
+      let lineup = t.lineup.filter(id => id !== pid);
+      if (!isInLineup && lineup.length >= 9) { notify("打線は最大9人です", "warn"); return t; }
+      lineup.splice(targetIdx, 0, pid);
+      return { ...t, lineup: lineup.slice(0, 9) };
+    });
+  }, [myTeam, upd, myId, notify]);
+
+  const setPlayerPosition = useCallback((pid, pos) => {
+    upd(myId, t => ({
+      ...t,
+      players: t.players.map(p => p.id === pid ? { ...p, pos } : p),
+    }));
+  }, [upd, myId]);
+
   const setStarter = useCallback((pid)=>{upd(myId,t=>({...t,rotation:t.rotation.includes(pid)?t.rotation:[...t.rotation,pid]}));notify("先発ローテに追加","ok");},[upd,myId,notify]);
   const moveRotation = useCallback((pid,dir)=>upd(myId,t=>{const r=[...t.rotation];const i=r.indexOf(pid);if(i<0)return t;const j=i+dir;if(j<0||j>=r.length)return t;[r[i],r[j]]=[r[j],r[i]];return{...t,rotation:r};}),[upd,myId]);
   const removeFromRotation = useCallback((pid)=>upd(myId,t=>({...t,rotation:t.rotation.filter(id=>id!==pid)})),[upd,myId]);
@@ -367,6 +395,8 @@ export function useGameState() {
     setDevGoal,
     handleInterview,
     toggleLineup,
+    setLineupOrder,
+    setPlayerPosition,
     setStarter,
     moveRotation,
     removeFromRotation,
