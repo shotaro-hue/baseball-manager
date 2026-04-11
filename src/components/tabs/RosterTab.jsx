@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL, DEV_GOALS_BATTER, DEV_GOALS_PITCHER, TALK_COOLDOWN_DAYS } from '../../constants';
+import { MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL, DEV_GOALS_BATTER, DEV_GOALS_PITCHER, TALK_COOLDOWN_DAYS, POSITIONS } from '../../constants';
 import { fmtAvg, fmtSal } from '../../utils';
 import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
 import { OV, CondBadge, HandBadge } from '../ui';
@@ -15,7 +15,7 @@ const TRAINING_OPTIONS=[["","バランス"],["contact","ミート"],["power","�
 
 const MoralBadge=({v})=>{const m=v||70;const icon=m>=75?"😊":m>=50?"😐":"😟";const col=m>=75?"#34d399":m>=50?"#f5c842":"#f87171";return <span style={{fontSize:10,color:col}}>{icon}{m}</span>;};
 
-export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onPlayerClick,onSetDevGoal,onPlayerTalk,gameDay}){
+export function RosterTab({team,onToggle,onSetLineupOrder,onSetPlayerPosition,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onPlayerClick,onSetDevGoal,onPlayerTalk,gameDay}){
   const [view,setView]=useState("batters");
   const [justConverted,setJustConverted]=useState(new Set());
   const [talkingPid,setTalkingPid]=useState(null);
@@ -54,9 +54,51 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
               <tbody>
                 {batters.map(p=>{const inL=team.lineup.includes(p.id);const sb=saberBatter(p.stats);const isInj=(p.injuryDaysLeft??0)>0;return(
                   <tr key={p.id} style={isInj?{opacity:.55}:undefined}>
-                    <td>{inL?<span className="lnb">{liMap[p.id]}</span>:<span style={{color:"#1e2d3d"}}>—</span>}</td>
+                    <td>
+                      <select
+                        value={inL ? liMap[p.id] : 0}
+                        disabled={isInj}
+                        style={{
+                          fontSize: 11,
+                          background: "#0d1b2a",
+                          color: inL ? "#93c5fd" : "#374151",
+                          border: "1px solid #1e3a5f",
+                          borderRadius: 3,
+                          padding: "1px 3px",
+                          width: 46,
+                        }}
+                        onChange={e => {
+                          const order = parseInt(e.target.value, 10);
+                          if (onSetLineupOrder) onSetLineupOrder(p.id, order);
+                        }}
+                      >
+                        <option value={0}>—</option>
+                        {[1,2,3,4,5,6,7,8,9].map(n => (
+                          <option key={n} value={n}>{n}番</option>
+                        ))}
+                      </select>
+                    </td>
                     <td style={{fontWeight:inL?700:400,cursor:"pointer"}} onClick={()=>onPlayerClick?.(p,team.name)}><span style={{color:inL?"#93c5fd":"#60a5fa"}}>{p.name}</span>{p.isForeign&&<span className="chip cb" style={{marginLeft:4,fontSize:8}}>外</span>}{isInj&&<span style={{marginLeft:4,fontSize:9,color:"#f87171"}}>🤕{p.injuryDaysLeft}</span>}</td>
-                    <td style={{fontSize:10,color:"#374151"}}>{p.pos}</td><td className="mono" style={{color:"#374151"}}>{p.age}</td>
+                    <td>
+                      <select
+                        value={p.pos || ""}
+                        style={{
+                          fontSize: 10,
+                          background: "#0d1b2a",
+                          color: "#94a3b8",
+                          border: "1px solid #1e3a5f",
+                          borderRadius: 3,
+                          padding: "1px 2px",
+                        }}
+                        onChange={e => {
+                          if (onSetPlayerPosition) onSetPlayerPosition(p.id, e.target.value);
+                        }}
+                      >
+                        {POSITIONS.map(pos => (
+                          <option key={pos} value={pos}>{pos}</option>
+                        ))}
+                      </select>
+                    </td><td className="mono" style={{color:"#374151"}}>{p.age}</td>
                     <td><OV v={p.batting.contact}/></td><td><OV v={p.batting.power}/></td><td><OV v={p.batting.speed}/></td><td><OV v={p.batting.eye}/></td>
                     <td><OV v={p.batting.clutch}/></td><td><OV v={p.batting.breakingBall}/></td>
                     <td><CondBadge p={p}/></td>
@@ -65,7 +107,7 @@ export function RosterTab({team,onToggle,onSetStarter,onPromo,onDemo,onSetTraini
                     <td className="mono" style={{color:p.stats.HR>=20?"#f5c842":undefined}}>{p.stats.HR}</td>
                     <td className="mono" style={{color:sb.OPS>=.850?"#34d399":sb.OPS>=.700?"#f5c842":undefined}}>{sb.OPS>0?sb.OPS.toFixed(3):"---"}</td>
                     <td><select style={{fontSize:9,background:"#0d1b2a",color:"#94a3b8",border:"1px solid #1e3a5f",borderRadius:3,padding:"1px 2px"}} value={p.trainingFocus||""} onChange={e=>onSetTrainingFocus&&onSetTrainingFocus(p.id,e.target.value||null)}>{TRAINING_OPTIONS.filter(([k])=>!["velocity","control","breaking","stamina"].includes(k)).map(([k,l])=><option key={k} value={k}>{l}</option>)}</select></td>
-                    <td><button className={`bsm ${inL?"bgr":"bga"}`} onClick={()=>!isInj&&onToggle(p.id)} disabled={isInj}>{inL?"外す":"入れる"}</button> <button className="bsm bgr" onClick={()=>onDemo(p.id)}>↓</button></td>
+                    <td><button className="bsm bgr" onClick={()=>onDemo(p.id)}>↓</button></td>
                   </tr>
                 );})}
               </tbody>
