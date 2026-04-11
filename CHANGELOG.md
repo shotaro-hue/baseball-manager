@@ -5,6 +5,17 @@
 
 ---
 
+### 2026-04-11 — 投手成績集計バグ修正（610620b）
+
+**仕様本文への影響なし（内部実装のみ）**
+
+- postGame.js: 盗塁企図イベント（isStolenBase:true）を投手 BF の集計から除外
+- CareerTable.jsx: 通算統計の pitcherフィールド修正（BB→BBp, HRA→HRp, HBPp/Hp 追加）→ キャリア WHIP/FIP/xFIP が正常値に
+- simulation.js: initGameState の myStarter フォールバックを全投手対象に緩和（全先発故障時の pitcherId undefined を防止）
+- simulation.js: Math.random() 直接呼び出し5箇所を rngf(0,1) に置換
+
+---
+
 ### 2026-04-09 — バグ修正: 成績タブ・投手ビューで ReferenceError
 
 **仕様本文への影響なし（内部バグ修正のみ）**

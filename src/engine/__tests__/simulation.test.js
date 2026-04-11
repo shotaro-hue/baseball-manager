@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { calcEffectiveFatigue, calcFatigue, matchupScore } from '../simulation';
+import { calcEffectiveFatigue, calcFatigue, matchupScore, initGameState } from '../simulation';
+import { applyGameStatsFromLog } from '../postGame';
+import { emptyStats } from '../player';
 
 describe('calcFatigue', () => {
   it('投球数0のときは疲労0', () => {
@@ -47,5 +49,49 @@ describe('matchupScore', () => {
   });
   it('打者・投手が undefined でも 0 を返す', () => {
     expect(matchupScore(undefined, undefined)).toBe(0);
+  });
+});
+
+describe('applyGameStatsFromLog — 盗塁BF除外', () => {
+  it('isStolenBase:true のイベントは投手の BF にカウントされない', () => {
+    const pitcher = { id: 'p1', isPitcher: true, stats: emptyStats() };
+    const players = [pitcher];
+    const log = [
+      { scorer: false, pitcherId: 'p1', result: 'k', rbi: 0 },
+      { scorer: false, pitcherId: 'p1', result: 'sb', isStolenBase: true, rbi: 0 },
+    ];
+
+    const updated = applyGameStatsFromLog(players, log, true);
+    expect(updated[0].stats.BF).toBe(1);
+    expect(updated[0].stats.Kp).toBe(1);
+  });
+});
+
+describe('initGameState — rotation 空時のフォールバック', () => {
+  it('rotation が空でも isPitcher な選手が myPitcher に設定される', () => {
+    const myTeam = {
+      id: 'my',
+      lineup: ['b1'],
+      rotation: [],
+      rotIdx: 0,
+      players: [
+        { id: 'b1', name: 'Batter', isPitcher: false, batting: { contact: 50, power: 50, eye: 50 } },
+        { id: 'rp1', name: 'Reliever', isPitcher: true, subtype: '中継ぎ', pitching: { velocity: 50, control: 50, breaking: 50 } },
+      ],
+    };
+    const oppTeam = {
+      id: 'opp',
+      lineup: ['ob1'],
+      rotation: [],
+      rotIdx: 0,
+      players: [
+        { id: 'ob1', name: 'Opp Batter', isPitcher: false, batting: { contact: 50, power: 50, eye: 50 } },
+        { id: 'op1', name: 'Opp Pitcher', isPitcher: true, subtype: '中継ぎ', pitching: { velocity: 50, control: 50, breaking: 50 } },
+      ],
+    };
+
+    const gs = initGameState(myTeam, oppTeam);
+    expect(gs.myPitcher).toBeDefined();
+    expect(gs.myPitcher.id).toBe('rp1');
   });
 });

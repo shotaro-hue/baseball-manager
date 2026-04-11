@@ -39,7 +39,7 @@ export function CareerTable({player}){
 
   // 通算計算
   const sumK=(k)=>log.reduce((a,r)=>a+(getS(r)[k]||0),0);
-  const totals={PA:sumK("PA"),AB:sumK("AB"),H:sumK("H"),HR:sumK("HR"),RBI:sumK("RBI"),SB:sumK("SB"),BF:sumK("BF"),W:sumK("W"),L:sumK("L"),SV:sumK("SV"),IP:sumK("IP"),Kp:sumK("Kp"),ER:sumK("ER"),BB:sumK("BB"),HRA:sumK("HRA")};
+  const totals={PA:sumK("PA"),AB:sumK("AB"),H:sumK("H"),HR:sumK("HR"),RBI:sumK("RBI"),SB:sumK("SB"),BF:sumK("BF"),W:sumK("W"),L:sumK("L"),SV:sumK("SV"),IP:sumK("IP"),Kp:sumK("Kp"),ER:sumK("ER"),BBp:sumK("BBp"),HBPp:sumK("HBPp"),Hp:sumK("Hp"),HRp:sumK("HRp")};
   const hasTotals=ip?(totals.BF>0):(totals.PA>0);
 
   return(
