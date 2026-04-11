@@ -603,8 +603,10 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,onDraftDone}){
 ═══════════════════════════════════════════════ */
 
 export function DraftReviewScreen({teams,myId,year,pool,drafted,onEnd}){
-  const myPicks=pool.filter(p=>drafted[p.id]===myId);
-  const undrafted=pool.filter(p=>!drafted[p.id]);
+  const sameTeam=(a,b)=>Number(a)===Number(b);
+  const picksFor=teamId=>pool.filter(p=>sameTeam(p._r1winner,teamId)||sameTeam(drafted[p.id],teamId));
+  const myPicks=picksFor(myId);
+  const undrafted=pool.filter(p=>!p._drafted&&drafted[p.id]===undefined);
   const [tab,setTab]=useState("myteam");
   const grade=()=>{
     if(!myPicks.length) return{g:"D",c:"指名なし。"};
@@ -645,7 +647,7 @@ export function DraftReviewScreen({teams,myId,year,pool,drafted,onEnd}){
         </div>
       </>)}
       {tab==="allteams"&&(<div className="card"><div className="card-h">全球団 指名結果</div>
-        {teams.map(t=>{const picks=pool.filter(p=>drafted[p.id]===t.id);const isMe=t.id===myId;return(<div key={t.id} style={{padding:"8px 10px",marginBottom:6,borderRadius:6,background:isMe?"rgba(245,200,66,.05)":"rgba(255,255,255,.02)",border:isMe?"1px solid rgba(245,200,66,.15)":"1px solid rgba(255,255,255,.04)"}}>
+        {teams.map(t=>{const picks=picksFor(t.id);const isMe=t.id===myId;return(<div key={t.id} style={{padding:"8px 10px",marginBottom:6,borderRadius:6,background:isMe?"rgba(245,200,66,.05)":"rgba(255,255,255,.02)",border:isMe?"1px solid rgba(245,200,66,.15)":"1px solid rgba(255,255,255,.04)"}}>
           <div style={{fontWeight:700,color:t.color,marginBottom:4}}>{t.emoji} {t.name}{isMe&&<span style={{fontSize:9,color:"#f5c842",marginLeft:6}}>← あなた</span>}</div>
           {picks.length===0?<span style={{fontSize:10,color:"#374151"}}>指名なし</span>:picks.map(p=>(<div key={p.id} style={{fontSize:11,color:isMe?"#f5c842":"#94a3b8",padding:"2px 0",display:"flex",gap:8,alignItems:"center"}}><span>{p.name}</span>{p.isPitcher&&<HandBadge p={p}/>}<span style={{fontSize:9,color:"#374151"}}>{p.pos}/{p.age}歳</span>{p.spotlight&&<span style={{fontSize:8,color:"#f97316"}}>{p.spotlight}</span>}<span style={{fontSize:9,color:"#a78bfa",marginLeft:"auto"}}>P:{p.potential}</span></div>))}
         </div>);})}

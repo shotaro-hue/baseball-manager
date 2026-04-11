@@ -67,9 +67,10 @@ export function useOffseason(gs) {
   };
 
   const handleDraftComplete = (pl, dr) => {
+    const sameTeam=(a,b)=>Number(a)===Number(b);
     const picksFor=teamId=>[
-      ...pl.filter(p=>p._drafted&&p._r1winner===teamId),
-      ...pl.filter(p=>dr[p.id]===teamId),
+      ...pl.filter(p=>p._drafted&&sameTeam(p._r1winner,teamId)),
+      ...pl.filter(p=>sameTeam(dr[p.id],teamId)),
     ];
     const myPicks=picksFor(myId);
     setTeams(prev=>prev.map(t=>{
