@@ -57,7 +57,7 @@ export function useOffseason(gs) {
       const trust=t.ownerTrust??50;
       const trustFactor=t.id===myId?(trust<OWNER_TRUST_BUDGET_LOW?OWNER_TRUST_FACTOR_LOW:trust>OWNER_TRUST_BUDGET_HIGH?OWNER_TRUST_FACTOR_HIGH:1.0):1.0;
       const newBudget=Math.max(Math.round(baseBudget*0.5),Math.round(rawBudget*trustFactor));
-      return{...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,revenueThisSeason:0,winStreak:0,loseStreak:0,stadiumLevel:t.stadiumLevel??0,budget:newBudget,players:nextPlayers,lineup:(t.lineup||[]).filter(id=>nextIds.has(id)),rotation:(t.rotation||[]).filter(id=>nextIds.has(id)),farm:t.farm.map(p=>({...p,age:p.age+1,stats:emptyStats(),injury:null,serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}))};
+      return{...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,revenueThisSeason:0,winStreak:0,loseStreak:0,stadiumLevel:t.stadiumLevel??0,budget:newBudget,players:nextPlayers,lineup:(t.lineup||[]).filter(id=>nextIds.has(id)),lineupNoDh:(t.lineupNoDh||[]).filter(id=>nextIds.has(id)),lineupDh:(t.lineupDh||[]).filter(id=>nextIds.has(id)),rotation:(t.rotation||[]).filter(id=>nextIds.has(id)),farm:t.farm.map(p=>({...p,age:p.age+1,stats:emptyStats(),injury:null,serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}))};
     }));
     const nextYear=year+1;
     const newSchedule=generateSeasonSchedule(nextYear, teams);
@@ -100,7 +100,7 @@ export function useOffseason(gs) {
         let nr=t.rotation.filter(id=>!myOut.find(x=>x.id===id));
         theirIn.filter(p=>!p.isPitcher).forEach(p=>{if(nl.length<9)nl=[...nl,p.id];});
         theirIn.filter(p=>p.isPitcher&&p.subtype==="先発").forEach(p=>{if(nr.length<6)nr=[...nr,p.id];});
-        return{...t,players:np,lineup:nl,rotation:nr,budget:t.budget-(cash||0)*10000};
+        return{...t,players:np,lineup:nl,lineupNoDh:nl.slice(0,8),lineupDh:nl.slice(0,9),rotation:nr,budget:t.budget-(cash||0)*10000};
       }
       if(t.id===tgtTeam.id) return{...t,players:[...t.players.filter(p=>!theirIn.find(x=>x.id===p.id)),...myOut],budget:t.budget+(cash||0)*10000};
       return t;
@@ -137,6 +137,8 @@ export function useOffseason(gs) {
             budget:t.budget+fee,
             players:t.players.filter(p=>p.id!==mail.playerId),
             lineup:(t.lineup||[]).filter(pid=>pid!==mail.playerId),
+            lineupNoDh:(t.lineupNoDh||[]).filter(pid=>pid!==mail.playerId),
+            lineupDh:(t.lineupDh||[]).filter(pid=>pid!==mail.playerId),
             rotation:(t.rotation||[]).filter(pid=>pid!==mail.playerId),
           }));
           setMailbox(prev=>[...prev,{id:uid(),type:"posting_result",read:false,

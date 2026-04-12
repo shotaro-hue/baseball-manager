@@ -7,12 +7,18 @@ export function PlayoffScreen({playoff,setPlayoff,teams,myId,year,onFinish}){
   const myTeam=teams.find(t=>t.id===myId);
   const phase=playoff.phase;
   const [simMsg,setSimMsg]=useState(null);
+  const applyDhLineup = (team, useDh) => {
+    const nonPitcherIds = (team.players || []).filter(p => !p.isPitcher).map(p => p.id);
+    const source = useDh ? (team.lineupDh || team.lineup || []) : (team.lineupNoDh || team.lineup || []);
+    return { ...team, lineup: source.filter(id => nonPitcherIds.includes(id)).slice(0, useDh ? 9 : 8) };
+  };
 
   const simOneGame=(seriesKey,need,nextPhaseBuilder)=>{
     const s=playoff[seriesKey];
     const t0=teams.find(t=>t.id===s.teams[0].id)||s.teams[0];
     const t1=teams.find(t=>t.id===s.teams[1].id)||s.teams[1];
-    const r=quickSimGame(t0,t1);
+    const useDh = !!t0.dhEnabled;
+    const r=quickSimGame(applyDhLineup(t0, useDh),applyDhLineup(t1, useDh));
     const my=r.score.my||0;
     const op=r.score.opp||0;
     const scoreStr=my+"-"+op;
@@ -48,7 +54,8 @@ export function PlayoffScreen({playoff,setPlayoff,teams,myId,year,onFinish}){
       while(!s.done){
         const t0=teams.find(t=>t.id===s.teams[0].id)||s.teams[0];
         const t1=teams.find(t=>t.id===s.teams[1].id)||s.teams[1];
-        const r=quickSimGame(t0,t1);
+        const useDh = !!t0.dhEnabled;
+        const r=quickSimGame(applyDhLineup(t0, useDh),applyDhLineup(t1, useDh));
         const my=r.score.my||0;const op=r.score.opp||0;
         const won0=my>op;
         const nw=[s.wins[0]+(won0?1:0),s.wins[1]+(!won0?1:0)];
