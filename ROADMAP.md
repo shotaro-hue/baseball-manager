@@ -89,6 +89,7 @@
 | B14 | **[P0] ドラフト指名選手ゼロバグ（全球団未反映・1位漏れ・重複指名）** | `handleDraftComplete` が myId のみ・2巡目以降のみを farm に追加 → 全12球団に1〜6巡目全指名を反映。`cpuPick()` の avail フィルタに `!p._drafted` を追加。くじ引き演出を CPU 間競合が実際に発生するよう `buildCpuPicks` の重複排除を廃止し複数競合ループ（最大3回）を実装 | TBD |
 | B15 | **[P1] 翌年移行時に前年オールスター結果が引き継がれる** | `handleNextYear()` が `setAllStarResult(null)` を呼ばないため前年スコアが AS セルに残存。`setAllStarResult` を useOffseason の destructuring に追加し null リセットを追加 | TBD |
 | B16 | **[P1] 翌年7月グリッドが途中切断（7/20以降不表示）** | オールスターエントリが schedule 末尾（index 144-145）に追加されるため `buildMonthGrid` の `lastDate` が AS 日付（7/16等）になりグリッドが週末で終端。`monthEntries.sort()` で日付順ソートして修正 | TBD |
+| U1 | **[P1] ロースター打順スワップ＋守備配置バリデーション（DH対応）** | ロースターの打順変更を挿入からスワップに変更。DH有無に応じたラインナップ人数（8/9）と守備配置（未割り当て/重複）をタブ遷移時に検証し、不正時は warn 通知で遷移ブロック。`dhEnabled` フラグと DH ポジション表示制御を追加 | TBD |
 
 ---
 
