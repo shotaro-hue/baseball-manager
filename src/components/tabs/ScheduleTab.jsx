@@ -77,6 +77,8 @@ function buildMonthGrid(schedule, year, myId, month, gameResultsMap) {
   }
   if (monthEntries.length === 0) return [];
 
+  monthEntries.sort((a, b) => a.date.day - b.date.day);
+
   const firstDate = monthEntries[0].date;
   const lastDate = monthEntries[monthEntries.length - 1].date;
 

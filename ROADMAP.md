@@ -1,6 +1,6 @@
 # Baseball Manager 2025 — ロードマップ
 
-> 最終更新: 2026-04-11（ロースター打順・守備位置プルダウン 完了）
+> 最終更新: 2026-04-12（B15/B16 日程タブ翌年バグ修正 完了）
 > **ゴール**: NPB版 OOTP / Football Manager — 深いシミュレーションと長期フランチャイズ経営
 > **運用ルール**: 実装完了した項目は ✅ に更新。新規項目は末尾に追記。過去の記録は削除しない。
 
@@ -87,6 +87,8 @@
 | B12 | **[P0] 残り全試合シムで黒画面（trade_news エントリの score 参照 TypeError）** | `runBatchGames` の `results` 配列に `trade_news` 型エントリ（CPU同士トレード通知）が混在するにもかかわらず、`setRecentResults` / `setGameResultsMap` の functional updater 内で `r.score.my` を全エントリに対して参照していた。`trade_news` エントリは `score` フィールドを持たないため `TypeError` が発生し React のレンダーフェーズでクラッシュ → 黒画面。`gameResults = results.filter(r=>r.type!=='trade_news')` で除外してから `setBatchResults` / `setRecentResults` / `setGameResultsMap` に渡すよう修正 | — |
 | B13 | **[P1] 投手成績集計バグ（BF過剰計上・キャリアWHIP崩壊・starter undefined）** | postGame.js の盗塁BF除外漏れ・CareerTable totals の投手フィールド名誤り（BB→BBp / HRA→HRp, Hp・HBPp追加）・initGameState の myStarter フォールバック条件を緩和（先発限定→全投手） + simulation.js の Math.random() → rngf() 置換 | TBD |
 | B14 | **[P0] ドラフト指名選手ゼロバグ（全球団未反映・1位漏れ・重複指名）** | `handleDraftComplete` が myId のみ・2巡目以降のみを farm に追加 → 全12球団に1〜6巡目全指名を反映。`cpuPick()` の avail フィルタに `!p._drafted` を追加。くじ引き演出を CPU 間競合が実際に発生するよう `buildCpuPicks` の重複排除を廃止し複数競合ループ（最大3回）を実装 | TBD |
+| B15 | **[P1] 翌年移行時に前年オールスター結果が引き継がれる** | `handleNextYear()` が `setAllStarResult(null)` を呼ばないため前年スコアが AS セルに残存。`setAllStarResult` を useOffseason の destructuring に追加し null リセットを追加 | TBD |
+| B16 | **[P1] 翌年7月グリッドが途中切断（7/20以降不表示）** | オールスターエントリが schedule 末尾（index 144-145）に追加されるため `buildMonthGrid` の `lastDate` が AS 日付（7/16等）になりグリッドが週末で終端。`monthEntries.sort()` で日付順ソートして修正 | TBD |
 
 ---
 
