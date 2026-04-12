@@ -77,3 +77,16 @@ describe('calcAllStarTriggerDay', () => {
     expect(calcAllStarTriggerDay(schedule, [])).toBe(72);
   });
 });
+
+
+describe('allstar entries in generated schedule', () => {
+  it('2026年のオールスターは7月で、通常試合の後ろに配置される', () => {
+    const schedule = generateSeasonSchedule(2026, teams);
+    const asEntries = schedule.filter(day => day?.isAllStar);
+
+    expect(asEntries.length).toBe(2);
+    expect(schedule.indexOf(asEntries[0])).toBeGreaterThan(143);
+    expect(asEntries[0].date.month).toBe(7);
+    expect(asEntries[1].date.month).toBe(7);
+  });
+});
