@@ -220,12 +220,20 @@ export function buildRealTeam(def, rosterData) {
 
   const nonPitchers = players.filter(p => !p.isPitcher);
   const starters    = players.filter(p => p.isPitcher && p.subtype === '先発');
+  const dhEnabled = def.league === 'パ';
+  if (nonPitchers[8]) nonPitchers[8].pos = 'DH';
+  const lineupNoDh = nonPitchers.slice(0, 8).map(p => p.id);
+  const lineupDh = nonPitchers.slice(0, 9).map(p => p.id);
 
   return {
     ...def,
     players, farm,
     育成Players: [],
-    lineup:   nonPitchers.slice(0, 9).map(p => p.id),
+    dhEnabled,
+    rosterDhMode: dhEnabled,
+    lineup: dhEnabled ? lineupDh : lineupNoDh,
+    lineupNoDh,
+    lineupDh,
     rotation: starters.slice(0, 5).map(p => p.id),
     rotIdx:   0,
     wins: 0, losses: 0, draws: 0, rf: 0, ra: 0,

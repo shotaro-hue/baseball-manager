@@ -18,7 +18,13 @@ import { pickQuestion, calcPressDelta } from '../engine/pressConference';
 
 const INIT_TEAMS = TEAM_DEFS.map(function(d){
   const t = NPB2025_ROSTERS[d.id] ? buildRealTeam(d, NPB2025_ROSTERS[d.id]) : buildTeam(d);
-  t.history = []; return t;
+  const nonPitcherIds = (t.players || []).filter(p => !p.isPitcher).map(p => p.id);
+  t.lineupNoDh = (t.lineupNoDh || t.lineup || nonPitcherIds).filter(id => nonPitcherIds.includes(id)).slice(0, 8);
+  t.lineupDh = (t.lineupDh || t.lineup || nonPitcherIds).filter(id => nonPitcherIds.includes(id)).slice(0, 9);
+  t.rosterDhMode = t.rosterDhMode ?? t.dhEnabled ?? false;
+  t.lineup = (t.rosterDhMode ? t.lineupDh : t.lineupNoDh).slice();
+  t.history = [];
+  return t;
 });
 
 export function useGameState() {
@@ -193,12 +199,18 @@ export function useGameState() {
     if(!myTeam) return;
     const inL=myTeam.lineup.includes(pid);
     const p=myTeam.players.find(x=>x.id===pid);
-    const maxLineup = myTeam.dhEnabled ? 9 : 8;
+    const dhMode = myTeam.rosterDhMode ?? myTeam.dhEnabled;
+    const maxLineup = dhMode ? 9 : 8;
     if(p?.isPitcher){notify("投手は打線に入れられません","warn");return;}
     if(p?.injury){notify("故障中は出場不可","warn");return;}
     if(!inL&&myTeam.lineup.length>=maxLineup){notify(`打線は最大${maxLineup}人です`,"warn");return;}
     if(inL&&myTeam.lineup.length<=4){notify("最低4人必要です","warn");return;}
-    upd(myId,t=>({...t,lineup:inL?t.lineup.filter(id=>id!==pid):[...t.lineup,pid]}));
+    upd(myId,t=>{
+      const nextLineup = inL ? t.lineup.filter(id=>id!==pid) : [...t.lineup,pid];
+      return dhMode
+        ? { ...t, lineup: nextLineup, lineupDh: nextLineup.slice(0, 9) }
+        : { ...t, lineup: nextLineup, lineupNoDh: nextLineup.slice(0, 8) };
+    });
   },[myTeam,upd,myId,notify]);
 
   const setLineupOrder = useCallback((pid, order) => {
@@ -208,7 +220,8 @@ export function useGameState() {
     if ((p?.injuryDaysLeft ?? 0) > 0) { notify("故障中は出場不可", "warn"); return; }
     if (order === 0 && myTeam.lineup.length <= 4) { notify("最低4人必要です", "warn"); return; }
 
-    const maxLineup = myTeam.dhEnabled ? 9 : 8;
+    const dhMode = myTeam.rosterDhMode ?? myTeam.dhEnabled;
+    const maxLineup = dhMode ? 9 : 8;
     const targetIdx = order - 1;
     const currentIdx = myTeam.lineup.indexOf(pid);
     const isInLineup = currentIdx !== -1;
@@ -218,7 +231,12 @@ export function useGameState() {
     }
 
     upd(myId, t => {
-      if (order === 0) return { ...t, lineup: t.lineup.filter(id => id !== pid) };
+      if (order === 0) {
+        const nextLineup = t.lineup.filter(id => id !== pid);
+        return dhMode
+          ? { ...t, lineup: nextLineup, lineupDh: nextLineup.slice(0, 9) }
+          : { ...t, lineup: nextLineup, lineupNoDh: nextLineup.slice(0, 8) };
+      }
       const lineup = [...t.lineup];
       const currentIdxInTeam = lineup.indexOf(pid);
       const inLineup = currentIdxInTeam !== -1;
@@ -227,7 +245,10 @@ export function useGameState() {
         if (targetIdx > lineup.length) return t;
         if (lineup.length >= maxLineup) return t;
         lineup.splice(targetIdx, 0, pid);
-        return { ...t, lineup: lineup.slice(0, maxLineup) };
+        const nextLineup = lineup.slice(0, maxLineup);
+        return dhMode
+          ? { ...t, lineup: nextLineup, lineupDh: nextLineup }
+          : { ...t, lineup: nextLineup, lineupNoDh: nextLineup };
       }
 
       if (targetIdx === currentIdxInTeam) return t;
@@ -235,7 +256,9 @@ export function useGameState() {
       const occupantId = lineup[targetIdx];
       lineup[currentIdxInTeam] = occupantId;
       lineup[targetIdx] = pid;
-      return { ...t, lineup };
+      return dhMode
+        ? { ...t, lineup, lineupDh: lineup.slice(0, 9) }
+        : { ...t, lineup, lineupNoDh: lineup.slice(0, 8) };
     });
   }, [myTeam, upd, myId, notify]);
 
@@ -244,6 +267,21 @@ export function useGameState() {
       ...t,
       players: t.players.map(p => p.id === pid ? { ...p, pos } : p),
     }));
+  }, [upd, myId]);
+
+  const setRosterDhMode = useCallback((dhMode) => {
+    upd(myId, t => {
+      const nonPitcherIds = (t.players || []).filter(p => !p.isPitcher).map(p => p.id);
+      const lineupNoDh = (t.lineupNoDh || t.lineup || []).filter(id => nonPitcherIds.includes(id)).slice(0, 8);
+      const lineupDh = (t.lineupDh || t.lineup || []).filter(id => nonPitcherIds.includes(id)).slice(0, 9);
+      return {
+        ...t,
+        rosterDhMode: dhMode,
+        lineupNoDh,
+        lineupDh,
+        lineup: (dhMode ? lineupDh : lineupNoDh).slice(),
+      };
+    });
   }, [upd, myId]);
 
   const setStarter = useCallback((pid)=>{upd(myId,t=>({...t,rotation:t.rotation.includes(pid)?t.rotation:[...t.rotation,pid]}));notify("先発ローテに追加","ok");},[upd,myId,notify]);
@@ -300,7 +338,7 @@ export function useGameState() {
     if(myTeam.farm.length>=MAX_FARM){notify("二軍満杯","warn");return;}
     // 手動降格: 登録抹消クールダウン10日をセット
     const demotedPlayer={...p,registrationCooldownDays:REGISTRATION_COOLDOWN_DAYS};
-    upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),lineup:t.lineup.filter(id=>id!==pid),rotation:t.rotation.filter(id=>id!==pid),farm:[...t.farm,demotedPlayer]}));
+    upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),lineup:t.lineup.filter(id=>id!==pid),lineupNoDh:(t.lineupNoDh||[]).filter(id=>id!==pid),lineupDh:(t.lineupDh||[]).filter(id=>id!==pid),rotation:t.rotation.filter(id=>id!==pid),farm:[...t.farm,demotedPlayer]}));
     notify(`${p.name}を二軍降格（再登録まで${REGISTRATION_COOLDOWN_DAYS}日）`,"warn");
   },[myTeam,upd,myId,notify]);
 
@@ -414,6 +452,7 @@ export function useGameState() {
     handleInterview,
     toggleLineup,
     setLineupOrder,
+    setRosterDhMode,
     setPlayerPosition,
     setStarter,
     moveRotation,

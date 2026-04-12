@@ -43,11 +43,19 @@ export default function App(){
   const handleLoad = () => {
     const saved = loadGame();
     if(!saved){ gs.notify('セーブデータがありません','warn'); return; }
-    gs.setTeams(saved.teams);
+    const normalizedTeams = (saved.teams || []).map(t => {
+      const nonPitcherIds = (t.players || []).filter(p => !p.isPitcher).map(p => p.id);
+      const fallback = (t.lineup || []).filter(id => nonPitcherIds.includes(id));
+      const lineupNoDh = (t.lineupNoDh || fallback).filter(id => nonPitcherIds.includes(id)).slice(0, 8);
+      const lineupDh = (t.lineupDh || fallback).filter(id => nonPitcherIds.includes(id)).slice(0, 9);
+      const rosterDhMode = t.rosterDhMode ?? t.dhEnabled ?? false;
+      return { ...t, lineupNoDh, lineupDh, rosterDhMode, lineup: (rosterDhMode ? lineupDh : lineupNoDh).slice() };
+    });
+    gs.setTeams(normalizedTeams);
     gs.setMyId(saved.myId);
     gs.setGameDay(saved.gameDay);
     gs.setYear(saved.year);
-    const loadedSchedule = generateSeasonSchedule(saved.year, saved.teams);
+    const loadedSchedule = generateSeasonSchedule(saved.year, normalizedTeams);
     gs.setSchedule(loadedSchedule);
     const loadedParams = SEASON_PARAMS[saved.year] || getDefaultParams(saved.year);
     gs.setAllStarTriggerDay(calcAllStarTriggerDay(loadedSchedule, loadedParams.allStarSkipDates));
@@ -84,12 +92,13 @@ export default function App(){
       const lineupPlayers = myTeam.lineup
         .map(id => myTeam.players.find(p => p.id === id))
         .filter(Boolean);
-      const required = myTeam.dhEnabled ? POSITIONS : FIELDING_POSITIONS;
+      const rosterDhMode = myTeam.rosterDhMode ?? myTeam.dhEnabled;
+      const required = rosterDhMode ? POSITIONS : FIELDING_POSITIONS;
       const requiredCount = required.length;
 
       if (lineupPlayers.length < requiredCount) {
         notify(
-          myTeam.dhEnabled
+          rosterDhMode
             ? "打線が 9 人揃っていません（DH含む）"
             : "打線が 8 人揃っていません",
           "warn",
@@ -160,7 +169,7 @@ export default function App(){
   if(screen==="title"){const saveMeta=saveExists?getSaveMeta():null;return(<><div className="app"><div className="title"><div className="tlogo">⚾ BASEBALL<br/>MANAGER 2025</div><div className="tsub">NPB SIMULATION v2.1 — TACTICAL MODE</div>{saveMeta&&(<div style={{background:"rgba(74,222,128,.08)",border:"1px solid rgba(74,222,128,.3)",borderRadius:8,padding:"10px 14px",marginBottom:16,textAlign:"left"}}><div style={{fontSize:10,color:"#4ade80",letterSpacing:".1em",marginBottom:6}}>◈ セーブデータ</div><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}><div><div style={{fontWeight:700,fontSize:15}}>{saveMeta.teamEmoji} {saveMeta.teamName}</div><div style={{fontSize:11,color:"#94a3b8"}}>{saveMeta.year}年 第{saveMeta.gameDay}戦 {saveMeta.wins}勝{saveMeta.losses}敗</div><div style={{fontSize:9,color:"#64748b",marginTop:2}}>{saveMeta.savedAt}</div></div><div style={{display:"flex",gap:6,alignItems:"center"}}><button className="sim-btn" style={{margin:0,padding:"8px 18px",fontSize:13,background:"linear-gradient(135deg,#14532d,#166534)",borderColor:"rgba(74,222,128,.6)",color:"#4ade80"}} onClick={handleLoad}>▶ 続きから</button><button className="bsm bgr" style={{padding:"6px 10px"}} onClick={()=>{if(window.confirm('セーブデータを削除しますか？')){deleteSave();setSaveExists(false);}}}>削除</button></div></div></div>)}<div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,marginTop:saveExists?8:0,zIndex:1,position:"relative"}}>◈ 新規ゲーム — チームを選択</div><div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,zIndex:1,position:"relative"}}>◈ セントラルリーグ</div><div className="tgrid" style={{marginBottom:14}}>{TEAM_DEFS.filter(t=>t.league==="セ").map(t=><div key={t.id} className="tcard" style={{"--c":t.color}} onClick={()=>gs.handleSelect(t.id)}><span style={{fontSize:24,display:"block",marginBottom:5}}>{t.emoji}</span><div className="tcard-nm">{t.name}</div></div>)}</div><div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,zIndex:1,position:"relative"}}>◈ パシフィックリーグ</div><div className="tgrid">{TEAM_DEFS.filter(t=>t.league==="パ").map(t=><div key={t.id} className="tcard" style={{"--c":t.color}} onClick={()=>gs.handleSelect(t.id)}><span style={{fontSize:24,display:"block",marginBottom:5}}>{t.emoji}</span><div className="tcard-nm">{t.name}</div></div>)}</div></div></div></>);}
 
   if(screen==="mode_select") return(<><ModeSelectScreen myTeam={myTeam} oppTeam={currentOpp} gameDay={gameDay} onSelect={sf.handleModeSelect} onBack={()=>setScreen("hub")}/></>);
-  if(screen==="tactical_game"&&currentOpp) return(<><ErrorBoundary onReset={()=>setScreen("hub")}><TacticalGameScreen myTeam={myTeam} oppTeam={currentOpp} onGameEnd={sf.handleTacticalGameEnd}/></ErrorBoundary></>);
+  if(screen==="tactical_game"&&currentOpp) return(<><ErrorBoundary onReset={()=>setScreen("hub")}><TacticalGameScreen myTeam={sf.currentGameTeams?.my||myTeam} oppTeam={sf.currentGameTeams?.opp||currentOpp} onGameEnd={sf.handleTacticalGameEnd}/></ErrorBoundary></>);
   if(screen==="batch_result") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><BatchResultScreen results={batchResults} myTeam={myTeam} onEnd={()=>setScreen("hub")}/></ErrorBoundary></>);
 
   if(screen==="result"&&gameResult) return(<><ResultScreen gsResult={gameResult} myTeam={myTeam} oppTeam={gameResult.oppTeam} gameDay={gameDay-1} onNext={()=>setScreen("hub")}/></>);
@@ -246,7 +255,7 @@ export default function App(){
 
     <ErrorBoundary key={tab}>
     {tab==="dashboard"&&<DashboardTab myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year} recentResults={gs.recentResults} mailbox={mailbox} faPool={faPool} onTabSwitch={handleTabChange}/>}
-    {tab==="roster"&&<RosterTab team={myTeam} onToggle={gs.toggleLineup} onSetLineupOrder={gs.setLineupOrder} onSetPlayerPosition={gs.setPlayerPosition} onSetStarter={gs.setStarter} onPromo={gs.promote} onDemo={gs.demote} onSetTrainingFocus={gs.setTrainingFocus} onConvertIkusei={gs.convertIkusei} onMoveRotation={gs.moveRotation} onRemoveFromRotation={gs.removeFromRotation} onSetPitchingPattern={gs.setPitchingPattern} onPlayerClick={gs.handlePlayerClick} onSetDevGoal={gs.setDevGoal} onPlayerTalk={gs.handlePlayerTalk} gameDay={gameDay}/>}
+    {tab==="roster"&&<RosterTab team={myTeam} onToggle={gs.toggleLineup} onSetLineupOrder={gs.setLineupOrder} onSetRosterDhMode={gs.setRosterDhMode} onSetPlayerPosition={gs.setPlayerPosition} onSetStarter={gs.setStarter} onPromo={gs.promote} onDemo={gs.demote} onSetTrainingFocus={gs.setTrainingFocus} onConvertIkusei={gs.convertIkusei} onMoveRotation={gs.moveRotation} onRemoveFromRotation={gs.removeFromRotation} onSetPitchingPattern={gs.setPitchingPattern} onPlayerClick={gs.handlePlayerClick} onSetDevGoal={gs.setDevGoal} onPlayerTalk={gs.handlePlayerTalk} gameDay={gameDay}/>}
     {tab==="schedule"&&<ScheduleTab schedule={schedule} gameDay={gameDay} myTeam={myTeam} teams={teams} year={year} gameResultsMap={gs.gameResultsMap} allStarDone={gs.allStarDone} allStarResult={gs.allStarResult} allStarTriggerDay={gs.allStarTriggerDay}/>}
     {tab==="records"&&<RecordsTab history={gs.seasonHistory}/>}
     {tab==="news"&&<NewsTab news={news} onInterview={gs.handleInterview}/>}

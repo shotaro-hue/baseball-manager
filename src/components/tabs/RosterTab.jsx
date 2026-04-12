@@ -15,7 +15,7 @@ const TRAINING_OPTIONS=[["","バランス"],["contact","ミート"],["power","�
 
 const MoralBadge=({v})=>{const m=v||70;const icon=m>=75?"😊":m>=50?"😐":"😟";const col=m>=75?"#34d399":m>=50?"#f5c842":"#f87171";return <span style={{fontSize:10,color:col}}>{icon}{m}</span>;};
 
-export function RosterTab({team,onToggle,onSetLineupOrder,onSetPlayerPosition,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onPlayerClick,onSetDevGoal,onPlayerTalk,gameDay}){
+export function RosterTab({team,onToggle,onSetLineupOrder,onSetRosterDhMode,onSetPlayerPosition,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onPlayerClick,onSetDevGoal,onPlayerTalk,gameDay}){
   const [view,setView]=useState("batters");
   const [justConverted,setJustConverted]=useState(new Set());
   const [talkingPid,setTalkingPid]=useState(null);
@@ -34,7 +34,8 @@ export function RosterTab({team,onToggle,onSetLineupOrder,onSetPlayerPosition,on
   const lineupPlayers=team.lineup.map(id=>batters.find(p=>p.id===id)).filter(Boolean);
   const posCountInLineup=lineupPlayers.reduce((acc,p)=>{acc[p.pos]=(acc[p.pos]??0)+1;return acc;},{});
   const injured=team.players.filter(p=>(p.injuryDaysLeft??0)>0);
-  const lineupLimit = team.dhEnabled ? 9 : 8;
+  const rosterDhMode = team.rosterDhMode ?? team.dhEnabled;
+  const lineupLimit = rosterDhMode ? 9 : 8;
   const lineupSlots = Array.from({ length: lineupLimit }, (_, i) => i + 1);
   const autoSetLineup=()=>{
     const candidate=batters.filter(p=>(p.injuryDaysLeft??0)===0).slice().sort((a,b)=>{
@@ -72,8 +73,12 @@ export function RosterTab({team,onToggle,onSetLineupOrder,onSetPlayerPosition,on
             <span>打線設定 ({team.lineup.length}/{lineupLimit})</span>
             <span style={{fontSize:10,color:"#6b7280",fontWeight:400}}>
               守備配置: {FIELDING_POSITIONS.map(pos=>`${pos.replace("手","")}:${posCountInLineup[pos]??0}`).join(" / ")}
-              {team.dhEnabled ? ` / DH:${posCountInLineup["DH"]??0}` : ""}
+              {rosterDhMode ? ` / DH:${posCountInLineup["DH"]??0}` : ""}
             </span>
+            <div style={{display:"inline-flex",gap:4,marginLeft:8}}>
+              <button className={`bsm ${!rosterDhMode?"bgb":""}`} onClick={()=>onSetRosterDhMode&&onSetRosterDhMode(false)}>DHなし</button>
+              <button className={`bsm ${rosterDhMode?"bgb":""}`} onClick={()=>onSetRosterDhMode&&onSetRosterDhMode(true)}>DHあり</button>
+            </div>
             <button className="bsm bgb" style={{marginLeft:"auto"}} onClick={autoSetLineup}>自動編成</button>
           </div>
           <div style={{overflowX:"auto"}}>
@@ -128,7 +133,7 @@ export function RosterTab({team,onToggle,onSetLineupOrder,onSetPlayerPosition,on
                           if (onSetPlayerPosition) onSetPlayerPosition(p.id, e.target.value);
                         }}
                       >
-                        {POSITIONS.filter(pos => pos !== "DH" || team.dhEnabled).map(pos => {
+                        {POSITIONS.filter(pos => pos !== "DH" || rosterDhMode).map(pos => {
                           const n=posCountInLineup[pos]??0;
                           return (
                           <option key={pos} value={pos}>{pos}{n>0?` (${n})`:""}</option>

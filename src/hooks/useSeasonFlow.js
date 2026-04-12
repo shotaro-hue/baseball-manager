@@ -55,7 +55,7 @@ function autoInjuryDemote(team) {
   }
   if(demoted.length===0)return team;
   const demotedIds=new Set(demoted.map(p=>p.id));
-  return{...team,players:kept,lineup:(team.lineup??[]).filter(id=>!demotedIds.has(id)),rotation:(team.rotation??[]).filter(id=>!demotedIds.has(id)),farm:[...farm,...demoted]};
+  return{...team,players:kept,lineup:(team.lineup??[]).filter(id=>!demotedIds.has(id)),lineupNoDh:(team.lineupNoDh??[]).filter(id=>!demotedIds.has(id)),lineupDh:(team.lineupDh??[]).filter(id=>!demotedIds.has(id)),rotation:(team.rotation??[]).filter(id=>!demotedIds.has(id)),farm:[...farm,...demoted]};
 }
 
 export function useSeasonFlow(gs) {
@@ -76,6 +76,7 @@ export function useSeasonFlow(gs) {
   const [gameMode, setGameMode] = useState(null);
   const [batchResults, setBatchResults] = useState([]);
   const [playoff, setPlayoff] = useState(null);
+  const [currentGameTeams, setCurrentGameTeams] = useState(null);
   const pendingPlayoffRef = useRef(false);
   const prevMyPlayersRef = useRef(null);
   const prevMyFarmRef = useRef(null);
@@ -214,6 +215,15 @@ export function useSeasonFlow(gs) {
     });
   };
 
+  const lineupForDh = (team, useDh) => {
+    const nonPitcherIds = (team.players || []).filter(p => !p.isPitcher).map(p => p.id);
+    const source = useDh ? (team.lineupDh || team.lineup || []) : (team.lineupNoDh || team.lineup || []);
+    const limit = useDh ? 9 : 8;
+    return source.filter(id => nonPitcherIds.includes(id)).slice(0, limit);
+  };
+
+  const applyDhToTeam = (team, useDh) => ({ ...team, lineup: lineupForDh(team, useDh) });
+
   const pickOpponentFromSchedule = (day) => {
     const matchup=getMyMatchup(schedule,day,myId);
     if(matchup){
@@ -227,9 +237,16 @@ export function useSeasonFlow(gs) {
   // Pick opponent and go to mode select
   const handleStartGame = () => {
     if(!myTeam) return;
-    const {opp}=pickOpponentFromSchedule(gameDay);
+    const {opp,isHome}=pickOpponentFromSchedule(gameDay);
     if(!opp) return;
     setCurrentOpp(opp);
+    const useDh = isHome ? !!myTeam.dhEnabled : !!opp.dhEnabled;
+    setCurrentGameTeams({
+      my: applyDhToTeam(myTeam, useDh),
+      opp: applyDhToTeam(opp, useDh),
+      useDh,
+      isHome,
+    });
     setScreen("mode_select");
   };
 
@@ -239,8 +256,9 @@ export function useSeasonFlow(gs) {
     if(mode==="tactical"){
       setScreen("tactical_game");
     } else {
-      const myT=teams.find(t=>t.id===myId);
-      const r=quickSimGame(myT,currentOpp);
+      const myT=(currentGameTeams?.my)||teams.find(t=>t.id===myId);
+      const oppT=(currentGameTeams?.opp)||currentOpp;
+      const r=quickSimGame(myT,oppT);
       handleAutoSimEnd(r);
     }
   };
@@ -311,7 +329,8 @@ export function useSeasonFlow(gs) {
         const a=newTeams.find(t=>t.id===matchup.homeId);
         const b=newTeams.find(t=>t.id===matchup.awayId);
         if(!a||!b) continue;
-        const cr=quickSimGame(a,b);
+        const useDh = !!a.dhEnabled;
+        const cr=quickSimGame(applyDhToTeam(a, useDh),applyDhToTeam(b, useDh));
         const cdrew=cr.score.my===cr.score.opp;
         const aWon=cr.won;
         if(aWon){a.wins++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.losses++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
@@ -426,7 +445,8 @@ export function useSeasonFlow(gs) {
         const a=newTeams.find(t=>t.id===cpuMatchup.homeId);
         const b=newTeams.find(t=>t.id===cpuMatchup.awayId);
         if(!a||!b) continue;
-        const cr=quickSimGame(a,b);
+        const useDh = !!a.dhEnabled;
+        const cr=quickSimGame(applyDhToTeam(a, useDh),applyDhToTeam(b, useDh));
         const cdrew=cr.score.my===cr.score.opp;
         const aWon=cr.won;
         if(aWon){a.wins++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.losses++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
@@ -455,7 +475,8 @@ export function useSeasonFlow(gs) {
         results.push({ type: 'trade_news', ...cpuCpuTradeNews, day: newDay });
       }
       const myT=newTeams.find(t=>t.id===myId);
-      const r=quickSimGame(myT,opp);
+      const useDh = scheduleMatchup ? (scheduleMatchup.isHome ? !!myT.dhEnabled : !!opp.dhEnabled) : !!myT.dhEnabled;
+      const r=quickSimGame(applyDhToTeam(myT, useDh),applyDhToTeam(opp, useDh));
       const won=r.score.my>r.score.opp;
       const drew=r.score.my===r.score.opp;
       if(won){myT.wins++;myT.rf+=r.score.my;myT.ra+=r.score.opp;}
@@ -476,7 +497,7 @@ export function useSeasonFlow(gs) {
       myT.farm=tickInjuries(myT.farm??[]);
       myT.farm=tickCooldowns(myT.farm??[]);
       // 怪我日数 > 10日の一軍選手を自動二軍降格（インライン: myT参照を維持）
-      {const farm=myT.farm??[];const demotedB=[];const keptB=[];for(const p of myT.players){if((p.injuryDaysLeft??0)>INJURY_AUTO_DEMOTE_DAYS&&farm.length+demotedB.length<MAX_FARM){demotedB.push({...p,registrationCooldownDays:REGISTRATION_COOLDOWN_DAYS});}else{keptB.push(p);}}if(demotedB.length>0){const dIds=new Set(demotedB.map(p=>p.id));myT.players=keptB;myT.farm=[...farm,...demotedB];myT.lineup=(myT.lineup??[]).filter(id=>!dIds.has(id));myT.rotation=(myT.rotation??[]).filter(id=>!dIds.has(id));}}
+      {const farm=myT.farm??[];const demotedB=[];const keptB=[];for(const p of myT.players){if((p.injuryDaysLeft??0)>INJURY_AUTO_DEMOTE_DAYS&&farm.length+demotedB.length<MAX_FARM){demotedB.push({...p,registrationCooldownDays:REGISTRATION_COOLDOWN_DAYS});}else{keptB.push(p);}}if(demotedB.length>0){const dIds=new Set(demotedB.map(p=>p.id));myT.players=keptB;myT.farm=[...farm,...demotedB];myT.lineup=(myT.lineup??[]).filter(id=>!dIds.has(id));myT.lineupNoDh=(myT.lineupNoDh??[]).filter(id=>!dIds.has(id));myT.lineupDh=(myT.lineupDh??[]).filter(id=>!dIds.has(id));myT.rotation=(myT.rotation??[]).filter(id=>!dIds.has(id));}}
       const oppT=newTeams.find(t=>t.id===opp.id);
       if(oppT){
         if(won){oppT.losses++;oppT.rf+=r.score.opp;oppT.ra+=r.score.my;}
@@ -589,7 +610,8 @@ export function useSeasonFlow(gs) {
         const a=newTeams.find(t=>t.id===matchup.homeId);
         const b=newTeams.find(t=>t.id===matchup.awayId);
         if(!a||!b) continue;
-        const cr=quickSimGame(a,b);
+        const useDh = !!a.dhEnabled;
+        const cr=quickSimGame(applyDhToTeam(a, useDh),applyDhToTeam(b, useDh));
         const cdrew=cr.score.my===cr.score.opp;
         const aWon=cr.won;
         if(aWon){a.wins++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.losses++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
@@ -655,6 +677,7 @@ export function useSeasonFlow(gs) {
   return {
     gameResult, setGameResult,
     currentOpp, setCurrentOpp,
+    currentGameTeams, setCurrentGameTeams,
     gameMode, setGameMode,
     batchResults, setBatchResults,
     playoff, setPlayoff,
