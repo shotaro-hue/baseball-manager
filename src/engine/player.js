@@ -1,6 +1,6 @@
 import { rng, clamp, uid, pname, CITIES } from '../utils';
 import {
-  POSITIONS, PLAYER_TYPES_B, PLAYER_TYPES_P, PLAYER_COMMENTS_B, PLAYER_COMMENTS_P, MIN_SALARY_IKUSEI,
+  FIELDING_POSITIONS, PLAYER_TYPES_B, PLAYER_TYPES_P, PLAYER_COMMENTS_B, PLAYER_COMMENTS_P, MIN_SALARY_IKUSEI,
   FOREIGN_PLAYER_NAMES, FOREIGN_NATIONALITIES, INJURY_BODY_PARTS, INJURY_RECURRENCE_MULTIPLIER,
   INJURY_RECURRENCE_WINDOW_YEARS,
 } from '../constants';
@@ -123,20 +123,26 @@ export function generateForeignFaPool(count) {
  */
 export function buildTeam(def) {
   const q = rng(56, 76);
+  const dhEnabled = def.league === "パ";
   const players = [];
-  POSITIONS.forEach((pos) => players.push(makePlayer(pos, q + (pos === "捕手" ? 3 : 0), false)));
-  for (let i = 0; i < 6; i++) players.push(makePlayer(POSITIONS[rng(0, 7)], q - 14, false));
+  FIELDING_POSITIONS.forEach((pos) => players.push(makePlayer(pos, q + (pos === "捕手" ? 3 : 0), false)));
+  for (let i = 0; i < 6; i++) players.push(makePlayer(FIELDING_POSITIONS[rng(0, FIELDING_POSITIONS.length - 1)], q - 14, false));
   for (let i = 0; i < 5; i++) players.push(makePlayer("先発", q + 5 - i * 3, true, rng(21, 33)));
   for (let i = 0; i < 4; i++) players.push(makePlayer("中継ぎ", q - 4, true, rng(23, 31)));
   players.push(makePlayer("抑え", q + 4, true, rng(24, 32)));
 
   const farm = [];
-  for (let i = 0; i < 15; i++) farm.push(makePlayer(POSITIONS[rng(0, 7)], q - 20, false, rng(18, 25)));
+  for (let i = 0; i < 15; i++) farm.push(makePlayer(FIELDING_POSITIONS[rng(0, FIELDING_POSITIONS.length - 1)], q - 20, false, rng(18, 25)));
   for (let i = 0; i < 8; i++) farm.push(makePlayer("先発", q - 15, true, rng(18, 24)));
+
+  const nonPitchers = players.filter((p) => !p.isPitcher);
+  if (dhEnabled && nonPitchers[8]) nonPitchers[8].pos = "DH";
+  const lineup = nonPitchers.slice(0, dhEnabled ? 9 : 8).map((p) => p.id);
 
   return {
     ...def, players, farm, 育成Players: [],
-    lineup: players.filter((p) => !p.isPitcher).slice(0, 9).map((p) => p.id),
+    dhEnabled,
+    lineup,
     rotation: players.filter((p) => p.isPitcher && p.subtype === "先発").map((p) => p.id),
     rotIdx: 0, wins: 0, losses: 0, draws: 0, rf: 0, ra: 0,
     coaches: [], budget: def.budget,

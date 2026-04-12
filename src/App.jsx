@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles.css';
 import { uid, fmtM, fmtSal, gameDayToDate, scoutedValue, clamp, rng, rngf } from './utils';
@@ -20,6 +20,7 @@ import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, Alumn
 import {
   SEASON_GAMES, BATCH, MAX_外国人_一軍, TEAM_DEFS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
   POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD,
+  POSITIONS, FIELDING_POSITIONS,
   FOREIGN_DEADLINE_DAY, FOREIGN_AGENT_SALARY_RATIO, FOREIGN_AGENT_ACCEPT_PROB, FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX, TRADE_DEADLINE_MONTH,
 } from './constants';
 import { calcOwnerTrustDelta } from './engine/frontend';
@@ -78,6 +79,40 @@ export default function App(){
   const { gameResult, currentOpp, batchResults, playoff, setPlayoff } = sf;
   const { developmentSummary, newSeasonInfo, draftPool, setDraftPool, draftResult, setDraftResult, draftAllocation, setDraftAllocation, waiverClaimResults } = os;
   const [agentNeg, setAgentNeg] = useState(null);
+  const handleTabChange = useCallback((newTab) => {
+    if (tab === "roster" && newTab !== "roster" && myTeam) {
+      const lineupPlayers = myTeam.lineup
+        .map(id => myTeam.players.find(p => p.id === id))
+        .filter(Boolean);
+      const required = myTeam.dhEnabled ? POSITIONS : FIELDING_POSITIONS;
+      const requiredCount = required.length;
+
+      if (lineupPlayers.length < requiredCount) {
+        notify(
+          myTeam.dhEnabled
+            ? "打線が 9 人揃っていません（DH含む）"
+            : "打線が 8 人揃っていません",
+          "warn",
+        );
+        return;
+      }
+
+      const posCount = {};
+      lineupPlayers.forEach(p => { posCount[p.pos] = (posCount[p.pos] ?? 0) + 1; });
+
+      for (const pos of required) {
+        if (!posCount[pos]) {
+          notify(`${pos}が未割り当てです`, "warn");
+          return;
+        }
+        if (posCount[pos] > 1) {
+          notify(`${pos}が重複しています`, "warn");
+          return;
+        }
+      }
+    }
+    setTab(newTab);
+  }, [tab, myTeam, notify, setTab]);
 
   const foreignFaPool = faPool.filter(p => p.isForeign);
   const domesticFaPool = faPool.filter(p => !p.isForeign);
@@ -200,7 +235,7 @@ export default function App(){
           <div className="tab-group-label">{group.label}</div>
           <div className="tabs">
             {group.tabs.map(([id,l])=>(
-              <button key={id} className={`tab ${tab===id?"on":""}`} onClick={()=>setTab(id)}>
+              <button key={id} className={`tab ${tab===id?"on":""}`} onClick={()=>handleTabChange(id)}>
                 {l}{tabBadges[id]&&<span style={{marginLeft:4,background:tabBadges[id].color,color:"#fff",borderRadius:8,padding:"0 5px",fontSize:9,fontWeight:700}}>{tabBadges[id].n}</span>}
               </button>
             ))}
@@ -210,7 +245,7 @@ export default function App(){
     </div>
 
     <ErrorBoundary key={tab}>
-    {tab==="dashboard"&&<DashboardTab myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year} recentResults={gs.recentResults} mailbox={mailbox} faPool={faPool} onTabSwitch={setTab}/>}
+    {tab==="dashboard"&&<DashboardTab myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year} recentResults={gs.recentResults} mailbox={mailbox} faPool={faPool} onTabSwitch={handleTabChange}/>}
     {tab==="roster"&&<RosterTab team={myTeam} onToggle={gs.toggleLineup} onSetLineupOrder={gs.setLineupOrder} onSetPlayerPosition={gs.setPlayerPosition} onSetStarter={gs.setStarter} onPromo={gs.promote} onDemo={gs.demote} onSetTrainingFocus={gs.setTrainingFocus} onConvertIkusei={gs.convertIkusei} onMoveRotation={gs.moveRotation} onRemoveFromRotation={gs.removeFromRotation} onSetPitchingPattern={gs.setPitchingPattern} onPlayerClick={gs.handlePlayerClick} onSetDevGoal={gs.setDevGoal} onPlayerTalk={gs.handlePlayerTalk} gameDay={gameDay}/>}
     {tab==="schedule"&&<ScheduleTab schedule={schedule} gameDay={gameDay} myTeam={myTeam} teams={teams} year={year} gameResultsMap={gs.gameResultsMap} allStarDone={gs.allStarDone} allStarResult={gs.allStarResult} allStarTriggerDay={gs.allStarTriggerDay}/>}
     {tab==="records"&&<RecordsTab history={gs.seasonHistory}/>}

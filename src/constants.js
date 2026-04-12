@@ -93,7 +93,8 @@ export const TEAM_DEFS = [
   { id: 11, name: "オリックス・バファローズ",       short: "オリックス", league: "パ", emoji: "🦬", color: "#10b981", city: "大阪",   budget: 460000 },
 ];
 
-export const POSITIONS = ["捕手", "一塁手", "二塁手", "三塁手", "遊撃手", "左翼手", "中堅手", "右翼手"];
+export const POSITIONS = ["捕手", "一塁手", "二塁手", "三塁手", "遊撃手", "左翼手", "中堅手", "右翼手", "DH"];
+export const FIELDING_POSITIONS = ["捕手", "一塁手", "二塁手", "三塁手", "遊撃手", "左翼手", "中堅手", "右翼手"];
 
 export const COACH_DEFS = [
   { type: "batting",  name: "打撃コーチ",     emoji: "🏏" },

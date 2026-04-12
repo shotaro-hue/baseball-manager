@@ -193,9 +193,10 @@ export function useGameState() {
     if(!myTeam) return;
     const inL=myTeam.lineup.includes(pid);
     const p=myTeam.players.find(x=>x.id===pid);
+    const maxLineup = myTeam.dhEnabled ? 9 : 8;
     if(p?.isPitcher){notify("投手は打線に入れられません","warn");return;}
     if(p?.injury){notify("故障中は出場不可","warn");return;}
-    if(!inL&&myTeam.lineup.length>=9){notify("打線は最大9人です","warn");return;}
+    if(!inL&&myTeam.lineup.length>=maxLineup){notify(`打線は最大${maxLineup}人です`,"warn");return;}
     if(inL&&myTeam.lineup.length<=4){notify("最低4人必要です","warn");return;}
     upd(myId,t=>({...t,lineup:inL?t.lineup.filter(id=>id!==pid):[...t.lineup,pid]}));
   },[myTeam,upd,myId,notify]);
@@ -205,19 +206,36 @@ export function useGameState() {
     const p = myTeam.players.find(x => x.id === pid);
     if (p?.isPitcher) { notify("投手は打線に入れられません", "warn"); return; }
     if ((p?.injuryDaysLeft ?? 0) > 0) { notify("故障中は出場不可", "warn"); return; }
+    if (order === 0 && myTeam.lineup.length <= 4) { notify("最低4人必要です", "warn"); return; }
+
+    const maxLineup = myTeam.dhEnabled ? 9 : 8;
+    const targetIdx = order - 1;
+    const currentIdx = myTeam.lineup.indexOf(pid);
+    const isInLineup = currentIdx !== -1;
+    if (!isInLineup && order > 0 && myTeam.lineup.length >= maxLineup) {
+      notify(`打線は最大${maxLineup}人です`, "warn");
+      return;
+    }
 
     upd(myId, t => {
-      if (order === 0) {
-        if (t.lineup.length <= 4) { notify("最低4人必要です", "warn"); return t; }
-        return { ...t, lineup: t.lineup.filter(id => id !== pid) };
+      if (order === 0) return { ...t, lineup: t.lineup.filter(id => id !== pid) };
+      const lineup = [...t.lineup];
+      const currentIdxInTeam = lineup.indexOf(pid);
+      const inLineup = currentIdxInTeam !== -1;
+
+      if (!inLineup) {
+        if (targetIdx > lineup.length) return t;
+        if (lineup.length >= maxLineup) return t;
+        lineup.splice(targetIdx, 0, pid);
+        return { ...t, lineup: lineup.slice(0, maxLineup) };
       }
 
-      const targetIdx = order - 1;
-      const isInLineup = t.lineup.includes(pid);
-      let lineup = t.lineup.filter(id => id !== pid);
-      if (!isInLineup && lineup.length >= 9) { notify("打線は最大9人です", "warn"); return t; }
-      lineup.splice(targetIdx, 0, pid);
-      return { ...t, lineup: lineup.slice(0, 9) };
+      if (targetIdx === currentIdxInTeam) return t;
+      if (targetIdx >= lineup.length) return t;
+      const occupantId = lineup[targetIdx];
+      lineup[currentIdxInTeam] = occupantId;
+      lineup[targetIdx] = pid;
+      return { ...t, lineup };
     });
   }, [myTeam, upd, myId, notify]);
 
