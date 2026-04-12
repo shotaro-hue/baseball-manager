@@ -23,6 +23,14 @@ export function RosterTab({team,onToggle,onSetLineupOrder,onSetPlayerPosition,on
   const batters=team.players.filter(p=>!p.isPitcher);
   const pitchers=team.players.filter(p=>p.isPitcher);
   const liMap={};team.lineup.forEach((id,i)=>liMap[id]=i+1);
+  const batterOriginalIndex = {};
+  batters.forEach((p, i) => { batterOriginalIndex[p.id] = i; });
+  const orderedBatters = [...batters].sort((a, b) => {
+    const aOrder = liMap[a.id] ?? Number.POSITIVE_INFINITY;
+    const bOrder = liMap[b.id] ?? Number.POSITIVE_INFINITY;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return (batterOriginalIndex[a.id] ?? 0) - (batterOriginalIndex[b.id] ?? 0);
+  });
   const lineupPlayers=team.lineup.map(id=>batters.find(p=>p.id===id)).filter(Boolean);
   const posCountInLineup=lineupPlayers.reduce((acc,p)=>{acc[p.pos]=(acc[p.pos]??0)+1;return acc;},{});
   const injured=team.players.filter(p=>(p.injuryDaysLeft??0)>0);
@@ -72,7 +80,7 @@ export function RosterTab({team,onToggle,onSetLineupOrder,onSetPlayerPosition,on
             <table className="tbl">
               <thead><tr><th>#</th><th>選手名</th><th>守備</th><th>年齢</th><th>ミート</th><th>長打</th><th>走力</th><th>選球</th><th>クラッチ</th><th>変化球</th><th>状態</th><th>モラル</th><th>打率</th><th>HR</th><th>OPS</th><th>強化</th><th></th></tr></thead>
               <tbody>
-                {batters.map(p=>{const inL=team.lineup.includes(p.id);const sb=saberBatter(p.stats);const isInj=(p.injuryDaysLeft??0)>0;return(
+                {orderedBatters.map(p=>{const inL=team.lineup.includes(p.id);const sb=saberBatter(p.stats);const isInj=(p.injuryDaysLeft??0)>0;return(
                   <tr key={p.id} style={isInj?{opacity:.55}:undefined}>
                     <td>
                       <select
