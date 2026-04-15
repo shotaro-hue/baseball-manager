@@ -66,7 +66,8 @@ function historyBatterEntry(h, teamId, teamName) {
 }
 
 function historyPitcherEntry(h, teamId, teamName) {
-  const { year, ERA = 4.0, W = 0, L = 0, IP = 0, K = 0, BB = 0, WHIP = 1.4, SV = 0 } = h;
+  const { year, ERA = 4.0, W = 0, L = 0, IP = 0, SO = 0, BB = 0, WHIP = 1.4, SV = 0 } = h;
+  const K = SO;
   const ER  = Math.round(ERA * IP / 9);
   const Hp  = Math.max(0, Math.round(WHIP * IP - BB));
   const BF  = Math.round(IP * 3.8);
@@ -147,7 +148,8 @@ export function realBatterToPlayer(b, teamDef) {
 /* ─── 投手変換 ─── */
 export function realPitcherToPlayer(p, teamDef) {
   const { name, age, pos, hand = 'right', hometown = teamDef.city, isForeign = false, salary, stats, history } = p;
-  const { ERA = 4.00, W = 5, L = 8, IP = 80, K = 70, BB = 35, WHIP = 1.40 } = stats;
+  const { ERA = 4.00, W = 5, L = 8, IP = 80, SO = 70, BB = 35, WHIP = 1.40 } = stats;
+  const K = SO;
 
   const k9  = IP > 0 ? K  / IP * 9 : 7;
   const bb9 = IP > 0 ? BB / IP * 9 : 3.5;
