@@ -56,15 +56,297 @@ export function ModeSelectScreen({myTeam,oppTeam,gameDay,onSelect,onBack}){
 ═══════════════════════════════════════════════ */
 
 export function ResultScreen({gsResult,myTeam,oppTeam,gameDay,onNext}){
+  const [activeTab,setActiveTab]=useState('bat');
   const won=gsResult.score.my>gsResult.score.opp;
+  const drew=gsResult.score.my===gsResult.score.opp;
+  const log=gsResult.log||[];
+  const inningSummary=gsResult.inningSummary||[];
+
+  // helpers
+  const IS_HIT=(r)=>['s','d','t','hr'].includes(r);
+  const IS_OUT=(r)=>['k','fo','go','po','dp','sf','sac','ife'].includes(r);
+  const findPlayer=(team,id)=>team?.players?.find(p=>p.id===id);
+  const fmtIPlocal=(outs)=>{const f=Math.floor(outs/3),r=outs%3;return r===0?`${f}`:`${f}.${r}`;};
+  const hrLabel=(rbi)=>({1:'ソロ',2:'2ラン',3:'3ラン',4:'満塁'}[rbi]||`${rbi}点本塁打`);
+  const fmtSeasonAvg=(p)=>{
+    if(!p?.stats)return'.---';
+    const ab=p.stats.AB||0,h=p.stats.H||0;
+    return ab===0?'.---':'.'+String(Math.round(h/ab*1000)).padStart(3,'0');
+  };
+
+  // line score
+  const maxInning=Math.max(9,...inningSummary.map(e=>e.inning));
+  const innings=Array.from({length:maxInning},(_,i)=>i+1);
+  const myRunsByInn={},oppRunsByInn={};
+  inningSummary.forEach(({inning,isTop,runs})=>{
+    if(isTop)oppRunsByInn[inning]=runs; else myRunsByInn[inning]=runs;
+  });
+  const myHitsTotal=log.filter(e=>e.scorer&&IS_HIT(e.result)&&!e.isStolenBase).length;
+  const oppHitsTotal=log.filter(e=>!e.scorer&&IS_HIT(e.result)&&!e.isStolenBase).length;
+
+  // pitcher event streams
+  const myPitchEvts=log.filter(e=>!e.scorer&&!e.isStolenBase&&e.pitcherId&&e.result&&e.result!=='change');
+  const oppPitchEvts=log.filter(e=>!!e.scorer&&!e.isStolenBase&&e.pitcherId&&e.result&&e.result!=='change');
+  const uniqueIds=(evts)=>{const seen=new Set(),out=[];evts.forEach(e=>{if(!seen.has(e.pitcherId)){seen.add(e.pitcherId);out.push(e.pitcherId);}});return out;};
+  const myPitcherIds=uniqueIds(myPitchEvts);
+  const oppPitcherIds=uniqueIds(oppPitchEvts);
+
+  const buildPitcherStats=(evts,ids)=>{
+    const m={};
+    evts.forEach(e=>{
+      if(!m[e.pitcherId])m[e.pitcherId]={outs:0,H:0,ER:0,K:0,BB:0};
+      const s=m[e.pitcherId];
+      if(IS_OUT(e.result))s.outs++;
+      if(IS_HIT(e.result))s.H++;
+      if(e.result==='k')s.K++;
+      if(e.result==='bb')s.BB++;
+      if((e.rbi||0)>0)s.ER+=e.rbi;
+    });
+    return ids.map(id=>({id,...(m[id]||{outs:0,H:0,ER:0,K:0,BB:0})}));
+  };
+  const myPStats=buildPitcherStats(myPitchEvts,myPitcherIds);
+  const oppPStats=buildPitcherStats(oppPitchEvts,oppPitcherIds);
+
+  // responsible pitchers
+  const myStarterOuts=myPStats[0]?.outs||0;
+  const myWinnerId=won?(myStarterOuts>=15?myPitcherIds[0]:(myPitcherIds[1]||myPitcherIds[0])):null;
+  const myLoserId=(!won&&!drew)?myPitcherIds[0]:null;
+  const finalLead=gsResult.score.my-gsResult.score.opp;
+  const mySaveSit=won&&finalLead>=1&&finalLead<=3;
+  const mySaverId=(won&&mySaveSit&&myPitcherIds.length>=2&&myPitcherIds[myPitcherIds.length-1]!==myWinnerId)?myPitcherIds[myPitcherIds.length-1]:null;
+  const oppStarterOuts=oppPStats[0]?.outs||0;
+  const oppWinnerId=(!won&&!drew)?(oppStarterOuts>=15?oppPitcherIds[0]:(oppPitcherIds[1]||oppPitcherIds[0])):null;
+  const oppLoserId=(won&&!drew)?oppPitcherIds[0]:null;
+  const oppSaveSit=!won&&!drew&&Math.abs(finalLead)<=3;
+  const oppSaverId=(!won&&oppSaveSit&&oppPitcherIds.length>=2&&oppPitcherIds[oppPitcherIds.length-1]!==oppWinnerId)?oppPitcherIds[oppPitcherIds.length-1]:null;
+
+  const myPRole=(id)=>id===myWinnerId?'勝':id===myLoserId?'敗':id===mySaverId?'S':'';
+  const oppPRole=(id)=>id===oppWinnerId?'勝':id===oppLoserId?'敗':id===oppSaverId?'S':'';
+
+  // home runs
+  const myHREvts=log.filter(e=>e.scorer&&e.result==='hr');
+  const oppHREvts=log.filter(e=>!e.scorer&&e.result==='hr');
+
+  // batter stats (this game, batting order)
+  const buildBatStats=(evts)=>{
+    const m={};
+    const ordered=[];
+    evts.filter(e=>e.batId&&e.result&&e.result!=='change'&&!e.isStolenBase).forEach(e=>{
+      if(!m[e.batId]){m[e.batId]={name:e.batter||'',AB:0,H:0,HR:0,RBI:0};ordered.push(e.batId);}
+      const s=m[e.batId];
+      if(!['bb','hbp','sf'].includes(e.result))s.AB++;
+      if(IS_HIT(e.result))s.H++;
+      if(e.result==='hr')s.HR++;
+      s.RBI+=(e.rbi||0);
+    });
+    return ordered.map(id=>({id,...m[id]}));
+  };
+  const myBatStats=buildBatStats(log.filter(e=>e.scorer));
+  const oppBatStats=buildBatStats(log.filter(e=>!e.scorer));
+
+  const resultColor=won?'var(--gold)':drew?'var(--blue)':'var(--red)';
+  const resultLabel=won?'VICTORY':drew?'DRAW':'DEFEAT';
+
+  const cellSt={textAlign:'center',padding:'5px 3px',fontFamily:"'Share Tech Mono',monospace"};
+  const thSt={...cellSt,fontSize:9,color:'var(--dim)',fontWeight:400,padding:'3px 3px'};
+
   return(
     <div className="app">
-      <div className="rw">
-        <div style={{color:"#1e2d3d",letterSpacing:".2em",fontSize:11,marginBottom:8}}>第{gameDay}戦 vs {oppTeam.name}</div>
-        <div className={`rtitle ${won?"rwin":"rlose"}`}>{won?"勝利！！":"敗北..."}</div>
-        <div className="rscore" style={{color:won?"#f5c842":"#374151"}}>{myTeam.short} {gsResult.score.my} – {gsResult.score.opp} {oppTeam.short}</div>
-        <div style={{color:"#374151",fontSize:12,marginBottom:28}}>通算 {myTeam.wins}勝 {myTeam.losses}敗</div>
-        <button className="btn btn-gold" onClick={onNext}>次の試合へ →</button>
+      <div style={{maxWidth:520,margin:'0 auto',paddingBottom:60}}>
+
+        {/* ── HEADER ── */}
+        <div style={{background:'linear-gradient(180deg,rgba(4,16,28,.95) 0%,var(--card) 100%)',padding:'20px 16px 16px',textAlign:'center',borderBottom:'1px solid var(--border)'}}>
+          <div style={{fontSize:10,color:'#94a3b8',letterSpacing:'.2em',marginBottom:10}}>第{gameDay}戦</div>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginBottom:12}}>
+            <div style={{textAlign:'center',flex:1}}>
+              <div style={{fontSize:30}}>{myTeam.emoji}</div>
+              <div style={{fontSize:11,color:'var(--text)',marginTop:3,fontWeight:700}}>{myTeam.short}</div>
+            </div>
+            <div style={{textAlign:'center',minWidth:120}}>
+              <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:52,lineHeight:1,letterSpacing:'.05em',color:resultColor}}>
+                {gsResult.score.my}<span style={{fontSize:32,color:'var(--dim)',margin:'0 4px'}}>-</span>{gsResult.score.opp}
+              </div>
+              <div style={{fontSize:9,letterSpacing:'.25em',color:resultColor,marginTop:3}}>{resultLabel}</div>
+            </div>
+            <div style={{textAlign:'center',flex:1}}>
+              <div style={{fontSize:30}}>{oppTeam.emoji}</div>
+              <div style={{fontSize:11,color:'var(--text)',marginTop:3,fontWeight:700}}>{oppTeam.short}</div>
+            </div>
+          </div>
+          <div style={{fontSize:11,color:'#94a3b8'}}>
+            vs {oppTeam.name}　通算
+            <span style={{color:'var(--green)',marginLeft:5}}>{myTeam.wins}勝</span>
+            <span style={{color:'#4b5563',margin:'0 2px'}}>/</span>
+            <span style={{color:'var(--red)'}}>{myTeam.losses}敗</span>
+            {(myTeam.draws||0)>0&&<><span style={{color:'#4b5563',margin:'0 2px'}}>/</span><span style={{color:'var(--dim)'}}>{myTeam.draws}分</span></>}
+          </div>
+        </div>
+
+        <div style={{padding:'12px 12px 0'}}>
+
+          {/* ── LINE SCORE ── */}
+          <div className="card" style={{padding:'10px 8px',overflowX:'auto'}}>
+            <div style={{fontSize:9,color:'var(--dim)',letterSpacing:'.2em',marginBottom:8}}>SCORE BY INNING</div>
+            <table style={{width:'100%',borderCollapse:'collapse',minWidth:280}}>
+              <thead>
+                <tr>
+                  <th style={{...thSt,textAlign:'left',width:28}}></th>
+                  {innings.map(i=><th key={i} style={{...thSt,minWidth:20}}>{i}</th>)}
+                  <th style={{...thSt,borderLeft:'1px solid var(--border)',paddingLeft:6,fontWeight:700}}>計</th>
+                  <th style={{...thSt}}>安</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style={{padding:'5px 2px',fontSize:11,fontWeight:700,color:oppTeam.color||'var(--text)',fontFamily:"'Share Tech Mono',monospace"}}>{oppTeam.short}</td>
+                  {innings.map(i=>{const r=oppRunsByInn[i];return<td key={i} style={{...cellSt,fontSize:12,color:r>0?'var(--text)':'var(--dim)',fontWeight:r>0?700:400}}>{r!==undefined?r:''}</td>;})}
+                  <td style={{...cellSt,fontSize:12,fontWeight:700,color:'var(--text)',borderLeft:'1px solid var(--border)',paddingLeft:6}}>{gsResult.score.opp}</td>
+                  <td style={{...cellSt,fontSize:11,color:'var(--dim)'}}>{oppHitsTotal}</td>
+                </tr>
+                <tr>
+                  <td style={{padding:'5px 2px',fontSize:11,fontWeight:700,color:myTeam.color||'var(--gold)',fontFamily:"'Share Tech Mono',monospace"}}>{myTeam.short}</td>
+                  {innings.map(i=>{
+                    const r=myRunsByInn[i];
+                    const isX=r===undefined&&won&&i===maxInning&&oppRunsByInn[i]!==undefined;
+                    return<td key={i} style={{...cellSt,fontSize:12,color:r>0?'var(--gold)':isX?'var(--dim)':'var(--dim)',fontWeight:r>0?700:400}}>{r!==undefined?r:isX?'X':''}</td>;
+                  })}
+                  <td style={{...cellSt,fontSize:12,fontWeight:700,color:'var(--gold)',borderLeft:'1px solid var(--border)',paddingLeft:6}}>{gsResult.score.my}</td>
+                  <td style={{...cellSt,fontSize:11,color:'var(--dim)'}}>{myHitsTotal}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* ── RESPONSIBLE PITCHERS ── */}
+          {(myWinnerId||myLoserId||mySaverId||oppWinnerId||oppLoserId||oppSaverId)&&(
+            <div className="card">
+              <div className="card-h">責任投手</div>
+              {[
+                myWinnerId&&{label:'勝',color:'var(--green)',player:findPlayer(myTeam,myWinnerId),team:myTeam.short},
+                oppWinnerId&&{label:'勝',color:'var(--green)',player:findPlayer(oppTeam,oppWinnerId),team:oppTeam.short},
+                myLoserId&&{label:'敗',color:'var(--red)',player:findPlayer(myTeam,myLoserId),team:myTeam.short},
+                oppLoserId&&{label:'敗',color:'var(--red)',player:findPlayer(oppTeam,oppLoserId),team:oppTeam.short},
+                mySaverId&&{label:'S',color:'var(--blue)',player:findPlayer(myTeam,mySaverId),team:myTeam.short},
+                oppSaverId&&{label:'S',color:'var(--blue)',player:findPlayer(oppTeam,oppSaverId),team:oppTeam.short},
+              ].filter(Boolean).map((row,i)=>(
+                <div key={i} className="fsb" style={{padding:'6px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:10}}>
+                    <span style={{width:12,fontWeight:700,color:row.color,fontSize:11}}>{row.label}</span>
+                    <span style={{fontSize:12,color:'var(--text)'}}>{row.player?.name||'?'}</span>
+                  </div>
+                  <span style={{fontSize:10,color:'var(--dim)'}}>【{row.team}】</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── HOME RUNS ── */}
+          {(myHREvts.length>0||oppHREvts.length>0)&&(
+            <div className="card">
+              <div className="card-h">本塁打</div>
+              {[
+                ...myHREvts.map(e=>({...e,teamShort:myTeam.short,teamColor:myTeam.color||'var(--gold)',isMy:true})),
+                ...oppHREvts.map(e=>({...e,teamShort:oppTeam.short,teamColor:oppTeam.color||'var(--text)',isMy:false})),
+              ].sort((a,b)=>a.inning-b.inning||(a.isTop?0:1)-(b.isTop?0:1)).map((e,i)=>(
+                <div key={i} className="fsb" style={{padding:'5px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <span style={{fontSize:11,color:'var(--text)',fontWeight:700}}>{e.batter}</span>
+                    <span style={{fontSize:10,color:'var(--red)'}}>本</span>
+                  </div>
+                  <span style={{fontSize:10,color:'var(--dim)'}}>{e.inning}回{e.isTop?'表':'裏'} {hrLabel(e.rbi)} <span style={{color:e.teamColor}}>【{e.teamShort}】</span></span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── STATS TABS ── */}
+          {log.length>0&&(
+            <div className="card" style={{padding:0,overflow:'hidden'}}>
+              <div style={{display:'flex',borderBottom:'1px solid var(--border)'}}>
+                {[['bat','打者成績'],['pitch','投手成績']].map(([t,label])=>(
+                  <button key={t} onClick={()=>setActiveTab(t)} style={{flex:1,padding:'10px 0',border:'none',background:activeTab===t?'rgba(245,200,66,.07)':'transparent',color:activeTab===t?'var(--gold)':'var(--dim)',fontSize:12,cursor:'pointer',borderBottom:activeTab===t?'2px solid var(--gold)':'2px solid transparent',transition:'.15s',fontFamily:"'Noto Sans JP',sans-serif"}}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div style={{padding:'10px 8px'}}>
+                {activeTab==='bat'&&(
+                  <>
+                    {[{team:myTeam,batters:myBatStats},{team:oppTeam,batters:oppBatStats}].map(({team,batters},ti)=>(
+                      <div key={ti} style={{marginBottom:ti===0?14:0}}>
+                        {ti>0&&<div style={{borderTop:'1px solid var(--border)',marginBottom:10}}/>}
+                        <div style={{fontSize:10,fontWeight:700,color:team.color||'var(--text)',marginBottom:6}}>{team.short}</div>
+                        <table style={{width:'100%',borderCollapse:'collapse',fontSize:11}}>
+                          <thead>
+                            <tr>
+                              {['選手','打率','打','安','点','本'].map(h=><th key={h} style={{...thSt,textAlign:h==='選手'?'left':'center'}}>{h}</th>)}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {batters.map(b=>{
+                              const p=findPlayer(team,b.id);
+                              return(
+                                <tr key={b.id} style={{borderBottom:'1px solid rgba(255,255,255,.03)'}}>
+                                  <td style={{padding:'4px 2px',color:b.H>0?'var(--text)':'var(--dim)',maxWidth:80,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{b.name}</td>
+                                  <td style={{...cellSt,fontSize:10,color:'#6b7280'}}>{fmtSeasonAvg(p)}</td>
+                                  <td style={{...cellSt}}>{b.AB}</td>
+                                  <td style={{...cellSt,color:b.H>0?'var(--green)':'var(--dim)',fontWeight:b.H>0?700:400}}>{b.H}</td>
+                                  <td style={{...cellSt,color:b.RBI>0?'var(--gold)':'var(--dim)'}}>{b.RBI||0}</td>
+                                  <td style={{...cellSt,color:b.HR>0?'var(--red)':'var(--dim)'}}>{b.HR||0}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ))}
+                  </>
+                )}
+                {activeTab==='pitch'&&(
+                  <>
+                    {[{team:myTeam,pstats:myPStats,roleF:myPRole},{team:oppTeam,pstats:oppPStats,roleF:oppPRole}].map(({team,pstats,roleF},ti)=>(
+                      <div key={ti} style={{marginBottom:ti===0?14:0}}>
+                        {ti>0&&<div style={{borderTop:'1px solid var(--border)',marginBottom:10}}/>}
+                        <div style={{fontSize:10,fontWeight:700,color:team.color||'var(--text)',marginBottom:6}}>{team.short}</div>
+                        <table style={{width:'100%',borderCollapse:'collapse',fontSize:11}}>
+                          <thead>
+                            <tr>
+                              {['選手','回','安','振','四','失'].map(h=><th key={h} style={{...thSt,textAlign:h==='選手'?'left':'center'}}>{h}</th>)}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {pstats.map(ps=>{
+                              const p=findPlayer(team,ps.id);
+                              const role=roleF(ps.id);
+                              return(
+                                <tr key={ps.id} style={{borderBottom:'1px solid rgba(255,255,255,.03)'}}>
+                                  <td style={{padding:'4px 2px',color:'var(--text)'}}>
+                                    {role&&<span style={{fontSize:9,fontWeight:700,marginRight:4,color:role==='勝'?'var(--green)':role==='敗'?'var(--red)':'var(--blue)'}}>{role}</span>}
+                                    {p?.name||'?'}
+                                  </td>
+                                  <td style={{...cellSt,fontSize:10}}>{fmtIPlocal(ps.outs)}</td>
+                                  <td style={{...cellSt,color:'var(--dim)'}}>{ps.H}</td>
+                                  <td style={{...cellSt,color:'var(--dim)'}}>{ps.K}</td>
+                                  <td style={{...cellSt,color:'var(--dim)'}}>{ps.BB}</td>
+                                  <td style={{...cellSt,color:ps.ER>0?'var(--red)':'var(--dim)'}}>{ps.ER}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          <button className="btn btn-gold" style={{width:'100%',padding:'14px 0',fontSize:14,marginTop:10}} onClick={onNext}>
+            次の試合へ →
+          </button>
+
+        </div>
       </div>
     </div>
   );
