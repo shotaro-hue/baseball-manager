@@ -75,6 +75,7 @@ export function useSeasonFlow(gs) {
   const [currentOpp, setCurrentOpp] = useState(null);
   const [gameMode, setGameMode] = useState(null);
   const [batchResults, setBatchResults] = useState([]);
+  const [batchMeta, setBatchMeta] = useState(null);
   const [playoff, setPlayoff] = useState(null);
   const [currentGameTeams, setCurrentGameTeams] = useState(null);
   const pendingPlayoffRef = useRef(false);
@@ -418,6 +419,17 @@ export function useSeasonFlow(gs) {
     runBatchGames(count);
   };
 
+  // リーグ内順位を計算（batchMeta用）
+  const calcLeagueRank = (teamId, allTeams, league) => {
+    const same = [...allTeams.filter(t => t.league === league)]
+      .sort((a, b) => {
+        const pa = a.wins / Math.max(1, a.wins + a.losses);
+        const pb = b.wins / Math.max(1, b.wins + b.losses);
+        return pb - pa || (b.rf - b.ra) - (a.rf - a.ra);
+      });
+    return same.findIndex(t => t.id === teamId) + 1;
+  };
+
   // バッチ処理の共通ロジック
   const runBatchGames = (count) => {
     if(!myTeam) return;
@@ -425,6 +437,13 @@ export function useSeasonFlow(gs) {
     const results=[];
     let newDay=gameDay;
     let allStarDoneLocal=allStarDone;
+
+    // バッチ前の順位・成績スナップショット
+    const beforeRank = calcLeagueRank(myId, newTeams, myTeam.league);
+    const beforeRecord = { w: myTeam.wins, l: myTeam.losses, d: myTeam.draws ?? 0 };
+    // バッチ中に集積するメタデータ
+    const batchInjuries = [];
+    const cpuHighlights = [];
 
     for(let g=0;g<count;g++){
       const scheduleMatchup=getMyMatchup(schedule,newDay,myId);
@@ -449,6 +468,19 @@ export function useSeasonFlow(gs) {
         const cr=quickSimGame(applyDhToTeam(a, useDh),applyDhToTeam(b, useDh));
         const cdrew=cr.score.my===cr.score.opp;
         const aWon=cr.won;
+        // 注目CPU試合を収集（大差 or 接戦）
+        {
+          const margin=Math.abs(cr.score.my-cr.score.opp);
+          if(!cdrew&&(margin>=4||margin<=1)&&cpuHighlights.length<8){
+            const label=margin>=4?"大勝":"接戦";
+            cpuHighlights.push({
+              homeTeam:{short:a.short,emoji:a.emoji,color:a.color},
+              awayTeam:{short:b.short,emoji:b.emoji,color:b.color},
+              homeScore:cr.score.my,awayScore:cr.score.opp,
+              homeWon:aWon,label
+            });
+          }
+        }
         if(aWon){a.wins++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.losses++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
         else if(cdrew){a.draws++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.draws++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
         else{b.wins++;b.rf+=cr.score.opp;b.ra+=cr.score.my;a.losses++;a.rf+=cr.score.my;a.ra+=cr.score.opp;}
@@ -490,6 +522,13 @@ export function useSeasonFlow(gs) {
       myT.players=myT.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
       myT.players=applyDefenseCoachRecovery(myT.players,myT.coaches);
       const _inj=checkForInjuries(myT.players, year);
+      // 新規負傷選手をバッチメタに収集
+      if(_inj.length>0){
+        _inj.forEach(inj=>{
+          const p=myT.players.find(pl=>pl.id===inj.id);
+          if(p) batchInjuries.push({name:p.name,pos:p.pos,type:inj.type,days:inj.days,part:inj.part});
+        });
+      }
       myT.players=applyInjuriesToPlayers(myT.players, _inj, year);
       // 登録クールダウンデクリメント
       myT.players=tickCooldowns(myT.players);
@@ -544,6 +583,11 @@ export function useSeasonFlow(gs) {
     setGameDay(newDay);
     if(allStarDoneLocal) setAllStarDone(true);
     const gameResults=results.filter(r=>r.type!=='trade_news');
+    // バッチ後の順位・成績を集計してメタデータをセット
+    const afterMyT=newTeams.find(t=>t.id===myId);
+    const afterRecord=afterMyT?{w:afterMyT.wins,l:afterMyT.losses,d:afterMyT.draws??0}:{w:0,l:0,d:0};
+    const afterRank=calcLeagueRank(myId,newTeams,myTeam.league);
+    setBatchMeta({beforeRank,afterRank,beforeRecord,afterRecord,injuries:batchInjuries,cpuHighlights});
     setBatchResults(gameResults);
     gs.setRecentResults(prev=>[...gameResults.map(r=>({won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp,gameNo:r.gameNo})).reverse(),...prev].slice(0,5));
     gs.setGameResultsMap(prev=>{const next={...prev};gameResults.forEach(r=>{next[r.gameNo]={won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp};});return next;});
@@ -680,6 +724,7 @@ export function useSeasonFlow(gs) {
     currentGameTeams, setCurrentGameTeams,
     gameMode, setGameMode,
     batchResults, setBatchResults,
+    batchMeta, setBatchMeta,
     playoff, setPlayoff,
     handleStartGame,
     handleModeSelect,
