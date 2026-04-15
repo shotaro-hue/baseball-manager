@@ -55,7 +55,7 @@ export function ModeSelectScreen({myTeam,oppTeam,gameDay,onSelect,onBack}){
    ROSTER TAB (simplified for space)
 ═══════════════════════════════════════════════ */
 
-export function ResultScreen({gsResult,myTeam,oppTeam,gameDay,onNext}){
+export function ResultScreen({gsResult,myTeam,oppTeam,gameDay,onNext,nextLabel='次の試合へ →'}){
   const [activeTab,setActiveTab]=useState('bat');
   const won=gsResult.score.my>gsResult.score.opp;
   const drew=gsResult.score.my===gsResult.score.opp;
@@ -64,7 +64,7 @@ export function ResultScreen({gsResult,myTeam,oppTeam,gameDay,onNext}){
 
   // helpers
   const IS_HIT=(r)=>['s','d','t','hr'].includes(r);
-  const IS_OUT=(r)=>['k','fo','go','po','dp','sf','sac','ife'].includes(r);
+  const IS_OUT=(r)=>['k','out','fo','go','sac','sf'].includes(r);
   const findPlayer=(team,id)=>team?.players?.find(p=>p.id===id);
   const fmtIPlocal=(outs)=>{const f=Math.floor(outs/3),r=outs%3;return r===0?`${f}`:`${f}.${r}`;};
   const hrLabel=(rbi)=>({1:'ソロ',2:'2ラン',3:'3ラン',4:'満塁'}[rbi]||`${rbi}点本塁打`);
@@ -94,15 +94,16 @@ export function ResultScreen({gsResult,myTeam,oppTeam,gameDay,onNext}){
   const buildPitcherStats=(evts,ids)=>{
     const m={};
     evts.forEach(e=>{
-      if(!m[e.pitcherId])m[e.pitcherId]={outs:0,H:0,ER:0,K:0,BB:0};
+      if(!m[e.pitcherId])m[e.pitcherId]={outs:0,H:0,ER:0,K:0,BB:0,PC:0};
       const s=m[e.pitcherId];
       if(IS_OUT(e.result))s.outs++;
       if(IS_HIT(e.result))s.H++;
       if(e.result==='k')s.K++;
       if(e.result==='bb')s.BB++;
       if((e.rbi||0)>0)s.ER+=e.rbi;
+      s.PC+=(e.pitches||0);
     });
-    return ids.map(id=>({id,...(m[id]||{outs:0,H:0,ER:0,K:0,BB:0})}));
+    return ids.map(id=>({id,...(m[id]||{outs:0,H:0,ER:0,K:0,BB:0,PC:0})}));
   };
   const myPStats=buildPitcherStats(myPitchEvts,myPitcherIds);
   const oppPStats=buildPitcherStats(oppPitchEvts,oppPitcherIds);
@@ -311,7 +312,7 @@ export function ResultScreen({gsResult,myTeam,oppTeam,gameDay,onNext}){
                         <table style={{width:'100%',borderCollapse:'collapse',fontSize:11}}>
                           <thead>
                             <tr>
-                              {['選手','回','安','振','四','失'].map(h=><th key={h} style={{...thSt,textAlign:h==='選手'?'left':'center'}}>{h}</th>)}
+                              {['選手','回','球','安','振','四','失'].map(h=><th key={h} style={{...thSt,textAlign:h==='選手'?'left':'center'}}>{h}</th>)}
                             </tr>
                           </thead>
                           <tbody>
@@ -325,6 +326,7 @@ export function ResultScreen({gsResult,myTeam,oppTeam,gameDay,onNext}){
                                     {p?.name||'?'}
                                   </td>
                                   <td style={{...cellSt,fontSize:10}}>{fmtIPlocal(ps.outs)}</td>
+                                  <td style={{...cellSt,color:'var(--dim)'}}>{ps.PC||0}</td>
                                   <td style={{...cellSt,color:'var(--dim)'}}>{ps.H}</td>
                                   <td style={{...cellSt,color:'var(--dim)'}}>{ps.K}</td>
                                   <td style={{...cellSt,color:'var(--dim)'}}>{ps.BB}</td>
@@ -343,7 +345,7 @@ export function ResultScreen({gsResult,myTeam,oppTeam,gameDay,onNext}){
           )}
 
           <button className="btn btn-gold" style={{width:'100%',padding:'14px 0',fontSize:14,marginTop:10}} onClick={onNext}>
-            次の試合へ →
+            {nextLabel}
           </button>
 
         </div>
