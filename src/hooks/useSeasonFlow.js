@@ -353,7 +353,7 @@ export function useSeasonFlow(gs) {
       }
       return newTeams;
     });
-    setGameResult({score:r.score,won,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:currentOpp});
+    setGameResult({score:r.score,won,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:currentOpp,gameNo:gameDay});
     tryGenerateCpuOffer();
     const autoDate = gameDayToDate(gameDay, schedule);
     if (autoDate && autoDate.month === TRADE_DEADLINE_MONTH) {
@@ -384,7 +384,7 @@ export function useSeasonFlow(gs) {
     }
     const _adrew=r.score.my===r.score.opp;
     pushResult(won,_adrew,currentOpp?.name||"",r.score.my,r.score.opp,gameDay);
-    gs.pushGameResult(gameDay,{won,drew:_adrew,oppName:currentOpp?.name||"",myScore:r.score.my,oppScore:r.score.opp});
+    gs.pushGameResult(gameDay,{won,drew:_adrew,oppName:currentOpp?.name||"",myScore:r.score.my,oppScore:r.score.opp,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:currentOpp});
     setGameDay(d=>d+1);
     if(!allStarDone && gameDay+1===allStarTriggerDay){
       const rosters=selectAllStars(teams);
@@ -590,7 +590,7 @@ export function useSeasonFlow(gs) {
     setBatchMeta({beforeRank,afterRank,beforeRecord,afterRecord,injuries:batchInjuries,cpuHighlights});
     setBatchResults(gameResults);
     gs.setRecentResults(prev=>[...gameResults.map(r=>({won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp,gameNo:r.gameNo})).reverse(),...prev].slice(0,5));
-    gs.setGameResultsMap(prev=>{const next={...prev};gameResults.forEach(r=>{next[r.gameNo]={won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp};});return next;});
+    gs.setGameResultsMap(prev=>{const next={...prev};gameResults.forEach(r=>{next[r.gameNo]={won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:r.oppTeam};});return next;});
     if(newDay-1>=SEASON_GAMES){const withFarm=runFarmSeason(newTeams);setTeams(withFarm);setPlayoff(initPlayoff(withFarm));setScreen("playoff");}
     else setScreen("batch_result");
   };
@@ -677,7 +677,7 @@ export function useSeasonFlow(gs) {
       }
       return newTeams;
     });
-    setGameResult({...gsResult,oppTeam:currentOpp,won});
+    setGameResult({...gsResult,oppTeam:currentOpp,won,gameNo:gameDay});
     // 試合ニュース（手動試合も同様に生成）
     const _tmpl=won?NEWS_TEMPLATES_WIN:NEWS_TEMPLATES_LOSE;
     const _scoreStr=gsResult.score.my+"-"+gsResult.score.opp;
@@ -700,7 +700,7 @@ export function useSeasonFlow(gs) {
     }
     const _tdrew=gsResult.score.my===gsResult.score.opp;
     pushResult(won,_tdrew,currentOpp?.name||"",gsResult.score.my,gsResult.score.opp,gameDay);
-    gs.pushGameResult(gameDay,{won,drew:_tdrew,oppName:currentOpp?.name||"",myScore:gsResult.score.my,oppScore:gsResult.score.opp});
+    gs.pushGameResult(gameDay,{won,drew:_tdrew,oppName:currentOpp?.name||"",myScore:gsResult.score.my,oppScore:gsResult.score.opp,log:gsResult.log||[],inningSummary:gsResult.inningSummary||[],oppTeam:currentOpp});
     setGameDay(d=>d+1);
     if(!allStarDone && gameDay+1===allStarTriggerDay){
       const rosters=selectAllStars(teams);
