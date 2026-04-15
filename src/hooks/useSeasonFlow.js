@@ -444,6 +444,7 @@ export function useSeasonFlow(gs) {
     // バッチ中に集積するメタデータ
     const batchInjuries = [];
     const cpuHighlights = [];
+    const batchNewsItems = []; // 試合結果ニュース
 
     for(let g=0;g<count;g++){
       const scheduleMatchup=getMyMatchup(schedule,newDay,myId);
@@ -555,6 +556,20 @@ export function useSeasonFlow(gs) {
       myT.budget+=revTotal;
       myT.revenueThisSeason=(myT.revenueThisSeason??0)+revTotal;
       results.push({...r,won,oppTeam:opp,gameNo:newDay});
+      // バッチ試合ごとに試合結果ニュースを生成
+      {
+        const _tmpl=won?NEWS_TEMPLATES_WIN:NEWS_TEMPLATES_LOSE;
+        const _scoreStr=r.score.my+"-"+r.score.opp;
+        const myTName=newTeams.find(t=>t.id===myId)?.name||"自チーム";
+        const _hl=_tmpl[rng(0,_tmpl.length-1)].replace("{team}",myTName).replace("{opp}",opp.name||"相手").replace("{score}",_scoreStr);
+        batchNewsItems.push({type:"game",headline:_hl,source:"スポーツ報知",dateLabel:`${year}年 ${newDay}日目`,body:(won?myTName+"が"+opp.name+"に"+_scoreStr+"で勝利した。":myTName+"は"+opp.name+"に"+_scoreStr+"で敗れた。")});
+        // インタビュー（バッチ中は低確率）
+        if(rngf(0,1)<0.15){
+          const _qs=won?INTERVIEW_QUESTIONS_WIN:INTERVIEW_QUESTIONS_LOSE;
+          const _opts=won?INTERVIEW_OPTIONS_WIN:INTERVIEW_OPTIONS_LOSE;
+          batchNewsItems.push({type:"interview",headline:"【インタビュー】"+myTName+"監督に直撃！",source:"野球速報",dateLabel:`${year}年 ${newDay}日目`,body:"試合後、記者団が監督にコメントを求めた。",question:_qs[rng(0,_qs.length-1)],options:_opts});
+        }
+      }
       if(!allStarDoneLocal && newDay===allStarTriggerDay){
         const rosters=selectAllStars(newTeams);
         const asResult=runAllStarGame(rosters, year);
@@ -579,6 +594,8 @@ export function useSeasonFlow(gs) {
         body:r.body,
       });
     });
+    // バッチ試合結果ニュース（古い順に追加 → ニュースタブは新しい順表示）
+    [...batchNewsItems].reverse().forEach(item=>addNews(item));
     setTeams(newTeams);
     setGameDay(newDay);
     if(allStarDoneLocal) setAllStarDone(true);
