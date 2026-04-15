@@ -84,7 +84,7 @@ export default function App(){
     pressEvent, handlePressAnswer,
     allStarResult,
   } = gs;
-  const { gameResult, currentOpp, batchResults, playoff, setPlayoff } = sf;
+  const { gameResult, currentOpp, batchResults, batchMeta, playoff, setPlayoff } = sf;
   const { developmentSummary, newSeasonInfo, draftPool, setDraftPool, draftResult, setDraftResult, draftAllocation, setDraftAllocation, waiverClaimResults } = os;
   const [agentNeg, setAgentNeg] = useState(null);
   const handleTabChange = useCallback((newTab) => {
@@ -170,7 +170,7 @@ export default function App(){
 
   if(screen==="mode_select") return(<><ModeSelectScreen myTeam={myTeam} oppTeam={currentOpp} gameDay={gameDay} onSelect={sf.handleModeSelect} onBack={()=>setScreen("hub")}/></>);
   if(screen==="tactical_game"&&currentOpp) return(<><ErrorBoundary onReset={()=>setScreen("hub")}><TacticalGameScreen myTeam={sf.currentGameTeams?.my||myTeam} oppTeam={sf.currentGameTeams?.opp||currentOpp} onGameEnd={sf.handleTacticalGameEnd}/></ErrorBoundary></>);
-  if(screen==="batch_result") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><BatchResultScreen results={batchResults} myTeam={myTeam} onEnd={()=>setScreen("hub")}/></ErrorBoundary></>);
+  if(screen==="batch_result") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><BatchResultScreen results={batchResults} batchMeta={batchMeta} myTeam={myTeam} onEnd={()=>setScreen("hub")}/></ErrorBoundary></>);
 
   if(screen==="result"&&gameResult) return(<><ResultScreen gsResult={gameResult} myTeam={myTeam} oppTeam={gameResult.oppTeam} gameDay={gameDay-1} onNext={()=>setScreen("hub")}/></>);
 
