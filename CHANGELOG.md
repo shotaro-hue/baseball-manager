@@ -5,6 +5,28 @@
 
 ---
 
+### 2026-04-15 — バッチシムニュース・過去日程閲覧・他球団情報拡張（U3/U4/U5）
+
+**仕様本文への影響なし（内部実装のみ）**
+
+- **U3: バッチシム試合結果ニュース** (`src/hooks/useSeasonFlow.js`)
+  - `runBatchGames` のループ内で各ゲームの試合結果ニュース記事を生成・収集し、バッチ完了後に一括 `addNews` するよう修正
+  - 勝利時: `NEWS_TEMPLATES_WIN`、敗北時: `NEWS_TEMPLATES_LOSE` テンプレートを使用
+  - インタビューイベントも15%確率でバッチ中に生成
+- **U4: 過去シーズン日程閲覧** (`src/hooks/useGameState.js`, `src/hooks/useOffseason.js`, `src/components/tabs/ScheduleTab.jsx`)
+  - `useGameState` に `scheduleArchive` state（最大5シーズン）を追加
+  - `handleNextYear` 実行時、現シーズンの `schedule` と `gameResultsMap` をアーカイブに保存
+  - 日程タブに年度セレクターを追加。過去シーズンを選択するとアーカイブからカレンダーを表示
+  - 過去シーズン表示時は最終成績（W/L/D）を `gameResultsMap` から集計して表示
+  - 「今日のカード」「今後8試合」は現シーズンのみ表示
+- **U5: 他球団情報モーダル拡張** (`src/components/TeamModal.jsx`, `src/App.jsx`)
+  - `TeamModal` を3タブ構成に拡張: 「ロスター・成績」「日程」「移籍履歴」
+  - **ロスター・成績タブ**: 野手（PA/AVG/OBP/HR/RBI/SB）・投手（W/L/SV/IP/ERA/K）を切り替え表示
+  - **日程タブ**: 月セレクターで当該チームの試合スケジュール（H/V・交流戦バッジ付き）を一覧表示
+  - `App.jsx` から `schedule`・`year`・`allTeams` props を追加渡し
+
+---
+
 ### 2026-04-15 — バグ修正: 実選手の年度別成績で奪三振数が全て0になる
 
 **仕様本文への影響なし（内部バグ修正のみ）**

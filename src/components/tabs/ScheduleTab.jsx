@@ -310,46 +310,70 @@ function SeasonProgressBar({ gameDay, wins, losses }) {
   );
 }
 
-export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResultsMap = {}, allStarDone = false, allStarResult = null, allStarTriggerDay = 72, onResultClick = null }) {
+export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResultsMap = {}, allStarDone = false, allStarResult = null, allStarTriggerDay = 72, onResultClick = null, scheduleArchive = [] }) {
   const [selectedDay, setSelectedDay] = useState(gameDay);
   const [resultModal, setResultModal] = useState(null); // dayNo or null
+  const [viewYear, setViewYear] = useState(year);
+
+  // 現シーズンに切り替わったら表示年をリセット
+  useEffect(() => {
+    setViewYear(year);
+    setSelectedDay(gameDay);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [year]);
 
   useEffect(() => {
-    setSelectedDay(gameDay);
-  }, [gameDay]);
+    if (viewYear === year) setSelectedDay(gameDay);
+  }, [gameDay, viewYear, year]);
+
+  // 表示対象シーズンのデータ
+  const archived = scheduleArchive.find(a => a.year === viewYear);
+  const isPast = viewYear !== year;
+  const viewSchedule = isPast ? (archived?.schedule || null) : schedule;
+  const viewResultsMap = isPast ? (archived?.gameResultsMap || {}) : gameResultsMap;
+
+  // 過去シーズンの最終成績を gameResultsMap から集計
+  const pastRecord = useMemo(() => {
+    if (!isPast) return null;
+    const results = Object.values(viewResultsMap);
+    const w = results.filter(r => r.won).length;
+    const d = results.filter(r => r.drew).length;
+    const l = results.filter(r => !r.won && !r.drew).length;
+    return { w, d, l };
+  }, [isPast, viewResultsMap]);
 
   const teamMap = useMemo(() => new Map((teams || []).map(t => [t.id, t])), [teams]);
-  const maxDay = schedule?.length ? schedule.length - 1 : 0;
+  const maxDay = viewSchedule?.length ? viewSchedule.length - 1 : 0;
 
   const todayMatchup = useMemo(
-    () => getMyMatchup(schedule, gameDay, myTeam?.id),
-    [schedule, gameDay, myTeam?.id]
+    () => !isPast ? getMyMatchup(viewSchedule, gameDay, myTeam?.id) : null,
+    [viewSchedule, gameDay, myTeam?.id, isPast]
   );
 
   const upcoming = useMemo(() => {
-    if (!schedule || myTeam?.id === null || myTeam?.id === undefined) return [];
+    if (isPast || !viewSchedule || myTeam?.id === null || myTeam?.id === undefined) return [];
     const days = [];
     for (let day = gameDay + 1; day <= Math.min(maxDay, gameDay + 8); day++) {
-      const matchup = getMyMatchup(schedule, day, myTeam.id);
+      const matchup = getMyMatchup(viewSchedule, day, myTeam.id);
       if (!matchup) continue;
-      const date = gameDayToDate(day, schedule);
-      const card = getCardMarker(schedule, day, myTeam.id);
+      const date = gameDayToDate(day, viewSchedule);
+      const card = getCardMarker(viewSchedule, day, myTeam.id);
       days.push({ day, date, matchup, opponent: teamMap.get(matchup.oppId), card });
     }
     return days;
-  }, [schedule, myTeam?.id, gameDay, maxDay, teamMap]);
+  }, [viewSchedule, myTeam?.id, gameDay, maxDay, teamMap, isPast]);
 
   // 月別グリッドデータ
   const monthGrids = useMemo(() => {
-    if (!schedule || myTeam?.id === null || myTeam?.id === undefined) return [];
+    if (!viewSchedule || myTeam?.id === null || myTeam?.id === undefined) return [];
     return MONTH_LABELS
       .map(label => Number(label.replace('月', '')))
       .map(month => ({
         month,
-        weeks: buildMonthGrid(schedule, year, myTeam.id, month, gameResultsMap),
+        weeks: buildMonthGrid(viewSchedule, viewYear, myTeam.id, month, viewResultsMap),
       }))
       .filter(m => m.weeks.length > 0);
-  }, [schedule, year, myTeam?.id, gameResultsMap]);
+  }, [viewSchedule, viewYear, myTeam?.id, viewResultsMap]);
 
   if (!schedule || !myTeam) {
     return (
@@ -360,18 +384,50 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
     );
   }
 
-  const todayDate = gameDayToDate(gameDay, schedule);
+  const todayDate = !isPast ? gameDayToDate(gameDay, viewSchedule) : null;
   const todayOpponent = todayMatchup ? teamMap.get(todayMatchup.oppId) : null;
-  const modalResult = resultModal ? gameResultsMap[resultModal] : null;
-  const modalDate = resultModal ? gameDayToDate(resultModal, schedule) : null;
+  const modalResult = resultModal ? viewResultsMap[resultModal] : null;
+  const modalDate = resultModal ? gameDayToDate(resultModal, viewSchedule) : null;
   const modalOpponent = resultModal && modalResult ? modalResult.oppName : null;
+
+  // 年度セレクター用リスト（過去アーカイブ + 現在）
+  const availableYears = [...scheduleArchive.map(a => a.year).sort((a,b)=>b-a), year];
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
-      {/* シーズン進捗バー */}
-      <SeasonProgressBar gameDay={gameDay} wins={myTeam.wins || 0} losses={myTeam.losses || 0} />
+      {/* 年度セレクター（アーカイブがある場合のみ表示） */}
+      {scheduleArchive.length > 0 && (
+        <div className="card" style={{ padding: '10px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, color: '#94a3b8' }}>シーズン:</span>
+            {availableYears.map(y => (
+              <button
+                key={y}
+                className={`bsm ${viewYear === y ? 'bgb' : 'bga'}`}
+                style={{ padding: '3px 10px', fontWeight: viewYear === y ? 700 : 400 }}
+                onClick={() => { setViewYear(y); setResultModal(null); }}
+              >
+                {y}年{y === year ? ' (現在)' : ''}
+              </button>
+            ))}
+          </div>
+          {isPast && pastRecord && (
+            <div style={{ marginTop: 8, fontSize: 12, color: '#94a3b8' }}>
+              {viewYear}年 最終成績:
+              <span style={{ color: '#4ade80', marginLeft: 6, fontWeight: 700 }}>{pastRecord.w}勝</span>
+              <span style={{ color: '#f87171', marginLeft: 4, fontWeight: 700 }}>{pastRecord.l}敗</span>
+              {pastRecord.d > 0 && <span style={{ color: '#6b7280', marginLeft: 4, fontWeight: 700 }}>{pastRecord.d}分</span>}
+              <span style={{ color: '#64748b', marginLeft: 8 }}>（{pastRecord.w + pastRecord.l + pastRecord.d}試合）</span>
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* 今日のカード */}
+      {/* シーズン進捗バー（現シーズンのみ） */}
+      {!isPast && <SeasonProgressBar gameDay={gameDay} wins={myTeam.wins || 0} losses={myTeam.losses || 0} />}
+
+      {/* 今日のカード（現シーズンのみ） */}
+      {!isPast && (
       <div className="card">
         <div className="card-h">🗓️ 今日のカード</div>
         {todayMatchup && todayOpponent ? (
@@ -402,9 +458,10 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
           <div style={{ fontSize: 12, color: '#94a3b8' }}>今日の対戦情報がありません。</div>
         )}
       </div>
+      )}
 
-      {/* 今後8試合 */}
-      {upcoming.length > 0 && (
+      {/* 今後8試合（現シーズンのみ） */}
+      {!isPast && upcoming.length > 0 && (
         <div className="card">
           <div className="card-h">⏭️ 今後8試合</div>
           <div style={{ display: 'grid', gap: 6 }}>
@@ -451,7 +508,7 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
 
       {/* 月別週グリッドカレンダー */}
       <div className="card">
-        <div className="card-h">🗓️ シーズンカレンダー</div>
+        <div className="card-h">🗓️ {viewYear}年 シーズンカレンダー</div>
         <div style={{ fontSize: 11, color: '#64748b', marginBottom: 10, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <span><span style={{ display: 'inline-block', width: 8, height: 8, background: 'rgba(74,222,128,.5)', borderRadius: 2, marginRight: 4 }} />ホーム</span>
           <span><span style={{ display: 'inline-block', width: 8, height: 8, background: 'rgba(96,165,250,.5)', borderRadius: 2, marginRight: 4 }} />ビジター</span>
@@ -479,13 +536,13 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
                     <GridCell
                       key={ci}
                       cell={cell}
-                      year={year}
+                      year={viewYear}
                       teamMap={teamMap}
-                      isToday={cell.type === 'game' && cell.dayNo === gameDay}
+                      isToday={!isPast && cell.type === 'game' && cell.dayNo === gameDay}
                       isSelected={cell.type === 'game' && cell.dayNo === selectedDay}
                       onSelect={setSelectedDay}
-                      onResultClick={onResultClick || setResultModal}
-                      allStarResult={allStarResult}
+                      onResultClick={isPast ? setResultModal : (onResultClick || setResultModal)}
+                      allStarResult={isPast ? null : allStarResult}
                     />
                   ))}
                 </div>
@@ -495,13 +552,13 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
         </div>
       </div>
 
-      {/* 結果モーダル（onResultClick prop がない場合のフォールバック） */}
-      {!onResultClick && resultModal && modalResult && (
+      {/* 結果モーダル（過去シーズンは常に内部モーダル、現シーズンは onResultClick なければ内部モーダル） */}
+      {(isPast || !onResultClick) && resultModal && modalResult && (
         <ResultModal
           dayNo={resultModal}
           result={modalResult}
           date={modalDate}
-          year={year}
+          year={viewYear}
           opponent={modalOpponent}
           onClose={() => setResultModal(null)}
         />

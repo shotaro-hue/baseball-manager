@@ -256,7 +256,7 @@ export default function App(){
     <ErrorBoundary key={tab}>
     {tab==="dashboard"&&<DashboardTab myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year} recentResults={gs.recentResults} mailbox={mailbox} faPool={faPool} onTabSwitch={handleTabChange}/>}
     {tab==="roster"&&<RosterTab team={myTeam} onToggle={gs.toggleLineup} onSetLineupOrder={gs.setLineupOrder} onSetRosterDhMode={gs.setRosterDhMode} onSetPlayerPosition={gs.setPlayerPosition} onSetStarter={gs.setStarter} onPromo={gs.promote} onDemo={gs.demote} onSetTrainingFocus={gs.setTrainingFocus} onConvertIkusei={gs.convertIkusei} onMoveRotation={gs.moveRotation} onRemoveFromRotation={gs.removeFromRotation} onSetPitchingPattern={gs.setPitchingPattern} onPlayerClick={gs.handlePlayerClick} onSetDevGoal={gs.setDevGoal} onPlayerTalk={gs.handlePlayerTalk} gameDay={gameDay}/>}
-    {tab==="schedule"&&<ScheduleTab schedule={schedule} gameDay={gameDay} myTeam={myTeam} teams={teams} year={year} gameResultsMap={gs.gameResultsMap} allStarDone={gs.allStarDone} allStarResult={gs.allStarResult} allStarTriggerDay={gs.allStarTriggerDay} onResultClick={dayNo=>{const r=gs.gameResultsMap[dayNo];if(r){sf.setGameResult({score:{my:r.myScore,opp:r.oppScore},log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:r.oppTeam,won:r.won,gameNo:dayNo,_source:"schedule"});setScreen("result");}}}/>}
+    {tab==="schedule"&&<ScheduleTab schedule={schedule} gameDay={gameDay} myTeam={myTeam} teams={teams} year={year} gameResultsMap={gs.gameResultsMap} allStarDone={gs.allStarDone} allStarResult={gs.allStarResult} allStarTriggerDay={gs.allStarTriggerDay} scheduleArchive={gs.scheduleArchive||[]} onResultClick={dayNo=>{const r=gs.gameResultsMap[dayNo];if(r){sf.setGameResult({score:{my:r.myScore,opp:r.oppScore},log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:r.oppTeam,won:r.won,gameNo:dayNo,_source:"schedule"});setScreen("result");}}}/>}
     {tab==="records"&&<RecordsTab history={gs.seasonHistory}/>}
     {tab==="news"&&<NewsTab news={news} onInterview={gs.handleInterview}/>}
     {tab==="mailbox"&&<MailboxTab mailbox={mailbox} onRead={os.handleMailRead} onAction={os.handleMailAction} teams={teams} myTeam={myTeam} onTrade={os.handleTrade} onTeamClick={gs.handleTeamClick}/>}
@@ -386,7 +386,7 @@ export default function App(){
     <RetireModal modal={retireModal} retireRole={retireRole} setRetireRole={setRetireRole} onRetain={()=>os.handleRetain(retireModal.player)} onAccept={()=>os.handleAcceptRetire(retireModal.player)} onStartRetireGame={()=>os.handleStartRetireGame(retireModal.player)} onSkipRetireGame={()=>os.handleSkipRetireGame(retireModal.player)}/>
     {playerModal&&<PlayerModal player={playerModal.player} teamName={playerModal.teamName} onClose={()=>setPlayerModal(null)}/>}
 
-    {gs.teamModal&&(<TeamModal team={gs.teamModal} onPlayerClick={gs.handlePlayerClick} onClose={()=>gs.setTeamModal(null)}/>)}
+    {gs.teamModal&&(<TeamModal team={gs.teamModal} onPlayerClick={gs.handlePlayerClick} onClose={()=>gs.setTeamModal(null)} schedule={schedule} year={year} allTeams={teams}/>)}
     {pressEvent&&<PressConferenceModal event={pressEvent} onAnswer={handlePressAnswer}/>}
     </ErrorBoundary>
   </div></div></>);

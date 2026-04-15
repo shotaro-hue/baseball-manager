@@ -51,6 +51,7 @@ export function useGameState() {
   const [mailbox, setMailbox] = useState([]);
   const [recentResults, setRecentResults] = useState([]);
   const [gameResultsMap, setGameResultsMap] = useState({});
+  const [scheduleArchive, setScheduleArchive] = useState([]); // 過去シーズン: [{year, schedule, gameResultsMap}]
   const [cpuTradeOffers, setCpuTradeOffers] = useState([]);
   const [pressEvent, setPressEvent] = useState(null);  // 記者会見イベント
   const [lastPressDay, setLastPressDay] = useState(0); // 最後に記者会見を行ったgameDay
@@ -426,6 +427,7 @@ export function useGameState() {
     mailbox, setMailbox,
     recentResults, setRecentResults,
     gameResultsMap, setGameResultsMap,
+    scheduleArchive, setScheduleArchive,
     cpuTradeOffers, setCpuTradeOffers,
     pressEvent, setPressEvent,
     lastPressDay, setLastPressDay,
