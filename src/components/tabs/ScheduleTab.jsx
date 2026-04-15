@@ -310,7 +310,7 @@ function SeasonProgressBar({ gameDay, wins, losses }) {
   );
 }
 
-export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResultsMap = {}, allStarDone = false, allStarResult = null, allStarTriggerDay = 72 }) {
+export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResultsMap = {}, allStarDone = false, allStarResult = null, allStarTriggerDay = 72, onResultClick = null }) {
   const [selectedDay, setSelectedDay] = useState(gameDay);
   const [resultModal, setResultModal] = useState(null); // dayNo or null
 
@@ -484,7 +484,7 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
                       isToday={cell.type === 'game' && cell.dayNo === gameDay}
                       isSelected={cell.type === 'game' && cell.dayNo === selectedDay}
                       onSelect={setSelectedDay}
-                      onResultClick={setResultModal}
+                      onResultClick={onResultClick || setResultModal}
                       allStarResult={allStarResult}
                     />
                   ))}
@@ -495,8 +495,8 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
         </div>
       </div>
 
-      {/* 結果モーダル */}
-      {resultModal && modalResult && (
+      {/* 結果モーダル（onResultClick prop がない場合のフォールバック） */}
+      {!onResultClick && resultModal && modalResult && (
         <ResultModal
           dayNo={resultModal}
           result={modalResult}
