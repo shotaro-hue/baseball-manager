@@ -36,11 +36,11 @@ const BASELINE = {
 
 const ABILITY_RANGE = {
   eye:       { lo: 0.030, mid: BASELINE.bb,  hi: 0.130 },
-  contact:   { lo: 0.100, mid: BASELINE.s,   hi: 0.240 },
+  contact:   { lo: 0.100, mid: BASELINE.s,   hi: 0.260 }, // 投高打低緩和: 一流打者の安打率天井を引き上げ (旧: 0.240)
   power:     { lo: 0.003, mid: BASELINE.hr,  hi: 0.050 },
   speed:     { lo: 0.003, mid: BASELINE.t,   hi: 0.012 },
   p_control: { lo: 0.130, mid: BASELINE.bb,  hi: 0.030 },
-  p_stuff:   { lo: 0.120, mid: BASELINE.k,   hi: 0.300 },
+  p_stuff:   { lo: 0.120, mid: BASELINE.k,   hi: 0.265 }, // 投高打低緩和: 最上位投手の K 率天井を引き下げ (旧: 0.300)
   p_power:   { lo: 0.030, mid: BASELINE.hr,  hi: 0.005 },
 };
 
@@ -119,7 +119,7 @@ function calcPAProbs(bat, pit, leagueEnv = DEFAULT_LEAGUE_ENV) {
   let bb  = mergeProb(batBB, pitBB) * leagueEnv.bbMod;
   let k   = mergeProb(BASELINE.k * (1 - (batContact - 50) / 200), pitK) * leagueEnv.kMod;
   let hr  = mergeProb(batHR, pitHR) * leagueEnv.hrMod;
-  let s   = batS * (1 - (pitStuff - 50) / 300) * leagueEnv.hitMod;
+  let s   = batS * (1 - (pitStuff - 50) / 400) * leagueEnv.hitMod; // 投高打低緩和: 投手 stuff による安打抑制を緩和 (旧: / 300)
   let d   = BASELINE.d * (batPower / 50) * 0.7 + BASELINE.d * 0.3 * leagueEnv.hitMod;
   let t   = batT;
   let hbp = BASELINE.hbp;
