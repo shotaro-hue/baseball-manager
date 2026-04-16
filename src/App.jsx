@@ -12,7 +12,7 @@ import { DraftPreviewScreen, DraftLotteryScreen, DraftScreen, DraftReviewScreen 
 import { PlayoffScreen } from './components/PlayoffScreen';
 import { RetireModal } from './components/RetireModal';
 import { PlayerModal } from './components/PlayerModal';
-import { TeamModal } from './components/TeamModal';
+import { TeamDetailScreen } from './components/TeamDetailScreen';
 import { PressConferenceModal } from './components/PressConferenceModal';
 import { AllStarScreen } from './components/AllStarScreen';
 import { DashboardTab } from './components/DashboardTab';
@@ -210,6 +210,18 @@ export default function App(){
   if(screen==="draft_review"&&draftResult) return(<><DraftReviewScreen teams={teams} myId={myId} year={year} pool={draftResult.pool} drafted={draftResult.drafted} onEnd={()=>os.handleDraftComplete(draftResult.pool,draftResult.drafted)}/></>);
   if(screen==="new_season") return(<><NewSeasonScreen year={year} info={newSeasonInfo} developmentSummary={developmentSummary} ownerGoal={myTeam?.ownerGoal||"cs"} onGoalSelect={(goal)=>gs.upd(myId,t=>({...t,ownerGoal:goal}))} onStart={()=>{setScreen("hub");setTab("dashboard");notify(`${year}年シーズン開幕！`,"ok");}}/></>);
 
+  if(screen==="team_detail"&&gs.viewingTeam) return(
+    <TeamDetailScreen
+      team={gs.viewingTeam}
+      allTeams={teams}
+      schedule={schedule}
+      year={year}
+      allTeamResultsMap={gs.allTeamResultsMap}
+      onBack={()=>setScreen("hub")}
+      onPlayerClick={gs.handlePlayerClick}
+    />
+  );
+
   // ── HUB ──
   const g=(myTeam?.wins||0)+(myTeam?.losses||0);
   const remain=SEASON_GAMES-g;
@@ -388,7 +400,24 @@ export default function App(){
     <RetireModal modal={retireModal} retireRole={retireRole} setRetireRole={setRetireRole} onRetain={()=>os.handleRetain(retireModal.player)} onAccept={()=>os.handleAcceptRetire(retireModal.player)} onStartRetireGame={()=>os.handleStartRetireGame(retireModal.player)} onSkipRetireGame={()=>os.handleSkipRetireGame(retireModal.player)}/>
     {playerModal&&<PlayerModal player={playerModal.player} teamName={playerModal.teamName} onClose={()=>setPlayerModal(null)}/>}
 
-    {gs.teamModal&&(<TeamModal team={gs.teamModal} onPlayerClick={gs.handlePlayerClick} onClose={()=>gs.setTeamModal(null)} schedule={schedule} year={year} allTeams={teams}/>)}
+    {gs.pregameError&&(
+      <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.72)',zIndex:400,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 16px'}}>
+        <div style={{background:'#0d1b2a',border:'1px solid rgba(248,113,113,.4)',borderRadius:12,padding:'24px 20px',width:'100%',maxWidth:420,boxShadow:'0 8px 32px rgba(0,0,0,.6)'}}>
+          <div style={{fontSize:15,fontWeight:700,color:'#f87171',marginBottom:10}}>⚠️ 試合開始エラー</div>
+          <div style={{fontSize:13,color:'#cbd5e1',marginBottom:18,lineHeight:1.6}}>{gs.pregameError.message}</div>
+          <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+            <button
+              className="bsm bga"
+              onClick={()=>{gs.setPregameError(null);setTab('roster');}}
+            >ロースタータブへ</button>
+            <button
+              className="bsm bgr"
+              onClick={()=>gs.setPregameError(null)}
+            >閉じる</button>
+          </div>
+        </div>
+      </div>
+    )}
     {pressEvent&&<PressConferenceModal event={pressEvent} onAnswer={handlePressAnswer}/>}
     </ErrorBoundary>
   </div></div></>);

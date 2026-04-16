@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { uid, rng, rngf, gameDayToDate } from '../utils';
 import { checkForInjuries, tickInjuries, calcRetireWill } from '../engine/player';
 import { quickSimGame, runFarmSeason } from '../engine/simulation';
-import { applyGameStatsFromLog, applyPostGameCondition } from '../engine/postGame';
+import { applyGameStatsFromLog, applyPostGameCondition, computeBoxScore } from '../engine/postGame';
 import { calcRevenue } from '../engine/finance';
 import { applyPopularityDelta } from '../engine/fanSentiment';
 import { generateCpuOffer, generateCpuCpuTrade, classifyTeam } from '../engine/trade';
@@ -10,7 +10,7 @@ import { initPlayoff } from '../engine/playoff';
 import { selectAllStars, runAllStarGame } from '../engine/allstar';
 import { getMyMatchup, getCpuMatchups } from '../engine/scheduleGen';
 import { saveGame } from '../engine/saveload';
-import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, MAX_FARM, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX } from '../constants';
+import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, MAX_FARM, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER, MAX_外国人_一軍 } from '../constants';
 
 // 守備コーチボーナス: 怪我回復速度 UP
 function applyDefenseCoachRecovery(players, coaches) {
@@ -69,6 +69,7 @@ export function useSeasonFlow(gs) {
     setSaveExists, cpuTradeOffers,
     allStarDone, setAllStarDone, allStarResult, setAllStarResult,
     allStarTriggerDay,
+    setAllTeamResultsMap, setPregameError,
   } = gs;
 
   const [gameResult, setGameResult] = useState(null);
@@ -79,6 +80,7 @@ export function useSeasonFlow(gs) {
   const [playoff, setPlayoff] = useState(null);
   const [currentGameTeams, setCurrentGameTeams] = useState(null);
   const pendingPlayoffRef = useRef(false);
+
   const prevMyPlayersRef = useRef(null);
   const prevMyFarmRef = useRef(null);
 
@@ -216,14 +218,49 @@ export function useSeasonFlow(gs) {
     });
   };
 
-  const lineupForDh = (team, useDh) => {
-    const nonPitcherIds = (team.players || []).filter(p => !p.isPitcher).map(p => p.id);
-    const source = useDh ? (team.lineupDh || team.lineup || []) : (team.lineupNoDh || team.lineup || []);
+  // ポジション優先順（不足時の自動補完に使用）
+  const POSITION_FILL_ORDER = ['C','SS','2B','3B','1B','LF','CF','RF','DH'];
+
+  // CPU チーム用ラインナップ構築（自動補完・外国人枠トリム付き）
+  const buildSimLineup = (team, useDh) => {
     const limit = useDh ? 9 : 8;
-    return source.filter(id => nonPitcherIds.includes(id)).slice(0, limit);
+    const nonPitchers = (team.players || []).filter(p => !p.isPitcher && !p.isIkusei);
+    const nonPitcherIds = new Set(nonPitchers.map(p => p.id));
+    const source = useDh ? (team.lineupDh || team.lineup || []) : (team.lineupNoDh || team.lineup || []);
+
+    // 既存ラインナップから有効な非投手のみ
+    let lineup = source.filter(id => nonPitcherIds.has(id));
+
+    // 外国人選手枠トリム（4人以内）
+    let foreignCount = 0;
+    lineup = lineup.filter(id => {
+      const p = nonPitchers.find(x => x.id === id);
+      if (p?.isForeign) { if (foreignCount < MAX_外国人_一軍) { foreignCount++; return true; } return false; }
+      return true;
+    });
+
+    // 不足分を自動補完（ポジション優先で並べる）
+    if (lineup.length < limit) {
+      const inLineup = new Set(lineup);
+      const available = nonPitchers
+        .filter(p => !inLineup.has(p.id))
+        .sort((a, b) => {
+          const ai = POSITION_FILL_ORDER.indexOf(a.pos);
+          const bi = POSITION_FILL_ORDER.indexOf(b.pos);
+          return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+        });
+      for (const p of available) {
+        if (lineup.length >= limit) break;
+        if (p.isForeign && foreignCount >= MAX_外国人_一軍) continue;
+        if (p.isForeign) foreignCount++;
+        lineup.push(p.id);
+      }
+    }
+
+    return lineup.slice(0, limit);
   };
 
-  const applyDhToTeam = (team, useDh) => ({ ...team, lineup: lineupForDh(team, useDh) });
+  const applyDhToTeam = (team, useDh) => ({ ...team, lineup: buildSimLineup(team, useDh) });
 
   const pickOpponentFromSchedule = (day) => {
     const matchup=getMyMatchup(schedule,day,myId);
@@ -240,8 +277,30 @@ export function useSeasonFlow(gs) {
     if(!myTeam) return;
     const {opp,isHome}=pickOpponentFromSchedule(gameDay);
     if(!opp) return;
-    setCurrentOpp(opp);
+
+    // ── 試合前バリデーション ──
     const useDh = isHome ? !!myTeam.dhEnabled : !!opp.dhEnabled;
+    const neededBatters = useDh ? 9 : 8;
+    const activeCount = myTeam.players.filter(p => !p.isIkusei).length;
+    if (activeCount > MAX_ROSTER) {
+      setPregameError({ message: `一軍登録人数が上限（${MAX_ROSTER}人）を超えています（現在 ${activeCount} 人）。ロースターを調整してから試合を開始してください。` });
+      return;
+    }
+    const myNonPitchers = myTeam.players.filter(p => !p.isPitcher && !p.isIkusei);
+    const myNonPitcherIds = new Set(myNonPitchers.map(p => p.id));
+    const lineupSrc = useDh ? (myTeam.lineupDh || myTeam.lineup || []) : (myTeam.lineupNoDh || myTeam.lineup || []);
+    const myLineup = lineupSrc.filter(id => myNonPitcherIds.has(id));
+    if (myLineup.length < neededBatters) {
+      setPregameError({ message: `打順の設定が不足しています（必要: ${neededBatters}人 / 現在: ${myLineup.length}人）。ロースタータブで打順を設定してください。` });
+      return;
+    }
+    const foreignInLineup = myLineup.filter(id => myNonPitchers.find(p => p.id === id)?.isForeign).length;
+    if (foreignInLineup > MAX_外国人_一軍) {
+      setPregameError({ message: `打順内の外国人選手が上限（${MAX_外国人_一軍}人）を超えています（現在 ${foreignInLineup} 人）。ロースタータブで打順を修正してください。` });
+      return;
+    }
+
+    setCurrentOpp(opp);
     setCurrentGameTeams({
       my: applyDhToTeam(myTeam, useDh),
       opp: applyDhToTeam(opp, useDh),
@@ -319,19 +378,30 @@ export function useSeasonFlow(gs) {
       return updated;
     });
     // Simulate remaining CPU vs CPU games for this day (schedule-based matchups)
+    // CPU チームはまだ upd() の影響を受けていないため teams を直接参照して OK
     const _oppId=currentOpp.id;
     const _cpuMatchups=getCpuMatchups(schedule,gameDay,myId,_oppId);
+    const _fallbackOthers=teams.filter(t=>t.id!==myId&&t.id!==_oppId);
+    const matchupList=_cpuMatchups.length>0
+      ?_cpuMatchups
+      :(()=>{const pairs=[];for(let i=0;i<_fallbackOthers.length-1;i+=2)pairs.push({homeId:_fallbackOthers[i].id,awayId:_fallbackOthers[i+1].id});return pairs;})();
+
+    // シム実行（setTeams 外）→ 結果をまとめてから state を更新
+    const cpuSimResults=[];
+    for(const matchup of matchupList){
+      const a=teams.find(t=>t.id===matchup.homeId);
+      const b=teams.find(t=>t.id===matchup.awayId);
+      if(!a||!b) continue;
+      const useDh=!!a.dhEnabled;
+      const cr=quickSimGame(applyDhToTeam(a,useDh),applyDhToTeam(b,useDh));
+      cpuSimResults.push({matchup,cr,homeTeam:a,awayTeam:b,useDh});
+    }
     setTeams(prev=>{
       let newTeams=prev.map(t=>({...t,players:t.players.map(p=>({...p,stats:{...p.stats}}))}));
-      const matchupList=_cpuMatchups.length>0
-        ?_cpuMatchups
-        :(()=>{const others=newTeams.filter(t=>t.id!==myId&&t.id!==_oppId);const pairs=[];for(let i=0;i<others.length-1;i+=2)pairs.push({homeId:others[i].id,awayId:others[i+1].id});return pairs;})();
-      for(const matchup of matchupList){
+      for(const{matchup,cr}of cpuSimResults){
         const a=newTeams.find(t=>t.id===matchup.homeId);
         const b=newTeams.find(t=>t.id===matchup.awayId);
         if(!a||!b) continue;
-        const useDh = !!a.dhEnabled;
-        const cr=quickSimGame(applyDhToTeam(a, useDh),applyDhToTeam(b, useDh));
         const cdrew=cr.score.my===cr.score.opp;
         const aWon=cr.won;
         if(aWon){a.wins++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.losses++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
@@ -343,15 +413,31 @@ export function useSeasonFlow(gs) {
         a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon);
         a.players=applyPostGameCondition(a.players,cr.log||[],true,gameDay);
         a.players=tickInjuries(a.players);
-        const aInj=checkForInjuries(a.players, year);
-        a.players=applyInjuriesToPlayers(a.players, aInj, year);
+        const aInj=checkForInjuries(a.players,year);
+        a.players=applyInjuriesToPlayers(a.players,aInj,year);
         b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew);
         b.players=applyPostGameCondition(b.players,cr.log||[],false,gameDay);
         b.players=tickInjuries(b.players);
-        const bInj=checkForInjuries(b.players, year);
-        b.players=applyInjuriesToPlayers(b.players, bInj, year);
+        const bInj=checkForInjuries(b.players,year);
+        b.players=applyInjuriesToPlayers(b.players,bInj,year);
       }
       return newTeams;
+    });
+    // allTeamResultsMap に CPU ゲーム + 自チームゲームのボックススコアを一括記録
+    setAllTeamResultsMap(prev=>{
+      const next={...prev};
+      const recordGame=(homeId,awayId,cr,hPlayers,aPlayers,oppHName,oppAName)=>{
+        const bs=computeBoxScore(cr.log||[],cr.inningSummary||[],hPlayers,aPlayers,cr.score.my,cr.score.opp);
+        const hWon=cr.won; const drew=cr.score.my===cr.score.opp;
+        next[homeId]={...(next[homeId]||{}),[gameDay]:{won:hWon,drew,myScore:cr.score.my,oppScore:cr.score.opp,oppName:oppAName,oppId:awayId,homeId,awayId,...(bs||{})}};
+        next[awayId]={...(next[awayId]||{}),[gameDay]:{won:!hWon&&!drew,drew,myScore:cr.score.opp,oppScore:cr.score.my,oppName:oppHName,oppId:homeId,homeId,awayId,inningScores:bs?.inningScores,myBatting:bs?.awayBatting,oppBatting:bs?.homeBatting,myPitching:bs?.awayPitching,oppPitching:bs?.homePitching}};
+      };
+      for(const{matchup,cr,homeTeam,awayTeam}of cpuSimResults){
+        recordGame(matchup.homeId,matchup.awayId,cr,homeTeam.players,awayTeam.players,homeTeam.name,awayTeam.name);
+      }
+      // 自チームの試合（myTeam が home）
+      recordGame(myId,_oppId,r,myTeam.players,currentOpp.players,myTeam.name,currentOpp.name);
+      return next;
     });
     setGameResult({score:r.score,won,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:currentOpp,gameNo:gameDay});
     tryGenerateCpuOffer();
@@ -445,6 +531,7 @@ export function useSeasonFlow(gs) {
     const batchInjuries = [];
     const cpuHighlights = [];
     const batchNewsItems = []; // 試合結果ニュース
+    const batchBoxScores = []; // { homeId, awayId, dayNo, cr, homePlayers, awayPlayers, homeName, awayName }
 
     for(let g=0;g<count;g++){
       const scheduleMatchup=getMyMatchup(schedule,newDay,myId);
@@ -466,7 +553,9 @@ export function useSeasonFlow(gs) {
         const b=newTeams.find(t=>t.id===cpuMatchup.awayId);
         if(!a||!b) continue;
         const useDh = !!a.dhEnabled;
+        const aPlayersSnap=[...a.players]; const bPlayersSnap=[...b.players]; // 名前解決用スナップショット
         const cr=quickSimGame(applyDhToTeam(a, useDh),applyDhToTeam(b, useDh));
+        batchBoxScores.push({homeId:a.id,awayId:b.id,dayNo:newDay,cr,homePlayers:aPlayersSnap,awayPlayers:bPlayersSnap,homeName:a.name,awayName:b.name});
         const cdrew=cr.score.my===cr.score.opp;
         const aWon=cr.won;
         // 注目CPU試合を収集（大差 or 接戦）
@@ -509,7 +598,9 @@ export function useSeasonFlow(gs) {
       }
       const myT=newTeams.find(t=>t.id===myId);
       const useDh = scheduleMatchup ? (scheduleMatchup.isHome ? !!myT.dhEnabled : !!opp.dhEnabled) : !!myT.dhEnabled;
+      const myTPlayersSnap=[...myT.players]; const oppPlayersSnap=[...opp.players];
       const r=quickSimGame(applyDhToTeam(myT, useDh),applyDhToTeam(opp, useDh));
+      batchBoxScores.push({homeId:myT.id,awayId:opp.id,dayNo:newDay,cr:r,homePlayers:myTPlayersSnap,awayPlayers:oppPlayersSnap,homeName:myT.name,awayName:opp.name});
       const won=r.score.my>r.score.opp;
       const drew=r.score.my===r.score.opp;
       if(won){myT.wins++;myT.rf+=r.score.my;myT.ra+=r.score.opp;}
@@ -608,6 +699,16 @@ export function useSeasonFlow(gs) {
     setBatchResults(gameResults);
     gs.setRecentResults(prev=>[...gameResults.map(r=>({won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp,gameNo:r.gameNo})).reverse(),...prev].slice(0,5));
     gs.setGameResultsMap(prev=>{const next={...prev};gameResults.forEach(r=>{next[r.gameNo]={won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:r.oppTeam};});return next;});
+    setAllTeamResultsMap(prev=>{
+      const next={...prev};
+      for(const{homeId,awayId,dayNo,cr,homePlayers,awayPlayers,homeName,awayName}of batchBoxScores){
+        const bs=computeBoxScore(cr.log||[],cr.inningSummary||[],homePlayers,awayPlayers,cr.score.my,cr.score.opp);
+        const hWon=cr.won; const drew=cr.score.my===cr.score.opp;
+        next[homeId]={...(next[homeId]||{}),[dayNo]:{won:hWon,drew,myScore:cr.score.my,oppScore:cr.score.opp,oppName:awayName,oppId:awayId,homeId,awayId,...(bs||{})}};
+        next[awayId]={...(next[awayId]||{}),[dayNo]:{won:!hWon&&!drew,drew,myScore:cr.score.opp,oppScore:cr.score.my,oppName:homeName,oppId:homeId,homeId,awayId,inningScores:bs?.inningScores,myBatting:bs?.awayBatting,oppBatting:bs?.homeBatting,myPitching:bs?.awayPitching,oppPitching:bs?.homePitching}};
+      }
+      return next;
+    });
     if(newDay-1>=SEASON_GAMES){const withFarm=runFarmSeason(newTeams);setTeams(withFarm);setPlayoff(initPlayoff(withFarm));setScreen("playoff");}
     else setScreen("batch_result");
   };
@@ -662,17 +763,25 @@ export function useSeasonFlow(gs) {
     });
     const _tOppId=currentOpp.id;
     const _tCpuMatchups=getCpuMatchups(schedule,gameDay,myId,_tOppId);
+    const _tFallbackOthers=teams.filter(t=>t.id!==myId&&t.id!==_tOppId);
+    const tMatchupList=_tCpuMatchups.length>0
+      ?_tCpuMatchups
+      :(()=>{const pairs=[];for(let i=0;i<_tFallbackOthers.length-1;i+=2)pairs.push({homeId:_tFallbackOthers[i].id,awayId:_tFallbackOthers[i+1].id});return pairs;})();
+    const tCpuSimResults=[];
+    for(const matchup of tMatchupList){
+      const a=teams.find(t=>t.id===matchup.homeId);
+      const b=teams.find(t=>t.id===matchup.awayId);
+      if(!a||!b) continue;
+      const useDh=!!a.dhEnabled;
+      const cr=quickSimGame(applyDhToTeam(a,useDh),applyDhToTeam(b,useDh));
+      tCpuSimResults.push({matchup,cr,homeTeam:a,awayTeam:b});
+    }
     setTeams(prev=>{
       let newTeams=prev.map(t=>({...t,players:t.players.map(p=>({...p,stats:{...p.stats}}))}));
-      const tMatchupList=_tCpuMatchups.length>0
-        ?_tCpuMatchups
-        :(()=>{const others=newTeams.filter(t=>t.id!==myId&&t.id!==_tOppId);const pairs=[];for(let i=0;i<others.length-1;i+=2)pairs.push({homeId:others[i].id,awayId:others[i+1].id});return pairs;})();
-      for(const matchup of tMatchupList){
+      for(const{matchup,cr}of tCpuSimResults){
         const a=newTeams.find(t=>t.id===matchup.homeId);
         const b=newTeams.find(t=>t.id===matchup.awayId);
         if(!a||!b) continue;
-        const useDh = !!a.dhEnabled;
-        const cr=quickSimGame(applyDhToTeam(a, useDh),applyDhToTeam(b, useDh));
         const cdrew=cr.score.my===cr.score.opp;
         const aWon=cr.won;
         if(aWon){a.wins++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.losses++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
@@ -684,15 +793,29 @@ export function useSeasonFlow(gs) {
         a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon);
         a.players=applyPostGameCondition(a.players,cr.log||[],true,gameDay);
         a.players=tickInjuries(a.players);
-        const aInj=checkForInjuries(a.players, year);
-        a.players=applyInjuriesToPlayers(a.players, aInj, year);
+        const aInj=checkForInjuries(a.players,year);
+        a.players=applyInjuriesToPlayers(a.players,aInj,year);
         b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew);
         b.players=applyPostGameCondition(b.players,cr.log||[],false,gameDay);
         b.players=tickInjuries(b.players);
-        const bInj=checkForInjuries(b.players, year);
-        b.players=applyInjuriesToPlayers(b.players, bInj, year);
+        const bInj=checkForInjuries(b.players,year);
+        b.players=applyInjuriesToPlayers(b.players,bInj,year);
       }
       return newTeams;
+    });
+    setAllTeamResultsMap(prev=>{
+      const next={...prev};
+      const recordGame=(homeId,awayId,cr,hPlayers,aPlayers,oppHName,oppAName)=>{
+        const bs=computeBoxScore(cr.log||[],cr.inningSummary||[],hPlayers,aPlayers,cr.score.my,cr.score.opp);
+        const hWon=cr.won; const drew=cr.score.my===cr.score.opp;
+        next[homeId]={...(next[homeId]||{}),[gameDay]:{won:hWon,drew,myScore:cr.score.my,oppScore:cr.score.opp,oppName:oppAName,oppId:awayId,homeId,awayId,...(bs||{})}};
+        next[awayId]={...(next[awayId]||{}),[gameDay]:{won:!hWon&&!drew,drew,myScore:cr.score.opp,oppScore:cr.score.my,oppName:oppHName,oppId:homeId,homeId,awayId,inningScores:bs?.inningScores,myBatting:bs?.awayBatting,oppBatting:bs?.homeBatting,myPitching:bs?.awayPitching,oppPitching:bs?.homePitching}};
+      };
+      for(const{matchup,cr,homeTeam,awayTeam}of tCpuSimResults){
+        recordGame(matchup.homeId,matchup.awayId,cr,homeTeam.players,awayTeam.players,homeTeam.name,awayTeam.name);
+      }
+      const r2=gsResult; recordGame(myId,_tOppId,r2,myTeam.players,currentOpp.players,myTeam.name,currentOpp.name);
+      return next;
     });
     setGameResult({...gsResult,oppTeam:currentOpp,won,gameNo:gameDay});
     // 試合ニュース（手動試合も同様に生成）

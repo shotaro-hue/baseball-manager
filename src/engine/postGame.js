@@ -2,6 +2,108 @@ import { r2, clamp } from '../utils';
 import { IS_HIT, IS_OUT } from '../constants';
 import { emptyStats } from './player';
 
+/**
+ * 試合ログからボックススコアデータを計算する。
+ * quickSimGame(homeTeam, awayTeam) の log を受け取り、
+ * ホーム・アウェイ両チームの打撃・投手成績を返す。
+ * @param {Object[]} log           - quickSimGame が返す log 配列
+ * @param {Object[]} inningSummary - quickSimGame が返す inningSummary 配列
+ * @param {Object[]} homeTeamPlayers - ホームチームの players 配列（名前解決用）
+ * @param {Object[]} awayTeamPlayers - アウェイチームの players 配列（名前解決用）
+ * @param {number}   homeScore     - 最終ホームチーム得点
+ * @param {number}   awayScore     - 最終アウェイチーム得点
+ * @returns {{ homeBatting, awayBatting, homePitching, awayPitching, inningScores }}
+ */
+export function computeBoxScore(log, inningSummary, homeTeamPlayers, awayTeamPlayers, homeScore, awayScore) {
+  if (!log || !log.length) return null;
+
+  // scorer=true → home team at bat (bottom of inning in sim)
+  // scorer=false → away team at bat (top of inning in sim)
+  function computeBatting(players, isHomeBatting) {
+    const scorer = isHomeBatting; // home bats → scorer=true
+    const map = {};
+    const order = [];
+    log.forEach(e => {
+      if (e.scorer !== scorer || !e.batId || e.isStolenBase || !e.result || e.result === 'change') return;
+      if (!map[e.batId]) { map[e.batId] = { AB: 0, H: 0, HR: 0, RBI: 0, BB: 0, K: 0 }; order.push(e.batId); }
+      const m = map[e.batId];
+      const isBB  = e.result === 'bb';
+      const isHBP = e.result === 'hbp';
+      const isSF  = e.result === 'sf';
+      if (!isBB && !isHBP && !isSF) m.AB++;
+      if (IS_HIT(e.result)) m.H++;
+      if (e.result === 'hr') m.HR++;
+      m.RBI += (e.rbi || 0);
+      if (isBB || isHBP) m.BB++;
+      if (e.result === 'k') m.K++;
+    });
+    return order.map(id => {
+      const p = players.find(pl => pl.id === id);
+      return { id, name: p?.name || '不明', pos: p?.pos || '-', ...map[id] };
+    });
+  }
+
+  function computePitching(players, isHomePitching, homeWon, drew) {
+    // home pitcher faces away batters → away bats → scorer=false
+    const batterScorer = !isHomePitching;
+    const events = log.filter(e =>
+      e.scorer === batterScorer && e.pitcherId && !e.isStolenBase && e.result && e.result !== 'change'
+    );
+    const map = {};
+    const order = [];
+    events.forEach(e => {
+      if (!map[e.pitcherId]) { map[e.pitcherId] = { outs: 0, H: 0, ER: 0, BB: 0, K: 0 }; order.push(e.pitcherId); }
+      const m = map[e.pitcherId];
+      if (IS_HIT(e.result)) m.H++;
+      if (e.result === 'bb' || e.result === 'hbp') m.BB++;
+      if (e.result === 'k') m.K++;
+      if (IS_OUT(e.result)) m.outs++;
+      if (e.rbi > 0) m.ER += e.rbi;
+    });
+    const teamWon = isHomePitching ? homeWon : (!homeWon && !drew);
+    const finalLead = isHomePitching ? (homeScore - awayScore) : (awayScore - homeScore);
+    const saveSit = teamWon && finalLead >= 1 && finalLead <= 3;
+    const starterId = order[0];
+    const closerId  = order[order.length - 1];
+    const isMulti   = order.length >= 2;
+    const starterQualifies = teamWon && (map[starterId]?.outs ?? 0) >= 15;
+    const winnerId = teamWon ? (starterQualifies ? starterId : (order[1] ?? starterId)) : null;
+    return order.map(id => {
+      const p = players.find(pl => pl.id === id);
+      const m = map[id];
+      let result = null;
+      if (id === winnerId) result = 'W';
+      else if (!teamWon && !drew && id === starterId && finalLead < 0) result = 'L';
+      else if (isMulti && id === closerId && id !== starterId && id !== winnerId && saveSit) result = 'S';
+      return { id, name: p?.name || '不明', ip: r2(m.outs / 3), H: m.H, ER: m.ER, BB: m.BB, K: m.K, result };
+    });
+  }
+
+  // イニング別得点を集計
+  const inningScores = (() => {
+    if (!inningSummary || !inningSummary.length) return [];
+    const maxInning = Math.max(...inningSummary.map(s => s.inning));
+    const scores = [];
+    for (let i = 1; i <= maxInning; i++) {
+      const top    = inningSummary.find(s => s.inning === i && s.isTop);
+      const bottom = inningSummary.find(s => s.inning === i && !s.isTop);
+      scores.push({ inning: i, away: top?.runs ?? 0, home: bottom?.runs ?? 0 });
+    }
+    return scores;
+  })();
+
+  const homeWon = homeScore > awayScore;
+  const drew    = homeScore === awayScore;
+
+  return {
+    homeBatting:  computeBatting(homeTeamPlayers, true),
+    awayBatting:  computeBatting(awayTeamPlayers, false),
+    homePitching: computePitching(homeTeamPlayers, true,  homeWon, drew),
+    awayPitching: computePitching(awayTeamPlayers, false, homeWon, drew),
+    inningScores,
+  };
+}
+
 
 /* ═══════════════════════════════════════════════
    POST-GAME PROCESSING
