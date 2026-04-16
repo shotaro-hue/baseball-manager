@@ -76,11 +76,17 @@ body{background:var(--bg);}
 .odots{display:flex;gap:5px;justify-content:center;margin-top:4px;}
 .odot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);transition:.3s;}
 .odot.on{background:var(--red);border-color:var(--red);}
-/* MOMENTUM BAR */
-.mom-wrap{margin:10px 0;}
-.mom-bar{height:10px;background:rgba(255,255,255,.05);border-radius:5px;overflow:hidden;position:relative;}
-.mom-fill{height:100%;background:linear-gradient(90deg,#f87171,#fbbf24,#34d399);transition:width .5s;}
-.mom-marker{position:absolute;top:-2px;bottom:-2px;width:3px;background:#fff;border-radius:2px;transition:left .5s;}
+/* SIDE BANNER (攻守インジケーター) */
+.side-banner{border-radius:10px;padding:12px 16px;margin-bottom:10px;display:flex;align-items:center;gap:14px;}
+.side-banner.attacking{background:rgba(52,211,153,.1);border:2px solid rgba(52,211,153,.4);}
+.side-banner.defending{background:rgba(96,165,250,.08);border:2px solid rgba(96,165,250,.3);}
+.side-banner-main{font-size:16px;font-weight:700;letter-spacing:.06em;}
+.side-banner.attacking .side-banner-main{color:var(--green);}
+.side-banner.defending .side-banner-main{color:#60a5fa;}
+.side-banner-sub{font-size:10px;color:var(--dim);margin-top:2px;}
+/* TODAY'S GAME STATS */
+.gstat{font-size:10px;color:#94a3b8;font-family:'Share Tech Mono',monospace;}
+.gstat span{color:#e2e8f0;}
 /* FATIGUE GAUGE */
 .fat-bar{height:8px;border-radius:4px;overflow:hidden;background:rgba(255,255,255,.06);}
 .fat-fill{height:100%;border-radius:4px;transition:width .5s,background .3s;}
