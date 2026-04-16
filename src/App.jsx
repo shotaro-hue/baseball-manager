@@ -16,7 +16,7 @@ import { TeamModal } from './components/TeamModal';
 import { PressConferenceModal } from './components/PressConferenceModal';
 import { AllStarScreen } from './components/AllStarScreen';
 import { DashboardTab } from './components/DashboardTab';
-import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab, ScheduleTab } from './components/Tabs';
+import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab, ScheduleTab, BalanceTab } from './components/Tabs';
 import {
   SEASON_GAMES, BATCH, MAX_外国人_一軍, TEAM_DEFS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
   POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD,
@@ -33,6 +33,7 @@ const TAB_GROUPS = [
   { label: "試合", tabs: [["dashboard","🏠 概況"],["schedule","🗓️ 日程"],["standings","🏆 順位"],["stats","📊 成績"],["records","🏛 記録"]] },
   { label: "編成", tabs: [["roster","👥 ロースター"],["trade","🔄 トレード"],["contract","📝 契約"],["fa","🏪 FA"],["scout","🔍 スカウト"]] },
   { label: "球団", tabs: [["news","📰 ニュース"],["mailbox","📨 メール"],["alumni","📖 歴代"],["finance","💴 財務"]] },
+  { label: "分析", tabs: [["balance","⚖️ リーグ分析"]] },
 ];
 
 export default function App(){
@@ -375,6 +376,7 @@ export default function App(){
     {tab==="finance"&&<FinanceTab team={myTeam} onStadiumUpgrade={gs.handleStadiumUpgrade} gameDay={gameDay} onPlayerClick={gs.handlePlayerClick}/>}
     {tab==="standings"&&<StandingsTab teams={teams} myId={myId} onTeamClick={gs.handleTeamClick}/>}
     {tab==="stats"&&<StatsTab teams={teams} myId={myId}/>}
+    {tab==="balance"&&<BalanceTab teams={teams}/>}
 
     {tab==="roster"&&(
       <div className="card">
