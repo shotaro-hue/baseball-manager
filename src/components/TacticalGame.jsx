@@ -7,6 +7,29 @@ import { OV, CondBadge, HandBadge, PitchBadge } from './ui';
 
 
 
+function getGameBattingStats(log, playerId) {
+  if (!playerId) return null;
+  const entries = log.filter(e => e.batId === playerId && e.result !== 'change');
+  if (!entries.length) return null;
+  const ab = entries.filter(e => !['bb','hbp','sac','sf'].includes(e.result)).length;
+  const h = entries.filter(e => IS_HIT(e.result)).length;
+  const hr = entries.filter(e => e.result === 'hr').length;
+  const rbi = entries.reduce((s,e) => s + (e.rbi||0), 0);
+  const bb = entries.filter(e => e.result === 'bb' || e.result === 'hbp').length;
+  return { pa: entries.length, ab, h, hr, rbi, bb };
+}
+
+function getGamePitchingStats(log, pitcherId) {
+  if (!pitcherId) return null;
+  const entries = log.filter(e => e.pitcherId === pitcherId && e.result !== 'change');
+  if (!entries.length) return null;
+  const k = entries.filter(e => e.result === 'k').length;
+  const ha = entries.filter(e => IS_HIT(e.result)).length;
+  const ra = entries.reduce((s,e) => s + (e.rbi||0), 0);
+  const bb = entries.filter(e => e.result === 'bb' || e.result === 'hbp').length;
+  return { bf: entries.length, k, ha, ra, bb };
+}
+
 export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   const [gs,setGs]=useState(()=>initGameState(myTeam,oppTeam));
   const [autoRunning,setAutoRunning]=useState(false);
@@ -163,6 +186,22 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
             </div>
           )}
 
+          {/* 攻守バナー */}
+          <div className={`side-banner ${gs.isTop?"defending":"attacking"}`}>
+            <div style={{fontSize:26}}>{gs.isTop?"🛡️":"⚔️"}</div>
+            <div style={{flex:1}}>
+              <div className="side-banner-main">{gs.isTop?"守備中":"攻撃中"} — {gs.inning}回{gs.isTop?"表":"裏"}</div>
+              <div className="side-banner-sub">
+                {gs.isTop?`${oppTeam.short}の攻撃 / 自チーム投手: ${curPitcher?.name||"—"}`:`自チームの攻撃 / ${gs.outs}アウト`}
+              </div>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:9,color:"#94a3b8",letterSpacing:".1em",marginBottom:2}}>{gs.isTop?"相手打者":"次打者"}</div>
+              <div style={{fontSize:14,fontWeight:700}}>{nextBatter?.name||"—"}</div>
+              {(()=>{const bs=getGameBattingStats(gs.log,nextBatter?.id);if(!bs)return<div style={{fontSize:9,color:"#94a3b8"}}>まだ打席なし</div>;return<div style={{fontSize:10,fontFamily:"'Share Tech Mono',monospace",color:"#e2e8f0"}}>{bs.ab}打{bs.h}安打{bs.hr>0?` ${bs.hr}HR`:""}</div>;})()}
+            </div>
+          </div>
+
           {/* Diamond + Game Info */}
           <div style={{display:"flex",gap:14,alignItems:"flex-start",marginBottom:10,flexWrap:"wrap"}}>
             {/* Diamond */}
@@ -181,13 +220,13 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
               <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:38,color:gs.score.my>gs.score.opp?"#f5c842":gs.score.my<gs.score.opp?"#f87171":"#94a3b8"}}>
                 {gs.score.my} <span style={{color:"#1e2d3d",fontSize:22}}>–</span> {gs.score.opp}
               </div>
-              <div style={{fontSize:11,color:"#374151",marginTop:2}}>{gs.isTop?"相手の攻撃":"自チームの攻撃"}</div>
             </div>
             {/* Pitcher info */}
             <div className="card2" style={{minWidth:160,margin:0}}>
               <div style={{fontSize:9,color:"#374151",letterSpacing:".2em",marginBottom:6}}>自チーム投手</div>
               <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>{curPitcher?.name||"—"}</div>
-              <div style={{fontSize:10,color:"#374151",marginBottom:6}}>球数: <span style={{fontFamily:"monospace",color:calcEffectiveFatigue(gs.myPitchCount,gs.myPitcher)>=FATIGUE_WARNING?"#f87171":"#f5c842"}}>{gs.myPitchCount}</span>球</div>
+              <div style={{fontSize:10,color:"#374151",marginBottom:4}}>球数: <span style={{fontFamily:"monospace",color:calcEffectiveFatigue(gs.myPitchCount,gs.myPitcher)>=FATIGUE_WARNING?"#f87171":"#f5c842"}}>{gs.myPitchCount}</span>球</div>
+              {(()=>{const ps=getGamePitchingStats(gs.log,curPitcher?.id);if(!ps)return null;return<div className="gstat" style={{marginBottom:6}}>{ps.bf}打者 <span style={{color:"#a78bfa"}}>{ps.k}K</span> <span style={{color:"#f87171"}}>{ps.ha}被安打</span> <span style={{color:"#fbbf24"}}>{ps.ra}失点</span></div>;})()}
               <div style={{fontSize:9,color:"#374151",marginBottom:3}}>疲労度</div>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <div className="fat-bar" style={{flex:1}}>
@@ -207,21 +246,6 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
             </div>
           </div>
 
-          {/* Momentum Bar */}
-          <div className="mom-wrap">
-            <div className="fsb" style={{fontSize:9,color:"#374151",marginBottom:3}}>
-              <span>← {oppTeam.short}</span>
-              <span style={{color:gs.momentum>55?"#34d399":gs.momentum<45?"#f87171":"#f5c842",fontWeight:700}}>
-                モメンタム {gs.momentum>65?"🔥 圧倒的優勢":gs.momentum>55?"↑優勢":gs.momentum>=45?"互角":gs.momentum>=35?"↓劣勢":"❄️ 劣勢"}
-              </span>
-              <span>{myTeam.short} →</span>
-            </div>
-            <div className="mom-bar">
-              <div className="mom-fill" style={{width:"100%"}}/>
-              <div className="mom-marker" style={{left:`${gs.momentum}%`}}/>
-            </div>
-          </div>
-
           {/* Next batter matchup */}
           <div className="card2" style={{marginBottom:10}}>
             <div className="fsb">
@@ -236,6 +260,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
               <span style={{fontSize:10}}>長打<OV v={nextBatter.batting.power}/></span>
               <span style={{fontSize:10}}>選球<OV v={nextBatter.batting.eye}/></span>
             </div>}
+            {(()=>{const bs=getGameBattingStats(gs.log,nextBatter?.id);if(!bs)return<div className="gstat" style={{marginTop:4}}>まだ打席なし</div>;return<div className="gstat" style={{marginTop:4}}>今日: <span>{bs.ab}打{bs.h}安打</span>{bs.hr>0&&<> <span style={{color:"var(--gold)"}}>{bs.hr}HR</span></>}{bs.rbi>0&&<> <span>{bs.rbi}打点</span></>}{bs.bb>0&&<> <span>{bs.bb}四球</span></>}</div>;})()}
           </div>
 
           {/* Event Log */}
@@ -314,11 +339,12 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
                         <button className="bsm bga" onClick={()=>sendPinchHitter(p.id)}>代打！</button>
                       </div>
                     </div>
-                    <div style={{display:"flex",gap:10,marginTop:5}}>
+                    <div style={{display:"flex",gap:10,marginTop:5,flexWrap:"wrap",alignItems:"center"}}>
                       <span style={{fontSize:11}}>ミート<OV v={p.batting.contact}/></span>
                       <span style={{fontSize:11}}>長打<OV v={p.batting.power}/></span>
                       <span style={{fontSize:11}}>選球<OV v={p.batting.eye}/></span>
                       <span style={{fontSize:10,color:"#374151"}}>打率:{fmtAvg(p.stats.H,p.stats.AB)}</span>
+                      {(()=>{const bs=getGameBattingStats(gs.log,p.id);if(!bs)return null;return<span className="gstat" style={{marginLeft:4}}>{bs.ab}打{bs.h}安</span>;})()}
                     </div>
                   </div>
                 );
