@@ -31,7 +31,9 @@ export function useGameState() {
   const [screen, setScreen] = useState("title");
   const [retireModal, setRetireModal] = useState(null);
   const [playerModal, setPlayerModal] = useState(null);
-  const [teamModal, setTeamModal] = useState(null);
+  const [viewingTeam, setViewingTeam] = useState(null);  // チーム詳細画面で表示中のチーム
+  const [pregameError, setPregameError] = useState(null); // 試合開始バリデーションエラー { message }
+  const [allTeamResultsMap, setAllTeamResultsMap] = useState({}); // { [teamId]: { [gameDay]: boxScoreResult } }
   const [retireGamePlayer, setRetireGamePlayer] = useState(null);
   const [retireRole, setRetireRole] = useState(null);
   const [gameState, dispatch] = useReducer(gameStateReducer, { teams: INIT_TEAMS, gameDay: 1, year: 2025, myId: null });
@@ -151,7 +153,7 @@ export function useGameState() {
   },[year,teams]);
 
   const handlePlayerClick = useCallback((player,teamName)=>setPlayerModal({player,teamName}),[]);
-  const handleTeamClick = useCallback((team)=>setTeamModal(team),[]);
+  const handleTeamClick = useCallback((team)=>{setViewingTeam(team);setScreen("team_detail");},[]);
 
   const setTrainingFocus = useCallback((pid,focus)=>upd(myId,t=>({...t,players:t.players.map(p=>p.id===pid?{...p,trainingFocus:focus}:p)})),[upd,myId]);
 
@@ -409,7 +411,9 @@ export function useGameState() {
     screen, setScreen,
     retireModal, setRetireModal,
     playerModal, setPlayerModal,
-    teamModal, setTeamModal,
+    viewingTeam, setViewingTeam,
+    pregameError, setPregameError,
+    allTeamResultsMap, setAllTeamResultsMap,
     retireGamePlayer, setRetireGamePlayer,
     retireRole, setRetireRole,
     teams, setTeams,
