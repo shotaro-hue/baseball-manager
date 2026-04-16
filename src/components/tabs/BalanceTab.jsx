@@ -53,9 +53,9 @@ function runPASim(bat, pit, n) {
 // ── 差分セル ─────────────────────────────────────────────────
 // invert=true → 値が高いほど投手有利（K率・ERA は逆方向）
 // invert=false → 値が高いほど打者有利（BA・HR率等は通常方向）
-function Diff({ val, ref, fmt, invert = false }) {
-  const d   = val - ref;
-  const ok  = Math.abs(d) < ref * 0.08;
+function Diff({ val, baseline, fmt, invert = false }) {
+  const d   = val - baseline;
+  const ok  = Math.abs(d) < baseline * 0.08;
   const good = invert ? d < 0 : d > 0;
   const color = ok ? '#94a3b8' : good ? '#34d399' : '#f87171';
   return (
@@ -65,9 +65,9 @@ function Diff({ val, ref, fmt, invert = false }) {
   );
 }
 
-function StatusBadge({ val, ref, invert = false }) {
-  const d = val - ref;
-  if (Math.abs(d) < ref * 0.10) return <span style={{ color: '#94a3b8', fontSize: 10 }}>正常</span>;
+function StatusBadge({ val, baseline, invert = false }) {
+  const d = val - baseline;
+  if (Math.abs(d) < baseline * 0.10) return <span style={{ color: '#94a3b8', fontSize: 10 }}>正常</span>;
   const good  = invert ? d < 0 : d > 0;
   const color = good ? '#34d399' : '#f87171';
   const text  = good ? '打者有利' : '投手有利';
@@ -170,20 +170,20 @@ export function BalanceTab({ teams }) {
               </thead>
               <tbody>
                 {[
-                  { label: '打率',   val: league.ba,    ref: REF.ba,    fmtV: ba3,  fmtD: baFmt,  invert: false },
-                  { label: '三振率', val: league.kPct,  ref: REF.kPct,  fmtV: pct,  fmtD: ppFmt,  invert: true  },
-                  { label: '四球率', val: league.bbPct, ref: REF.bbPct, fmtV: pct,  fmtD: ppFmt,  invert: false },
-                  { label: 'HR率',   val: league.hrPct, ref: REF.hrPct, fmtV: pct,  fmtD: ppFmt,  invert: false },
+                  { label: '打率',   val: league.ba,    baseline: REF.ba,    fmtV: ba3,  fmtD: baFmt,  invert: false },
+                  { label: '三振率', val: league.kPct,  baseline: REF.kPct,  fmtV: pct,  fmtD: ppFmt,  invert: true  },
+                  { label: '四球率', val: league.bbPct, baseline: REF.bbPct, fmtV: pct,  fmtD: ppFmt,  invert: false },
+                  { label: 'HR率',   val: league.hrPct, baseline: REF.hrPct, fmtV: pct,  fmtD: ppFmt,  invert: false },
                   ...(league.era != null
-                    ? [{ label: 'ERA', val: league.era, ref: REF.era, fmtV: v => v.toFixed(2), fmtD: eraFmt, invert: false }]
+                    ? [{ label: 'ERA', val: league.era, baseline: REF.era, fmtV: v => v.toFixed(2), fmtD: eraFmt, invert: false }]
                     : []),
-                ].map(({ label, val, ref, fmtV, fmtD, invert }) => (
+                ].map(({ label, val, baseline, fmtV, fmtD, invert }) => (
                   <tr key={label}>
                     <td>{label}</td>
                     <td className="mono">{fmtV(val)}</td>
-                    <td className="mono" style={{ color: '#374151' }}>{fmtV(ref)}</td>
-                    <td><Diff val={val} ref={ref} fmt={fmtD} invert={invert} /></td>
-                    <td><StatusBadge val={val} ref={ref} invert={invert} /></td>
+                    <td className="mono" style={{ color: '#374151' }}>{fmtV(baseline)}</td>
+                    <td><Diff val={val} baseline={baseline} fmt={fmtD} invert={invert} /></td>
+                    <td><StatusBadge val={val} baseline={baseline} invert={invert} /></td>
                   </tr>
                 ))}
               </tbody>

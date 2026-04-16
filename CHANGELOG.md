@@ -5,6 +5,15 @@
 
 ---
 
+### 2026-04-16 — fix: BalanceTab の ref 予約プロップバグ修正
+
+**仕様本文への影響なし（内部バグ修正のみ）**
+
+- 根本原因: `Diff`/`StatusBadge` コンポーネントに `ref={...}` で NPB 基準値を渡していたが、`ref` は React 予約済みプロップのため受け取り側が `undefined` となり差分計算が NaN に。React StrictMode（二重レンダリング）でのエラー throw が ErrorBoundary を起動
+- 修正内容: プロップ名を `ref` → `baseline` にリネーム（コンポーネント定義・行データオブジェクト・JSX 呼び出しの3箇所）
+
+---
+
 ### 2026-04-16 — feat: リーグ分析タブ新設（BalanceTab）
 
 **仕様本文への影響なし（内部実装のみ）**
