@@ -82,7 +82,7 @@ function historyPitcherEntry(h, teamId, teamName) {
 
 /* ─── 打者変換 ─── */
 export function realBatterToPlayer(b, teamDef) {
-  const { name, age, birthYear, pos, hometown = teamDef.city, isForeign = false, salary, stats, history } = b;
+  const { name, age, pos, hometown = teamDef.city, isForeign = false, salary, stats, history } = b;
   const { AVG = 0.250, HR = 5, RBI = 30, SB = 5, BB = 30, PA = 300, OPS = 0.680 } = stats;
 
   const bbPct = PA > 0 ? BB / PA : 0.08;
@@ -119,7 +119,6 @@ export function realBatterToPlayer(b, teamDef) {
 
   return {
     id: uid(), name, pos, age,
-    ...(birthYear ? { birthYear } : {}),
     potential: clamp(sc(OPS, 0.60, 1.05, 55, 96) + rng(-5, 8), 55, 99),
     isPitcher: false, isForeign,
     salary: salary ?? 5000000,
@@ -148,7 +147,7 @@ export function realBatterToPlayer(b, teamDef) {
 
 /* ─── 投手変換 ─── */
 export function realPitcherToPlayer(p, teamDef) {
-  const { name, age, birthYear, pos, hand = 'right', hometown = teamDef.city, isForeign = false, salary, stats, history } = p;
+  const { name, age, pos, hand = 'right', hometown = teamDef.city, isForeign = false, salary, stats, history } = p;
   const { ERA = 4.00, W = 5, L = 8, IP = 80, SO = 70, BB = 35, WHIP = 1.40 } = stats;
   const K = SO;
 
@@ -181,7 +180,6 @@ export function realPitcherToPlayer(p, teamDef) {
 
   return {
     id: uid(), name, pos, age,
-    ...(birthYear ? { birthYear } : {}),
     potential: clamp(sc(ERA, 5.5, 1.8, 55, 97) + rng(-5, 8), 55, 99),
     isPitcher: true, isForeign,
     hand,
