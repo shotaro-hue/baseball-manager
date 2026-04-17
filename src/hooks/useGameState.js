@@ -36,7 +36,7 @@ export function useGameState() {
   const [allTeamResultsMap, setAllTeamResultsMap] = useState({}); // { [teamId]: { [gameDay]: boxScoreResult } }
   const [retireGamePlayer, setRetireGamePlayer] = useState(null);
   const [retireRole, setRetireRole] = useState(null);
-  const [gameState, dispatch] = useReducer(gameStateReducer, { teams: INIT_TEAMS, gameDay: 1, year: 2025, myId: null });
+  const [gameState, dispatch] = useReducer(gameStateReducer, { teams: INIT_TEAMS, gameDay: 1, year: 2026, myId: null });
   const { teams, gameDay, year, myId } = gameState;
   const setTeams   = useCallback((n) => dispatch({ type: G.SET_TEAMS,    teams: n }),    []);
   const setGameDay = useCallback((n) => dispatch({ type: G.SET_GAME_DAY, day:   n }),    []);
