@@ -35,6 +35,72 @@ const DEBUG_TEAM = (() => {
 
 console.log(`[fetch-spaia] year=${YEAR}  dry-run=${DRY_RUN}  debug=${DEBUG}`);
 
+// ── playerProfiles.json 読み込み（patch-spaia.cjs で生成） ─────
+const PROFILES_PATH = path.join(__dirname, '..', 'src', 'data', 'playerProfiles.json');
+const PLAYER_PROFILES = fs.existsSync(PROFILES_PATH)
+  ? JSON.parse(fs.readFileSync(PROFILES_PATH, 'utf8'))
+  : {};
+{
+  const n = Object.keys(PLAYER_PROFILES).length;
+  if (n > 0) console.log(`[profiles] ${n} 件のプロフィールをロード`);
+  else console.warn('[profiles] playerProfiles.json が存在しないか空です。先に patch-spaia.cjs を実行してください。');
+}
+
+// ── 年俸推定（SPAIA が年俸データを提供しないため成績から算出） ──
+// 単位: 円。NPB 最低年俸 4,400,000 円を下限とする。
+const MIN_SALARY = 4_400_000;
+const MAX_SALARY = 500_000_000;
+
+function estimateBatterSalary(stats) {
+  const { OPS = 0.650, G = 0, HR = 0, SB = 0 } = stats;
+  const ptFactor = Math.max(0.35, Math.min(1.0, G / 120));
+
+  let base;
+  if      (OPS >= 0.950) base = 200_000_000;
+  else if (OPS >= 0.900) base = 120_000_000;
+  else if (OPS >= 0.850) base =  70_000_000;
+  else if (OPS >= 0.800) base =  40_000_000;
+  else if (OPS >= 0.750) base =  22_000_000;
+  else if (OPS >= 0.700) base =  12_000_000;
+  else if (OPS >= 0.650) base =   7_000_000;
+  else                   base = MIN_SALARY;
+
+  const bonus = HR * 500_000 + SB * 200_000;
+  return Math.round(Math.min(Math.max(base * ptFactor + bonus, MIN_SALARY), MAX_SALARY));
+}
+
+function estimatePitcherSalary(stats) {
+  const { ERA = 4.50, IP = 0, W = 0, SV = 0, HLD = 0, GS = 0 } = stats;
+
+  // 先発投手（GS >= 5 または IP >= 80）
+  if (GS >= 5 || IP >= 80) {
+    const ipFactor = Math.max(0.4, Math.min(1.2, IP / 160));
+    let base;
+    if      (ERA <= 1.80 && IP >= 160) base = 300_000_000;
+    else if (ERA <= 2.20 && IP >= 130) base = 150_000_000;
+    else if (ERA <= 2.60 && IP >= 100) base =  80_000_000;
+    else if (ERA <= 3.00 && IP >=  80) base =  40_000_000;
+    else if (ERA <= 3.50)              base =  20_000_000;
+    else if (ERA <= 4.00)              base =  12_000_000;
+    else                               base =   7_000_000;
+    const bonus = W * 2_000_000;
+    return Math.round(Math.min(Math.max(base * ipFactor + bonus, MIN_SALARY), MAX_SALARY));
+  }
+
+  // リリーフ投手
+  let base;
+  if      (SV >= 25)              base =  80_000_000;
+  else if (SV >= 15)              base =  50_000_000;
+  else if (SV >= 5)               base =  25_000_000;
+  else if (HLD >= 20)             base =  30_000_000;
+  else if (HLD >= 10)             base =  18_000_000;
+  else if (ERA <= 2.50 && IP >=30)base =  14_000_000;
+  else if (ERA <= 3.50)           base =   9_000_000;
+  else                            base =   6_000_000;
+  const bonus = SV * 1_000_000 + W * 1_000_000;
+  return Math.round(Math.min(Math.max(base + bonus, MIN_SALARY), MAX_SALARY));
+}
+
 // ── SPAIA チーム ID ↔ ゲーム内チーム ID マッピング ────────
 const TEAM_MAP = [
   { gameId:  0, name: '東京ヤクルトスワローズ',     spaia:   2, city: '東京'   },
@@ -205,21 +271,25 @@ function convertBatter(info, stats, history, cityFallback, profile) {
   const name = pick(info, 'Name', 'name', 'player_name', '選手名');
   if (!name) return null;
 
-  const age  = num(pick(profile, 'Age', 'age', '年齢', 'PlayerAge', 'player_age') ??
-               pickDebug('age', info, 'Age', 'age', '年齢', 'PlayerAge', 'player_age', 'BirthAge', 'birth_age'), 25);
-  const pos  = normalizePos(pickDebug('pos', info, 'Position', 'DefensePosition', 'defense_position', 'DefensePos', 'DefPos', 'position', 'pos', '守備', '守備位置')) ?? '一塁手';
+  // プロフィール補完: Wikipedia データ優先、なければ SPAIA、最後にデフォルト
+  const wikiProfile = PLAYER_PROFILES[name?.trim()] ?? {};
+  const birthYear = wikiProfile.birthYear ?? null;
+  const age = birthYear
+    ? (YEAR - birthYear)
+    : num(pick(profile, 'Age', 'age', '年齢', 'PlayerAge', 'player_age') ??
+          pickDebug('age', info, 'Age', 'age', '年齢', 'PlayerAge', 'player_age', 'BirthAge', 'birth_age'), 25);
+  const pos  = wikiProfile.pos
+    ?? normalizePos(pickDebug('pos', info, 'Position', 'DefensePosition', 'defense_position', 'DefensePos', 'DefPos', 'position', 'pos', '守備', '守備位置'))
+    ?? '一塁手';
   const city = pick(profile, 'BirthPlace', 'birth_place', 'BirthPref', 'birth_pref', 'Hometown', 'hometown', '出身地', '出身') ??
                pick(info, 'BirthPlace', 'birth_place', 'hometown', 'BirthPref', 'birth_pref', '出身地', '出身') ??
                cityFallback;
-  const salary = (() => {
-    const raw = num(
-      pick(profile, 'Salary', 'salary', '年俸', 'AnnualSalary', 'annual_salary') ??
-      pickDebug('salary', info, 'Salary', 'salary', '年俸', 'AnnualSalary', 'annual_salary', 'Contract', 'contract', '契約金'),
-      0
-    );
-    if (raw > 0 && raw < 1000) return raw * 10000;  // 万円 → 円
-    return raw || 5000;
-  })();
+  const salary = estimateBatterSalary({
+    OPS: num(pick(stats, 'Ops', 'ops', 'OPS'), 0),
+    G:   num(pick(stats, 'Game', 'game', 'G'),   0),
+    HR:  num(pick(stats, 'Homerun', 'home_run', 'HR'), 0),
+    SB:  num(pick(stats, 'StolenBase', 'stolen_base', 'SB'), 0),
+  });
   const foreign = !!(pick(info, 'IsForeign', 'is_foreign', 'isForeign'));
   const backNumber = pick(info, 'BackNumber', 'back_number', 'Num', 'num') ?? '';
   const batHand = (() => {
@@ -261,6 +331,7 @@ function convertBatter(info, stats, history, cityFallback, profile) {
   return {
     name,
     age,
+    ...(birthYear ? { birthYear } : {}),
     pos,
     batHand,
     backNumber,
@@ -278,8 +349,12 @@ function convertPitcher(info, stats, history, cityFallback, profile) {
   const name = pick(info, 'Name', 'name', 'player_name', '選手名');
   if (!name) return null;
 
-  const age     = num(pick(profile, 'Age', 'age', '年齢', 'PlayerAge', 'player_age') ??
-                  pickDebug('age', info, 'Age', 'age', '年齢', 'PlayerAge', 'player_age', 'BirthAge', 'birth_age'), 27);
+  const wikiProfileP = PLAYER_PROFILES[name?.trim()] ?? {};
+  const birthYearP   = wikiProfileP.birthYear ?? null;
+  const age     = birthYearP
+    ? (YEAR - birthYearP)
+    : num(pick(profile, 'Age', 'age', '年齢', 'PlayerAge', 'player_age') ??
+          pickDebug('age', info, 'Age', 'age', '年齢', 'PlayerAge', 'player_age', 'BirthAge', 'birth_age'), 27);
   const subtype = inferPitcherSubtype(info);  // info から推定（stats で上書きしない）
   const hand    = (() => {
     // 実フィールド名: PitchingArm（1=左, 2=右）
@@ -291,15 +366,14 @@ function convertPitcher(info, stats, history, cityFallback, profile) {
   const city    = pick(profile, 'BirthPlace', 'birth_place', 'BirthPref', 'birth_pref', 'Hometown', 'hometown', '出身地', '出身') ??
                   pick(info, 'BirthPlace', 'birth_place', 'hometown', 'BirthPref', 'birth_pref', '出身地', '出身') ??
                   cityFallback;
-  const salary  = (() => {
-    const raw = num(
-      pick(profile, 'Salary', 'salary', '年俸', 'AnnualSalary', 'annual_salary') ??
-      pickDebug('salary', info, 'Salary', 'salary', '年俸', 'AnnualSalary', 'annual_salary', 'Contract', 'contract', '契約金'),
-      0
-    );
-    if (raw > 0 && raw < 1000) return raw * 10000;  // 万円 → 円
-    return raw || 5000;
-  })();
+  const salary  = estimatePitcherSalary({
+    ERA: num(pick(stats, 'EarnedRunAverage', 'earned_run_average', 'ERA'), 4.50),
+    IP:  num(pick(stats, 'InningsPitched', 'innings_pitched', 'IP'), 0),
+    W:   num(pick(stats, 'Win', 'win', 'W'), 0),
+    SV:  num(pick(stats, 'Save', 'save', 'SV'), 0),
+    HLD: num(pick(stats, 'Hold', 'hold', 'HLD'), 0),
+    GS:  num(pick(stats, 'Started', 'GamesStarted', 'games_started', 'GS'), 0),
+  });
   const foreign    = !!(pick(info, 'IsForeign', 'is_foreign', 'isForeign'));
   const backNumber = pick(info, 'BackNumber', 'back_number', 'Num', 'num') ?? '';
 
@@ -330,6 +404,7 @@ function convertPitcher(info, stats, history, cityFallback, profile) {
   return {
     name,
     age,
+    ...(birthYearP ? { birthYear: birthYearP } : {}),
     pos: subtype,
     hand,
     backNumber,
@@ -505,12 +580,13 @@ function buildFileContent(rosters) {
 
     lines.push('    batters: [');
     for (const b of batters) {
-      const { name, age, pos, batHand, backNumber, hometown, isForeign, salary, stats, history } = b;
+      const { name, age, birthYear, pos, batHand, backNumber, hometown, isForeign, salary, stats, history } = b;
       const { AVG, G, AB, H, '2B': D, '3B': T, HR, TB, R, RBI, SB, CS, BB, SO, HBP, SH, SF, GIDP, PA, OBP, SLG, OPS } = stats;
-      const foreignStr = isForeign ? ', isForeign:true' : '';
-      const histStr = history?.length ? `, history:${JSON.stringify(history)}` : '';
+      const foreignStr  = isForeign  ? ', isForeign:true' : '';
+      const birthYearStr = birthYear ? `, birthYear:${birthYear}` : '';
+      const histStr     = history?.length ? `, history:${JSON.stringify(history)}` : '';
       lines.push(
-        `      { name:'${name}', age:${age}, pos:'${pos}', batHand:'${batHand}', backNumber:'${backNumber}', hometown:'${hometown}'${foreignStr}, salary:${salary},` +
+        `      { name:'${name}', age:${age}${birthYearStr}, pos:'${pos}', batHand:'${batHand}', backNumber:'${backNumber}', hometown:'${hometown}'${foreignStr}, salary:${salary},` +
         ` stats:{ AVG:${AVG.toFixed(3)}, G:${G}, AB:${AB}, H:${H}, '2B':${D}, '3B':${T}, HR:${HR}, TB:${TB}, R:${R}, RBI:${RBI},` +
         ` SB:${SB}, CS:${CS}, BB:${BB}, SO:${SO}, HBP:${HBP}, SH:${SH}, SF:${SF}, GIDP:${GIDP}, PA:${PA},` +
         ` OBP:${OBP.toFixed(3)}, SLG:${SLG.toFixed(3)}, OPS:${OPS.toFixed(3)} }${histStr} },`
@@ -520,12 +596,13 @@ function buildFileContent(rosters) {
 
     lines.push('    pitchers: [');
     for (const p of pitchers) {
-      const { name, age, pos, hand, backNumber, hometown, isForeign, salary, stats, history } = p;
+      const { name, age, birthYear, pos, hand, backNumber, hometown, isForeign, salary, stats, history } = p;
       const { ERA, G, GS, W, L, SV, HLD, CG, SHO, IP, H, HR, BB, SO, HBP, WP, BK, ER, R, WHIP } = stats;
-      const foreignStr = isForeign ? ', isForeign:true' : '';
-      const histStr = history?.length ? `, history:${JSON.stringify(history)}` : '';
+      const foreignStr   = isForeign  ? ', isForeign:true' : '';
+      const birthYearStr = birthYear  ? `, birthYear:${birthYear}` : '';
+      const histStr      = history?.length ? `, history:${JSON.stringify(history)}` : '';
       lines.push(
-        `      { name:'${name}', age:${age}, pos:'${pos}', hand:'${hand}', backNumber:'${backNumber}', hometown:'${hometown}'${foreignStr}, salary:${salary},` +
+        `      { name:'${name}', age:${age}${birthYearStr}, pos:'${pos}', hand:'${hand}', backNumber:'${backNumber}', hometown:'${hometown}'${foreignStr}, salary:${salary},` +
         ` stats:{ ERA:${ERA.toFixed(2)}, G:${G}, GS:${GS}, W:${W}, L:${L}, SV:${SV}, HLD:${HLD}, CG:${CG}, SHO:${SHO},` +
         ` IP:${IP.toFixed(1)}, H:${H}, HR:${HR}, BB:${BB}, SO:${SO}, HBP:${HBP}, WP:${WP}, BK:${BK}, ER:${ER}, R:${R}, WHIP:${WHIP.toFixed(2)} }${histStr} },`
       );

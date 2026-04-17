@@ -5,6 +5,21 @@
 
 ---
 
+### 2026-04-17 — feat: 選手プロフィール補完（birthYear・守備位置・年俸推定）
+
+**仕様本文への影響なし（データ取得基盤の整備）**
+
+- `scripts/patch-spaia.cjs`（新規）: Wikipedia 日本語版 API から選手の `birthYear`・`pos` を取得し `src/data/playerProfiles.json` に出力。差分更新対応（既存データはスキップ）
+- `scripts/fetch-spaia.cjs`（修正）: `playerProfiles.json` をマージし birthYear/pos を優先設定。SPAIA が未提供の年俸を打撃成績（OPS・G・HR・SB）/ 投球成績（ERA・IP・W・SV・HLD）から推定（単位: 円、NPB 最低年俸 440 万円下限）
+- `src/engine/realplayer.js`（修正）: `birthYear` フィールドをプレイヤーオブジェクトに伝播
+- `src/hooks/useOffseason.js`（修正）: シーズン開幕時の年齢計算を `birthYear` 優先（`nextYear - birthYear`）に変更。`birthYear` なしの生成選手は従来通り `age + 1`
+
+**運用手順**:
+1. `node scripts/patch-spaia.cjs` → `src/data/playerProfiles.json` を生成
+2. `node scripts/fetch-spaia.cjs` → `src/data/npb2025.js` を再生成（birthYear・正確な年齢・推定年俸が反映）
+
+---
+
 ### 2026-04-16 — feat: 他チーム試合結果閲覧・試合前バリデーション強化・エラーダイアログ
 
 **仕様本文への影響あり**
