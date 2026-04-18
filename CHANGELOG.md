@@ -5,6 +5,21 @@
 
 ---
 
+### 2026-04-18 — fix: 年俸の単位混在を修正（円→万円に統一）
+
+**仕様本文への影響なし（内部バグ修正のみ）**
+
+- 根本原因: `npb2025.js` / `TEAM_DEFS.budget` は万円単位だが、`fmtSal` が円単位を前提に `/10000` していたため、山田哲人（50000万円=5億円）が「5万」と表示されていた。また `MIN_SALARY_SHIHAKA/IKUSEI` が円単位（4200000/2400000）、`player.js` 生成式に `*100` が余分に入り、`POP_RELEASE_SALARY_THRESHOLD` も円単位だった。
+- 修正内容:
+  - `src/utils.js` `fmtSal`: 万円単位前提に変更。1億円以上は `X.X億円`、未満は `X万円` 表示
+  - `src/constants.js` `MIN_SALARY_SHIHAKA`: 4200000 → 420（万円）
+  - `src/constants.js` `MIN_SALARY_IKUSEI`: 2400000 → 240（万円）
+  - `src/constants.js` `POP_RELEASE_SALARY_THRESHOLD`: 50000000 → 5000（万円: 5000万円相当）
+  - `src/engine/player.js`: 投手・野手の年俸生成式から `*100` を削除（万円で 0〜60000 に統一）
+  - `src/engine/contract.js`: moneyScore の floor を `100000`（円単位の誤り）→ `MIN_SALARY_SHIHAKA`（420万円）に変更
+
+---
+
 ### 2026-04-17 — fix: シーズン開始年を2025→2026に修正
 
 **仕様本文への影響なし（内部バグ修正のみ）**

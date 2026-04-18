@@ -13,8 +13,8 @@ export const MAX_ROSTER = 28;
 export const MAX_FARM = 30;
 export const MAX_外国人_一軍 = 4;  // NPB規定: 一軍出場選手登録は外国人最大4名
 export const ACCEPT_THRESHOLD = 55;
-export const MIN_SALARY_SHIHAKA = 4200000;  // 支配下選手最低年俸 420万円 (NPB協約 第89条)
-export const MIN_SALARY_IKUSEI  = 2400000;  // 育成選手最低年俸  240万円 (NPB協約)
+export const MIN_SALARY_SHIHAKA = 420;  // 支配下選手最低年俸 420万円 (NPB協約 第89条)
+export const MIN_SALARY_IKUSEI  = 240;  // 育成選手最低年俸  240万円 (NPB協約)
 export const ACTIVE_ROSTER_FA_DAYS_PER_YEAR = 120; // FA権1年分の一軍登録日数（NPB145日→ゲーム換算120日）
 export const CPU_FA_BUDGET_RESERVE_RATIO = 0.15; // CPU球団がFA補強後に残す予算割合（15%）
 export const CPU_FA_MIN_SCORE = 45; // CPU球団がFAに入札する最低スコア
@@ -46,7 +46,7 @@ export const POP_LOSS_STREAK3              = -2;   // 3連敗以上の敗戦
 export const POP_LOSS_STREAK5              = -3;   // 5連敗以上の敗戦
 export const POP_DRIFT_RATE                = 0.1;  // オフシーズンに50へ回帰する割合
 export const POP_RELEASE_PENALTY           = -3;   // 高年俸選手放出時の popularity ペナルティ
-export const POP_RELEASE_SALARY_THRESHOLD  = 50_000_000; // この年俸以上の放出でペナルティ
+export const POP_RELEASE_SALARY_THRESHOLD  = 5000; // この年俸以上の放出でペナルティ（万円: 5000万円）
 
 // オーナー信頼度（ownerTrust）定数
 export const OWNER_TRUST_BUDGET_LOW  = 30;   // 信頼度がこれ未満: 翌年予算 ×0.8

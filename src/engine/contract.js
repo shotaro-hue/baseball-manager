@@ -33,7 +33,7 @@ export function evalOffer(player, offer, myTeam, allTeams) {
     .sort((a, b) => b.wins - a.wins)
     .findIndex((t) => t.id === myTeam.id) + 1;
 
-  const moneyScore = clamp((offer.salary / Math.max(player.salary, 100000)) * 60 + 20, 0, 100);
+  const moneyScore = clamp((offer.salary / Math.max(player.salary, MIN_SALARY_SHIHAKA)) * 60 + 20, 0, 100);
   const winScore = clamp(winPct * 100 * 1.2, 0, 100);
   const rankScore = clamp((7 - rank) / 6 * 100, 0, 100);
   const playScore = myTeam.lineup.includes(player.id) ? 85 : 40;
