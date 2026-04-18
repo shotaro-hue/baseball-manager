@@ -77,7 +77,7 @@ export function CareerTable({player}){
         {ip&&(
           <table className="tbl" style={{fontSize:9,width:"100%"}}>
             <thead>
-              <tr><th>年度</th><th>防御率</th><th>勝</th><th>負</th><th>S</th><th>回</th><th>K</th><th>WHIP</th></tr>
+              <tr><th>年度</th><th>チーム</th><th>防御率</th><th>勝</th><th>負</th><th>S</th><th>回</th><th>K</th><th>WHIP</th></tr>
             </thead>
             <tbody>
               {[...log].reverse().map((row,ri)=>{
@@ -87,6 +87,7 @@ export function CareerTable({player}){
                 return(
                   <tr key={row.year+"-p-"+ri}>
                     <td className="mono" style={{color:"#f5c842"}}>{row.year}</td>
+                    <td className="mono" style={{color:"#94a3b8",maxWidth:60,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.teamName||""}</td>
                     <td className="mono">{sp.ERA}</td>
                     <td className="mono" style={{color:"#34d399"}}>{s.W}</td>
                     <td className="mono" style={{color:"#f87171"}}>{s.L}</td>
@@ -100,6 +101,7 @@ export function CareerTable({player}){
               {hasTotals&&(
                 <tr style={{background:"rgba(245,200,66,.06)",fontWeight:700}}>
                   <td style={{color:"#f5c842",fontSize:9}}>通算</td>
+                  <td></td>
                   <td className="mono">{saberPitcher(totals).ERA}</td>
                   <td className="mono" style={{color:"#34d399"}}>{totals.W}</td>
                   <td className="mono" style={{color:"#f87171"}}>{totals.L}</td>
@@ -115,7 +117,7 @@ export function CareerTable({player}){
         {!ip&&(
           <table className="tbl" style={{fontSize:9,width:"100%"}}>
             <thead>
-              <tr><th>年度</th><th>打席</th><th>打率</th><th>HR</th><th>打点</th><th>盗塁</th><th>OPS</th></tr>
+              <tr><th>年度</th><th>チーム</th><th>打席</th><th>打率</th><th>HR</th><th>打点</th><th>盗塁</th><th>OPS</th></tr>
             </thead>
             <tbody>
               {[...log].reverse().map((row,ri)=>{
@@ -125,6 +127,7 @@ export function CareerTable({player}){
                 return(
                   <tr key={row.year+"-b-"+ri}>
                     <td className="mono" style={{color:"#f5c842"}}>{row.year}</td>
+                    <td className="mono" style={{color:"#94a3b8",maxWidth:60,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.teamName||""}</td>
                     <td className="mono">{s.PA}</td>
                     <td className="mono">{fmtAvg(s.H,s.AB)}</td>
                     <td className="mono" style={{color:s.HR>=20?"#f5c842":undefined}}>{s.HR}</td>
@@ -137,6 +140,7 @@ export function CareerTable({player}){
               {hasTotals&&(
                 <tr style={{background:"rgba(245,200,66,.06)",fontWeight:700}}>
                   <td style={{color:"#f5c842",fontSize:9}}>通算</td>
+                  <td></td>
                   <td className="mono">{totals.PA}</td>
                   <td className="mono">{fmtAvg(totals.H,totals.AB)}</td>
                   <td className="mono" style={{color:totals.HR>=200?"#f5c842":undefined}}>{totals.HR}</td>

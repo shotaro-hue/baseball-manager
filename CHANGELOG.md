@@ -5,6 +5,15 @@
 
 ---
 
+### 2026-04-18 — feat: 年度別成績欄に所属チーム列を追加
+
+**仕様本文への影響なし**
+
+- `src/components/tabs/CareerTable.jsx`: 打者・投手テーブルの「年度」列右隣に「チーム」列を追加。通算行はチーム名なし（空セル）
+- `src/engine/realplayer.js`: `resolveTeamName` ヘルパーを追加し、`npb2025.js` の `career[].{team,from,to}` を参照して各年度の実際の所属チーム名を `careerLog` に反映
+
+---
+
 ### 2026-04-18 — fix: 年俸の単位混在を修正（円→万円に統一）
 
 **仕様本文への影響なし（内部バグ修正のみ）**
