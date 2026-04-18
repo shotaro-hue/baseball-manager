@@ -30,7 +30,7 @@ export const fmtM = (v) =>
       ? (v / 10000).toFixed(0) + "万"
       : v + "円";
 
-export const fmtSal = (v) => (v / 10000).toFixed(0) + "万";
+export const fmtSal = (v) => v >= 10000 ? (v / 10000).toFixed(1) + "億円" : v + "万円";
 
 // 投球回表記: 6.333...→"6.1"、6.666...→"6.2"、7.0→"7.0"
 export const fmtIP = (v) => {
