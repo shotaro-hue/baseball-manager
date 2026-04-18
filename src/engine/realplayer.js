@@ -45,6 +45,16 @@ function makePers(age) {
   };
 }
 
+/* ─── career配列から特定年度のチーム名を解決 ─── */
+function resolveTeamName(career, year, fallback) {
+  if (!career || career.length === 0) return fallback;
+  for (let i = career.length - 1; i >= 0; i--) {
+    const c = career[i];
+    if (year >= c.from && (c.to === null || year <= c.to)) return c.team;
+  }
+  return fallback;
+}
+
 /* ─── 過去成績 → careerLog エントリ変換 ─── */
 
 function historyBatterEntry(h, teamId, teamName) {
@@ -82,7 +92,7 @@ function historyPitcherEntry(h, teamId, teamName) {
 
 /* ─── 打者変換 ─── */
 export function realBatterToPlayer(b, teamDef) {
-  const { name, age, pos, hometown = teamDef.city, isForeign = false, salary, stats, history } = b;
+  const { name, age, pos, hometown = teamDef.city, isForeign = false, salary, stats, history, career } = b;
   const { AVG = 0.250, HR = 5, RBI = 30, SB = 5, BB = 30, PA = 300, OPS = 0.680 } = stats;
 
   const bbPct = PA > 0 ? BB / PA : 0.08;
@@ -109,7 +119,7 @@ export function realBatterToPlayer(b, teamDef) {
 
   // careerLog: 実際の過去成績から生成（なければ空配列）
   const careerLog = (history ?? []).map(h =>
-    historyBatterEntry(h, teamDef.gameId, teamDef.name)
+    historyBatterEntry(h, teamDef.gameId, resolveTeamName(career, h.year, teamDef.name))
   );
   // serviceYears: 実績年数優先、なければ年齢から推定
   const serviceYears = careerLog.length > 0
@@ -147,7 +157,7 @@ export function realBatterToPlayer(b, teamDef) {
 
 /* ─── 投手変換 ─── */
 export function realPitcherToPlayer(p, teamDef) {
-  const { name, age, pos, hand = 'right', hometown = teamDef.city, isForeign = false, salary, stats, history } = p;
+  const { name, age, pos, hand = 'right', hometown = teamDef.city, isForeign = false, salary, stats, history, career } = p;
   const { ERA = 4.00, W = 5, L = 8, IP = 80, SO = 70, BB = 35, WHIP = 1.40 } = stats;
   const K = SO;
 
@@ -171,7 +181,7 @@ export function realPitcherToPlayer(p, teamDef) {
   const growthPhase = age <= 24 ? 'growth' : age <= 29 ? 'peak' : age <= 33 ? 'earlyDecline' : 'decline';
 
   const careerLog = (history ?? []).map(h =>
-    historyPitcherEntry(h, teamDef.gameId, teamDef.name)
+    historyPitcherEntry(h, teamDef.gameId, resolveTeamName(career, h.year, teamDef.name))
   );
   const serviceYears = careerLog.length > 0
     ? careerLog.length
