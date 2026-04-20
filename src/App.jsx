@@ -398,7 +398,7 @@ export default function App(){
       </div>
     )}
     <RetireModal modal={retireModal} retireRole={retireRole} setRetireRole={setRetireRole} onRetain={()=>os.handleRetain(retireModal.player)} onAccept={()=>os.handleAcceptRetire(retireModal.player)} onStartRetireGame={()=>os.handleStartRetireGame(retireModal.player)} onSkipRetireGame={()=>os.handleSkipRetireGame(retireModal.player)}/>
-    {playerModal&&<PlayerModal player={playerModal.player} teamName={playerModal.teamName} onClose={()=>setPlayerModal(null)}/>}
+    {playerModal&&<PlayerModal player={playerModal.player} teamName={playerModal.teamName} isMyTeam={playerModal.teamName===myTeam?.name} onSetConvertTarget={gs.setConvertTarget} onClose={()=>setPlayerModal(null)}/>}
 
     {gs.pregameError&&(
       <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.72)',zIndex:400,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 16px'}}>
