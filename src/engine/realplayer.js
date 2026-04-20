@@ -1,6 +1,6 @@
 import { clamp, rng, uid } from '../utils';
 import { POSITIONS } from '../constants';
-import { emptyStats, makePlayer } from './player';
+import { emptyStats, makePlayer, applyPositionFields } from './player';
 
 /* ═══════════════════════════════════════════════
    REAL PLAYER CONVERTER
@@ -127,7 +127,7 @@ export function realBatterToPlayer(b, teamDef) {
     : rng(0, Math.max(0, age - 18));
   const entryAge = age - serviceYears;
 
-  return {
+  return applyPositionFields({
     id: uid(), name, pos, age,
     potential: clamp(sc(OPS, 0.60, 1.05, 55, 96) + rng(-5, 8), 55, 99),
     isPitcher: false, isForeign,
@@ -152,7 +152,7 @@ export function realBatterToPlayer(b, teamDef) {
     ikuseiYears: 0,
     playerType: '',
     playerComment: '',
-  };
+  });
 }
 
 /* ─── 投手変換 ─── */
@@ -188,7 +188,7 @@ export function realPitcherToPlayer(p, teamDef) {
     : rng(0, Math.max(0, age - 18));
   const entryAge = age - serviceYears;
 
-  return {
+  return applyPositionFields({
     id: uid(), name, pos, age,
     potential: clamp(sc(ERA, 5.5, 1.8, 55, 97) + rng(-5, 8), 55, 99),
     isPitcher: true, isForeign,
@@ -215,7 +215,7 @@ export function realPitcherToPlayer(p, teamDef) {
     ikuseiYears: 0,
     playerType: '',
     playerComment: '',
-  };
+  });
 }
 
 /* ─── チーム構築 ─── */

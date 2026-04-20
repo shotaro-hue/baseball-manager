@@ -100,6 +100,17 @@ function assignSecondaryPositions(p) {
   }
 }
 
+export function applyPositionFields(p) {
+  if (!p.isPitcher) {
+    p.positions = { [p.pos]: 100 };
+    assignSecondaryPositions(p);
+  } else {
+    p.positions = {};
+  }
+  p.convertTarget = null;
+  return p;
+}
+
 /**
  * 毎シーズン開幕時に FA 市場へ追加する外国人選手プールを生成する。
  * @param {number} count
