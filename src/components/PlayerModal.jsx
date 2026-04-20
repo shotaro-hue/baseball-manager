@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { fmtSal, fmtAvg, fmtIP } from '../utils';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 import { CareerTable } from './tabs/CareerTable';
@@ -35,7 +35,118 @@ function AbilityBar({label, value, color="#60a5fa"}){
   );
 }
 
-export function PlayerModal({player:p, teamName, onClose}){
+// 守備適正ダイヤモンド
+const FIELD_POSITIONS = [
+  { key:"捕手",   x:150, y:165, label:"C"  },
+  { key:"一塁手", x:232, y:100, label:"1B" },
+  { key:"二塁手", x:166, y:44,  label:"2B" },
+  { key:"三塁手", x:68,  y:100, label:"3B" },
+  { key:"遊撃手", x:104, y:60,  label:"SS" },
+  { key:"左翼手", x:22,  y:22,  label:"LF" },
+  { key:"中堅手", x:150, y:6,   label:"CF" },
+  { key:"右翼手", x:278, y:22,  label:"RF" },
+];
+
+function profColor(prof){
+  if(prof>=80) return "#34d399";
+  if(prof>=60) return "#f5c842";
+  if(prof>=40) return "#f97316";
+  return "#f87171";
+}
+
+function PositionDiamond({player, convertTarget, onSetConvertTarget}){
+  const positions = player.positions || {[player.pos]:100};
+
+  const handleClick = (key) => {
+    if(!onSetConvertTarget) return;
+    onSetConvertTarget(key === convertTarget ? null : key);
+  };
+
+  return(
+    <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+        <span style={{fontSize:10,color:"#374151",fontWeight:700,letterSpacing:".05em"}}>守備適正</span>
+        {onSetConvertTarget&&<span style={{fontSize:8,color:"#818cf8"}}>ポジションをクリックでコンバート指示</span>}
+      </div>
+
+      <svg viewBox="0 0 300 180" style={{width:"100%",display:"block",maxHeight:160}}>
+        {/* ファウルライン */}
+        <line x1="150" y1="148" x2="5"   y2="5"   stroke="rgba(255,255,255,.05)" strokeWidth="1"/>
+        <line x1="150" y1="148" x2="295" y2="5"   stroke="rgba(255,255,255,.05)" strokeWidth="1"/>
+        {/* 内野ダイヤモンド */}
+        <polygon points="150,148 228,94 150,40 72,94"
+          fill="rgba(52,211,153,.04)" stroke="rgba(52,211,153,.18)" strokeWidth="1"/>
+
+        {FIELD_POSITIONS.map(({key, x, y, label})=>{
+          const prof    = positions[key];
+          const isPrimary   = key === player.pos;
+          const isConverting = key === convertTarget;
+          const hasProf = prof != null;
+          const canClick = onSetConvertTarget && !isPrimary;
+
+          const color = isPrimary ? "#60a5fa" : hasProf ? profColor(prof) : "rgba(255,255,255,.2)";
+          const r     = isPrimary ? 15 : 12;
+          const bgOpacity = isPrimary ? ".18" : hasProf ? ".12" : ".03";
+
+          return(
+            <g key={key}
+               style={{cursor: canClick ? "pointer" : "default"}}
+               onClick={()=> canClick && handleClick(key)}>
+              {/* 外枠ハイライト（コンバート中） */}
+              {isConverting&&<circle cx={x} cy={y} r={r+4} fill="none" stroke="#818cf8" strokeWidth="1" strokeDasharray="3,2" opacity=".7"/>}
+              {/* メイン円 */}
+              <circle cx={x} cy={y} r={r}
+                fill={`${color.replace("#","rgba(").replace(/^rgba\(/,"rgba(")}`}
+                style={{fill: `${color}${bgOpacity.replace(".","").padStart(2,"0")}`}}
+                stroke={isConverting ? "#818cf8" : color}
+                strokeWidth={isPrimary ? 2 : isConverting ? 1.5 : 1}
+              />
+              {/* ラベル */}
+              <text x={x} y={y-2} textAnchor="middle" fontSize="7.5"
+                fill={color} fontWeight={isPrimary?"bold":"normal"}>{label}</text>
+              {/* 習熟度 or 主 */}
+              <text x={x} y={y+8} textAnchor="middle" fontSize="7.5" fill={color}>
+                {isPrimary ? "主" : hasProf ? Math.round(prof) : "?"}
+              </text>
+              {/* コンバート中矢印 */}
+              {isConverting&&<text x={x} y={y-r-3} textAnchor="middle" fontSize="8" fill="#818cf8">▶</text>}
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* コンバート状態表示 */}
+      {convertTarget && convertTarget !== player.pos && (
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:4,padding:"4px 8px",background:"rgba(129,140,248,.08)",borderRadius:6,border:"1px solid rgba(129,140,248,.2)"}}>
+          <span style={{fontSize:9,color:"#818cf8"}}>
+            ▶ {convertTarget}にコンバート中&nbsp;
+            ({Math.round(positions[convertTarget]??0)}/100)
+          </span>
+          {onSetConvertTarget&&(
+            <button
+              style={{fontSize:8,background:"none",border:"1px solid rgba(129,140,248,.3)",color:"#818cf8",borderRadius:3,padding:"1px 6px",cursor:"pointer"}}
+              onClick={()=>onSetConvertTarget(null)}
+            >解除</button>
+          )}
+        </div>
+      )}
+
+      {/* 凡例 */}
+      <div style={{display:"flex",gap:10,justifyContent:"center",marginTop:6}}>
+        {[["#60a5fa","主"],["#34d399","80+"],["#f5c842","60+"],["#f97316","40+"],["#f87171","~39"]].map(([c,l])=>(
+          <span key={l} style={{fontSize:7.5,color:c,display:"flex",alignItems:"center",gap:2}}>
+            <span style={{width:6,height:6,borderRadius:"50%",background:c,display:"inline-block"}}/>
+            {l}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function PlayerModal({player:p, teamName, isMyTeam, onSetConvertTarget, onClose}){
+  const [localConvertTarget, setLocalConvertTarget] = useState(p?.convertTarget ?? null);
+
   useEffect(()=>{
     const handler=(e)=>{if(e.key==="Escape")onClose();};
     window.addEventListener("keydown",handler);
@@ -50,23 +161,26 @@ export function PlayerModal({player:p, teamName, onClose}){
   const phase=p.growthPhase==="growth"?"成長期":p.growthPhase==="peak"?"全盛期":p.growthPhase==="earlyDecline"?"衰退初期":"衰退期";
   const phaseColor=p.growthPhase==="growth"?"#34d399":p.growthPhase==="peak"?"#f5c842":p.growthPhase==="earlyDecline"?"#f97316":"#f87171";
 
-  // FA資格（累積日数方式）
   const FA_DAYS = 120;
   const domDays = (p.entryType==='高卒'||p.entryType==='外国人') ? 8*FA_DAYS : 7*FA_DAYS;
-  const ovsDays = 9 * FA_DAYS;
   const days = p.daysOnActiveRoster ?? (p.serviceYears??0)*FA_DAYS;
   const domLeft = Math.max(0, domDays - days);
   const faLabel = p.isFA ? "FA中"
     : domLeft===0 ? "FA資格あり"
     : `FA まで ${domLeft}日（${Math.ceil(domLeft/FA_DAYS)}年相当）`;
-  const foreignExemptDays = p.isForeign && !p.isFA ? Math.max(0, ovsDays - days) : 0;
+  const foreignExemptDays = p.isForeign && !p.isFA ? Math.max(0, (9*FA_DAYS) - days) : 0;
+
+  const handleConvert = (pos) => {
+    setLocalConvertTarget(pos);
+    onSetConvertTarget?.(p.id, pos);
+  };
 
   return(
     <div
       style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.78)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 16px"}}
       onClick={e=>{if(e.target===e.currentTarget)onClose();}}
     >
-      <div style={{background:"#0d1b2a",border:"1px solid #1e3a5f",borderRadius:12,padding:20,width:"100%",maxWidth:460,boxShadow:"0 8px 32px rgba(0,0,0,.6)",maxHeight:"90vh",overflowY:"auto"}}>
+      <div style={{background:"#0d1b2a",border:"1px solid #1e3a5f",borderRadius:12,padding:20,width:"100%",maxWidth:480,boxShadow:"0 8px 32px rgba(0,0,0,.6)",maxHeight:"90vh",overflowY:"auto"}}>
 
         {/* ヘッダー */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
@@ -131,7 +245,6 @@ export function PlayerModal({player:p, teamName, onClose}){
 
           {/* 今季成績 + 契約 */}
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {/* 今季成績 */}
             <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px",flex:1}}>
               <div style={{fontSize:10,color:"#374151",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>今季成績</div>
               {p.isPitcher?(
@@ -156,7 +269,6 @@ export function PlayerModal({player:p, teamName, onClose}){
               )}
             </div>
 
-            {/* 契約情報 */}
             <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}>
               <div style={{fontSize:10,color:"#374151",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>契約</div>
               <StatRow label="年俸" value={fmtSal(p.salary)} color="#f5c842"/>
@@ -172,6 +284,17 @@ export function PlayerModal({player:p, teamName, onClose}){
             </div>
           </div>
         </div>
+
+        {/* 守備適正ダイヤモンド（野手のみ） */}
+        {!p.isPitcher&&(
+          <div style={{marginBottom:12}}>
+            <PositionDiamond
+              player={p}
+              convertTarget={localConvertTarget}
+              onSetConvertTarget={isMyTeam ? handleConvert : null}
+            />
+          </div>
+        )}
 
         {/* 年度別・通算成績 */}
         <CareerTable player={p}/>
