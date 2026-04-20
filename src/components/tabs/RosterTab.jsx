@@ -15,7 +15,7 @@ const TRAINING_OPTIONS=[["","バランス"],["contact","ミート"],["power","�
 
 const MoralBadge=({v})=>{const m=v||70;const icon=m>=75?"😊":m>=50?"😐":"😟";const col=m>=75?"#34d399":m>=50?"#f5c842":"#f87171";return <span style={{fontSize:10,color:col}}>{icon}{m}</span>;};
 
-export function RosterTab({team,onToggle,onSetLineupOrder,onSetRosterDhMode,onSetPlayerPosition,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onPlayerClick,onSetDevGoal,onPlayerTalk,gameDay}){
+export function RosterTab({team,onToggle,onSetLineupOrder,onSetRosterDhMode,onSetPlayerPosition,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onPlayerClick,onSetDevGoal,onPlayerTalk,onSetConvertTarget,gameDay}){
   const [view,setView]=useState("batters");
   const [justConverted,setJustConverted]=useState(new Set());
   const [talkingPid,setTalkingPid]=useState(null);
@@ -83,7 +83,7 @@ export function RosterTab({team,onToggle,onSetLineupOrder,onSetRosterDhMode,onSe
           </div>
           <div style={{overflowX:"auto"}}>
             <table className="tbl">
-              <thead><tr><th>#</th><th>選手名</th><th>守備</th><th>年齢</th><th>ミート</th><th>長打</th><th>走力</th><th>選球</th><th>クラッチ</th><th>変化球</th><th>状態</th><th>モラル</th><th>打率</th><th>HR</th><th>OPS</th><th>強化</th><th></th></tr></thead>
+              <thead><tr><th>#</th><th>選手名</th><th>守備</th><th>適正</th><th>年齢</th><th>ミート</th><th>長打</th><th>走力</th><th>選球</th><th>クラッチ</th><th>変化球</th><th>状態</th><th>モラル</th><th>打率</th><th>HR</th><th>OPS</th><th>強化</th><th>コンバート</th><th></th></tr></thead>
               <tbody>
                 {orderedBatters.map(p=>{const inL=team.lineup.includes(p.id);const sb=saberBatter(p.stats);const isInj=(p.injuryDaysLeft??0)>0;return(
                   <tr key={p.id} style={isInj?{opacity:.55}:undefined}>
@@ -144,7 +144,17 @@ export function RosterTab({team,onToggle,onSetLineupOrder,onSetRosterDhMode,onSe
                           ?(p.pos==="DH"?"⚠ DHは1人まで":"⚠ 同守備が重複")
                           :" "}
                       </div>
-                    </td><td className="mono" style={{color:"#374151"}}>{p.age}</td>
+                    </td>
+                    <td style={{minWidth:60}}>
+                      {Object.entries(p.positions||{}).filter(([pos])=>pos!==p.pos).map(([pos,prof])=>{
+                        const profColor=prof>=80?"#34d399":prof>=60?"#f5c842":"#f87171";
+                        return <span key={pos} style={{display:"inline-block",fontSize:8,color:profColor,marginRight:2,whiteSpace:"nowrap"}}>{pos.replace("手","")}{Math.round(prof)}</span>;
+                      })}
+                      {p.convertTarget&&p.convertTarget!==p.pos&&(
+                        <span style={{display:"block",fontSize:8,color:"#818cf8",marginTop:1}}>▶{p.convertTarget.replace("手","")}</span>
+                      )}
+                    </td>
+                    <td className="mono" style={{color:"#374151"}}>{p.age}</td>
                     <td><OV v={p.batting.contact}/></td><td><OV v={p.batting.power}/></td><td><OV v={p.batting.speed}/></td><td><OV v={p.batting.eye}/></td>
                     <td><OV v={p.batting.clutch}/></td><td><OV v={p.batting.breakingBall}/></td>
                     <td><CondBadge p={p}/></td>
@@ -153,6 +163,15 @@ export function RosterTab({team,onToggle,onSetLineupOrder,onSetRosterDhMode,onSe
                     <td className="mono" style={{color:p.stats.HR>=20?"#f5c842":undefined}}>{p.stats.HR}</td>
                     <td className="mono" style={{color:sb.OPS>=.850?"#34d399":sb.OPS>=.700?"#f5c842":undefined}}>{sb.OPS>0?sb.OPS.toFixed(3):"---"}</td>
                     <td><select style={{fontSize:9,background:"#0d1b2a",color:"#94a3b8",border:"1px solid #1e3a5f",borderRadius:3,padding:"1px 2px"}} value={p.trainingFocus||""} onChange={e=>onSetTrainingFocus&&onSetTrainingFocus(p.id,e.target.value||null)}>{TRAINING_OPTIONS.filter(([k])=>!["velocity","control","breaking","stamina"].includes(k)).map(([k,l])=><option key={k} value={k}>{l}</option>)}</select></td>
+                    <td style={{minWidth:70}}>
+                      <select style={{fontSize:9,background:"#0d1b2a",color:"#818cf8",border:"1px solid #1e3a5f",borderRadius:3,padding:"1px 2px"}} value={p.convertTarget||""} onChange={e=>onSetConvertTarget&&onSetConvertTarget(p.id,e.target.value||null)}>
+                        <option value="">—</option>
+                        {FIELDING_POSITIONS.filter(pos=>pos!==p.pos).map(pos=>{
+                          const prof=p.positions?.[pos];
+                          return <option key={pos} value={pos}>{pos.replace("手","")}{prof!=null?` ${Math.round(prof)}`:" 新"}</option>;
+                        })}
+                      </select>
+                    </td>
                     <td><button className="bsm bgr" onClick={()=>onDemo(p.id)}>↓</button></td>
                   </tr>
                 );})}

@@ -272,6 +272,13 @@ export function useGameState() {
     }));
   }, [upd, myId]);
 
+  const setConvertTarget = useCallback((pid, target) => {
+    upd(myId, t => ({
+      ...t,
+      players: t.players.map(p => p.id === pid ? { ...p, convertTarget: target || null } : p),
+    }));
+  }, [upd, myId]);
+
   const setRosterDhMode = useCallback((dhMode) => {
     upd(myId, t => {
       const nonPitcherIds = (t.players || []).filter(p => !p.isPitcher).map(p => p.id);
@@ -460,6 +467,7 @@ export function useGameState() {
     setLineupOrder,
     setRosterDhMode,
     setPlayerPosition,
+    setConvertTarget,
     setStarter,
     moveRotation,
     removeFromRotation,

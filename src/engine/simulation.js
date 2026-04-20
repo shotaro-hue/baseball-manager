@@ -448,7 +448,13 @@ function processAtBat(gs, strategy = 'normal') {
   }
 
   const ftl           = (isMyAtBat ? gs.opLineup : gs.myLineup).filter(p => !p.isPitcher);
-  const fieldingLevel = ftl.length > 0 ? ftl.reduce((s,p) => s+(p.batting?.defense||50),0)/ftl.length : 50;
+  const fieldingLevel = ftl.length > 0
+    ? ftl.reduce((s,p) => {
+        const prof = p.positions ? (p.positions[p.pos] ?? 30) : 100;
+        const mod  = 0.7 + (prof / 100) * 0.3;
+        return s + (p.batting?.defense || 50) * mod;
+      }, 0) / ftl.length
+    : 50;
   const situation     = { runnersOnBase: gs.bases.some(Boolean), runnersInScoring: gs.bases[1]||gs.bases[2], lateGame: gs.inning>=7, closeGame: Math.abs((gs.score?.my||0)-(gs.score?.opp||0))<=2, fieldingLevel, pitchCount, teamMorale: gs.teamMorale||60, stadium: gs.stadium, pitcherHand: pitcher?.hand || 'right', pitchingPolicy: isMyAtBat ? 'normal' : (gs.pitchingPolicy || 'normal'), coachBonuses: isMyAtBat ? {} : (gs.coachBonuses || {}) };
 
   let { result, pitches, pitchType, zone, isIntentional, pitchLog } = simAtBat(batter, pitcher, strategy, pitchCount, situation, gs.leagueEnv);

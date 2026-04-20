@@ -96,6 +96,23 @@ export const TEAM_DEFS = [
 export const POSITIONS = ["捕手", "一塁手", "二塁手", "三塁手", "遊撃手", "左翼手", "中堅手", "右翼手", "DH"];
 export const FIELDING_POSITIONS = ["捕手", "一塁手", "二塁手", "三塁手", "遊撃手", "左翼手", "中堅手", "右翼手"];
 
+// 複数守備適正: pos → [[副守備, 習熟度下限, 習熟度上限], ...]
+export const SECONDARY_POSITION_RULES = {
+  "遊撃手": [["二塁手", 60, 80], ["三塁手", 50, 70]],
+  "二塁手": [["遊撃手", 50, 70], ["三塁手", 55, 75]],
+  "中堅手": [["左翼手", 70, 90], ["右翼手", 70, 90]],
+  "左翼手": [["右翼手", 65, 85]],
+  "右翼手": [["左翼手", 65, 85]],
+  "一塁手": [["左翼手", 70, 90], ["右翼手", 70, 90]],
+  "捕手":   [["一塁手", 50, 70]],
+  "三塁手": [["一塁手", 50, 70]],
+};
+
+// コンバート習熟度上昇速度（/試合日）
+export const POS_TRAINING_PER_DAY = 0.5;
+// 未知ポジションのデフォルト習熟度（positions に存在しない場合）
+export const POS_PROFICIENCY_UNKNOWN = 30;
+
 export const COACH_DEFS = [
   { type: "batting",  name: "打撃コーチ",     emoji: "🏏" },
   { type: "pitching", name: "投手コーチ",     emoji: "⚾" },
