@@ -39,7 +39,7 @@ export function CareerTable({player}){
 
   // 通算計算
   const sumK=(k)=>log.reduce((a,r)=>a+(getS(r)[k]||0),0);
-  const totals={PA:sumK("PA"),AB:sumK("AB"),H:sumK("H"),HR:sumK("HR"),RBI:sumK("RBI"),SB:sumK("SB"),BF:sumK("BF"),W:sumK("W"),L:sumK("L"),SV:sumK("SV"),IP:sumK("IP"),Kp:sumK("Kp"),ER:sumK("ER"),BBp:sumK("BBp"),HBPp:sumK("HBPp"),Hp:sumK("Hp"),HRp:sumK("HRp")};
+  const totals={PA:sumK("PA"),AB:sumK("AB"),H:sumK("H"),D:sumK("D"),T:sumK("T"),HR:sumK("HR"),RBI:sumK("RBI"),BB:sumK("BB"),K:sumK("K"),HBP:sumK("HBP"),SF:sumK("SF"),SB:sumK("SB"),BF:sumK("BF"),W:sumK("W"),L:sumK("L"),SV:sumK("SV"),IP:sumK("IP"),Kp:sumK("Kp"),ER:sumK("ER"),BBp:sumK("BBp"),HBPp:sumK("HBPp"),Hp:sumK("Hp"),HRp:sumK("HRp")};
   const hasTotals=ip?(totals.BF>0):(totals.PA>0);
 
   return(
@@ -133,7 +133,7 @@ export function CareerTable({player}){
                     <td className="mono" style={{color:s.HR>=20?"#f5c842":undefined}}>{s.HR}</td>
                     <td className="mono">{s.RBI}</td>
                     <td className="mono">{s.SB}</td>
-                    <td className="mono">{sb.OPS.toFixed(3)}</td>
+                    <td className="mono">{sb.OPS>0?sb.OPS.toFixed(3):"---"}</td>
                   </tr>
                 );
               })}
@@ -146,7 +146,7 @@ export function CareerTable({player}){
                   <td className="mono" style={{color:totals.HR>=200?"#f5c842":undefined}}>{totals.HR}</td>
                   <td className="mono">{totals.RBI}</td>
                   <td className="mono">{totals.SB}</td>
-                  <td className="mono">{saberBatter(totals).OPS.toFixed(3)}</td>
+                  <td className="mono">{(t=>t.OPS>0?t.OPS.toFixed(3):"---")(saberBatter(totals))}</td>
                 </tr>
               )}
             </tbody>
