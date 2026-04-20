@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { uid, rng, rngf, gameDayToDate } from '../utils';
-import { checkForInjuries, tickInjuries, calcRetireWill } from '../engine/player';
+import { checkForInjuries, tickInjuries, calcRetireWill, tickPositionTraining } from '../engine/player';
 import { quickSimGame, runFarmSeason } from '../engine/simulation';
 import { applyGameStatsFromLog, applyPostGameCondition, computeBoxScore } from '../engine/postGame';
 import { calcRevenue } from '../engine/finance';
@@ -338,6 +338,7 @@ export function useSeasonFlow(gs) {
       updated.players=applyGameStatsFromLog(updated.players, r.log||[], true, won);
       updated.players=applyPostGameCondition(updated.players, r.log||[], true, gameDay);
       updated.players=tickInjuries(updated.players);
+      updated.players=tickPositionTraining(updated.players);
       updated.players=updated.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
       updated.players=applyDefenseCoachRecovery(updated.players,t.coaches);
       const newInj=checkForInjuries(updated.players, year);
@@ -611,6 +612,7 @@ export function useSeasonFlow(gs) {
       myT.players=applyGameStatsFromLog(myT.players, r.log||[], true, won);
       myT.players=applyPostGameCondition(myT.players, r.log||[], true, newDay);
       myT.players=tickInjuries(myT.players);
+      myT.players=tickPositionTraining(myT.players);
       myT.players=myT.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
       myT.players=applyDefenseCoachRecovery(myT.players,myT.coaches);
       const _inj=checkForInjuries(myT.players, year);
@@ -727,6 +729,7 @@ export function useSeasonFlow(gs) {
       updated.players=applyGameStatsFromLog(updated.players, gsResult.log, true, won);
       updated.players=applyPostGameCondition(updated.players, gsResult.log, true, gameDay);
       updated.players=tickInjuries(updated.players);
+      updated.players=tickPositionTraining(updated.players);
       updated.players=updated.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
       updated.players=applyDefenseCoachRecovery(updated.players,t.coaches);
       const newInj=checkForInjuries(updated.players, year);

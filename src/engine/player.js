@@ -2,7 +2,7 @@ import { rng, clamp, uid, pname, CITIES } from '../utils';
 import {
   FIELDING_POSITIONS, PLAYER_TYPES_B, PLAYER_TYPES_P, PLAYER_COMMENTS_B, PLAYER_COMMENTS_P, MIN_SALARY_IKUSEI,
   FOREIGN_PLAYER_NAMES, FOREIGN_NATIONALITIES, INJURY_BODY_PARTS, INJURY_RECURRENCE_MULTIPLIER,
-  INJURY_RECURRENCE_WINDOW_YEARS,
+  INJURY_RECURRENCE_WINDOW_YEARS, SECONDARY_POSITION_RULES, POS_TRAINING_PER_DAY,
 } from '../constants';
 
 
@@ -58,6 +58,8 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
     entryType: isForeign ? '外国人' : age <= 19 ? '高卒' : age <= 22 ? '大卒' : '社会人',
     daysOnActiveRoster: 0,
     allStarSelections: 0,
+    positions: isPitch ? {} : { [pos]: 100 },
+    convertTarget: null,
   };
 
   if (isPitch) {
@@ -84,7 +86,18 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
   const comments = isPitch ? PLAYER_COMMENTS_P : PLAYER_COMMENTS_B;
   p.playerType = types[rng(0, types.length - 1)];
   p.playerComment = comments[rng(0, comments.length - 1)];
+  if (!isPitch) assignSecondaryPositions(p);
   return p;
+}
+
+function assignSecondaryPositions(p) {
+  const rules = SECONDARY_POSITION_RULES[p.pos];
+  if (!rules) return;
+  for (const [secPos, minProf, maxProf] of rules) {
+    if (rng(0, 99) < 75) {
+      p.positions[secPos] = rng(minProf, maxProf);
+    }
+  }
 }
 
 /**
@@ -438,5 +451,15 @@ export function tickInjuries(players) {
     if (!p.injuryDaysLeft) return p;
     const next = Math.max(0, p.injuryDaysLeft - 1);
     return { ...p, injuryDaysLeft: next, injury: next > 0 ? p.injury : null, injuryPart: next > 0 ? p.injuryPart : null };
+  });
+}
+
+export function tickPositionTraining(players) {
+  return players.map(p => {
+    if (p.isPitcher || !p.convertTarget) return p;
+    const cur = p.positions?.[p.convertTarget] ?? 0;
+    if (cur >= 100) return p;
+    const next = Math.min(100, cur + POS_TRAINING_PER_DAY);
+    return { ...p, positions: { ...(p.positions || {}), [p.convertTarget]: next } };
   });
 }
