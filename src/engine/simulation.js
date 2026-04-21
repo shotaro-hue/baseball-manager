@@ -331,9 +331,11 @@ function scoreBullpenArm(pitcher, targetRole) {
     ? (subtype === '抑え' ? 14 : subtype === '中継ぎ' ? 7 : -8)
     : targetRole === 'setup'
       ? (subtype === '中継ぎ' ? 10 : subtype === '抑え' ? 6 : -4)
-      : targetRole === 'long'
-        ? (subtype === '先発' ? 12 : subtype === '中継ぎ' ? 4 : -6)
-        : (subtype === '中継ぎ' ? 9 : subtype === '先発' ? 4 : 2);
+      : targetRole === 'seventh'
+        ? (subtype === '中継ぎ' ? 9 : subtype === '先発' ? 4 : 2)
+        : targetRole === 'long'
+          ? (subtype === '先発' ? 12 : subtype === '中継ぎ' ? 4 : -6)
+          : (subtype === '中継ぎ' ? 9 : subtype === '先発' ? 4 : 2);
   return stuff + stamina * 0.18 + condition * 0.22 + roleBonus;
 }
 
@@ -349,6 +351,10 @@ function pickBullpenArm(bullpen, targetRole, pattern = {}) {
     const d = bullpen.find(p => p.id === pattern.setupId);
     if (d) return d;
   }
+  if (targetRole === 'seventh' && pattern.seventhId) {
+    const d = bullpen.find(p => p.id === pattern.seventhId);
+    if (d) return d;
+  }
   if ((targetRole === 'middle' || targetRole === 'long') && pattern.middleOrder?.length) {
     for (const id of pattern.middleOrder) {
       const d = bullpen.find(p => p.id === id);
@@ -360,6 +366,7 @@ function pickBullpenArm(bullpen, targetRole, pattern = {}) {
   const roleGroups = {
     closer: ['抑え', '中継ぎ', '先発'],
     setup: ['中継ぎ', '抑え', '先発'],
+    seventh: ['中継ぎ', '先発', '抑え'],
     middle: ['中継ぎ', '先発', '抑え'],
     long: ['先発', '中継ぎ', '抑え'],
   };
@@ -407,8 +414,8 @@ function initGameState(myTeam, oppTeam) {
     leagueEnv: myTeam.leagueEnv || DEFAULT_LEAGUE_ENV,
     coachBonuses: (()=>{ const c=myTeam.coaches||[]; return { running:c.filter(x=>x.type==='running').reduce((s,x)=>s+(x.bonus||0),0), pitching:c.filter(x=>x.type==='pitching').reduce((s,x)=>s+(x.bonus||0),0) }; })(),
     pitchingPolicy: myTeam.pitchingPolicy || 'normal',
-    myPitchingPattern: myTeam.pitchingPattern ?? { closerId: null, setupId: null, middleOrder: [] },
-    opPitchingPattern: { closerId: null, setupId: null, middleOrder: [] },
+    myPitchingPattern: myTeam.pitchingPattern ?? { closerId: null, setupId: null, seventhId: null, middleOrder: [] },
+    opPitchingPattern: { closerId: null, setupId: null, seventhId: null, middleOrder: [] },
   };
 }
 
@@ -645,13 +652,17 @@ function autoSwapPitcher(gs, side) {
 
   if (!starterShouldYield && !relieverShouldYield) return gs;
 
+  const seventhSituation = gs.inning === 7 && lead >= -2 && lead <= 4;
+
   const targetRole = saveSituation
     ? 'closer'
     : (setupSituation || leverageCrisis)
       ? 'setup'
-      : (isExtra || lead <= -2)
-        ? 'long'
-        : 'middle';
+      : seventhSituation
+        ? 'seventh'
+        : (isExtra || lead <= -2)
+          ? 'long'
+          : 'middle';
 
   const nextPitcher = pickBullpenArm(bullpen, targetRole, pattern);
   if (!nextPitcher) return gs;
