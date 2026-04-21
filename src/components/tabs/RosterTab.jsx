@@ -38,13 +38,26 @@ export function RosterTab({team,onToggle,onSetLineupOrder,onSetRosterDhMode,onSe
   const lineupLimit = rosterDhMode ? 9 : 8;
   const lineupSlots = Array.from({ length: lineupLimit }, (_, i) => i + 1);
   const autoSetLineup=()=>{
-    const candidate=batters.filter(p=>(p.injuryDaysLeft??0)===0).slice().sort((a,b)=>{
-      const sa=saberBatter(a.stats), sb=saberBatter(b.stats);
-      const scoreA=(sa.OPS||0)*1000+a.batting.contact*1.6+a.batting.eye*1.1+a.batting.power*1.2+a.batting.speed*0.7;
-      const scoreB=(sb.OPS||0)*1000+b.batting.contact*1.6+b.batting.eye*1.1+b.batting.power*1.2+b.batting.speed*0.7;
-      return scoreB-scoreA;
-    }).slice(0,lineupLimit);
-    candidate.forEach((p,idx)=>onSetLineupOrder&&onSetLineupOrder(p.id,idx+1));
+    const eligible=batters.filter(p=>(p.injuryDaysLeft??0)===0);
+    if(!eligible.length)return;
+    const scoreOf=p=>{const s=saberBatter(p.stats);return(s.OPS||0)*1000+p.batting.contact*1.6+p.batting.eye*1.1+p.batting.power*1.2+p.batting.speed*0.7;};
+    const profAt=(p,pos)=>pos==='DH'?50:p.pos===pos?100:(p.positions?.[pos]??0);
+    const required=[...FIELDING_POSITIONS,...(rosterDhMode?['DH']:[])];
+    const sorted=[...eligible].sort((a,b)=>scoreOf(b)-scoreOf(a));
+    const posEligible=Object.fromEntries(required.map(pos=>[pos,sorted.filter(p=>profAt(p,pos)>0)]));
+    // 最も候補が少ないポジションから埋める（MRV ヒューリスティック）
+    const posOrder=[...required].sort((a,b)=>posEligible[a].length-posEligible[b].length);
+    const assignment=new Map();
+    const playerUsed=new Set();
+    for(const pos of posOrder){
+      const best=posEligible[pos].find(p=>!playerUsed.has(p.id));
+      if(best){assignment.set(pos,best);playerUsed.add(best.id);}
+    }
+    // スコア順に打順を割り当て
+    [...assignment.entries()].sort((a,b)=>scoreOf(b[1])-scoreOf(a[1])).forEach(([pos,player],idx)=>{
+      onSetLineupOrder&&onSetLineupOrder(player.id,idx+1);
+      if(pos!==player.pos)onSetPlayerPosition&&onSetPlayerPosition(player.id,pos);
+    });
   };
   return(
     <div>
