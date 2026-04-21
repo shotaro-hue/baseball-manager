@@ -8,7 +8,7 @@ import { OV, HandBadge } from './ui';
 
 
 
-export function DraftPreviewScreen({teams,myId,year,pool,draftAllocation,onAllocationChange,onStart}){
+export function DraftPreviewScreen({teams,myId,year,pool,draftAllocation,onAllocationChange,onStart,startLabel}){
   const myTeam=teams.find(t=>t.id===myId);
   const rec=recommendForTeam(myTeam,pool);
   const spots=pool.filter(p=>p.spotlight);
@@ -90,7 +90,7 @@ export function DraftPreviewScreen({teams,myId,year,pool,draftAllocation,onAlloc
           </div>);
         })}
       </div>)}
-      <div style={{textAlign:"center",marginTop:16}}><button className="btn btn-gold" style={{padding:"12px 48px",fontSize:15}} onClick={onStart}>⚾ ドラフト会議を開始する</button></div>
+      <div style={{textAlign:"center",marginTop:16}}><button className="btn btn-gold" style={{padding:"12px 48px",fontSize:15}} onClick={onStart}>{startLabel||"⚾ ドラフト会議を開始する"}</button></div>
     </div></div>
   );
 }
@@ -99,6 +99,7 @@ export function DraftPreviewScreen({teams,myId,year,pool,draftAllocation,onAlloc
 export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
   // phase: "select" → "announce" → "lottery" → "hazure" → "done"
   const [phase,setPhase]=React.useState("select");
+  const [showPreview,setShowPreview]=React.useState(false);
   const [myPick,setMyPick]=React.useState(null);
   const [cpuPicks,setCpuPicks]=React.useState(null);
   const [lotteryTarget,setLotteryTarget]=React.useState(null); // 競合選手
@@ -322,11 +323,24 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
     onDone(finalPicks,true);
   };
 
+  if(showPreview) return(
+    <div style={{position:"relative"}}>
+      <div style={{position:"sticky",top:0,zIndex:99,background:"rgba(10,15,26,.95)",padding:"8px 14px",borderBottom:"1px solid rgba(255,255,255,.08)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <span style={{fontSize:12,color:"#94a3b8"}}>📋 ドラフト展望 (参考)</span>
+        <button className="btn" style={{fontSize:11,padding:"4px 14px",background:"rgba(148,163,184,.1)",color:"#94a3b8",border:"1px solid rgba(148,163,184,.2)"}} onClick={()=>setShowPreview(false)}>← 戻る</button>
+      </div>
+      <DraftPreviewScreen teams={teams} myId={myId} year={year} pool={pool} draftAllocation={null} onAllocationChange={null} onStart={()=>setShowPreview(false)} startLabel="← ドラフトに戻る"/>
+    </div>
+  );
+
   if(phase==="select") return(
     <div className="app"><div style={{padding:"14px"}}>
       <div style={{fontSize:11,color:"#94a3b8",letterSpacing:".1em",marginBottom:2}}>DRAFT {year}</div>
       <div style={{fontSize:22,fontWeight:700,color:"#f5c842",marginBottom:4}}>📋 1巡目 — 指名選手を選択</div>
-      <div style={{fontSize:11,color:"#94a3b8",marginBottom:14}}>全球団が同時発表します。被りはくじ引きで決定。</div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <span style={{fontSize:11,color:"#94a3b8"}}>全球団が同時発表します。被りはくじ引きで決定。</span>
+        <button className="btn" style={{fontSize:10,padding:"3px 10px",background:"rgba(148,163,184,.1)",color:"#94a3b8",border:"1px solid rgba(148,163,184,.2)",flexShrink:0}} onClick={()=>setShowPreview(true)}>📋 展望</button>
+      </div>
       <div className="card" style={{marginBottom:10}}>
         <div className="card-h">{myTeam?.name} — 1位指名選手</div>
         {availPool.slice(0,20).map(p=>(
@@ -352,7 +366,10 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
 
   if(phase==="announce") return(
     <div className="app"><div style={{padding:"14px"}}>
-      <div style={{fontSize:22,fontWeight:700,color:"#f5c842",marginBottom:14,textAlign:"center"}}>📢 1巡目 一斉発表</div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <div style={{fontSize:22,fontWeight:700,color:"#f5c842"}}>📢 1巡目 一斉発表</div>
+        <button className="btn" style={{fontSize:10,padding:"3px 10px",background:"rgba(148,163,184,.1)",color:"#94a3b8",border:"1px solid rgba(148,163,184,.2)"}} onClick={()=>setShowPreview(true)}>📋 展望</button>
+      </div>
       <div className="card">
         {allSorted.map((t,idx)=>{
           const pick=t.id===myId?myPick:(cpuPicks?cpuPicks[t.id]:null);
@@ -377,7 +394,10 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
 
   if(phase==="lottery") return(
     <div className="app"><div style={{padding:"14px"}}>
-      <div style={{fontSize:22,fontWeight:700,color:"#f5c842",marginBottom:4,textAlign:"center"}}>🎰 競合！くじ引き</div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+        <div style={{fontSize:22,fontWeight:700,color:"#f5c842"}}>🎰 競合！くじ引き</div>
+        <button className="btn" style={{fontSize:10,padding:"3px 10px",background:"rgba(148,163,184,.1)",color:"#94a3b8",border:"1px solid rgba(148,163,184,.2)"}} onClick={()=>setShowPreview(true)}>📋 展望</button>
+      </div>
       {pendingConflicts.length>1&&(
         <div style={{fontSize:10,color:"#94a3b8",textAlign:"center",marginBottom:8}}>
           競合 {currentConflictIdx+1} / {pendingConflicts.length} 件目（第{lotteryRound}回戦）
@@ -408,28 +428,64 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
 
   if(phase==="hazure") return(
     <div className="app"><div style={{padding:"14px"}}>
-      <div style={{fontSize:20,fontWeight:700,color:"#f5c842",marginBottom:4}}>外れ1位指名</div>
+      <div style={{fontSize:11,color:"#94a3b8",letterSpacing:".1em",marginBottom:2}}>DRAFT {year}</div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+        <div style={{fontSize:22,fontWeight:700,color:"#f5c842"}}>外れ1位指名</div>
+        <button className="btn" style={{fontSize:10,padding:"3px 10px",background:"rgba(148,163,184,.1)",color:"#94a3b8",border:"1px solid rgba(148,163,184,.2)"}} onClick={()=>setShowPreview(true)}>📋 展望</button>
+      </div>
       <div style={{fontSize:11,color:"#94a3b8",marginBottom:14}}>くじに外れた球団が次の指名を行います</div>
-      {myHazure&&(
-        <div className="card" style={{marginBottom:10}}>
-          <div className="card-h" style={{color:"#f5c842"}}>{myTeam?.name} — 外れ1位を選択</div>
-          {hazurePool.slice(0,15).map(p=>(
-            <div key={p.id} onClick={()=>setMyHazurePick(p)} style={{padding:"7px 6px",borderBottom:"1px solid rgba(255,255,255,.04)",cursor:"pointer",background:myHazurePick?.id===p.id?"rgba(245,200,66,.08)":undefined}}>
-              <div className="fsb">
-                <span style={{fontWeight:700,fontSize:13,color:myHazurePick?.id===p.id?"#f5c842":"#e0d4bf"}}>{p.name} <span style={{fontSize:10,color:"#374151"}}>{p.pos}/{p.age}歳</span></span>
-                <span style={{fontSize:10,color:"#94a3b8"}}>{p.isPitcher?"投手":"野手"}</span>
-              </div>
+
+      {/* 外れ球団を1位指名画面と同じカードレイアウトで並べる */}
+      {hazureTeams.map(t=>{
+        const isMe=t.id===myId;
+        const pick=isMe?myHazurePick:hazurePicks[String(t.id)];
+        return(
+          <div key={t.id} className="card" style={{marginBottom:10,borderLeft:`2px solid ${isMe?"#f5c842":t.color}`}}>
+            <div className="card-h" style={{color:isMe?"#f5c842":t.color,marginBottom:6}}>
+              {t.emoji} {t.name}{isMe&&<span style={{fontSize:10,color:"#94a3b8",fontWeight:400,marginLeft:6}}>← あなた</span>}
             </div>
-          ))}
-        </div>
-      )}
-      {Object.entries(hazurePicks).filter(([tid])=>tid!==myId).map(([tid,p])=>{
-        const t=teams.find(x=>x.id===tid);
-        return p?(
-          <div key={tid} style={{fontSize:11,color:"#94a3b8",padding:"4px 0"}}>{t?.emoji} {t?.name} → 外れ1位: <span style={{color:"#e0d4bf",fontWeight:700}}>{p.name}</span></div>
-        ):null;
+            {isMe?(
+              <>
+                {myHazurePick&&(
+                  <div style={{padding:"7px 8px",marginBottom:6,background:"rgba(245,200,66,.08)",borderRadius:5,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div><span style={{fontWeight:700,color:"#f5c842"}}>{myHazurePick.name}</span><span style={{fontSize:10,color:"#374151",marginLeft:6}}>{myHazurePick.pos}/{myHazurePick.age}歳</span></div>
+                    <span style={{fontSize:9,color:"#f5c842",padding:"2px 6px",borderRadius:3,border:"1px solid rgba(245,200,66,.4)"}}>選択中</span>
+                  </div>
+                )}
+                <div style={{maxHeight:200,overflowY:"auto"}}>
+                  {hazurePool.slice(0,15).map(p=>(
+                    <div key={p.id} onClick={()=>setMyHazurePick(p)} style={{padding:"7px 6px",borderBottom:"1px solid rgba(255,255,255,.04)",cursor:"pointer",background:myHazurePick?.id===p.id?"rgba(245,200,66,.08)":undefined}}>
+                      <div className="fsb">
+                        <div>
+                          <span style={{fontWeight:700,fontSize:13,color:myHazurePick?.id===p.id?"#f5c842":"#e0d4bf"}}>{p.name}</span>
+                          {p.isPitcher&&<HandBadge p={p}/>}
+                          <span style={{fontSize:10,color:"#374151",marginLeft:6}}>{p.pos}/{p.age}歳</span>
+                        </div>
+                        <span style={{fontSize:10,color:"#94a3b8"}}>{p.isPitcher?"投手":"野手"}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ):(
+              pick?(
+                <div style={{padding:"8px 6px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div>
+                    <span style={{fontWeight:700,fontSize:14,color:"#e0d4bf"}}>{pick.name}</span>
+                    {pick.isPitcher&&<HandBadge p={pick}/>}
+                    <span style={{fontSize:10,color:"#374151",marginLeft:8}}>{pick.pos}/{pick.age}歳</span>
+                  </div>
+                  <span style={{fontSize:10,color:"#94a3b8"}}>{pick.isPitcher?"投手":"野手"}</span>
+                </div>
+              ):(
+                <div style={{padding:"8px 6px",color:"#374151",fontSize:11}}>自動選択中…</div>
+              )
+            )}
+          </div>
+        );
       })}
-      <button className="btn btn-gold" style={{width:"100%",padding:"12px 0",marginTop:12,opacity:(!myHazure||myHazurePick)?1:0.4}} onClick={()=>{if(!myHazure||myHazurePick) confirmHazure(myHazurePick);}}>
+
+      <button className="btn btn-gold" style={{width:"100%",padding:"12px 0",marginTop:4,opacity:(!myHazure||myHazurePick)?1:0.4}} onClick={()=>{if(!myHazure||myHazurePick) confirmHazure(myHazurePick);}}>
         外れ1位確定 →
       </button>
     </div></div>
@@ -490,6 +546,7 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoS
   const [autoRunning,setAutoRunning]=useState(false);
   const [localAutoSkip,setLocalAutoSkip]=useState(!!autoSkipProp);
   const effectiveAutoSkip=autoSkipProp||localAutoSkip;
+  const [showPreview,setShowPreview]=useState(false);
   const current=draftOrderFiltered[pickIdx];
   const isMyTurn=current&&current.team.id===myId&&!done;
   const isPickedAfterRound1=pid=>Object.prototype.hasOwnProperty.call(drafted,pid);
@@ -587,6 +644,15 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoS
     return p.isPitcher?Math.round((sv(p.pitching,"velocity")+sv(p.pitching,"control")+sv(p.pitching,"breaking"))/3):Math.round((sv(p.batting,"contact")+sv(p.batting,"power")+sv(p.batting,"eye")+sv(p.batting,"speed"))/4);
   };
   const progress=Math.round(pickIdx/draftOrderFiltered.length*100);
+  if(showPreview) return(
+    <div style={{position:"relative"}}>
+      <div style={{position:"sticky",top:0,zIndex:99,background:"rgba(10,15,26,.95)",padding:"8px 14px",borderBottom:"1px solid rgba(255,255,255,.08)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <span style={{fontSize:12,color:"#94a3b8"}}>📋 ドラフト展望 (参考)</span>
+        <button className="btn" style={{fontSize:11,padding:"4px 14px",background:"rgba(148,163,184,.1)",color:"#94a3b8",border:"1px solid rgba(148,163,184,.2)"}} onClick={()=>setShowPreview(false)}>← 戻る</button>
+      </div>
+      <DraftPreviewScreen teams={teams} myId={myId} year={year} pool={pool} draftAllocation={null} onAllocationChange={null} onStart={()=>setShowPreview(false)} startLabel="← ドラフトに戻る"/>
+    </div>
+  );
   return(
     <div className="app">
       <style>{`.draft-pool{max-height:320px;overflow-y:auto;}.draft-pick{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:.15s;}.draft-pick:hover{background:rgba(245,200,66,.06);}.draft-log{max-height:240px;overflow-y:auto;}@keyframes fadeSlide{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}.announce{animation:fadeSlide .3s ease;}`}</style>
@@ -595,12 +661,15 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoS
           <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:38,color:"#f5c842",letterSpacing:".05em"}}>{year+1}年 ドラフト会議</div>
           <div style={{fontSize:10,color:"#374151"}}>2巡目以降 · {pickIdx}/{draftOrderFiltered.length}指名完了</div>
           <div style={{background:"rgba(255,255,255,.05)",borderRadius:4,height:5,margin:"8px 0",overflow:"hidden"}}><div style={{height:"100%",background:"linear-gradient(90deg,#f5c842,#f97316)",width:progress+"%",transition:".4s"}}/></div>
-          {!done&&!effectiveAutoSkip&&(
-            <button className="btn" style={{fontSize:11,padding:"4px 16px",background:"rgba(148,163,184,.1)",color:"#94a3b8",border:"1px solid rgba(148,163,184,.2)"}} onClick={()=>setLocalAutoSkip(true)}>
-              ⚡ 全自動処理
-            </button>
+          {!done&&(
+            <div style={{display:"flex",gap:6,justifyContent:"center",marginTop:4}}>
+              <button className="btn" style={{fontSize:11,padding:"4px 14px",background:"rgba(148,163,184,.1)",color:"#94a3b8",border:"1px solid rgba(148,163,184,.2)"}} onClick={()=>setShowPreview(true)}>📋 展望</button>
+              {!effectiveAutoSkip&&(
+                <button className="btn" style={{fontSize:11,padding:"4px 14px",background:"rgba(148,163,184,.1)",color:"#94a3b8",border:"1px solid rgba(148,163,184,.2)"}} onClick={()=>setLocalAutoSkip(true)}>⚡ 全自動処理</button>
+              )}
+              {effectiveAutoSkip&&<span style={{fontSize:10,color:"#94a3b8",alignSelf:"center"}}>⚡ 自動処理中…</span>}
+            </div>
           )}
-          {effectiveAutoSkip&&!done&&<div style={{fontSize:10,color:"#94a3b8",marginTop:4}}>⚡ 自動処理中…</div>}
         </div>
         {pool.filter(p=>p.spotlight&&!isPickedAfterRound1(p.id)).length>0&&(
           <div style={{display:"flex",gap:6,marginBottom:10,overflowX:"auto",paddingBottom:4}}>
