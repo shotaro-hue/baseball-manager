@@ -88,6 +88,7 @@ export default function App(){
   const { gameResult, currentOpp, batchResults, batchMeta, playoff, setPlayoff } = sf;
   const { developmentSummary, newSeasonInfo, draftPool, setDraftPool, draftResult, setDraftResult, draftAllocation, setDraftAllocation, waiverClaimResults } = os;
   const [agentNeg, setAgentNeg] = useState(null);
+  const [draftAutoSkip, setDraftAutoSkip] = useState(false);
   const handleTabChange = useCallback((newTab) => {
     if (tab === "roster" && newTab !== "roster" && myTeam) {
       const lineupPlayers = myTeam.lineup
@@ -205,8 +206,8 @@ export default function App(){
     setScreen("retire_phase");
   }}/></ErrorBoundary></>);
   if(screen==="draft_preview"&&draftPool) return(<><DraftPreviewScreen teams={teams} myId={myId} year={year} pool={draftPool} draftAllocation={draftAllocation} onAllocationChange={setDraftAllocation} onStart={()=>setScreen("draft_lottery")}/></>);
-  if(screen==="draft_lottery"&&draftPool) return(<><DraftLotteryScreen teams={teams} myId={myId} year={year} pool={draftPool} onDone={(r1)=>{setDraftPool(prev=>prev.map(p=>{const winner=Object.entries(r1).find(function(e){return e[1]&&e[1].id===p.id;});return{...p,_drafted:winner?true:undefined,_r1winner:winner?Number(winner[0]):undefined};}));setScreen("draft");}}/></>);
-  if(screen==="draft"&&draftPool) return(<><DraftScreen teams={teams} myId={myId} year={year} pool={draftPool} draftAllocation={draftAllocation} onDraftDone={(pl,dr)=>{setDraftResult({pool:pl,drafted:dr});setScreen("draft_review");}}/></>);
+  if(screen==="draft_lottery"&&draftPool) return(<><DraftLotteryScreen teams={teams} myId={myId} year={year} pool={draftPool} onDone={(r1,autoSkip)=>{setDraftPool(prev=>prev.map(p=>{const winner=Object.entries(r1).find(function(e){return e[1]&&e[1].id===p.id;});return{...p,_drafted:winner?true:undefined,_r1winner:winner?Number(winner[0]):undefined};}));if(autoSkip) setDraftAutoSkip(true);setScreen("draft");}}/></>);
+  if(screen==="draft"&&draftPool) return(<><DraftScreen teams={teams} myId={myId} year={year} pool={draftPool} draftAllocation={draftAllocation} autoSkip={draftAutoSkip} onDraftDone={(pl,dr)=>{setDraftAutoSkip(false);setDraftResult({pool:pl,drafted:dr});setScreen("draft_review");}}/></>);
   if(screen==="draft_review"&&draftResult) return(<><DraftReviewScreen teams={teams} myId={myId} year={year} pool={draftResult.pool} drafted={draftResult.drafted} onEnd={()=>os.handleDraftComplete(draftResult.pool,draftResult.drafted)}/></>);
   if(screen==="new_season") return(<><NewSeasonScreen year={year} info={newSeasonInfo} developmentSummary={developmentSummary} ownerGoal={myTeam?.ownerGoal||"cs"} onGoalSelect={(goal)=>gs.upd(myId,t=>({...t,ownerGoal:goal}))} onStart={()=>{setScreen("hub");setTab("dashboard");notify(`${year}年シーズン開幕！`,"ok");}}/></>);
 
