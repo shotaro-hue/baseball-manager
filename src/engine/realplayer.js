@@ -17,6 +17,12 @@ function sc(val, inMin, inMax, outMin, outMax) {
   );
 }
 
+// 大雑把な守備位置を具体的ポジションに正規化
+// 外野手→中堅手: SECONDARY_POSITION_RULES で左翼手・右翼手が自動付与される
+// 内野手→二塁手: 同ルールで遊撃手・三塁手が付与され、一塁手は除外される
+const GENERIC_POS_MAP = { '外野手': '中堅手', '内野手': '二塁手', 'OF': '中堅手', 'IF': '二塁手' };
+function normalizeRealPos(pos) { return GENERIC_POS_MAP[pos] ?? pos; }
+
 // ポジション別守備基準値
 function posDefenseBase(pos) {
   const map = {
@@ -92,7 +98,8 @@ function historyPitcherEntry(h, teamId, teamName) {
 
 /* ─── 打者変換 ─── */
 export function realBatterToPlayer(b, teamDef) {
-  const { name, age, pos, hometown = teamDef.city, isForeign = false, salary, stats, history, career } = b;
+  const { name, age, hometown = teamDef.city, isForeign = false, salary, stats, history, career } = b;
+  const pos = normalizeRealPos(b.pos);
   const { AVG = 0.250, HR = 5, RBI = 30, SB = 5, BB = 30, PA = 300, OPS = 0.680 } = stats;
 
   const bbPct = PA > 0 ? BB / PA : 0.08;
@@ -157,7 +164,8 @@ export function realBatterToPlayer(b, teamDef) {
 
 /* ─── 投手変換 ─── */
 export function realPitcherToPlayer(p, teamDef) {
-  const { name, age, pos, hand = 'right', hometown = teamDef.city, isForeign = false, salary, stats, history, career } = p;
+  const { name, age, hand = 'right', hometown = teamDef.city, isForeign = false, salary, stats, history, career } = p;
+  const pos = normalizeRealPos(p.pos);
   const { ERA = 4.00, W = 5, L = 8, IP = 80, SO = 70, BB = 35, WHIP = 1.40 } = stats;
   const K = SO;
 
