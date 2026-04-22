@@ -5,6 +5,15 @@
 
 ---
 
+### 2026-04-22 — fix: 盗塁ゼロバグ修正（realplayer.js の speed/stealSkill 基準値）
+
+**仕様本文への影響なし（内部バグ修正のみ）**
+
+- 根本原因: `realBatterToPlayer` が speed/stealSkill を `stats.SB`（2025 開幕直後スナップショット、最大 8）から算出しており、全実選手の値が 30〜38 に集中。`quickSimGame` の盗塁試行閾値 sp≥60 を誰も超えられず盗塁が 0 になっていた
+- 修正内容: `bestSB = Math.max(SB, ...(history ?? []).map(h => h.SB || 0))` でキャリア最高盗塁数を取得し、speed・stealSkill・baseRunning の sc() 計算に使用。career-best SB 35 前後の走り屋が speed≈64、SB 50 の俊足選手が speed≈78 に正規化される
+
+---
+
 ### 2026-04-22 — fix: 投手敗戦条件を go-ahead run 方式に修正
 
 **仕様本文への影響なし（内部実装のみ）**

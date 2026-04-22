@@ -105,15 +105,18 @@ export function realBatterToPlayer(b, teamDef) {
   const bbPct = PA > 0 ? BB / PA : 0.08;
   const hrPct = PA > 0 ? HR / PA : 0.02;
 
+  // キャリア最高盗塁数: 2025年スナップショットは開幕直後で少ないため history の最大値を使用
+  const bestSB = Math.max(SB, ...(history ?? []).map(h => h.SB || 0));
+
   const batting = {
     contact:     sc(AVG,   0.195, 0.345, 38, 90),
     power:       sc(hrPct, 0.005, 0.080, 30, 93),
     eye:         sc(bbPct, 0.04,  0.18,  30, 90),
-    speed:       sc(SB,    0,     60,    30, 88),
-    stealSkill:  sc(SB,    0,     60,    30, 88),
+    speed:       sc(bestSB, 0,    60,    30, 88),
+    stealSkill:  sc(bestSB, 0,    60,    30, 88),
     arm:         posArmBase(pos),
     defense:     posDefenseBase(pos),
-    baseRunning: sc(SB,    0,     50,    30, 85),
+    baseRunning: sc(bestSB, 0,    50,    30, 85),
     clutch:      clamp(55 + rng(-12, 15), 30, 90),
     vsLeft:      clamp(sc(OPS, 0.55, 1.05, 35, 88) + rng(-8, 8), 30, 90),
     breakingBall:clamp(sc(AVG, 0.195, 0.345, 35, 85) + rng(-8, 8), 30, 88),

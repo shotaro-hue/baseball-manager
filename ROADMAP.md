@@ -90,6 +90,7 @@
 | B15 | **[P1] 翌年移行時に前年オールスター結果が引き継がれる** | `handleNextYear()` が `setAllStarResult(null)` を呼ばないため前年スコアが AS セルに残存。`setAllStarResult` を useOffseason の destructuring に追加し null リセットを追加 | TBD |
 | B16 | **[P1] 翌年7月グリッドが途中切断（7/20以降不表示）** | オールスターエントリが schedule 末尾（index 144-145）に追加されるため `buildMonthGrid` の `lastDate` が AS 日付（7/16等）になりグリッドが週末で終端。`monthEntries.sort()` で日付順ソートして修正 | TBD |
 | B17 | **[P1] 実選手の年度別成績で奪三振数が全て0** | `historyPitcherEntry` が `npb2025.js` history の `SO` フィールドを `K` として読もうとしていたため常に0。`realPitcherToPlayer` の現在成績も同様（投手能力値 k9 計算に影響）。両箇所の destructuring を `K` → `SO` に修正 | ✅ |
+| B18 | **[P1] 1シーズン通じて盗塁ゼロ** | `realBatterToPlayer` の speed/stealSkill が `stats.SB`（2025開幕直後スナップショット、最大8）を基準にしていたため全選手の speed/stealSkill が 30〜38 に集中し、`quickSimGame` の盗塁試行閾値（sp≥60）を誰も超えられなかった。`bestSB = Math.max(SB, ...history.map(h=>h.SB))` に変更し career-best を使用 | ✅ |
 | U1 | **[P1] ロースター打順スワップ＋守備配置バリデーション（DH対応）** | ロースターの打順変更を挿入からスワップに変更。DH有無に応じたラインナップ人数（8/9）と守備配置（未割り当て/重複）をタブ遷移時に検証し、不正時は warn 通知で遷移ブロック。`dhEnabled` フラグと DH ポジション表示制御を追加 | TBD |
 | U2 | **[UI] 投手画面・継投画面の統合** | RosterTab の「⚾ 投手」「📋 継投」2サブタブを「⚾ 投手・継投」1タブに統合。上部：投手能力値テーブル、下部：先発ローテ・指名投手・中継ぎ優先順カードを縦積み表示。タブ数 5→4 に削減 | TBD |
 | U3 | **[UI] バッチシム試合結果ニュース** | `runBatchGames` 内で各試合の結果ニュースを生成し `addNews` で配信。インタビューイベントも15%確率で生成。 | ✅ |
