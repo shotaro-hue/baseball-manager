@@ -53,6 +53,12 @@ export function RosterTab({team,onToggle,onSetLineupOrder,onSetRosterDhMode,onSe
       const best=posEligible[pos].find(p=>!playerUsed.has(p.id));
       if(best){assignment.set(pos,best);playerUsed.add(best.id);}
     }
+    // 全守備位置を埋めることを最優先: 適性なしでも残った選手を強制割り当て
+    for(const pos of posOrder){
+      if(assignment.has(pos))continue;
+      const fallback=sorted.find(p=>!playerUsed.has(p.id));
+      if(fallback){assignment.set(pos,fallback);playerUsed.add(fallback.id);}
+    }
     // スコア順に打順を割り当て
     [...assignment.entries()].sort((a,b)=>scoreOf(b[1])-scoreOf(a[1])).forEach(([pos,player],idx)=>{
       onSetLineupOrder&&onSetLineupOrder(player.id,idx+1);
