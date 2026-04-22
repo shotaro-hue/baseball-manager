@@ -68,12 +68,31 @@ export function computeBoxScore(log, inningSummary, homeTeamPlayers, awayTeamPla
     const isMulti   = order.length >= 2;
     const starterQualifies = teamWon && (map[starterId]?.outs ?? 0) >= 15;
     const winnerId = teamWon ? (starterQualifies ? starterId : (order[1] ?? starterId)) : null;
+    // 敗戦投手: 相手チームが最終的にリードを奪ったプレイの投手
+    const losingPitcherId = (() => {
+      if (teamWon || drew) return null;
+      let myScore = 0, oppScore = 0, losingId = null;
+      for (const e of log) {
+        if (!e.rbi || e.rbi <= 0 || e.isStolenBase) continue;
+        if (e.scorer !== batterScorer) {
+          // 自チーム得点 → リード回復でリセット
+          myScore += e.rbi;
+          if (myScore >= oppScore) losingId = null;
+        } else {
+          // 相手得点 → 勝ち越しなら記録
+          const prev = oppScore;
+          oppScore += e.rbi;
+          if (oppScore > myScore && prev <= myScore) losingId = e.pitcherId ?? null;
+        }
+      }
+      return losingId ?? starterId;
+    })();
     return order.map(id => {
       const p = players.find(pl => pl.id === id);
       const m = map[id];
       let result = null;
       if (id === winnerId) result = 'W';
-      else if (!teamWon && !drew && id === starterId && finalLead < 0) result = 'L';
+      else if (losingPitcherId && id === losingPitcherId) result = 'L';
       else if (isMulti && id === closerId && id !== starterId && id !== winnerId && saveSit) result = 'S';
       return { id, name: p?.name || '不明', ip: r2(m.outs / 3), H: m.H, ER: m.ER, BB: m.BB, K: m.K, result };
     });
@@ -200,16 +219,38 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won) {
     const starterQualifies = won && (pitcherMap[starterId]?.outs ?? 0) >= 15;
     const winnerId = won ? (starterQualifies ? starterId : (pitcherOrder[1] ?? starterId)) : null;
 
+    // 敗戦投手: 相手チームが最終的にリードを奪ったプレイの投手
+    const losingPitcherId = (() => {
+      if (won || finalLead >= 0) return null; // 勝利or引き分けは敗戦なし
+      let myScore = 0, oppScore = 0, losingId = null;
+      for (const e of log) {
+        if (!e.rbi || e.rbi <= 0 || e.isStolenBase) continue;
+        if (e.scorer === isMyTeam) {
+          // 自チーム得点 → 同点or逆転でリセット
+          myScore += e.rbi;
+          if (myScore >= oppScore) losingId = null;
+        } else {
+          // 相手得点 → 勝ち越しなら記録
+          const prev = oppScore;
+          oppScore += e.rbi;
+          if (oppScore > myScore && prev <= myScore) losingId = e.pitcherId ?? null;
+        }
+      }
+      return losingId ?? starterId; // 特定できなければ先発
+    })();
+
     return updated.map((p) => {
       const s = { ...p.stats };
 
       if (p.id === starterId) {
         if (p.id === winnerId) s.W++;
-        if (!won && finalLead < 0) s.L++; // 引き分けは敗戦なし
         // QS: 先発が6回以上投げ自責点3以下
         const sm = pitcherMap[starterId];
         if (sm && sm.outs >= 18 && sm.ER <= 3) s.QS++;
       }
+
+      // 敗戦投手（先発・救援問わず）: 引き分けは除外
+      if (losingPitcherId && p.id === losingPitcherId) s.L++;
 
       // 先発が資格なし(5回未満): 最初の中継ぎが勝利投手
       if (winnerId && p.id === winnerId && p.id !== starterId) s.W++;
