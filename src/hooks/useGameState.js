@@ -216,6 +216,24 @@ export function useGameState() {
     });
   },[myTeam,upd,myId,notify]);
 
+  const replaceLineup = useCallback((entries) => {
+    // entries: [{id, pos}, ...] in batting order — ラインアップを一括置換しつつ守備位置も更新
+    upd(myId, t => {
+      const dhMode = t.rosterDhMode ?? t.dhEnabled;
+      const newLineup = entries.map(e => e.id);
+      const updatedPlayers = t.players.map(p => {
+        const entry = entries.find(e => e.id === p.id);
+        return entry && entry.pos !== p.pos ? { ...p, pos: entry.pos } : p;
+      });
+      return {
+        ...t,
+        players: updatedPlayers,
+        lineup: newLineup,
+        ...(dhMode ? { lineupDh: newLineup } : { lineupNoDh: newLineup }),
+      };
+    });
+  }, [upd, myId]);
+
   const setLineupOrder = useCallback((pid, order) => {
     if (!myTeam) return;
     const p = myTeam.players.find(x => x.id === pid);
@@ -464,6 +482,7 @@ export function useGameState() {
     setDevGoal,
     handleInterview,
     toggleLineup,
+    replaceLineup,
     setLineupOrder,
     setRosterDhMode,
     setPlayerPosition,
