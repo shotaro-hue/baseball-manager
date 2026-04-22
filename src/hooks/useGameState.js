@@ -244,13 +244,6 @@ export function useGameState() {
     const dhMode = myTeam.rosterDhMode ?? myTeam.dhEnabled;
     const maxLineup = dhMode ? 9 : 8;
     const targetIdx = order - 1;
-    const currentIdx = myTeam.lineup.indexOf(pid);
-    const isInLineup = currentIdx !== -1;
-    if (!isInLineup && order > 0 && myTeam.lineup.length >= maxLineup) {
-      notify(`打線は最大${maxLineup}人です`, "warn");
-      return;
-    }
-
     upd(myId, t => {
       if (order === 0) {
         const nextLineup = t.lineup.filter(id => id !== pid);
@@ -263,9 +256,12 @@ export function useGameState() {
       const inLineup = currentIdxInTeam !== -1;
 
       if (!inLineup) {
-        if (targetIdx > lineup.length) return t;
-        if (lineup.length >= maxLineup) return t;
-        lineup.splice(targetIdx, 0, pid);
+        if (lineup.length >= maxLineup) {
+          // 打線満員: 対象スロットの選手を控えに落として入れ替え
+          lineup[Math.min(targetIdx, lineup.length - 1)] = pid;
+        } else {
+          lineup.splice(Math.min(targetIdx, lineup.length), 0, pid);
+        }
         const nextLineup = lineup.slice(0, maxLineup);
         return dhMode
           ? { ...t, lineup: nextLineup, lineupDh: nextLineup }
