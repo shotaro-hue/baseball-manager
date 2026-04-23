@@ -54,6 +54,19 @@ export const OWNER_TRUST_BUDGET_HIGH = 80;   // 信頼度がこれ超: 翌年予
 export const OWNER_TRUST_FACTOR_LOW  = 0.8;
 export const OWNER_TRUST_FACTOR_HIGH = 1.15;
 
+// 財務モデル（単位: 万円）
+export const FINANCE_TICKET_BASE_PER_GAME = 2200;
+export const FINANCE_TICKET_LEVEL_MULT = [1.0, 1.18, 1.4, 1.65];
+export const FINANCE_BUDGET_FACTOR_MIN = 0.85;
+export const FINANCE_BUDGET_FACTOR_MAX = 1.25;
+export const FINANCE_MERCH_RATE = 0.18;
+export const FINANCE_SPONSOR_BY_WINS = [
+  { minWin: 0, perGame: 900 },
+  { minWin: 30, perGame: 1300 },
+  { minWin: 60, perGame: 1800 },
+  { minWin: 90, perGame: 2600 },
+];
+
 export const PITCH_NORM      = 120;  // calcFatigue 正規化分母
 export const PITCH_HARD_CAP  = 130;  // 球数の絶対上限（安全弁）
 export const FATIGUE_WARNING = 83;   // 疲弊度警告閾値（stamina=50, condition=100 時 ≈ 100球相当）
