@@ -45,10 +45,10 @@ describe('fmtIP', () => {
 
 describe('fmtM', () => {
   it('1億以上は億表記', () => {
-    expect(fmtM(200000000)).toBe('2.0億');
+    expect(fmtM(200000000)).toBe('2.0億円');
   });
   it('1万以上は万表記', () => {
-    expect(fmtM(5000000)).toBe('500万');
+    expect(fmtM(5000000)).toBe('500万円');
   });
   it('1万未満はそのまま円', () => {
     expect(fmtM(9999)).toBe('9999円');
@@ -57,6 +57,9 @@ describe('fmtM', () => {
 
 describe('fmtSal', () => {
   it('年俸を万円単位に変換する', () => {
-    expect(fmtSal(30000000)).toBe('3000万');
+    expect(fmtSal(3000)).toBe('3,000万円');
+  });
+  it('1億円以上は億円単位で表示する', () => {
+    expect(fmtSal(12000)).toBe('1.2億円');
   });
 });
