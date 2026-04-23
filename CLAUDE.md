@@ -51,18 +51,19 @@ node scripts/fetch-spaia.js  # NPB 2025 実選手データ取得 → src/data/np
 
 ## 現在の開発フォーカス
 
-### 最優先: Tier 8（二軍シミュレーション基盤）🔴
+> Tier 1〜10 + Tier 11 3/4 完了（完成度 約87%）。詳細は `ROADMAP.md` の「現在のフォーカス」セクション参照。
 
-- **㉔** 二軍シミュレーション（farm simulation）
-- **㉕** 育成→支配下昇格パイプライン（ikusei → shihaka）
-- **㉖** オプション制度
-- **㉗** 選手育成目標・指示システム
+### 🔴 即対応: TBD バグ修正
 
-### 並行整備
+- **B14** `src/hooks/useOffseason.js` — ドラフト指名選手ゼロバグ（全12球団・全巡目への反映）
+- **B13** `src/engine/postGame.js` — 投手成績集計バグ（CareerTable フィールド名・BF 計算）
+- **B19** `src/engine/contract.js` — 外国人960日枠免除フラグ（`isForeign: false` 切替）
 
-- **T5**: セーブデータバリデーション（ロード時 null チェック・ローリングバックアップ 2世代）
-- **T6**: JSDoc 型注釈（player.js / simulation.js の主要関数から順次）
-- **T7**: Vitest 拡充 → `resolveAtBat` / `calcEffectiveFatigue` 等（3ファイル実装済み、追加カバレッジ）
+### 🔶 近期: UI 改善 + Tier 11 残件
+
+- **U1** `src/components/tabs/RosterTab.jsx` — 打順スワップ + DH バリデーション
+- **U2** `src/components/tabs/RosterTab.jsx` — 投手/継投サブタブ統合（5→4）
+- **㊴** スプリングトレーニング（Tier 11 最後の未着手機能）
 
 詳細は `ROADMAP.md` を参照。
 
@@ -74,7 +75,7 @@ node scripts/fetch-spaia.js  # NPB 2025 実選手データ取得 → src/data/np
 - **フォーマッタ**: `fmtAvg` / `fmtOBP` / `fmtM` / `fmtSal` / `fmtIP` 等を活用
 - **UID**: 選手・イベント等の ID は `uid()` で生成
 - **定数**: ゲームバランスに関わる数値は `src/constants.js` に名前付き定数として切り出す
-- **state 更新**: `useState` + `useCallback`（`useReducer` 移行は T8 で予定）
+- **state 更新**: `useReducer` + `useCallback`（`gameStateReducer.js` に移行済み）
 - **エラー境界**: `ErrorBoundary.jsx` で主要コンポーネントをラップ済み
 
 ---

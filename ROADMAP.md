@@ -1,6 +1,6 @@
 # Baseball Manager 2025 — ロードマップ
 
-> 最終更新: 2026-04-16（他チーム試合結果閲覧・試合前バリデーション強化・エラーダイアログ 完了）
+> 最終更新: 2026-04-23（ROADMAP 全面更新：TBD バグ状況明確化・Tier 完了マーク修正・現在フォーカス追記）
 > **ゴール**: NPB版 OOTP / Football Manager — 深いシミュレーションと長期フランチャイズ経営
 > **運用ルール**: 実装完了した項目は ✅ に更新。新規項目は末尾に追記。過去の記録は削除しない。
 
@@ -85,14 +85,15 @@
 | B10 | **[P0] ドラフト1位指名クラッシュ（analyzeTeamNeeds戻り値型誤用）** | `buildCpuPicks()` / `cpuPick()` で `needs.some(n=>n.includes(...))` が TypeError。`n.type.includes(...)` に修正 | 3e2f4c4 |
 | B11 | **[P1] ニュースタブ未読バッジ欠落・インタビュー回答リセット** | `tabBadges` に `news` キー追加。`handleInterview` で `answered:true` フラグを付与し再マウント後も維持 | 3e2f4c4 |
 | B12 | **[P0] 残り全試合シムで黒画面（trade_news エントリの score 参照 TypeError）** | `runBatchGames` の `results` 配列に `trade_news` 型エントリ（CPU同士トレード通知）が混在するにもかかわらず、`setRecentResults` / `setGameResultsMap` の functional updater 内で `r.score.my` を全エントリに対して参照していた。`trade_news` エントリは `score` フィールドを持たないため `TypeError` が発生し React のレンダーフェーズでクラッシュ → 黒画面。`gameResults = results.filter(r=>r.type!=='trade_news')` で除外してから `setBatchResults` / `setRecentResults` / `setGameResultsMap` に渡すよう修正 | — |
-| B13 | **[P1] 投手成績集計バグ（BF過剰計上・キャリアWHIP崩壊・starter undefined）** | postGame.js の盗塁BF除外漏れ・CareerTable totals の投手フィールド名誤り（BB→BBp / HRA→HRp, Hp・HBPp追加）・initGameState の myStarter フォールバック条件を緩和（先発限定→全投手） + simulation.js の Math.random() → rngf() 置換 | TBD |
-| B14 | **[P0] ドラフト指名選手ゼロバグ（全球団未反映・1位漏れ・重複指名）** | `handleDraftComplete` が myId のみ・2巡目以降のみを farm に追加 → 全12球団に1〜6巡目全指名を反映。`cpuPick()` の avail フィルタに `!p._drafted` を追加。くじ引き演出を CPU 間競合が実際に発生するよう `buildCpuPicks` の重複排除を廃止し複数競合ループ（最大3回）を実装 | TBD |
-| B15 | **[P1] 翌年移行時に前年オールスター結果が引き継がれる** | `handleNextYear()` が `setAllStarResult(null)` を呼ばないため前年スコアが AS セルに残存。`setAllStarResult` を useOffseason の destructuring に追加し null リセットを追加 | TBD |
-| B16 | **[P1] 翌年7月グリッドが途中切断（7/20以降不表示）** | オールスターエントリが schedule 末尾（index 144-145）に追加されるため `buildMonthGrid` の `lastDate` が AS 日付（7/16等）になりグリッドが週末で終端。`monthEntries.sort()` で日付順ソートして修正 | TBD |
+| B13 | **[P1] 投手成績集計バグ（BF過剰計上・キャリアWHIP崩壊・starter undefined）** | postGame.js の盗塁BF除外漏れ・CareerTable totals の投手フィールド名誤り（BB→BBp / HRA→HRp, Hp・HBPp追加）・initGameState の myStarter フォールバック条件を緩和（先発限定→全投手） + simulation.js の Math.random() → rngf() 置換 | 🔴 未修正 |
+| B14 | **[P0] ドラフト指名選手ゼロバグ（全球団未反映・1位漏れ・重複指名）** | `handleDraftComplete` が myId のみ・2巡目以降のみを farm に追加 → 全12球団に1〜6巡目全指名を反映。`cpuPick()` の avail フィルタに `!p._drafted` を追加。くじ引き演出を CPU 間競合が実際に発生するよう `buildCpuPicks` の重複排除を廃止し複数競合ループ（最大3回）を実装 | 🔴 未修正 |
+| B15 | **[P1] 翌年移行時に前年オールスター結果が引き継がれる** | `handleNextYear()` が `setAllStarResult(null)` を呼ばないため前年スコアが AS セルに残存。`setAllStarResult` を useOffseason の destructuring に追加し null リセットを追加 | ✅ 完了 |
+| B16 | **[P1] 翌年7月グリッドが途中切断（7/20以降不表示）** | オールスターエントリが schedule 末尾（index 144-145）に追加されるため `buildMonthGrid` の `lastDate` が AS 日付（7/16等）になりグリッドが週末で終端。`monthEntries.sort()` で日付順ソートして修正 | ✅ 完了 |
 | B17 | **[P1] 実選手の年度別成績で奪三振数が全て0** | `historyPitcherEntry` が `npb2025.js` history の `SO` フィールドを `K` として読もうとしていたため常に0。`realPitcherToPlayer` の現在成績も同様（投手能力値 k9 計算に影響）。両箇所の destructuring を `K` → `SO` に修正 | ✅ |
 | B18 | **[P1] 1シーズン通じて盗塁ゼロ** | `realBatterToPlayer` の speed/stealSkill が `stats.SB`（2025開幕直後スナップショット、最大8）を基準にしていたため全選手の speed/stealSkill が 30〜38 に集中し、`quickSimGame` の盗塁試行閾値（sp≥60）を誰も超えられなかった。`bestSB = Math.max(SB, ...history.map(h=>h.SB))` に変更し career-best を使用 | ✅ |
-| U1 | **[P1] ロースター打順スワップ＋守備配置バリデーション（DH対応）** | ロースターの打順変更を挿入からスワップに変更。DH有無に応じたラインナップ人数（8/9）と守備配置（未割り当て/重複）をタブ遷移時に検証し、不正時は warn 通知で遷移ブロック。`dhEnabled` フラグと DH ポジション表示制御を追加 | TBD |
-| U2 | **[UI] 投手画面・継投画面の統合** | RosterTab の「⚾ 投手」「📋 継投」2サブタブを「⚾ 投手・継投」1タブに統合。上部：投手能力値テーブル、下部：先発ローテ・指名投手・中継ぎ優先順カードを縦積み表示。タブ数 5→4 に削減 | TBD |
+| B19 | **[P1] 外国人選手の960日枠免除フラグ未反映** | `daysOnActiveRoster` の累積・FA閾値計算は正しいが、960日（8年分）到達後も `isForeign` フラグが `false` に切り替わらない。`useSeasonFlow.js` の外国人枠カウント（`p.isForeign` 参照）が常に外国人として扱い続けるため、長期在日の外国人選手が枠から解放されない NPB 協約違反。修正箇所: `faCheckPlayers`（`contract.js`）またはオフシーズン処理（`useOffseason.js`）で `daysOnActiveRoster >= threshold.domestic` かつ `isForeign === true` の選手を `isForeign: false` に更新する | 🔴 未修正 |
+| U1 | **[P1] ロースター打順スワップ＋守備配置バリデーション（DH対応）** | ロースターの打順変更を挿入からスワップに変更。DH有無に応じたラインナップ人数（8/9）と守備配置（未割り当て/重複）をタブ遷移時に検証し、不正時は warn 通知で遷移ブロック。`dhEnabled` フラグと DH ポジション表示制御を追加 | 🔶 未完成 |
+| U2 | **[UI] 投手画面・継投画面の統合** | RosterTab の「⚾ 投手」「📋 継投」2サブタブを「⚾ 投手・継投」1タブに統合。上部：投手能力値テーブル、下部：先発ローテ・指名投手・中継ぎ優先順カードを縦積み表示。タブ数 5→4 に削減 | 🔶 未完成 |
 | U3 | **[UI] バッチシム試合結果ニュース** | `runBatchGames` 内で各試合の結果ニュースを生成し `addNews` で配信。インタビューイベントも15%確率で生成。 | ✅ |
 | U4 | **[UI] 過去シーズン日程閲覧** | `useGameState` に `scheduleArchive` state を追加（最大5シーズン保持）。`handleNextYear` 時に現シーズンの日程・試合結果をアーカイブ保存。日程タブに年度セレクターを追加し、過去シーズンの全試合カレンダー・最終成績を閲覧可能に。 | ✅ |
 | U5 | **[UI] 他球団情報モーダル拡張** | `TeamModal` を「ロスター・成績（打者/投手切り替え）」「日程（月別試合リスト）」「移籍履歴」3タブに拡張。 | ✅ |
@@ -136,7 +137,7 @@
 
 ---
 
-## Tier 8（ファームシステム拡張・育成戦略深化）— 未着手 🟡 高優先
+## Tier 8（ファームシステム拡張・育成戦略深化）— ✅ 完了
 
 > 「組織全体を経営する」感覚。一軍に影響するファーム育成の戦略性を高める。
 
@@ -149,7 +150,7 @@
 
 ---
 
-## Tier 9（フロント・メディア・選手関係）— 未着手 🟡 高優先
+## Tier 9（フロント・メディア・選手関係）— ✅ 完了
 
 > **FMの核心**: すべての選択に人間が絡む。関係性が結果に波及する。OOTP優先方針により中期実装。
 
@@ -162,7 +163,7 @@
 
 ---
 
-## Tier 10（NPB固有システム深化）— 未着手 🟡 高優先
+## Tier 10（NPB固有システム深化）— ✅ 完了
 
 > NPB版OOTP/FMとしての差別化。日本プロ野球ならではのルールと文化を深く実装する。
 
@@ -177,7 +178,7 @@
 
 ---
 
-## Tier 11（シミュレーション精度向上・AI強化）— 未着手 🟢 中優先
+## Tier 11（シミュレーション精度向上・AI強化）— 🔶 ほぼ完了（㊴ のみ未着手）
 
 > CPU球団をOOTPレベルの意思決定に近づける。リーグ全体のリアリティが向上する。
 
@@ -260,6 +261,37 @@
 | U7 | ラインナップD&D | 打順・守備位置プルダウン選択（✅ 完了） | ✅ 完了 |
 | U8 | バッチシム結果サマリー改善 | 試合ハイライトメッセージ・順位変動・負傷情報を5試合分まとめて表示 | ✅ 完了 |
 | U9 | ダーク/ライトモード | CSS変数ベースで切り替え。テーマ設定をlocalStorageに保存 | 未着手 |
+
+---
+
+## 現在のフォーカス（2026-04-23）
+
+> **完成度: 約87%**（Tier 1〜10 + Tier 11 3/4 完了。残りは下記 🔴🔶 項目のみ）
+
+### 🔴 即対応（P0/P1 バグ）
+
+| 優先度 | タスク | ファイル |
+|---|---|---|
+| P0 | **B14** ドラフト指名選手ゼロバグ — 全12球団・全巡目への反映・重複指名排除 | `src/hooks/useOffseason.js`, `src/engine/draft.js` |
+| P1 | **B13** 投手成績集計バグ — CareerTable フィールド名・BF 計算・starter フォールバック | `src/engine/postGame.js`, `src/components/tabs/StatsTab.jsx` |
+| P1 | **B19** 外国人960日枠免除フラグ — `isForeign: false` 切替ロジック追加 | `src/engine/contract.js` または `src/hooks/useOffseason.js` |
+
+### 🔶 近期 UI 改善（P1）
+
+| タスク | ファイル |
+|---|---|
+| **U1** ロースター打順スワップ + DH バリデーション | `src/components/tabs/RosterTab.jsx` |
+| **U2** 投手/継投サブタブ統合（5→4 タブ） | `src/components/tabs/RosterTab.jsx` |
+
+### 🟡 Tier 11 残件
+
+| タスク | 概要 |
+|---|---|
+| **㊴** スプリングトレーニング | 2〜3月オープン戦シミュ・スターター争い・能力±3季節変動 |
+
+### 🟢 Tier 12（中長期）
+
+⑰ カスタムチーム / ⑱ 統計エクスポート / ⑲ モバイル最適化 / ㊶ 統計ビジュアライゼーション / ㊷ ゲーム速度設定 / ㊸ コミッショナーモード
 
 ---
 
