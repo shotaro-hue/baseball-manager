@@ -546,3 +546,18 @@ export const NPB2025_ROSTERS = {
   },
 
 };
+
+const KATAKANA_NAME_RE = /^[ァ-ヺー・]+$/;
+
+function isKatakanaName(name = '') {
+  const normalized = String(name).replace(/[ 　]/g, '');
+  return KATAKANA_NAME_RE.test(normalized);
+}
+
+for (const team of Object.values(NPB2025_ROSTERS)) {
+  for (const player of [...team.batters, ...team.pitchers]) {
+    if (player.isForeign == null && isKatakanaName(player.name)) {
+      player.isForeign = true;
+    }
+  }
+}
