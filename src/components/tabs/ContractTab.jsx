@@ -10,6 +10,16 @@ export function ContractTab({team,allTeams,onOffer,onRelease}){
   const [offerYrs,setOfferYrs]=useState(1);
   const expiring=team.players.filter(p=>p.contractYearsLeft<=1);
   const sel=team.players.find(p=>p.id===selId);
+  const salaryOptions=sel
+    ? Array.from(new Set([
+        2000, 3000, 5000,
+        Math.max(1000, Math.round(sel.salary * 0.8 / 100) * 100),
+        Math.max(1000, Math.round(sel.salary / 100) * 100),
+        Math.max(1000, Math.round(sel.salary * 1.2 / 100) * 100),
+        Math.max(1000, Math.round(sel.salary * 1.5 / 100) * 100),
+        Math.max(1000, Math.round(sel.salary * 2.0 / 100) * 100),
+      ])).sort((a,b)=>a-b)
+    : [];
   const preview=sel?evalOffer(sel,{salary:offerSal,years:offerYrs},team,allTeams):null;
   const ac=preview?.total>=ACCEPT_THRESHOLD?"#34d399":preview?.total>=40?"#f5c842":"#f87171";
   return(
@@ -22,7 +32,7 @@ export function ContractTab({team,allTeams,onOffer,onRelease}){
             <thead><tr><th>選手名</th><th>守備</th><th>年齢</th><th>現年俸</th><th>残年数</th><th></th></tr></thead>
             <tbody>{expiring.map(p=>(
               <tr key={p.id} style={{background:selId===p.id?"rgba(245,200,66,.04)":undefined}}>
-                <td style={{fontWeight:700,cursor:"pointer",color:selId===p.id?"#f5c842":undefined}} onClick={()=>{setSelId(p.id);setOfferSal(Math.round(p.salary));setOfferYrs(1);}}>{p.name}</td>
+                <td style={{fontWeight:700,cursor:"pointer",color:selId===p.id?"#f5c842":undefined}} onClick={()=>{setSelId(p.id);setOfferSal(Math.max(1000,Math.round(p.salary/100)*100));setOfferYrs(1);}}>{p.name}</td>
                 <td style={{fontSize:10,color:"#374151"}}>{p.pos}</td><td className="mono">{p.age}</td>
                 <td className="mono">{fmtSal(p.salary)}</td>
                 <td className="mono" style={{color:p.contractYearsLeft===0?"#f87171":"#f5c842"}}>{p.contractYearsLeft}年</td>
@@ -39,8 +49,10 @@ export function ContractTab({team,allTeams,onOffer,onRelease}){
             <div><div style={{fontSize:11,color:"#374151",marginBottom:6}}>選手の価値観</div><PersonalityView p={sel}/></div>
             <div>
               <div style={{marginBottom:10}}>
-                <label style={{fontSize:11,color:"#4b5563",display:"block",marginBottom:4}}>年俸（万円）</label>
-                <input type="number" min={0} step={10} value={offerSal} onChange={e=>setOfferSal(Math.max(0,Math.round(Number(e.target.value)||0)))} style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:6,padding:"6px 10px",color:"#e0d4bf",fontFamily:"'Share Tech Mono',monospace",width:"100%"}}/>
+                <label style={{fontSize:11,color:"#4b5563",display:"block",marginBottom:4}}>年俸オファー</label>
+                <select value={offerSal} onChange={e=>setOfferSal(Number(e.target.value)||0)} style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:6,padding:"6px 10px",color:"#e0d4bf",fontFamily:"'Share Tech Mono',monospace",width:"100%"}}>
+                  {salaryOptions.map(v=><option key={v} value={v} style={{background:"#0b1220"}}>{fmtSal(v)}</option>)}
+                </select>
                 <div style={{fontSize:10,color:"#374151",marginTop:2}}>現在値: {fmtSal(sel.salary)}</div>
               </div>
               <div style={{marginBottom:12}}>
