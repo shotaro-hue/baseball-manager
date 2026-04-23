@@ -17,6 +17,9 @@ describe('calcRevenue', () => {
     expect(rev.sponsor).toBeGreaterThan(1000);
     expect(rev.sponsor).toBeLessThan(3000);
     expect(rev.merch).toBeGreaterThan(200);
+    expect(rev.ticket).toBe(Math.round((rev.avgTicketPrice * rev.attendance) / 10000));
+    expect(rev.attendance).toBeGreaterThan(10000);
+    expect(rev.avgTicketPrice).toBeGreaterThan(600);
   });
 
   it('球場投資でチケット収入が増える', () => {
