@@ -3,9 +3,7 @@ import {
   FINANCE_BUDGET_FACTOR_MIN,
   FINANCE_MERCH_RATE,
   FINANCE_SPONSOR_BY_WINS,
-  FINANCE_TICKET_BASE_PER_GAME,
   FINANCE_TICKET_LEVEL_MULT,
-  SEASON_GAMES,
 } from '../constants';
 import { clamp } from '../utils';
 
@@ -23,15 +21,19 @@ export function calcRevenue(team) {
     FINANCE_BUDGET_FACTOR_MIN,
     FINANCE_BUDGET_FACTOR_MAX,
   );
-  const ticket = Math.round(
-    FINANCE_TICKET_BASE_PER_GAME
-      * budgetFactor
-      * (0.75 + (team.popularity ?? 50) / 220 + wr * 0.45)
-      * mult,
-  );
+  const demand = budgetFactor * (0.82 + (team.popularity ?? 50) / 210 + wr * 0.42);
+  const attendance = Math.round(clamp(18500 * demand * (0.92 + lvl * 0.06), 14000, 42000));
+  const avgTicketPrice = Math.round(900 * (0.9 + wr * 0.15 + (team.popularity ?? 50) / 500) * (0.96 + lvl * 0.08)); // 円/人
+  const ticket = Math.round((avgTicketPrice * attendance) / 10000) * mult; // 万円
   const sponsor = FINANCE_SPONSOR_BY_WINS
     .slice()
     .reverse()
     .find((s) => team.wins >= s.minWin)?.perGame ?? FINANCE_SPONSOR_BY_WINS[0].perGame;
-  return { ticket, sponsor, merch: Math.round(ticket * FINANCE_MERCH_RATE) };
+  return {
+    ticket: Math.round(ticket),
+    sponsor,
+    merch: Math.round(ticket * FINANCE_MERCH_RATE),
+    attendance,
+    avgTicketPrice,
+  };
 }
