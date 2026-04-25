@@ -1,9 +1,13 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { fmtSal } from '../../utils';
 import { calcRevenue } from '../../engine/finance';
 
-export function FinanceTab({team,onStadiumUpgrade,gameDay,onPlayerClick}){
+export function FinanceTab({team,onStadiumUpgrade,onTicketPriceChange,gameDay,onPlayerClick}){
   const rev=calcRevenue(team);
+  const [ticketPriceInput,setTicketPriceInput]=useState(String(team.customAvgTicketPrice??rev.avgTicketPrice));
+  useEffect(()=>{
+    setTicketPriceInput(String(team.customAvgTicketPrice??rev.avgTicketPrice));
+  },[team.customAvgTicketPrice,rev.avgTicketPrice]);
   const lvl=team.stadiumLevel??0;
   const UPGRADE_COSTS=[5000000,10000000,20000000];
   const MULT_LABELS=["1.0x","1.25x","1.6x","2.0x"];
@@ -12,8 +16,14 @@ export function FinanceTab({team,onStadiumUpgrade,gameDay,onPlayerClick}){
   const revThisSeason=team.revenueThisSeason??0;
   const gamesPlayed=(gameDay||1)-1;
   const projected=gamesPlayed>0?Math.round(revThisSeason/gamesPlayed*143):0;
+  const annualTicket = rev.ticket * 143;
   const annualSponsor = rev.sponsor * 143;
   const annualMerch = rev.merch * 143;
+  const applyTicketPrice=()=>{
+    const next=Math.round(Number(ticketPriceInput));
+    if(!Number.isFinite(next)) return;
+    onTicketPriceChange?.(next);
+  };
   return(
     <div>
       <div className="g2">
@@ -25,10 +35,19 @@ export function FinanceTab({team,onStadiumUpgrade,gameDay,onPlayerClick}){
         </div>
         <div className="card">
           <div className="card-h">収入（年間見込み）</div>
-          {[["スポンサー",fmtSal(annualSponsor)],["グッズ",fmtSal(annualMerch)],["年間合計",fmtSal(annualSponsor+annualMerch)]].map(([l,v])=>(
+          {[["チケット売上",fmtSal(annualTicket)],["スポンサー",fmtSal(annualSponsor)],["グッズ",fmtSal(annualMerch)],["年間合計",fmtSal(annualTicket+annualSponsor+annualMerch)]].map(([l,v])=>(
             <div key={l} className="fsb" style={{padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,.03)"}}><span style={{fontSize:11,color:"#4b5563"}}>{l}</span><span className="mono" style={{color:"#34d399"}}>{v}</span></div>
           ))}
         </div>
+      </div>
+      <div className="card">
+        <div className="card-h">🎫 チケット価格調整</div>
+        <div style={{fontSize:11,color:"#4b5563",marginBottom:8}}>平均価格を上げると動員が下がり、下げると動員が上がります。</div>
+        <div className="fsb" style={{gap:8,alignItems:"center"}}>
+          <input value={ticketPriceInput} onChange={e=>setTicketPriceInput(e.target.value.replace(/[^\d]/g,''))} onBlur={applyTicketPrice} style={{flex:1,background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",color:"#e5e7eb",padding:"8px 10px",borderRadius:6}} />
+          <button className="btn" onClick={applyTicketPrice}>反映</button>
+        </div>
+        <div style={{fontSize:11,color:"#4b5563",marginTop:6}}>設定範囲: 500〜5,000円</div>
       </div>
       <div className="card">
         <div className="card-h">支出</div>
