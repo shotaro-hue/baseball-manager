@@ -10,7 +10,8 @@ import { initPlayoff } from '../engine/playoff';
 import { selectAllStars, runAllStarGame } from '../engine/allstar';
 import { getMyMatchup, getCpuMatchups } from '../engine/scheduleGen';
 import { saveGame } from '../engine/saveload';
-import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, MAX_FARM, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER, MAX_外国人_一軍 } from '../constants';
+import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, MAX_FARM, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER, MAX_外国人_一軍, CPU_AUTO_MANAGE_INTERVAL, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX, FIELDING_POSITIONS } from '../constants';
+import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 
 // 守備コーチボーナス: 怪我回復速度 UP
 function applyDefenseCoachRecovery(players, coaches) {
@@ -56,6 +57,141 @@ function autoInjuryDemote(team) {
   if(demoted.length===0)return team;
   const demotedIds=new Set(demoted.map(p=>p.id));
   return{...team,players:kept,lineup:(team.lineup??[]).filter(id=>!demotedIds.has(id)),lineupNoDh:(team.lineupNoDh??[]).filter(id=>!demotedIds.has(id)),lineupDh:(team.lineupDh??[]).filter(id=>!demotedIds.has(id)),rotation:(team.rotation??[]).filter(id=>!demotedIds.has(id)),farm:[...farm,...demoted]};
+}
+
+// ─── CPU チーム自動編成 ───────────────────────────────────────────────────────
+// スコア関数（RosterTab の rosterRecScore と同じロジック）
+function _cpuBatterScore(p) {
+  const sb = saberBatter(p.stats ?? {});
+  return (sb.OPS || 0) * 1000 + (p.batting?.contact ?? 50) * 1.6 + (p.batting?.eye ?? 50) * 1.1 + (p.batting?.power ?? 50) * 1.2 + (p.batting?.speed ?? 50) * 0.7;
+}
+function _cpuStarterScore(p) {
+  const sp = saberPitcher(p.stats ?? {});
+  const eraBonus = sp.ERA > 0 ? Math.max(0, (4 - sp.ERA) * 15) : 0;
+  return (p.pitching?.velocity ?? 50) * 1.2 + (p.pitching?.control ?? 50) * 1.5 + (p.pitching?.breaking ?? 50) * 1.0 + (p.pitching?.stamina ?? 50) * 2.0 + eraBonus;
+}
+function _cpuRelieverScore(p) {
+  const sp = saberPitcher(p.stats ?? {});
+  const eraBonus = sp.ERA > 0 ? Math.max(0, (4 - sp.ERA) * 15) : 0;
+  return (p.pitching?.velocity ?? 50) * 2.0 + (p.pitching?.control ?? 50) * 1.5 + (p.pitching?.breaking ?? 50) * 1.2 + (p.pitching?.stamina ?? 50) * 0.5 + eraBonus;
+}
+function _cpuRosterRecScore(p) {
+  if (p.isPitcher) {
+    const sp = saberPitcher(p.stats ?? {});
+    const ability = (p.pitching?.velocity ?? 50) * 1.2 + (p.pitching?.control ?? 50) * 1.5 + (p.pitching?.breaking ?? 50) * 1.0 + (p.pitching?.stamina ?? 50) * 0.8;
+    if (!sp.ERA && !sp.WHIP) return ability;
+    return ability * 0.55 + Math.max(0, (5.0 - sp.ERA) * 35) + Math.max(0, (1.5 - sp.WHIP) * 50);
+  }
+  const sb = saberBatter(p.stats ?? {});
+  return (sb.OPS || 0) * 1000 + (p.batting?.contact ?? 50) * 1.6 + (p.batting?.eye ?? 50) * 1.1 + (p.batting?.power ?? 50) * 1.2 + (p.batting?.speed ?? 50) * 0.7;
+}
+
+// CPU チームのロスター全体を自動最適化して更新したチームオブジェクトを返す
+function cpuAutoManageTeam(team) {
+  const farm = team.farm ?? [];
+  const foreignInActive = team.players.filter(p => p.isForeign).length;
+  const canPromote = (p) => !p.育成 && !p.isIkusei && (p.injuryDaysLeft ?? 0) === 0 && (p.registrationCooldownDays ?? 0) === 0 && !(p.isForeign && foreignInActive >= MAX_外国人_一軍);
+  const effScore = (p, isFarm) => {
+    const base = _cpuRosterRecScore(p);
+    if (isFarm && (p.potential ?? 0) >= ROSTER_DEVREC_POTENTIAL_MIN && (p.daysOnActiveRoster ?? 0) < ROSTER_DEVREC_DAYS_MAX) return base + ROSTER_DEVREC_BONUS;
+    return base;
+  };
+
+  let players = [...team.players];
+  let newFarm = [...farm];
+
+  // ── 1. ロスター入れ替え（降格・昇格・スワップ） ──
+  const openSlots = MAX_ROSTER - players.length;
+  if (openSlots < 0) {
+    // 超過分を下位スコアから降格
+    const tooDemote = [...players].sort((a, b) => effScore(a, false) - effScore(b, false)).slice(0, -openSlots);
+    const demoteIds = new Set(tooDemote.map(p => p.id));
+    players = players.filter(p => !demoteIds.has(p.id));
+    newFarm = [...newFarm, ...tooDemote.map(p => ({ ...p, registrationCooldownDays: REGISTRATION_COOLDOWN_DAYS }))];
+  } else {
+    const usedFarmIds = new Set();
+    const usedActiveIds = new Set();
+    const eligibleFarm = newFarm.filter(canPromote).sort((a, b) => effScore(b, true) - effScore(a, true));
+
+    // 昇格（空き枠あり）
+    const toPromote = eligibleFarm.slice(0, Math.min(openSlots, 3));
+    toPromote.forEach(p => {
+      players.push(p);
+      usedFarmIds.add(p.id);
+    });
+
+    // スワップ（有力二軍 vs 一軍下位）
+    const remainFarm = eligibleFarm.filter(fp => !usedFarmIds.has(fp.id));
+    if (remainFarm.length > 0) {
+      [...players].sort((a, b) => effScore(a, false) - effScore(b, false)).forEach(ap => {
+        if (usedActiveIds.has(ap.id)) return;
+        const best = remainFarm.find(fp => !usedFarmIds.has(fp.id) && fp.isPitcher === ap.isPitcher);
+        if (!best) return;
+        if (effScore(best, true) - effScore(ap, false) >= ROSTER_SWAP_SCORE_THRESHOLD) {
+          players = players.filter(p => p.id !== ap.id);
+          players.push(best);
+          newFarm = newFarm.filter(p => p.id !== best.id);
+          newFarm.push({ ...ap, registrationCooldownDays: REGISTRATION_COOLDOWN_DAYS });
+          usedFarmIds.add(best.id);
+          usedActiveIds.add(ap.id);
+        }
+      });
+    }
+
+    // 昇格実行: farm から除去
+    toPromote.forEach(p => { newFarm = newFarm.filter(fp => fp.id !== p.id); });
+  }
+
+  // ── 2. 打順自動設定（MRV ヒューリスティック） ──
+  const batters = players.filter(p => !p.isPitcher && !p.isIkusei && (p.injuryDaysLeft ?? 0) === 0);
+  const useDh = !!team.dhEnabled;
+  const required = [...FIELDING_POSITIONS, ...(useDh ? ['DH'] : [])];
+  const profAt = (p, pos) => pos === 'DH' ? 50 : p.pos === pos ? 100 : (p.positions?.[pos] ?? 0);
+  const sortedB = [...batters].sort((a, b) => _cpuBatterScore(b) - _cpuBatterScore(a));
+  const posEligible = Object.fromEntries(required.map(pos => [pos, sortedB.filter(p => profAt(p, pos) > 0)]));
+  const posOrder = [...required].sort((a, b) => posEligible[a].length - posEligible[b].length);
+  const assignment = new Map();
+  const playerUsed = new Set();
+  for (const pos of posOrder) {
+    const best = posEligible[pos].find(p => !playerUsed.has(p.id));
+    if (best) { assignment.set(pos, best); playerUsed.add(best.id); }
+  }
+  for (const pos of posOrder) {
+    if (assignment.has(pos)) continue;
+    const fallback = sortedB.find(p => !playerUsed.has(p.id));
+    if (fallback) { assignment.set(pos, fallback); playerUsed.add(fallback.id); }
+  }
+  const newLineup = [...assignment.entries()]
+    .sort((a, b) => _cpuBatterScore(b[1]) - _cpuBatterScore(a[1]))
+    .map(([, player]) => player.id);
+
+  // ── 3. 投手ローテ・継投自動設定 ──
+  const pitchers = players.filter(p => p.isPitcher && !p.isIkusei && (p.injuryDaysLeft ?? 0) === 0);
+  const starters = pitchers.filter(p => p.subtype === '先発').sort((a, b) => _cpuStarterScore(b) - _cpuStarterScore(a));
+  const relievers = pitchers.filter(p => p.subtype !== '先発').sort((a, b) => _cpuRelieverScore(b) - _cpuRelieverScore(a));
+  const newRotation = [
+    ...starters.slice(0, 6),
+    ...relievers.slice(0, Math.max(0, 6 - starters.length)),
+  ].map(p => p.id);
+  const rotSet = new Set(newRotation);
+  const remaining = pitchers.filter(p => !rotSet.has(p.id)).sort((a, b) => _cpuRelieverScore(b) - _cpuRelieverScore(a));
+  const newPattern = {
+    closerId: remaining[0]?.id ?? null,
+    setupId: remaining[1]?.id ?? null,
+    seventhId: remaining[2]?.id ?? null,
+    middleOrder: remaining.slice(3).map(p => p.id),
+  };
+
+  return {
+    ...team,
+    players,
+    farm: newFarm,
+    lineup: newLineup,
+    lineupDh: newLineup,
+    lineupNoDh: newLineup,
+    rotation: newRotation,
+    pitchingPattern: { ...(team.pitchingPattern ?? {}), ...newPattern },
+  };
 }
 
 export function useSeasonFlow(gs) {
@@ -535,6 +671,11 @@ export function useSeasonFlow(gs) {
     const batchBoxScores = []; // { homeId, awayId, dayNo, cr, homePlayers, awayPlayers, homeName, awayName }
 
     for(let g=0;g<count;g++){
+      // CPU チーム自動編成: CPU_AUTO_MANAGE_INTERVAL 日ごとに全 CPU 球団のロスター・打順・ローテを最適化
+      if(newDay % CPU_AUTO_MANAGE_INTERVAL === 0){
+        newTeams=newTeams.map(t=>t.id===myId?t:cpuAutoManageTeam(t));
+      }
+
       const scheduleMatchup=getMyMatchup(schedule,newDay,myId);
       let oppId=scheduleMatchup?.oppId;
       if(!oppId){
