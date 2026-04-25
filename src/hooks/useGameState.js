@@ -312,6 +312,7 @@ export function useGameState() {
   const moveRotation = useCallback((pid,dir)=>upd(myId,t=>{const r=[...t.rotation];const i=r.indexOf(pid);if(i<0)return t;const j=i+dir;if(j<0||j>=r.length)return t;[r[i],r[j]]=[r[j],r[i]];return{...t,rotation:r};}),[upd,myId]);
   const removeFromRotation = useCallback((pid)=>upd(myId,t=>({...t,rotation:t.rotation.filter(id=>id!==pid)})),[upd,myId]);
   const setPitchingPattern = useCallback((patch)=>upd(myId,t=>({...t,pitchingPattern:{...(t.pitchingPattern??{}), ...patch}})),[upd,myId]);
+  const replaceRotation = useCallback((rotationIds, patternPatch)=>upd(myId,t=>({...t,rotation:rotationIds,pitchingPattern:{...(t.pitchingPattern??{}),...patternPatch}})),[upd,myId]);
 
   const promote = useCallback((pid)=>{
     if(!myTeam) return;
@@ -496,6 +497,7 @@ export function useGameState() {
     moveRotation,
     removeFromRotation,
     setPitchingPattern,
+    replaceRotation,
     promote,
     convertIkusei,
     demote,

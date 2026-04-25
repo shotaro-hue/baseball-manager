@@ -5,6 +5,19 @@
 
 ---
 
+### 2026-04-25 — feat: 投手自動編成・昇降格レコメンド（U1b）
+
+**仕様本文への影響なし（内部実装のみ）**
+
+- 投手・継投タブの先発ローテーションカードヘッダに「自動編成」ボタンを追加
+- 先発スコア（スタミナ×2.0 重視）で `subtype==="先発"` を最大6枠の先発ローテーションに自動確定。不足分は中継ぎ系をスタミナ順で補充
+- 中継ぎスコア（球速×2.0 重視）でローテ外投手をソートし、クローザー・セットアッパー・7回担当・middleOrder を自動割当
+- ボタン押下と同時に野手側と同じ昇降格レコメンド（buildRosterRecs）を生成・表示
+- `replaceRotation(rotationIds, patternPatch)` ハンドラを `useGameState.js` に追加し、rotation と pitchingPattern をアトミックに更新
+- 変更ファイル: `src/hooks/useGameState.js`・`src/App.jsx`・`src/components/tabs/RosterTab.jsx`
+
+---
+
 ### 2026-04-25 — feat: ロスタースワップレコメンド（自動編成拡張）
 
 **仕様本文への影響なし（内部実装のみ）**

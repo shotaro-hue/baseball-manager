@@ -25,6 +25,20 @@ const playerScore=(p)=>{
   return(sb.OPS||0)*1000+(p.batting?.contact??50)*1.6+(p.batting?.eye??50)*1.1+(p.batting?.power??50)*1.2+(p.batting?.speed??50)*0.7;
 };
 
+// 先発向け: スタミナ最重視
+const starterScore=(p)=>{
+  const sp=saberPitcher(p.stats??{});
+  const eraBonus=sp.ERA>0?Math.max(0,(4-sp.ERA)*15):0;
+  return(p.pitching?.velocity??50)*1.2+(p.pitching?.control??50)*1.5+(p.pitching?.breaking??50)*1.0+(p.pitching?.stamina??50)*2.0+eraBonus;
+};
+
+// 中継ぎ/抑え向け: 球速最重視
+const relieverScore=(p)=>{
+  const sp=saberPitcher(p.stats??{});
+  const eraBonus=sp.ERA>0?Math.max(0,(4-sp.ERA)*15):0;
+  return(p.pitching?.velocity??50)*2.0+(p.pitching?.control??50)*1.5+(p.pitching?.breaking??50)*1.2+(p.pitching?.stamina??50)*0.5+eraBonus;
+};
+
 const buildRosterRecs=(team)=>{
   const recs=[];
   const rosterCount=team.players.length;
@@ -66,7 +80,7 @@ const buildRosterRecs=(team)=>{
   return recs;
 };
 
-export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetRosterDhMode,onSetPlayerPosition,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onPlayerClick,onSetDevGoal,onPlayerTalk,onSetConvertTarget,gameDay}){
+export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetRosterDhMode,onSetPlayerPosition,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onReplaceRotation,onPlayerClick,onSetDevGoal,onPlayerTalk,onSetConvertTarget,gameDay}){
   const [view,setView]=useState("batters");
   const [justConverted,setJustConverted]=useState(new Set());
   const [talkingPid,setTalkingPid]=useState(null);
@@ -116,6 +130,27 @@ export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetR
       .sort((a,b)=>scoreOf(b[1])-scoreOf(a[1]))
       .map(([pos,player])=>({id:player.id,pos}));
     onReplaceLineup&&onReplaceLineup(entries);
+    setRosterRecs(buildRosterRecs(team));
+  };
+  const autoSetPitcherLineup=()=>{
+    const eligible=pitchers.filter(p=>(p.injuryDaysLeft??0)===0);
+    if(!eligible.length)return;
+    // 先発 subtype を先発スコアでソート、不足分は中継ぎ系をスタミナ順で補充
+    const starters=[...eligible].filter(p=>p.subtype==="先発").sort((a,b)=>starterScore(b)-starterScore(a));
+    const relievers=[...eligible].filter(p=>p.subtype!=="先発").sort((a,b)=>relieverScore(b)-relieverScore(a));
+    const newRotation=[
+      ...starters.slice(0,6),
+      ...relievers.slice(0,Math.max(0,6-starters.length)),
+    ].map(p=>p.id);
+    const rotSet=new Set(newRotation);
+    const remaining=[...eligible].filter(p=>!rotSet.has(p.id)).sort((a,b)=>relieverScore(b)-relieverScore(a));
+    const newPattern={
+      closerId:remaining[0]?.id??null,
+      setupId:remaining[1]?.id??null,
+      seventhId:remaining[2]?.id??null,
+      middleOrder:remaining.slice(3).map(p=>p.id),
+    };
+    onReplaceRotation&&onReplaceRotation(newRotation,newPattern);
     setRosterRecs(buildRosterRecs(team));
   };
   const executeRec=(rec,idx)=>{
@@ -331,7 +366,10 @@ export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetR
           <div>
             {/* 先発ローテーション */}
             <div className="card" style={{marginBottom:8}}>
-              <div className="card-h">先発ローテーション ({rotPitchers.length}/6)</div>
+              <div className="card-h" style={{display:"flex",alignItems:"center",gap:8}}>
+                <span>先発ローテーション ({rotPitchers.length}/6)</span>
+                <button className="bsm bgb" style={{marginLeft:"auto"}} onClick={autoSetPitcherLineup}>自動編成</button>
+              </div>
               {rotPitchers.map((p,i)=>{
                 const sp=saberPitcher(p.stats);
                 return(
