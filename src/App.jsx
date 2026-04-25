@@ -252,6 +252,7 @@ export default function App(){
   if(screen==="team_detail"&&gs.viewingTeam) return(
     <TeamDetailScreen
       team={gs.viewingTeam}
+      myTeam={myTeam}
       allTeams={teams}
       schedule={schedule}
       year={year}

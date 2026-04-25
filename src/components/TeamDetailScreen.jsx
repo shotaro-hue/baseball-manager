@@ -406,6 +406,7 @@ function HistoryTab({ team, onPlayerClick }) {
 // ── メイン: TeamDetailScreen ──────────────────────────
 export function TeamDetailScreen({ team, allTeams, schedule, year, allTeamResultsMap, onBack, onPlayerClick, onOpenTrade }) {
   const [tab, setTab] = useState('roster');
+  const [showCompare, setShowCompare] = useState(true);
 
   // チームが変わったらタブをリセット
   useEffect(() => { setTab('roster'); }, [team?.id]);
@@ -539,6 +540,23 @@ export function TeamDetailScreen({ team, allTeams, schedule, year, allTeamResult
         {tab === 'history' && (
           <HistoryTab team={team} onPlayerClick={onPlayerClick} />
         )}
+
+        <div style={{
+          position: 'sticky',
+          bottom: 8,
+          display: 'flex',
+          gap: 6,
+          justifyContent: 'space-between',
+          background: 'rgba(2,6,23,.88)',
+          border: '1px solid rgba(148,163,184,.2)',
+          borderRadius: 8,
+          padding: 6,
+          marginTop: 10,
+        }}>
+          <button className="bsm bgb" style={{ flex: 1 }} onClick={() => onOpenTrade?.()}>🔄 トレード提案</button>
+          <button className="bsm bga" style={{ flex: 1 }} onClick={() => setTab('schedule')}>📅 次カード確認</button>
+          <button className="bsm bga" style={{ flex: 1 }} onClick={() => setShowCompare(v => !v)}>{showCompare ? '比較を隠す' : '比較を表示'}</button>
+        </div>
       </div>
     </div>
   );
