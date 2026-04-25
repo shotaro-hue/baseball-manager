@@ -27,4 +27,11 @@ describe('calcRevenue', () => {
     const high = calcRevenue({ ...baseTeam, stadiumLevel: 3 });
     expect(high.ticket).toBeGreaterThan(low.ticket);
   });
+
+  it('手動価格設定で価格を上げると動員が減る', () => {
+    const normal = calcRevenue(baseTeam);
+    const expensive = calcRevenue({ ...baseTeam, customAvgTicketPrice: normal.avgTicketPrice * 1.5 });
+    expect(expensive.avgTicketPrice).toBeGreaterThan(normal.avgTicketPrice);
+    expect(expensive.attendance).toBeLessThan(normal.attendance);
+  });
 });

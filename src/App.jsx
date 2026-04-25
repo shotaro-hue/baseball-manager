@@ -386,7 +386,7 @@ export default function App(){
         <div className="card"><div className="card-h">スカウト派遣</div><div className="g2">{SCOUT_REGIONS.map(sr=><div key={sr.id} className="card2" style={{cursor:"pointer"}} onClick={()=>gs.sendScout(sr)}><div style={{fontWeight:700,fontSize:12,marginBottom:3}}>{sr.name}</div><div style={{fontSize:10,color:"#374151"}}>費用:{fmtSal(sr.cost)} / Lv{sr.qMin}〜{sr.qMax}</div></div>)}</div></div>
       </div>
     )}
-    {tab==="finance"&&<FinanceTab team={myTeam} onStadiumUpgrade={gs.handleStadiumUpgrade} gameDay={gameDay} onPlayerClick={gs.handlePlayerClick}/>}
+    {tab==="finance"&&<FinanceTab team={myTeam} onStadiumUpgrade={gs.handleStadiumUpgrade} onTicketPriceChange={gs.handleSetTicketPrice} gameDay={gameDay} onPlayerClick={gs.handlePlayerClick}/>}
     {tab==="standings"&&<StandingsTab teams={teams} myId={myId} onTeamClick={gs.handleTeamClick}/>}
     {tab==="stats"&&<StatsTab teams={teams} myId={myId}/>}
     {tab==="balance"&&<BalanceTab teams={teams}/>}

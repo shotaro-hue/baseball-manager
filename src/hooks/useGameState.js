@@ -427,6 +427,15 @@ export function useGameState() {
     notify(`球場をLv${lvl+1}にアップグレード！チケット収入 UP`,"ok");
   },[myTeam,upd,myId,notify]);
 
+  const handleSetTicketPrice = useCallback((nextPrice)=>{
+    if(!myTeam) return;
+    const parsed=Math.round(Number(nextPrice));
+    if(!Number.isFinite(parsed)){notify("チケット価格が不正です","warn");return;}
+    const clamped=Math.min(5000,Math.max(500,parsed));
+    upd(myId,t=>({...t,customAvgTicketPrice:clamped}));
+    notify(`平均チケット価格を${clamped.toLocaleString()}円に設定`,"ok");
+  },[myTeam,upd,myId,notify]);
+
   return {
     // state & setters
     screen, setScreen,
@@ -495,6 +504,7 @@ export function useGameState() {
     sendScout,
     signPlayer,
     handleStadiumUpgrade,
+    handleSetTicketPrice,
     handlePressAnswer,
   };
 }
