@@ -252,12 +252,14 @@ export default function App(){
   if(screen==="team_detail"&&gs.viewingTeam) return(
     <TeamDetailScreen
       team={gs.viewingTeam}
+      myTeam={myTeam}
       allTeams={teams}
       schedule={schedule}
       year={year}
       allTeamResultsMap={gs.allTeamResultsMap}
       onBack={()=>setScreen("hub")}
       onPlayerClick={gs.handlePlayerClick}
+      onOpenTrade={()=>{ setScreen("hub"); setTab("trade"); }}
     />
   );
 

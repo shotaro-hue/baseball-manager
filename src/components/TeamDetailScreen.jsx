@@ -9,9 +9,77 @@ function weekdayShort(year, date) {
   return ['日', '月', '火', '水', '木', '金', '土'][new Date(year, date.month - 1, date.day).getDay()];
 }
 
+function calcWinPct(wins = 0, losses = 0) {
+  const total = wins + losses;
+  return total > 0 ? wins / total : 0;
+}
+
+function fmtWinPctNumber(pct) {
+  return '.' + Math.round((pct || 0) * 1000).toString().padStart(3, '0');
+}
+
+function buildWeakPositionTags(team) {
+  const players = (team?.players || []).filter(p => !p.isPitcher);
+  if (players.length === 0) return [];
+  const posMap = new Map();
+  players.forEach(p => {
+    const pos = p.pos || '不明';
+    if (!posMap.has(pos)) posMap.set(pos, []);
+    posMap.get(pos).push(p);
+  });
+  const tags = [];
+  posMap.forEach((list, pos) => {
+    const count = list.length;
+    const topPa = [...list].sort((a, b) => (b.stats?.PA || 0) - (a.stats?.PA || 0))[0];
+    const avg = fmtAvg(topPa?.stats?.H || 0, topPa?.stats?.AB || 0);
+    const avgNum = Number(avg);
+    if (count <= 1) tags.push({ pos, reason: '層薄' });
+    if (!Number.isNaN(avgNum) && avgNum > 0 && avgNum < 0.23) tags.push({ pos, reason: '打率低' });
+  });
+  return tags.slice(0, 4);
+}
+
+function buildTeamArchetype(team) {
+  const players = team?.players || [];
+  const batters = players.filter(p => !p.isPitcher);
+  const pitchers = players.filter(p => p.isPitcher);
+  const hrTotal = batters.reduce((s, p) => s + (p.stats?.HR || 0), 0);
+  const sbTotal = batters.reduce((s, p) => s + (p.stats?.SB || 0), 0);
+  const era = pitchers.reduce((acc, p) => {
+    const ip = p.stats?.IP || 0;
+    const er = p.stats?.ER || 0;
+    return { ip: acc.ip + ip, er: acc.er + er };
+  }, { ip: 0, er: 0 });
+  const teamEra = era.ip > 0 ? (era.er / era.ip) * 9 : 99;
+  if (hrTotal >= 60 && sbTotal <= 35) return '打撃偏重';
+  if (sbTotal >= 60) return '機動力型';
+  if (teamEra <= 3.2) return '投高守備型';
+  return 'バランス型';
+}
+
+function calcTeamMetrics(team) {
+  const players = team?.players || [];
+  const batters = players.filter(p => !p.isPitcher);
+  const pitchers = players.filter(p => p.isPitcher);
+  const hr = batters.reduce((sum, p) => sum + (p.stats?.HR || 0), 0);
+  const sb = batters.reduce((sum, p) => sum + (p.stats?.SB || 0), 0);
+  const pitching = pitchers.reduce((acc, p) => ({
+    ip: acc.ip + (p.stats?.IP || 0),
+    er: acc.er + (p.stats?.ER || 0),
+  }), { ip: 0, er: 0 });
+  const era = pitching.ip > 0 ? (pitching.er / pitching.ip) * 9 : null;
+  return {
+    winPct: calcWinPct(team?.wins || 0, team?.losses || 0),
+    hr,
+    sb,
+    era,
+  };
+}
+
 // ── ロスター・成績タブ ─────────────────────────────────
-function RosterStatsTab({ team, onPlayerClick }) {
+function RosterStatsTab({ team, onPlayerClick, onOpenTrade }) {
   const [view, setView] = useState('batter');
+  const weakTags = useMemo(() => buildWeakPositionTags(team), [team]);
 
   const batters = useMemo(() => {
     const ps = (team?.players || []).filter(p => !p.isPitcher);
@@ -25,6 +93,22 @@ function RosterStatsTab({ team, onPlayerClick }) {
 
   return (
     <div className="card">
+      {weakTags.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+          {weakTags.map((t, idx) => (
+            <span key={`${t.pos}-${t.reason}-${idx}`} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 999, border: '1px solid rgba(251,113,133,.4)', background: 'rgba(251,113,133,.08)', color: '#fda4af' }}>
+              弱点 {t.pos} : {t.reason}
+            </span>
+          ))}
+          <button
+            className="bsm bga"
+            style={{ marginLeft: 'auto', fontSize: 10, padding: '2px 8px' }}
+            onClick={() => onOpenTrade?.()}
+          >
+            🔄 トレード検討へ
+          </button>
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
         <button className={`bsm ${view === 'batter' ? 'bgb' : 'bga'}`} onClick={() => setView('batter')}>野手</button>
         <button className={`bsm ${view === 'pitcher' ? 'bgb' : 'bga'}`} onClick={() => setView('pitcher')}>投手</button>
@@ -132,7 +216,7 @@ function RosterStatsTab({ team, onPlayerClick }) {
 }
 
 // ── 日程・結果タブ ─────────────────────────────────────
-function TeamScheduleTab({ team, allTeams, schedule, year, allTeamResultsMap }) {
+function TeamScheduleTab({ team, allTeams, schedule, year, allTeamResultsMap, onOpenTrade }) {
   const [selectedMonth, setSelectedMonth] = useState(null);
   const [boxScore, setBoxScore] = useState(null); // { result, dayNo }
 
@@ -169,6 +253,20 @@ function TeamScheduleTab({ team, allTeams, schedule, year, allTeamResultsMap }) 
 
   const activeMonth = selectedMonth ?? months[0] ?? 3;
   const filtered = games.filter(g => g.date.month === activeMonth);
+  const nextGames = games.filter(g => !g.result).slice(0, 10);
+  const nextDiffAvg = nextGames.length > 0
+    ? nextGames.reduce((sum, g) => {
+      const opp = teamMap.get(g.oppId);
+      return sum + calcWinPct(opp?.wins || 0, opp?.losses || 0);
+    }, 0) / nextGames.length
+    : null;
+  const diffLabel = nextDiffAvg == null
+    ? '計算不可'
+    : nextDiffAvg >= 0.56
+      ? '高'
+      : nextDiffAvg >= 0.51
+        ? '中'
+        : '低';
 
   if (!schedule) {
     return <div className="card" style={{ fontSize: 12, color: '#64748b' }}>日程データなし</div>;
@@ -176,6 +274,16 @@ function TeamScheduleTab({ team, allTeams, schedule, year, allTeamResultsMap }) 
 
   return (
     <div className="card">
+      <div style={{ marginBottom: 10, padding: '8px 10px', borderRadius: 6, border: '1px solid rgba(56,189,248,.25)', background: 'rgba(56,189,248,.07)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 10, color: '#7dd3fc' }}>今後10試合の難易度</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>
+          {diffLabel}
+          {nextDiffAvg != null ? `（相手勝率平均 ${fmtWinPctNumber(nextDiffAvg)}）` : ''}
+        </span>
+        <button className="bsm bga" style={{ marginLeft: 'auto', fontSize: 10, padding: '2px 8px' }} onClick={() => onOpenTrade?.()}>
+          弱点補強を検討
+        </button>
+      </div>
       {/* 月セレクター */}
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 10 }}>
         {MONTH_LABELS.filter(m => months.includes(m)).map(m => (
@@ -315,8 +423,9 @@ function HistoryTab({ team, onPlayerClick }) {
 }
 
 // ── メイン: TeamDetailScreen ──────────────────────────
-export function TeamDetailScreen({ team, allTeams, schedule, year, allTeamResultsMap, onBack, onPlayerClick }) {
+export function TeamDetailScreen({ team, myTeam, allTeams, schedule, year, allTeamResultsMap, onBack, onPlayerClick, onOpenTrade }) {
   const [tab, setTab] = useState('roster');
+  const [showCompare, setShowCompare] = useState(true);
 
   // チームが変わったらタブをリセット
   useEffect(() => { setTab('roster'); }, [team?.id]);
@@ -326,6 +435,60 @@ export function TeamDetailScreen({ team, allTeams, schedule, year, allTeamResult
   const winPct = (team.wins || 0) + (team.losses || 0) > 0
     ? '.' + Math.round(team.wins / ((team.wins || 0) + (team.losses || 0)) * 1000).toString().padStart(3, '0')
     : '---';
+  const teamResultsMap = allTeamResultsMap?.[team.id] || {};
+  const recent10 = Object.entries(teamResultsMap)
+    .map(([dayNo, r]) => ({ dayNo: Number(dayNo), ...r }))
+    .sort((a, b) => b.dayNo - a.dayNo)
+    .slice(0, 10);
+  const recentSummary = recent10.reduce((acc, r) => {
+    if (r.drew) acc.draws += 1;
+    else if (r.won) acc.wins += 1;
+    else acc.losses += 1;
+    return acc;
+  }, { wins: 0, losses: 0, draws: 0 });
+  const streak = (team.winStreak || 0) > 0
+    ? `${team.winStreak}連勝`
+    : (team.loseStreak || 0) > 0
+      ? `${team.loseStreak}連敗`
+      : '連勝連敗なし';
+  const injuredCount = (team.players || []).filter(p => (p.injuryDaysLeft || 0) > 0).length;
+  const archetype = buildTeamArchetype(team);
+  const teamEraData = (team.players || [])
+    .filter(p => p.isPitcher)
+    .reduce((acc, p) => ({ ip: acc.ip + (p.stats?.IP || 0), er: acc.er + (p.stats?.ER || 0) }), { ip: 0, er: 0 });
+  const teamEra = teamEraData.ip > 0 ? (teamEraData.er / teamEraData.ip * 9) : null;
+  const insightCards = [
+    {
+      level: injuredCount >= 3 ? 'High' : 'Med',
+      title: `離脱者 ${injuredCount}人`,
+      detail: injuredCount > 0 ? 'ロスター再編と補強検討が必要です。' : '離脱者は出ていません。',
+      cta: 'トレード提案へ',
+      action: onOpenTrade,
+    },
+    {
+      level: recentSummary.losses >= 6 ? 'High' : 'Med',
+      title: `直近10試合 ${recentSummary.wins}勝${recentSummary.losses}敗${recentSummary.draws > 0 ? `${recentSummary.draws}分` : ''}`,
+      detail: recentSummary.losses >= 6 ? '直近失速。ローテ/勝ちパターンの見直し推奨。' : '戦績は許容レンジです。',
+      cta: '日程詳細を見る',
+      action: () => setTab('schedule'),
+    },
+    {
+      level: (teamEra != null && teamEra >= 3.9) ? 'High' : 'Low',
+      title: `チームERA ${teamEra != null ? teamEra.toFixed(2) : '-.--'}`,
+      detail: (teamEra != null && teamEra >= 3.9) ? '投手陣の被失点傾向が強めです。' : '投手成績は安定しています。',
+      cta: 'ロスター確認',
+      action: () => setTab('roster'),
+    },
+    ...(myTeam && myTeam.id !== team.id ? [{
+      level: 'Med',
+      title: `自チーム比較 ${fmtWinPctNumber(calcTeamMetrics(team).winPct)} vs ${fmtWinPctNumber(calcTeamMetrics(myTeam).winPct)}`,
+      detail: '主要指標を並列比較して、優位・劣位を即判定できます。',
+      cta: showCompare ? '比較を閉じる' : '比較を開く',
+      action: () => setShowCompare(v => !v),
+    }] : []),
+  ];
+  const targetMetrics = calcTeamMetrics(team);
+  const myMetrics = myTeam ? calcTeamMetrics(myTeam) : null;
 
   return (
     <div className="app">
@@ -352,6 +515,60 @@ export function TeamDetailScreen({ team, allTeams, schedule, year, allTeamResult
           </div>
         </div>
 
+        <div className="card" style={{ marginBottom: 10 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span className="chip" style={{ background: 'rgba(96,165,250,.13)', color: '#93c5fd' }}>直近10: {recentSummary.wins}-{recentSummary.losses}{recentSummary.draws > 0 ? `-${recentSummary.draws}` : ''}</span>
+            <span className="chip" style={{ background: 'rgba(245,158,11,.12)', color: '#fbbf24' }}>{streak}</span>
+            <span className="chip" style={{ background: injuredCount > 0 ? 'rgba(248,113,113,.12)' : 'rgba(74,222,128,.12)', color: injuredCount > 0 ? '#f87171' : '#4ade80' }}>離脱者 {injuredCount}人</span>
+            <span className="chip" style={{ background: 'rgba(167,139,250,.12)', color: '#c4b5fd' }}>チーム傾向: {archetype}</span>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>
+          {insightCards.map((c, idx) => (
+            <div key={`${c.title}-${idx}`} style={{ border: '1px solid rgba(148,163,184,.2)', background: 'rgba(2,6,23,.35)', borderRadius: 8, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 999, color: c.level === 'High' ? '#fca5a5' : c.level === 'Med' ? '#fcd34d' : '#93c5fd', background: c.level === 'High' ? 'rgba(248,113,113,.15)' : c.level === 'Med' ? 'rgba(250,204,21,.15)' : 'rgba(96,165,250,.15)' }}>
+                {c.level}
+              </span>
+              <div style={{ minWidth: 180, flex: 1 }}>
+                <div style={{ fontSize: 12, color: '#e2e8f0', fontWeight: 700 }}>{c.title}</div>
+                <div style={{ fontSize: 10, color: '#94a3b8' }}>{c.detail}</div>
+              </div>
+              <button className="bsm bga" style={{ fontSize: 10, padding: '3px 10px' }} onClick={() => c.action?.()}>
+                {c.cta}
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {showCompare && myMetrics && myTeam.id !== team.id && (
+          <div className="card" style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 11, color: '#7dd3fc', marginBottom: 6, fontWeight: 700 }}>自チーム比較</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 6 }}>
+              {[
+                { label: '勝率', left: fmtWinPctNumber(targetMetrics.winPct), right: fmtWinPctNumber(myMetrics.winPct), highIsGood: true, leftNum: targetMetrics.winPct, rightNum: myMetrics.winPct },
+                { label: 'ERA', left: targetMetrics.era != null ? targetMetrics.era.toFixed(2) : '-.--', right: myMetrics.era != null ? myMetrics.era.toFixed(2) : '-.--', highIsGood: false, leftNum: targetMetrics.era ?? 99, rightNum: myMetrics.era ?? 99 },
+                { label: 'HR', left: String(targetMetrics.hr), right: String(myMetrics.hr), highIsGood: true, leftNum: targetMetrics.hr, rightNum: myMetrics.hr },
+                { label: 'SB', left: String(targetMetrics.sb), right: String(myMetrics.sb), highIsGood: true, leftNum: targetMetrics.sb, rightNum: myMetrics.sb },
+              ].map((m) => {
+                const targetBetter = m.highIsGood ? m.leftNum > m.rightNum : m.leftNum < m.rightNum;
+                const myBetter = m.highIsGood ? m.rightNum > m.leftNum : m.rightNum < m.leftNum;
+                return (
+                  <div key={m.label} style={{ border: '1px solid rgba(148,163,184,.2)', borderRadius: 6, padding: 6, background: 'rgba(15,23,42,.45)' }}>
+                    <div style={{ fontSize: 9, color: '#64748b', marginBottom: 4 }}>{m.label}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
+                      <span style={{ color: targetBetter ? '#4ade80' : '#cbd5e1', fontSize: 12, fontWeight: 700 }}>{m.left}</span>
+                      <span style={{ color: '#334155', fontSize: 9 }}>vs</span>
+                      <span style={{ color: myBetter ? '#fbbf24' : '#cbd5e1', fontSize: 12, fontWeight: 700 }}>{m.right}</span>
+                    </div>
+                    <div style={{ marginTop: 4, fontSize: 9, color: '#64748b' }}>{team.name} / {myTeam.name}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* タブ */}
         <div className="tabs-nav">
           <div className="tab-group">
@@ -364,7 +581,7 @@ export function TeamDetailScreen({ team, allTeams, schedule, year, allTeamResult
         </div>
 
         {tab === 'roster' && (
-          <RosterStatsTab team={team} onPlayerClick={onPlayerClick} />
+          <RosterStatsTab team={team} onPlayerClick={onPlayerClick} onOpenTrade={onOpenTrade} />
         )}
         {tab === 'schedule' && (
           <TeamScheduleTab
@@ -373,11 +590,29 @@ export function TeamDetailScreen({ team, allTeams, schedule, year, allTeamResult
             schedule={schedule}
             year={year}
             allTeamResultsMap={allTeamResultsMap}
+            onOpenTrade={onOpenTrade}
           />
         )}
         {tab === 'history' && (
           <HistoryTab team={team} onPlayerClick={onPlayerClick} />
         )}
+
+        <div style={{
+          position: 'sticky',
+          bottom: 8,
+          display: 'flex',
+          gap: 6,
+          justifyContent: 'space-between',
+          background: 'rgba(2,6,23,.88)',
+          border: '1px solid rgba(148,163,184,.2)',
+          borderRadius: 8,
+          padding: 6,
+          marginTop: 10,
+        }}>
+          <button className="bsm bgb" style={{ flex: 1 }} onClick={() => onOpenTrade?.()}>🔄 トレード提案</button>
+          <button className="bsm bga" style={{ flex: 1 }} onClick={() => setTab('schedule')}>📅 次カード確認</button>
+          <button className="bsm bga" style={{ flex: 1 }} onClick={() => setShowCompare(v => !v)}>{showCompare ? '比較を隠す' : '比較を表示'}</button>
+        </div>
       </div>
     </div>
   );
