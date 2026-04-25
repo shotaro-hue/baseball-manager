@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { calcRevenue } from '../finance';
 
 const baseTeam = {
+  id: 0,
   wins: 70,
   losses: 60,
   popularity: 55,
@@ -33,5 +34,17 @@ describe('calcRevenue', () => {
     const expensive = calcRevenue({ ...baseTeam, customAvgTicketPrice: normal.avgTicketPrice * 1.5 });
     expect(expensive.avgTicketPrice).toBeGreaterThan(normal.avgTicketPrice);
     expect(expensive.attendance).toBeLessThan(normal.attendance);
+  });
+
+  it('価格を下げても動員は本拠地収容人数を超えない', () => {
+    const rev = calcRevenue({
+      ...baseTeam,
+      wins: 120,
+      losses: 10,
+      popularity: 100,
+      budget: 3000000,
+      customAvgTicketPrice: 500,
+    });
+    expect(rev.attendance).toBeLessThanOrEqual(30969);
   });
 });

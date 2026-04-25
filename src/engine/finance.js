@@ -4,6 +4,7 @@ import {
   FINANCE_MERCH_RATE,
   FINANCE_SPONSOR_BY_WINS,
   FINANCE_TICKET_LEVEL_MULT,
+  TEAM_STADIUM_CAPACITY,
 } from '../constants';
 import { clamp } from '../utils';
 
@@ -28,7 +29,9 @@ export function calcRevenue(team) {
   const avgTicketPrice = hasManualPrice ? Math.round(clamp(manualPriceRaw, 500, 5000)) : baseAvgTicketPrice; // 円/人
   const priceRatio = avgTicketPrice / Math.max(1, baseAvgTicketPrice);
   const priceAttendanceFactor = clamp(1 - (priceRatio - 1) * 0.48, 0.62, 1.18);
-  const attendance = Math.round(clamp(18500 * demand * (0.92 + lvl * 0.06) * priceAttendanceFactor, 11000, 42000));
+  const rawAttendance = 18500 * demand * (0.92 + lvl * 0.06) * priceAttendanceFactor;
+  const stadiumCapacity = TEAM_STADIUM_CAPACITY[team.id] ?? 42000;
+  const attendance = Math.round(clamp(rawAttendance, 11000, stadiumCapacity));
   const ticket = Math.round((avgTicketPrice * attendance) / 10000) * mult; // 万円
   const sponsor = FINANCE_SPONSOR_BY_WINS
     .slice()

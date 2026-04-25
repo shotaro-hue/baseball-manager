@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { fmtSal } from '../../utils';
 import { calcRevenue } from '../../engine/finance';
+import { SEASON_GAMES } from '../../constants';
 
 export function FinanceTab({team,onStadiumUpgrade,onTicketPriceChange,gameDay,onPlayerClick}){
   const rev=calcRevenue(team);
@@ -15,10 +16,17 @@ export function FinanceTab({team,onStadiumUpgrade,onTicketPriceChange,gameDay,on
   const nextCost=lvl<3?UPGRADE_COSTS[lvl]:null;
   const revThisSeason=team.revenueThisSeason??0;
   const gamesPlayed=(gameDay||1)-1;
-  const projected=gamesPlayed>0?Math.round(revThisSeason/gamesPlayed*143):0;
-  const annualTicket = rev.ticket * 143;
-  const annualSponsor = rev.sponsor * 143;
-  const annualMerch = rev.merch * 143;
+  const HOME_GAMES_MIN = Math.floor(SEASON_GAMES / 2);
+  const HOME_GAMES_MAX = Math.ceil(SEASON_GAMES / 2);
+  const projectedMin=gamesPlayed>0?Math.round(revThisSeason/gamesPlayed*HOME_GAMES_MIN):0;
+  const projectedMax=gamesPlayed>0?Math.round(revThisSeason/gamesPlayed*HOME_GAMES_MAX):0;
+  const annualTicketMin = rev.ticket * HOME_GAMES_MIN;
+  const annualTicketMax = rev.ticket * HOME_GAMES_MAX;
+  const annualSponsorMin = rev.sponsor * HOME_GAMES_MIN;
+  const annualSponsorMax = rev.sponsor * HOME_GAMES_MAX;
+  const annualMerchMin = rev.merch * HOME_GAMES_MIN;
+  const annualMerchMax = rev.merch * HOME_GAMES_MAX;
+  const fmtRange=(min,max)=>`${fmtSal(min)} 〜 ${fmtSal(max)}`;
   const applyTicketPrice=()=>{
     const next=Math.round(Number(ticketPriceInput));
     if(!Number.isFinite(next)) return;
@@ -34,8 +42,8 @@ export function FinanceTab({team,onStadiumUpgrade,onTicketPriceChange,gameDay,on
           ))}
         </div>
         <div className="card">
-          <div className="card-h">収入（年間見込み）</div>
-          {[["チケット売上",fmtSal(annualTicket)],["スポンサー",fmtSal(annualSponsor)],["グッズ",fmtSal(annualMerch)],["年間合計",fmtSal(annualTicket+annualSponsor+annualMerch)]].map(([l,v])=>(
+          <div className="card-h">収入（年間見込み / 本拠地71〜72試合）</div>
+          {[["チケット売上",fmtRange(annualTicketMin,annualTicketMax)],["スポンサー",fmtRange(annualSponsorMin,annualSponsorMax)],["グッズ",fmtRange(annualMerchMin,annualMerchMax)],["年間合計",fmtRange(annualTicketMin+annualSponsorMin+annualMerchMin,annualTicketMax+annualSponsorMax+annualMerchMax)]].map(([l,v])=>(
             <div key={l} className="fsb" style={{padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,.03)"}}><span style={{fontSize:11,color:"#4b5563"}}>{l}</span><span className="mono" style={{color:"#34d399"}}>{v}</span></div>
           ))}
         </div>
@@ -72,7 +80,7 @@ export function FinanceTab({team,onStadiumUpgrade,onTicketPriceChange,gameDay,on
       </div>
       <div className="card">
         <div className="card-h">📈 シーズン収益サマリー</div>
-        {[["シーズン累計",fmtSal(revThisSeason)],["投資済み球場レベル",`Lv${lvl} ${STAR_LABELS[lvl]} (${MULT_LABELS[lvl]})`],["シーズン収入予測",gamesPlayed>0?fmtSal(projected):"計算中..."]].map(([l,v])=>(
+        {[["シーズン累計",fmtSal(revThisSeason)],["投資済み球場レベル",`Lv${lvl} ${STAR_LABELS[lvl]} (${MULT_LABELS[lvl]})`],["シーズン収入予測",gamesPlayed>0?fmtRange(projectedMin,projectedMax):"計算中..."]].map(([l,v])=>(
           <div key={l} className="fsb" style={{padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,.03)"}}><span style={{fontSize:11,color:"#4b5563"}}>{l}</span><span className="mono" style={{color:"#34d399"}}>{v}</span></div>
         ))}
       </div>
