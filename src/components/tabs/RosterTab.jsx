@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL, DEV_GOALS_BATTER, DEV_GOALS_PITCHER, TALK_COOLDOWN_DAYS, POSITIONS, FIELDING_POSITIONS } from '../../constants';
+import { MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL, DEV_GOALS_BATTER, DEV_GOALS_PITCHER, TALK_COOLDOWN_DAYS, POSITIONS, FIELDING_POSITIONS, ROSTER_SWAP_SCORE_THRESHOLD } from '../../constants';
 import { fmtAvg, fmtSal } from '../../utils';
 import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
 import { OV, CondBadge, HandBadge } from '../ui';
@@ -15,10 +15,62 @@ const TRAINING_OPTIONS=[["","バランス"],["contact","ミート"],["power","�
 
 const MoralBadge=({v})=>{const m=v||70;const icon=m>=75?"😊":m>=50?"😐":"😟";const col=m>=75?"#34d399":m>=50?"#f5c842":"#f87171";return <span style={{fontSize:10,color:col}}>{icon}{m}</span>;};
 
+const playerScore=(p)=>{
+  if(p.isPitcher){
+    const sp=saberPitcher(p.stats??{});
+    const eraBonus=sp.ERA>0?Math.max(0,(4-sp.ERA)*15):0;
+    return(p.pitching?.velocity??50)*1.5+(p.pitching?.control??50)*1.5+(p.pitching?.breaking??50)*1.2+(p.pitching?.stamina??50)*1.0+eraBonus;
+  }
+  const sb=saberBatter(p.stats??{});
+  return(sb.OPS||0)*1000+(p.batting?.contact??50)*1.6+(p.batting?.eye??50)*1.1+(p.batting?.power??50)*1.2+(p.batting?.speed??50)*0.7;
+};
+
+const buildRosterRecs=(team)=>{
+  const recs=[];
+  const rosterCount=team.players.length;
+  const openSlots=MAX_ROSTER-rosterCount;
+  const foreignInActive=team.players.filter(p=>p.isForeign).length;
+  const canPromote=(p)=>!p.育成&&(p.injuryDaysLeft??0)===0&&(p.registrationCooldownDays??0)===0&&!(p.isForeign&&foreignInActive>=MAX_外国人_一軍);
+
+  // 降格（1軍枠超過）
+  if(openSlots<0){
+    [...team.players].sort((a,b)=>playerScore(a)-playerScore(b)).slice(0,Math.min(-openSlots,3)).forEach(p=>recs.push({type:'demote',downPlayer:p,upPlayer:null,scoreDiff:0}));
+    return recs;
+  }
+
+  const usedFarmIds=new Set();
+  const usedActiveIds=new Set();
+  const eligible=[...team.farm].filter(canPromote).sort((a,b)=>playerScore(b)-playerScore(a));
+
+  // 昇格（空き枠あり）
+  eligible.slice(0,Math.min(openSlots,3)).forEach(p=>{
+    recs.push({type:'promote',upPlayer:p,downPlayer:null,scoreDiff:Math.round(playerScore(p))});
+    usedFarmIds.add(p.id);
+  });
+
+  // スワップ（残り有力二軍選手 vs 一軍下位選手）
+  const remainFarm=eligible.filter(fp=>!usedFarmIds.has(fp.id));
+  if(remainFarm.length>0){
+    [...team.players].sort((a,b)=>playerScore(a)-playerScore(b)).forEach(ap=>{
+      if(recs.length>=6||usedActiveIds.has(ap.id))return;
+      const best=remainFarm.find(fp=>!usedFarmIds.has(fp.id)&&fp.isPitcher===ap.isPitcher);
+      if(!best)return;
+      const diff=playerScore(best)-playerScore(ap);
+      if(diff>=ROSTER_SWAP_SCORE_THRESHOLD){
+        recs.push({type:'swap',upPlayer:best,downPlayer:ap,scoreDiff:Math.round(diff)});
+        usedFarmIds.add(best.id);
+        usedActiveIds.add(ap.id);
+      }
+    });
+  }
+  return recs;
+};
+
 export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetRosterDhMode,onSetPlayerPosition,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onPlayerClick,onSetDevGoal,onPlayerTalk,onSetConvertTarget,gameDay}){
   const [view,setView]=useState("batters");
   const [justConverted,setJustConverted]=useState(new Set());
   const [talkingPid,setTalkingPid]=useState(null);
+  const [rosterRecs,setRosterRecs]=useState(null);
   const handleConvertIkusei=(pid)=>{onConvertIkusei&&onConvertIkusei(pid);setJustConverted(s=>new Set([...s,pid]));};
   const batters=team.players.filter(p=>!p.isPitcher);
   const pitchers=team.players.filter(p=>p.isPitcher);
@@ -64,6 +116,18 @@ export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetR
       .sort((a,b)=>scoreOf(b[1])-scoreOf(a[1]))
       .map(([pos,player])=>({id:player.id,pos}));
     onReplaceLineup&&onReplaceLineup(entries);
+    setRosterRecs(buildRosterRecs(team));
+  };
+  const executeRec=(rec,idx)=>{
+    if(rec.type==='demote'||rec.type==='swap')onDemo&&onDemo(rec.downPlayer.id);
+    if(rec.type==='promote'||rec.type==='swap')onPromo&&onPromo(rec.upPlayer.id);
+    setRosterRecs(prev=>prev?prev.filter((_,i)=>i!==idx):null);
+  };
+  const executeAllRecs=()=>{
+    if(!rosterRecs?.length){setRosterRecs(null);return;}
+    rosterRecs.filter(r=>r.downPlayer).forEach(r=>onDemo&&onDemo(r.downPlayer.id));
+    rosterRecs.filter(r=>r.upPlayer).forEach(r=>onPromo&&onPromo(r.upPlayer.id));
+    setRosterRecs(null);
   };
   return(
     <div>
@@ -86,6 +150,31 @@ export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetR
         <span className="chip cb" style={{alignSelf:"center"}}>外国人 {team.players.filter(p=>p.isForeign).length}/{MAX_外国人_一軍}</span>
         {(()=>{const s=team.players.filter(p=>!p.育成).length+team.farm.filter(p=>!p.育成).length;const over=s>=MAX_SHIHAKA_TOTAL;return <span className="chip" style={{alignSelf:"center",background:over?"rgba(248,113,113,.15)":"rgba(52,211,153,.08)",border:`1px solid ${over?"rgba(248,113,113,.4)":"rgba(52,211,153,.25)"}`,color:over?"#f87171":"#94a3b8",fontSize:10}}>支配下 {s}/{MAX_SHIHAKA_TOTAL}</span>;})()}
       </div>
+      {rosterRecs!==null&&(
+        <div className="card" style={{marginBottom:10,borderColor:"rgba(99,102,241,.35)",background:"rgba(99,102,241,.04)"}}>
+          <div className="card-h" style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{color:"#a5b4fc"}}>📋 編成レコメンド</span>
+            {rosterRecs.length>0&&<button className="bsm bgb" style={{marginLeft:"auto"}} onClick={executeAllRecs}>▶ すべて実行</button>}
+            <button className="bsm" style={{marginLeft:rosterRecs.length>0?0:"auto"}} onClick={()=>setRosterRecs(null)}>✕ 閉じる</button>
+          </div>
+          {rosterRecs.length===0&&<div style={{fontSize:11,color:"#6b7280",padding:"4px 0"}}>現在のロスターは最適です。改善推薦なし。</div>}
+          {rosterRecs.map((rec,i)=>{
+            const badge=rec.type==='promote'?{label:'昇格',bg:'rgba(52,211,153,.15)',border:'rgba(52,211,153,.4)',color:'#34d399'}
+              :rec.type==='demote'?{label:'降格',bg:'rgba(248,113,113,.15)',border:'rgba(248,113,113,.4)',color:'#f87171'}
+              :{label:'スワップ',bg:'rgba(245,200,66,.12)',border:'rgba(245,200,66,.35)',color:'#f5c842'};
+            return(
+              <div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 0",borderBottom:"1px solid rgba(30,58,95,.4)",fontSize:11,flexWrap:"wrap"}}>
+                <span style={{fontSize:9,padding:"2px 6px",borderRadius:3,background:badge.bg,border:`1px solid ${badge.border}`,color:badge.color,flexShrink:0}}>{badge.label}</span>
+                {rec.upPlayer&&<span style={{color:"#34d399"}}>↑ <span style={{fontWeight:600,cursor:"pointer"}} onClick={()=>onPlayerClick?.(rec.upPlayer,team.name)}>{rec.upPlayer.name}</span><span style={{fontSize:9,color:"#6b7280",marginLeft:2}}>{rec.upPlayer.pos}</span>{rec.upPlayer.isForeign&&<span className="chip cb" style={{marginLeft:3,fontSize:7}}>外</span>}</span>}
+                {rec.type==='swap'&&<span style={{color:"#374151",fontSize:10}}>⇄</span>}
+                {rec.downPlayer&&<span style={{color:"#f87171"}}>↓ <span style={{fontWeight:600,cursor:"pointer"}} onClick={()=>onPlayerClick?.(rec.downPlayer,team.name)}>{rec.downPlayer.name}</span><span style={{fontSize:9,color:"#6b7280",marginLeft:2}}>{rec.downPlayer.pos}</span></span>}
+                {rec.scoreDiff>0&&<span style={{fontSize:9,color:"#f5c842",marginLeft:2}}>+{rec.scoreDiff}pt</span>}
+                <button className="bsm bga" style={{marginLeft:"auto",fontSize:9}} onClick={()=>executeRec(rec,i)}>▶ 実行</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
       {view==="batters"&&(
         <div className="card">
           <div className="card-h" style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
