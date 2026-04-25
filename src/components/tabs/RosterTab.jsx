@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL, DEV_GOALS_BATTER, DEV_GOALS_PITCHER, TALK_COOLDOWN_DAYS, POSITIONS, FIELDING_POSITIONS, ROSTER_SWAP_SCORE_THRESHOLD } from '../../constants';
+import { MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL, DEV_GOALS_BATTER, DEV_GOALS_PITCHER, TALK_COOLDOWN_DAYS, POSITIONS, FIELDING_POSITIONS, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX } from '../../constants';
 import { fmtAvg, fmtSal } from '../../utils';
 import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
 import { OV, CondBadge, HandBadge } from '../ui';
@@ -39,37 +39,57 @@ const relieverScore=(p)=>{
   return(p.pitching?.velocity??50)*2.0+(p.pitching?.control??50)*1.5+(p.pitching?.breaking??50)*1.2+(p.pitching?.stamina??50)*0.5+eraBonus;
 };
 
+// 昇降格レコメンド専用スコア: 能力値×実成績ブレンド
+const rosterRecScore=(p)=>{
+  if(p.isPitcher){
+    const sp=saberPitcher(p.stats??{});
+    const ability=(p.pitching?.velocity??50)*1.2+(p.pitching?.control??50)*1.5+(p.pitching?.breaking??50)*1.0+(p.pitching?.stamina??50)*0.8;
+    if(!sp.ERA&&!sp.WHIP)return ability;
+    const eraScore=sp.ERA>0?Math.max(0,(5.0-sp.ERA)*35):0;
+    const whipScore=sp.WHIP>0?Math.max(0,(1.5-sp.WHIP)*50):0;
+    return ability*0.55+eraScore+whipScore;
+  }
+  const sb=saberBatter(p.stats??{});
+  return(sb.OPS||0)*1000+(p.batting?.contact??50)*1.6+(p.batting?.eye??50)*1.1+(p.batting?.power??50)*1.2+(p.batting?.speed??50)*0.7;
+};
+
 const buildRosterRecs=(team)=>{
   const recs=[];
   const rosterCount=team.players.length;
   const openSlots=MAX_ROSTER-rosterCount;
   const foreignInActive=team.players.filter(p=>p.isForeign).length;
   const canPromote=(p)=>!p.育成&&(p.injuryDaysLeft??0)===0&&(p.registrationCooldownDays??0)===0&&!(p.isForeign&&foreignInActive>=MAX_外国人_一軍);
+  // 育成加点: 有望な1軍未経験ファーム選手のスコアにボーナスを加算
+  const effScore=(p,isFarm)=>{
+    const base=rosterRecScore(p);
+    if(isFarm&&(p.potential??0)>=ROSTER_DEVREC_POTENTIAL_MIN&&(p.daysOnActiveRoster??0)<ROSTER_DEVREC_DAYS_MAX)return base+ROSTER_DEVREC_BONUS;
+    return base;
+  };
 
   // 降格（1軍枠超過）
   if(openSlots<0){
-    [...team.players].sort((a,b)=>playerScore(a)-playerScore(b)).slice(0,Math.min(-openSlots,3)).forEach(p=>recs.push({type:'demote',downPlayer:p,upPlayer:null,scoreDiff:0}));
+    [...team.players].sort((a,b)=>effScore(a,false)-effScore(b,false)).slice(0,Math.min(-openSlots,3)).forEach(p=>recs.push({type:'demote',downPlayer:p,upPlayer:null,scoreDiff:0}));
     return recs;
   }
 
   const usedFarmIds=new Set();
   const usedActiveIds=new Set();
-  const eligible=[...team.farm].filter(canPromote).sort((a,b)=>playerScore(b)-playerScore(a));
+  const eligible=[...team.farm].filter(canPromote).sort((a,b)=>effScore(b,true)-effScore(a,true));
 
   // 昇格（空き枠あり）
   eligible.slice(0,Math.min(openSlots,3)).forEach(p=>{
-    recs.push({type:'promote',upPlayer:p,downPlayer:null,scoreDiff:Math.round(playerScore(p))});
+    recs.push({type:'promote',upPlayer:p,downPlayer:null,scoreDiff:Math.round(effScore(p,true))});
     usedFarmIds.add(p.id);
   });
 
   // スワップ（残り有力二軍選手 vs 一軍下位選手）
   const remainFarm=eligible.filter(fp=>!usedFarmIds.has(fp.id));
   if(remainFarm.length>0){
-    [...team.players].sort((a,b)=>playerScore(a)-playerScore(b)).forEach(ap=>{
+    [...team.players].sort((a,b)=>effScore(a,false)-effScore(b,false)).forEach(ap=>{
       if(recs.length>=6||usedActiveIds.has(ap.id))return;
       const best=remainFarm.find(fp=>!usedFarmIds.has(fp.id)&&fp.isPitcher===ap.isPitcher);
       if(!best)return;
-      const diff=playerScore(best)-playerScore(ap);
+      const diff=effScore(best,true)-effScore(ap,false);
       if(diff>=ROSTER_SWAP_SCORE_THRESHOLD){
         recs.push({type:'swap',upPlayer:best,downPlayer:ap,scoreDiff:Math.round(diff)});
         usedFarmIds.add(best.id);
@@ -80,7 +100,7 @@ const buildRosterRecs=(team)=>{
   return recs;
 };
 
-export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetRosterDhMode,onSetPlayerPosition,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onReplaceRotation,onPlayerClick,onSetDevGoal,onPlayerTalk,onSetConvertTarget,gameDay}){
+export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetRosterDhMode,onSetPlayerPosition,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onReplaceRotation,onReplaceFullRoster,onPlayerClick,onSetDevGoal,onPlayerTalk,onSetConvertTarget,gameDay}){
   const [view,setView]=useState("batters");
   const [justConverted,setJustConverted]=useState(new Set());
   const [talkingPid,setTalkingPid]=useState(null);
@@ -153,6 +173,30 @@ export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetR
     onReplaceRotation&&onReplaceRotation(newRotation,newPattern);
     setRosterRecs(buildRosterRecs(team));
   };
+  const autoSetFullRoster=()=>{
+    // 野手打線
+    const eligibleB=batters.filter(p=>(p.injuryDaysLeft??0)===0);
+    const scoreOf=p=>{const s=saberBatter(p.stats);return(s.OPS||0)*1000+p.batting.contact*1.6+p.batting.eye*1.1+p.batting.power*1.2+p.batting.speed*0.7;};
+    const profAt=(p,pos)=>pos==='DH'?50:p.pos===pos?100:(p.positions?.[pos]??0);
+    const required=[...FIELDING_POSITIONS,...(rosterDhMode?['DH']:[])];
+    const sortedB=[...eligibleB].sort((a,b)=>scoreOf(b)-scoreOf(a));
+    const posEligible=Object.fromEntries(required.map(pos=>[pos,sortedB.filter(p=>profAt(p,pos)>0)]));
+    const posOrder=[...required].sort((a,b)=>posEligible[a].length-posEligible[b].length);
+    const assignment=new Map();const playerUsed=new Set();
+    for(const pos of posOrder){const best=posEligible[pos].find(p=>!playerUsed.has(p.id));if(best){assignment.set(pos,best);playerUsed.add(best.id);}}
+    for(const pos of posOrder){if(assignment.has(pos))continue;const fallback=sortedB.find(p=>!playerUsed.has(p.id));if(fallback){assignment.set(pos,fallback);playerUsed.add(fallback.id);}}
+    const lineupEntries=[...assignment.entries()].sort((a,b)=>scoreOf(b[1])-scoreOf(a[1])).map(([pos,player])=>({id:player.id,pos}));
+    // 投手ローテ・継投
+    const eligibleP=pitchers.filter(p=>(p.injuryDaysLeft??0)===0);
+    const sp2=[...eligibleP].filter(p=>p.subtype==="先発").sort((a,b)=>starterScore(b)-starterScore(a));
+    const rp2=[...eligibleP].filter(p=>p.subtype!=="先発").sort((a,b)=>relieverScore(b)-relieverScore(a));
+    const newRotation=[...sp2.slice(0,6),...rp2.slice(0,Math.max(0,6-sp2.length))].map(p=>p.id);
+    const rotSet=new Set(newRotation);
+    const remaining=[...eligibleP].filter(p=>!rotSet.has(p.id)).sort((a,b)=>relieverScore(b)-relieverScore(a));
+    const newPattern={closerId:remaining[0]?.id??null,setupId:remaining[1]?.id??null,seventhId:remaining[2]?.id??null,middleOrder:remaining.slice(3).map(p=>p.id)};
+    onReplaceFullRoster&&onReplaceFullRoster(lineupEntries,newRotation,newPattern);
+    setRosterRecs(buildRosterRecs(team));
+  };
   const executeRec=(rec,idx)=>{
     if(rec.type==='demote'||rec.type==='swap')onDemo&&onDemo(rec.downPlayer.id);
     if(rec.type==='promote'||rec.type==='swap')onPromo&&onPromo(rec.upPlayer.id);
@@ -184,6 +228,7 @@ export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetR
         <span className="chip cy" style={{marginLeft:"auto",alignSelf:"center"}}>一軍 {team.players.length}/{MAX_ROSTER}</span>
         <span className="chip cb" style={{alignSelf:"center"}}>外国人 {team.players.filter(p=>p.isForeign).length}/{MAX_外国人_一軍}</span>
         {(()=>{const s=team.players.filter(p=>!p.育成).length+team.farm.filter(p=>!p.育成).length;const over=s>=MAX_SHIHAKA_TOTAL;return <span className="chip" style={{alignSelf:"center",background:over?"rgba(248,113,113,.15)":"rgba(52,211,153,.08)",border:`1px solid ${over?"rgba(248,113,113,.4)":"rgba(52,211,153,.25)"}`,color:over?"#f87171":"#94a3b8",fontSize:10}}>支配下 {s}/{MAX_SHIHAKA_TOTAL}</span>;})()}
+        <button className="bsm bgb" style={{alignSelf:"center",fontSize:11,padding:"5px 10px"}} onClick={autoSetFullRoster}>🔄 一括自動編成</button>
       </div>
       {rosterRecs!==null&&(
         <div className="card" style={{marginBottom:10,borderColor:"rgba(99,102,241,.35)",background:"rgba(99,102,241,.04)"}}>
