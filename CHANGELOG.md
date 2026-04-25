@@ -5,6 +5,19 @@
 
 ---
 
+### 2026-04-25 — feat: CPU球団自動ロスター管理（㊶）
+
+**仕様本文への影響なし（内部実装のみ）**
+
+- `cpuAutoManageTeam(team)` 関数を `useSeasonFlow.js` に追加。バッチシム中、`CPU_AUTO_MANAGE_INTERVAL`（7日）ごとに全CPU球団へ適用
+- 処理内容: ① 一軍/二軍スワップ（昇格・降格・スコア差スワップ）② 打順自動設定（MRV ヒューリスティック）③ 投手ローテ・継投パターン自動割当
+- スコアロジックはユーザー側の `autoSetFullRoster` / `buildRosterRecs` と同等（能力値×実成績ブレンド、育成加点）
+- 外国人4人枠・クールダウン中選手の昇格禁止・育成フラグ（`isIkusei`）の一軍登録禁止を考慮
+- `CPU_AUTO_MANAGE_INTERVAL = 7` を `constants.js` に追加
+- 変更ファイル: `src/constants.js`・`src/hooks/useSeasonFlow.js`
+
+---
+
 ### 2026-04-25 — balance: 投高打低緩和 + リーグ環境ノブUI
 
 **仕様本文への影響あり（§7）**
