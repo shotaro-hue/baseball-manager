@@ -258,6 +258,7 @@ export default function App(){
       allTeamResultsMap={gs.allTeamResultsMap}
       onBack={()=>setScreen("hub")}
       onPlayerClick={gs.handlePlayerClick}
+      onOpenTrade={()=>{ setScreen("hub"); setTab("trade"); }}
     />
   );
 
