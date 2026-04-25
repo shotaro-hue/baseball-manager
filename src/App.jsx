@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles.css';
 import { uid, fmtM, fmtSal, gameDayToDate, scoutedValue, clamp, rng, rngf } from './utils';
@@ -29,12 +29,20 @@ import { useGameState } from './hooks/useGameState';
 import { useSeasonFlow } from './hooks/useSeasonFlow';
 import { useOffseason } from './hooks/useOffseason';
 
-const TAB_GROUPS = [
-  { label: "試合", tabs: [["dashboard","🏠 概況"],["schedule","🗓️ 日程"],["standings","🏆 順位"],["stats","📊 成績"],["records","🏛 記録"]] },
-  { label: "編成", tabs: [["roster","👥 ロースター"],["trade","🔄 トレード"],["contract","📝 契約"],["fa","🏪 FA"],["scout","🔍 スカウト"]] },
-  { label: "球団", tabs: [["news","📰 ニュース"],["mailbox","📨 メール"],["alumni","📖 歴代"],["finance","💴 財務"]] },
-  { label: "分析", tabs: [["balance","⚖️ リーグ分析"]] },
+const PRIMARY_SECTIONS = [
+  { id: "home", label: "ホーム", icon: "🏠", defaultTab: "dashboard", tabs: [["dashboard", "概況"]] },
+  { id: "game", label: "試合", icon: "⚾", defaultTab: "schedule", tabs: [["schedule", "日程"]] },
+  { id: "rosterOps", label: "編成", icon: "🧩", defaultTab: "roster", tabs: [["roster", "ロースター"], ["trade", "トレード"], ["contract", "契約"], ["fa", "FA"], ["scout", "スカウト"]] },
+  { id: "analysis", label: "分析", icon: "📊", defaultTab: "stats", tabs: [["stats", "成績"], ["standings", "順位"], ["records", "記録"], ["finance", "財務"], ["balance", "リーグ分析"]] },
+  { id: "inbox", label: "受信箱", icon: "📨", defaultTab: "mailbox", tabs: [["mailbox", "メール"], ["news", "ニュース"], ["alumni", "歴代"]] },
 ];
+
+const TAB_TO_SECTION = PRIMARY_SECTIONS.reduce((acc, section) => {
+  section.tabs.forEach(([tabId]) => {
+    acc[tabId] = section.id;
+  });
+  return acc;
+}, {});
 
 export default function App(){
   const gs = useGameState();
@@ -89,6 +97,22 @@ export default function App(){
   const { developmentSummary, newSeasonInfo, draftPool, setDraftPool, draftResult, setDraftResult, draftAllocation, setDraftAllocation, waiverClaimResults } = os;
   const [agentNeg, setAgentNeg] = useState(null);
   const [draftAutoSkip, setDraftAutoSkip] = useState(false);
+  const [sectionLastTab, setSectionLastTab] = useState(() => (
+    PRIMARY_SECTIONS.reduce((acc, section) => ({ ...acc, [section.id]: section.defaultTab }), {})
+  ));
+  const [currentPrimarySection, setCurrentPrimarySection] = useState("home");
+
+  useEffect(() => {
+    const sectionId = TAB_TO_SECTION[tab];
+    if (!sectionId) return;
+    setCurrentPrimarySection(sectionId);
+    setSectionLastTab(prev => (
+      prev[sectionId] === tab
+        ? prev
+        : { ...prev, [sectionId]: tab }
+    ));
+  }, [tab]);
+
   const handleTabChange = useCallback((newTab) => {
     if (tab === "roster" && newTab !== "roster" && myTeam) {
       const lineupPlayers = myTeam.lineup
@@ -124,6 +148,16 @@ export default function App(){
     }
     setTab(newTab);
   }, [tab, myTeam, notify, setTab]);
+
+  const handlePrimarySectionChange = useCallback((sectionId) => {
+    const section = PRIMARY_SECTIONS.find(item => item.id === sectionId);
+    if (!section) return;
+    setCurrentPrimarySection(sectionId);
+    const targetTab = sectionLastTab[sectionId] || section.defaultTab;
+    handleTabChange(targetTab);
+  }, [handleTabChange, sectionLastTab]);
+
+  const activeSection = PRIMARY_SECTIONS.find(section => section.id === currentPrimarySection) || PRIMARY_SECTIONS[0];
 
   const foreignFaPool = faPool.filter(p => p.isForeign);
   const domesticFaPool = faPool.filter(p => !p.isForeign);
@@ -252,19 +286,17 @@ export default function App(){
       </div>
     )}
 
-    <div className="tabs-nav">
-      {TAB_GROUPS.map(group=>(
-        <div key={group.label} className="tab-group">
-          <div className="tab-group-label">{group.label}</div>
-          <div className="tabs">
-            {group.tabs.map(([id,l])=>(
-              <button key={id} className={`tab ${tab===id?"on":""}`} onClick={()=>handleTabChange(id)}>
-                {l}{tabBadges[id]&&<span style={{marginLeft:4,background:tabBadges[id].color,color:"#fff",borderRadius:8,padding:"0 5px",fontSize:9,fontWeight:700}}>{tabBadges[id].n}</span>}
-              </button>
-            ))}
-          </div>
+    <div className="tabs-nav redesigned-tabs">
+      <div className="tab-group">
+        <div className="tab-group-label">{activeSection.label}</div>
+        <div className="tabs">
+          {activeSection.tabs.map(([id, label])=>(
+            <button key={id} className={`tab ${tab===id?"on":""}`} onClick={()=>handleTabChange(id)}>
+              {label}{tabBadges[id]&&<span style={{marginLeft:4,background:tabBadges[id].color,color:"#fff",borderRadius:8,padding:"0 5px",fontSize:9,fontWeight:700}}>{tabBadges[id].n}</span>}
+            </button>
+          ))}
         </div>
-      ))}
+      </div>
     </div>
 
     <ErrorBoundary key={tab}>
@@ -421,5 +453,22 @@ export default function App(){
     )}
     {pressEvent&&<PressConferenceModal event={pressEvent} onAnswer={handlePressAnswer}/>}
     </ErrorBoundary>
+
+    <div className="primary-bottom-nav">
+      {PRIMARY_SECTIONS.map((section) => {
+        const badgeTab = section.id === "inbox" ? "mailbox" : section.id === "rosterOps" ? "contract" : null;
+        const badge = badgeTab ? tabBadges[badgeTab] : null;
+        return (
+          <button key={section.id} className={`primary-nav-btn ${currentPrimarySection===section.id?"on":""}`} onClick={()=>handlePrimarySectionChange(section.id)}>
+            <span className="primary-nav-icon">{section.icon}</span>
+            <span>{section.label}</span>
+            {badge&&<span className="primary-nav-badge" style={{background:badge.color}}>{badge.n}</span>}
+          </button>
+        );
+      })}
+      <button className="primary-nav-cta" onClick={sf.handleStartGame} disabled={gameDay>SEASON_GAMES}>
+        次へ進む
+      </button>
+    </div>
   </div></div></>);
 }
