@@ -18,7 +18,7 @@ import { AllStarScreen } from './components/AllStarScreen';
 import { DashboardTab } from './components/DashboardTab';
 import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab, ScheduleTab, BalanceTab } from './components/Tabs';
 import {
-  SEASON_GAMES, BATCH, MAX_外国人_一軍, TEAM_DEFS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
+  SEASON_GAMES, BATCH, MAX_外国人_一軍, MAX_ROSTER, TEAM_DEFS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
   POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD,
   POSITIONS, FIELDING_POSITIONS,
   FOREIGN_DEADLINE_DAY, FOREIGN_AGENT_SALARY_RATIO, FOREIGN_AGENT_ACCEPT_PROB, FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX, TRADE_DEADLINE_MONTH,
@@ -177,7 +177,8 @@ export default function App(){
     const wouldBeAllPitchers = player.isPitcher && foreignPitchers === MAX_外国人_一軍 - 1;
     const wouldBeAllBatters = !player.isPitcher && foreignBatters === MAX_外国人_一軍 - 1;
     const balanceViolation = foreignActiveCount === MAX_外国人_一軍 - 1 && (wouldBeAllPitchers || wouldBeAllBatters);
-    const goToFarm = foreignActiveCount >= MAX_外国人_一軍 || balanceViolation;
+    const rosterFull = (myTeam?.players?.length || 0) >= MAX_ROSTER;
+    const goToFarm = foreignActiveCount >= MAX_外国人_一軍 || balanceViolation || rosterFull;
     if (goToFarm) {
       upd(myId, t => ({
         ...t,
@@ -186,7 +187,9 @@ export default function App(){
       }));
       const reason = foreignActiveCount >= MAX_外国人_一軍
         ? "外国人枠満杯"
-        : "投手4名または野手4名は登録不可";
+        : rosterFull
+          ? "一軍枠満杯"
+          : "投手4名または野手4名は登録不可";
       notify(`${player.name}と契約（${reason}のため二軍スタート）`, "warn");
     } else {
       upd(myId, t => ({
@@ -382,7 +385,7 @@ export default function App(){
               <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
                 <span style={{fontSize:10,color:"#374151"}}>契約年数:</span>
                 {[1,2,3].map(y=><button key={y} className={"bsm "+(yrs===y?"bgb":"bga")} style={{padding:"2px 8px"}} onClick={()=>setFaYears(prev=>({...prev,[p.id]:y}))}>{y}年</button>)}
-                <button className="bsm bga" style={{marginLeft:4,opacity:canAfford?1:0.4}} onClick={()=>{if(!canAfford){notify("予算不足","warn");return;}upd(myId,t=>({...t,budget:t.budget-totalCost,players:[...t.players,{...p,isFA:false,contractYearsLeft:yrs,contractYears:yrs}]}));setFaPool(prev=>prev.filter(x=>x.id!==p.id));setFaYears(prev=>{const n={...prev};delete n[p.id];return n;});notify(`${p.name}を獲得！(${yrs}年 計${fmtSal(totalCost)})`,"ok");}}>獲得</button>
+                <button className="bsm bga" style={{marginLeft:4,opacity:canAfford?1:0.4}} onClick={()=>{if(!canAfford){notify("予算不足","warn");return;}const toFarm=(myTeam?.players?.length||0)>=MAX_ROSTER;upd(myId,t=>toFarm?({...t,budget:t.budget-totalCost,farm:[...t.farm,{...p,isFA:false,contractYearsLeft:yrs,contractYears:yrs}]}):({...t,budget:t.budget-totalCost,players:[...t.players,{...p,isFA:false,contractYearsLeft:yrs,contractYears:yrs}]}));setFaPool(prev=>prev.filter(x=>x.id!==p.id));setFaYears(prev=>{const n={...prev};delete n[p.id];return n;});notify(toFarm?`${p.name}を獲得（一軍枠満杯のため二軍スタート）`:`${p.name}を獲得！(${yrs}年 計${fmtSal(totalCost)})`,"ok");}}>獲得</button>
               </div>
             </div>
           </div>

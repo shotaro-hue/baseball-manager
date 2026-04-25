@@ -5,6 +5,19 @@
 
 ---
 
+### 2026-04-25 — fix: 二軍降格デッドロック・ドラフト選手支配下登録・FA一軍超過（B20）
+
+**仕様本文への影響なし（内部バグ修正のみ）**
+
+- 根本原因①: `demote` 関数 (`useGameState.js`) の `farm.length >= MAX_FARM` チェックに育成選手が含まれるため、ドラフト指名（育成:true）でファームが埋まると一軍超過時でも降格不能なデッドロックが発生
+- 根本原因②: 国内・外国人FA獲得コード (`App.jsx`) に `MAX_ROSTER` チェックがなく、一軍が28人満員でも直接追加されて超過状態になっていた
+- 修正①: `demote` チェックを `farm.filter(x=>!x.育成).length >= MAX_FARM`（支配下ファームのみカウント）に変更
+- 修正②: ドラフト指名選手を `育成:false`（支配下）・`salary: max(MIN_SALARY_SHIHAKA, p.salary)`・1年契約で追加するよう `handleDraftComplete` を変更
+- 修正③: 国内FA獲得・外国人FA獲得とも一軍枠満杯 (`players.length >= MAX_ROSTER`) の場合は二軍スタートへ誘導
+- 変更ファイル: `src/hooks/useOffseason.js`・`src/hooks/useGameState.js`・`src/App.jsx`
+
+---
+
 ### 2026-04-25 — feat: CPU球団自動ロスター管理（㊶）
 
 **仕様本文への影響なし（内部実装のみ）**
