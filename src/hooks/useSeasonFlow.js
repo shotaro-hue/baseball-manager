@@ -677,19 +677,9 @@ export function useSeasonFlow(gs) {
       }
 
       const scheduleMatchup=getMyMatchup(schedule,newDay,myId);
-      let oppId=scheduleMatchup?.oppId;
-      if(!oppId){
-        const isInterleague=newDay>=60&&newDay<=94;
-        const oppPool=isInterleague
-          ?newTeams.filter(t=>t.id!==myId&&t.league!==myTeam.league)
-          :newTeams.filter(t=>t.id!==myId&&t.league===myTeam.league);
-        oppId=(oppPool[rng(0,oppPool.length-1)]||newTeams.find(t=>t.id!==myId))?.id;
-      }
-      const opp=newTeams.find(t=>t.id===oppId)||newTeams.find(t=>t.id!==myId);
-      const batchCpuMatchups=getCpuMatchups(schedule,newDay,myId,opp.id);
-      const cpuPairs=batchCpuMatchups.length>0
-        ?batchCpuMatchups
-        :(()=>{const others=newTeams.filter(t=>t.id!==myId&&t.id!==opp.id);const pairs=[];for(let i=0;i<others.length-1;i+=2)pairs.push({homeId:others[i].id,awayId:others[i+1].id});return pairs;})();
+      const oppId=scheduleMatchup?.oppId;
+      const opp=oppId ? newTeams.find(t=>t.id===oppId) : null;
+      const cpuPairs=getCpuMatchups(schedule,newDay,myId,oppId);
       for(const cpuMatchup of cpuPairs){
         const a=newTeams.find(t=>t.id===cpuMatchup.homeId);
         const b=newTeams.find(t=>t.id===cpuMatchup.awayId);
@@ -739,69 +729,71 @@ export function useSeasonFlow(gs) {
         results.push({ type: 'trade_news', ...cpuCpuTradeNews, day: newDay });
       }
       const myT=newTeams.find(t=>t.id===myId);
-      const useDh = scheduleMatchup ? (scheduleMatchup.isHome ? !!myT.dhEnabled : !!opp.dhEnabled) : !!myT.dhEnabled;
-      const myTPlayersSnap=[...myT.players]; const oppPlayersSnap=[...opp.players];
-      const r=quickSimGame(applyDhToTeam(myT, useDh),applyDhToTeam(opp, useDh));
-      batchBoxScores.push({homeId:myT.id,awayId:opp.id,dayNo:newDay,cr:r,homePlayers:myTPlayersSnap,awayPlayers:oppPlayersSnap,homeName:myT.name,awayName:opp.name});
-      const won=r.score.my>r.score.opp;
-      const drew=r.score.my===r.score.opp;
-      if(won){myT.wins++;myT.rf+=r.score.my;myT.ra+=r.score.opp;}
-      else if(drew){myT.draws++;myT.rf+=r.score.my;myT.ra+=r.score.opp;}
-      else{myT.losses++;myT.rf+=r.score.my;myT.ra+=r.score.opp;}
-      Object.assign(myT,applyPopularityDelta(myT,won,drew));
-      myT.rotIdx++;
-      myT.players=applyGameStatsFromLog(myT.players, r.log||[], true, won);
-      myT.players=applyPostGameCondition(myT.players, r.log||[], true, newDay);
-      myT.players=tickInjuries(myT.players);
-      myT.players=tickPositionTraining(myT.players);
-      myT.players=myT.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
-      myT.players=applyDefenseCoachRecovery(myT.players,myT.coaches);
-      const _inj=checkForInjuries(myT.players, year);
-      // 新規負傷選手をバッチメタに収集
-      if(_inj.length>0){
-        _inj.forEach(inj=>{
-          const p=myT.players.find(pl=>pl.id===inj.id);
-          if(p) batchInjuries.push({name:p.name,pos:p.pos,type:inj.type,days:inj.days,part:inj.part});
-        });
-      }
-      myT.players=applyInjuriesToPlayers(myT.players, _inj, year);
-      // 登録クールダウンデクリメント
-      myT.players=tickCooldowns(myT.players);
-      // 二軍: 怪我回復 + クールダウンデクリメント
-      myT.farm=tickInjuries(myT.farm??[]);
-      myT.farm=tickCooldowns(myT.farm??[]);
-      // 怪我日数 > 10日の一軍選手を自動二軍降格（インライン: myT参照を維持）
-      {const farm=myT.farm??[];const demotedB=[];const keptB=[];for(const p of myT.players){if((p.injuryDaysLeft??0)>INJURY_AUTO_DEMOTE_DAYS){demotedB.push({...p,registrationCooldownDays:REGISTRATION_COOLDOWN_DAYS});}else{keptB.push(p);}}if(demotedB.length>0){const dIds=new Set(demotedB.map(p=>p.id));myT.players=keptB;myT.farm=[...farm,...demotedB];myT.lineup=(myT.lineup??[]).filter(id=>!dIds.has(id));myT.lineupNoDh=(myT.lineupNoDh??[]).filter(id=>!dIds.has(id));myT.lineupDh=(myT.lineupDh??[]).filter(id=>!dIds.has(id));myT.rotation=(myT.rotation??[]).filter(id=>!dIds.has(id));}}
-      const oppT=newTeams.find(t=>t.id===opp.id);
-      if(oppT){
-        if(won){oppT.losses++;oppT.rf+=r.score.opp;oppT.ra+=r.score.my;}
-        else if(drew){oppT.draws++;oppT.rf+=r.score.opp;oppT.ra+=r.score.my;}
-        else{oppT.wins++;oppT.rf+=r.score.opp;oppT.ra+=r.score.my;}
-        Object.assign(oppT,applyPopularityDelta(oppT,!won&&!drew,drew));
-        oppT.players=applyGameStatsFromLog(oppT.players,r.log||[],false,!won&&!drew);
-        oppT.players=applyPostGameCondition(oppT.players,r.log||[],false,newDay);
-        oppT.players=tickInjuries(oppT.players);
-        const oppInj=checkForInjuries(oppT.players, year);
-        oppT.players=applyInjuriesToPlayers(oppT.players, oppInj, year);
-        oppT.rotIdx=(oppT.rotIdx||0)+1;
-      }
-      const rev=calcRevenue(myT);
-      const revTotal=rev.ticket+rev.sponsor+rev.merch;
-      myT.budget+=revTotal;
-      myT.revenueThisSeason=(myT.revenueThisSeason??0)+revTotal;
-      results.push({...r,won,oppTeam:opp,gameNo:newDay});
-      // バッチ試合ごとに試合結果ニュースを生成
-      {
-        const _tmpl=won?NEWS_TEMPLATES_WIN:NEWS_TEMPLATES_LOSE;
-        const _scoreStr=r.score.my+"-"+r.score.opp;
-        const myTName=newTeams.find(t=>t.id===myId)?.name||"自チーム";
-        const _hl=_tmpl[rng(0,_tmpl.length-1)].replace("{team}",myTName).replace("{opp}",opp.name||"相手").replace("{score}",_scoreStr);
-        batchNewsItems.push({type:"game",headline:_hl,source:"スポーツ報知",dateLabel:`${year}年 ${newDay}日目`,body:(won?myTName+"が"+opp.name+"に"+_scoreStr+"で勝利した。":myTName+"は"+opp.name+"に"+_scoreStr+"で敗れた。")});
-        // インタビュー（バッチ中は低確率）
-        if(rngf(0,1)<0.15){
-          const _qs=won?INTERVIEW_QUESTIONS_WIN:INTERVIEW_QUESTIONS_LOSE;
-          const _opts=won?INTERVIEW_OPTIONS_WIN:INTERVIEW_OPTIONS_LOSE;
-          batchNewsItems.push({type:"interview",headline:"【インタビュー】"+myTName+"監督に直撃！",source:"野球速報",dateLabel:`${year}年 ${newDay}日目`,body:"試合後、記者団が監督にコメントを求めた。",question:_qs[rng(0,_qs.length-1)],options:_opts});
+      if(scheduleMatchup && opp && myT){
+        const useDh = scheduleMatchup.isHome ? !!myT.dhEnabled : !!opp.dhEnabled;
+        const myTPlayersSnap=[...myT.players]; const oppPlayersSnap=[...opp.players];
+        const r=quickSimGame(applyDhToTeam(myT, useDh),applyDhToTeam(opp, useDh));
+        batchBoxScores.push({homeId:myT.id,awayId:opp.id,dayNo:newDay,cr:r,homePlayers:myTPlayersSnap,awayPlayers:oppPlayersSnap,homeName:myT.name,awayName:opp.name});
+        const won=r.score.my>r.score.opp;
+        const drew=r.score.my===r.score.opp;
+        if(won){myT.wins++;myT.rf+=r.score.my;myT.ra+=r.score.opp;}
+        else if(drew){myT.draws++;myT.rf+=r.score.my;myT.ra+=r.score.opp;}
+        else{myT.losses++;myT.rf+=r.score.my;myT.ra+=r.score.opp;}
+        Object.assign(myT,applyPopularityDelta(myT,won,drew));
+        myT.rotIdx++;
+        myT.players=applyGameStatsFromLog(myT.players, r.log||[], true, won);
+        myT.players=applyPostGameCondition(myT.players, r.log||[], true, newDay);
+        myT.players=tickInjuries(myT.players);
+        myT.players=tickPositionTraining(myT.players);
+        myT.players=myT.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
+        myT.players=applyDefenseCoachRecovery(myT.players,myT.coaches);
+        const _inj=checkForInjuries(myT.players, year);
+        // 新規負傷選手をバッチメタに収集
+        if(_inj.length>0){
+          _inj.forEach(inj=>{
+            const p=myT.players.find(pl=>pl.id===inj.id);
+            if(p) batchInjuries.push({name:p.name,pos:p.pos,type:inj.type,days:inj.days,part:inj.part});
+          });
+        }
+        myT.players=applyInjuriesToPlayers(myT.players, _inj, year);
+        // 登録クールダウンデクリメント
+        myT.players=tickCooldowns(myT.players);
+        // 二軍: 怪我回復 + クールダウンデクリメント
+        myT.farm=tickInjuries(myT.farm??[]);
+        myT.farm=tickCooldowns(myT.farm??[]);
+        // 怪我日数 > 10日の一軍選手を自動二軍降格（インライン: myT参照を維持）
+        {const farm=myT.farm??[];const demotedB=[];const keptB=[];for(const p of myT.players){if((p.injuryDaysLeft??0)>INJURY_AUTO_DEMOTE_DAYS){demotedB.push({...p,registrationCooldownDays:REGISTRATION_COOLDOWN_DAYS});}else{keptB.push(p);}}if(demotedB.length>0){const dIds=new Set(demotedB.map(p=>p.id));myT.players=keptB;myT.farm=[...farm,...demotedB];myT.lineup=(myT.lineup??[]).filter(id=>!dIds.has(id));myT.lineupNoDh=(myT.lineupNoDh??[]).filter(id=>!dIds.has(id));myT.lineupDh=(myT.lineupDh??[]).filter(id=>!dIds.has(id));myT.rotation=(myT.rotation??[]).filter(id=>!dIds.has(id));}}
+        const oppT=newTeams.find(t=>t.id===opp.id);
+        if(oppT){
+          if(won){oppT.losses++;oppT.rf+=r.score.opp;oppT.ra+=r.score.my;}
+          else if(drew){oppT.draws++;oppT.rf+=r.score.opp;oppT.ra+=r.score.my;}
+          else{oppT.wins++;oppT.rf+=r.score.opp;oppT.ra+=r.score.my;}
+          Object.assign(oppT,applyPopularityDelta(oppT,!won&&!drew,drew));
+          oppT.players=applyGameStatsFromLog(oppT.players,r.log||[],false,!won&&!drew);
+          oppT.players=applyPostGameCondition(oppT.players,r.log||[],false,newDay);
+          oppT.players=tickInjuries(oppT.players);
+          const oppInj=checkForInjuries(oppT.players, year);
+          oppT.players=applyInjuriesToPlayers(oppT.players, oppInj, year);
+          oppT.rotIdx=(oppT.rotIdx||0)+1;
+        }
+        const rev=calcRevenue(myT);
+        const revTotal=rev.ticket+rev.sponsor+rev.merch;
+        myT.budget+=revTotal;
+        myT.revenueThisSeason=(myT.revenueThisSeason??0)+revTotal;
+        results.push({...r,won,oppTeam:opp,gameNo:newDay});
+        // バッチ試合ごとに試合結果ニュースを生成
+        {
+          const _tmpl=won?NEWS_TEMPLATES_WIN:NEWS_TEMPLATES_LOSE;
+          const _scoreStr=r.score.my+"-"+r.score.opp;
+          const myTName=newTeams.find(t=>t.id===myId)?.name||"自チーム";
+          const _hl=_tmpl[rng(0,_tmpl.length-1)].replace("{team}",myTName).replace("{opp}",opp.name||"相手").replace("{score}",_scoreStr);
+          batchNewsItems.push({type:"game",headline:_hl,source:"スポーツ報知",dateLabel:`${year}年 ${newDay}日目`,body:(won?myTName+"が"+opp.name+"に"+_scoreStr+"で勝利した。":myTName+"は"+opp.name+"に"+_scoreStr+"で敗れた。")});
+          // インタビュー（バッチ中は低確率）
+          if(rngf(0,1)<0.15){
+            const _qs=won?INTERVIEW_QUESTIONS_WIN:INTERVIEW_QUESTIONS_LOSE;
+            const _opts=won?INTERVIEW_OPTIONS_WIN:INTERVIEW_OPTIONS_LOSE;
+            batchNewsItems.push({type:"interview",headline:"【インタビュー】"+myTName+"監督に直撃！",source:"野球速報",dateLabel:`${year}年 ${newDay}日目`,body:"試合後、記者団が監督にコメントを求めた。",question:_qs[rng(0,_qs.length-1)],options:_opts});
+          }
         }
       }
       if(!allStarDoneLocal && newDay===allStarTriggerDay){
