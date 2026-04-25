@@ -5,6 +5,17 @@
 
 ---
 
+### 2026-04-25 — balance: 投高打低緩和 + リーグ環境ノブUI
+
+**仕様本文への影響あり（§7）**
+
+- `kMod`: 1.00 → **0.89**（実NPBデータの stuff>50 標準による三振過剰を抑制）
+- `hitMod`: 1.00 → **1.05**（安打率を NPB 実績水準に近づける）
+- `BalanceTab` に「リーグ環境設定」セクションを追加: kMod/hitMod/hrMod/bbMod をスライダーで調整可能。変更は `myTeam.leagueEnv` に保存され次試合から即時反映
+- 変更ファイル: `src/engine/simulation.js`・`src/components/tabs/BalanceTab.jsx`・`src/App.jsx`
+
+---
+
 ### 2026-04-25 — feat: 一括自動編成・能力値×成績ブレンドスコア（U1c）
 
 **仕様本文への影響なし（内部実装のみ）**

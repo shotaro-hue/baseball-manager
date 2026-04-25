@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { simAtBat, BASELINE, ABILITY_RANGE } from '../../engine/simulation';
+import { simAtBat, BASELINE, ABILITY_RANGE, DEFAULT_LEAGUE_ENV } from '../../engine/simulation';
 
 /* ================================================================
    BALANCE TAB
@@ -74,10 +74,32 @@ function StatusBadge({ val, baseline, invert = false }) {
   return <span style={{ color, fontSize: 10, fontWeight: 700 }}>{text}</span>;
 }
 
+// ── リーグ環境ノブ定義 ─────────────────────────────────────
+const KNOB_DEFS = [
+  { key: 'kMod',   label: '三振率補正',   desc: '1.0=基準, <1で投手の三振が減る（打者有利）',   min: 0.70, max: 1.30, step: 0.01, invertColor: true  },
+  { key: 'hitMod', label: '安打率補正',   desc: '1.0=基準, >1で安打が増える（打者有利）',       min: 0.70, max: 1.30, step: 0.01, invertColor: false },
+  { key: 'hrMod',  label: '本塁打率補正', desc: '1.0=基準, >1でホームランが増える（打者有利）', min: 0.70, max: 1.50, step: 0.01, invertColor: false },
+  { key: 'bbMod',  label: '四球率補正',   desc: '1.0=基準, >1で四球が増える（打者有利）',       min: 0.70, max: 1.30, step: 0.01, invertColor: false },
+];
+
 // ── メインコンポーネント ──────────────────────────────────────
-export function BalanceTab({ teams }) {
+export function BalanceTab({ teams, myTeam, upd, myId }) {
   const [simRows, setSimRows] = useState([]);
   const [busy, setBusy]       = useState(false);
+
+  const leagueEnv = myTeam?.leagueEnv || DEFAULT_LEAGUE_ENV;
+
+  const setKnob = useCallback((key, raw) => {
+    if (!upd || !myId) return;
+    const value = parseFloat(raw);
+    if (isNaN(value)) return;
+    upd(myId, t => ({ ...t, leagueEnv: { ...(t.leagueEnv || DEFAULT_LEAGUE_ENV), [key]: value } }));
+  }, [upd, myId]);
+
+  const resetKnobs = useCallback(() => {
+    if (!upd || !myId) return;
+    upd(myId, t => ({ ...t, leagueEnv: { ...DEFAULT_LEAGUE_ENV } }));
+  }, [upd, myId]);
 
   // Section 1: リーグ全体集計
   const league = useMemo(() => {
@@ -256,10 +278,60 @@ export function BalanceTab({ teams }) {
       </div>
 
       {/* ═══════════════════════════════════════
-          Section 3: バランス設定値
+          Section 3: リーグ環境ノブ
+      ═══════════════════════════════════════ */}
+      {myTeam && upd && (
+        <div className="card">
+          <div className="card-h" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>🎛️ リーグ環境設定</span>
+            <button className="bsm" style={{ background: 'rgba(255,255,255,.08)', fontSize: 10 }} onClick={resetKnobs}>
+              リセット
+            </button>
+          </div>
+          <p style={{ fontSize: 11, color: '#374151', margin: '4px 0 10px' }}>
+            シミュレーションエンジンに適用されるリーグ全体の環境係数を調整できます。<br />
+            変更は次の試合から反映されます。
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {KNOB_DEFS.map(({ key, label, desc, min, max, step, invertColor }) => {
+              const val = leagueEnv[key] ?? DEFAULT_LEAGUE_ENV[key];
+              const diff = val - 1.00;
+              const isNeutral = Math.abs(diff) < 0.005;
+              const isBatterFavor = invertColor ? diff < -0.005 : diff > 0.005;
+              const dotColor = isNeutral ? '#94a3b8' : isBatterFavor ? '#34d399' : '#f87171';
+              return (
+                <div key={key}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontWeight: 700, fontSize: 12, minWidth: 80 }}>{label}</span>
+                    <span className="mono" style={{ color: dotColor, fontSize: 13, minWidth: 36 }}>{val.toFixed(2)}</span>
+                    <span style={{ fontSize: 10, color: dotColor }}>
+                      {isNeutral ? '基準値' : isBatterFavor ? '打者有利' : '投手有利'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 10, color: '#374151', minWidth: 28 }}>{min.toFixed(2)}</span>
+                    <input
+                      type="range"
+                      min={min} max={max} step={step}
+                      value={val}
+                      onChange={e => setKnob(key, e.target.value)}
+                      style={{ flex: 1, accentColor: dotColor }}
+                    />
+                    <span style={{ fontSize: 10, color: '#374151', minWidth: 28 }}>{max.toFixed(2)}</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: '#374151', marginTop: 2 }}>{desc}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════
+          Section 4: バランス設定値（エンジン定数）
       ═══════════════════════════════════════ */}
       <div className="card">
-        <div className="card-h">⚙️ 現在のバランス設定値</div>
+        <div className="card-h">⚙️ 現在のバランス設定値（エンジン定数）</div>
         <div style={{ overflowX: 'auto' }}>
           <table className="tbl">
             <thead>
