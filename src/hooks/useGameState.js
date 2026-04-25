@@ -9,7 +9,7 @@ import { NPB2025_ROSTERS } from '../data/npb2025';
 import { SEASON_PARAMS, getDefaultParams } from '../data/scheduleParams.js';
 import {
   TEAM_DEFS, POSITIONS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
-  MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, MIN_SALARY_SHIHAKA,
+  MAX_ROSTER, MAX_外国人_一軍, MIN_SALARY_SHIHAKA,
   MAX_SHIHAKA_TOTAL, REGISTRATION_COOLDOWN_DAYS, TALK_COOLDOWN_DAYS,
   PRESS_CONFERENCE_INTERVAL,
   FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX,
@@ -366,7 +366,7 @@ export function useGameState() {
     if(!myTeam) return;
     const p=myTeam.players.find(x=>x.id===pid);
     if(!p) return;
-    if(myTeam.farm.filter(x=>!x.育成).length>=MAX_FARM){notify("二軍満杯（支配下枠）","warn");return;}
+    // 降格は支配下数を変えないためファーム枠チェック不要
     // 手動降格: 登録抹消クールダウン10日をセット
     const demotedPlayer={...p,registrationCooldownDays:REGISTRATION_COOLDOWN_DAYS};
     upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),lineup:t.lineup.filter(id=>id!==pid),lineupNoDh:(t.lineupNoDh||[]).filter(id=>id!==pid),lineupDh:(t.lineupDh||[]).filter(id=>id!==pid),rotation:t.rotation.filter(id=>id!==pid),farm:[...t.farm,demotedPlayer]}));
@@ -398,7 +398,8 @@ export function useGameState() {
     if(!myTeam) return;
     const p=myTeam.scoutResults[idx];
     if(!p||myTeam.budget<p.salary){notify("予算不足","warn");return;}
-    if(myTeam.farm.length>=MAX_FARM){notify("二軍枠満杯","warn");return;}
+    const shihakaNow=myTeam.players.filter(x=>!x.育成).length+myTeam.farm.filter(x=>!x.育成).length;
+    if(shihakaNow>=MAX_SHIHAKA_TOTAL){notify(`支配下上限（${MAX_SHIHAKA_TOTAL}人）到達。獲得不可`,"warn");return;}
     upd(myId,t=>({...t,budget:t.budget-p.salary,farm:[...t.farm,{...p,contractYearsLeft:2}],scoutResults:t.scoutResults.filter((_,i)=>i!==idx)}));
     notify(`${p.name}を獲得！`,"ok");
   },[myTeam,upd,myId,notify]);

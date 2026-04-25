@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { MAX_ROSTER, MAX_FARM, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL, DEV_GOALS_BATTER, DEV_GOALS_PITCHER, TALK_COOLDOWN_DAYS, POSITIONS, FIELDING_POSITIONS, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX } from '../../constants';
+import { MAX_ROSTER, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL, DEV_GOALS_BATTER, DEV_GOALS_PITCHER, TALK_COOLDOWN_DAYS, POSITIONS, FIELDING_POSITIONS, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX } from '../../constants';
 import { fmtAvg, fmtSal } from '../../utils';
 import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
 import { OV, CondBadge, HandBadge } from '../ui';
@@ -542,7 +542,7 @@ export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetR
             return null;
           })()}
           <div className="card">
-            <div className="card-h">二軍 ({team.farm.length}/{MAX_FARM})</div>
+            <div className="card-h">二軍 ({team.farm.length}人)</div>
             <div style={{overflowX:"auto"}}>
               <table className="tbl">
                 <thead><tr><th>選手名</th><th>守備</th><th>年齢</th><th>育成年</th><th>潜在</th><th>主要能力</th><th>育成目標</th><th>状態</th><th>二軍成績</th><th></th></tr></thead>

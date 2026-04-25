@@ -10,7 +10,7 @@ import { initPlayoff } from '../engine/playoff';
 import { selectAllStars, runAllStarGame } from '../engine/allstar';
 import { getMyMatchup, getCpuMatchups } from '../engine/scheduleGen';
 import { saveGame } from '../engine/saveload';
-import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, MAX_FARM, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER, MAX_外国人_一軍, CPU_AUTO_MANAGE_INTERVAL, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX, FIELDING_POSITIONS } from '../constants';
+import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER, MAX_外国人_一軍, CPU_AUTO_MANAGE_INTERVAL, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX, FIELDING_POSITIONS } from '../constants';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 
 // 守備コーチボーナス: 怪我回復速度 UP
@@ -50,7 +50,7 @@ function autoInjuryDemote(team) {
   const farm=team.farm??[];
   const demoted=[];const kept=[];
   for(const p of team.players){
-    if((p.injuryDaysLeft??0)>INJURY_AUTO_DEMOTE_DAYS&&farm.length+demoted.length<MAX_FARM){
+    if((p.injuryDaysLeft??0)>INJURY_AUTO_DEMOTE_DAYS){
       demoted.push({...p,registrationCooldownDays:REGISTRATION_COOLDOWN_DAYS});
     }else{kept.push(p);}
   }
@@ -771,7 +771,7 @@ export function useSeasonFlow(gs) {
       myT.farm=tickInjuries(myT.farm??[]);
       myT.farm=tickCooldowns(myT.farm??[]);
       // 怪我日数 > 10日の一軍選手を自動二軍降格（インライン: myT参照を維持）
-      {const farm=myT.farm??[];const demotedB=[];const keptB=[];for(const p of myT.players){if((p.injuryDaysLeft??0)>INJURY_AUTO_DEMOTE_DAYS&&farm.length+demotedB.length<MAX_FARM){demotedB.push({...p,registrationCooldownDays:REGISTRATION_COOLDOWN_DAYS});}else{keptB.push(p);}}if(demotedB.length>0){const dIds=new Set(demotedB.map(p=>p.id));myT.players=keptB;myT.farm=[...farm,...demotedB];myT.lineup=(myT.lineup??[]).filter(id=>!dIds.has(id));myT.lineupNoDh=(myT.lineupNoDh??[]).filter(id=>!dIds.has(id));myT.lineupDh=(myT.lineupDh??[]).filter(id=>!dIds.has(id));myT.rotation=(myT.rotation??[]).filter(id=>!dIds.has(id));}}
+      {const farm=myT.farm??[];const demotedB=[];const keptB=[];for(const p of myT.players){if((p.injuryDaysLeft??0)>INJURY_AUTO_DEMOTE_DAYS){demotedB.push({...p,registrationCooldownDays:REGISTRATION_COOLDOWN_DAYS});}else{keptB.push(p);}}if(demotedB.length>0){const dIds=new Set(demotedB.map(p=>p.id));myT.players=keptB;myT.farm=[...farm,...demotedB];myT.lineup=(myT.lineup??[]).filter(id=>!dIds.has(id));myT.lineupNoDh=(myT.lineupNoDh??[]).filter(id=>!dIds.has(id));myT.lineupDh=(myT.lineupDh??[]).filter(id=>!dIds.has(id));myT.rotation=(myT.rotation??[]).filter(id=>!dIds.has(id));}}
       const oppT=newTeams.find(t=>t.id===opp.id);
       if(oppT){
         if(won){oppT.losses++;oppT.rf+=r.score.opp;oppT.ra+=r.score.my;}
