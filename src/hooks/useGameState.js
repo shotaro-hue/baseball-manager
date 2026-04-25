@@ -313,6 +313,12 @@ export function useGameState() {
   const removeFromRotation = useCallback((pid)=>upd(myId,t=>({...t,rotation:t.rotation.filter(id=>id!==pid)})),[upd,myId]);
   const setPitchingPattern = useCallback((patch)=>upd(myId,t=>({...t,pitchingPattern:{...(t.pitchingPattern??{}), ...patch}})),[upd,myId]);
   const replaceRotation = useCallback((rotationIds, patternPatch)=>upd(myId,t=>({...t,rotation:rotationIds,pitchingPattern:{...(t.pitchingPattern??{}),...patternPatch}})),[upd,myId]);
+  const replaceFullRoster = useCallback((lineupEntries, rotationIds, patternPatch)=>upd(myId,t=>{
+    const dhMode=t.rosterDhMode??t.dhEnabled;
+    const newLineup=lineupEntries.map(e=>e.id);
+    const updatedPlayers=t.players.map(p=>{const entry=lineupEntries.find(e=>e.id===p.id);return entry&&entry.pos!==p.pos?{...p,pos:entry.pos}:p;});
+    return{...t,players:updatedPlayers,lineup:newLineup,...(dhMode?{lineupDh:newLineup}:{lineupNoDh:newLineup}),rotation:rotationIds,pitchingPattern:{...(t.pitchingPattern??{}),...patternPatch}};
+  }),[upd,myId]);
 
   const promote = useCallback((pid)=>{
     if(!myTeam) return;
@@ -498,6 +504,7 @@ export function useGameState() {
     removeFromRotation,
     setPitchingPattern,
     replaceRotation,
+    replaceFullRoster,
     promote,
     convertIkusei,
     demote,

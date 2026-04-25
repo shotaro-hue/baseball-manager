@@ -21,6 +21,9 @@ export const CPU_FA_MIN_SCORE = 45; // CPU球団がFAに入札する最低スコ
 export const INJURY_AUTO_DEMOTE_DAYS = 10;        // この日数を超える怪我は自動二軍降格（NPB登録抹消相当）
 export const REGISTRATION_COOLDOWN_DAYS = 10;     // 登録抹消後の再登録不可日数（NPB10日ルール）
 export const ROSTER_SWAP_SCORE_THRESHOLD = 15;   // 二軍選手スワップ推薦のスコア差閾値
+export const ROSTER_DEVREC_BONUS = 12;           // 育成加点: 有望1軍未経験ファーム選手へのスコア補正
+export const ROSTER_DEVREC_POTENTIAL_MIN = 65;   // 育成加点: potential 最低ライン
+export const ROSTER_DEVREC_DAYS_MAX = 20;        // 育成加点: 1軍登録日数の上限（今季未経験圏）
 // 故障箇所（確率重み付き）
 export const INJURY_BODY_PARTS = [
   { part: '肩', weight: 20 },

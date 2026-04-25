@@ -5,6 +5,20 @@
 
 ---
 
+### 2026-04-25 — feat: 一括自動編成・能力値×成績ブレンドスコア（U1c）
+
+**仕様本文への影響なし（内部実装のみ）**
+
+- ロスタータブのサブタブ行右端に「🔄 一括自動編成」ボタンを追加。野手打線・投手ローテ・ブルペンパターンを `replaceFullRoster` により1回のstateアップデートでアトミックに確定
+- 昇降格レコメンド評価スコアを `rosterRecScore`（新関数）に刷新:
+  - **投手**: 能力ベース×0.55 + ERA成績スコア `(5.0-ERA)×35` + WHIP成績スコア `(1.5-WHIP)×50`。登板ゼロの場合は能力のみ（ペナルティなし）
+  - **野手**: OPS主体（既存式を維持）
+- 育成加点ロジックを追加: `potential≥ROSTER_DEVREC_POTENTIAL_MIN(65)` かつ `daysOnActiveRoster<ROSTER_DEVREC_DAYS_MAX(20)` のファーム選手に `ROSTER_DEVREC_BONUS(+12pt)` を加算しスワップ・昇格推薦を優先
+- 定数3件追加（`ROSTER_DEVREC_BONUS` / `ROSTER_DEVREC_POTENTIAL_MIN` / `ROSTER_DEVREC_DAYS_MAX`）を `src/constants.js` に追加
+- 変更ファイル: `src/constants.js`・`src/hooks/useGameState.js`・`src/App.jsx`・`src/components/tabs/RosterTab.jsx`
+
+---
+
 ### 2026-04-25 — feat: 投手自動編成・昇降格レコメンド（U1b）
 
 **仕様本文への影響なし（内部実装のみ）**
