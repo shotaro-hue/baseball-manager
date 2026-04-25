@@ -11,7 +11,7 @@ import { SEASON_PARAMS, getDefaultParams } from '../data/scheduleParams.js';
 import {
   TEAM_DEFS, ACCEPT_THRESHOLD, OWNER_TRUST_BUDGET_LOW, OWNER_TRUST_BUDGET_HIGH,
   OWNER_TRUST_FACTOR_LOW, OWNER_TRUST_FACTOR_HIGH, POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD,
-  FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX,
+  FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX, MIN_SALARY_SHIHAKA,
 } from '../constants';
 
 export function useOffseason(gs) {
@@ -85,7 +85,7 @@ export function useOffseason(gs) {
     setTeams(prev=>prev.map(t=>{
       const picks=picksFor(t.id);
       if(!picks.length) return t;
-      return{...t,farm:[...t.farm,...picks.map(p=>({...p,育成:true}))]};
+      return{...t,farm:[...t.farm,...picks.map(p=>({...p,育成:false,salary:Math.max(MIN_SALARY_SHIHAKA,p.salary),contractYears:1,contractYearsLeft:1,ikuseiYears:0}))]};
     }));
     setNewSeasonInfo(prev=>({...(prev||{}),draftCount:myPicks.length,draftNames:myPicks.slice(0,3).map(p=>p.name)}));
     handleNextYear();

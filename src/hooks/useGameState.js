@@ -366,7 +366,7 @@ export function useGameState() {
     if(!myTeam) return;
     const p=myTeam.players.find(x=>x.id===pid);
     if(!p) return;
-    if(myTeam.farm.length>=MAX_FARM){notify("二軍満杯","warn");return;}
+    if(myTeam.farm.filter(x=>!x.育成).length>=MAX_FARM){notify("二軍満杯（支配下枠）","warn");return;}
     // 手動降格: 登録抹消クールダウン10日をセット
     const demotedPlayer={...p,registrationCooldownDays:REGISTRATION_COOLDOWN_DAYS};
     upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),lineup:t.lineup.filter(id=>id!==pid),lineupNoDh:(t.lineupNoDh||[]).filter(id=>id!==pid),lineupDh:(t.lineupDh||[]).filter(id=>id!==pid),rotation:t.rotation.filter(id=>id!==pid),farm:[...t.farm,demotedPlayer]}));
