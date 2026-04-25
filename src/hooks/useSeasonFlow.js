@@ -626,12 +626,12 @@ export function useSeasonFlow(gs) {
     else setScreen("result");
   };
 
-  // 5試合まとめてオートシム
-  const handleBatchSim = () => {
+  // 任意試合数まとめてオートシム
+  const handleBatchSim = (count) => {
     if(!myTeam) return;
-    const count=Math.min(BATCH, SEASON_GAMES-(gameDay-1));
-    if(count<=0) return;
-    runBatchGames(count);
+    const actual=Math.min(count ?? BATCH, SEASON_GAMES-(gameDay-1));
+    if(actual<=0) return;
+    runBatchGames(actual);
   };
 
   // 残り全試合まとめてオートシム

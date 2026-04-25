@@ -18,7 +18,7 @@ import { AllStarScreen } from './components/AllStarScreen';
 import { DashboardTab } from './components/DashboardTab';
 import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab, ScheduleTab, BalanceTab } from './components/Tabs';
 import {
-  SEASON_GAMES, BATCH, MAX_外国人_一軍, MAX_ROSTER, TEAM_DEFS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
+  SEASON_GAMES, MAX_外国人_一軍, MAX_ROSTER, TEAM_DEFS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
   POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD,
   POSITIONS, FIELDING_POSITIONS,
   FOREIGN_DEADLINE_DAY, FOREIGN_AGENT_SALARY_RATIO, FOREIGN_AGENT_ACCEPT_PROB, FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX, TRADE_DEADLINE_MONTH,
@@ -101,6 +101,7 @@ export default function App(){
     PRIMARY_SECTIONS.reduce((acc, section) => ({ ...acc, [section.id]: section.defaultTab }), {})
   ));
   const [currentPrimarySection, setCurrentPrimarySection] = useState("home");
+  const [batchCount, setBatchCount] = useState(5);
 
   useEffect(() => {
     const sectionId = TAB_TO_SECTION[tab];
@@ -278,13 +279,34 @@ export default function App(){
     {gameDay<=SEASON_GAMES&&(
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
         <button className="sim-btn" style={{margin:0,fontSize:12}} onClick={sf.handleStartGame}>
-          ⚾ 1試合<br/><span style={{fontSize:9,opacity:.7}}>采配 or オート</span>
+          ⚾ 1試合<br/>
+          <span style={{fontSize:9,opacity:.7}}>
+            {(d=>d?`${d.month}/${d.day} `:"") (gameDayToDate(gameDay,schedule))}采配 or オート
+          </span>
         </button>
-        <button className="sim-btn" style={{margin:0,fontSize:12,background:"linear-gradient(135deg,#071a2c,#0d2840)",borderColor:"rgba(96,165,250,.5)",color:"#60a5fa"}} onClick={sf.handleBatchSim}>
-          ⚡ {Math.min(BATCH,SEASON_GAMES-(gameDay-1))}試合まとめて<br/><span style={{fontSize:9,opacity:.7}}>オートシム</span>
-        </button>
+        {/* バッチシム — 試合数カスタム */}
+        {(()=>{
+          const eff=Math.min(batchCount,remain);
+          const sd=gameDayToDate(gameDay,schedule);
+          const ed=gameDayToDate(Math.min(gameDay+eff-1,SEASON_GAMES),schedule);
+          return(
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5,background:"linear-gradient(135deg,#071a2c,#0d2840)",border:"1px solid rgba(96,165,250,.5)",borderRadius:10,padding:"8px 6px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:3}}>
+                <button onClick={()=>setBatchCount(c=>Math.max(1,c-1))} style={{width:20,height:20,border:"1px solid rgba(96,165,250,.5)",background:"rgba(96,165,250,.1)",color:"#60a5fa",borderRadius:3,cursor:"pointer",fontSize:14,lineHeight:1,padding:0}}>−</button>
+                <input type="number" value={batchCount} onChange={e=>{const v=parseInt(e.target.value)||1;setBatchCount(clamp(v,1,remain));}} style={{width:34,textAlign:"center",background:"rgba(15,23,42,.9)",border:"1px solid rgba(96,165,250,.4)",color:"#93c5fd",borderRadius:4,fontSize:12,fontWeight:700,padding:"1px 0",fontFamily:"'Share Tech Mono',monospace"}} min={1} max={remain}/>
+                <button onClick={()=>setBatchCount(c=>Math.min(remain,c+1))} style={{width:20,height:20,border:"1px solid rgba(96,165,250,.5)",background:"rgba(96,165,250,.1)",color:"#60a5fa",borderRadius:3,cursor:"pointer",fontSize:14,lineHeight:1,padding:0}}>+</button>
+                <span style={{fontSize:10,color:"#60a5fa",marginLeft:2}}>試合</span>
+              </div>
+              {sd&&ed&&<div style={{fontSize:9,color:"#7dd3fc"}}>{sd.month}/{sd.day} 〜 {ed.month}/{ed.day}</div>}
+              <button style={{background:"transparent",border:"none",color:"#60a5fa",fontSize:11,cursor:"pointer",padding:"2px 4px",fontFamily:"'Bebas Neue',cursive",letterSpacing:".15em"}} onClick={()=>sf.handleBatchSim(eff)}>⚡ まとめてシム</button>
+            </div>
+          );
+        })()}
         <button className="sim-btn" style={{margin:0,fontSize:12,background:"linear-gradient(135deg,#1a0730,#2d0f50)",borderColor:"rgba(167,139,250,.5)",color:"#a78bfa"}} onClick={sf.handleSeasonSim}>
-          🚀 残り全{remain}試合<br/><span style={{fontSize:9,opacity:.7}}>シーズン一括消化</span>
+          🚀 残り全{remain}試合<br/>
+          <span style={{fontSize:9,opacity:.7}}>
+            {(()=>{const s=gameDayToDate(gameDay,schedule);const e=gameDayToDate(SEASON_GAMES,schedule);return s&&e?`${s.month}/${s.day}〜${e.month}/${e.day}`:"シーズン一括";})()}
+          </span>
         </button>
       </div>
     )}
