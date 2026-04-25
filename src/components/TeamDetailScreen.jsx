@@ -57,25 +57,6 @@ function buildTeamArchetype(team) {
   return 'バランス型';
 }
 
-function calcTeamMetrics(team) {
-  const players = team?.players || [];
-  const batters = players.filter(p => !p.isPitcher);
-  const pitchers = players.filter(p => p.isPitcher);
-  const hr = batters.reduce((sum, p) => sum + (p.stats?.HR || 0), 0);
-  const sb = batters.reduce((sum, p) => sum + (p.stats?.SB || 0), 0);
-  const pitching = pitchers.reduce((acc, p) => ({
-    ip: acc.ip + (p.stats?.IP || 0),
-    er: acc.er + (p.stats?.ER || 0),
-  }), { ip: 0, er: 0 });
-  const era = pitching.ip > 0 ? (pitching.er / pitching.ip) * 9 : null;
-  return {
-    winPct: calcWinPct(team?.wins || 0, team?.losses || 0),
-    hr,
-    sb,
-    era,
-  };
-}
-
 // ── ロスター・成績タブ ─────────────────────────────────
 function RosterStatsTab({ team, onPlayerClick, onOpenTrade }) {
   const [view, setView] = useState('batter');
@@ -423,7 +404,7 @@ function HistoryTab({ team, onPlayerClick }) {
 }
 
 // ── メイン: TeamDetailScreen ──────────────────────────
-export function TeamDetailScreen({ team, myTeam, allTeams, schedule, year, allTeamResultsMap, onBack, onPlayerClick, onOpenTrade }) {
+export function TeamDetailScreen({ team, allTeams, schedule, year, allTeamResultsMap, onBack, onPlayerClick, onOpenTrade }) {
   const [tab, setTab] = useState('roster');
   const [showCompare, setShowCompare] = useState(true);
 
@@ -479,16 +460,7 @@ export function TeamDetailScreen({ team, myTeam, allTeams, schedule, year, allTe
       cta: 'ロスター確認',
       action: () => setTab('roster'),
     },
-    ...(myTeam && myTeam.id !== team.id ? [{
-      level: 'Med',
-      title: `自チーム比較 ${fmtWinPctNumber(calcTeamMetrics(team).winPct)} vs ${fmtWinPctNumber(calcTeamMetrics(myTeam).winPct)}`,
-      detail: '主要指標を並列比較して、優位・劣位を即判定できます。',
-      cta: showCompare ? '比較を閉じる' : '比較を開く',
-      action: () => setShowCompare(v => !v),
-    }] : []),
   ];
-  const targetMetrics = calcTeamMetrics(team);
-  const myMetrics = myTeam ? calcTeamMetrics(myTeam) : null;
 
   return (
     <div className="app">
@@ -540,34 +512,6 @@ export function TeamDetailScreen({ team, myTeam, allTeams, schedule, year, allTe
             </div>
           ))}
         </div>
-
-        {showCompare && myMetrics && myTeam.id !== team.id && (
-          <div className="card" style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 11, color: '#7dd3fc', marginBottom: 6, fontWeight: 700 }}>自チーム比較</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 6 }}>
-              {[
-                { label: '勝率', left: fmtWinPctNumber(targetMetrics.winPct), right: fmtWinPctNumber(myMetrics.winPct), highIsGood: true, leftNum: targetMetrics.winPct, rightNum: myMetrics.winPct },
-                { label: 'ERA', left: targetMetrics.era != null ? targetMetrics.era.toFixed(2) : '-.--', right: myMetrics.era != null ? myMetrics.era.toFixed(2) : '-.--', highIsGood: false, leftNum: targetMetrics.era ?? 99, rightNum: myMetrics.era ?? 99 },
-                { label: 'HR', left: String(targetMetrics.hr), right: String(myMetrics.hr), highIsGood: true, leftNum: targetMetrics.hr, rightNum: myMetrics.hr },
-                { label: 'SB', left: String(targetMetrics.sb), right: String(myMetrics.sb), highIsGood: true, leftNum: targetMetrics.sb, rightNum: myMetrics.sb },
-              ].map((m) => {
-                const targetBetter = m.highIsGood ? m.leftNum > m.rightNum : m.leftNum < m.rightNum;
-                const myBetter = m.highIsGood ? m.rightNum > m.leftNum : m.rightNum < m.leftNum;
-                return (
-                  <div key={m.label} style={{ border: '1px solid rgba(148,163,184,.2)', borderRadius: 6, padding: 6, background: 'rgba(15,23,42,.45)' }}>
-                    <div style={{ fontSize: 9, color: '#64748b', marginBottom: 4 }}>{m.label}</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
-                      <span style={{ color: targetBetter ? '#4ade80' : '#cbd5e1', fontSize: 12, fontWeight: 700 }}>{m.left}</span>
-                      <span style={{ color: '#334155', fontSize: 9 }}>vs</span>
-                      <span style={{ color: myBetter ? '#fbbf24' : '#cbd5e1', fontSize: 12, fontWeight: 700 }}>{m.right}</span>
-                    </div>
-                    <div style={{ marginTop: 4, fontSize: 9, color: '#64748b' }}>{team.name} / {myTeam.name}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {/* タブ */}
         <div className="tabs-nav">
