@@ -284,19 +284,19 @@ export default function App(){
             {(d=>d?`${d.month}/${d.day} `:"") (gameDayToDate(gameDay,schedule))}采配 or オート
           </span>
         </button>
-        {/* バッチシム — 試合数カスタム */}
+        {/* バッチシム — 5試合刻みプルダウン */}
         {(()=>{
-          const eff=Math.min(batchCount,remain);
+          const opts=[];
+          for(let i=5;i<=remain;i+=5) opts.push(i);
+          if(opts.length===0) opts.push(Math.max(1,remain));
+          const eff=opts.includes(batchCount)?batchCount:opts[0];
           const sd=gameDayToDate(gameDay,schedule);
           const ed=gameDayToDate(Math.min(gameDay+eff-1,SEASON_GAMES),schedule);
           return(
             <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5,background:"linear-gradient(135deg,#071a2c,#0d2840)",border:"1px solid rgba(96,165,250,.5)",borderRadius:10,padding:"8px 6px"}}>
-              <div style={{display:"flex",alignItems:"center",gap:3}}>
-                <button onClick={()=>setBatchCount(c=>Math.max(1,c-1))} style={{width:20,height:20,border:"1px solid rgba(96,165,250,.5)",background:"rgba(96,165,250,.1)",color:"#60a5fa",borderRadius:3,cursor:"pointer",fontSize:14,lineHeight:1,padding:0}}>−</button>
-                <input type="number" value={batchCount} onChange={e=>{const v=parseInt(e.target.value)||1;setBatchCount(clamp(v,1,remain));}} style={{width:34,textAlign:"center",background:"rgba(15,23,42,.9)",border:"1px solid rgba(96,165,250,.4)",color:"#93c5fd",borderRadius:4,fontSize:12,fontWeight:700,padding:"1px 0",fontFamily:"'Share Tech Mono',monospace"}} min={1} max={remain}/>
-                <button onClick={()=>setBatchCount(c=>Math.min(remain,c+1))} style={{width:20,height:20,border:"1px solid rgba(96,165,250,.5)",background:"rgba(96,165,250,.1)",color:"#60a5fa",borderRadius:3,cursor:"pointer",fontSize:14,lineHeight:1,padding:0}}>+</button>
-                <span style={{fontSize:10,color:"#60a5fa",marginLeft:2}}>試合</span>
-              </div>
+              <select value={eff} onChange={e=>setBatchCount(parseInt(e.target.value))} style={{width:"100%",background:"rgba(15,23,42,.9)",border:"1px solid rgba(96,165,250,.4)",color:"#93c5fd",borderRadius:4,fontSize:11,fontWeight:700,padding:"3px 4px",fontFamily:"'Share Tech Mono',monospace",cursor:"pointer"}}>
+                {opts.map(n=>{const d=gameDayToDate(Math.min(gameDay+n-1,SEASON_GAMES),schedule);return<option key={n} value={n}>{n}試合{d?` (〜${d.month}/${d.day})`:""}</option>;})}
+              </select>
               {sd&&ed&&<div style={{fontSize:9,color:"#7dd3fc"}}>{sd.month}/{sd.day} 〜 {ed.month}/{ed.day}</div>}
               <button style={{background:"transparent",border:"none",color:"#60a5fa",fontSize:11,cursor:"pointer",padding:"2px 4px",fontFamily:"'Bebas Neue',cursive",letterSpacing:".15em"}} onClick={()=>sf.handleBatchSim(eff)}>⚡ まとめてシム</button>
             </div>
