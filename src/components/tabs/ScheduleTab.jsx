@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { gameDayToDate } from '../../utils';
 import { getMyMatchup } from '../../engine/scheduleGen';
 import { SEASON_GAMES } from '../../constants';
+import { BoxScoreModal } from '../BoxScoreModal';
 
 const MONTH_LABELS = ['3月','4月','5月','6月','7月','8月','9月','10月'];
 // 月曜始まり: 0=月,1=火,2=水,3=木,4=金,5=土,6=日
@@ -313,6 +314,7 @@ function SeasonProgressBar({ gameDay, wins, losses }) {
 export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResultsMap = {}, allStarDone = false, allStarResult = null, allStarTriggerDay = 72, onResultClick = null, scheduleArchive = [] }) {
   const [selectedDay, setSelectedDay] = useState(gameDay);
   const [resultModal, setResultModal] = useState(null); // dayNo or null
+  const [boxScoreModal, setBoxScoreModal] = useState(null); // { dayNo, result } or null
   const [viewYear, setViewYear] = useState(year);
 
   // 現シーズンに切り替わったら表示年をリセット
@@ -331,6 +333,7 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
   const isPast = viewYear !== year;
   const viewSchedule = isPast ? (archived?.schedule || null) : schedule;
   const viewResultsMap = isPast ? (archived?.gameResultsMap || {}) : gameResultsMap;
+  const viewBoxResultsMap = isPast ? (archived?.myTeamResultsMap || {}) : null;
 
   // 過去シーズンの最終成績を gameResultsMap から集計
   const pastRecord = useMemo(() => {
@@ -389,6 +392,7 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
   const modalResult = resultModal ? viewResultsMap[resultModal] : null;
   const modalDate = resultModal ? gameDayToDate(resultModal, viewSchedule) : null;
   const modalOpponent = resultModal && modalResult ? modalResult.oppName : null;
+  const boxModalDate = boxScoreModal ? gameDayToDate(boxScoreModal.dayNo, viewSchedule) : null;
 
   // 年度セレクター用リスト（過去アーカイブ + 現在）
   const availableYears = [...scheduleArchive.map(a => a.year).sort((a,b)=>b-a), year];
@@ -405,7 +409,7 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
                 key={y}
                 className={`bsm ${viewYear === y ? 'bgb' : 'bga'}`}
                 style={{ padding: '3px 10px', fontWeight: viewYear === y ? 700 : 400 }}
-                onClick={() => { setViewYear(y); setResultModal(null); }}
+                onClick={() => { setViewYear(y); setResultModal(null); setBoxScoreModal(null); }}
               >
                 {y}年{y === year ? ' (現在)' : ''}
               </button>
@@ -541,7 +545,18 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
                       isToday={!isPast && cell.type === 'game' && cell.dayNo === gameDay}
                       isSelected={cell.type === 'game' && cell.dayNo === selectedDay}
                       onSelect={setSelectedDay}
-                      onResultClick={isPast ? setResultModal : (onResultClick || setResultModal)}
+                      onResultClick={(dayNo) => {
+                        if (!isPast) {
+                          (onResultClick || setResultModal)(dayNo);
+                          return;
+                        }
+                        const boxResult = viewBoxResultsMap?.[dayNo];
+                        if (boxResult && (boxResult.inningScores || boxResult.myBatting || boxResult.myPitching)) {
+                          setBoxScoreModal({ dayNo, result: boxResult });
+                        } else {
+                          setResultModal(dayNo);
+                        }
+                      }}
                       allStarResult={isPast ? null : allStarResult}
                     />
                   ))}
@@ -561,6 +576,19 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
           year={viewYear}
           opponent={modalOpponent}
           onClose={() => setResultModal(null)}
+        />
+      )}
+
+      {isPast && boxScoreModal?.result && (
+        <BoxScoreModal
+          result={boxScoreModal.result}
+          myTeamName={myTeam?.name || '自チーム'}
+          oppTeamName={boxScoreModal.result.oppName || '相手'}
+          teamId={myTeam?.id}
+          dayNo={boxScoreModal.dayNo}
+          date={boxModalDate}
+          year={viewYear}
+          onClose={() => setBoxScoreModal(null)}
         />
       )}
     </div>
