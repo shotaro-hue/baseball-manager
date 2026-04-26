@@ -678,7 +678,7 @@ export function useSeasonFlow(gs) {
 
       const scheduleMatchup=getMyMatchup(schedule,newDay,myId);
       const oppId=scheduleMatchup?.oppId;
-      const opp=oppId ? newTeams.find(t=>t.id===oppId) : null;
+      const opp=scheduleMatchup ? newTeams.find(t=>t.id===scheduleMatchup.oppId) : null;
       const cpuPairs=getCpuMatchups(schedule,newDay,myId,oppId);
       for(const cpuMatchup of cpuPairs){
         const a=newTeams.find(t=>t.id===cpuMatchup.homeId);
