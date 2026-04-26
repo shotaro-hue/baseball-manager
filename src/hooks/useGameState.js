@@ -46,7 +46,7 @@ export function useGameState() {
   const [faPool, setFaPool] = useState(() => generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX)));
   const [faYears, setFaYears] = useState({});
   const [notif, setNotif] = useState(null);
-  const [seasonHistory, setSeasonHistory] = useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[]});
+  const [seasonHistory, setSeasonHistory] = useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[],transfers:[]});
   const [saveExists, setSaveExists] = useState(()=>hasSave());
   const [schedule, setSchedule] = useState(null);
   const [news, setNews] = useState([]);
@@ -125,6 +125,14 @@ export function useGameState() {
     }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[year]);
+
+  const addTransferLog = useCallback((entry)=>{
+    if(!entry) return;
+    setSeasonHistory(prev=>({
+      ...(prev||{}),
+      transfers:[...(prev?.transfers||[]),{id:uid(),timestamp:Date.now(),...entry}].slice(-400),
+    }));
+  },[]);
 
   // オートセーブ（hubに戻った時）
   useEffect(()=>{
@@ -486,6 +494,7 @@ export function useGameState() {
     pushGameResult,
     addNews,
     addToHistory,
+    addTransferLog,
     handleSave,
     handleSelect,
     handlePlayerClick,

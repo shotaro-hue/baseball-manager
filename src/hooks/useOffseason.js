@@ -21,7 +21,7 @@ export function useOffseason(gs) {
     faPool, setFaPool, setFaYears,
     seasonHistory, setSeasonHistory,
     setMailbox, setScreen,
-    notify, upd, addNews, addToHistory,
+    notify, upd, addNews, addToHistory, addTransferLog,
     setRetireModal, setRetireGamePlayer, retireRole,
     setAllStarDone,
     setAllStarResult,
@@ -120,6 +120,18 @@ export function useOffseason(gs) {
     gs.setCpuTradeOffers([]);
     notify("🔄 トレード成立！","ok");
     addNews({type:"trade",headline:"【移籍】"+(theirIn.map(p=>p.name).join("、")||"選手")+"が"+(myTeam?.name||"")+"へ",source:"Baseball Times",dateLabel:year+"年 "+gameDay+"日目",body:(myTeam?.name||"自チーム")+"と"+(tgtTeam?.name||"相手")+"の間でトレードが成立。"+(myTeam?.name||"")+"は"+(theirIn.map(p=>p.name).join("、")||"選手")+"を獲得し、"+(myOut.map(p=>p.name).join("、")||"選手")+"を放出した。"+(cash&&cash>0?"\nなお"+Math.abs(cash).toLocaleString()+"万円の金銭も含まれる。":"")});
+    addTransferLog({
+      year,
+      day: gameDay,
+      type: "trade",
+      headline: `【トレード成立】${myTeam?.name||"自チーム"} ↔ ${tgtTeam?.name||"相手"}`,
+      fromTeam: tgtTeam?.name||"相手",
+      toTeam: myTeam?.name||"自チーム",
+      playersIn: theirIn.map(p=>p.name),
+      playersOut: myOut.map(p=>p.name),
+      cash,
+      detail: `${myTeam?.name||"自チーム"}が${theirIn.map(p=>p.name).join("、")||"なし"}を獲得 / ${myOut.map(p=>p.name).join("、")||"なし"}を放出`,
+    });
   };
 
   const acceptCpuOffer = (idx) => {

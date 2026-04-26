@@ -1,10 +1,18 @@
 import React, { useState } from "react";
 
-export function NewsTab({news,onInterview}){
+export function NewsTab({news,onInterview,seasonHistory,currentYear}){
   const [sel,setSel]=useState(null);
   const [answered,setAnswered]=useState({});
+  const [transferYear,setTransferYear]=useState("all");
   const icon=t=>t==="game"?"⚾":t==="trade"?"🔄":t==="draft"?"📋":t==="interview"?"🎤":t==="season"?"🏆":"📰";
   const col=t=>t==="game"?"#60a5fa":t==="trade"?"#f97316":t==="draft"?"#a78bfa":t==="interview"?"#f5c842":t==="season"?"#34d399":"#94a3b8";
+  const transferLogs=(seasonHistory?.transfers||[]).slice().sort((a,b)=>{
+    if((b.year||0)!==(a.year||0)) return (b.year||0)-(a.year||0);
+    if((b.day||0)!==(a.day||0)) return (b.day||0)-(a.day||0);
+    return (b.timestamp||0)-(a.timestamp||0);
+  });
+  const transferYears=["all",...new Set(transferLogs.map(l=>l.year).filter(Boolean))];
+  const shownTransfers=transferYear==="all"?transferLogs:transferLogs.filter(l=>String(l.year)===transferYear);
   const handleAnswer=(newsId,opt)=>{
     onInterview(newsId,opt);
     setAnswered(prev=>({...prev,[newsId]:opt}));
@@ -26,6 +34,29 @@ export function NewsTab({news,onInterview}){
             <div style={{fontSize:9,color:"#374151",paddingLeft:18}}>{n.source} · {n.dateLabel}</div>
           </div>);
         })}
+      </div>
+      <div className="card" style={{padding:"10px"}}>
+        <div className="card-h">🌐 球界移籍トラッカー</div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,gap:8}}>
+          <div style={{fontSize:10,color:"#374151"}}>シーズン中の全球団トレード履歴（過去シーズン閲覧対応）</div>
+          <select value={transferYear} onChange={e=>setTransferYear(e.target.value)} style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.12)",color:"#e0d4bf",borderRadius:6,padding:"4px 6px",fontSize:10}}>
+            {transferYears.map(y=><option key={String(y)} value={String(y)}>{y==="all"?"全年度":`${y}年`}{y===currentYear?"（今季）":""}</option>)}
+          </select>
+        </div>
+        {shownTransfers.length===0&&<p style={{fontSize:11,color:"#374151",padding:"8px 0"}}>この年度の移籍ログはまだありません</p>}
+        {shownTransfers.slice(0,120).map(item=>(
+          <div key={item.id} style={{padding:"8px 10px",marginBottom:5,borderRadius:6,background:"rgba(249,115,22,.06)",border:"1px solid rgba(249,115,22,.2)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",gap:6,alignItems:"center"}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#f97316"}}>{item.headline||"トレード"}</div>
+              <div style={{fontSize:9,color:"#94a3b8"}}>{item.year}年 {item.day?`${item.day}日目`:""}</div>
+            </div>
+            <div style={{fontSize:10,color:"#d1d5db",marginTop:4}}>
+              IN: {(item.playersIn||[]).join("、")||"なし"} / OUT: {(item.playersOut||[]).join("、")||"なし"}
+              {Number(item.cash)!==0&&<span style={{marginLeft:6,color:"#f5c842"}}>{Number(item.cash)>0?`金銭支払い ${Math.abs(item.cash).toLocaleString()}万円`:`金銭受取 ${Math.abs(item.cash).toLocaleString()}万円`}</span>}
+            </div>
+            {item.detail&&<div style={{fontSize:9,color:"#94a3b8",marginTop:3,whiteSpace:"pre-wrap"}}>{item.detail}</div>}
+          </div>
+        ))}
       </div>
       {sel&&(
         <div className="card" style={{padding:"12px"}}>

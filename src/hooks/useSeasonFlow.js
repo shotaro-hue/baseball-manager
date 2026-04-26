@@ -274,7 +274,7 @@ export function useSeasonFlow(gs) {
     teams, setTeams, myId, myTeam,
     gameDay, setGameDay, year,
     schedule, setScreen,
-    notify, upd, addNews, pushResult,
+    notify, upd, addNews, addTransferLog, pushResult,
     setMailbox, setRetireModal,
     faPool, setFaPool, faYears, seasonHistory, news, mailbox,
     setSaveExists, cpuTradeOffers,
@@ -396,6 +396,10 @@ export function useSeasonFlow(gs) {
     return {
       headline: `【移籍情報】${buyerGets.name}が${buyerName}へ`,
       body: `${sellerName}と${buyerName}の間でトレードが成立。${buyerName}は${buyerGets.name}を獲得し、${sellerGets.name}を放出した。`,
+      buyerName,
+      sellerName,
+      buyerGetsName: buyerGets.name,
+      sellerGetsName: sellerGets.name,
     };
   };
 
@@ -716,6 +720,17 @@ export function useSeasonFlow(gs) {
       if (newsItem) {
         setTeams(liveTeams);
         addNews({ type: 'trade', headline: newsItem.headline, source: 'Baseball Times', dateLabel: `${year}年 ${gameDay}日目`, body: newsItem.body });
+        addTransferLog({
+          year,
+          day: gameDay,
+          type: "trade",
+          headline: `【CPU間トレード】${newsItem.sellerName} ↔ ${newsItem.buyerName}`,
+          fromTeam: newsItem.sellerName,
+          toTeam: newsItem.buyerName,
+          playersIn: [newsItem.buyerGetsName],
+          playersOut: [newsItem.sellerGetsName],
+          detail: newsItem.body,
+        });
       }
     }
     // 引退表明ランダム発生
@@ -966,6 +981,17 @@ export function useSeasonFlow(gs) {
         dateLabel:`${year}年 ${r.day}日目`,
         body:r.body,
       });
+      addTransferLog({
+        year,
+        day: r.day,
+        type: "trade",
+        headline: `【CPU間トレード】${r.sellerName} ↔ ${r.buyerName}`,
+        fromTeam: r.sellerName,
+        toTeam: r.buyerName,
+        playersIn: [r.buyerGetsName],
+        playersOut: [r.sellerGetsName],
+        detail: r.body,
+      });
     });
     // バッチ試合結果ニュース（古い順に追加 → ニュースタブは新しい順表示）
     [...batchNewsItems].reverse().forEach(item=>addNews(item));
@@ -1125,6 +1151,17 @@ export function useSeasonFlow(gs) {
       if (newsItem) {
         setTeams(liveTeams);
         addNews({ type: 'trade', headline: newsItem.headline, source: 'Baseball Times', dateLabel: `${year}年 ${gameDay}日目`, body: newsItem.body });
+        addTransferLog({
+          year,
+          day: gameDay,
+          type: "trade",
+          headline: `【CPU間トレード】${newsItem.sellerName} ↔ ${newsItem.buyerName}`,
+          fromTeam: newsItem.sellerName,
+          toTeam: newsItem.buyerName,
+          playersIn: [newsItem.buyerGetsName],
+          playersOut: [newsItem.sellerGetsName],
+          detail: newsItem.body,
+        });
       }
     }
     const _tdrew=gsResult.score.my===gsResult.score.opp;
