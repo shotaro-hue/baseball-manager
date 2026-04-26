@@ -53,7 +53,7 @@ export function useGameState() {
   const [mailbox, setMailbox] = useState([]);
   const [recentResults, setRecentResults] = useState([]);
   const [gameResultsMap, setGameResultsMap] = useState({});
-  const [scheduleArchive, setScheduleArchive] = useState([]); // 過去シーズン: [{year, schedule, gameResultsMap}]
+  const [scheduleArchive, setScheduleArchive] = useState([]); // 過去シーズン: [{year, schedule, gameResultsMap, myTeamResultsMap}]
   const [cpuTradeOffers, setCpuTradeOffers] = useState([]);
   const [pressEvent, setPressEvent] = useState(null);  // 記者会見イベント
   const [lastPressDay, setLastPressDay] = useState(0); // 最後に記者会見を行ったgameDay
