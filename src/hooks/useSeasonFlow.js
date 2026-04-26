@@ -10,7 +10,7 @@ import { initPlayoff } from '../engine/playoff';
 import { selectAllStars, runAllStarGame } from '../engine/allstar';
 import { getMyMatchup, getCpuMatchups } from '../engine/scheduleGen';
 import { saveGame } from '../engine/saveload';
-import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER, MAX_外国人_一軍, CPU_AUTO_MANAGE_INTERVAL, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX, FIELDING_POSITIONS } from '../constants';
+import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER, MAX_外国人_一軍, CPU_AUTO_MANAGE_INTERVAL, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX, FIELDING_POSITIONS, OPTIMAL_PITCHER_COUNT, ROSTER_BALANCE_BONUS } from '../constants';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 
 // 守備コーチボーナス: 怪我回復速度 UP
@@ -91,14 +91,22 @@ function cpuAutoManageTeam(team) {
   const farm = team.farm ?? [];
   const foreignInActive = team.players.filter(p => p.isForeign).length;
   const canPromote = (p) => !p.育成 && !p.isIkusei && (p.injuryDaysLeft ?? 0) === 0 && (p.registrationCooldownDays ?? 0) === 0 && !(p.isForeign && foreignInActive >= MAX_外国人_一軍);
-  const effScore = (p, isFarm) => {
-    const base = _cpuRosterRecScore(p);
-    if (isFarm && (p.potential ?? 0) >= ROSTER_DEVREC_POTENTIAL_MIN && (p.daysOnActiveRoster ?? 0) < ROSTER_DEVREC_DAYS_MAX) return base + ROSTER_DEVREC_BONUS;
-    return base;
-  };
-
   let players = [...team.players];
   let newFarm = [...farm];
+
+  // 投手/野手バランスボーナス: 不足している種別の選手にスコア加算
+  const _balanceBonus = (p) => {
+    const pc = players.filter(q => q.isPitcher).length;
+    const bc = players.filter(q => !q.isPitcher).length;
+    if (p.isPitcher && pc < OPTIMAL_PITCHER_COUNT) return ROSTER_BALANCE_BONUS;
+    if (!p.isPitcher && bc < MAX_ROSTER - OPTIMAL_PITCHER_COUNT) return ROSTER_BALANCE_BONUS;
+    return 0;
+  };
+  const effScore = (p, isFarm) => {
+    const base = _cpuRosterRecScore(p);
+    const devBonus = isFarm && (p.potential ?? 0) >= ROSTER_DEVREC_POTENTIAL_MIN && (p.daysOnActiveRoster ?? 0) < ROSTER_DEVREC_DAYS_MAX ? ROSTER_DEVREC_BONUS : 0;
+    return base + devBonus + _balanceBonus(p);
+  };
 
   // ── 1. ロスター入れ替え（降格・昇格・スワップ） ──
   const openSlots = MAX_ROSTER - players.length;
