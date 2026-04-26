@@ -10,7 +10,7 @@ import { initPlayoff } from '../engine/playoff';
 import { selectAllStars, runAllStarGame } from '../engine/allstar';
 import { getMyMatchup, getCpuMatchups } from '../engine/scheduleGen';
 import { saveGame } from '../engine/saveload';
-import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER, MAX_外国人_一軍, CPU_AUTO_MANAGE_INTERVAL, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX, FIELDING_POSITIONS, OPTIMAL_PITCHER_COUNT, ROSTER_BALANCE_BONUS } from '../constants';
+import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER, MAX_外国人_一軍, CPU_AUTO_MANAGE_INTERVAL, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX, FIELDING_POSITIONS, OPTIMAL_PITCHER_COUNT } from '../constants';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 
 // 守備コーチボーナス: 怪我回復速度 UP
@@ -94,41 +94,54 @@ function cpuAutoManageTeam(team) {
   let players = [...team.players];
   let newFarm = [...farm];
 
-  // 投手/野手バランスボーナス: 不足している種別の選手にスコア加算
-  const _balanceBonus = (p) => {
-    const pc = players.filter(q => q.isPitcher).length;
-    const bc = players.filter(q => !q.isPitcher).length;
-    if (p.isPitcher && pc < OPTIMAL_PITCHER_COUNT) return ROSTER_BALANCE_BONUS;
-    if (!p.isPitcher && bc < MAX_ROSTER - OPTIMAL_PITCHER_COUNT) return ROSTER_BALANCE_BONUS;
-    return 0;
-  };
   const effScore = (p, isFarm) => {
     const base = _cpuRosterRecScore(p);
     const devBonus = isFarm && (p.potential ?? 0) >= ROSTER_DEVREC_POTENTIAL_MIN && (p.daysOnActiveRoster ?? 0) < ROSTER_DEVREC_DAYS_MAX ? ROSTER_DEVREC_BONUS : 0;
-    return base + devBonus + _balanceBonus(p);
+    return base + devBonus;
   };
 
   // ── 1. ロスター入れ替え（降格・昇格・スワップ） ──
+  const TARGET_BATTERS = MAX_ROSTER - OPTIMAL_PITCHER_COUNT;
   const openSlots = MAX_ROSTER - players.length;
   if (openSlots < 0) {
-    // 超過分を下位スコアから降格
-    const tooDemote = [...players].sort((a, b) => effScore(a, false) - effScore(b, false)).slice(0, -openSlots);
-    const demoteIds = new Set(tooDemote.map(p => p.id));
-    players = players.filter(p => !demoteIds.has(p.id));
-    newFarm = [...newFarm, ...tooDemote.map(p => ({ ...p, registrationCooldownDays: REGISTRATION_COOLDOWN_DAYS }))];
+    // 超過分: 超過種別（投手>13 or 野手>15）から優先降格、残りは全体最下位から
+    const excess = -openSlots;
+    const pitcherOver = Math.max(0, players.filter(p => p.isPitcher).length - OPTIMAL_PITCHER_COUNT);
+    const batterOver = Math.max(0, players.filter(p => !p.isPitcher).length - TARGET_BATTERS);
+    const demoted = new Set();
+    const applyDemote = (candidates, limit) => {
+      [...candidates].sort((a, b) => effScore(a, false) - effScore(b, false)).slice(0, limit).forEach(p => {
+        players = players.filter(q => q.id !== p.id);
+        newFarm = [...newFarm, { ...p, registrationCooldownDays: REGISTRATION_COOLDOWN_DAYS }];
+        demoted.add(p.id);
+      });
+    };
+    applyDemote(players.filter(p => p.isPitcher), Math.min(pitcherOver, excess));
+    applyDemote(players.filter(p => !p.isPitcher), Math.min(batterOver, excess - demoted.size));
+    if (demoted.size < excess) applyDemote(players.filter(p => !demoted.has(p.id)), excess - demoted.size);
   } else {
     const usedFarmIds = new Set();
     const usedActiveIds = new Set();
-    const eligibleFarm = newFarm.filter(canPromote).sort((a, b) => effScore(b, true) - effScore(a, true));
+    const eligibleFarm = newFarm.filter(canPromote);
+    const eligP = [...eligibleFarm].filter(p => p.isPitcher).sort((a, b) => effScore(b, true) - effScore(a, true));
+    const eligB = [...eligibleFarm].filter(p => !p.isPitcher).sort((a, b) => effScore(b, true) - effScore(a, true));
+    let slotsLeft = Math.min(openSlots, 3); // CPU は1回最大3人まで変更
 
-    // 昇格（空き枠あり）
-    const toPromote = eligibleFarm.slice(0, Math.min(openSlots, 3));
-    toPromote.forEach(p => {
-      players.push(p);
-      usedFarmIds.add(p.id);
-    });
+    // 投手枠を優先昇格（目標OPTIMAL_PITCHER_COUNTまで）
+    const pitcherNeed = Math.max(0, OPTIMAL_PITCHER_COUNT - players.filter(p => p.isPitcher).length);
+    eligP.slice(0, Math.min(pitcherNeed, slotsLeft)).forEach(p => { players.push(p); usedFarmIds.add(p.id); slotsLeft--; });
 
-    // スワップ（有力二軍 vs 一軍下位）
+    // 野手枠を優先昇格（目標TARGET_BATTERSまで）
+    const batterNeed = Math.max(0, TARGET_BATTERS - players.filter(p => !p.isPitcher).length);
+    eligB.slice(0, Math.min(batterNeed, slotsLeft)).forEach(p => { players.push(p); usedFarmIds.add(p.id); slotsLeft--; });
+
+    // 残り枠は最高スコア順
+    if (slotsLeft > 0) {
+      eligibleFarm.filter(p => !usedFarmIds.has(p.id)).sort((a, b) => effScore(b, true) - effScore(a, true))
+        .slice(0, slotsLeft).forEach(p => { players.push(p); usedFarmIds.add(p.id); });
+    }
+
+    // スワップ（有力二軍 vs 一軍下位・同種別）
     const remainFarm = eligibleFarm.filter(fp => !usedFarmIds.has(fp.id));
     if (remainFarm.length > 0) {
       [...players].sort((a, b) => effScore(a, false) - effScore(b, false)).forEach(ap => {
@@ -147,7 +160,7 @@ function cpuAutoManageTeam(team) {
     }
 
     // 昇格実行: farm から除去
-    toPromote.forEach(p => { newFarm = newFarm.filter(fp => fp.id !== p.id); });
+    [...usedFarmIds].forEach(id => { newFarm = newFarm.filter(fp => fp.id !== id); });
   }
 
   // ── 2. 打順自動設定（MRV ヒューリスティック） ──
