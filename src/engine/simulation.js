@@ -90,9 +90,10 @@ export const STADIUMS = {
 export const TEAM_STADIUM = { 0:'jingu', 1:'yokohama', 2:'mazda', 3:'hanshin', 4:'tokyo_dome', 5:'nagoya', 6:'paypaydome', 7:'rakuten', 8:'seibu', 9:'zozopark', 10:'escon', 11:'kyocera' };
 
 export const DEFAULT_LEAGUE_ENV = {
-  hrMod: 1.00, bbMod: 1.00,
-  kMod: 0.89,   // 投高打低緩和: 実NPBデータのstuff>50標準による三振過剰を抑制 (旧: 1.00)
-  hitMod: 1.05, // 投高打低緩和: 安打率を NPB 実績水準に近づける (旧: 1.00)
+  hrMod: 1.35,  // 投高打低緩和: HR率 1.3%→1.8% 目標 (旧: 1.00)
+  bbMod: 1.30,  // 投高打低緩和: 四球率 5.6%→7.3% 目標 (旧: 1.00)
+  kMod: 0.89,   // 投高打低緩和: 三振過剰を抑制 (旧: 1.00)
+  hitMod: 1.10, // 投高打低緩和: 打率 0.230→0.244 目標 (旧: 1.05)
   label: '通常',
 };
 
