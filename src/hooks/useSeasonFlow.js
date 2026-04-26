@@ -169,10 +169,7 @@ function cpuAutoManageTeam(team) {
   const pitchers = players.filter(p => p.isPitcher && !p.isIkusei && (p.injuryDaysLeft ?? 0) === 0);
   const starters = pitchers.filter(p => p.subtype === '先発').sort((a, b) => _cpuStarterScore(b) - _cpuStarterScore(a));
   const relievers = pitchers.filter(p => p.subtype !== '先発').sort((a, b) => _cpuRelieverScore(b) - _cpuRelieverScore(a));
-  const newRotation = [
-    ...starters.slice(0, 6),
-    ...relievers.slice(0, Math.max(0, 6 - starters.length)),
-  ].map(p => p.id);
+  const newRotation = starters.slice(0, 6).map(p => p.id);
   const rotSet = new Set(newRotation);
   const remaining = pitchers.filter(p => !rotSet.has(p.id)).sort((a, b) => _cpuRelieverScore(b) - _cpuRelieverScore(a));
   const newPattern = {
