@@ -12,3 +12,4 @@ export { StandingsTab } from './tabs/StandingsTab';
 export { RecordsTab } from './tabs/RecordsTab';
 export { ScheduleTab } from './tabs/ScheduleTab';
 export { BalanceTab } from './tabs/BalanceTab';
+export { LeaderboardTab } from './tabs/LeaderboardTab';
