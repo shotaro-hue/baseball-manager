@@ -65,7 +65,7 @@ export function ResultScreen({gsResult,myTeam,oppTeam,gameDay,onNext,nextLabel='
   // helpers
   const IS_HIT=(r)=>['s','d','t','hr'].includes(r);
   const IS_OUT=(r)=>['k','out','fo','go','sac','sf'].includes(r);
-  const findPlayer=(team,id)=>team?.players?.find(p=>p.id===id);
+  const findPlayer=(team,id)=>team?.players?.find(p=>p.id===id)??team?.farm?.find(p=>p.id===id);
   const fmtIPlocal=(outs)=>{const f=Math.floor(outs/3),r=outs%3;return r===0?`${f}`:`${f}.${r}`;};
   const hrLabel=(rbi)=>({1:'ソロ',2:'2ラン',3:'3ラン',4:'満塁'}[rbi]||`${rbi}点本塁打`);
   const fmtSeasonAvg=(p)=>{
