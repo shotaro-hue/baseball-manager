@@ -5,6 +5,16 @@
 
 ---
 
+### 2026-04-26 — fix: トレード補強ポイント表示・バッチシムヤクルト戦スキップ（B21・B22）
+
+**仕様本文への影響なし（内部バグ修正のみ）**
+
+- 根本原因①（B21）: `TradeTab.jsx` の `analyzeTeamNeeds(t).map(n=>"📌"+n)` で `n` がオブジェクト `{type, score}` のため `[object Object]` と表示されていた。`n.type` を参照するよう修正
+- 根本原因②（B22）: `runBatchGames` の `oppId ? newTeams.find(t=>t.id===oppId) : null` が JavaScript の falsy 評価により、ヤクルト（チームid=0）を対戦相手とする日に `opp=null` になり試合を毎回スキップしていた。`scheduleMatchup ? newTeams.find(t=>t.id===scheduleMatchup.oppId) : null` に修正
+- 変更ファイル: `src/components/tabs/TradeTab.jsx`・`src/hooks/useSeasonFlow.js`
+
+---
+
 ### 2026-04-25 — fix: 二軍降格デッドロック・ドラフト選手支配下登録・FA一軍超過（B20）
 
 **仕様本文への影響なし（内部バグ修正のみ）**

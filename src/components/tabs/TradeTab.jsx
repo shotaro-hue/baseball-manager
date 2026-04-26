@@ -96,7 +96,7 @@ export function TradeTab({myTeam,teams,onTrade,cpuOffers,onAcceptOffer,onDecline
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
             {otherTeams.map(t=>(<div key={t.id} style={{padding:"10px",borderRadius:6,background:deadlinePassed?"rgba(255,255,255,.01)":"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",cursor:deadlinePassed?"not-allowed":"pointer",opacity:deadlinePassed?0.4:1}} onClick={()=>{if(deadlinePassed)return;setTargetTeam(t);setPhase("build");}}>
               <div style={{fontWeight:700,color:t.color,marginBottom:4}}>{t.emoji} {t.name}</div>
-              <div style={{fontSize:9,color:"#374151"}}>{analyzeTeamNeeds(t).map(n=>"📌"+n).join(" ")}</div>
+              <div style={{fontSize:9,color:"#374151"}}>{analyzeTeamNeeds(t).map(n=>"📌"+n.type).join(" ")}</div>
             </div>))}
           </div>
         </div>
