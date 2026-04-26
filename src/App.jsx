@@ -16,7 +16,7 @@ import { TeamDetailScreen } from './components/TeamDetailScreen';
 import { PressConferenceModal } from './components/PressConferenceModal';
 import { AllStarScreen } from './components/AllStarScreen';
 import { DashboardTab } from './components/DashboardTab';
-import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab, ScheduleTab, BalanceTab } from './components/Tabs';
+import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab, ScheduleTab, BalanceTab, LeaderboardTab } from './components/Tabs';
 import {
   SEASON_GAMES, MAX_外国人_一軍, MAX_ROSTER, TEAM_DEFS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
   POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD,
@@ -33,7 +33,7 @@ const PRIMARY_SECTIONS = [
   { id: "home", label: "ホーム", icon: "🏠", defaultTab: "dashboard", tabs: [["dashboard", "概況"]] },
   { id: "game", label: "試合", icon: "⚾", defaultTab: "schedule", tabs: [["schedule", "日程"]] },
   { id: "rosterOps", label: "編成", icon: "🧩", defaultTab: "roster", tabs: [["roster", "ロースター"], ["trade", "トレード"], ["contract", "契約"], ["fa", "FA"], ["scout", "スカウト"]] },
-  { id: "analysis", label: "分析", icon: "📊", defaultTab: "stats", tabs: [["stats", "成績"], ["standings", "順位"], ["records", "記録"], ["finance", "財務"], ["balance", "リーグ分析"]] },
+  { id: "analysis", label: "分析", icon: "📊", defaultTab: "stats", tabs: [["stats", "成績"], ["leaderboard", "ランキング"], ["standings", "順位"], ["records", "記録"], ["finance", "財務"], ["balance", "リーグ分析"]] },
   { id: "inbox", label: "受信箱", icon: "📨", defaultTab: "mailbox", tabs: [["mailbox", "メール"], ["news", "ニュース"], ["alumni", "歴代"]] },
 ];
 
@@ -102,6 +102,7 @@ export default function App(){
   ));
   const [currentPrimarySection, setCurrentPrimarySection] = useState("home");
   const [batchCount, setBatchCount] = useState(5);
+  const [batchAutoManage, setBatchAutoManage] = useState(false);
 
   useEffect(() => {
     const sectionId = TAB_TO_SECTION[tab];
@@ -300,11 +301,15 @@ export default function App(){
                 {opts.map(n=>{const d=gameDayToDate(Math.min(gameDay+n-1,SEASON_GAMES),schedule);return<option key={n} value={n}>{n}試合{d?` (〜${d.month}/${d.day})`:""}</option>;})}
               </select>
               {sd&&ed&&<div style={{fontSize:9,color:"#7dd3fc"}}>{sd.month}/{sd.day} 〜 {ed.month}/{ed.day}</div>}
-              <button style={{background:"transparent",border:"none",color:"#60a5fa",fontSize:11,cursor:"pointer",padding:"2px 4px",fontFamily:"'Bebas Neue',cursive",letterSpacing:".15em"}} onClick={()=>sf.handleBatchSim(eff)}>⚡ まとめてシム</button>
+              <label style={{display:"flex",alignItems:"center",gap:4,fontSize:9,color:batchAutoManage?"#34d399":"#475569",cursor:"pointer",userSelect:"none"}}>
+                <input type="checkbox" checked={batchAutoManage} onChange={e=>setBatchAutoManage(e.target.checked)} style={{accentColor:"#34d399",cursor:"pointer"}}/>
+                自動編成も実行
+              </label>
+              <button style={{background:"transparent",border:"none",color:"#60a5fa",fontSize:11,cursor:"pointer",padding:"2px 4px",fontFamily:"'Bebas Neue',cursive",letterSpacing:".15em"}} onClick={()=>sf.handleBatchSim(eff,batchAutoManage)}>⚡ まとめてシム</button>
             </div>
           );
         })()}
-        <button className="sim-btn" style={{margin:0,fontSize:12,background:"linear-gradient(135deg,#1a0730,#2d0f50)",borderColor:"rgba(167,139,250,.5)",color:"#a78bfa"}} onClick={sf.handleSeasonSim}>
+        <button className="sim-btn" style={{margin:0,fontSize:12,background:"linear-gradient(135deg,#1a0730,#2d0f50)",borderColor:"rgba(167,139,250,.5)",color:"#a78bfa"}} onClick={()=>sf.handleSeasonSim(batchAutoManage)}>
           🚀 残り全{remain}試合<br/>
           <span style={{fontSize:9,opacity:.7}}>
             {(()=>{const s=gameDayToDate(gameDay,schedule);const e=gameDayToDate(SEASON_GAMES,schedule);return s&&e?`${s.month}/${s.day}〜${e.month}/${e.day}`:"シーズン一括";})()}
@@ -448,6 +453,7 @@ export default function App(){
     {tab==="finance"&&<FinanceTab team={myTeam} onStadiumUpgrade={gs.handleStadiumUpgrade} onTicketPriceChange={gs.handleSetTicketPrice} gameDay={gameDay} onPlayerClick={gs.handlePlayerClick}/>}
     {tab==="standings"&&<StandingsTab teams={teams} myId={myId} onTeamClick={gs.handleTeamClick}/>}
     {tab==="stats"&&<StatsTab teams={teams} myId={myId}/>}
+    {tab==="leaderboard"&&<LeaderboardTab teams={teams} myId={myId}/>}
     {tab==="balance"&&<BalanceTab teams={teams} myTeam={myTeam} upd={upd} myId={myId}/>}
 
     {tab==="roster"&&(

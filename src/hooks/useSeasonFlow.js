@@ -627,19 +627,19 @@ export function useSeasonFlow(gs) {
   };
 
   // 任意試合数まとめてオートシム
-  const handleBatchSim = (count) => {
+  const handleBatchSim = (count, autoManageMyTeam=false) => {
     if(!myTeam) return;
     const actual=Math.min(count ?? BATCH, SEASON_GAMES-(gameDay-1));
     if(actual<=0) return;
-    runBatchGames(actual);
+    runBatchGames(actual, autoManageMyTeam);
   };
 
   // 残り全試合まとめてオートシム
-  const handleSeasonSim = () => {
+  const handleSeasonSim = (autoManageMyTeam=false) => {
     if(!myTeam) return;
     const count=SEASON_GAMES-(gameDay-1);
     if(count<=0) return;
-    runBatchGames(count);
+    runBatchGames(count, autoManageMyTeam);
   };
 
   // リーグ内順位を計算（batchMeta用）
@@ -654,7 +654,7 @@ export function useSeasonFlow(gs) {
   };
 
   // バッチ処理の共通ロジック
-  const runBatchGames = (count) => {
+  const runBatchGames = (count, autoManageMyTeam=false) => {
     if(!myTeam) return;
     let newTeams=[...teams.map(t=>({...t,players:[...t.players.map(p=>({...p,stats:{...p.stats}}))],...(t.id===myId?{}:{})}))];
     const results=[];
@@ -671,9 +671,10 @@ export function useSeasonFlow(gs) {
     const batchBoxScores = []; // { homeId, awayId, dayNo, cr, homePlayers, awayPlayers, homeName, awayName }
 
     for(let g=0;g<count;g++){
-      // CPU チーム自動編成: CPU_AUTO_MANAGE_INTERVAL 日ごとに全 CPU 球団のロスター・打順・ローテを最適化
+      // CPU_AUTO_MANAGE_INTERVAL 日ごとに全球団のロスター・打順・ローテを最適化
+      // autoManageMyTeam=true の場合は自チームも対象に含める
       if(newDay % CPU_AUTO_MANAGE_INTERVAL === 0){
-        newTeams=newTeams.map(t=>t.id===myId?t:cpuAutoManageTeam(t));
+        newTeams=newTeams.map(t=>(t.id===myId && !autoManageMyTeam)?t:cpuAutoManageTeam(t));
       }
 
       const scheduleMatchup=getMyMatchup(schedule,newDay,myId);
