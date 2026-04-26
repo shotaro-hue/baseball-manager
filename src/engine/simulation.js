@@ -36,7 +36,7 @@ const BASELINE = {
 
 const ABILITY_RANGE = {
   eye:       { lo: 0.030, mid: BASELINE.bb,  hi: 0.130 },
-  contact:   { lo: 0.100, mid: BASELINE.s,   hi: 0.260 }, // 投高打低緩和: 一流打者の安打率天井を引き上げ (旧: 0.240)
+  contact:   { lo: 0.100, mid: BASELINE.s,   hi: 0.240 }, // 打率過剰抑制: 上位層の打率を NPB 実績に近づける (旧: 0.260)
   power:     { lo: 0.003, mid: BASELINE.hr,  hi: 0.050 },
   speed:     { lo: 0.003, mid: BASELINE.t,   hi: 0.012 },
   p_control: { lo: 0.130, mid: BASELINE.bb,  hi: 0.030 },
@@ -93,7 +93,7 @@ export const DEFAULT_LEAGUE_ENV = {
   hrMod: 1.35,  // 投高打低緩和: HR率 1.3%→1.8% 目標 (旧: 1.00)
   bbMod: 1.30,  // 投高打低緩和: 四球率 5.6%→7.3% 目標 (旧: 1.00)
   kMod: 0.89,   // 投高打低緩和: 三振過剰を抑制 (旧: 1.00)
-  hitMod: 1.10, // 投高打低緩和: 打率 0.230→0.244 目標 (旧: 1.05)
+  hitMod: 1.02, // 打率過剰抑制: 全体打率を引き下げつつ投高打低への逆振れ防止 (旧: 1.10)
   label: '通常',
 };
 
@@ -444,7 +444,7 @@ function processAtBat(gs, strategy = 'normal') {
       const lineup      = isMyAtBat ? gs.myLineup : gs.opLineup;
       const runner       = lineup.find(p => p.id === newBases[stealBase]) || batter;
       const runningBonus = gs.coachBonuses?.running || 0;
-      const successRate  = clamp(0.65 + (runner?.batting?.speed||50)/500 + (runner?.batting?.stealSkill||50)/600 - (pitcher?.pitching?.control||60)/600 + runningBonus * 0.025, 0.35, 0.92);
+      const successRate  = clamp(0.60 + (runner?.batting?.speed||50)/500 + (runner?.batting?.stealSkill||50)/600 - (pitcher?.pitching?.control||60)/600 + runningBonus * 0.025, 0.35, 0.85); // 盗塁成功率: 上限 0.92→0.85・ベース 0.65→0.60 (NPB 実績 70-75% 目標)
       const success     = rngf(0, 1) < successRate;
       if (success) { newBases[stealBase+1] = newBases[stealBase]; newBases[stealBase] = null; }
       else          { newBases[stealBase] = null; }
@@ -698,7 +698,7 @@ function quickSimGame(myTeam, oppTeam) {
       const lineup=(!gs.isTop?gs.myLineup:gs.opLineup);
       const runner=lineup.find(p=>p.id===gs.bases[0]);
       const sp=runner?.batting?.speed||50, sk=runner?.batting?.stealSkill||50;
-      const prob=sp>=80&&sk>=70?0.28:sp>=70&&sk>=60?0.18:sp>=60&&sk>=50?0.08:0;
+      const prob=sp>=80&&sk>=70?0.22:sp>=70&&sk>=60?0.12:sp>=60&&sk>=50?0.04:0; // 盗塁試図頻度: 全層引き下げ (旧: 0.28/0.18/0.08)
       if (rngf(0, 1)<prob) autoStrategy='steal';
     }
     gs=processAtBat(gs, autoStrategy);
