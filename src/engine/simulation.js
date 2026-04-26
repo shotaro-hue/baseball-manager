@@ -641,7 +641,7 @@ function autoSwapPitcher(gs, side) {
   const starterShouldYield = isStarter && (
     fatigueLimit
     || (gs.inning >= 6 && fatigueWarning)
-    || (gs.inning >= 7 && lead > 0)  // 同点(lead=0)では先発続投を許容
+    || (gs.inning >= 7 && lead > 0 && fatigueWarning)  // 7回リード時は疲弊警告が出ていれば交代
     || (leverageCrisis && effectiveFatigue >= Math.max(FATIGUE_WARNING - 10, 50))
   );
 
