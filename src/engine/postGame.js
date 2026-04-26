@@ -93,7 +93,7 @@ export function computeBoxScore(log, inningSummary, homeTeamPlayers, awayTeamPla
       let result = null;
       if (id === winnerId) result = 'W';
       else if (losingPitcherId && id === losingPitcherId) result = 'L';
-      else if (isMulti && id === closerId && id !== starterId && id !== winnerId && saveSit && players.find(pl => pl.id === id)?.subtype !== '先発') result = 'S';
+      else if (isMulti && id === closerId && id !== starterId && id !== winnerId && saveSit) result = 'S';
       return { id, name: p?.name || '不明', ip: r2(m.outs / 3), H: m.H, ER: m.ER, BB: m.BB, K: m.K, result };
     });
   }
@@ -255,8 +255,8 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won) {
       // 先発が資格なし(5回未満): 最初の中継ぎが勝利投手
       if (winnerId && p.id === winnerId && p.id !== starterId) s.W++;
 
-      // SV: 勝利投手でないクローザーがセーブ状況を締めた（先発タイプは対象外）
-      if (isMulti && p.id === closerId && p.id !== starterId && p.id !== winnerId && p.subtype !== '先発') {
+      // SV: 勝利投手でないクローザーがセーブ状況を締めた
+      if (isMulti && p.id === closerId && p.id !== starterId && p.id !== winnerId) {
         if (saveSit) s.SV++;
         // BS: セーブ状況で登板したが守れなかった（引き分けはBS対象外）
         else if (!won && finalLead < 0 && Math.abs(finalLead) <= 3) s.BS++;
