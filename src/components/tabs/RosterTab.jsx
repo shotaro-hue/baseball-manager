@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { MAX_ROSTER, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL, DEV_GOALS_BATTER, DEV_GOALS_PITCHER, TALK_COOLDOWN_DAYS, POSITIONS, FIELDING_POSITIONS, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX } from '../../constants';
+import { MAX_ROSTER, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL, DEV_GOALS_BATTER, DEV_GOALS_PITCHER, TALK_COOLDOWN_DAYS, POSITIONS, FIELDING_POSITIONS, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX, OPTIMAL_PITCHER_COUNT, ROSTER_BALANCE_BONUS } from '../../constants';
 import { fmtAvg, fmtSal } from '../../utils';
 import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
 import { OV, CondBadge, HandBadge } from '../ui';
@@ -59,16 +59,26 @@ const buildRosterRecs=(team)=>{
   const openSlots=MAX_ROSTER-rosterCount;
   const foreignInActive=team.players.filter(p=>p.isForeign).length;
   const canPromote=(p)=>!p.育成&&(p.injuryDaysLeft??0)===0&&(p.registrationCooldownDays??0)===0&&!(p.isForeign&&foreignInActive>=MAX_外国人_一軍);
-  // 育成加点: 有望な1軍未経験ファーム選手のスコアにボーナスを加算
-  const effScore=(p,isFarm)=>{
-    const base=rosterRecScore(p);
-    if(isFarm&&(p.potential??0)>=ROSTER_DEVREC_POTENTIAL_MIN&&(p.daysOnActiveRoster??0)<ROSTER_DEVREC_DAYS_MAX)return base+ROSTER_DEVREC_BONUS;
-    return base;
+
+  // 投手/野手バランスボーナス: 不足している種別の選手にスコア加算
+  const currentPitchers=team.players.filter(p=>p.isPitcher).length;
+  const currentBatters=team.players.filter(p=>!p.isPitcher).length;
+  const targetBatters=MAX_ROSTER-OPTIMAL_PITCHER_COUNT;
+  const balanceBonus=(p)=>{
+    if(p.isPitcher&&currentPitchers<OPTIMAL_PITCHER_COUNT)return ROSTER_BALANCE_BONUS;
+    if(!p.isPitcher&&currentBatters<targetBatters)return ROSTER_BALANCE_BONUS;
+    return 0;
   };
 
-  // 降格（1軍枠超過）
+  const effScore=(p,isFarm)=>{
+    const base=rosterRecScore(p);
+    const devBonus=isFarm&&(p.potential??0)>=ROSTER_DEVREC_POTENTIAL_MIN&&(p.daysOnActiveRoster??0)<ROSTER_DEVREC_DAYS_MAX?ROSTER_DEVREC_BONUS:0;
+    return base+devBonus+balanceBonus(p);
+  };
+
+  // 降格（1軍枠超過）: 過多の種別から優先的に降格
   if(openSlots<0){
-    [...team.players].sort((a,b)=>effScore(a,false)-effScore(b,false)).slice(0,Math.min(-openSlots,3)).forEach(p=>recs.push({type:'demote',downPlayer:p,upPlayer:null,scoreDiff:0}));
+    [...team.players].sort((a,b)=>effScore(a,false)-effScore(b,false)).slice(0,-openSlots).forEach(p=>recs.push({type:'demote',downPlayer:p,upPlayer:null,scoreDiff:0}));
     return recs;
   }
 
@@ -76,17 +86,17 @@ const buildRosterRecs=(team)=>{
   const usedActiveIds=new Set();
   const eligible=[...team.farm].filter(canPromote).sort((a,b)=>effScore(b,true)-effScore(a,true));
 
-  // 昇格（空き枠あり）
-  eligible.slice(0,Math.min(openSlots,3)).forEach(p=>{
+  // 昇格（空き枠すべて）: バランスを考慮したスコア順で全枠分推薦
+  eligible.slice(0,openSlots).forEach(p=>{
     recs.push({type:'promote',upPlayer:p,downPlayer:null,scoreDiff:Math.round(effScore(p,true))});
     usedFarmIds.add(p.id);
   });
 
-  // スワップ（残り有力二軍選手 vs 一軍下位選手）
+  // スワップ（有力二軍選手 vs 一軍下位選手）: 件数上限なしで全候補を列挙
   const remainFarm=eligible.filter(fp=>!usedFarmIds.has(fp.id));
   if(remainFarm.length>0){
     [...team.players].sort((a,b)=>effScore(a,false)-effScore(b,false)).forEach(ap=>{
-      if(recs.length>=6||usedActiveIds.has(ap.id))return;
+      if(usedActiveIds.has(ap.id))return;
       const best=remainFarm.find(fp=>!usedFarmIds.has(fp.id)&&fp.isPitcher===ap.isPitcher);
       if(!best)return;
       const diff=effScore(best,true)-effScore(ap,false);
