@@ -10,6 +10,7 @@ import { initPlayoff } from '../engine/playoff';
 import { selectAllStars, runAllStarGame } from '../engine/allstar';
 import { getMyMatchup, getCpuMatchups } from '../engine/scheduleGen';
 import { saveGame } from '../engine/saveload';
+import { processCpuFaBids } from '../engine/contract';
 import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER, MAX_外国人_一軍, CPU_AUTO_MANAGE_INTERVAL, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX, FIELDING_POSITIONS, OPTIMAL_PITCHER_COUNT } from '../constants';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 
@@ -275,7 +276,7 @@ export function useSeasonFlow(gs) {
     schedule, setScreen,
     notify, upd, addNews, pushResult,
     setMailbox, setRetireModal,
-    faPool, faYears, seasonHistory, news, mailbox,
+    faPool, setFaPool, faYears, seasonHistory, news, mailbox,
     setSaveExists, cpuTradeOffers,
     allStarDone, setAllStarDone, allStarResult, setAllStarResult,
     allStarTriggerDay,
@@ -396,6 +397,62 @@ export function useSeasonFlow(gs) {
       headline: `【移籍情報】${buyerGets.name}が${buyerName}へ`,
       body: `${sellerName}と${buyerName}の間でトレードが成立。${buyerName}は${buyerGets.name}を獲得し、${sellerGets.name}を放出した。`,
     };
+  };
+
+  const tryGenerateCpuOfferInBatch = (teamsArr, currentGameDay, existingOfferCount) => {
+    if (!myTeam) return null;
+    const currentDate = gameDayToDate(currentGameDay, schedule);
+    if (currentDate && currentDate.month > TRADE_DEADLINE_MONTH) return null;
+    let prob = 0.15;
+    if (currentDate && currentDate.month === TRADE_DEADLINE_MONTH) {
+      prob = currentDate.day > 15 ? TRADE_DEADLINE_PROB_PEAK : TRADE_DEADLINE_PROB_EARLY;
+    }
+    if (rngf(0, 1) > prob || existingOfferCount >= 2) return null;
+
+    const liveMyTeam = teamsArr.find((t) => t.id === myId);
+    if (!liveMyTeam) return null;
+    const others = teamsArr.filter((t) => t.id !== myId);
+    if (!others.length) return null;
+
+    let cpuTeam;
+    if (currentDate && currentDate.month === TRADE_DEADLINE_MONTH) {
+      const buyers = others.filter((t) => classifyTeam(t, teamsArr) === 'buyer');
+      cpuTeam = buyers.length ? buyers[rng(0, buyers.length - 1)] : others[rng(0, others.length - 1)];
+    } else {
+      cpuTeam = others[rng(0, others.length - 1)];
+    }
+
+    const offer = generateCpuOffer(cpuTeam, liveMyTeam);
+    if (!offer) return null;
+    return {
+      id: uid(),
+      type: 'trade',
+      title: `${offer.from.name}からトレードオファー`,
+      from: offer.from.name,
+      dateLabel: `${year}年 ${currentGameDay}日目`,
+      timestamp: Date.now(),
+      read: false,
+      resolved: false,
+      body: `${offer.from.name}より交渉の申し入れがありました。\n\n■ あなたが出す: ${offer.want.map(p => p.name).join('、')}\n■ 受け取る: ${offer.offer.length > 0 ? offer.offer.map(p => p.name).join('、') : 'なし'}${offer.cash > 0 ? '\n■ 金銭: +' + (offer.cash / 10000).toLocaleString() + '万円' : ''}\n\n期限内にご検討ください。`,
+      offer,
+    };
+  };
+
+  const tryCpuForeignFaInBatch = (teamsArr, currentGameDay, pool) => {
+    if (!pool.length) return { updatedTeams: teamsArr, remainingFaPool: pool, news: null };
+    if (rngf(0, 1) > 0.2) return { updatedTeams: teamsArr, remainingFaPool: pool, news: null };
+    const foreignPool = pool.filter((p) => p.isForeign);
+    if (!foreignPool.length) return { updatedTeams: teamsArr, remainingFaPool: pool, news: null };
+
+    const res = processCpuFaBids(teamsArr, myId, foreignPool, teamsArr);
+    if (res.remainingFaPool.length === foreignPool.length) {
+      return { updatedTeams: teamsArr, remainingFaPool: pool, news: null };
+    }
+
+    const signedIdSet = new Set(foreignPool.filter((p) => !res.remainingFaPool.some((r) => r.id === p.id)).map((p) => p.id));
+    const mergedPool = pool.filter((p) => !signedIdSet.has(p.id));
+    const dayNews = (res.news || []).map((item) => ({ ...item, dateLabel: `${year}年 ${currentGameDay}日目` }));
+    return { updatedTeams: res.updatedTeams, remainingFaPool: mergedPool, news: dayNews };
   };
 
   // スケジュールから対戦相手を取得（フォールバック: ランダム同リーグ選択）
@@ -734,6 +791,10 @@ export function useSeasonFlow(gs) {
     const results=[];
     let newDay=gameDay;
     let allStarDoneLocal=allStarDone;
+    let newFaPool=[...faPool];
+    const pendingTradeCountBase=mailbox.filter(m=>m.type==='trade'&&!m.resolved).length;
+    const batchTradeMails=[];
+    const batchForeignSignNews=[];
 
     // バッチ前の順位・成績スナップショット
     const beforeRank = calcLeagueRank(myId, newTeams, myTeam.league);
@@ -802,6 +863,16 @@ export function useSeasonFlow(gs) {
       const cpuCpuTradeNews = tryCpuCpuDeadlineTrade(newTeams, newDay);
       if (cpuCpuTradeNews) {
         results.push({ type: 'trade_news', ...cpuCpuTradeNews, day: newDay });
+      }
+      const tradeMail = tryGenerateCpuOfferInBatch(newTeams, newDay, pendingTradeCountBase + batchTradeMails.length);
+      if (tradeMail) {
+        batchTradeMails.push(tradeMail);
+      }
+      const foreignFaResult = tryCpuForeignFaInBatch(newTeams, newDay, newFaPool);
+      newTeams = foreignFaResult.updatedTeams;
+      newFaPool = foreignFaResult.remainingFaPool;
+      if (foreignFaResult.news?.length) {
+        batchForeignSignNews.push(...foreignFaResult.news);
       }
       const myT=newTeams.find(t=>t.id===myId);
       if(scheduleMatchup && opp && myT){
@@ -884,7 +955,8 @@ export function useSeasonFlow(gs) {
       newDay++;
     }
 
-    const batchSaveResult=saveGame({teams:newTeams,myId,gameDay:newDay,year,faPool,faYears,seasonHistory,news,mailbox});
+    const nextMailbox = batchTradeMails.length ? [...mailbox, ...batchTradeMails] : mailbox;
+    const batchSaveResult=saveGame({teams:newTeams,myId,gameDay:newDay,year,faPool:newFaPool,faYears,seasonHistory,news,mailbox:nextMailbox});
     if(batchSaveResult.ok) setSaveExists(true);
     results.filter(r=>r.type==='trade_news').forEach(r=>{
       addNews({
@@ -897,6 +969,12 @@ export function useSeasonFlow(gs) {
     });
     // バッチ試合結果ニュース（古い順に追加 → ニュースタブは新しい順表示）
     [...batchNewsItems].reverse().forEach(item=>addNews(item));
+    batchForeignSignNews.forEach(item=>addNews(item));
+    if(batchTradeMails.length){
+      setMailbox(prev=>[...prev,...batchTradeMails]);
+      notify(`📨 バッチ中にトレードオファーが${batchTradeMails.length}件届きました`,'ok');
+    }
+    if(newFaPool.length!==faPool.length) setFaPool(newFaPool);
     setTeams(newTeams);
     setGameDay(newDay);
     if(allStarDoneLocal) setAllStarDone(true);
