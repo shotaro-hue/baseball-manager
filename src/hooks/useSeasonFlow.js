@@ -236,7 +236,17 @@ function cpuAutoManageTeam(team) {
   const pitchers = players.filter(p => p.isPitcher && !p.isIkusei && (p.injuryDaysLeft ?? 0) === 0);
   const starters = pitchers.filter(p => p.subtype === '先発').sort((a, b) => _cpuStarterScore(b) - _cpuStarterScore(a));
   const relievers = pitchers.filter(p => p.subtype !== '先発').sort((a, b) => _cpuRelieverScore(b) - _cpuRelieverScore(a));
+  const MIN_ROT = 5;
   const newRotation = starters.slice(0, 6).map(p => p.id);
+  // 先発タイプが足りない場合は、スタミナ上位の中継ぎで最低5枠を埋める
+  if (newRotation.length < MIN_ROT) {
+    const need = MIN_ROT - newRotation.length;
+    const fallbackRelievers = [...relievers]
+      .sort((a, b) => (b.pitching?.stamina ?? 50) - (a.pitching?.stamina ?? 50))
+      .slice(0, need)
+      .map(p => p.id);
+    newRotation.push(...fallbackRelievers);
+  }
   const rotSet = new Set(newRotation);
   const remaining = pitchers.filter(p => !rotSet.has(p.id)).sort((a, b) => _cpuRelieverScore(b) - _cpuRelieverScore(a));
   const newPattern = {
