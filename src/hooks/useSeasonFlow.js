@@ -443,20 +443,20 @@ export function useSeasonFlow(gs) {
   };
 
   const tryCpuForeignFaInBatch = (teamsArr, currentGameDay, pool) => {
-    if (!pool.length) return { updatedTeams: teamsArr, remainingFaPool: pool, news: null };
-    if (rngf(0, 1) > 0.2) return { updatedTeams: teamsArr, remainingFaPool: pool, news: null };
+    if (!pool.length) return { updatedTeams: teamsArr, remainingFaPool: pool, news: null, claimed: [] };
+    if (rngf(0, 1) > 0.2) return { updatedTeams: teamsArr, remainingFaPool: pool, news: null, claimed: [] };
     const foreignPool = pool.filter((p) => p.isForeign);
-    if (!foreignPool.length) return { updatedTeams: teamsArr, remainingFaPool: pool, news: null };
+    if (!foreignPool.length) return { updatedTeams: teamsArr, remainingFaPool: pool, news: null, claimed: [] };
 
     const res = processCpuFaBids(teamsArr, myId, foreignPool, teamsArr);
     if (res.remainingFaPool.length === foreignPool.length) {
-      return { updatedTeams: teamsArr, remainingFaPool: pool, news: null };
+      return { updatedTeams: teamsArr, remainingFaPool: pool, news: null, claimed: [] };
     }
 
     const signedIdSet = new Set(foreignPool.filter((p) => !res.remainingFaPool.some((r) => r.id === p.id)).map((p) => p.id));
     const mergedPool = pool.filter((p) => !signedIdSet.has(p.id));
     const dayNews = (res.news || []).map((item) => ({ ...item, dateLabel: `${year}年 ${currentGameDay}日目` }));
-    return { updatedTeams: res.updatedTeams, remainingFaPool: mergedPool, news: dayNews };
+    return { updatedTeams: res.updatedTeams, remainingFaPool: mergedPool, news: dayNews, claimed: res.claimed || [] };
   };
 
   // スケジュールから対戦相手を取得（フォールバック: ランダム同リーグ選択）
@@ -810,6 +810,7 @@ export function useSeasonFlow(gs) {
     const pendingTradeCountBase=mailbox.filter(m=>m.type==='trade'&&!m.resolved).length;
     const batchTradeMails=[];
     const batchForeignSignNews=[];
+    const batchForeignSignings=[];
 
     // バッチ前の順位・成績スナップショット
     const beforeRank = calcLeagueRank(myId, newTeams, myTeam.league);
@@ -888,6 +889,9 @@ export function useSeasonFlow(gs) {
       newFaPool = foreignFaResult.remainingFaPool;
       if (foreignFaResult.news?.length) {
         batchForeignSignNews.push(...foreignFaResult.news);
+      }
+      if (foreignFaResult.claimed?.length) {
+        batchForeignSignings.push(...foreignFaResult.claimed);
       }
       const myT=newTeams.find(t=>t.id===myId);
       if(scheduleMatchup && opp && myT){
@@ -999,6 +1003,27 @@ export function useSeasonFlow(gs) {
     if(batchTradeMails.length){
       setMailbox(prev=>[...prev,...batchTradeMails]);
       notify(`📨 バッチ中にトレードオファーが${batchTradeMails.length}件届きました`,'ok');
+    }
+    if(batchForeignSignings.length){
+      const byTeam=new Map();
+      for(const c of batchForeignSignings){
+        if(!byTeam.has(c.teamId)) byTeam.set(c.teamId,{teamId:c.teamId,teamName:c.teamName,teamEmoji:c.teamEmoji,players:[]});
+        byTeam.get(c.teamId).players.push(`${c.player.name}（${c.player.pos}）`);
+      }
+      const signings=Array.from(byTeam.values());
+      setMailbox(prev=>[...prev,{
+        id:uid(),
+        type:'cpu_fa_summary',
+        read:false,
+        title:`【バッチ補強情報】${signings.length}球団が選手補強`,
+        subject:`【バッチ補強情報】${signings.length}球団が選手補強`,
+        from:'スカウト部',
+        dateLabel:`${year}年 ${newDay-1}日目まで`,
+        timestamp:Date.now(),
+        body:'バッチシム中に他球団で補強がありました。球団名をクリックして詳細ロスターを確認できます。',
+        signings,
+      }]);
+      notify(`🗞 バッチ中に他球団の補強が${batchForeignSignings.length}件ありました`,'ok');
     }
     if(newFaPool.length!==faPool.length) setFaPool(newFaPool);
     setTeams(newTeams);
