@@ -5,6 +5,19 @@
 
 ---
 
+### 2026-04-26 — fix: 先発投手の異常投球回・先発のセーブ取得・コンディション未回復バグを修正（B27）
+
+**仕様本文への影響なし（内部バグ修正のみ）**
+
+- 根本原因①: `initGameState` でブルペン構築時にローテーション登録投手（登板日以外）も含めていたため、先発投手が他の試合にロングリリーフとして登板し投球回が1シーズン 270+ IP に達していた
+- 根本原因②: セーブ判定 (`applyGameStatsFromLog` / `computeBoxScore`) が今日の先発でないことしか確認せず、先発タイプ (`subtype !== '先発'`) チェックが欠如しており先発投手にセーブが付いていた
+- 根本原因③: `applyPostGameCondition` で登板しなかった投手のコンディション回復処理がなく、シーズン中盤以降すべての投手が condition=20 (下限) に張り付いていた
+- 修正①: `simulation.js:initGameState` — `myBullpen/opBullpen` から `rotation` 登録投手を除外
+- 修正②: `postGame.js:applyGameStatsFromLog` / `computeBoxScore` — SV 条件に `p.subtype !== '先発'` を追加
+- 修正③: `postGame.js:applyPostGameCondition` — 登板なし投手の日次コンディション回復を追加（+8〜+14/日、recovery 能力値に連動）
+
+---
+
 ### 2026-04-26 — fix: CPUチーム1軍ロースターに先発投手が2人しか残らないバグを修正（B26）
 
 **仕様本文への影響なし（内部バグ修正のみ）**

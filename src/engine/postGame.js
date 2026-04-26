@@ -297,7 +297,10 @@ export function applyPostGameCondition(players, log, isMyTeam, gameDay) {
       // 直近7試合の記録を保持
       const recentBase = (p.recentPitchingDays || []).filter(d => !gameDay || d > gameDay - 7);
       if (thrown === 0) {
-        return { ...p, recentPitchingDays: recentBase };
+        // 登板なし: 日次コンディション回復（休養効果）
+        const recoveryRate = (p.pitching?.recovery ?? 50);
+        const dailyRecovery = Math.round(8 + (recoveryRate - 50) / 10);
+        return { ...p, condition: Math.min((p.condition ?? 100) + dailyRecovery, 100), recentPitchingDays: recentBase };
       }
       const recoveryBonus = ((p.pitching?.recovery || 50) - 50) / 200;
       const fatigueDrop   = clamp(Math.round(thrown / 3 - recoveryBonus * 15), 5, 40);
