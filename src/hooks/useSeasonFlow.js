@@ -185,6 +185,30 @@ function cpuAutoManageTeam(team) {
     [...usedFarmIds].forEach(id => { newFarm = newFarm.filter(fp => fp.id !== id); });
   }
 
+  // ── 1.5 先発ローテ確保: 1軍先発が6人未満なら farm 先発を優先昇格 ──
+  // 空き枠があればそのまま昇格、なければ最弱の非先発投手と入れ替え（最低5人・目標6人）
+  {
+    const TARGET_ROT = 6;
+    const farmSP = newFarm
+      .filter(p => p.isPitcher && p.subtype === '先発' && canPromote(p))
+      .sort((a, b) => effScore(b, true) - effScore(a, true));
+    for (const sp of farmSP) {
+      const curSP = players.filter(p => p.isPitcher && p.subtype === '先発' && !p.isIkusei && (p.injuryDaysLeft ?? 0) === 0).length;
+      if (curSP >= TARGET_ROT) break;
+      if (players.length < MAX_ROSTER) {
+        players = [...players, sp];
+        newFarm = newFarm.filter(p => p.id !== sp.id);
+      } else {
+        const weakRP = players
+          .filter(p => p.isPitcher && p.subtype !== '先発' && !p.isIkusei)
+          .sort((a, b) => effScore(a, false) - effScore(b, false))[0];
+        if (!weakRP) break;
+        players = [...players.filter(p => p.id !== weakRP.id), sp];
+        newFarm = [...newFarm.filter(p => p.id !== sp.id), { ...weakRP, registrationCooldownDays: REGISTRATION_COOLDOWN_DAYS }];
+      }
+    }
+  }
+
   // ── 2. 打順自動設定（MRV ヒューリスティック） ──
   const batters = players.filter(p => !p.isPitcher && !p.isIkusei && (p.injuryDaysLeft ?? 0) === 0);
   const useDh = !!team.dhEnabled;
