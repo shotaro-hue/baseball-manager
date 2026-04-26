@@ -15,7 +15,11 @@ export function DraftPreviewScreen({teams,myId,year,pool,draftAllocation,onAlloc
   const alloc=draftAllocation??{pitcher:50,batter:50};
   const predictTeam=player=>{
     const cands=[...teams].sort((a,b)=>a.wins-b.wins).slice(0,4);
-    return cands.find(t=>{const n=analyzeTeamNeeds(t);return player.isPitcher?n.some(x=>x.type.includes("投手")):n.some(x=>x.type.includes("ミート"));})||cands[0];
+    return cands.find(t=>{
+      const n=analyzeTeamNeeds(t);
+      const wantsPitcher=n.some(x=>x.type.includes("先発")||x.type.includes("中継ぎ")||x.type.includes("抑え")||x.type.includes("投手"));
+      return player.isPitcher ? wantsPitcher : n.some(x=>x.type.includes("ミート")||x.type.includes("捕手"));
+    })||cands[0];
   };
   const [tab,setTab]=useState("overview");
   const [recFilter,setRecFilter]=useState("all");
@@ -125,6 +129,21 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
   const priorUsedIds=new Set(Object.values(confirmedPicks).filter(Boolean).map(p=>p.id));
   const roundPool=pool.filter(p=>!p._drafted&&!priorUsedIds.has(p.id));
   const roundLabel=hazureRound===0?"1位指名":"外れ".repeat(hazureRound)+"1位指名";
+  const scoreProspectForTeam=(team, player, rankIdx=0)=>{
+    const needs=analyzeTeamNeeds(team);
+    const topNeed=needs[0];
+    const wantsPitcher=needs.some(n=>n.type.includes("先発")||n.type.includes("中継ぎ")||n.type.includes("抑え")||n.type.includes("投手"));
+    const wantsYouth=needs.some(n=>n.type.includes("若手")||n.type.includes("将来"));
+    const urgent=topNeed?.horizon==="short";
+    let score=100-rankIdx*3;
+    if(wantsPitcher&&player.isPitcher) score+=26;
+    if(!wantsPitcher&&!player.isPitcher) score+=16;
+    if(needs.some(n=>n.type.includes("捕手"))&&!player.isPitcher&&player.pos==="捕手") score+=18;
+    if(urgent) score+=Math.round((player.readinessScore??50)*0.2);
+    else score+=Math.round((player.potential??50)*0.15);
+    if(wantsYouth&&(player.age||22)<=20) score+=10;
+    return score;
+  };
 
   // CPU指名（現ラウンドのactiveTeams・roundPoolを使用）
   const buildCpuPicks=()=>{
@@ -134,9 +153,7 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
       const already=new Set(Object.values(picks).filter(Boolean).map(p=>p.id));
       const avail=roundPool.filter(p=>!already.has(p.id));
       if(!avail.length) return;
-      const needs=analyzeTeamNeeds(t);
-      const needsPitcher=needs.some(n=>n.type.includes("投手"));
-      const scored=avail.map((p,i)=>{let s=100-i*3;if(needsPitcher&&p.isPitcher)s+=30;if(!needsPitcher&&!p.isPitcher)s+=20;return{p,s};}).sort((a,b)=>b.s-a.s);
+      const scored=avail.map((p,i)=>({p,s:scoreProspectForTeam(t,p,i)})).sort((a,b)=>b.s-a.s);
       picks[t.id]=rng(0,9)<3&&scored.length>1?scored[rng(1,Math.min(3,scored.length-1))].p:scored[0].p;
     });
     return picks;
@@ -259,9 +276,7 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
     allSorted.forEach(t=>{
       const avail=roundPool.filter(p=>!used.has(p.id));
       if(!avail.length) return;
-      const needs=analyzeTeamNeeds(t);
-      const needsPitcher=needs.some(n=>n.type.includes("投手"));
-      const scored=avail.map((p,i)=>({p,score:(100-i*3)+(needsPitcher&&p.isPitcher?25:0)+(!needsPitcher&&!p.isPitcher?15:0)})).sort((a,b)=>b.score-a.score);
+      const scored=avail.map((p,i)=>({p,score:scoreProspectForTeam(t,p,i)})).sort((a,b)=>b.score-a.score);
       picks[t.id]=scored[0].p;used.add(scored[0].p.id);
     });
     onDone(picks,true);
@@ -441,6 +456,21 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoS
   const effectiveAutoSkip=autoSkipProp||localAutoSkip;
   const [showPreview,setShowPreview]=useState(false);
   const current=draftOrderFiltered[pickIdx];
+  const scoreProspectForTeam=(team, player, rankIdx=0)=>{
+    const needs=analyzeTeamNeeds(team);
+    const topNeed=needs[0];
+    const wantsPitcher=needs.some(n=>n.type.includes("先発")||n.type.includes("中継ぎ")||n.type.includes("抑え")||n.type.includes("投手"));
+    const wantsYouth=needs.some(n=>n.type.includes("若手")||n.type.includes("将来"));
+    const urgent=topNeed?.horizon==="short";
+    let score=100-rankIdx*2;
+    if(wantsPitcher&&player.isPitcher) score+=24;
+    if(!wantsPitcher&&!player.isPitcher) score+=14;
+    if(needs.some(n=>n.type.includes("捕手"))&&!player.isPitcher&&player.pos==="捕手") score+=16;
+    if(urgent) score+=Math.round((player.readinessScore??50)*0.2);
+    else score+=Math.round((player.potential??50)*0.15);
+    if(wantsYouth&&(player.age||22)<=20) score+=10;
+    return score;
+  };
   const isMyTurn=current&&current.team.id===myId&&!done;
   const isPickedAfterRound1=pid=>Object.prototype.hasOwnProperty.call(drafted,pid);
   // 1巡目で指名済みの選手を除外
@@ -481,14 +511,10 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoS
     if(!avail.length){setDone(true);return;}
     // CPU戦略：補強ニーズに合う選手を優先
     const needs=analyzeTeamNeeds(current.team);
-    const needsPitcher=needs.some(n=>n.type.includes("投手"));
-    const needsPower=needs.some(n=>n.type.includes("長打"));
     const scored=avail.map((p,i)=>{
-      let score=100-i*2; // ポテンシャル順の基礎点
-      if(needsPitcher&&p.isPitcher) score+=25;
-      if(!needsPitcher&&!p.isPitcher) score+=15;
-      if(needsPower&&!p.isPitcher&&p.batting?.power>65) score+=10;
-      return{p,score};
+      let score=scoreProspectForTeam(current.team,p,i);
+      if(needs.some(n=>n.type.includes("ミート"))&&!p.isPitcher&&(p.batting?.contact||0)>=65) score+=8;
+      return {p,score};
     }).sort((a,b)=>b.score-a.score);
     // 8%でサプライズ指名
     const surprise=Math.random()<0.08&&avail.length>6;
@@ -507,10 +533,7 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoS
       if(!current) return;
       const avail=pool.filter(p=>!isPickedAfterRound1(p.id)&&!p._drafted);
       if(!avail.length){setDone(true);return;}
-      const needs=analyzeTeamNeeds(current.team);
-      const needsPitcher=needs.some(n=>n.type.includes("投手"));
-      const needsPower=needs.some(n=>n.type.includes("長打"));
-      const scored=avail.map((p,i)=>({p,score:(100-i*2)+(needsPitcher&&p.isPitcher?25:0)+(!needsPitcher&&!p.isPitcher?15:0)+(needsPower&&!p.isPitcher&&p.batting?.power>65?10:0)})).sort((a,b)=>b.score-a.score);
+      const scored=avail.map((p,i)=>({p,score:scoreProspectForTeam(current.team,p,i)})).sort((a,b)=>b.score-a.score);
       const pick=scored[0].p;
       const isMe=current.team.id===myId;
       setDrafted(prev=>({...prev,[pick.id]:isMe?myId:current.team.id}));
@@ -695,3 +718,18 @@ export function DraftReviewScreen({teams,myId,year,pool,drafted,onEnd}){
     </div></div>
   );
 }
+  const scoreProspectForTeam=(team, player, rankIdx=0)=>{
+    const needs=analyzeTeamNeeds(team);
+    const topNeed=needs[0];
+    const wantsPitcher=needs.some(n=>n.type.includes("先発")||n.type.includes("中継ぎ")||n.type.includes("抑え")||n.type.includes("投手"));
+    const wantsYouth=needs.some(n=>n.type.includes("若手")||n.type.includes("将来"));
+    const urgent=topNeed?.horizon==="short";
+    let score=100-rankIdx*3;
+    if(wantsPitcher&&player.isPitcher) score+=26;
+    if(!wantsPitcher&&!player.isPitcher) score+=16;
+    if(needs.some(n=>n.type.includes("捕手"))&&!player.isPitcher&&player.pos==="捕手") score+=18;
+    if(urgent) score+=Math.round((player.readinessScore??50)*0.2);
+    else score+=Math.round((player.potential??50)*0.15);
+    if(wantsYouth&&(player.age||22)<=20) score+=10;
+    return score;
+  };
