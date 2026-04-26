@@ -55,7 +55,6 @@ const rosterRecScore=(p)=>{
 
 const buildRosterRecs=(team)=>{
   const recs=[];
-  const openSlots=MAX_ROSTER-team.players.length;
   const foreignInActive=team.players.filter(p=>p.isForeign).length;
   const canPromote=(p)=>!p.育成&&(p.injuryDaysLeft??0)===0&&(p.registrationCooldownDays??0)===0&&!(p.isForeign&&foreignInActive>=MAX_外国人_一軍);
   const effScore=(p,isFarm)=>{
@@ -63,63 +62,83 @@ const buildRosterRecs=(team)=>{
     const devBonus=isFarm&&(p.potential??0)>=ROSTER_DEVREC_POTENTIAL_MIN&&(p.daysOnActiveRoster??0)<ROSTER_DEVREC_DAYS_MAX?ROSTER_DEVREC_BONUS:0;
     return base+devBonus;
   };
-
   const TARGET_BATTERS=MAX_ROSTER-OPTIMAL_PITCHER_COUNT;
-  const currentPitchers=team.players.filter(p=>p.isPitcher).length;
-  const currentBatters=team.players.filter(p=>!p.isPitcher).length;
 
-  // 降格（1軍枠超過）: 超過種別から優先降格 → 残りは全体最下位から
+  // 仮想ロースターを使って変更を積み上げ、矛盾のないレコメンドを生成する
+  let projPlayers=[...team.players];
+  let projFarm=[...team.farm];
+  const usedFarmIds=new Set();
+  const usedActiveIds=new Set();
+
+  // ─── フェーズ1: 枠超過を降格で解消 ───
+  const openSlots=MAX_ROSTER-projPlayers.length;
   if(openSlots<0){
     const excess=-openSlots;
-    const pitcherOver=Math.max(0,currentPitchers-OPTIMAL_PITCHER_COUNT);
-    const batterOver=Math.max(0,currentBatters-TARGET_BATTERS);
-    const demoted=new Set();
-    const tryDemote=(candidates,limit)=>{
-      [...candidates].sort((a,b)=>effScore(a,false)-effScore(b,false))
-        .slice(0,limit).forEach(p=>{recs.push({type:'demote',downPlayer:p,upPlayer:null,scoreDiff:0});demoted.add(p.id);});
+    const pitcherOver=Math.max(0,projPlayers.filter(p=>p.isPitcher).length-OPTIMAL_PITCHER_COUNT);
+    const batterOver=Math.max(0,projPlayers.filter(p=>!p.isPitcher).length-TARGET_BATTERS);
+    const addDemotes=(candidates,limit)=>{
+      [...candidates].sort((a,b)=>effScore(a,false)-effScore(b,false)).slice(0,limit).forEach(p=>{
+        if(!usedActiveIds.has(p.id)){
+          recs.push({type:'demote',downPlayer:p,upPlayer:null,scoreDiff:0});
+          usedActiveIds.add(p.id);
+          projPlayers=projPlayers.filter(q=>q.id!==p.id);
+        }
+      });
     };
-    tryDemote(team.players.filter(p=>p.isPitcher),Math.min(pitcherOver,excess));
-    tryDemote(team.players.filter(p=>!p.isPitcher),Math.min(batterOver,excess-demoted.size));
-    if(demoted.size<excess){
-      tryDemote(team.players.filter(p=>!demoted.has(p.id)),excess-demoted.size);
-    }
+    addDemotes(projPlayers.filter(p=>p.isPitcher),Math.min(pitcherOver,excess));
+    addDemotes(projPlayers.filter(p=>!p.isPitcher),Math.min(batterOver,excess-usedActiveIds.size));
+    if(usedActiveIds.size<excess) addDemotes(projPlayers.filter(p=>!usedActiveIds.has(p.id)),excess-usedActiveIds.size);
     return recs;
   }
 
-  const usedFarmIds=new Set();
-  const usedActiveIds=new Set();
-  const eligible=[...team.farm].filter(canPromote);
-  const eligP=[...eligible].filter(p=>p.isPitcher).sort((a,b)=>effScore(b,true)-effScore(a,true));
-  const eligB=[...eligible].filter(p=>!p.isPitcher).sort((a,b)=>effScore(b,true)-effScore(a,true));
+  // ─── フェーズ2: 空き枠を投手枠→野手枠→残り最高スコア順で昇格推薦 ───
   let slotsLeft=openSlots;
-
-  // 1. 投手枠を優先昇格（目標OPTIMAL_PITCHER_COUNTまで）
-  const pitcherNeed=Math.max(0,OPTIMAL_PITCHER_COUNT-currentPitchers);
-  eligP.slice(0,Math.min(pitcherNeed,slotsLeft)).forEach(p=>{
-    recs.push({type:'promote',upPlayer:p,downPlayer:null,scoreDiff:Math.round(effScore(p,true))});
-    usedFarmIds.add(p.id);slotsLeft--;
-  });
-
-  // 2. 野手枠を優先昇格（目標TARGET_BATTERSまで）
-  const batterNeed=Math.max(0,TARGET_BATTERS-currentBatters);
-  eligB.slice(0,Math.min(batterNeed,slotsLeft)).forEach(p=>{
-    recs.push({type:'promote',upPlayer:p,downPlayer:null,scoreDiff:Math.round(effScore(p,true))});
-    usedFarmIds.add(p.id);slotsLeft--;
-  });
-
-  // 3. 残り枠は最高スコア順で埋める（投手/野手問わず）
-  if(slotsLeft>0){
-    [...eligible].filter(p=>!usedFarmIds.has(p.id)).sort((a,b)=>effScore(b,true)-effScore(a,true))
-      .slice(0,slotsLeft).forEach(p=>{
+  const eligP=projFarm.filter(p=>p.isPitcher&&canPromote(p)).sort((a,b)=>effScore(b,true)-effScore(a,true));
+  const eligB=projFarm.filter(p=>!p.isPitcher&&canPromote(p)).sort((a,b)=>effScore(b,true)-effScore(a,true));
+  const addPromotes=(candidates,limit)=>{
+    candidates.slice(0,limit).forEach(p=>{
+      if(!usedFarmIds.has(p.id)&&slotsLeft>0){
         recs.push({type:'promote',upPlayer:p,downPlayer:null,scoreDiff:Math.round(effScore(p,true))});
-        usedFarmIds.add(p.id);
-      });
+        usedFarmIds.add(p.id);projPlayers.push(p);projFarm=projFarm.filter(q=>q.id!==p.id);slotsLeft--;
+      }
+    });
+  };
+  const pitcherNeed=Math.max(0,OPTIMAL_PITCHER_COUNT-projPlayers.filter(p=>p.isPitcher).length);
+  addPromotes(eligP,pitcherNeed);
+  const batterNeed=Math.max(0,TARGET_BATTERS-projPlayers.filter(p=>!p.isPitcher).length);
+  addPromotes(eligB.filter(p=>!usedFarmIds.has(p.id)),batterNeed);
+  if(slotsLeft>0){
+    addPromotes([...projFarm].filter(p=>canPromote(p)&&!usedFarmIds.has(p.id)).sort((a,b)=>effScore(b,true)-effScore(a,true)),slotsLeft);
   }
 
-  // 4. スワップ（同種別・スコア差が閾値以上・件数上限なし）
-  const remainFarm=[...eligible].filter(p=>!usedFarmIds.has(p.id)).sort((a,b)=>effScore(b,true)-effScore(a,true));
+  // ─── フェーズ3: 満員時クロス種別バランス調整（投手不足→最弱野手と交換、野手不足→最弱投手と交換）───
+  let curP=projPlayers.filter(p=>p.isPitcher).length;
+  let curB=projPlayers.filter(p=>!p.isPitcher).length;
+  // 投手不足: 野手を下ろして投手を上げる
+  while(curP<OPTIMAL_PITCHER_COUNT&&curB>TARGET_BATTERS){
+    const fp=projFarm.filter(p=>p.isPitcher&&canPromote(p)&&!usedFarmIds.has(p.id)).sort((a,b)=>effScore(b,true)-effScore(a,true))[0];
+    const ap=projPlayers.filter(p=>!p.isPitcher&&!usedActiveIds.has(p.id)).sort((a,b)=>effScore(a,false)-effScore(b,false))[0];
+    if(!fp||!ap)break;
+    recs.push({type:'swap',upPlayer:fp,downPlayer:ap,scoreDiff:Math.round(effScore(fp,true)-effScore(ap,false))});
+    usedFarmIds.add(fp.id);usedActiveIds.add(ap.id);
+    projPlayers=[...projPlayers.filter(p=>p.id!==ap.id),fp];projFarm=projFarm.filter(p=>p.id!==fp.id);
+    curP=projPlayers.filter(p=>p.isPitcher).length;curB=projPlayers.filter(p=>!p.isPitcher).length;
+  }
+  // 野手不足: 投手を下ろして野手を上げる
+  while(curB<TARGET_BATTERS&&curP>OPTIMAL_PITCHER_COUNT){
+    const fp=projFarm.filter(p=>!p.isPitcher&&canPromote(p)&&!usedFarmIds.has(p.id)).sort((a,b)=>effScore(b,true)-effScore(a,true))[0];
+    const ap=projPlayers.filter(p=>p.isPitcher&&!usedActiveIds.has(p.id)).sort((a,b)=>effScore(a,false)-effScore(b,false))[0];
+    if(!fp||!ap)break;
+    recs.push({type:'swap',upPlayer:fp,downPlayer:ap,scoreDiff:Math.round(effScore(fp,true)-effScore(ap,false))});
+    usedFarmIds.add(fp.id);usedActiveIds.add(ap.id);
+    projPlayers=[...projPlayers.filter(p=>p.id!==ap.id),fp];projFarm=projFarm.filter(p=>p.id!==fp.id);
+    curP=projPlayers.filter(p=>p.isPitcher).length;curB=projPlayers.filter(p=>!p.isPitcher).length;
+  }
+
+  // ─── フェーズ4: 同種別・能力スワップ（スコア差が閾値以上の全候補） ───
+  const remainFarm=projFarm.filter(p=>canPromote(p)&&!usedFarmIds.has(p.id)).sort((a,b)=>effScore(b,true)-effScore(a,true));
   if(remainFarm.length>0){
-    [...team.players].sort((a,b)=>effScore(a,false)-effScore(b,false)).forEach(ap=>{
+    [...projPlayers].sort((a,b)=>effScore(a,false)-effScore(b,false)).forEach(ap=>{
       if(usedActiveIds.has(ap.id))return;
       const best=remainFarm.find(fp=>!usedFarmIds.has(fp.id)&&fp.isPitcher===ap.isPitcher);
       if(!best)return;

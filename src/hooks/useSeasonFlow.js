@@ -141,8 +141,30 @@ function cpuAutoManageTeam(team) {
         .slice(0, slotsLeft).forEach(p => { players.push(p); usedFarmIds.add(p.id); });
     }
 
+    // クロス種別バランス調整: 投手不足なら最弱野手↔最強farm投手、野手不足なら最弱投手↔最強farm野手
+    let curP = players.filter(p => p.isPitcher).length;
+    let curB = players.filter(p => !p.isPitcher).length;
+    while (curP < OPTIMAL_PITCHER_COUNT && curB > TARGET_BATTERS) {
+      const fp = newFarm.filter(p => p.isPitcher && canPromote(p) && !usedFarmIds.has(p.id)).sort((a, b) => effScore(b, true) - effScore(a, true))[0];
+      const ap = players.filter(p => !p.isPitcher && !usedActiveIds.has(p.id)).sort((a, b) => effScore(a, false) - effScore(b, false))[0];
+      if (!fp || !ap) break;
+      players = [...players.filter(p => p.id !== ap.id), fp];
+      newFarm = [...newFarm.filter(p => p.id !== fp.id), { ...ap, registrationCooldownDays: REGISTRATION_COOLDOWN_DAYS }];
+      usedFarmIds.add(fp.id); usedActiveIds.add(ap.id);
+      curP = players.filter(p => p.isPitcher).length; curB = players.filter(p => !p.isPitcher).length;
+    }
+    while (curB < TARGET_BATTERS && curP > OPTIMAL_PITCHER_COUNT) {
+      const fp = newFarm.filter(p => !p.isPitcher && canPromote(p) && !usedFarmIds.has(p.id)).sort((a, b) => effScore(b, true) - effScore(a, true))[0];
+      const ap = players.filter(p => p.isPitcher && !usedActiveIds.has(p.id)).sort((a, b) => effScore(a, false) - effScore(b, false))[0];
+      if (!fp || !ap) break;
+      players = [...players.filter(p => p.id !== ap.id), fp];
+      newFarm = [...newFarm.filter(p => p.id !== fp.id), { ...ap, registrationCooldownDays: REGISTRATION_COOLDOWN_DAYS }];
+      usedFarmIds.add(fp.id); usedActiveIds.add(ap.id);
+      curP = players.filter(p => p.isPitcher).length; curB = players.filter(p => !p.isPitcher).length;
+    }
+
     // スワップ（有力二軍 vs 一軍下位・同種別）
-    const remainFarm = eligibleFarm.filter(fp => !usedFarmIds.has(fp.id));
+    const remainFarm = newFarm.filter(fp => canPromote(fp) && !usedFarmIds.has(fp.id));
     if (remainFarm.length > 0) {
       [...players].sort((a, b) => effScore(a, false) - effScore(b, false)).forEach(ap => {
         if (usedActiveIds.has(ap.id)) return;
@@ -159,7 +181,7 @@ function cpuAutoManageTeam(team) {
       });
     }
 
-    // 昇格実行: farm から除去
+    // 昇格実行: farm から除去（クロス種別分含む）
     [...usedFarmIds].forEach(id => { newFarm = newFarm.filter(fp => fp.id !== id); });
   }
 
