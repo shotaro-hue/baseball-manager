@@ -36,17 +36,58 @@ export function analyzeTeamNeeds(team) {
     : 50;
   const avgAge = team.players.reduce((sum, p) => sum + (p.age || 25), 0) / Math.max(team.players.length, 1);
 
+  const primeStarters = starters.filter((p) => (p.age || 25) <= 30).length;
+  const youngStarters = starters.filter((p) => (p.age || 25) <= 24).length;
+  const veteranShare = team.players.length
+    ? team.players.filter((p) => (p.age || 25) >= 31).length / team.players.length
+    : 0;
+
   const needs = [];
-  if (starters.length < 4) needs.push({ type: '先発投手が不足', score: 30 + (4 - starters.length) * 10 });
-  if (closers.length === 0) needs.push({ type: '抑え不在', score: 25 });
-  if (relievers.length < 3) needs.push({ type: '中継ぎ不足', score: 15 + (3 - relievers.length) * 5 });
-  if (avgV < 60) needs.push({ type: '投手陣の球威強化', score: Math.round((60 - avgV) * 0.5) });
-  if (catchers.length === 0) needs.push({ type: '捕手補強が急務', score: 28 });
-  if (avgC < 60) needs.push({ type: 'ミート力の向上', score: Math.round((60 - avgC) * 0.5) });
-  if (avgAge > 30) needs.push({ type: '若手の補充が急務', score: Math.round((avgAge - 30) * 5) });
-  if (needs.length === 0) needs.push({ type: 'バランス型の補強', score: 10 });
+  if (starters.length < 4) needs.push({ type: '先発投手が不足', score: 30 + (4 - starters.length) * 10, horizon: 'short' });
+  if (primeStarters < 3) needs.push({ type: '先発ローテの主力層が薄い', score: 24 + (3 - primeStarters) * 8, horizon: 'mid' });
+  if (youngStarters < 2) needs.push({ type: '将来の先発候補を育成したい', score: 20 + (2 - youngStarters) * 8, horizon: 'long' });
+  if (closers.length === 0) needs.push({ type: '抑え不在', score: 25, horizon: 'short' });
+  if (relievers.length < 3) needs.push({ type: '中継ぎ不足', score: 15 + (3 - relievers.length) * 5, horizon: 'short' });
+  if (avgV < 60) needs.push({ type: '投手陣の球威強化', score: Math.round((60 - avgV) * 0.5), horizon: 'mid' });
+  if (catchers.length === 0) needs.push({ type: '捕手補強が急務', score: 28, horizon: 'short' });
+  if (avgC < 60) needs.push({ type: 'ミート力の向上', score: Math.round((60 - avgC) * 0.5), horizon: 'mid' });
+  if (avgAge > 30 || veteranShare > 0.35) needs.push({ type: '若手の補充が急務', score: Math.round((avgAge - 30) * 5) + Math.round(veteranShare * 10), horizon: 'long' });
+  if (needs.length === 0) needs.push({ type: 'バランス型の補強', score: 10, horizon: 'mid' });
 
   return needs.sort((a, b) => b.score - a.score).slice(0, 3);
+}
+
+function calcNeedFitScore(player, needs) {
+  return needs.reduce((sum, n) => {
+    let gain = 0;
+    const isShort = n.horizon === 'short';
+    const isMid = n.horizon === 'mid';
+    const isLong = n.horizon === 'long';
+
+    if (n.type.includes('先発') && player.isPitcher && player.subtype === '先発') {
+      gain += n.score * (isLong ? 0.8 : 1.0);
+      if (isLong && (player.age || 25) <= 23) gain += 6;
+    } else if (n.type.includes('抑え') && player.isPitcher && player.subtype === '抑え') {
+      gain += n.score;
+    } else if (n.type.includes('中継ぎ') && player.isPitcher && player.subtype === '中継ぎ') {
+      gain += n.score;
+    } else if (n.type.includes('球威') && player.isPitcher) {
+      gain += (player.pitching?.velocity || 50) >= 65 ? n.score * 0.6 : n.score * 0.2;
+    } else if (n.type.includes('捕手') && !player.isPitcher && player.pos === '捕手') {
+      gain += n.score;
+    } else if (n.type.includes('ミート') && !player.isPitcher) {
+      gain += (player.batting?.contact || 50) >= 62 ? n.score * 0.6 : n.score * 0.2;
+    } else if (n.type.includes('若手') && (player.age || 25) <= 24) {
+      gain += n.score;
+    } else if (n.type.includes('バランス')) {
+      gain += 5;
+    }
+
+    if (isShort && (player.age || 25) >= 29) gain += 2;
+    if (isMid && (player.age || 25) >= 25 && (player.age || 25) <= 29) gain += 2;
+    if (isLong && (player.age || 25) <= 23) gain += 3;
+    return sum + gain;
+  }, 0);
 }
 
 export function evalTradeForCpu(cpuTeam, give, receive, cashDiff) {
@@ -54,13 +95,12 @@ export function evalTradeForCpu(cpuTeam, give, receive, cashDiff) {
   const rv = receive.reduce((s, p) => s + tradeValue(p), 0);
   let diff = gv - rv + (cashDiff || 0) / 100000;
   const needs = analyzeTeamNeeds(cpuTeam);
-  const np = needs.some((n) => n.type.includes("投手"));
-  give.forEach((p) => { if (np && p.isPitcher) diff += 8; if (!np && !p.isPitcher) diff += 5; if ((p.age || 25) <= 23) diff += 5; });
+  give.forEach((p) => { diff += calcNeedFitScore(p, needs) * 0.15; if ((p.age || 25) <= 23) diff += 5; });
   receive.forEach((p) => { if ((p.age || 25) <= 26 && tradeValue(p) > 70) diff -= 8; });
   const reasons = [];
   if (diff < -5) reasons.push(`対価が不足（差: ${Math.abs(Math.round(diff))}点）`);
-  if (np) reasons.push("投手補強を優先したい");
-  else reasons.push("打線強化を優先したい");
+  if (needs[0]?.type) reasons.push(`${needs[0].type}を優先したい`);
+  else reasons.push("戦力バランスを改善したい");
   const hasYoungGive = give.some(p => (p.age || 25) <= 23);
   if (!hasYoungGive) reasons.push("若手選手が欲しい");
   return { diff, fair: diff >= -5, favorable: diff >= 8, reasons: reasons.slice(0, 2) };
@@ -71,8 +111,9 @@ export function generateCpuOffer(cpuTeam, myTeam) {
   const cp = cpuTeam.players.filter((p) => !p.injury);
   if (!mp.length || !cp.length) return null;
   const needs = analyzeTeamNeeds(cpuTeam);
-  const np = needs.some((n) => n.type.includes("投手"));
-  const want = mp.filter((p) => np ? p.isPitcher : !p.isPitcher).sort((a, b) => tradeValue(b) - tradeValue(a))[0];
+  const want = mp
+    .map((p) => ({ p, score: tradeValue(p) + calcNeedFitScore(p, needs) * 0.25 }))
+    .sort((a, b) => b.score - a.score)[0]?.p;
   if (!want) return null;
   const wv = tradeValue(want);
   const offer = cp.map((p) => ({ p, d: Math.abs(tradeValue(p) - wv) })).sort((a, b) => a.d - b.d)[0]?.p;

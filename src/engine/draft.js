@@ -1,6 +1,7 @@
 import { rng, clamp } from '../utils';
 import { POSITIONS, DRAFT_POOL_SIZE, PROSPECT_TYPE_WEIGHTS, PROSPECT_ENTRY_AGE, PROSPECT_READINESS_RANGE } from '../constants';
 import { makePlayer } from './player';
+import { analyzeTeamNeeds } from './trade';
 
 /* ═══════════════════════════════════════════════
    DRAFT SYSTEM
@@ -38,17 +39,26 @@ export function draftOverallComment(pool) {
 }
 
 export function recommendForTeam(team, pool) {
-  const needsPitcher = team.players.filter((p) => p.isPitcher).length < 8;
-  // 勝ち越しているチームは即戦力を優先
-  const wantImmediacy = (team.wins || 0) > (team.losses || 0) + 10;
+  const needs = analyzeTeamNeeds(team);
+  const shortNeed = needs.find((n) => n.horizon === 'short');
+  const longNeed = needs.find((n) => n.horizon === 'long');
+  const shortPressure = shortNeed ? shortNeed.score : 0;
+  const longPressure = longNeed ? longNeed.score : 0;
+  const needsPitcher = needs.some((n) => n.type.includes('先発') || n.type.includes('中継ぎ') || n.type.includes('抑え') || n.type.includes('投手'));
+  const needsCatcher = needs.some((n) => n.type.includes('捕手'));
+  const wantsYouth = needs.some((n) => n.type.includes('若手') || n.type.includes('将来'));
+  const contending = (team.wins || 0) > (team.losses || 0) + 8;
+  const wantImmediacy = contending || shortPressure >= longPressure;
   return pool
     .map((p) => ({
       ...p,
       recScore: p.potential
         + (needsPitcher && p.isPitcher ? 15 : 0)
         + (!needsPitcher && !p.isPitcher ? 10 : 0)
-        + (p.age <= 20 ? 8 : p.age <= 21 ? 4 : 0)
-        + (wantImmediacy ? Math.round((p.readinessScore ?? 50) * 0.3) : 0),
+        + (needsCatcher && !p.isPitcher && p.pos === '捕手' ? 14 : 0)
+        + (wantsYouth && p.age <= 20 ? 12 : p.age <= 21 ? 6 : 0)
+        + (wantImmediacy ? Math.round((p.readinessScore ?? 50) * 0.35) : Math.round((p.potential || 50) * 0.12))
+        + (!wantImmediacy && (p.prospectType === '高卒' ? 8 : 0)),
     }))
     .sort((a, b) => b.recScore - a.recScore)
     .slice(0, 5);
