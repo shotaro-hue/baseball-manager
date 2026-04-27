@@ -104,7 +104,7 @@ export function useOffseason(gs) {
     const deliveryDay=gameDay+waitDays;
     setMailbox(prev=>[...prev,{
       id:uid(),
-      type:"contract_decision",
+      type:"contract_decision_pending",
       read:false,
       resolved:false,
       deliverOnDay:deliveryDay,

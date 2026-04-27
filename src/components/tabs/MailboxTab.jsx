@@ -10,8 +10,9 @@ export function MailboxTab({mailbox, onRead, onAction, teams, myTeam, onTrade, o
     if(!m.read) onRead(m.id);
   };
 
-  const typeIcon = t => t==="trade"?"🔄":t==="posting_request"?"✈️":t==="posting_result"?"💰":t==="cpu_fa_summary"?"🗞":t==="info"?"📋":t==="scout"?"🔍":"📨";
-  const typeColor = t => t==="trade"?"#f97316":t==="posting_request"?"#34d399":t==="posting_result"?"#f5c842":t==="cpu_fa_summary"?"#38bdf8":t==="info"?"#60a5fa":t==="scout"?"#a78bfa":"#94a3b8";
+  const typeIcon = t => t==="trade"?"🔄":t==="posting_request"?"✈️":t==="posting_result"?"💰":t==="cpu_fa_summary"?"🗞":t==="info"?"📋":t==="scout"?"🔍":t==="contract_reply"?"✉️":"📨";
+  const typeColor = t => t==="trade"?"#f97316":t==="posting_request"?"#34d399":t==="posting_result"?"#f5c842":t==="cpu_fa_summary"?"#38bdf8":t==="info"?"#60a5fa":t==="scout"?"#a78bfa":t==="contract_reply"?"#22d3ee":"#94a3b8";
+  const typeLabel = t => t==="trade"?"トレードオファー":t==="contract_reply"?"契約回答":"お知らせ";
 
   return(
     <div style={{display:"grid", gridTemplateColumns: selected?"1fr 1fr":"1fr", gap:8}}>
@@ -41,7 +42,7 @@ export function MailboxTab({mailbox, onRead, onAction, teams, myTeam, onTrade, o
       {selected&&(
         <div className="card" style={{padding:"12px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-            <span style={{fontSize:10,color:typeColor(selected.type),fontWeight:700}}>{typeIcon(selected.type)} {selected.type==="trade"?"トレードオファー":"お知らせ"}</span>
+            <span style={{fontSize:10,color:typeColor(selected.type),fontWeight:700}}>{typeIcon(selected.type)} {typeLabel(selected.type)}</span>
             <button className="bsm bga" onClick={()=>setSelected(null)}>✕</button>
           </div>
           <div style={{fontWeight:700,fontSize:14,marginBottom:4}}>{selected.title}</div>
