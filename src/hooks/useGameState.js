@@ -1,6 +1,6 @@
 import { useState, useReducer, useMemo, useCallback, useEffect } from "react";
 import { gameStateReducer, G } from './gameStateReducer';
-import { uid, clamp, rng, pname, scoutedValue } from '../utils';
+import { uid, clamp, rng, pname, scoutedValue, fmtSal } from '../utils';
 import { buildTeam, makePlayer, resolveTrainingFocusFromGoal, generateForeignFaPool } from '../engine/player';
 import { saveGame, hasSave } from '../engine/saveload';
 import { generateSeasonSchedule, calcAllStarTriggerDay } from '../engine/scheduleGen';
@@ -173,7 +173,7 @@ export function useGameState() {
         dateLabel:`${year}年 ${gameDay}日目`,
         timestamp:Date.now(),
         body:m.decision?.accepted
-          ? `${m.decision.playerName}より契約受諾の連絡が届きました。\n\n契約条件: ${m.decision.years}年 / ${(m.decision.salary/100000000).toFixed(1)}億円`
+          ? `${m.decision.playerName}より契約受諾の連絡が届きました。\n\n契約条件: ${m.decision.years}年 / ${fmtSal(m.decision.salary)}`
           : `${m.decision.playerName}より契約辞退の連絡が届きました。\n\n選手はFA市場へ移行します。`,
       }));
       return [...keptMails, ...resultMails];
