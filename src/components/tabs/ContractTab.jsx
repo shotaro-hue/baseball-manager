@@ -4,6 +4,63 @@ import { fmtSal } from '../../utils';
 import { evalOffer } from '../../engine/contract';
 import { PersonalityView } from '../ui';
 
+function getReactionTone(total){
+  if(total >= ACCEPT_THRESHOLD + 10) return "excited";
+  if(total >= ACCEPT_THRESHOLD) return "positive";
+  if(total >= 55) return "consider";
+  if(total >= 40) return "tough";
+  return "reject";
+}
+
+function makeNegotiationChat(player, offerSal, offerYrs, preview){
+  if(!player || !preview) return [];
+  const tone = getReactionTone(preview.total);
+  const delta = offerSal - (player.salary || 0);
+  const deltaText = delta >= 0 ? `+${fmtSal(delta)}` : `-${fmtSal(Math.abs(delta))}`;
+  const salaryScore = preview?.breakdown?.money?.score ?? 0;
+  const yearScore = preview?.breakdown?.stability?.score ?? 0;
+  const rivalScore = preview?.breakdown?.market?.score ?? 0;
+
+  const opening = {
+    gm: `来季は ${offerYrs}年 / ${fmtSal(offerSal)} で残留してほしい。現状年俸から${deltaText}の提示だ。`,
+    player: `${player.name}「提示ありがとうございます。条件、しっかり確認します。」`,
+  };
+
+  const reactions = {
+    excited: [
+      `${player.name}「この条件なら前向きです！チームへの思いに応えたいです。」`,
+      `代理人「年俸評価(${salaryScore})・契約安定(${yearScore})ともに高水準。合意は目前です。」`,
+    ],
+    positive: [
+      `${player.name}「かなり良い条件ですね。細部がまとまれば決められそうです。」`,
+      `代理人「市場評価(${rivalScore})と比べても悪くありません。前向きに進めましょう。」`,
+    ],
+    consider: [
+      `${player.name}「気持ちはありますが、もう一声あると安心できます。」`,
+      `代理人「単年リスクと市場価格の差が気になります。条件調整の余地があります。」`,
+    ],
+    tough: [
+      `${player.name}「正直、迷います…。この条件では決断が難しいです。」`,
+      `代理人「提示は把握しましたが、評価が不足しています。再提示を推奨します。」`,
+    ],
+    reject: [
+      `${player.name}「この条件では厳しいです。納得できません。」`,
+      `代理人「現時点では合意困難です。年俸か年数の大幅見直しが必要です。」`,
+    ],
+  };
+
+  return [
+    { speaker: "GM", text: opening.gm, align: "right", color: "#60a5fa" },
+    { speaker: player.name, text: opening.player, align: "left", color: "#f5c842" },
+    ...reactions[tone].map((text, idx)=>({
+      speaker: idx === 0 ? player.name : "代理人",
+      text,
+      align: "left",
+      color: idx === 0 ? "#f5c842" : "#c084fc",
+    })),
+  ];
+}
+
 export function ContractTab({team,allTeams,onOffer,onRelease}){
   const [selId,setSelId]=useState(null);
   const [offerSal,setOfferSal]=useState(0);
@@ -21,6 +78,7 @@ export function ContractTab({team,allTeams,onOffer,onRelease}){
       ])).sort((a,b)=>a-b)
     : [];
   const preview=sel?evalOffer(sel,{salary:offerSal,years:offerYrs},team,allTeams):null;
+  const chat = sel ? makeNegotiationChat(sel, offerSal, offerYrs, preview) : [];
   const ac=preview?.total>=ACCEPT_THRESHOLD?"#34d399":preview?.total>=40?"#f5c842":"#f87171";
   return(
     <div>
@@ -66,6 +124,21 @@ export function ContractTab({team,allTeams,onOffer,onRelease}){
                     <div style={{fontSize:12,fontWeight:700,color:ac}}>{preview.total>=ACCEPT_THRESHOLD?"✅ 受諾見込み":preview.total>=40?"⚠️ 微妙":"❌ 拒否の可能性大"}</div>
                   </div>
                   {Object.entries(preview.breakdown).map(([k,v])=>{const def=PVAL_DEFS.find(d=>d.k===k);return(<div key={k} style={{display:"flex",alignItems:"center",gap:5,marginBottom:2}}><span style={{fontSize:9,color:"#374151",width:80}}>{def?.lbl}</span><div style={{flex:1,height:4,background:"rgba(255,255,255,.06)",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${v.score}%`,background:def?.color||"#60a5fa"}}/></div><span style={{fontFamily:"monospace",fontSize:10,color:"#374151",width:22}}>{v.score}</span><span style={{fontSize:9,color:"#1e2d3d",width:28}}>×{v.weight}</span></div>);})}
+                </div>
+              )}
+              {chat.length>0&&(
+                <div style={{background:"rgba(15,23,42,.6)",border:"1px solid rgba(148,163,184,.2)",borderRadius:8,padding:10,marginBottom:10}}>
+                  <div style={{fontSize:10,color:"#94a3b8",marginBottom:8,letterSpacing:".08em"}}>NEGOTIATION TALK</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                    {chat.map((line,idx)=>(
+                      <div key={`${line.speaker}-${idx}`} style={{display:"flex",justifyContent:line.align==="right"?"flex-end":"flex-start"}}>
+                        <div style={{maxWidth:"92%",background:line.align==="right"?"rgba(37,99,235,.2)":"rgba(30,41,59,.9)",border:`1px solid ${line.color}55`,borderRadius:10,padding:"7px 9px"}}>
+                          <div style={{fontSize:9,color:line.color,fontWeight:700,marginBottom:2}}>{line.speaker}</div>
+                          <div style={{fontSize:11,color:"#e2e8f0",lineHeight:1.45}}>{line.text}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               <button className="btn btn-gold" style={{width:"100%"}} onClick={()=>onOffer(sel.id,offerSal,offerYrs)}>オファーを送る</button>
