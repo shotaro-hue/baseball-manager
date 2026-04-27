@@ -9,7 +9,7 @@ import { calcOffseasonPopDelta, driftPopularity } from '../engine/fanSentiment';
 import { generateSeasonSchedule, calcAllStarTriggerDay } from '../engine/scheduleGen';
 import { SEASON_PARAMS, getDefaultParams } from '../data/scheduleParams.js';
 import {
-  TEAM_DEFS, ACCEPT_THRESHOLD, OWNER_TRUST_BUDGET_LOW, OWNER_TRUST_BUDGET_HIGH,
+  TEAM_DEFS, OWNER_TRUST_BUDGET_LOW, OWNER_TRUST_BUDGET_HIGH,
   OWNER_TRUST_FACTOR_LOW, OWNER_TRUST_FACTOR_HIGH, POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD,
   FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX, MIN_SALARY_SHIHAKA,
 } from '../constants';
@@ -96,11 +96,33 @@ export function useOffseason(gs) {
     handleNextYear();
   };
 
-  const handleContractOffer = (pid, sal, yrs) => {
+  const handleContractOffer = (pid, sal, yrs, meta = {}) => {
     const p=myTeam?.players.find(x=>x.id===pid);if(!p) return;
     const r=evalOffer(p,{salary:sal,years:yrs},myTeam,teams);
-    if(r.total>=ACCEPT_THRESHOLD){upd(myId,t=>({...t,players:t.players.map(x=>x.id===pid?{...x,salary:sal,contractYears:yrs,contractYearsLeft:yrs}:x)}));notify(`✅ ${p.name}が合意 (${r.total})`,"ok");}
-    else{addToHistory(myId,p,"FA移籍");upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid)}));setFaPool(prev=>[...prev,{...p,isFA:true,highestBid:0}]);notify(`❌ ${p.name}がFA宣言 (${r.total})`,"warn");}
+    const waitDays=Math.max(1, Math.min(7, Number(meta.responseAfterDays)||rng(2,4)));
+    const willAccept=r.total>=ACCEPT_THRESHOLD;
+    const deliveryDay=gameDay+waitDays;
+    setMailbox(prev=>[...prev,{
+      id:uid(),
+      type:"contract_decision",
+      read:false,
+      resolved:false,
+      deliverOnDay:deliveryDay,
+      title:`【契約回答予定】${p.name}`,
+      from:`${p.name} / 代理人`,
+      dateLabel:`${year}年 ${deliveryDay}日目`,
+      timestamp:Date.now(),
+      body:`${p.name}の最終回答は ${waitDays} 日後に届く予定です。\n\n最終提示: ${yrs}年 / ${fmtM(sal)}\n評価スコア: ${r.total}`,
+      decision:{
+        playerId:pid,
+        playerName:p.name,
+        salary:sal,
+        years:yrs,
+        score:r.total,
+        accepted:willAccept,
+      },
+    }]);
+    notify(`📨 ${p.name}の最終回答は${waitDays}日後に受信箱へ届きます`,"ok");
   };
 
   const handleTrade = (myOut, theirIn, tgtTeam, cash) => {

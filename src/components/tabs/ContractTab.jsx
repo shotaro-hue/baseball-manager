@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { PVAL_DEFS, ACCEPT_THRESHOLD } from '../../constants';
 import { fmtSal } from '../../utils';
 import { evalOffer } from '../../engine/contract';
@@ -80,10 +80,15 @@ export function ContractTab({team,allTeams,onOffer,onRelease}){
       ])).sort((a,b)=>a-b)
     : [];
   const preview=sel?evalOffer(sel,{salary:offerSal,years:offerYrs},team,allTeams):null;
-  const previewChat = sel ? makeNegotiationChat(sel, offerSal, offerYrs, preview) : [];
-  const chat = sel ? (negotiationLogs[sel.id] || previewChat) : [];
+  const chat = sel ? (negotiationLogs[sel.id] || []) : [];
   const currentRound = sel ? (offerRounds[sel.id] || 0) : 0;
   const ac=preview?.total>=ACCEPT_THRESHOLD?"#34d399":preview?.total>=40?"#f5c842":"#f87171";
+
+  const finalOfferDisabled = useMemo(() => {
+    if (!sel) return true;
+    const logs = negotiationLogs[sel.id] || [];
+    return logs.some(line => line.tag === "final-offer");
+  }, [negotiationLogs, sel]);
 
   const appendOfferRally = () => {
     if(!sel || !preview) return;
@@ -106,9 +111,34 @@ export function ContractTab({team,allTeams,onOffer,onRelease}){
 
     setNegotiationLogs(prev => ({
       ...prev,
-      [sel.id]: [...(prev[sel.id] || previewChat), ...rally],
+      [sel.id]: [...(prev[sel.id] || []), ...rally],
     }));
     setOfferRounds(prev => ({ ...prev, [sel.id]: nextRound }));
+  };
+
+  const handleFinalOffer = () => {
+    if (!sel || !preview) return;
+    if (finalOfferDisabled) return;
+    const tone = getReactionTone(preview.total);
+    const responseAfterDays = tone === "excited" || tone === "positive" ? 2 : tone === "consider" ? 3 : 4;
+    const finalReaction = [
+      { speaker: "GM", text: `この条件で最終オファーを送る。${offerYrs}年 / ${fmtSal(offerSal)}。`, align: "right", color: "#60a5fa", tag: "final-offer" },
+      { speaker: sel.name, text: tone === "excited" || tone === "positive"
+        ? `${sel.name}「最終提示、受け取りました。前向きに最終判断します。」`
+        : `${sel.name}「最終条件として受け取りました。慎重に判断して返答します。」`, align: "left", color: "#f5c842", tag: "final-offer" },
+      { speaker: "代理人", text: `代理人「最終回答は数日後に受信箱へお送りします。」`, align: "left", color: "#c084fc", tag: "final-offer" },
+    ];
+
+    setNegotiationLogs(prev => ({
+      ...prev,
+      [sel.id]: [...(prev[sel.id] || []), ...finalReaction],
+    }));
+
+    onOffer(sel.id, offerSal, offerYrs, {
+      score: preview.total,
+      responseAfterDays,
+      summary: tone,
+    });
   };
 
   return(
@@ -174,7 +204,7 @@ export function ContractTab({team,allTeams,onOffer,onRelease}){
               )}
               <div style={{display:"grid",gap:8}}>
                 <button className="btn btn-gold" style={{width:"100%"}} onClick={appendOfferRally}>オファーを送る（会話）</button>
-                <button className="btn" style={{width:"100%"}} onClick={()=>onOffer(sel.id,offerSal,offerYrs)}>この条件で最終オファー</button>
+                <button className="btn" style={{width:"100%",opacity:finalOfferDisabled?0.6:1}} disabled={finalOfferDisabled} onClick={handleFinalOffer}>この条件で最終オファー</button>
               </div>
             </div>
           </div>
