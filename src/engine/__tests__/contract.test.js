@@ -55,6 +55,16 @@ describe('evalOffer', () => {
     expect(result.total).toBeGreaterThanOrEqual(0);
     expect(result.total).toBeLessThanOrEqual(100);
   });
+  it('インセンティブを含む提示は incentive スコアに反映される', () => {
+    const noIncentive = evalOffer(basePlayer, { salary: 10000000, years: 1, incentives: {} }, baseTeam, allTeams);
+    const richIncentive = evalOffer(basePlayer, {
+      salary: 10000000,
+      years: 1,
+      incentives: { performanceBonusRate: 15, titleBonus: 1000, optOut: true },
+    }, baseTeam, allTeams);
+    expect(richIncentive.breakdown.incentive.score).toBeGreaterThan(noIncentive.breakdown.incentive.score);
+    expect(richIncentive.total).toBeGreaterThan(noIncentive.total);
+  });
 });
 
 describe('processCpuFaBids foreign roster constraint', () => {

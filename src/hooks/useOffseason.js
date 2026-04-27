@@ -98,10 +98,16 @@ export function useOffseason(gs) {
 
   const handleContractOffer = (pid, sal, yrs, meta = {}) => {
     const p=myTeam?.players.find(x=>x.id===pid);if(!p) return;
-    const r=evalOffer(p,{salary:sal,years:yrs},myTeam,teams);
+    const incentives = meta.incentives || {};
+    const r=evalOffer(p,{salary:sal,years:yrs,incentives},myTeam,teams);
     const waitDays=Math.max(1, Math.min(7, Number(meta.responseAfterDays)||rng(2,4)));
     const willAccept=r.total>=ACCEPT_THRESHOLD;
     const deliveryDay=gameDay+waitDays;
+    const incentiveParts = [];
+    if ((Number(incentives.performanceBonusRate) || 0) > 0) incentiveParts.push(`出来高+${incentives.performanceBonusRate}%`);
+    if ((Number(incentives.titleBonus) || 0) > 0) incentiveParts.push(`タイトル${fmtM(incentives.titleBonus)}`);
+    if (incentives.optOut) incentiveParts.push("オプトアウト");
+    const incentiveLabel = incentiveParts.length ? incentiveParts.join(" / ") : "なし";
     setMailbox(prev=>[...prev,{
       id:uid(),
       type:"contract_decision_pending",
@@ -112,12 +118,13 @@ export function useOffseason(gs) {
       from:`${p.name} / 代理人`,
       dateLabel:`${year}年 ${deliveryDay}日目`,
       timestamp:Date.now(),
-      body:`${p.name}の最終回答は ${waitDays} 日後に届く予定です。\n\n最終提示: ${yrs}年 / ${fmtM(sal)}\n評価スコア: ${r.total}`,
+      body:`${p.name}の最終回答は ${waitDays} 日後に届く予定です。\n\n最終提示: ${yrs}年 / ${fmtM(sal)}\nインセンティブ: ${incentiveLabel}\n評価スコア: ${r.total}`,
       decision:{
         playerId:pid,
         playerName:p.name,
         salary:sal,
         years:yrs,
+        incentives,
         score:r.total,
         accepted:willAccept,
       },
