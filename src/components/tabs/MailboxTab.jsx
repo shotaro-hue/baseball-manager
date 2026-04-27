@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 
-export function MailboxTab({mailbox, onRead, onAction, teams, myTeam, onTrade, onTeamClick}){
+export function MailboxTab({mailbox, onRead, onAction, teams, myTeam, onTrade, onTeamClick, gameDay}){
   const [selected, setSelected] = useState(null);
-  const unread = mailbox.filter(m=>!m.read).length;
+  const visibleMails = mailbox.filter(m=>(m.deliverOnDay??0)<=gameDay);
+  const unread = visibleMails.filter(m=>!m.read).length;
 
   const handleSelect = (m) => {
     setSelected(m);
@@ -20,8 +21,8 @@ export function MailboxTab({mailbox, onRead, onAction, teams, myTeam, onTrade, o
           📨 メールボックス
           {unread>0&&<span style={{marginLeft:8,background:"#f87171",color:"#fff",borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700}}>{unread}</span>}
         </div>
-        {mailbox.length===0&&<p style={{fontSize:11,color:"#374151",padding:"12px 0"}}>メールはありません</p>}
-        {[...mailbox].sort((a,b)=>b.timestamp-a.timestamp).map(m=>(
+        {visibleMails.length===0&&<p style={{fontSize:11,color:"#374151",padding:"12px 0"}}>メールはありません</p>}
+        {[...visibleMails].sort((a,b)=>b.timestamp-a.timestamp).map(m=>(
           <div key={m.id} onClick={()=>handleSelect(m)}
             style={{padding:"8px 10px",marginBottom:4,borderRadius:6,cursor:"pointer",
               background:selected?.id===m.id?"rgba(245,200,66,.08)":m.read?"rgba(255,255,255,.02)":"rgba(255,255,255,.05)",

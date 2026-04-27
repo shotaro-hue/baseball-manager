@@ -86,8 +86,9 @@ export function useGameState() {
   const tabBadges = useMemo(()=>{
     if(!myTeam) return {};
     const expiringCount=myTeam.players.filter(p=>!p.isIkusei&&(p.contractYearsLeft??99)<=1).length;
-    const pendingTrades=mailbox.filter(m=>m.type==="trade"&&!m.resolved&&!m.read).length;
-    const unreadMail=mailbox.filter(m=>!m.read).length;
+    const visibleMails=mailbox.filter(m=>(m.deliverOnDay??0)<=gameDay);
+    const pendingTrades=visibleMails.filter(m=>m.type==="trade"&&!m.resolved&&!m.read).length;
+    const unreadMail=visibleMails.filter(m=>!m.read).length;
     const unreadInterviews=news.filter(n=>n.type==="interview"&&!n.answered).length;
     return {
       roster: myTeam.players.filter(p=>!p.isIkusei).length>MAX_ROSTER?{n:myTeam.players.filter(p=>!p.isIkusei).length-MAX_ROSTER,color:"#f87171"}:null,
@@ -97,7 +98,7 @@ export function useGameState() {
       fa: faPool.length>0?{n:faPool.length,color:"#94a3b8"}:null,
       news: unreadInterviews>0?{n:unreadInterviews,color:"#f5c842"}:null,
     };
-  },[myTeam,mailbox,faPool,news]);
+  },[myTeam,mailbox,faPool,news,gameDay]);
 
   const notify = useCallback((msg,type="ok")=>{setNotif({msg,type});setTimeout(()=>setNotif(null),3500);},[]);
   const upd = useCallback((id, fn) => dispatch({ type: G.UPD_TEAM, id, fn }), []);
@@ -133,6 +134,45 @@ export function useGameState() {
       transfers:[...(prev?.transfers||[]),{id:uid(),timestamp:Date.now(),...entry}].slice(-400),
     }));
   },[]);
+
+  useEffect(()=>{
+    const dueMails=mailbox.filter(m=>
+      m.type==="contract_decision" &&
+      !m.resolved &&
+      (m.deliverOnDay??0)<=gameDay &&
+      m.decision?.playerId
+    );
+    if(dueMails.length===0||!myTeam) return;
+
+    for(const mail of dueMails){
+      const d=mail.decision;
+      const target=myTeam.players.find(p=>p.id===d.playerId);
+      if(!target) continue;
+      if(d.accepted){
+        upd(myId,t=>({...t,players:t.players.map(p=>p.id===d.playerId?{...p,salary:d.salary,contractYears:d.years,contractYearsLeft:d.years}:p)}));
+        notify(`✅ ${d.playerName}が契約を受諾しました`,"ok");
+      }else{
+        addToHistory(myId,target,"FA移籍");
+        upd(myId,t=>({...t,players:t.players.filter(p=>p.id!==d.playerId)}));
+        setFaPool(prev=>[...prev,{...target,isFA:true,highestBid:0}]);
+        notify(`❌ ${d.playerName}が契約を拒否しFA宣言しました`,"warn");
+      }
+    }
+
+    setMailbox(prev=>prev.map(m=>(
+      dueMails.find(dm=>dm.id===m.id)
+        ? {
+            ...m,
+            resolved:true,
+            title:`【契約回答】${m.decision?.playerName||m.title}`,
+            body:m.decision?.accepted
+              ? `${m.decision.playerName}より契約受諾の連絡が届きました。\n\n契約条件: ${m.decision.years}年 / ${(m.decision.salary/100000000).toFixed(1)}億円`
+              : `${m.decision.playerName}より契約辞退の連絡が届きました。\n\n選手はFA市場へ移行します。`,
+            timestamp:Date.now(),
+          }
+        : m
+    )));
+  },[mailbox, gameDay, myTeam, myId, upd, notify, addToHistory, setFaPool]);
 
   // オートセーブ（hubに戻った時）
   useEffect(()=>{
