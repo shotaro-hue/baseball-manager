@@ -137,7 +137,7 @@ export function useGameState() {
 
   useEffect(()=>{
     const dueMails=mailbox.filter(m=>
-      m.type==="contract_decision" &&
+      (m.type==="contract_decision_pending" || m.type==="contract_decision") &&
       !m.resolved &&
       (m.deliverOnDay??0)<=gameDay &&
       m.decision?.playerId
@@ -159,20 +159,26 @@ export function useGameState() {
       }
     }
 
-    setMailbox(prev=>prev.map(m=>(
-      dueMails.find(dm=>dm.id===m.id)
-        ? {
-            ...m,
-            resolved:true,
-            title:`【契約回答】${m.decision?.playerName||m.title}`,
-            body:m.decision?.accepted
-              ? `${m.decision.playerName}より契約受諾の連絡が届きました。\n\n契約条件: ${m.decision.years}年 / ${(m.decision.salary/100000000).toFixed(1)}億円`
-              : `${m.decision.playerName}より契約辞退の連絡が届きました。\n\n選手はFA市場へ移行します。`,
-            timestamp:Date.now(),
-          }
-        : m
-    )));
-  },[mailbox, gameDay, myTeam, myId, upd, notify, addToHistory, setFaPool]);
+    setMailbox(prev=>{
+      const dueIds=new Set(dueMails.map(m=>m.id));
+      const keptMails=prev.filter(m=>!dueIds.has(m.id));
+      const resultMails=dueMails.map(m=>({
+        id:uid(),
+        type:"contract_reply",
+        read:false,
+        resolved:false,
+        deliverOnDay:gameDay,
+        title:`【契約回答】${m.decision?.playerName||m.title}`,
+        from:`${m.decision?.playerName||"選手"} / 代理人`,
+        dateLabel:`${year}年 ${gameDay}日目`,
+        timestamp:Date.now(),
+        body:m.decision?.accepted
+          ? `${m.decision.playerName}より契約受諾の連絡が届きました。\n\n契約条件: ${m.decision.years}年 / ${(m.decision.salary/100000000).toFixed(1)}億円`
+          : `${m.decision.playerName}より契約辞退の連絡が届きました。\n\n選手はFA市場へ移行します。`,
+      }));
+      return [...keptMails, ...resultMails];
+    });
+  },[mailbox, gameDay, myTeam, myId, upd, notify, addToHistory, setFaPool, year]);
 
   // オートセーブ（hubに戻った時）
   useEffect(()=>{
