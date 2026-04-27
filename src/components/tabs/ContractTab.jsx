@@ -65,6 +65,8 @@ export function ContractTab({team,allTeams,onOffer,onRelease}){
   const [selId,setSelId]=useState(null);
   const [offerSal,setOfferSal]=useState(0);
   const [offerYrs,setOfferYrs]=useState(1);
+  const [negotiationLogs, setNegotiationLogs] = useState({});
+  const [offerRounds, setOfferRounds] = useState({});
   const expiring=team.players.filter(p=>p.contractYearsLeft<=1);
   const sel=team.players.find(p=>p.id===selId);
   const salaryOptions=sel
@@ -78,8 +80,37 @@ export function ContractTab({team,allTeams,onOffer,onRelease}){
       ])).sort((a,b)=>a-b)
     : [];
   const preview=sel?evalOffer(sel,{salary:offerSal,years:offerYrs},team,allTeams):null;
-  const chat = sel ? makeNegotiationChat(sel, offerSal, offerYrs, preview) : [];
+  const previewChat = sel ? makeNegotiationChat(sel, offerSal, offerYrs, preview) : [];
+  const chat = sel ? (negotiationLogs[sel.id] || previewChat) : [];
+  const currentRound = sel ? (offerRounds[sel.id] || 0) : 0;
   const ac=preview?.total>=ACCEPT_THRESHOLD?"#34d399":preview?.total>=40?"#f5c842":"#f87171";
+
+  const appendOfferRally = () => {
+    if(!sel || !preview) return;
+    const tone = getReactionTone(preview.total);
+    const nextRound = (offerRounds[sel.id] || 0) + 1;
+    const roundLabel = `第${nextRound}ラリー`;
+    const desiredSalary = Math.max(1000, Math.round((sel.salary || 0) * (tone === "reject" ? 1.5 : tone === "tough" ? 1.3 : tone === "consider" ? 1.2 : 1.05) / 100) * 100);
+    const desiredYears = tone === "reject" ? Math.max(offerYrs, 3) : tone === "tough" ? Math.max(offerYrs, 2) : offerYrs;
+
+    const rally = [
+      { speaker: "GM", text: `${roundLabel}：${offerYrs}年 / ${fmtSal(offerSal)} を正式提示する。`, align: "right", color: "#60a5fa" },
+      { speaker: sel.name, text: `${sel.name}「条件を受け取りました。率直に返答します。」`, align: "left", color: "#f5c842" },
+      { speaker: "代理人", text: tone === "excited" || tone === "positive"
+        ? `代理人「かなり前向きです。このままなら合意できる見込みです。」`
+        : `代理人「現時点では ${desiredYears}年 / ${fmtSal(desiredSalary)} 付近が妥結ラインです。」`, align: "left", color: "#c084fc" },
+      { speaker: sel.name, text: tone === "excited" || tone === "positive"
+        ? `${sel.name}「次の提示で最終判断できます。」`
+        : `${sel.name}「もう少し条件が上がれば、残留を真剣に考えます。」`, align: "left", color: "#f5c842" },
+    ];
+
+    setNegotiationLogs(prev => ({
+      ...prev,
+      [sel.id]: [...(prev[sel.id] || previewChat), ...rally],
+    }));
+    setOfferRounds(prev => ({ ...prev, [sel.id]: nextRound }));
+  };
+
   return(
     <div>
       <div className="card">
@@ -128,7 +159,7 @@ export function ContractTab({team,allTeams,onOffer,onRelease}){
               )}
               {chat.length>0&&(
                 <div style={{background:"rgba(15,23,42,.6)",border:"1px solid rgba(148,163,184,.2)",borderRadius:8,padding:10,marginBottom:10}}>
-                  <div style={{fontSize:10,color:"#94a3b8",marginBottom:8,letterSpacing:".08em"}}>NEGOTIATION TALK</div>
+                  <div style={{fontSize:10,color:"#94a3b8",marginBottom:8,letterSpacing:".08em"}}>NEGOTIATION TALK {currentRound>0?`/ ${currentRound} ROUNDS`:""}</div>
                   <div style={{display:"flex",flexDirection:"column",gap:7}}>
                     {chat.map((line,idx)=>(
                       <div key={`${line.speaker}-${idx}`} style={{display:"flex",justifyContent:line.align==="right"?"flex-end":"flex-start"}}>
@@ -141,7 +172,10 @@ export function ContractTab({team,allTeams,onOffer,onRelease}){
                   </div>
                 </div>
               )}
-              <button className="btn btn-gold" style={{width:"100%"}} onClick={()=>onOffer(sel.id,offerSal,offerYrs)}>オファーを送る</button>
+              <div style={{display:"grid",gap:8}}>
+                <button className="btn btn-gold" style={{width:"100%"}} onClick={appendOfferRally}>オファーを送る（会話）</button>
+                <button className="btn" style={{width:"100%"}} onClick={()=>onOffer(sel.id,offerSal,offerYrs)}>この条件で最終オファー</button>
+              </div>
             </div>
           </div>
         </div>
