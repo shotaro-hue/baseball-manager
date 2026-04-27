@@ -204,6 +204,7 @@ export const PVAL_DEFS = [
   { k: "loyalty",   lbl: "🤝 忠誠心",     color: "#a78bfa" },
   { k: "stability", lbl: "📈 安定志向",   color: "#06b6d4" },
   { k: "future",    lbl: "🌱 将来性重視", color: "#22d3ee" },
+  { k: "incentive", lbl: "🎯 出来高",     color: "#f43f5e" },
 ];
 
 // ニュース・インタビュー用テンプレート

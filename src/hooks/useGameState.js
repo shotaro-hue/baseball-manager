@@ -149,7 +149,7 @@ export function useGameState() {
       const target=myTeam.players.find(p=>p.id===d.playerId);
       if(!target) continue;
       if(d.accepted){
-        upd(myId,t=>({...t,players:t.players.map(p=>p.id===d.playerId?{...p,salary:d.salary,contractYears:d.years,contractYearsLeft:d.years}:p)}));
+        upd(myId,t=>({...t,players:t.players.map(p=>p.id===d.playerId?{...p,salary:d.salary,contractYears:d.years,contractYearsLeft:d.years,contractIncentives:d.incentives||null}:p)}));
         notify(`✅ ${d.playerName}が契約を受諾しました`,"ok");
       }else{
         addToHistory(myId,target,"FA移籍");
@@ -173,7 +173,14 @@ export function useGameState() {
         dateLabel:`${year}年 ${gameDay}日目`,
         timestamp:Date.now(),
         body:m.decision?.accepted
-          ? `${m.decision.playerName}より契約受諾の連絡が届きました。\n\n契約条件: ${m.decision.years}年 / ${fmtSal(m.decision.salary)}`
+          ? `${m.decision.playerName}より契約受諾の連絡が届きました。\n\n契約条件: ${m.decision.years}年 / ${fmtSal(m.decision.salary)}${(() => {
+            const i = m.decision?.incentives || {};
+            const parts = [];
+            if ((Number(i.performanceBonusRate) || 0) > 0) parts.push(`出来高+${i.performanceBonusRate}%`);
+            if ((Number(i.titleBonus) || 0) > 0) parts.push(`タイトル${fmtSal(i.titleBonus)}`);
+            if (i.optOut) parts.push("オプトアウト");
+            return parts.length ? `\nインセンティブ: ${parts.join(" / ")}` : "";
+          })()}`
           : `${m.decision.playerName}より契約辞退の連絡が届きました。\n\n選手はFA市場へ移行します。`,
       }));
       return [...keptMails, ...resultMails];

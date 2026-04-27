@@ -12,7 +12,21 @@ function getReactionTone(total){
   return "reject";
 }
 
-function makeNegotiationChat(player, offerSal, offerYrs, preview){
+function formatExpirySeason(year, yearsLeft){
+  const safeYear = Number(year) || 0;
+  const safeLeft = Math.max(0, Number(yearsLeft) || 0);
+  return `${safeYear + Math.max(0, safeLeft - 1)}年シーズン満了まで`;
+}
+
+function formatIncentiveSummary(incentives = {}){
+  const parts = [];
+  if ((Number(incentives.performanceBonusRate) || 0) > 0) parts.push(`出来高+${incentives.performanceBonusRate}%`);
+  if ((Number(incentives.titleBonus) || 0) > 0) parts.push(`タイトルボーナス${fmtSal(incentives.titleBonus)}`);
+  if (incentives.optOut) parts.push("オプトアウト条項");
+  return parts.length ? parts.join(" / ") : "なし";
+}
+
+function makeNegotiationChat(player, offerSal, offerYrs, preview, incentives){
   if(!player || !preview) return [];
   const tone = getReactionTone(preview.total);
   const delta = offerSal - (player.salary || 0);
@@ -22,7 +36,7 @@ function makeNegotiationChat(player, offerSal, offerYrs, preview){
   const rivalScore = preview?.breakdown?.market?.score ?? 0;
 
   const opening = {
-    gm: `来季は ${offerYrs}年 / ${fmtSal(offerSal)} で残留してほしい。現状年俸から${deltaText}の提示だ。`,
+    gm: `来季は ${offerYrs}年 / ${fmtSal(offerSal)} で残留してほしい。現状年俸から${deltaText}の提示だ。出来高は「${formatIncentiveSummary(incentives)}」でどうだろう。`,
     player: `${player.name}「提示ありがとうございます。条件、しっかり確認します。」`,
   };
 
@@ -61,10 +75,13 @@ function makeNegotiationChat(player, offerSal, offerYrs, preview){
   ];
 }
 
-export function ContractTab({team,allTeams,onOffer,onRelease}){
+export function ContractTab({team,allTeams,onOffer,onRelease,year}){
   const [selId,setSelId]=useState(null);
   const [offerSal,setOfferSal]=useState(0);
   const [offerYrs,setOfferYrs]=useState(1);
+  const [perfBonusRate, setPerfBonusRate] = useState(0);
+  const [titleBonus, setTitleBonus] = useState(0);
+  const [optOut, setOptOut] = useState(false);
   const [negotiationLogs, setNegotiationLogs] = useState({});
   const [offerRounds, setOfferRounds] = useState({});
   const expiring=team.players.filter(p=>p.contractYearsLeft<=1);
@@ -79,7 +96,8 @@ export function ContractTab({team,allTeams,onOffer,onRelease}){
         Math.max(1000, Math.round(sel.salary * 2.0 / 100) * 100),
       ])).sort((a,b)=>a-b)
     : [];
-  const preview=sel?evalOffer(sel,{salary:offerSal,years:offerYrs},team,allTeams):null;
+  const incentives = { performanceBonusRate: perfBonusRate, titleBonus, optOut };
+  const preview=sel?evalOffer(sel,{salary:offerSal,years:offerYrs,incentives},team,allTeams):null;
   const chat = sel ? (negotiationLogs[sel.id] || []) : [];
   const currentRound = sel ? (offerRounds[sel.id] || 0) : 0;
   const ac=preview?.total>=ACCEPT_THRESHOLD?"#34d399":preview?.total>=40?"#f5c842":"#f87171";
@@ -99,7 +117,7 @@ export function ContractTab({team,allTeams,onOffer,onRelease}){
     const desiredYears = tone === "reject" ? Math.max(offerYrs, 3) : tone === "tough" ? Math.max(offerYrs, 2) : offerYrs;
 
     const rally = [
-      { speaker: "GM", text: `${roundLabel}：${offerYrs}年 / ${fmtSal(offerSal)} を正式提示する。`, align: "right", color: "#60a5fa" },
+      { speaker: "GM", text: `${roundLabel}：${offerYrs}年 / ${fmtSal(offerSal)}（出来高: ${formatIncentiveSummary(incentives)}）を正式提示する。`, align: "right", color: "#60a5fa" },
       { speaker: sel.name, text: `${sel.name}「条件を受け取りました。率直に返答します。」`, align: "left", color: "#f5c842" },
       { speaker: "代理人", text: tone === "excited" || tone === "positive"
         ? `代理人「かなり前向きです。このままなら合意できる見込みです。」`
@@ -122,7 +140,7 @@ export function ContractTab({team,allTeams,onOffer,onRelease}){
     const tone = getReactionTone(preview.total);
     const responseAfterDays = tone === "excited" || tone === "positive" ? 2 : tone === "consider" ? 3 : 4;
     const finalReaction = [
-      { speaker: "GM", text: `この条件で最終オファーを送る。${offerYrs}年 / ${fmtSal(offerSal)}。`, align: "right", color: "#60a5fa", tag: "final-offer" },
+      { speaker: "GM", text: `この条件で最終オファーを送る。${offerYrs}年 / ${fmtSal(offerSal)}（出来高: ${formatIncentiveSummary(incentives)}）。`, align: "right", color: "#60a5fa", tag: "final-offer" },
       { speaker: sel.name, text: tone === "excited" || tone === "positive"
         ? `${sel.name}「最終提示、受け取りました。前向きに最終判断します。」`
         : `${sel.name}「最終条件として受け取りました。慎重に判断して返答します。」`, align: "left", color: "#f5c842", tag: "final-offer" },
@@ -138,6 +156,7 @@ export function ContractTab({team,allTeams,onOffer,onRelease}){
       score: preview.total,
       responseAfterDays,
       summary: tone,
+      incentives,
     });
   };
 
@@ -148,13 +167,13 @@ export function ContractTab({team,allTeams,onOffer,onRelease}){
         {expiring.length===0&&<p style={{color:"#2a3a4c",fontSize:12}}>今季満了の選手はいません</p>}
         <div style={{overflowX:"auto"}}>{expiring.length>0&&(
           <table className="tbl">
-            <thead><tr><th>選手名</th><th>守備</th><th>年齢</th><th>現年俸</th><th>残年数</th><th></th></tr></thead>
+            <thead><tr><th>選手名</th><th>守備</th><th>年齢</th><th>現年俸</th><th>契約期限</th><th></th></tr></thead>
             <tbody>{expiring.map(p=>(
               <tr key={p.id} style={{background:selId===p.id?"rgba(245,200,66,.04)":undefined}}>
-                <td style={{fontWeight:700,cursor:"pointer",color:selId===p.id?"#f5c842":undefined}} onClick={()=>{setSelId(p.id);setOfferSal(Math.max(1000,Math.round(p.salary/100)*100));setOfferYrs(1);}}>{p.name}</td>
+                <td style={{fontWeight:700,cursor:"pointer",color:selId===p.id?"#f5c842":undefined}} onClick={()=>{setSelId(p.id);setOfferSal(Math.max(1000,Math.round(p.salary/100)*100));setOfferYrs(1);setPerfBonusRate(0);setTitleBonus(0);setOptOut(false);}}>{p.name}</td>
                 <td style={{fontSize:10,color:"#374151"}}>{p.pos}</td><td className="mono">{p.age}</td>
                 <td className="mono">{fmtSal(p.salary)}</td>
-                <td className="mono" style={{color:p.contractYearsLeft===0?"#f87171":"#f5c842"}}>{p.contractYearsLeft}年</td>
+                <td className="mono" style={{color:p.contractYearsLeft===0?"#f87171":"#f5c842"}}>{formatExpirySeason(year, p.contractYearsLeft)}</td>
                 <td><button className="bsm bgr" onClick={()=>onRelease(p.id)}>放出</button></td>
               </tr>
             ))}</tbody>
@@ -177,6 +196,21 @@ export function ContractTab({team,allTeams,onOffer,onRelease}){
               <div style={{marginBottom:12}}>
                 <label style={{fontSize:11,color:"#4b5563",display:"block",marginBottom:4}}>契約年数</label>
                 <div style={{display:"flex",gap:6}}>{[1,2,3,4,5].map(y=><button key={y} className={`bsm ${offerYrs===y?"bgy":"bgb"}`} onClick={()=>setOfferYrs(y)}>{y}年</button>)}</div>
+              </div>
+              <div style={{marginBottom:12}}>
+                <label style={{fontSize:11,color:"#4b5563",display:"block",marginBottom:4}}>インセンティブ（出来高）</label>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  <select value={perfBonusRate} onChange={e=>setPerfBonusRate(Number(e.target.value)||0)} style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:6,padding:"6px 10px",color:"#e0d4bf",fontFamily:"'Share Tech Mono',monospace"}}>
+                    {[0,5,10,15,20].map(v=><option key={v} value={v} style={{background:"#0b1220"}}>出来高 {v}%</option>)}
+                  </select>
+                  <select value={titleBonus} onChange={e=>setTitleBonus(Number(e.target.value)||0)} style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:6,padding:"6px 10px",color:"#e0d4bf",fontFamily:"'Share Tech Mono',monospace"}}>
+                    {[0,300,500,800,1000].map(v=><option key={v} value={v} style={{background:"#0b1220"}}>タイトル {fmtSal(v)}</option>)}
+                  </select>
+                </div>
+                <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"#94a3b8",marginTop:8,cursor:"pointer"}}>
+                  <input type="checkbox" checked={optOut} onChange={e=>setOptOut(e.target.checked)} />
+                  オプトアウト条項を付与
+                </label>
               </div>
               {preview&&(
                 <div style={{background:"rgba(0,0,0,.3)",borderRadius:8,padding:10,marginBottom:10}}>
@@ -203,7 +237,11 @@ export function ContractTab({team,allTeams,onOffer,onRelease}){
                 </div>
               )}
               <div style={{display:"grid",gap:8}}>
-                <button className="btn btn-gold" style={{width:"100%"}} onClick={appendOfferRally}>オファーを送る（会話）</button>
+                <button className="btn btn-gold" style={{width:"100%"}} onClick={()=>{
+                  appendOfferRally();
+                  const scripted = makeNegotiationChat(sel, offerSal, offerYrs, preview, incentives);
+                  setNegotiationLogs(prev => ({ ...prev, [sel.id]: [...(prev[sel.id] || []), ...scripted] }));
+                }}>オファーを送る（会話）</button>
                 <button className="btn" style={{width:"100%",opacity:finalOfferDisabled?0.6:1}} disabled={finalOfferDisabled} onClick={handleFinalOffer}>この条件で最終オファー</button>
               </div>
             </div>
