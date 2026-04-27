@@ -42,6 +42,16 @@ export function evalOffer(player, offer, myTeam, allTeams) {
   const avgAge = myTeam.players.reduce((s, x) => s + x.age, 0) / Math.max(myTeam.players.length, 1);
   const futureScore = clamp((32 - avgAge) / 14 * 100, 0, 100);
   const stabilityScore = offer.years >= 3 ? 85 : offer.years === 2 ? 65 : 40;
+  const incentives = offer.incentives || {};
+  const performanceBonusRate = clamp(Number(incentives.performanceBonusRate) || 0, 0, 30);
+  const titleBonus = clamp(Number(incentives.titleBonus) || 0, 0, 3000);
+  const optOut = Boolean(incentives.optOut);
+  const incentiveScore = clamp(
+    performanceBonusRate * 3 + Math.min(35, titleBonus / 35) + (optOut ? 22 : 0),
+    0,
+    100,
+  );
+  const incentiveWeight = Math.max(15, Math.round((p.money + p.future) / 4));
 
   const total = (
     p.money * moneyScore +
@@ -50,8 +60,9 @@ export function evalOffer(player, offer, myTeam, allTeams) {
     p.hometown * homeScore +
     p.loyalty * trustScore +
     p.stability * stabilityScore +
-    p.future * futureScore
-  ) / (p.money + p.winning + p.playing + p.hometown + p.loyalty + p.stability + p.future);
+    p.future * futureScore +
+    incentiveWeight * incentiveScore
+  ) / (p.money + p.winning + p.playing + p.hometown + p.loyalty + p.stability + p.future + incentiveWeight);
 
   return {
     total: Math.round(total),
@@ -63,6 +74,7 @@ export function evalOffer(player, offer, myTeam, allTeams) {
       loyalty:   { score: Math.round(trustScore), weight: p.loyalty },
       stability: { score: Math.round(stabilityScore), weight: p.stability },
       future:    { score: Math.round(futureScore), weight: p.future },
+      incentive: { score: Math.round(incentiveScore), weight: incentiveWeight },
     },
   };
 }
