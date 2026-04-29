@@ -447,11 +447,10 @@ export function useSeasonFlow(gs) {
 
   const tryCpuForeignFaInBatch = (teamsArr, currentGameDay, pool) => {
     if (!pool.length) return { updatedTeams: teamsArr, remainingFaPool: pool, news: null, claimed: [] };
-    if (rngf(0, 1) > 0.2) return { updatedTeams: teamsArr, remainingFaPool: pool, news: null, claimed: [] };
     const foreignPool = pool.filter((p) => p.isForeign);
     if (!foreignPool.length) return { updatedTeams: teamsArr, remainingFaPool: pool, news: null, claimed: [] };
 
-    const res = processCpuFaBids(teamsArr, myId, foreignPool, teamsArr);
+    const res = processCpuFaBids(teamsArr, myId, foreignPool, teamsArr, year);
     if (res.remainingFaPool.length === foreignPool.length) {
       return { updatedTeams: teamsArr, remainingFaPool: pool, news: null, claimed: [] };
     }

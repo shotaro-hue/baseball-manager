@@ -186,6 +186,7 @@ export default function App(){
         ...t,
         budget: t.budget - totalCost,
         farm: [...(t.farm || []), { ...player, isFA: false, contractYearsLeft: years, contractYears: years, salary }],
+        history: [...(t.history || []), { ...player, isFA: false, contractYearsLeft: years, contractYears: years, salary, exitYear: year, exitReason: '外国人獲得', tenure: 0 }],
       }));
       const reason = foreignActiveCount >= MAX_外国人_一軍
         ? "外国人枠満杯"
@@ -198,6 +199,7 @@ export default function App(){
         ...t,
         budget: t.budget - totalCost,
         players: [...t.players, { ...player, isFA: false, contractYearsLeft: years, contractYears: years, salary }],
+        history: [...(t.history || []), { ...player, isFA: false, contractYearsLeft: years, contractYears: years, salary, exitYear: year, exitReason: '外国人獲得', tenure: 0 }],
       }));
       notify(`${player.name}を一軍登録で獲得！(${years}年 計${fmtSal(totalCost)})`, "ok");
     }
@@ -414,7 +416,7 @@ export default function App(){
               <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
                 <span style={{fontSize:10,color:"#374151"}}>契約年数:</span>
                 {[1,2,3].map(y=><button key={y} className={"bsm "+(yrs===y?"bgb":"bga")} style={{padding:"2px 8px"}} onClick={()=>setFaYears(prev=>({...prev,[p.id]:y}))}>{y}年</button>)}
-                <button className="bsm bga" style={{marginLeft:4,opacity:canAfford?1:0.4}} onClick={()=>{if(!canAfford){notify("予算不足","warn");return;}const toFarm=(myTeam?.players?.length||0)>=MAX_ROSTER;upd(myId,t=>toFarm?({...t,budget:t.budget-totalCost,farm:[...t.farm,{...p,isFA:false,contractYearsLeft:yrs,contractYears:yrs}]}):({...t,budget:t.budget-totalCost,players:[...t.players,{...p,isFA:false,contractYearsLeft:yrs,contractYears:yrs}]}));setFaPool(prev=>prev.filter(x=>x.id!==p.id));setFaYears(prev=>{const n={...prev};delete n[p.id];return n;});notify(toFarm?`${p.name}を獲得（一軍枠満杯のため二軍スタート）`:`${p.name}を獲得！(${yrs}年 計${fmtSal(totalCost)})`,"ok");}}>獲得</button>
+                <button className="bsm bga" style={{marginLeft:4,opacity:canAfford?1:0.4}} onClick={()=>{if(!canAfford){notify("予算不足","warn");return;}const toFarm=(myTeam?.players?.length||0)>=MAX_ROSTER;const acquireReason=p.isWaiverReleased?'戦力外獲得':'FA獲得';upd(myId,t=>toFarm?({...t,budget:t.budget-totalCost,farm:[...t.farm,{...p,isFA:false,contractYearsLeft:yrs,contractYears:yrs}],history:[...(t.history||[]),{...p,isFA:false,contractYearsLeft:yrs,contractYears:yrs,exitYear:year,exitReason:acquireReason,tenure:0}]}):({...t,budget:t.budget-totalCost,players:[...t.players,{...p,isFA:false,contractYearsLeft:yrs,contractYears:yrs}],history:[...(t.history||[]),{...p,isFA:false,contractYearsLeft:yrs,contractYears:yrs,exitYear:year,exitReason:acquireReason,tenure:0}]}));setFaPool(prev=>prev.filter(x=>x.id!==p.id));setFaYears(prev=>{const n={...prev};delete n[p.id];return n;});notify(toFarm?`${p.name}を獲得（一軍枠満杯のため二軍スタート）`:`${p.name}を獲得！(${yrs}年 計${fmtSal(totalCost)})`,"ok");}}>獲得</button>
               </div>
             </div>
           </div>
