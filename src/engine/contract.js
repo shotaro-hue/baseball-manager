@@ -203,7 +203,7 @@ function calcNeedMatch(player, needs) {
   return bonus;
 }
 
-export function processCpuFaBids(teams, myId, faPool, allTeams) {
+export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = null) {
   if (!faPool.length) return { updatedTeams: teams, remainingFaPool: faPool, news: [] };
 
   const news = [];
@@ -260,18 +260,22 @@ export function processCpuFaBids(teams, myId, faPool, allTeams) {
       const goToFarm = player.isForeign && (foreignActiveOnTeam >= MAX_外国人_一軍 || balanceViolation);
 
       const newPlayerEntry = { ...player, isFA: false, contractYearsLeft: 1, salary: best.salary };
+      const acquireReason = player.isForeign ? '外国人獲得' : (player.isWaiverReleased ? '戦力外獲得' : 'FA獲得');
+      const historyRecord = { ...newPlayerEntry, exitYear: currentYear ?? 0, exitReason: acquireReason, tenure: 0 };
 
       if (goToFarm) {
         teamMap.set(team.id, {
           ...team,
           farm: [...(team.farm || []), newPlayerEntry],
           budget: team.budget - best.salary,
+          history: [...(team.history || []), historyRecord],
         });
       } else {
         teamMap.set(team.id, {
           ...team,
           players: [...team.players, newPlayerEntry],
           budget: team.budget - best.salary,
+          history: [...(team.history || []), historyRecord],
         });
       }
 

@@ -376,10 +376,10 @@ export function useOffseason(gs) {
   // ウェーバーフェーズ処理（戦力外確定→CPU FA獲得→ドラフトへ）
   const handleWaiverPhaseNext = (markedIds) => {
     const waiverReleased=[];
-    markedIds.forEach(pid=>{const p=myTeam?.players.find(x=>x.id===pid);const popPenalty=(p?.salary??0)>POP_RELEASE_SALARY_THRESHOLD?POP_RELEASE_PENALTY:0;upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),popularity:Math.min(100,Math.max(0,(t.popularity??50)+popPenalty))}));if(p){addToHistory(myId,p,"戦力外");waiverReleased.push({...p,isFA:true});addNews({type:"season",headline:"【戦力外】"+p.name+"選手に戦力外通告",source:"野球速報",dateLabel:year+"年",body:p.name+"選手（"+p.age+"歳）が戦力外通告を受けた。"});}});
+    markedIds.forEach(pid=>{const p=myTeam?.players.find(x=>x.id===pid);const popPenalty=(p?.salary??0)>POP_RELEASE_SALARY_THRESHOLD?POP_RELEASE_PENALTY:0;upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),popularity:Math.min(100,Math.max(0,(t.popularity??50)+popPenalty))}));if(p){addToHistory(myId,p,"戦力外");waiverReleased.push({...p,isFA:true,isWaiverReleased:true});addNews({type:"season",headline:"【戦力外】"+p.name+"選手に戦力外通告",source:"野球速報",dateLabel:year+"年",body:p.name+"選手（"+p.age+"歳）が戦力外通告を受けた。"});}});
     const releasedIds=new Set(waiverReleased.map(p=>p.id));
     const combinedPool=[...faPool,...waiverReleased];
-    const faResult=processCpuFaBids(teams,myId,combinedPool,teams);
+    const faResult=processCpuFaBids(teams,myId,combinedPool,teams,year);
     setTeams(faResult.updatedTeams);
     setFaPool(faResult.remainingFaPool);
     faResult.news.forEach(n=>addNews(n));
