@@ -1,5 +1,6 @@
 import { rng, rngf, clamp } from '../utils';
 import { PITCH_NORM, PITCH_HARD_CAP, FATIGUE_WARNING, FATIGUE_LIMIT } from '../constants';
+import { calcBallDist, calcSprayAngle } from './physics';
 
 /* ================================================================
    SIMULATION ENGINE v4.0
@@ -562,7 +563,9 @@ function processAtBat(gs, strategy = 'normal') {
     else if (result === 's')  la = Math.round(rngf(3, 22)  * 10) / 10;
     else                      la = Math.round(rngf(-8, 35)  * 10) / 10; // out/sf/sac
   }
-  const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, pitcherId:pitcher?.id, result, ev, la, dist:0, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog, pitchType, zone, scorers };
+  const dist = ev > 0 ? calcBallDist(ev, la) : 0;
+  const sprayAngle = ev > 0 ? calcSprayAngle(result) : 45;
+  const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, pitcherId:pitcher?.id, result, ev, la, dist, sprayAngle, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog, pitchType, zone, scorers };
   const nextMyPitcherState = isMyAtBat
     ? gs.myPitcherState
     : { ...(gs.myPitcherState || makePitcherState(gs.inning, gs.isTop)), battersFaced: (gs.myPitcherState?.battersFaced || 0) + 1 };
