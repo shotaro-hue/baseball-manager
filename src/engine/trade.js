@@ -20,6 +20,48 @@ export function tradeValue(p) {
   return Math.round(raw * ageMod * (0.7 + pot * 0.3));
 }
 
+const FRONT_OFFICE_MODES = ['contend', 'retool', 'rebuild', 'neutral'];
+const MODE_WEIGHTS = {
+  contend: { current: 0.55, future: 0.2, contract: 0.25 },
+  retool: { current: 0.4, future: 0.35, contract: 0.25 },
+  rebuild: { current: 0.2, future: 0.6, contract: 0.2 },
+  neutral: { current: 0.4, future: 0.3, contract: 0.3 },
+};
+
+function getFrontOfficePlan(team) {
+  const mode = FRONT_OFFICE_MODES.includes(team?.frontOfficePlan?.mode) ? team.frontOfficePlan.mode : 'neutral';
+  return { mode, confidence: team?.frontOfficePlan?.confidence ?? 0.5, updatedAtDay: team?.frontOfficePlan?.updatedAtDay ?? 0, reasons: team?.frontOfficePlan?.reasons || [] };
+}
+
+function getPlayerCurrentValue(p) {
+  const base = tradeValue(p);
+  const age = p?.age || 25;
+  const ageCurve = age <= 30 ? 1.05 : age <= 33 ? 0.9 : 0.75;
+  return base * ageCurve;
+}
+
+function getPlayerFutureValue(p) {
+  const base = tradeValue(p);
+  const age = p?.age || 25;
+  const potential = (p?.potential || 60) / 100;
+  const ageGrowth = age <= 22 ? 1.25 : age <= 26 ? 1.05 : age <= 30 ? 0.8 : 0.55;
+  return base * ageGrowth * (0.65 + potential * 0.45);
+}
+
+function getPlayerContractValue(p) {
+  const salary = p?.salary ?? 12000;
+  const yearsLeft = p?.contractYearsLeft ?? 1;
+  const perf = tradeValue(p);
+  const salaryPenalty = Math.max(0.7, 1.2 - salary / 90000);
+  const stabilityBonus = 0.9 + Math.min(yearsLeft, 4) * 0.05;
+  return perf * salaryPenalty * stabilityBonus;
+}
+
+function weightedPlayerValue(p, mode = 'neutral') {
+  const w = MODE_WEIGHTS[mode] || MODE_WEIGHTS.neutral;
+  return getPlayerCurrentValue(p) * w.current + getPlayerFutureValue(p) * w.future + getPlayerContractValue(p) * w.contract;
+}
+
 export function analyzeTeamNeeds(team) {
   const pitchers = team.players.filter((p) => p.isPitcher);
   const starters = pitchers.filter((p) => p.subtype === '先発');
@@ -91,19 +133,31 @@ function calcNeedFitScore(player, needs) {
 }
 
 export function evalTradeForCpu(cpuTeam, give, receive, cashDiff) {
-  const gv = give.reduce((s, p) => s + tradeValue(p), 0);
-  const rv = receive.reduce((s, p) => s + tradeValue(p), 0);
+  const plan = getFrontOfficePlan(cpuTeam);
+  const mode = plan.mode;
+  const gv = give.reduce((s, p) => s + weightedPlayerValue(p, mode), 0);
+  const rv = receive.reduce((s, p) => s + weightedPlayerValue(p, mode), 0);
   let diff = gv - rv + (cashDiff || 0) / 100000;
   const needs = analyzeTeamNeeds(cpuTeam);
-  give.forEach((p) => { diff += calcNeedFitScore(p, needs) * 0.15; if ((p.age || 25) <= 23) diff += 5; });
-  receive.forEach((p) => { if ((p.age || 25) <= 26 && tradeValue(p) > 70) diff -= 8; });
+  give.forEach((p) => {
+    diff += calcNeedFitScore(p, needs) * 0.15;
+    if ((p.age || 25) <= 23) diff += 5;
+    if (mode === 'rebuild' && (p.age || 25) <= 26) diff += 7;
+  });
+  receive.forEach((p) => {
+    if ((p.age || 25) <= 26 && tradeValue(p) > 70) diff -= 8;
+    if (mode === 'rebuild' && (p.age || 25) >= 30 && (p.contractYearsLeft || 1) <= 1) diff += 7;
+  });
+  const threshold = mode === 'contend' ? -7 : mode === 'rebuild' ? -2 : -5;
   const reasons = [];
   if (diff < -5) reasons.push(`対価が不足（差: ${Math.abs(Math.round(diff))}点）`);
+  if (mode === 'rebuild') reasons.push('再建方針で若手資産を重視');
+  if (mode === 'contend') reasons.push('優勝争いのため即戦力を重視');
   if (needs[0]?.type) reasons.push(`${needs[0].type}を優先したい`);
   else reasons.push("戦力バランスを改善したい");
   const hasYoungGive = give.some(p => (p.age || 25) <= 23);
   if (!hasYoungGive) reasons.push("若手選手が欲しい");
-  return { diff, fair: diff >= -5, favorable: diff >= 8, reasons: reasons.slice(0, 2) };
+  return { diff, fair: diff >= threshold, favorable: diff >= 8, reasons: reasons.slice(0, 2), mode };
 }
 
 export function generateCpuOffer(cpuTeam, myTeam) {
@@ -129,6 +183,9 @@ export function generateCpuOffer(cpuTeam, myTeam) {
  * @returns {"buyer" | "seller" | "neutral"}
  */
 export function classifyTeam(team, allTeams) {
+  const mode = team?.frontOfficePlan?.mode;
+  if (mode === 'contend') return "buyer";
+  if (mode === 'rebuild') return "seller";
   const leagueTeams = allTeams
     .filter((t) => t.league === team.league)
     .sort((a, b) => b.wins - a.wins);
@@ -139,6 +196,38 @@ export function classifyTeam(team, allTeams) {
   if (rank <= 2 || winPct >= 0.56) return "buyer";
   if (rank >= 5 || winPct <= 0.44) return "seller";
   return "neutral";
+}
+
+export function evaluateFrontOfficePlan(team, allTeams, gameDay = 0) {
+  const prev = getFrontOfficePlan(team);
+  const freezeDays = 30;
+  if (gameDay - prev.updatedAtDay < freezeDays) return prev;
+  const leagueTeams = allTeams.filter((t) => t.league === team.league).sort((a, b) => b.wins - a.wins);
+  const rank = Math.max(1, leagueTeams.findIndex((t) => t.id === team.id) + 1);
+  const totalGames = (team.wins || 0) + (team.losses || 0);
+  const winPct = totalGames > 0 ? team.wins / totalGames : 0.5;
+  const runDiff = team.runDiff || 0;
+  const players = team.players || [];
+  const youngRatio = players.length ? players.filter((p) => (p.age || 25) <= 25).length / players.length : 0;
+  const oldRatio = players.length ? players.filter((p) => (p.age || 25) >= 30).length / players.length : 0;
+  const expiringCore = players.filter((p) => (p.core || tradeValue(p) >= 70) && (p.contractYearsLeft || 1) <= 1).length;
+  const rankScore = Math.max(0, 1 - (rank - 1) / 5);
+  const trendScore = Math.max(0, Math.min(1, (winPct - 0.35) / 0.35));
+  const runDiffScore = Math.max(0, Math.min(1, (runDiff + 80) / 160));
+  const contractSecurity = Math.max(0, 1 - expiringCore / 5);
+  const primeAgeBalance = Math.max(0, 1 - Math.abs(youngRatio - 0.4) - Math.max(0, oldRatio - 0.35));
+  const contendIndex = 0.3 * rankScore + 0.25 * trendScore + 0.2 * runDiffScore + 0.15 * contractSecurity + 0.1 * primeAgeBalance;
+  const rebuildIndex = 0.35 * oldRatio + 0.25 * Math.min(1, expiringCore / 4) + 0.25 * (1 - trendScore) + 0.15 * youngRatio;
+  let mode = 'neutral';
+  if (contendIndex >= 0.62) mode = 'contend';
+  else if (rebuildIndex >= 0.6 && contendIndex < 0.5) mode = 'rebuild';
+  else if (contendIndex >= 0.5 || rebuildIndex >= 0.5) mode = 'retool';
+  const reasons = [];
+  if (mode === 'contend') reasons.push('高勝率・順位優位');
+  if (mode === 'rebuild') reasons.push('高齢化と成績低迷');
+  if (mode === 'retool') reasons.push('短期再編の必要性');
+  if (!reasons.length) reasons.push('戦力評価を継続');
+  return { mode, confidence: Math.max(contendIndex, rebuildIndex), updatedAtDay: gameDay, reasons };
 }
 
 /**
