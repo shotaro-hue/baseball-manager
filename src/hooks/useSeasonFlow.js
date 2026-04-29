@@ -5,7 +5,7 @@ import { quickSimGame, runFarmSeason } from '../engine/simulation';
 import { applyGameStatsFromLog, applyPostGameCondition, computeBoxScore } from '../engine/postGame';
 import { calcRevenue } from '../engine/finance';
 import { applyPopularityDelta } from '../engine/fanSentiment';
-import { generateCpuOffer, generateCpuCpuTrade, classifyTeam } from '../engine/trade';
+import { generateCpuOffer, generateCpuCpuTrade, classifyTeam, evaluateFrontOfficePlan } from '../engine/trade';
 import { initPlayoff } from '../engine/playoff';
 import { selectAllStars, runAllStarGame } from '../engine/allstar';
 import { getMyMatchup, getCpuMatchups } from '../engine/scheduleGen';
@@ -344,6 +344,7 @@ export function useSeasonFlow(gs) {
     }
     if (rngf(0, 1) > prob || cpuTradeOffers.length >= 2) return;
     const others=teams.filter(t=>t.id!==myId);
+    others.forEach((t) => { t.frontOfficePlan = evaluateFrontOfficePlan(t, teams, gameDay); });
     if(!others.length) return;
     let cpuTeam;
     if (currentDate && currentDate.month === TRADE_DEADLINE_MONTH) {
@@ -382,6 +383,7 @@ export function useSeasonFlow(gs) {
     if (!currentDate || currentDate.month !== TRADE_DEADLINE_MONTH) return null;
     if (rngf(0, 1) > TRADE_DEADLINE_CPU_CPU_PROB) return null;
 
+    teamsArr.forEach((t) => { t.frontOfficePlan = evaluateFrontOfficePlan(t, teamsArr, currentGameDay); });
     const result = generateCpuCpuTrade(teamsArr);
     if (!result) return null;
 
@@ -416,6 +418,7 @@ export function useSeasonFlow(gs) {
     const liveMyTeam = teamsArr.find((t) => t.id === myId);
     if (!liveMyTeam) return null;
     const others = teamsArr.filter((t) => t.id !== myId);
+    others.forEach((t) => { t.frontOfficePlan = evaluateFrontOfficePlan(t, teamsArr, currentGameDay); });
     if (!others.length) return null;
 
     let cpuTeam;
