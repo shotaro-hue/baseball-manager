@@ -34,10 +34,10 @@ function mkPit(a) {
 }
 
 // ── N 打席シミュレーション ────────────────────────────────────
-function runPASim(bat, pit, n) {
+function runPASim(bat, pit, n, leagueEnv = DEFAULT_LEAGUE_ENV) {
   const c = {};
   for (let i = 0; i < n; i++) {
-    const { result } = simAtBat(bat, pit, 'normal', 0, {});
+    const { result } = simAtBat(bat, pit, 'normal', 0, {}, leagueEnv);
     c[result] = (c[result] || 0) + 1;
   }
   const h  = (c.s || 0) + (c.d || 0) + (c.t || 0) + (c.hr || 0);
@@ -136,13 +136,13 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
     setTimeout(() => {
       const N = 800;
       setSimRows([
-        { label: '平均打者 (50) vs 平均投手 (55)', ...runPASim(mkBat(50), mkPit(55), N) },
-        { label: '強打者 (70) vs 強投手 (70)',     ...runPASim(mkBat(70), mkPit(70), N) },
-        { label: '一流打者 (85) vs 一流投手 (85)', ...runPASim(mkBat(85), mkPit(85), N) },
+        { label: '平均打者 (50) vs 平均投手 (55)', ...runPASim(mkBat(50), mkPit(55), N, leagueEnv) },
+        { label: '強打者 (70) vs 強投手 (70)',     ...runPASim(mkBat(70), mkPit(70), N, leagueEnv) },
+        { label: '一流打者 (85) vs 一流投手 (85)', ...runPASim(mkBat(85), mkPit(85), N, leagueEnv) },
       ]);
       setBusy(false);
     }, 10);
-  }, []);
+  }, [leagueEnv]);
 
   const pct  = v => `${(v * 100).toFixed(1)}%`;
   const ba3  = v => v.toFixed(3);

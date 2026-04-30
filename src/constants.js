@@ -338,10 +338,11 @@ export const FOREIGN_NATIONALITIES = [
 
 // ── 物理演算打撃シミュレーション定数（Phase 1） ──────────────────────────────
 export const PHYSICS_BAT = {
-  EV_FLOOR: 65,
-  EV_POWER_SCALE: 35,
-  EV_STUFF_SCALE: 10,
-  EV_NOISE: 8,
+  // 打球速度を実運用スケール(km/h)へ補正（旧値は低すぎてHRが物理補正で大量に2塁打化していた）
+  EV_FLOOR: 120,
+  EV_POWER_SCALE: 45,
+  EV_STUFF_SCALE: 14,
+  EV_NOISE: 10,
 
   LA_FLY_MID: 18,
   LA_CONTACT_MID: 12,
