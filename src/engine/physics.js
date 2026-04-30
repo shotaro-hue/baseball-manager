@@ -40,3 +40,26 @@ export function calcLandingZone(dist, sprayAngle, stadium) {
   if (dist >= targetFence * 0.7) return `${side}深めフェアゾーン`;
   return `${side}フェアゾーン`;
 }
+
+// Returns [[hDist, height], ...] sampled every 5 steps using same drag model as calcBallDist.
+// Used by Baseball3DModal to animate the trajectory consistently with displayed event.dist.
+export function calcTrajectory(ev, la) {
+  const evMs = ev * 0.44704;
+  const laRad = la * (Math.PI / 180);
+  let vx = evMs * Math.cos(laRad);
+  let vy = evMs * Math.sin(laRad);
+  let x = 0, y = 1;
+  const pts = [[0, 1]];
+  for (let i = 1; i < 1200; i++) {
+    const v = Math.max(0.0001, Math.sqrt(vx ** 2 + vy ** 2));
+    const drag = DRAG_COEFF * v;
+    vx -= drag * (vx / v) * DT;
+    vy -= (GRAVITY + drag * (vy / v)) * DT;
+    x += vx * DT;
+    y += vy * DT;
+    if (y < 0) break;
+    if (i % 5 === 0) pts.push([x, y]);
+  }
+  pts.push([Math.max(0, x), 0]);
+  return pts;
+}
