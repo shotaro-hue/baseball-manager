@@ -1,5 +1,5 @@
 import { rng, rngf, clamp } from '../utils';
-import { PITCH_NORM, PITCH_HARD_CAP, FATIGUE_WARNING, FATIGUE_LIMIT } from '../constants';
+import { PITCH_NORM, PITCH_HARD_CAP, FATIGUE_WARNING, FATIGUE_LIMIT, PHYSICS_BAT } from '../constants';
 import { calcBallDist, calcSprayAngle } from './physics';
 
 /* ================================================================
@@ -157,6 +157,47 @@ function sampleResult(probs) {
 
 
 // ═══════════════════════════════════════════════════════════════
+//  SECTION 5.5: 能力値先行 EV/LA 生成（Phase 1）
+//  打者タイプと投手stuffからEV・LAを先行決定する。
+//  確率テーブルによる結果（hr/s/d/out 等）には干渉しない。
+// ═══════════════════════════════════════════════════════════════
+
+function generateContactEVLA(batter, pitcher) {
+  const power = batter?.batting?.power || 50;
+  const contact = batter?.batting?.contact || 50;
+  const pitVel = pitcher?.pitching?.velocity || 50;
+  const pitBrk = pitcher?.pitching?.breaking || 50;
+  const pitStuff = (pitVel + pitBrk) / 2;
+
+  const evBase = PHYSICS_BAT.EV_FLOOR
+    + (power / 99) * PHYSICS_BAT.EV_POWER_SCALE
+    - ((pitStuff - 50) / 49) * PHYSICS_BAT.EV_STUFF_SCALE;
+  const ev = Math.round(
+    clamp(
+      evBase + rngf(-PHYSICS_BAT.EV_NOISE, PHYSICS_BAT.EV_NOISE),
+      PHYSICS_BAT.EV_FLOOR,
+      PHYSICS_BAT.EV_FLOOR + PHYSICS_BAT.EV_POWER_SCALE + PHYSICS_BAT.EV_NOISE
+    ) * 10
+  ) / 10;
+
+  const laMid = power >= PHYSICS_BAT.FLY_POWER_THRESHOLD ? PHYSICS_BAT.LA_FLY_MID
+    : power <= PHYSICS_BAT.GROUND_POWER_THRESHOLD ? PHYSICS_BAT.LA_GROUND_MID
+    : contact >= PHYSICS_BAT.CONTACT_THRESHOLD ? PHYSICS_BAT.LA_CONTACT_MID
+    : PHYSICS_BAT.LA_DEFAULT_MID;
+  const la = Math.round(
+    clamp(
+      rngf(laMid - PHYSICS_BAT.LA_NOISE, laMid + PHYSICS_BAT.LA_NOISE),
+      PHYSICS_BAT.LA_MIN,
+      PHYSICS_BAT.LA_MAX
+    ) * 10
+  ) / 10;
+
+  return { ev, la };
+}
+
+
+
+// ═══════════════════════════════════════════════════════════════
 //  SECTION 6: 演出レイヤー（Step C）
 // ═══════════════════════════════════════════════════════════════
 
@@ -187,6 +228,7 @@ function selectZoneForResult(result, bat) {
   if (result === 'bb') return 'outer_low';
   return ['inner_mid','mid_mid','outer_mid','inner_low','mid_low','outer_low'][rng(0, 5)];
 }
+
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -552,16 +594,10 @@ function processAtBat(gs, strategy = 'normal') {
   if (isMyAtBat) newOpPC+=pitches; else newMyPC+=pitches;
 
   // 打球指標 (EV / 打球角度) — インプレー結果のみ計算
+  // Phase 1: 結果ではなく打者タイプ×投手stuffから先行生成
   let ev = 0, la = 0;
   if (!['k', 'bb', 'hbp'].includes(result)) {
-    const power = batter?.batting?.power || 50;
-    const evBase = 65 + (power / 99) * 45;
-    ev = Math.round((evBase + rngf(-8, 8)) * 10) / 10;
-    if      (result === 'hr') la = Math.round(rngf(22, 38) * 10) / 10;
-    else if (result === 'd')  la = Math.round(rngf(10, 28) * 10) / 10;
-    else if (result === 't')  la = Math.round(rngf(5, 22)  * 10) / 10;
-    else if (result === 's')  la = Math.round(rngf(3, 22)  * 10) / 10;
-    else                      la = Math.round(rngf(-8, 35)  * 10) / 10; // out/sf/sac
+    ({ ev, la } = generateContactEVLA(batter, pitcher));
   }
   const dist = ev > 0 ? calcBallDist(ev, la) : 0;
   const sprayAngle = ev > 0 ? calcSprayAngle(result) : 45;
@@ -767,4 +803,4 @@ export function runFarmSeason(teams) {
   });
 }
 
-export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, matchupScore, calcFatigue, calcEffectiveFatigue, PITCH_TYPES, BASELINE, ABILITY_RANGE };
+export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, matchupScore, calcFatigue, calcEffectiveFatigue, PITCH_TYPES, BASELINE, ABILITY_RANGE, generateContactEVLA as _generateContactEVLA_TEST };

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcEffectiveFatigue, calcFatigue, matchupScore, initGameState } from '../simulation';
+import { calcEffectiveFatigue, calcFatigue, matchupScore, initGameState, _generateContactEVLA_TEST } from '../simulation';
 import { applyGameStatsFromLog } from '../postGame';
 import { emptyStats } from '../player';
 
@@ -93,5 +93,48 @@ describe('initGameState — rotation 空時のフォールバック', () => {
     const gs = initGameState(myTeam, oppTeam);
     expect(gs.myPitcher).toBeDefined();
     expect(gs.myPitcher.id).toBe('rp1');
+  });
+});
+
+
+describe('generateContactEVLA', () => {
+  it('パワー打者(power=99)は平均EV > コンタクト打者(power=30)', () => {
+    const powerBat = { batting: { power: 99, contact: 50 } };
+    const contBat = { batting: { power: 30, contact: 80 } };
+    const pit = { pitching: { velocity: 50, breaking: 50 } };
+
+    const sample = (batter) => Array.from({ length: 200 }, () => _generateContactEVLA_TEST(batter, pit).ev)
+      .reduce((a, b) => a + b, 0) / 200;
+
+    expect(sample(powerBat)).toBeGreaterThan(sample(contBat));
+  });
+
+  it('投手stuff=99 は stuff=1 よりEVを下げる', () => {
+    const batter = { batting: { power: 70, contact: 50 } };
+    const weakPit = { pitching: { velocity: 1, breaking: 1 } };
+    const strongPit = { pitching: { velocity: 99, breaking: 99 } };
+
+    const sample = (pitcher) => Array.from({ length: 200 }, () => _generateContactEVLA_TEST(batter, pitcher).ev)
+      .reduce((a, b) => a + b, 0) / 200;
+
+    expect(sample(strongPit)).toBeLessThan(sample(weakPit));
+  });
+
+  it('power=70 の打者は平均LA > power=30 の打者', () => {
+    const highPower = { batting: { power: 70, contact: 50 } };
+    const lowPower = { batting: { power: 30, contact: 80 } };
+    const pit = { pitching: { velocity: 50, breaking: 50 } };
+
+    const sample = (batter) => Array.from({ length: 200 }, () => _generateContactEVLA_TEST(batter, pit).la)
+      .reduce((a, b) => a + b, 0) / 200;
+
+    expect(sample(highPower)).toBeGreaterThan(sample(lowPower));
+  });
+
+  it('EV の最小値が EV_FLOOR 以上', () => {
+    const batter = { batting: { power: 1, contact: 50 } };
+    const pitcher = { pitching: { velocity: 99, breaking: 99 } };
+    const minEv = Math.min(...Array.from({ length: 500 }, () => _generateContactEVLA_TEST(batter, pitcher).ev));
+    expect(minEv).toBeGreaterThanOrEqual(65);
   });
 });
