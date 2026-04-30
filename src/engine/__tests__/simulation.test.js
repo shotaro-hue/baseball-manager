@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { calcEffectiveFatigue, calcFatigue, matchupScore, initGameState, _generateContactEVLA_TEST, _getFenceDistanceBySpray_TEST, _adjustResultByPhysics_TEST } from '../simulation';
 import { applyGameStatsFromLog } from '../postGame';
 import { emptyStats } from '../player';
+import { PHYSICS_BAT } from '../../constants';
 
 describe('calcFatigue', () => {
   it('投球数0のときは疲労0', () => {
@@ -135,7 +136,7 @@ describe('generateContactEVLA', () => {
     const batter = { batting: { power: 1, contact: 50 } };
     const pitcher = { pitching: { velocity: 99, breaking: 99 } };
     const minEv = Math.min(...Array.from({ length: 500 }, () => _generateContactEVLA_TEST(batter, pitcher).ev));
-    expect(minEv).toBeGreaterThanOrEqual(120);
+    expect(minEv).toBeGreaterThanOrEqual(PHYSICS_BAT.EV_FLOOR);
   });
 });
 
