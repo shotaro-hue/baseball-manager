@@ -316,10 +316,13 @@ function getFenceDistanceBySpray(stadium, sprayAngle) {
 }
 
 function adjustResultByPhysics(result, dist, sprayAngle, stadium) {
-  if (!stadium || dist <= 0 || (result !== 'hr' && result !== 'd')) return result;
+  if (!stadium || dist <= 0) return result;
+  if (!['hr', 'd', 's', 't'].includes(result)) return result;
   const fenceDistance = getFenceDistanceBySpray(stadium, sprayAngle);
+  // フェンス+8m超えた打球は打球種別に関わらずHR
+  if (dist >= fenceDistance + 8) return 'hr';
+  // HRと判定されたが飛距離が足りない場合は二塁打に降格
   if (result === 'hr' && dist < fenceDistance) return 'd';
-  if (result === 'd' && dist >= fenceDistance + 8) return 'hr';
   return result;
 }
 

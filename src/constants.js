@@ -338,10 +338,10 @@ export const FOREIGN_NATIONALITIES = [
 
 // ── 物理演算打撃シミュレーション定数（Phase 1） ──────────────────────────────
 export const PHYSICS_BAT = {
-  // 打球速度を現実的レンジへ再調整（飛びすぎ抑制）
-  EV_FLOOR: 112,
-  EV_POWER_SCALE: 34,
-  EV_STUFF_SCALE: 16,
+  // NPB実測値に基づくEVレンジ: 弱打=72mph, 平均=88mph, 強打=105+mph
+  EV_FLOOR: 72,
+  EV_POWER_SCALE: 33,
+  EV_STUFF_SCALE: 14,
   EV_NOISE: 8,
 
   LA_FLY_MID: 18,
