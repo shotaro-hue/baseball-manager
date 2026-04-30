@@ -91,7 +91,7 @@ export const STADIUMS = {
 export const TEAM_STADIUM = { 0:'jingu', 1:'yokohama', 2:'mazda', 3:'hanshin', 4:'tokyo_dome', 5:'nagoya', 6:'paypaydome', 7:'rakuten', 8:'seibu', 9:'zozopark', 10:'escon', 11:'kyocera' };
 
 export const DEFAULT_LEAGUE_ENV = {
-  hrMod: 1.12,  // 長打過剰抑制: 物理打球の強化後にHR過多にならないよう補正
+  hrMod: 0.88,  // HR過多是正: リーグ全体の被本塁打率をNPB基準へ戻すため下方補正
   bbMod: 1.30,  // 投高打低緩和: 四球率 5.6%→7.3% 目標 (旧: 1.00)
   kMod: 0.89,   // 投高打低緩和: 三振過剰を抑制 (旧: 1.00)
   hitMod: 1.02, // 打率過剰抑制: 全体打率を引き下げつつ投高打低への逆振れ防止 (旧: 1.10)
