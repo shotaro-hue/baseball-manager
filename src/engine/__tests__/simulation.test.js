@@ -157,4 +157,8 @@ describe('physics HR/D log correction helpers', () => {
   it('dist がフェンス+8以上の2塁打はログ上でHRに補正される', () => {
     expect(_adjustResultByPhysics_TEST('d', 130, 45, stadium)).toBe('hr');
   });
+
+  it('dist がフェンス+2以上の単打はログ上でHRに補正される', () => {
+    expect(_adjustResultByPhysics_TEST('s', 124, 45, stadium)).toBe('hr');
+  });
 });
