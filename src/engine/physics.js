@@ -1,28 +1,60 @@
 import { rngf } from '../utils';
+import { DEFAULT_PHYSICS_PRESET, PHYSICS_PRESETS } from './physicsConstants';
 
-const GRAVITY = 9.81;
-const DRAG_COEFF = 0.35;
-const DT = 0.01;
+const EPSILON = 0.0001;
 
-export function calcBallDist(ev, la) {
+function getPhysicsConfig(options = {}) {
+  const preset = PHYSICS_PRESETS[options.preset ?? DEFAULT_PHYSICS_PRESET] ?? PHYSICS_PRESETS[DEFAULT_PHYSICS_PRESET];
+  return {
+    ...preset,
+    ...(options.config ?? {}),
+  };
+}
+
+export function simulateFlight(ev, la, options = {}) {
+  const config = getPhysicsConfig(options);
+  const environment = options.environment ?? {};
+  const windOut = environment.windOut ?? 0;
+  const releaseHeight = options.releaseHeight ?? config.releaseHeight;
+
   const evMs = ev * 0.44704;
   const laRad = la * (Math.PI / 180);
-  let vx = evMs * Math.cos(laRad);
+  let vx = evMs * Math.cos(laRad) + windOut;
   let vy = evMs * Math.sin(laRad);
   let x = 0;
-  let y = 1;
+  let y = releaseHeight;
 
-  for (let i = 0; i < 12000; i += 1) {
-    const v = Math.max(0.0001, Math.sqrt(vx ** 2 + vy ** 2));
-    const drag = DRAG_COEFF * v;
-    vx -= drag * (vx / v) * DT;
-    vy -= (GRAVITY + drag * (vy / v)) * DT;
-    x += vx * DT;
-    y += vy * DT;
-    if (y < 0) break;
+  const points = [[0, releaseHeight]];
+
+  for (let i = 1; i <= config.maxSteps; i += 1) {
+    const speed = Math.max(EPSILON, Math.hypot(vx, vy));
+    const dragAccel = config.dragCoeff * speed * speed;
+    vx -= dragAccel * (vx / speed) * config.dt;
+    vy -= (config.gravity + dragAccel * (vy / speed)) * config.dt;
+
+    x += vx * config.dt;
+    y += vy * config.dt;
+
+    if (y <= 0) {
+      points.push([Math.max(0, x), 0]);
+      break;
+    }
+
+    if (i % config.sampleInterval === 0) points.push([x, y]);
   }
 
-  return Math.max(0, Math.round(x));
+  if (points[points.length - 1][1] > 0) {
+    points.push([Math.max(0, x), 0]);
+  }
+
+  return {
+    distance: Math.max(0, Math.round(points[points.length - 1][0])),
+    points,
+  };
+}
+
+export function calcBallDist(ev, la, options = {}) {
+  return simulateFlight(ev, la, options).distance;
 }
 
 export function calcSprayAngle(result) {
@@ -41,25 +73,6 @@ export function calcLandingZone(dist, sprayAngle, stadium) {
   return `${side}フェアゾーン`;
 }
 
-// Returns [[hDist, height], ...] sampled every 5 steps using same drag model as calcBallDist.
-// Used by Baseball3DModal to animate the trajectory consistently with displayed event.dist.
-export function calcTrajectory(ev, la) {
-  const evMs = ev * 0.44704;
-  const laRad = la * (Math.PI / 180);
-  let vx = evMs * Math.cos(laRad);
-  let vy = evMs * Math.sin(laRad);
-  let x = 0, y = 1;
-  const pts = [[0, 1]];
-  for (let i = 1; i < 1200; i++) {
-    const v = Math.max(0.0001, Math.sqrt(vx ** 2 + vy ** 2));
-    const drag = DRAG_COEFF * v;
-    vx -= drag * (vx / v) * DT;
-    vy -= (GRAVITY + drag * (vy / v)) * DT;
-    x += vx * DT;
-    y += vy * DT;
-    if (y < 0) break;
-    if (i % 5 === 0) pts.push([x, y]);
-  }
-  pts.push([Math.max(0, x), 0]);
-  return pts;
+export function calcTrajectory(ev, la, options = {}) {
+  return simulateFlight(ev, la, options).points;
 }
