@@ -598,10 +598,21 @@ function processAtBat(gs, strategy = 'normal') {
   let ev = 0, la = 0;
   if (!['k', 'bb', 'hbp'].includes(result)) {
     ({ ev, la } = generateContactEVLA(batter, pitcher));
+    if (result === 'hr') la = clamp(la, PHYSICS_BAT.LA_HR_MIN, PHYSICS_BAT.LA_HR_MAX);
+    else if (result === 'd') la = clamp(la, PHYSICS_BAT.LA_D_MIN, PHYSICS_BAT.LA_D_MAX);
+    else if (result === 't') la = clamp(la, PHYSICS_BAT.LA_T_MIN, PHYSICS_BAT.LA_T_MAX);
+    else if (result === 's') la = clamp(la, PHYSICS_BAT.LA_S_MIN, PHYSICS_BAT.LA_S_MAX);
   }
   const dist = ev > 0 ? calcBallDist(ev, la) : 0;
   const sprayAngle = ev > 0 ? calcSprayAngle(result) : 45;
-  const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, pitcherId:pitcher?.id, result, ev, la, dist, sprayAngle, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog, pitchType, zone, scorers };
+  const stadium = situation.stadium ? STADIUMS[situation.stadium] : null;
+  let physResult = result;
+  if (stadium && dist > 0 && (result === 'hr' || result === 'd')) {
+    const fenceDistance = sprayAngle < 30 ? stadium.lf : sprayAngle > 60 ? stadium.rf : stadium.cf;
+    if (result === 'hr' && dist < fenceDistance) physResult = 'd';
+    if (result === 'd' && dist >= fenceDistance + 8) physResult = 'hr';
+  }
+  const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, pitcherId:pitcher?.id, result:physResult, ev, la, dist, sprayAngle, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog, pitchType, zone, scorers };
   const nextMyPitcherState = isMyAtBat
     ? gs.myPitcherState
     : { ...(gs.myPitcherState || makePitcherState(gs.inning, gs.isTop)), battersFaced: (gs.myPitcherState?.battersFaced || 0) + 1 };
