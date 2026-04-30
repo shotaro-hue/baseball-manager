@@ -334,3 +334,24 @@ export const FOREIGN_NATIONALITIES = [
   "台湾","メキシコ","パナマ","コロンビア","ブラジル",
   "オーストラリア","プエルトリコ",
 ];
+
+
+// ── 物理演算打撃シミュレーション定数（Phase 1） ──────────────────────────────
+export const PHYSICS_BAT = {
+  EV_FLOOR: 65,
+  EV_POWER_SCALE: 35,
+  EV_STUFF_SCALE: 10,
+  EV_NOISE: 8,
+
+  LA_FLY_MID: 18,
+  LA_CONTACT_MID: 12,
+  LA_GROUND_MID: 5,
+  LA_DEFAULT_MID: 12,
+  LA_NOISE: 12,
+  LA_MIN: -10,
+  LA_MAX: 45,
+
+  FLY_POWER_THRESHOLD: 65,
+  GROUND_POWER_THRESHOLD: 35,
+  CONTACT_THRESHOLD: 65,
+};
