@@ -307,6 +307,22 @@ function applyBatterSituation(bat, situation) {
   }};
 }
 
+
+function getFenceDistanceBySpray(stadium, sprayAngle) {
+  if (!stadium) return null;
+  if (sprayAngle < 30) return stadium.lf;
+  if (sprayAngle > 60) return stadium.rf;
+  return stadium.cf;
+}
+
+function adjustResultByPhysics(result, dist, sprayAngle, stadium) {
+  if (!stadium || dist <= 0 || (result !== 'hr' && result !== 'd')) return result;
+  const fenceDistance = getFenceDistanceBySpray(stadium, sprayAngle);
+  if (result === 'hr' && dist < fenceDistance) return 'd';
+  if (result === 'd' && dist >= fenceDistance + 8) return 'hr';
+  return result;
+}
+
 function estimatePitchCount(result) {
   switch (result) {
     case 'bb':  return rng(4, 6);
@@ -606,12 +622,7 @@ function processAtBat(gs, strategy = 'normal') {
   const dist = ev > 0 ? calcBallDist(ev, la) : 0;
   const sprayAngle = ev > 0 ? calcSprayAngle(result) : 45;
   const stadium = situation.stadium ? STADIUMS[situation.stadium] : null;
-  let physResult = result;
-  if (stadium && dist > 0 && (result === 'hr' || result === 'd')) {
-    const fenceDistance = sprayAngle < 30 ? stadium.lf : sprayAngle > 60 ? stadium.rf : stadium.cf;
-    if (result === 'hr' && dist < fenceDistance) physResult = 'd';
-    if (result === 'd' && dist >= fenceDistance + 8) physResult = 'hr';
-  }
+  const physResult = adjustResultByPhysics(result, dist, sprayAngle, stadium);
   const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, pitcherId:pitcher?.id, result:physResult, ev, la, dist, sprayAngle, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog, pitchType, zone, scorers };
   const nextMyPitcherState = isMyAtBat
     ? gs.myPitcherState
@@ -814,4 +825,4 @@ export function runFarmSeason(teams) {
   });
 }
 
-export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, matchupScore, calcFatigue, calcEffectiveFatigue, PITCH_TYPES, BASELINE, ABILITY_RANGE, generateContactEVLA as _generateContactEVLA_TEST };
+export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, matchupScore, calcFatigue, calcEffectiveFatigue, PITCH_TYPES, BASELINE, ABILITY_RANGE, generateContactEVLA as _generateContactEVLA_TEST, getFenceDistanceBySpray as _getFenceDistanceBySpray_TEST, adjustResultByPhysics as _adjustResultByPhysics_TEST };
