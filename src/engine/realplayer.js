@@ -72,7 +72,7 @@ function historyBatterEntry(h, teamId, teamName) {
   const SF  = Math.round(PA * 0.010);
   const R   = Math.round(RBI * 0.85);
   const CS  = Math.round(SB * 0.25);
-  const empty = { PA:0,AB:0,H:0,D:0,T:0,HR:0,RBI:0,BB:0,K:0,HBP:0,SF:0,SB:0,CS:0,R:0,
+  const empty = { PA:0,AB:0,H:0,D:0,T:0,HR:0,RBI:0,BB:0,K:0,HBP:0,SF:0,SB:0,CS:0,R:0,FO_LF:0,FO_CF:0,FO_RF:0,GO:0,LO:0,
                   IP:0,ER:0,BBp:0,HBPp:0,Kp:0,HRp:0,Hp:0,BF:0,W:0,L:0,SV:0,HLD:0,QS:0,BS:0 };
   return {
     year, teamId, teamName,
@@ -87,7 +87,7 @@ function historyPitcherEntry(h, teamId, teamName) {
   const ER  = Math.round(ERA * IP / 9);
   const Hp  = Math.max(0, Math.round(WHIP * IP - BB));
   const BF  = Math.round(IP * 3.8);
-  const empty = { PA:0,AB:0,H:0,D:0,T:0,HR:0,RBI:0,BB:0,K:0,HBP:0,SF:0,SB:0,CS:0,R:0,
+  const empty = { PA:0,AB:0,H:0,D:0,T:0,HR:0,RBI:0,BB:0,K:0,HBP:0,SF:0,SB:0,CS:0,R:0,FO_LF:0,FO_CF:0,FO_RF:0,GO:0,LO:0,
                   IP:0,ER:0,BBp:0,HBPp:0,Kp:0,HRp:0,Hp:0,BF:0,W:0,L:0,SV:0,HLD:0,QS:0,BS:0 };
   return {
     year, teamId, teamName,

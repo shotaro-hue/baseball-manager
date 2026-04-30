@@ -2,6 +2,21 @@ import { r2, clamp } from '../utils';
 import { IS_HIT, IS_OUT } from '../constants';
 import { emptyStats } from './player';
 
+const getBattedBallType = (e) => {
+  if (!e || !['out', 'sf'].includes(e.result)) return null;
+  const la = e.la ?? 0;
+  if (la >= 18) return 'fly';
+  if (la >= 8) return 'line';
+  return 'ground';
+};
+
+const getFieldZone = (e) => {
+  const spray = e?.sprayAngle ?? 45;
+  if (spray < 35) return 'LF';
+  if (spray > 55) return 'RF';
+  return 'CF';
+};
+
 /**
  * 試合ログからボックススコアデータを計算する。
  * quickSimGame(homeTeam, awayTeam) の log を受け取り、
@@ -25,7 +40,7 @@ export function computeBoxScore(log, inningSummary, homeTeamPlayers, awayTeamPla
     const order = [];
     log.forEach(e => {
       if (e.scorer !== scorer || !e.batId || e.isStolenBase || !e.result || e.result === 'change') return;
-      if (!map[e.batId]) { map[e.batId] = { AB: 0, H: 0, HR: 0, RBI: 0, BB: 0, K: 0 }; order.push(e.batId); }
+      if (!map[e.batId]) { map[e.batId] = { AB: 0, H: 0, HR: 0, RBI: 0, BB: 0, K: 0, FO_LF: 0, FO_CF: 0, FO_RF: 0, GO: 0, LO: 0 }; order.push(e.batId); }
       const m = map[e.batId];
       const isBB  = e.result === 'bb';
       const isHBP = e.result === 'hbp';
@@ -36,6 +51,10 @@ export function computeBoxScore(log, inningSummary, homeTeamPlayers, awayTeamPla
       m.RBI += (e.rbi || 0);
       if (isBB || isHBP) m.BB++;
       if (e.result === 'k') m.K++;
+      const battedType = getBattedBallType(e);
+      if (battedType === 'fly') m[`FO_${getFieldZone(e)}`]++;
+      else if (battedType === 'ground') m.GO++;
+      else if (battedType === 'line') m.LO++;
     });
     return order.map(id => {
       const p = players.find(pl => pl.id === id);
@@ -183,6 +202,10 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won) {
       if (isHBP) s.HBP++;
       if (isSF) s.SF++;
       if (e.result === "k") s.K++;
+      const battedType = getBattedBallType(e);
+      if (battedType === 'fly') s[`FO_${getFieldZone(e)}`]++;
+      else if (battedType === 'ground') s.GO++;
+      else if (battedType === 'line') s.LO++;
       s.RBI += (e.rbi || 0);
       if (e.ev > 0) { s.evSum += e.ev; s.evN++; }
       if (e.ev > 0 && e.la !== undefined) { s.laSum += e.la; s.laN++; }
