@@ -308,6 +308,8 @@ function applyBatterSituation(bat, situation) {
 }
 
 
+const MIN_HR_CLEARANCE = 2; // フェンスを明確に越えた打球を本塁打扱いにする閾値（m）
+
 function getFenceDistanceBySpray(stadium, sprayAngle) {
   if (!stadium) return null;
   if (sprayAngle < 30) return stadium.lf;
@@ -317,12 +319,17 @@ function getFenceDistanceBySpray(stadium, sprayAngle) {
 
 function adjustResultByPhysics(result, dist, sprayAngle, stadium) {
   if (!stadium || dist <= 0) return result;
-  if (!['hr', 'd', 's', 't'].includes(result)) return result;
   const fenceDistance = getFenceDistanceBySpray(stadium, sprayAngle);
-  // フェンス+8m超えた打球は打球種別に関わらずHR
-  if (dist >= fenceDistance + 8) return 'hr';
-  // HRと判定されたが飛距離が足りない場合は二塁打に降格
-  if (result === 'hr' && dist < fenceDistance) return 'd';
+
+  if (result === 'hr') {
+    return dist < fenceDistance ? 'd' : 'hr';
+  }
+
+  if (dist >= fenceDistance + MIN_HR_CLEARANCE && ['s', 'd', 't'].includes(result)) {
+    return 'hr';
+  }
+
+  if (result === 'd' && dist >= fenceDistance + 8) return 'hr';
   return result;
 }
 
