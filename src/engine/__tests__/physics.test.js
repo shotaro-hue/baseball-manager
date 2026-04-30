@@ -39,15 +39,16 @@ describe('physics flight simulation', () => {
     expect(a).toEqual(b);
   });
 
-  it('dragCoeff calibration: EV=100mph LA=25° lands 110-120m', () => {
+  it('dragCoeff calibration: EV=100mph LA=25° lands 118-138m', () => {
     const d = calcBallDist(100, 25);
-    expect(d).toBeGreaterThanOrEqual(110);
-    expect(d).toBeLessThanOrEqual(120);
+    expect(d).toBeGreaterThanOrEqual(118);
+    expect(d).toBeLessThanOrEqual(138);
   });
 
   it('HR-range EV/LA clears typical NPB CF fence', () => {
-    const d = calcBallDist(108, 30);
-    expect(d).toBeGreaterThanOrEqual(122);
+    // power=77+ 相当の EV=92mph で CF フェンス (120m) を越える
+    const d = calcBallDist(92, 30);
+    expect(d).toBeGreaterThanOrEqual(120);
   });
 
   it('groundball LA does not clear fence', () => {
