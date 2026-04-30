@@ -307,6 +307,22 @@ function applyBatterSituation(bat, situation) {
   }};
 }
 
+
+function getFenceDistanceBySpray(stadium, sprayAngle) {
+  if (!stadium) return null;
+  if (sprayAngle < 30) return stadium.lf;
+  if (sprayAngle > 60) return stadium.rf;
+  return stadium.cf;
+}
+
+function adjustResultByPhysics(result, dist, sprayAngle, stadium) {
+  if (!stadium || dist <= 0 || (result !== 'hr' && result !== 'd')) return result;
+  const fenceDistance = getFenceDistanceBySpray(stadium, sprayAngle);
+  if (result === 'hr' && dist < fenceDistance) return 'd';
+  if (result === 'd' && dist >= fenceDistance + 8) return 'hr';
+  return result;
+}
+
 function estimatePitchCount(result) {
   switch (result) {
     case 'bb':  return rng(4, 6);
@@ -598,10 +614,16 @@ function processAtBat(gs, strategy = 'normal') {
   let ev = 0, la = 0;
   if (!['k', 'bb', 'hbp'].includes(result)) {
     ({ ev, la } = generateContactEVLA(batter, pitcher));
+    if (result === 'hr') la = clamp(la, PHYSICS_BAT.LA_HR_MIN, PHYSICS_BAT.LA_HR_MAX);
+    else if (result === 'd') la = clamp(la, PHYSICS_BAT.LA_D_MIN, PHYSICS_BAT.LA_D_MAX);
+    else if (result === 't') la = clamp(la, PHYSICS_BAT.LA_T_MIN, PHYSICS_BAT.LA_T_MAX);
+    else if (result === 's') la = clamp(la, PHYSICS_BAT.LA_S_MIN, PHYSICS_BAT.LA_S_MAX);
   }
   const dist = ev > 0 ? calcBallDist(ev, la) : 0;
   const sprayAngle = ev > 0 ? calcSprayAngle(result) : 45;
-  const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, pitcherId:pitcher?.id, result, ev, la, dist, sprayAngle, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog, pitchType, zone, scorers };
+  const stadium = situation.stadium ? STADIUMS[situation.stadium] : null;
+  const physResult = adjustResultByPhysics(result, dist, sprayAngle, stadium);
+  const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, pitcherId:pitcher?.id, result:physResult, ev, la, dist, sprayAngle, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog, pitchType, zone, scorers };
   const nextMyPitcherState = isMyAtBat
     ? gs.myPitcherState
     : { ...(gs.myPitcherState || makePitcherState(gs.inning, gs.isTop)), battersFaced: (gs.myPitcherState?.battersFaced || 0) + 1 };
@@ -803,4 +825,4 @@ export function runFarmSeason(teams) {
   });
 }
 
-export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, matchupScore, calcFatigue, calcEffectiveFatigue, PITCH_TYPES, BASELINE, ABILITY_RANGE, generateContactEVLA as _generateContactEVLA_TEST };
+export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, matchupScore, calcFatigue, calcEffectiveFatigue, PITCH_TYPES, BASELINE, ABILITY_RANGE, generateContactEVLA as _generateContactEVLA_TEST, getFenceDistanceBySpray as _getFenceDistanceBySpray_TEST, adjustResultByPhysics as _adjustResultByPhysics_TEST };

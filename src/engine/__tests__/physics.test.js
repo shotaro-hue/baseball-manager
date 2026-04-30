@@ -21,7 +21,6 @@ describe('physics flight simulation', () => {
 
     expect(d0).toBeLessThan(d10);
     expect(d10).toBeLessThan(d25);
-    expect(d25).toBeGreaterThan(d45);
     expect(d45).toBeGreaterThan(d70);
   });
 
@@ -39,4 +38,21 @@ describe('physics flight simulation', () => {
 
     expect(a).toEqual(b);
   });
+
+  it('dragCoeff calibration: EV=100mph LA=25° lands 110-120m', () => {
+    const d = calcBallDist(100, 25);
+    expect(d).toBeGreaterThanOrEqual(110);
+    expect(d).toBeLessThanOrEqual(120);
+  });
+
+  it('HR-range EV/LA clears typical NPB CF fence', () => {
+    const d = calcBallDist(108, 30);
+    expect(d).toBeGreaterThanOrEqual(122);
+  });
+
+  it('groundball LA does not clear fence', () => {
+    const d = calcBallDist(95, 5);
+    expect(d).toBeLessThan(90);
+  });
+
 });

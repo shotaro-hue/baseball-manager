@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcEffectiveFatigue, calcFatigue, matchupScore, initGameState, _generateContactEVLA_TEST } from '../simulation';
+import { calcEffectiveFatigue, calcFatigue, matchupScore, initGameState, _generateContactEVLA_TEST, _getFenceDistanceBySpray_TEST, _adjustResultByPhysics_TEST } from '../simulation';
 import { applyGameStatsFromLog } from '../postGame';
 import { emptyStats } from '../player';
 
@@ -136,5 +136,24 @@ describe('generateContactEVLA', () => {
     const pitcher = { pitching: { velocity: 99, breaking: 99 } };
     const minEv = Math.min(...Array.from({ length: 500 }, () => _generateContactEVLA_TEST(batter, pitcher).ev));
     expect(minEv).toBeGreaterThanOrEqual(65);
+  });
+});
+
+
+describe('physics HR/D log correction helpers', () => {
+  const stadium = { lf: 100, cf: 122, rf: 98 };
+
+  it('spray angle でフェンス距離を選択する', () => {
+    expect(_getFenceDistanceBySpray_TEST(stadium, 20)).toBe(100);
+    expect(_getFenceDistanceBySpray_TEST(stadium, 45)).toBe(122);
+    expect(_getFenceDistanceBySpray_TEST(stadium, 70)).toBe(98);
+  });
+
+  it('dist がフェンス未満のHRはログ上で2塁打に補正される', () => {
+    expect(_adjustResultByPhysics_TEST('hr', 118, 45, stadium)).toBe('d');
+  });
+
+  it('dist がフェンス+8以上の2塁打はログ上でHRに補正される', () => {
+    expect(_adjustResultByPhysics_TEST('d', 130, 45, stadium)).toBe('hr');
   });
 });
