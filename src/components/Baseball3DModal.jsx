@@ -34,37 +34,93 @@ function validate3DReplayEvent(event) {
 }
 
 function StadiumGeometry({ stadium }) {
-  const safeStadium = stadium ?? { lf: 100, cf: 120, rf: 100 };
-  const maxFence = Math.max(safeStadium.lf, safeStadium.cf, safeStadium.rf);
+  const safeLf = Math.max(70, sanitizeNumber(stadium?.lf, 100));
+  const safeCf = Math.max(80, sanitizeNumber(stadium?.cf, 120));
+  const safeRf = Math.max(70, sanitizeNumber(stadium?.rf, 100));
+  const maxFence = Math.max(safeLf, safeCf, safeRf);
+  const fieldCenterZ = 22;
+
   const fencePoints = [
-    [-safeStadium.lf * 0.72, 2.5, safeStadium.lf * 0.7],
-    [-safeStadium.lf * 0.38, 2.5, safeStadium.lf * 0.9],
-    [0, 2.5, safeStadium.cf],
-    [safeStadium.rf * 0.38, 2.5, safeStadium.rf * 0.9],
-    [safeStadium.rf * 0.72, 2.5, safeStadium.rf * 0.7],
+    [-safeLf * 0.72, 2.5, safeLf * 0.7],
+    [-safeLf * 0.38, 2.5, safeLf * 0.9],
+    [0, 2.5, safeCf],
+    [safeRf * 0.38, 2.5, safeRf * 0.9],
+    [safeRf * 0.72, 2.5, safeRf * 0.7],
   ];
+
+  const fenceInnerPoints = fencePoints.map(([x, y, z]) => [x * 0.985, y, z * 0.985]);
 
   return (
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[maxFence * 2.4, maxFence * 2.4]} />
+        <planeGeometry args={[maxFence * 2.5, maxFence * 2.5]} />
         <meshStandardMaterial color="#0c7a3e" />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 22]}>
+
+      {[0.35, 0.55, 0.75, 0.95].map((ratio, index) => (
+        <mesh key={`grass-ring-${ratio}`} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012 + index * 0.001, fieldCenterZ]}>
+          <ringGeometry args={[maxFence * ratio * 0.45, maxFence * ratio * 0.46, 96]} />
+          <meshStandardMaterial color={index % 2 === 0 ? '#0f8d48' : '#0d7f42'} transparent opacity={0.32} />
+        </mesh>
+      ))}
+
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, fieldCenterZ]}>
         <circleGeometry args={[20, 48]} />
         <meshStandardMaterial color="#7a5230" />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 22]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, fieldCenterZ]}>
         <circleGeometry args={[15.5, 48]} />
         <meshStandardMaterial color="#0e8844" />
       </mesh>
-      <Line points={[[0, 0.1, 0], [-safeStadium.lf * 0.76, 0.1, safeStadium.lf * 0.76]]} color="#ffffff" lineWidth={2} />
-      <Line points={[[0, 0.1, 0], [safeStadium.rf * 0.76, 0.1, safeStadium.rf * 0.76]]} color="#ffffff" lineWidth={2} />
+
+      <Line points={[[0, 0.1, 0], [-safeLf * 0.76, 0.1, safeLf * 0.76]]} color="#ffffff" lineWidth={2} />
+      <Line points={[[0, 0.1, 0], [safeRf * 0.76, 0.1, safeRf * 0.76]]} color="#ffffff" lineWidth={2} />
       <Line points={fencePoints} color="#94a3b8" lineWidth={6} />
+      <Line points={fenceInnerPoints} color="#64748b" lineWidth={3} />
       <Line points={[HOME, FIRST, SECOND, THIRD, HOME]} color="#ffffff" lineWidth={2.5} />
 
-      <Text position={[0, 4, safeStadium.cf + 6]} fontSize={4} color="#fde68a" anchorX="center" anchorY="middle">
-        {safeStadium.cf}m
+      {/* 外野フェンスの厚み【＝奥行き視認用の帯】 */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.09, fieldCenterZ + maxFence * 0.12]}>
+        <ringGeometry args={[maxFence * 0.9, maxFence * 0.915, 96, 1, Math.PI * 0.1, Math.PI * 0.8]} />
+        <meshStandardMaterial color="#334155" />
+      </mesh>
+
+      {/* ファウルポール */}
+      <mesh position={[-safeLf * 0.76, 8.5, safeLf * 0.76]}>
+        <cylinderGeometry args={[0.35, 0.35, 17, 12]} />
+        <meshStandardMaterial color="#facc15" emissive="#fde047" emissiveIntensity={0.25} />
+      </mesh>
+      <mesh position={[safeRf * 0.76, 8.5, safeRf * 0.76]}>
+        <cylinderGeometry args={[0.35, 0.35, 17, 12]} />
+        <meshStandardMaterial color="#facc15" emissive="#fde047" emissiveIntensity={0.25} />
+      </mesh>
+
+      {/* ベース袋【＝白い塁ベース】 */}
+      {[FIRST, SECOND, THIRD].map((basePos, idx) => (
+        <mesh key={`base-bag-${idx}`} position={[basePos[0], 0.28, basePos[2]]} rotation={[-Math.PI / 2, Math.PI / 4, 0]}>
+          <boxGeometry args={[3.3, 3.3, 0.55]} />
+          <meshStandardMaterial color="#f8fafc" roughness={0.7} metalness={0.05} />
+        </mesh>
+      ))}
+
+      {/* ホームプレート【＝五角形の打席基準点】 */}
+      <mesh position={[HOME[0], 0.22, HOME[2]]} rotation={[-Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[2.3, 2.3, 0.4, 5]} />
+        <meshStandardMaterial color="#f8fafc" roughness={0.75} />
+      </mesh>
+
+      <Text position={[-safeLf * 0.52, 3.8, safeLf * 0.98]} fontSize={3.4} color="#e2e8f0" anchorX="center" anchorY="middle">
+        LF
+      </Text>
+      <Text position={[0, 4.2, safeCf + 8]} fontSize={3.8} color="#fde68a" anchorX="center" anchorY="middle">
+        CF
+      </Text>
+      <Text position={[safeRf * 0.52, 3.8, safeRf * 0.98]} fontSize={3.4} color="#e2e8f0" anchorX="center" anchorY="middle">
+        RF
+      </Text>
+
+      <Text position={[0, 7, safeCf + 14]} fontSize={3.2} color="#fde68a" anchorX="center" anchorY="middle">
+        {safeCf}m
       </Text>
       <mesh position={[MOUND[0], MOUND[1], MOUND[2]]}>
         <cylinderGeometry args={[2.7, 2.7, 0.35, 24]} />
@@ -199,12 +255,13 @@ export default function Baseball3DModal({ event, stadium, onClose }) {
 
               {safeData ? (
                 <div style={{ width: '100%', height: 'min(62vh, 560px)', borderRadius: 8, overflow: 'hidden' }}>
-                  <Canvas camera={{ position: [0, 55, -65], fov: 50 }}>
-                    <ambientLight intensity={0.85} />
-                    <directionalLight position={[50, 80, 30]} intensity={1.2} castShadow />
+                  <Canvas camera={{ position: [0, 62, -48], fov: 48 }}>
+                    <ambientLight intensity={0.55} />
+                    <directionalLight position={[50, 85, 35]} intensity={1.45} castShadow />
+                    <directionalLight position={[-40, 45, -20]} intensity={0.55} />
                     <StadiumGeometry stadium={stadium} />
                     <BallTrajectory ev={safeData.safeEv} la={safeData.safeLa} sprayAngle={safeData.safeSpray} />
-                    <OrbitControls target={[0, 8, 65]} minPolarAngle={0.2} maxPolarAngle={1.5} enableZoom zoomSpeed={0.8} />
+                    <OrbitControls target={[0, 10, 74]} minPolarAngle={0.2} maxPolarAngle={1.5} enableZoom zoomSpeed={0.8} />
                   </Canvas>
                 </div>
               ) : (
