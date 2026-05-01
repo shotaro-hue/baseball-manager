@@ -110,14 +110,10 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
 
   function validate3DReplayEvent(event) {
     if (!event || typeof event !== 'object') return { ok: false, reason: 'イベントが未定義です' };
-    const ev = Number(event.ev);
-    const launchAngle = Number(event.la ?? event.launchAngle);
-    const sprayAngle = event.sprayAngle == null ? 45 : Number(event.sprayAngle);
-    const distance = event.dist == null ? 0 : Number(event.dist);
-    if (!Number.isFinite(ev)) return { ok: false, reason: 'ev（打球速度）が不正です' };
-    if (!Number.isFinite(launchAngle)) return { ok: false, reason: 'la（打球角度）が不正です' };
-    if (!Number.isFinite(sprayAngle)) return { ok: false, reason: 'sprayAngle（方向角）が不正です' };
-    if (!Number.isFinite(distance)) return { ok: false, reason: 'dist（飛距離）が不正です' };
+    const requiredKeys = ['type', 'ev', 'la'];
+    for (const key of requiredKeys) {
+      if (!(key in event)) return { ok: false, reason: `${key} が不足しています` };
+    }
     return { ok: true, reason: '' };
   }
 

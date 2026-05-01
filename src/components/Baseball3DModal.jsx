@@ -17,10 +17,10 @@ function sanitizeNumber(value, fallback = 0) {
 
 function validateReplayEvent(event) {
   if (!event || typeof event !== 'object') return { ok: false, reason: 'eventが未定義です' };
-  const exitVelocity = Number(event.ev);
-  const launchAngle = Number(event.la ?? event.launchAngle);
-  if (!Number.isFinite(exitVelocity)) return { ok: false, reason: 'event.ev が不正です' };
-  if (!Number.isFinite(launchAngle)) return { ok: false, reason: 'event.la が不正です' };
+  const requiredKeys = ['type', 'ev', 'la'];
+  for (const key of requiredKeys) {
+    if (!(key in event)) return { ok: false, reason: `event.${key} が不足しています` };
+  }
   return { ok: true, reason: '' };
 }
 
@@ -117,7 +117,7 @@ export default function Baseball3DModal({ event, stadium, onClose }) {
     try {
       if (!validation.ok) return null;
       const safeEv = sanitizeNumber(event.ev);
-      const safeLa = sanitizeNumber(event.la ?? event.launchAngle);
+      const safeLa = sanitizeNumber(event.la);
       const safeSpray = sanitizeNumber(event.sprayAngle, 45);
       const safeDist = sanitizeNumber(event.dist);
       const safeZone = calcLandingZone(safeDist, safeSpray, stadium ?? {});
