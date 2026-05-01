@@ -265,9 +265,22 @@ export function PlayerModal({player:p, teamName, isMyTeam, onSetConvertTarget, o
                   <StatRow label="OPS" value={sb.OPS>0?sb.OPS.toFixed(3):"---"} color={sb.OPS>=.850?"#34d399":sb.OPS>=.700?"#f5c842":undefined}/>
                   <StatRow label="盗塁" value={p.stats.SB||0}/>
                   <StatRow label="出塁率" value={sb.OBP>0?sb.OBP.toFixed(3):"---"}/>
+                  <StatRow label="強打球率" value={sb.hardHitPct>0?`${(sb.hardHitPct*100).toFixed(1)}%`:"---"} color={sb.hardHitPct>=0.4?"#34d399":undefined}/>
                 </>
               )}
             </div>
+
+            {!p.isPitcher&&(
+              <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}>
+                <div style={{fontSize:10,color:"#374151",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>打球傾向分析</div>
+                <StatRow label="引っ張り" value={sb.pullPct>0?`${(sb.pullPct*100).toFixed(1)}%`:"---"}/>
+                <StatRow label="センター" value={sb.centerPct>0?`${(sb.centerPct*100).toFixed(1)}%`:"---"}/>
+                <StatRow label="逆方向" value={sb.oppositePct>0?`${(sb.oppositePct*100).toFixed(1)}%`:"---"}/>
+                <StatRow label="ゴロ率" value={sb.gbPct>0?`${(sb.gbPct*100).toFixed(1)}%`:"---"}/>
+                <StatRow label="ライナー率" value={sb.ldPct>0?`${(sb.ldPct*100).toFixed(1)}%`:"---"}/>
+                <StatRow label="フライ率" value={sb.fbPct>0?`${(sb.fbPct*100).toFixed(1)}%`:"---"}/>
+              </div>
+            )}
 
             <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}>
               <div style={{fontSize:10,color:"#374151",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>契約</div>

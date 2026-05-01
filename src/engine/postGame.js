@@ -206,6 +206,17 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won) {
       if (battedType === 'fly') s[`FO_${getFieldZone(e)}`]++;
       else if (battedType === 'ground') s.GO++;
       else if (battedType === 'line') s.LO++;
+      if (e.ev > 0) {
+        const sprayAngle = Number.isFinite(e.sprayAngle) ? e.sprayAngle : 45;
+        if (sprayAngle < 30) s.pullBatted++;
+        else if (sprayAngle > 60) s.oppositeBatted++;
+        else s.centerBatted++;
+
+        if (e.ev >= 145) s.hardHit++;
+        if (battedType === 'ground') s.groundBatted++;
+        else if (battedType === 'line') s.lineBatted++;
+        else if (battedType === 'fly') s.flyBatted++;
+      }
       s.RBI += (e.rbi || 0);
       if (e.ev > 0) { s.evSum += e.ev; s.evN++; }
       if (e.ev > 0 && e.la !== undefined) { s.laSum += e.la; s.laN++; }
