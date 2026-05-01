@@ -7,7 +7,7 @@ import { generateSeasonSchedule, calcAllStarTriggerDay } from './engine/schedule
 import { SEASON_PARAMS, getDefaultParams } from './data/scheduleParams.js';
 import { TacticalGameScreen } from './components/TacticalGame';
 import { BatchResultScreen } from './components/BatchResult';
-import { ModeSelectScreen, ResultScreen, RetirePhaseScreen, WaiverPhaseScreen, WaiverResultScreen, GrowthSummaryScreen, NewSeasonScreen } from './components/Screens';
+import { ModeSelectScreen, ResultScreen, RetirePhaseScreen, WaiverPhaseScreen, WaiverResultScreen, GrowthSummaryScreen, NewSeasonScreen, SpringTrainingScreen } from './components/Screens';
 import { DraftPreviewScreen, DraftLotteryScreen, DraftScreen, DraftReviewScreen } from './components/Draft';
 import { PlayoffScreen } from './components/PlayoffScreen';
 import { RetireModal } from './components/RetireModal';
@@ -250,6 +250,7 @@ export default function App(){
   if(screen==="draft_lottery"&&draftPool) return(<><DraftLotteryScreen teams={teams} myId={myId} year={year} pool={draftPool} onDone={(r1,autoSkip)=>{setDraftPool(prev=>prev.map(p=>{const winner=Object.entries(r1).find(function(e){return e[1]&&e[1].id===p.id;});return{...p,_drafted:winner?true:undefined,_r1winner:winner?Number(winner[0]):undefined};}));if(autoSkip) setDraftAutoSkip(true);setScreen("draft");}}/></>);
   if(screen==="draft"&&draftPool) return(<><DraftScreen teams={teams} myId={myId} year={year} pool={draftPool} draftAllocation={draftAllocation} autoSkip={draftAutoSkip} onDraftDone={(pl,dr)=>{setDraftAutoSkip(false);setDraftResult({pool:pl,drafted:dr});setScreen("draft_review");}}/></>);
   if(screen==="draft_review"&&draftResult) return(<><DraftReviewScreen teams={teams} myId={myId} year={year} pool={draftResult.pool} drafted={draftResult.drafted} onEnd={()=>os.handleDraftComplete(draftResult.pool,draftResult.drafted)}/></>);
+  if(screen==="spring_training") return(<><SpringTrainingScreen year={year} myTeam={myTeam} springData={os.springTrainingData} onComplete={os.handleSpringTrainingComplete}/></>);
   if(screen==="new_season") return(<><NewSeasonScreen year={year} info={newSeasonInfo} developmentSummary={developmentSummary} ownerGoal={myTeam?.ownerGoal||"cs"} onGoalSelect={(goal)=>gs.upd(myId,t=>({...t,ownerGoal:goal}))} onStart={()=>{setScreen("hub");setTab("dashboard");notify(`${year}年シーズン開幕！`,"ok");}}/></>);
 
   if(screen==="team_detail"&&gs.viewingTeam) return(

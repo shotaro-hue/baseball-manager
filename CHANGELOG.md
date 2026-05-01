@@ -5,6 +5,21 @@
 
 ---
 
+### 2026-05-01 — スプリングトレーニング + 選手比較UI（feat）
+
+**仕様本文への影響あり（§3 画面フロー・§4 ゲームシステム追加）**
+
+- `draft_review` → `spring_training` → `new_season` の画面フロー追加
+- `SpringTrainingScreen`（`Screens.jsx`）: 3タブ構成（キャンプレポート・コンディション・選手比較）
+- `generateSpringTraining()`（`useOffseason.js`）: 全選手のコンディション変動（±15）を生成
+- キャンプ台頭選手（ファーム若手・potential≥60・年齢≤26）に+20ボーナス
+- 不調選手（一軍高齢選手）に-15ペナルティ
+- `handleSpringTrainingComplete()`: condition 適用 → `handleNextYear()` の2段処理
+- 選手比較タブ: 同一ポジション複数選手を並べてOV・昨年成績・コンディション変動を表示
+- `src/constants.js` にキャンプ定数 6件追加（`CAMP_COND_VARIATION` 等）
+
+---
+
 ### 2026-05-01 — 物理演算打撃シミュレーション Phase 3（df51cf8）
 
 **仕様本文への影響なし（内部実装のみ）**
