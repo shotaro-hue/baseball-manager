@@ -40,6 +40,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   const [showMenu,setShowMenu]=useState(null); // "pitcher"|"pinch"|"strategy"
   const [pitchingPolicy,setPitchingPolicy]=useState("normal");
   const [modal3D,setModal3D]=useState(null);
+  const [modalWarning,setModalWarning]=useState('');
   const logRef=useRef(null);
 
   // Auto-scroll log
@@ -106,6 +107,29 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
 
   const currentStadiumKey = TEAM_STADIUM[gs.homeTeamId];
   const currentStadium = STADIUMS[currentStadiumKey] || STADIUMS.tokyo_dome;
+
+  function validate3DReplayEvent(event) {
+    if (!event || typeof event !== 'object') return { ok: false, reason: 'イベントが未定義です' };
+    const ev = Number(event.ev);
+    const launchAngle = Number(event.la ?? event.launchAngle);
+    const sprayAngle = event.sprayAngle == null ? 45 : Number(event.sprayAngle);
+    const distance = event.dist == null ? 0 : Number(event.dist);
+    if (!Number.isFinite(ev)) return { ok: false, reason: 'ev（打球速度）が不正です' };
+    if (!Number.isFinite(launchAngle)) return { ok: false, reason: 'la（打球角度）が不正です' };
+    if (!Number.isFinite(sprayAngle)) return { ok: false, reason: 'sprayAngle（方向角）が不正です' };
+    if (!Number.isFinite(distance)) return { ok: false, reason: 'dist（飛距離）が不正です' };
+    return { ok: true, reason: '' };
+  }
+
+  function open3DReplaySafely(event) {
+    const validation = validate3DReplayEvent(event);
+    if (!validation.ok) {
+      setModalWarning(`⚠️ 3D再生を開始できません: ${validation.reason}`);
+      return;
+    }
+    setModalWarning('');
+    setModal3D({ event, stadium: currentStadium });
+  }
 
   if(gs.gameOver){
     const won=gs.score.my>gs.score.opp;
@@ -269,6 +293,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
           </div>
 
           {/* Event Log */}
+          {modalWarning && <div className="notif nwarn" style={{marginTop:8}}>{modalWarning}</div>}
           <div className="evlog" ref={logRef}>
             {gs.log.map((e,i)=>{
               if(e.result==="change") return <div key={i} style={{padding:"3px 8px",fontSize:10,color:"#a78bfa",borderLeft:"3px solid #a78bfa",margin:"4px 0"}}>{e.text}</div>;
@@ -283,7 +308,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
                   <PitchBadge pitchType={e.pitchType} zone={e.zone} />
                   {e.strategy&&<span style={{fontSize:9,color:"#a78bfa",marginLeft:4}}>[{e.strategy}]</span>}
                   {e.ev>0&&<span style={{fontFamily:"monospace",fontSize:9,color:"#1e2d3d",marginLeft:4}}>EV:{e.ev} LA:{e.la}° {e.dist>0&&`${e.dist}m`}</span>}
-                  {e.ev>0&&<button onClick={()=>setModal3D({ event:e, stadium:currentStadium })} style={{fontSize:9,marginLeft:4,padding:'1px 4px',cursor:'pointer'}}>3D再生</button>}
+                  {e.ev>0&&<button onClick={()=>open3DReplaySafely(e)} style={{fontSize:9,marginLeft:4,padding:'1px 4px',cursor:'pointer'}}>3D再生</button>}
                   {e.rbi>0&&<span style={{color:"#f5c842",marginLeft:5,fontSize:11}}>+{e.rbi}点！</span>}
                 </div>
               );
