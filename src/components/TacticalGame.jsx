@@ -108,23 +108,32 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   const currentStadiumKey = TEAM_STADIUM[gs.homeTeamId];
   const currentStadium = STADIUMS[currentStadiumKey] || STADIUMS.tokyo_dome;
 
-  function validate3DReplayEvent(event) {
-    if (!event || typeof event !== 'object') return { ok: false, reason: 'イベントが未定義です' };
-    const requiredKeys = ['type', 'ev', 'la'];
-    for (const key of requiredKeys) {
-      if (!(key in event)) return { ok: false, reason: `${key} が不足しています` };
+  function normalizeReplayEvent(event) {
+    // ⚠️ セキュリティ: 外部入力由来の可能性があるため、必ず型と数値を検証してからUIに渡す
+    if (!event || typeof event !== 'object' || Array.isArray(event)) {
+      return { ok: false, reason: 'イベントがオブジェクトではありません', event: null };
     }
-    return { ok: true, reason: '' };
+    const normalizedEv = Number(event.ev);
+    const normalizedLa = Number(event.la);
+    if (!Number.isFinite(normalizedEv) || !Number.isFinite(normalizedLa)) {
+      return { ok: false, reason: 'ev または la が有限数ではありません', event: null };
+    }
+    const fallbackType = event.result || 'batted_ball';
+    return {
+      ok: true,
+      reason: '',
+      event: { ...event, ev: normalizedEv, la: normalizedLa, type: event.type || fallbackType },
+    };
   }
 
   function open3DReplaySafely(event) {
-    const validation = validate3DReplayEvent(event);
+    const validation = normalizeReplayEvent(event);
     if (!validation.ok) {
       setModalWarning(`⚠️ 3D再生を開始できません: ${validation.reason}`);
       return;
     }
     setModalWarning('');
-    setModal3D({ event, stadium: currentStadium });
+    setModal3D({ event: validation.event, stadium: currentStadium });
   }
 
   if(gs.gameOver){
@@ -304,7 +313,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
                   <PitchBadge pitchType={e.pitchType} zone={e.zone} />
                   {e.strategy&&<span style={{fontSize:9,color:"#a78bfa",marginLeft:4}}>[{e.strategy}]</span>}
                   {e.ev>0&&<span style={{fontFamily:"monospace",fontSize:9,color:"#1e2d3d",marginLeft:4}}>EV:{e.ev} LA:{e.la}° {e.dist>0&&`${e.dist}m`}</span>}
-                  {e.ev>0&&<button onClick={()=>open3DReplaySafely(e)} style={{fontSize:9,marginLeft:4,padding:'1px 4px',cursor:'pointer'}}>3D再生</button>}
+                  {Number.isFinite(Number(e.ev)) && Number(e.ev) > 0 && <button onClick={()=>open3DReplaySafely(e)} style={{fontSize:9,marginLeft:4,padding:'1px 4px',cursor:'pointer'}}>3D再生</button>}
                   {e.rbi>0&&<span style={{color:"#f5c842",marginLeft:5,fontSize:11}}>+{e.rbi}点！</span>}
                 </div>
               );

@@ -318,6 +318,11 @@ function getFenceDistanceBySpray(stadium, sprayAngle) {
   return stadium.cf;
 }
 
+function inferReplayTypeFromResult(result) {
+  if (['hr', 'd', 't', 's', 'out', 'sac'].includes(result)) return 'batted_ball';
+  return result || 'batted_ball';
+}
+
 function adjustResultByPhysics(result, dist, sprayAngle, stadium) {
   if (!stadium || dist <= 0) return result;
   const fenceDistance = getFenceDistanceBySpray(stadium, sprayAngle);
@@ -521,7 +526,7 @@ function processAtBat(gs, strategy = 'normal') {
       const result      = success ? 'sb' : 'cs';
       const newOuts     = success ? gs.outs : gs.outs+1;
       const newMomentum = clamp(gs.momentum + (success ? (isMyAtBat?6:-6) : (isMyAtBat?-5:5)), 0, 100);
-      const stealLog    = { inning:gs.inning, isTop:gs.isTop, batter:runner?.name||'?', batId:runner?.id, pitcherId:pitcher?.id, result, ev:0, la:0, dist:0, rbi:0, outs:newOuts, bases:[...newBases], pitches:0, strategy:'steal', scorer:isMyAtBat, isStolenBase:true };
+      const stealLog    = { inning:gs.inning, isTop:gs.isTop, batter:runner?.name||'?', batId:runner?.id, pitcherId:pitcher?.id, result, type:'baserunning', ev:0, la:0, dist:0, rbi:0, outs:newOuts, bases:[...newBases], pitches:0, strategy:'steal', scorer:isMyAtBat, isStolenBase:true };
       const newGs = { ...gs, outs:newOuts, bases:newBases, momentum:newMomentum, log:[...gs.log, stealLog] };
       if (newOuts >= 3) return endHalfInning(newGs);
       return processAtBat(newGs, 'normal');
@@ -633,7 +638,7 @@ function processAtBat(gs, strategy = 'normal') {
   let newMyPC=gs.myPitchCount, newOpPC=gs.opPitchCount;
   if (isMyAtBat) newOpPC+=pitches; else newMyPC+=pitches;
 
-  const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, pitcherId:pitcher?.id, result, ev, la, dist, sprayAngle, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog, pitchType, zone, scorers };
+  const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, pitcherId:pitcher?.id, result, type:inferReplayTypeFromResult(result), ev, la, dist, sprayAngle, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog, pitchType, zone, scorers };
   const nextMyPitcherState = isMyAtBat
     ? gs.myPitcherState
     : { ...(gs.myPitcherState || makePitcherState(gs.inning, gs.isTop)), battersFaced: (gs.myPitcherState?.battersFaced || 0) + 1 };
