@@ -35,39 +35,25 @@ function AbilityBar({label, value, color="#60a5fa"}){
   );
 }
 
-function sanitizeSprayPoint(point) {
-  if (!point || typeof point !== 'object' || Array.isArray(point)) return null;
-  const rawDist = Number(point.dist);
-  const rawSpray = Number(point.sprayAngle);
-  if (!Number.isFinite(rawDist) || !Number.isFinite(rawSpray)) return null;
-  return {
-    dist: Math.min(220, Math.max(0, rawDist)),
-    sprayAngle: Math.min(90, Math.max(0, rawSpray)),
-    result: String(point.result || 'out'),
-  };
+function sanitizeRatio(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.min(1, Math.max(0, numeric));
 }
 
-function SprayDistributionChart({ sprayPoints }) {
-  const safePoints = Array.isArray(sprayPoints)
-    ? sprayPoints.map(sanitizeSprayPoint).filter(Boolean)
-    : [];
-  const hasData = safePoints.length > 0;
-  const plottedPoints = safePoints.map((point, idx) => {
-    // 角度 0~90 を左翼〜右翼方向にマップ【＝座標変換】
-    const angleRad = ((point.sprayAngle - 45) * Math.PI) / 180;
-    const radius = (point.dist / 220) * 106;
-    const cx = 130 + Math.sin(angleRad) * radius;
-    const cy = 140 - Math.cos(angleRad) * radius;
-    const isHomeRun = point.result === 'hr';
-    return {
-      key: `spray-pt-${idx}`,
-      cx: Math.max(12, Math.min(248, cx)),
-      cy: Math.max(12, Math.min(146, cy)),
-      color: isHomeRun ? '#f87171' : '#f8fafc',
-      opacity: isHomeRun ? 0.95 : 0.78,
-      radius: isHomeRun ? 2.4 : 1.9,
-    };
-  });
+function SprayDistributionChart({ leftRatio, centerRatio, rightRatio }) {
+  const safeLeft = sanitizeRatio(leftRatio);
+  const safeCenter = sanitizeRatio(centerRatio);
+  const safeRight = sanitizeRatio(rightRatio);
+  const total = safeLeft + safeCenter + safeRight;
+  const normalizedLeft = total > 0 ? safeLeft / total : 0;
+  const normalizedCenter = total > 0 ? safeCenter / total : 0;
+  const normalizedRight = total > 0 ? safeRight / total : 0;
+  const hasData = total > 0;
+
+  const leftRadius = 8 + normalizedLeft * 20;
+  const centerRadius = 8 + normalizedCenter * 20;
+  const rightRadius = 8 + normalizedRight * 20;
 
   return (
     <div style={{ marginTop: 8 }}>
@@ -84,16 +70,9 @@ function SprayDistributionChart({ sprayPoints }) {
         <text x="130" y="13" fontSize="9" fill="#fde68a" textAnchor="middle">中堅方向</text>
         <text x="206" y="20" fontSize="9" fill="#e2e8f0" textAnchor="middle">右翼方向</text>
 
-        {plottedPoints.map((dot) => (
-          <circle
-            key={dot.key}
-            cx={dot.cx}
-            cy={dot.cy}
-            r={dot.radius}
-            fill={dot.color}
-            opacity={dot.opacity}
-          />
-        ))}
+        <circle cx="74" cy="84" r={leftRadius} fill="rgba(96,165,250,.55)" stroke="#60a5fa" strokeWidth="1.5" />
+        <circle cx="130" cy="62" r={centerRadius} fill="rgba(245,194,66,.55)" stroke="#f5c842" strokeWidth="1.5" />
+        <circle cx="186" cy="84" r={rightRadius} fill="rgba(52,211,153,.55)" stroke="#34d399" strokeWidth="1.5" />
 
         {!hasData && (
           <text x="130" y="96" fontSize="10" fill="#cbd5e1" textAnchor="middle">
@@ -349,7 +328,11 @@ export function PlayerModal({player:p, teamName, isMyTeam, onSetConvertTarget, o
                 <StatRow label="ゴロ率" value={sb.gbPct>0?`${(sb.gbPct*100).toFixed(1)}%`:"---"}/>
                 <StatRow label="ライナー率" value={sb.ldPct>0?`${(sb.ldPct*100).toFixed(1)}%`:"---"}/>
                 <StatRow label="フライ率" value={sb.fbPct>0?`${(sb.fbPct*100).toFixed(1)}%`:"---"}/>
-                <SprayDistributionChart sprayPoints={p.stats?.sprayPoints} />
+                <SprayDistributionChart
+                  leftRatio={sb.pullPct}
+                  centerRatio={sb.centerPct}
+                  rightRatio={sb.oppositePct}
+                />
               </div>
             )}
 
