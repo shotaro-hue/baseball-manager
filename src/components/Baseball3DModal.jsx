@@ -171,7 +171,7 @@ export default function Baseball3DModal({ event, stadium, onClose }) {
           ) : (
             <>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <div className="sim-chip">打球速度: <strong>{safeData?.safeEv ?? 0}</strong> mph</div>
+                <div className="sim-chip">打球速度: <strong>{safeData?.safeEv ?? 0}</strong> km/h</div>
                 <div className="sim-chip">打球角度: <strong>{safeData?.safeLa ?? 0}</strong>°</div>
                 <div className="sim-chip">方向角: <strong>{safeData?.safeSpray ?? 45}</strong>°</div>
                 <div className="sim-chip">推定飛距離: <strong>{safeData?.safeDist ?? 0}</strong> m</div>
