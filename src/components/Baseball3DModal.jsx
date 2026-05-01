@@ -33,6 +33,24 @@ function validate3DReplayEvent(event) {
   };
 }
 
+
+function convertToPitcherViewLabel(fieldLabel) {
+  // ⚠️ セキュリティ: 文字列以外は表示に使わず、既定値へフォールバック【＝安全な代替値へ戻す】する
+  if (typeof fieldLabel !== 'string') return '中堅';
+  if (fieldLabel === '左翼') return '右翼';
+  if (fieldLabel === '右翼') return '左翼';
+  return fieldLabel;
+}
+
+function convertToPitcherViewZone(zoneLabel) {
+  // ⚠️ セキュリティ: 文字列以外は表示に使わず、不明値として扱う
+  if (typeof zoneLabel !== 'string') return '不明';
+  return zoneLabel
+    .replaceAll('左翼', '__TMP_SIDE__')
+    .replaceAll('右翼', '左翼')
+    .replaceAll('__TMP_SIDE__', '右翼');
+}
+
 function StadiumGeometry({ stadium }) {
   const safeLf = Math.max(70, sanitizeNumber(stadium?.lf, 100));
   const safeCf = Math.max(80, sanitizeNumber(stadium?.cf, 120));
@@ -109,14 +127,15 @@ function StadiumGeometry({ stadium }) {
         <meshStandardMaterial color="#f8fafc" roughness={0.75} />
       </mesh>
 
+      {/* 投手視点【＝マウンド側からホーム方向を見る基準】に合わせて左右表記を入れ替え */}
       <Text position={[-safeLf * 0.52, 3.8, safeLf * 0.98]} fontSize={3.4} color="#e2e8f0" anchorX="center" anchorY="middle">
-        LF
+        RF
       </Text>
       <Text position={[0, 4.2, safeCf + 8]} fontSize={3.8} color="#fde68a" anchorX="center" anchorY="middle">
         CF
       </Text>
       <Text position={[safeRf * 0.52, 3.8, safeRf * 0.98]} fontSize={3.4} color="#e2e8f0" anchorX="center" anchorY="middle">
-        RF
+        LF
       </Text>
 
       <Text position={[0, 7, safeCf + 14]} fontSize={3.2} color="#fde68a" anchorX="center" anchorY="middle">
@@ -195,7 +214,9 @@ export default function Baseball3DModal({ event, stadium, onClose }) {
       const safeDist = sanitizeNumber(normalizedEvent.dist);
       const safeZone = calcLandingZone(safeDist, safeSpray, stadium ?? {});
       const safeFieldSide = resolveFieldSideBySprayAngle(safeSpray);
-      return { safeEv, safeLa, safeSpray, safeDist, safeZone, safeFieldSide };
+      const displayFieldSideLabel = convertToPitcherViewLabel(safeFieldSide?.label);
+      const displayZoneLabel = convertToPitcherViewZone(safeZone);
+      return { safeEv, safeLa, safeSpray, safeDist, safeZone, safeFieldSide, displayFieldSideLabel, displayZoneLabel };
     } catch (_) {
       return null;
     }
@@ -248,9 +269,9 @@ export default function Baseball3DModal({ event, stadium, onClose }) {
                 <div className="sim-chip">打球速度: <strong>{safeData?.safeEv ?? 0}</strong> km/h</div>
                 <div className="sim-chip">打球角度: <strong>{safeData?.safeLa ?? 0}</strong>°</div>
                 <div className="sim-chip">方向角: <strong>{safeData?.safeSpray ?? 45}</strong>°</div>
-                <div className="sim-chip">打球方向: <strong>{safeData?.safeFieldSide?.label ?? '中堅'}</strong></div>
+                <div className="sim-chip">打球方向: <strong>{safeData?.displayFieldSideLabel ?? '中堅'}</strong></div>
                 <div className="sim-chip">推定飛距離: <strong>{safeData?.safeDist ?? 0}</strong> m</div>
-                <div className="sim-chip">着弾: <strong>{safeData?.safeZone ?? '不明'}</strong></div>
+                <div className="sim-chip">着弾: <strong>{safeData?.displayZoneLabel ?? '不明'}</strong></div>
               </div>
 
               {safeData ? (
