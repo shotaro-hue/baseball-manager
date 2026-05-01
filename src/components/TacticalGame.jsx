@@ -312,7 +312,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
                   <span>{RLABEL[e.result]||e.result}</span>
                   <PitchBadge pitchType={e.pitchType} zone={e.zone} />
                   {e.strategy&&<span style={{fontSize:9,color:"#a78bfa",marginLeft:4}}>[{e.strategy}]</span>}
-                  {e.ev>0&&<span style={{fontFamily:"monospace",fontSize:9,color:"#1e2d3d",marginLeft:4}}>EV:{e.ev} LA:{e.la}° {e.dist>0&&`${e.dist}m`}</span>}
+                  {e.ev>0&&<span style={{fontFamily:"monospace",fontSize:9,color:"#1e2d3d",marginLeft:4}}>EV:{Math.round((Number(e.ev)||0)*10)/10}km/h LA:{e.la}° {e.dist>0&&`${e.dist}m`}</span>}
                   {Number.isFinite(Number(e.ev)) && Number(e.ev) > 0 && <button onClick={()=>open3DReplaySafely(e)} style={{fontSize:9,marginLeft:4,padding:'1px 4px',cursor:'pointer'}}>3D再生</button>}
                   {e.rbi>0&&<span style={{color:"#f5c842",marginLeft:5,fontSize:11}}>+{e.rbi}点！</span>}
                 </div>

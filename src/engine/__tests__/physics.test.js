@@ -4,16 +4,16 @@ import { lookupBallDist } from '../physicsLookup';
 
 describe('physics flight simulation', () => {
   it('increases distance as EV increases with same LA', () => {
-    const low = calcBallDist(85, 25);
-    const mid = calcBallDist(95, 25);
-    const high = calcBallDist(105, 25);
+    const low = calcBallDist(137, 25);
+    const mid = calcBallDist(153, 25);
+    const high = calcBallDist(169, 25);
 
     expect(low).toBeLessThan(mid);
     expect(mid).toBeLessThan(high);
   });
 
   it('has plausible distance ordering for typical launch angles', () => {
-    const ev = 100;
+    const ev = 161;
     const d0 = calcBallDist(ev, 0);
     const d10 = calcBallDist(ev, 10);
     const d25 = calcBallDist(ev, 25);
@@ -26,7 +26,7 @@ describe('physics flight simulation', () => {
   });
 
   it('trajectory ends at ground level', () => {
-    const traj = calcTrajectory(100, 28);
+    const traj = calcTrajectory(161, 28);
     const last = traj[traj.length - 1];
 
     expect(last[1]).toBe(0);
@@ -34,27 +34,27 @@ describe('physics flight simulation', () => {
   });
 
   it('is deterministic for same input', () => {
-    const a = calcTrajectory(97, 31);
-    const b = calcTrajectory(97, 31);
+    const a = calcTrajectory(156, 31);
+    const b = calcTrajectory(156, 31);
 
     expect(a).toEqual(b);
   });
 
-  it('dragCoeff calibration: EV=100mph LA=25° lands 112-138m', () => {
-    const d = calcBallDist(100, 25);
+  it('dragCoeff calibration: EV=161km/h LA=25° lands 112-138m', () => {
+    const d = calcBallDist(161, 25);
     expect(d).toBeGreaterThanOrEqual(112);
     expect(d).toBeLessThanOrEqual(138);
   });
 
   it('HR-range EV/LA clears typical NPB CF fence', () => {
-    // power=80+ 相当の EV=100mph, LA=30° で CF フェンス (120m) を越える
-    // dragCoeff=0.0036 では EV=92 は 111m 止まりのため EV=100 を基準とする
-    const d = calcBallDist(100, 30);
+    // power=80+ 相当の EV=161km/h, LA=30° で CF フェンス (120m) を越える
+    // dragCoeff=0.0036 では EV=148 は 111m 止まりのため EV=100 を基準とする
+    const d = calcBallDist(161, 30);
     expect(d).toBeGreaterThanOrEqual(120);
   });
 
   it('groundball LA does not clear fence', () => {
-    const d = calcBallDist(95, 5);
+    const d = calcBallDist(153, 5);
     expect(d).toBeLessThan(90);
   });
 
@@ -63,21 +63,21 @@ describe('physics flight simulation', () => {
 
 describe('lookupBallDist', () => {
   it('matches calcBallDist within ±3m for mid-range inputs', () => {
-    const pairs = [[100, 25], [85, 10], [110, 30], [72, 5], [95, 0]];
+    const pairs = [[161, 25], [137, 10], [177, 30], [116, 5], [153, 0]];
     for (const [ev, la] of pairs) {
       expect(Math.abs(lookupBallDist(ev, la) - calcBallDist(ev, la))).toBeLessThanOrEqual(3);
     }
   });
 
   it('clamps out-of-range EV/LA gracefully', () => {
-    expect(() => lookupBallDist(50, 25)).not.toThrow();
-    expect(() => lookupBallDist(120, 25)).not.toThrow();
-    expect(() => lookupBallDist(100, -20)).not.toThrow();
-    expect(() => lookupBallDist(100, 60)).not.toThrow();
+    expect(() => lookupBallDist(80, 25)).not.toThrow();
+    expect(() => lookupBallDist(200, 25)).not.toThrow();
+    expect(() => lookupBallDist(161, -20)).not.toThrow();
+    expect(() => lookupBallDist(161, 60)).not.toThrow();
   });
 
   it('HR-range returns ≥ typical NPB CF fence (122m)', () => {
-    expect(lookupBallDist(108, 30)).toBeGreaterThanOrEqual(122);
+    expect(lookupBallDist(174, 30)).toBeGreaterThanOrEqual(122);
   });
 });
 
