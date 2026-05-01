@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { calcBallDist, calcTrajectory } from '../physics';
+import { lookupBallDist } from '../physicsLookup';
 
 describe('physics flight simulation', () => {
   it('increases distance as EV increases with same LA', () => {
@@ -56,4 +57,25 @@ describe('physics flight simulation', () => {
     expect(d).toBeLessThan(90);
   });
 
+});
+
+
+describe('lookupBallDist', () => {
+  it('matches calcBallDist within ±3m for mid-range inputs', () => {
+    const pairs = [[100, 25], [85, 10], [110, 30], [72, 5], [95, 0]];
+    for (const [ev, la] of pairs) {
+      expect(Math.abs(lookupBallDist(ev, la) - calcBallDist(ev, la))).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it('clamps out-of-range EV/LA gracefully', () => {
+    expect(() => lookupBallDist(50, 25)).not.toThrow();
+    expect(() => lookupBallDist(120, 25)).not.toThrow();
+    expect(() => lookupBallDist(100, -20)).not.toThrow();
+    expect(() => lookupBallDist(100, 60)).not.toThrow();
+  });
+
+  it('HR-range returns ≥ typical NPB CF fence (122m)', () => {
+    expect(lookupBallDist(108, 30)).toBeGreaterThanOrEqual(122);
+  });
 });
