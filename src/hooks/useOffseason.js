@@ -12,6 +12,8 @@ import {
   TEAM_DEFS, OWNER_TRUST_BUDGET_LOW, OWNER_TRUST_BUDGET_HIGH,
   OWNER_TRUST_FACTOR_LOW, OWNER_TRUST_FACTOR_HIGH, POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD,
   FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX, MIN_SALARY_SHIHAKA, ACCEPT_THRESHOLD,
+  CAMP_COND_VARIATION, CAMP_BREAKOUT_COUNT, CAMP_BREAKOUT_COND_BOOST,
+  CAMP_STRUGGLE_COUNT, CAMP_STRUGGLE_COND_HIT, CAMP_MIN_CONDITION,
 } from '../constants';
 
 export function useOffseason(gs) {
@@ -37,6 +39,7 @@ export function useOffseason(gs) {
 
   const [developmentSummary, setDevelopmentSummary] = useState(null);
   const [newSeasonInfo, setNewSeasonInfo] = useState(null);
+  const [springTrainingData, setSpringTrainingData] = useState(null);
   const [draftPool, setDraftPool] = useState(null);
   const [draftResult, setDraftResult] = useState(null);
   const [draftAllocation, setDraftAllocation] = useState({pitcher:50,batter:50});
@@ -80,6 +83,70 @@ export function useOffseason(gs) {
     setScreen("new_season");
   };
 
+  const generateSpringTraining = (currentTeams) => {
+    const myT = currentTeams.find(t => t.id === myId);
+    if (!myT) return null;
+    const conditionDeltas = {};
+    currentTeams.forEach(t => {
+      [...t.players, ...(t.farm || [])].forEach(p => {
+        if (p.育成) return;
+        conditionDeltas[p.id] = rng(-CAMP_COND_VARIATION, CAMP_COND_VARIATION);
+      });
+    });
+    // 台頭選手: ファームの若手・高potential
+    const breakoutCandidates = (myT.farm || [])
+      .filter(p => !p.育成 && p.age <= 26 && (p.potential || 50) >= 60)
+      .sort((a, b) => (b.potential || 0) - (a.potential || 0));
+    const breakoutPlayers = breakoutCandidates.slice(0, CAMP_BREAKOUT_COUNT);
+    breakoutPlayers.forEach(p => {
+      conditionDeltas[p.id] = (conditionDeltas[p.id] || 0) + CAMP_BREAKOUT_COND_BOOST;
+    });
+    // 不調選手: 一軍の高齢選手
+    const struggleCandidates = myT.players
+      .filter(p => p.age >= 30)
+      .sort((a, b) => b.age - a.age);
+    const strugglePlayers = struggleCandidates.slice(0, CAMP_STRUGGLE_COUNT);
+    strugglePlayers.forEach(p => {
+      conditionDeltas[p.id] = (conditionDeltas[p.id] || 0) + CAMP_STRUGGLE_COND_HIT;
+    });
+    // 一軍選手のコンディション変動リスト（表示用）
+    const conditionChanges = myT.players.map(p => ({
+      id: p.id, name: p.name, pos: p.pos, isPitcher: p.isPitcher, age: p.age,
+      oldCond: p.condition || 100,
+      delta: conditionDeltas[p.id] || 0,
+      newCond: clamp((p.condition || 100) + (conditionDeltas[p.id] || 0), CAMP_MIN_CONDITION, 100),
+      stats: p.stats,
+      pitching: p.pitching,
+      batting: p.batting,
+    }));
+    // キャンプイベント
+    const campEvents = [];
+    breakoutPlayers.forEach(p => {
+      campEvents.push({ type: "breakout", playerName: p.name, pos: p.pos, age: p.age, delta: conditionDeltas[p.id] || 0 });
+    });
+    strugglePlayers.forEach(p => {
+      campEvents.push({ type: "struggle", playerName: p.name, pos: p.pos, age: p.age, delta: conditionDeltas[p.id] || 0 });
+    });
+    // ポジション争い（同一ポジションに複数選手）
+    const posGroups = {};
+    myT.players.forEach(p => {
+      if (!posGroups[p.pos]) posGroups[p.pos] = [];
+      posGroups[p.pos].push({
+        ...p,
+        condChange: conditionDeltas[p.id] || 0,
+        newCond: clamp((p.condition || 100) + (conditionDeltas[p.id] || 0), CAMP_MIN_CONDITION, 100),
+      });
+    });
+    const rosterBattles = Object.entries(posGroups)
+      .filter(([, ps]) => ps.length >= 2)
+      .map(([pos, competitors]) => ({ pos, competitors }));
+    rosterBattles.slice(0, 2).forEach(({ pos, competitors }) => {
+      const sorted = [...competitors].sort((a, b) => b.condChange - a.condChange);
+      campEvents.push({ type: "battle", pos, winner: sorted[0].name, loser: sorted[1].name, delta: sorted[0].condChange });
+    });
+    return { conditionDeltas, conditionChanges, campEvents, rosterBattles };
+  };
+
   const handleDraftComplete = (pl, dr) => {
     const sameTeam=(a,b)=>Number(a)===Number(b);
     const picksFor=teamId=>[
@@ -87,12 +154,34 @@ export function useOffseason(gs) {
       ...pl.filter(p=>sameTeam(dr[p.id],teamId)),
     ];
     const myPicks=picksFor(myId);
-    setTeams(prev=>prev.map(t=>{
+    const updatedTeams = teams.map(t => {
       const picks=picksFor(t.id);
       if(!picks.length) return t;
       return{...t,farm:[...t.farm,...picks.map(p=>({...p,育成:false,salary:Math.max(MIN_SALARY_SHIHAKA,p.salary),contractYears:1,contractYearsLeft:1,ikuseiYears:0}))]};
-    }));
+    });
+    setTeams(updatedTeams);
     setNewSeasonInfo(prev=>({...(prev||{}),draftCount:myPicks.length,draftNames:myPicks.slice(0,3).map(p=>p.name)}));
+    const stData = generateSpringTraining(updatedTeams);
+    setSpringTrainingData(stData);
+    setScreen("spring_training");
+  };
+
+  const handleSpringTrainingComplete = () => {
+    if (springTrainingData?.conditionDeltas) {
+      const deltas = springTrainingData.conditionDeltas;
+      setTeams(prev => prev.map(t => ({
+        ...t,
+        players: t.players.map(p => ({
+          ...p,
+          condition: clamp((p.condition || 100) + (deltas[p.id] || 0), CAMP_MIN_CONDITION, 100),
+        })),
+        farm: (t.farm || []).map(p => ({
+          ...p,
+          condition: p.育成 ? (p.condition || 100) : clamp((p.condition || 100) + (deltas[p.id] || 0), CAMP_MIN_CONDITION, 100),
+        })),
+      })));
+    }
+    setSpringTrainingData(null);
     handleNextYear();
   };
 
@@ -417,12 +506,14 @@ export function useOffseason(gs) {
   return {
     developmentSummary, setDevelopmentSummary,
     newSeasonInfo, setNewSeasonInfo,
+    springTrainingData,
     draftPool, setDraftPool,
     draftResult, setDraftResult,
     draftAllocation, setDraftAllocation,
     waiverClaimResults,
     handleNextYear,
     handleDraftComplete,
+    handleSpringTrainingComplete,
     handleContractOffer,
     handleTrade,
     acceptCpuOffer,

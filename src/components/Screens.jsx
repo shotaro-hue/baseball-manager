@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { TEAM_DEFS } from '../constants';
-import { fmtSal, fmtM } from '../utils';
+import { fmtSal, fmtM, fmtAvg } from '../utils';
 import { calcRetireWill } from '../engine/player';
+import { OV, CondBadge, HandBadge } from './ui';
 
 
 
@@ -769,6 +770,229 @@ export function NewSeasonScreen({ year, info, developmentSummary, ownerGoal, onG
         >
           ⚾ 開幕！
         </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────
+   SPRING TRAINING SCREEN
+───────────────────────────────────────────────── */
+
+function campEventIcon(type) {
+  if (type === "breakout") return "🔥";
+  if (type === "struggle") return "❄️";
+  if (type === "battle") return "⚔️";
+  return "📋";
+}
+
+function campEventText(ev) {
+  if (ev.type === "breakout")
+    return `${ev.playerName}（${ev.pos}・${ev.age}歳）がキャンプで台頭、コンディション+${ev.delta}`;
+  if (ev.type === "struggle")
+    return `${ev.playerName}（${ev.pos}・${ev.age}歳）が調整遅れ、コンディション${ev.delta}`;
+  if (ev.type === "battle")
+    return `${ev.pos}争いは${ev.winner}が優位に。${ev.loser}は競争を続ける`;
+  return "";
+}
+
+function playerOv(p) {
+  if (!p) return 0;
+  if (p.isPitcher) return Math.round(((p.pitching?.velocity || 50) + (p.pitching?.control || 50) + (p.pitching?.breaking || 50)) / 3);
+  return Math.round(((p.batting?.contact || 50) + (p.batting?.power || 50) + (p.batting?.eye || 50) + (p.batting?.speed || 50)) / 4);
+}
+
+function CondBar({ old: oldC, next: newC }) {
+  const delta = newC - oldC;
+  const color = delta > 0 ? "#34d399" : delta < 0 ? "#f87171" : "#94a3b8";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11 }}>
+      <span style={{ color: "#94a3b8", minWidth: 24, textAlign: "right" }}>{oldC}</span>
+      <span style={{ color: "#374151" }}>→</span>
+      <span style={{ color, fontWeight: 700, minWidth: 24 }}>{newC}</span>
+      {delta !== 0 && <span style={{ color, fontSize: 10 }}>({delta > 0 ? "+" : ""}{delta})</span>}
+    </div>
+  );
+}
+
+function PlayerCompareCard({ p, highlightWinner }) {
+  const ov = playerOv(p);
+  const s = p.stats || {};
+  const bg = highlightWinner ? "rgba(52,211,153,.06)" : "rgba(255,255,255,.03)";
+  const border = highlightWinner ? "1px solid rgba(52,211,153,.25)" : "1px solid rgba(255,255,255,.06)";
+  return (
+    <div style={{ flex: 1, borderRadius: 8, padding: "10px 12px", background: bg, border }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 13, color: "#e0d4bf" }}>
+            {p.name}
+            {p.isPitcher && <HandBadge p={p} />}
+          </div>
+          <div style={{ fontSize: 10, color: "#64748b" }}>{p.age}歳</div>
+        </div>
+        <OV v={ov} />
+      </div>
+      <div style={{ marginBottom: 6 }}>
+        <CondBadge p={p} />
+        <span style={{ fontSize: 10, color: "#94a3b8", marginLeft: 6 }}>
+          → <span style={{ color: p.condChange >= 0 ? "#34d399" : "#f87171", fontWeight: 700 }}>{p.newCond}</span>
+          {p.condChange !== 0 && <span style={{ color: p.condChange > 0 ? "#34d399" : "#f87171" }}> ({p.condChange > 0 ? "+" : ""}{p.condChange})</span>}
+        </span>
+      </div>
+      {p.isPitcher ? (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4, fontSize: 10, color: "#94a3b8" }}>
+          <div>W <span style={{ color: "#e0d4bf" }}>{s.W ?? 0}</span></div>
+          <div>防御率 <span style={{ color: "#e0d4bf" }}>{s.IP ? ((s.ER ?? 0) / (s.IP / 9)).toFixed(2) : "-.--"}</span></div>
+          <div>K <span style={{ color: "#e0d4bf" }}>{s.Kp ?? 0}</span></div>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4, fontSize: 10, color: "#94a3b8" }}>
+          <div>打率 <span style={{ color: "#e0d4bf" }}>{fmtAvg(s.AB ? s.H / s.AB : 0)}</span></div>
+          <div>HR <span style={{ color: "#e0d4bf" }}>{s.HR ?? 0}</span></div>
+          <div>打点 <span style={{ color: "#e0d4bf" }}>{s.RBI ?? 0}</span></div>
+        </div>
+      )}
+      {highlightWinner && <div style={{ fontSize: 9, color: "#34d399", marginTop: 4 }}>◎ 開幕優勢</div>}
+    </div>
+  );
+}
+
+export function SpringTrainingScreen({ year, myTeam, springData, onComplete }) {
+  const [tab, setTab] = useState("report");
+  const { campEvents = [], conditionChanges = [], rosterBattles = [] } = springData || {};
+
+  const condSorted = [...conditionChanges].sort((a, b) => b.delta - a.delta);
+  const improved = condSorted.filter(c => c.delta > 0);
+  const declined = condSorted.filter(c => c.delta < 0);
+
+  return (
+    <div className="app">
+      <div style={{ maxWidth: 700, margin: "0 auto", padding: "16px 12px" }}>
+        {/* ヘッダー */}
+        <div style={{ textAlign: "center", marginBottom: 14 }}>
+          <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: 36, color: "#34d399", letterSpacing: ".05em" }}>
+            ⚾ {year}年 スプリングトレーニング
+          </div>
+          <div style={{ fontSize: 11, color: "#374151" }}>{myTeam?.name} — キャンプ最終報告</div>
+        </div>
+
+        {/* タブ */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          {[["report", "📋 キャンプレポート"], ["cond", "❤️ コンディション"], ["compare", "⚔️ 選手比較"]].map(([k, l]) => (
+            <button key={k} className={"bsm " + (tab === k ? "bgb" : "bga")} style={{ flex: 1, padding: "7px 0", fontSize: 11 }} onClick={() => setTab(k)}>
+              {l}
+            </button>
+          ))}
+        </div>
+
+        {/* キャンプレポートタブ */}
+        {tab === "report" && (
+          <>
+            <div className="card" style={{ marginBottom: 10 }}>
+              <div className="card-h">📅 キャンプ期間終了</div>
+              <p style={{ color: "#94a3b8", fontSize: 12, margin: "4px 0" }}>
+                全選手がキャンプを終え、開幕ロースターが固まりつつある。
+                チームの状態を確認して最終的な編成を整えよう。
+              </p>
+            </div>
+            {campEvents.length === 0 && (
+              <div className="card"><div style={{ color: "#64748b", fontSize: 12 }}>特筆すべきイベントなし</div></div>
+            )}
+            {campEvents.map((ev, i) => (
+              <div key={i} className="card" style={{
+                marginBottom: 8,
+                background: ev.type === "breakout" ? "rgba(52,211,153,.05)" : ev.type === "struggle" ? "rgba(248,113,113,.05)" : "rgba(96,165,250,.05)",
+                border: `1px solid ${ev.type === "breakout" ? "rgba(52,211,153,.2)" : ev.type === "struggle" ? "rgba(248,113,113,.2)" : "rgba(96,165,250,.2)"}`,
+              }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <span style={{ fontSize: 20 }}>{campEventIcon(ev.type)}</span>
+                  <div>
+                    <div style={{ fontSize: 12, color: "#e0d4bf", lineHeight: 1.6 }}>{campEventText(ev)}</div>
+                    <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>
+                      {ev.type === "breakout" ? "キャンプ台頭" : ev.type === "struggle" ? "調整遅れ" : "ポジション競争"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* コンディションタブ */}
+        {tab === "cond" && (
+          <>
+            {improved.length > 0 && (
+              <div className="card" style={{ marginBottom: 10, background: "rgba(52,211,153,.04)", border: "1px solid rgba(52,211,153,.15)" }}>
+                <div className="card-h" style={{ color: "#34d399" }}>↑ 状態上昇</div>
+                {improved.map(c => (
+                  <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: "1px solid rgba(255,255,255,.04)" }}>
+                    <div style={{ fontSize: 12 }}>
+                      <span style={{ color: "#e0d4bf", fontWeight: 600 }}>{c.name}</span>
+                      <span style={{ color: "#64748b", fontSize: 10, marginLeft: 6 }}>{c.pos}・{c.age}歳</span>
+                    </div>
+                    <CondBar old={c.oldCond} next={c.newCond} />
+                  </div>
+                ))}
+              </div>
+            )}
+            {declined.length > 0 && (
+              <div className="card" style={{ marginBottom: 10, background: "rgba(248,113,113,.04)", border: "1px solid rgba(248,113,113,.15)" }}>
+                <div className="card-h" style={{ color: "#f87171" }}>↓ 状態低下</div>
+                {declined.map(c => (
+                  <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: "1px solid rgba(255,255,255,.04)" }}>
+                    <div style={{ fontSize: 12 }}>
+                      <span style={{ color: "#e0d4bf", fontWeight: 600 }}>{c.name}</span>
+                      <span style={{ color: "#64748b", fontSize: 10, marginLeft: 6 }}>{c.pos}・{c.age}歳</span>
+                    </div>
+                    <CondBar old={c.oldCond} next={c.newCond} />
+                  </div>
+                ))}
+              </div>
+            )}
+            {improved.length === 0 && declined.length === 0 && (
+              <div className="card"><div style={{ color: "#64748b", fontSize: 12 }}>コンディション変動なし</div></div>
+            )}
+          </>
+        )}
+
+        {/* 選手比較タブ */}
+        {tab === "compare" && (
+          <>
+            {rosterBattles.length === 0 && (
+              <div className="card"><div style={{ color: "#64748b", fontSize: 12 }}>ポジション競争なし（各ポジション1名）</div></div>
+            )}
+            {rosterBattles.map(({ pos, competitors }) => {
+              const sorted = [...competitors].sort((a, b) => b.newCond - a.newCond);
+              return (
+                <div key={pos} className="card" style={{ marginBottom: 10 }}>
+                  <div className="card-h">{pos} 争い</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {sorted.slice(0, 3).map((p, i) => (
+                      <PlayerCompareCard key={p.id} p={p} highlightWinner={i === 0} />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        )}
+
+        {/* キャンプ終了ボタン */}
+        <button
+          className="btn btn-gold"
+          style={{ width: "100%", padding: "16px 0", fontSize: 16, fontWeight: 700, marginTop: 12, letterSpacing: ".1em" }}
+          onClick={onComplete}
+        >
+          ⚾ キャンプ終了・開幕へ
+        </button>
+        <div style={{ textAlign: "center", marginTop: 6 }}>
+          <button
+            style={{ background: "none", border: "none", color: "#64748b", fontSize: 11, cursor: "pointer", padding: "4px 8px" }}
+            onClick={onComplete}
+          >
+            スキップして開幕
+          </button>
+        </div>
       </div>
     </div>
   );
