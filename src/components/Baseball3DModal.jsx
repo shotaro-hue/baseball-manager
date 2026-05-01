@@ -15,13 +15,22 @@ function sanitizeNumber(value, fallback = 0) {
   return Number.isFinite(num) ? num : fallback;
 }
 
-function validateReplayEvent(event) {
-  if (!event || typeof event !== 'object') return { ok: false, reason: 'eventが未定義です' };
-  const requiredKeys = ['type', 'ev', 'la'];
-  for (const key of requiredKeys) {
-    if (!(key in event)) return { ok: false, reason: `event.${key} が不足しています` };
-  }
-  return { ok: true, reason: '' };
+function validate3DReplayEvent(event) {
+  // ⚠️ セキュリティ: 表示前に入力値を検証し、無効値は必ず遮断する
+  if (!event || typeof event !== 'object' || Array.isArray(event)) return { ok: false, reason: 'eventがオブジェクトではありません', normalized: null };
+  const ev = Number(event.ev);
+  const la = Number(event.la);
+  if (!Number.isFinite(ev) || !Number.isFinite(la)) return { ok: false, reason: 'event.ev または event.la が有限数ではありません', normalized: null };
+  return {
+    ok: true,
+    reason: '',
+    normalized: {
+      ...event,
+      ev,
+      la,
+      type: event.type || event.result || 'batted_ball',
+    },
+  };
 }
 
 function StadiumGeometry({ stadium }) {
@@ -111,15 +120,16 @@ function BallTrajectory({ ev, la, sprayAngle }) {
 export default function Baseball3DModal({ event, stadium, onClose }) {
   const closeButtonRef = useRef(null);
   const [errorMessage, setErrorMessage] = useState('');
-  const validation = useMemo(() => validateReplayEvent(event), [event]);
+  const validation = useMemo(() => validate3DReplayEvent(event), [event]);
 
   const safeData = useMemo(() => {
     try {
       if (!validation.ok) return null;
-      const safeEv = sanitizeNumber(event.ev);
-      const safeLa = sanitizeNumber(event.la);
-      const safeSpray = sanitizeNumber(event.sprayAngle, 45);
-      const safeDist = sanitizeNumber(event.dist);
+      const normalizedEvent = validation.normalized;
+      const safeEv = sanitizeNumber(normalizedEvent.ev);
+      const safeLa = sanitizeNumber(normalizedEvent.la);
+      const safeSpray = sanitizeNumber(normalizedEvent.sprayAngle, 45);
+      const safeDist = sanitizeNumber(normalizedEvent.dist);
       const safeZone = calcLandingZone(safeDist, safeSpray, stadium ?? {});
       return { safeEv, safeLa, safeSpray, safeDist, safeZone };
     } catch (_) {
