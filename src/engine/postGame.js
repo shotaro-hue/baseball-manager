@@ -182,6 +182,8 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won) {
     const allMyEvents = log.filter((e) => e.scorer === isMyTeam && e.batId === p.id && e.result && e.result !== "change");
     if (!allMyEvents.length && !pm) return p;
     const s = { ...emptyStats(), ...p.stats }; // STEP3安全弁: stats未初期化対策
+    const baseSprayPoints = Array.isArray(s.sprayPoints) ? s.sprayPoints : [];
+    const newSprayPoints = [];
 
     allMyEvents.forEach((e) => {
       if (e.isStolenBase) {
@@ -216,6 +218,10 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won) {
         if (battedType === 'ground') s.groundBatted++;
         else if (battedType === 'line') s.lineBatted++;
         else if (battedType === 'fly') s.flyBatted++;
+        // ⚠️ セキュリティ: ログ由来値は有限数に検証し、安全な範囲へ丸めて保持する
+        const safeDist = Number.isFinite(e.dist) ? Math.max(0, Math.min(220, Number(e.dist))) : 0;
+        const safeSpray = Number.isFinite(e.sprayAngle) ? Math.max(0, Math.min(90, Number(e.sprayAngle))) : 45;
+        newSprayPoints.push({ dist: safeDist, sprayAngle: safeSpray, result: String(e.result || 'out') });
       }
       s.RBI += (e.rbi || 0);
       if (e.ev > 0) { s.evSum += e.ev; s.evN++; }
@@ -234,6 +240,8 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won) {
       s.HBPp += pm.HBPp; s.HRp += pm.HRp; s.Hp += pm.Hp;
       s.ER += Math.round(pm.ER);
     }
+    const MAX_SPRAY_POINTS = 120;
+    s.sprayPoints = [...baseSprayPoints, ...newSprayPoints].slice(-MAX_SPRAY_POINTS);
     return { ...p, stats: s };
   });
 

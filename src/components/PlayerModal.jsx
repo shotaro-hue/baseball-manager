@@ -35,6 +35,113 @@ function AbilityBar({label, value, color="#60a5fa"}){
   );
 }
 
+function sanitizeSprayPoint(point) {
+  if (!point || typeof point !== 'object' || Array.isArray(point)) return null;
+  const rawDist = Number(point.dist);
+  const rawSpray = Number(point.sprayAngle);
+  if (!Number.isFinite(rawDist) || !Number.isFinite(rawSpray)) return null;
+  return {
+    dist: Math.min(220, Math.max(0, rawDist)),
+    sprayAngle: Math.min(90, Math.max(0, rawSpray)),
+    result: String(point.result || 'out'),
+  };
+}
+
+function generateSyntheticSprayPoints(leftRatio, centerRatio, rightRatio, sampleSize) {
+  const safeLeft = Math.min(1, Math.max(0, Number.isFinite(Number(leftRatio)) ? Number(leftRatio) : 0));
+  const safeCenter = Math.min(1, Math.max(0, Number.isFinite(Number(centerRatio)) ? Number(centerRatio) : 0));
+  const safeRight = Math.min(1, Math.max(0, Number.isFinite(Number(rightRatio)) ? Number(rightRatio) : 0));
+  const totalRatio = safeLeft + safeCenter + safeRight;
+  if (totalRatio <= 0) return [];
+
+  const totalPoints = Math.min(120, Math.max(12, Number.isFinite(Number(sampleSize)) ? Math.round(sampleSize) : 36));
+  const normalized = {
+    left: safeLeft / totalRatio,
+    center: safeCenter / totalRatio,
+    right: safeRight / totalRatio,
+  };
+  const leftCount = Math.round(totalPoints * normalized.left);
+  const centerCount = Math.round(totalPoints * normalized.center);
+  const rightCount = Math.max(0, totalPoints - leftCount - centerCount);
+
+  const buildPoint = (segment, index, count) => {
+    const t = (index + 1) / (count + 1);
+    const angleBand = segment === 'left' ? [2, 28] : segment === 'right' ? [62, 88] : [32, 58];
+    const distanceBand = [25, 205];
+    const angle = angleBand[0] + (angleBand[1] - angleBand[0]) * t;
+    const dist = distanceBand[0] + (distanceBand[1] - distanceBand[0]) * ((index * 37) % 100) / 100;
+    return { sprayAngle: angle, dist, result: 'out' };
+  };
+
+  return [
+    ...Array.from({ length: leftCount }, (_, i) => buildPoint('left', i, leftCount)),
+    ...Array.from({ length: centerCount }, (_, i) => buildPoint('center', i, centerCount)),
+    ...Array.from({ length: rightCount }, (_, i) => buildPoint('right', i, rightCount)),
+  ];
+}
+
+function SprayDistributionChart({ sprayPoints, leftRatio, centerRatio, rightRatio, sampleSize }) {
+  const safePoints = Array.isArray(sprayPoints)
+    ? sprayPoints.map(sanitizeSprayPoint).filter(Boolean)
+    : [];
+  const syntheticPoints = safePoints.length > 0
+    ? []
+    : generateSyntheticSprayPoints(leftRatio, centerRatio, rightRatio, sampleSize).map(sanitizeSprayPoint).filter(Boolean);
+  const pointsForPlot = safePoints.length > 0 ? safePoints : syntheticPoints;
+  const hasData = pointsForPlot.length > 0;
+  const plottedPoints = pointsForPlot.map((point, idx) => {
+    // 角度 0~90 を左翼〜右翼方向にマップ【＝座標変換】
+    const angleRad = ((point.sprayAngle - 45) * Math.PI) / 180;
+    const radius = (point.dist / 220) * 106;
+    const cx = 130 + Math.sin(angleRad) * radius;
+    const cy = 140 - Math.cos(angleRad) * radius;
+    const isHomeRun = point.result === 'hr';
+    return {
+      key: `spray-pt-${idx}`,
+      cx: Math.max(12, Math.min(248, cx)),
+      cy: Math.max(12, Math.min(146, cy)),
+      color: isHomeRun ? '#f87171' : '#f8fafc',
+      opacity: isHomeRun ? 0.95 : 0.78,
+      radius: isHomeRun ? 2.4 : 1.9,
+    };
+  });
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ fontSize: 9, color: "#64748b", marginBottom: 4 }}>
+        着弾分布図【＝外野方向ごとの打球の偏りを図で可視化】
+      </div>
+      <svg viewBox="0 0 260 150" style={{ width: "100%", display: "block", borderRadius: 8, background: "rgba(12,122,62,.15)", border: "1px solid rgba(255,255,255,.08)" }}>
+        <line x1="130" y1="140" x2="16" y2="26" stroke="rgba(255,255,255,.4)" strokeWidth="1.2" />
+        <line x1="130" y1="140" x2="244" y2="26" stroke="rgba(255,255,255,.4)" strokeWidth="1.2" />
+        <path d="M 36 122 Q 130 18 224 122" fill="none" stroke="rgba(148,163,184,.7)" strokeWidth="2" />
+        <path d="M 58 118 Q 130 38 202 118" fill="none" stroke="rgba(148,163,184,.35)" strokeWidth="1.2" />
+        <line x1="130" y1="140" x2="130" y2="22" stroke="rgba(255,255,255,.25)" strokeDasharray="3 3" strokeWidth="1" />
+        <text x="54" y="20" fontSize="9" fill="#e2e8f0" textAnchor="middle">左翼方向</text>
+        <text x="130" y="13" fontSize="9" fill="#fde68a" textAnchor="middle">中堅方向</text>
+        <text x="206" y="20" fontSize="9" fill="#e2e8f0" textAnchor="middle">右翼方向</text>
+
+        {plottedPoints.map((dot) => (
+          <circle
+            key={dot.key}
+            cx={dot.cx}
+            cy={dot.cy}
+            r={dot.radius}
+            fill={dot.color}
+            opacity={dot.opacity}
+          />
+        ))}
+
+        {!hasData && (
+          <text x="130" y="96" fontSize="10" fill="#cbd5e1" textAnchor="middle">
+            データ不足
+          </text>
+        )}
+      </svg>
+    </div>
+  );
+}
+
 // 守備適正ダイヤモンド
 const FIELD_POSITIONS = [
   { key:"捕手",   x:150, y:165, label:"C"  },
@@ -273,12 +380,19 @@ export function PlayerModal({player:p, teamName, isMyTeam, onSetConvertTarget, o
             {!p.isPitcher&&(
               <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}>
                 <div style={{fontSize:10,color:"#374151",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>打球傾向分析</div>
-                <StatRow label="引っ張り" value={sb.pullPct>0?`${(sb.pullPct*100).toFixed(1)}%`:"---"}/>
-                <StatRow label="センター" value={sb.centerPct>0?`${(sb.centerPct*100).toFixed(1)}%`:"---"}/>
-                <StatRow label="逆方向" value={sb.oppositePct>0?`${(sb.oppositePct*100).toFixed(1)}%`:"---"}/>
+                <StatRow label="左翼方向" value={sb.pullPct>0?`${(sb.pullPct*100).toFixed(1)}%`:"---"}/>
+                <StatRow label="中堅方向" value={sb.centerPct>0?`${(sb.centerPct*100).toFixed(1)}%`:"---"}/>
+                <StatRow label="右翼方向" value={sb.oppositePct>0?`${(sb.oppositePct*100).toFixed(1)}%`:"---"}/>
                 <StatRow label="ゴロ率" value={sb.gbPct>0?`${(sb.gbPct*100).toFixed(1)}%`:"---"}/>
                 <StatRow label="ライナー率" value={sb.ldPct>0?`${(sb.ldPct*100).toFixed(1)}%`:"---"}/>
                 <StatRow label="フライ率" value={sb.fbPct>0?`${(sb.fbPct*100).toFixed(1)}%`:"---"}/>
+                <SprayDistributionChart
+                  sprayPoints={p.stats?.sprayPoints}
+                  leftRatio={sb.pullPct}
+                  centerRatio={sb.centerPct}
+                  rightRatio={sb.oppositePct}
+                  sampleSize={p.stats?.evN}
+                />
               </div>
             )}
 
