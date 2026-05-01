@@ -27,6 +27,8 @@ export function saberBatter(s) {
   const wOBA = wOBA_d > 0 ? wOBA_n / wOBA_d : 0;
   const wRCp = Math.round(((wOBA - LG_WOBA) / WOBA_SCALE + 1) * 100);
   const WAR = r2(((wOBA - LG_WOBA) / WOBA_SCALE) * s.PA / 10);
+  const battedBallTotal = (s.groundBatted || 0) + (s.lineBatted || 0) + (s.flyBatted || 0);
+  const sprayTotal = (s.pullBatted || 0) + (s.centerBatted || 0) + (s.oppositeBatted || 0);
 
   return {
     AVG: r3(AVG), OBP: r3(OBP), SLG: r3(SLG), OPS: r2(OPS), ISO: r2(ISO),
@@ -34,6 +36,13 @@ export function saberBatter(s) {
     wOBA: r3(wOBA), wRCp, WAR,
     EVavg: s.evN > 0 ? r2(s.evSum / s.evN) : 0,
     LAavg: s.laN > 0 ? r2(s.laSum / s.laN) : 0,
+    hardHitPct: s.evN > 0 ? r3((s.hardHit || 0) / s.evN) : 0,
+    pullPct: sprayTotal > 0 ? r3((s.pullBatted || 0) / sprayTotal) : 0,
+    centerPct: sprayTotal > 0 ? r3((s.centerBatted || 0) / sprayTotal) : 0,
+    oppositePct: sprayTotal > 0 ? r3((s.oppositeBatted || 0) / sprayTotal) : 0,
+    gbPct: battedBallTotal > 0 ? r3((s.groundBatted || 0) / battedBallTotal) : 0,
+    ldPct: battedBallTotal > 0 ? r3((s.lineBatted || 0) / battedBallTotal) : 0,
+    fbPct: battedBallTotal > 0 ? r3((s.flyBatted || 0) / battedBallTotal) : 0,
   };
 }
 
