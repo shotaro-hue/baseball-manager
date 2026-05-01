@@ -17,6 +17,46 @@ const getFieldZone = (e) => {
   return 'CF';
 };
 
+const MAX_BATTED_BALL_EVENTS = 500;
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function normalizeBattedBallCoordinate(rawValue, fallbackValue = 0) {
+  if (!Number.isFinite(rawValue)) return fallbackValue;
+  // ⚠️ セキュリティ: ログ由来値は有限数を検証し、描画崩れ防止のため 0〜1 に正規化して保存する
+  return clamp01(Number(rawValue));
+}
+
+function mapHitTypeFromResult(result) {
+  if (result === 's') return 'single';
+  if (result === 'd') return 'double';
+  if (result === 't') return 'triple';
+  if (result === 'hr') return 'homeRun';
+  return 'out';
+}
+
+function buildBattedBallEvent(e, gameDay) {
+  if (!e || !e.batId || !Number.isFinite(e.ev) || e.ev <= 0) return null;
+
+  const safeSpray = Number.isFinite(e.sprayAngle) ? Math.max(0, Math.min(90, Number(e.sprayAngle))) : 45;
+  const safeDist = Number.isFinite(e.dist) ? Math.max(0, Math.min(220, Number(e.dist))) : 0;
+  const x = normalizeBattedBallCoordinate(safeSpray / 90, 0.5);
+  const y = normalizeBattedBallCoordinate(safeDist / 220, 0);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+
+  return {
+    playerId: e.batId,
+    gameDay: Number.isFinite(gameDay) ? Number(gameDay) : 0,
+    x,
+    y,
+    hitType: mapHitTypeFromResult(e.result),
+    exitVelo: Number(e.ev),
+    launchAngle: Number.isFinite(e.la) ? Number(e.la) : 0,
+  };
+}
+
 /**
  * 試合ログからボックススコアデータを計算する。
  * quickSimGame(homeTeam, awayTeam) の log を受け取り、
@@ -148,7 +188,7 @@ export function computeBoxScore(log, inningSummary, homeTeamPlayers, awayTeamPla
 ═══════════════════════════════════════════════ */
 
 // 試合ログから選手成績を反映
-export function applyGameStatsFromLog(players, log, isMyTeam, won) {
+export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0) {
   const myAtBats = log.filter((e) => e.scorer === isMyTeam && e.batId && e.result && e.result !== "change");
   const myPitchABs = log.filter((e) => e.scorer === !isMyTeam && e.pitcherId && e.result && e.result !== "change" && !e.isStolenBase);
 
@@ -183,7 +223,9 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won) {
     if (!allMyEvents.length && !pm) return p;
     const s = { ...emptyStats(), ...p.stats }; // STEP3安全弁: stats未初期化対策
     const baseSprayPoints = Array.isArray(s.sprayPoints) ? s.sprayPoints : [];
+    const baseBattedBallEvents = Array.isArray(s.battedBallEvents) ? s.battedBallEvents : [];
     const newSprayPoints = [];
+    const newBattedBallEvents = [];
 
     allMyEvents.forEach((e) => {
       if (e.isStolenBase) {
@@ -222,6 +264,8 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won) {
         const safeDist = Number.isFinite(e.dist) ? Math.max(0, Math.min(220, Number(e.dist))) : 0;
         const safeSpray = Number.isFinite(e.sprayAngle) ? Math.max(0, Math.min(90, Number(e.sprayAngle))) : 45;
         newSprayPoints.push({ dist: safeDist, sprayAngle: safeSpray, result: String(e.result || 'out') });
+        const event = buildBattedBallEvent(e, gameDay);
+        if (event) newBattedBallEvents.push(event);
       }
       s.RBI += (e.rbi || 0);
       if (e.ev > 0) { s.evSum += e.ev; s.evN++; }
@@ -242,6 +286,7 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won) {
     }
     const MAX_SPRAY_POINTS = 120;
     s.sprayPoints = [...baseSprayPoints, ...newSprayPoints].slice(-MAX_SPRAY_POINTS);
+    s.battedBallEvents = [...baseBattedBallEvents, ...newBattedBallEvents].slice(-MAX_BATTED_BALL_EVENTS);
     return { ...p, stats: s };
   });
 

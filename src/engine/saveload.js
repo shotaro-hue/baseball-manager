@@ -22,6 +22,11 @@ function rotateBk() {
 
 // ── 選手フィールドのマイグレーション ──────────────
 function migratePlayer(p) {
+  const migratedStats = {
+    ...(p.stats ?? {}),
+    sprayPoints: Array.isArray(p?.stats?.sprayPoints) ? p.stats.sprayPoints : [],
+    battedBallEvents: Array.isArray(p?.stats?.battedBallEvents) ? p.stats.battedBallEvents : [],
+  };
   return {
     ...p,
     entryAge:           p.entryAge           ?? p.age,
@@ -35,6 +40,7 @@ function migratePlayer(p) {
     recentPitchingDays: p.recentPitchingDays ?? [],
     careerLog:          p.careerLog          ?? [],
     peakAbilities:      p.peakAbilities      ?? null,
+    stats:              migratedStats,
     stats2:             p.stats2             ?? { PA:0, H:0, HR:0, W:0, IP:0, ER:0, K:0 },
     entryType:          p.entryType          ?? (p.isForeign ? '外国人' : (p.entryAge??p.age) <= 19 ? '高卒' : (p.entryAge??p.age) <= 22 ? '大卒' : '社会人'),
     daysOnActiveRoster: p.daysOnActiveRoster ?? (p.serviceYears ?? 0) * 120,
