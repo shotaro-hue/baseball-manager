@@ -16,6 +16,7 @@ export const emptyStats = () => ({
   SB: 0, CS: 0, R: 0, SF: 0, evSum: 0, evN: 0, laSum: 0, laN: 0,
   pullBatted: 0, centerBatted: 0, oppositeBatted: 0, hardHit: 0,
   groundBatted: 0, lineBatted: 0, flyBatted: 0,
+  sprayPoints: [], // 打球着弾点の簡易ログ（最新N件）
   FO_LF: 0, FO_CF: 0, FO_RF: 0, GO: 0, LO: 0,
   IP: 0, ER: 0, BBp: 0, HBPp: 0, Kp: 0, HRp: 0, Hp: 0, BF: 0, W: 0, L: 0, SV: 0, HLD: 0, QS: 0, BS: 0,
 });
