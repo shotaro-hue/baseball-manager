@@ -11,7 +11,7 @@ import { selectAllStars, runAllStarGame } from '../engine/allstar';
 import { getMyMatchup, getCpuMatchups } from '../engine/scheduleGen';
 import { saveGame } from '../engine/saveload';
 import { processCpuFaBids } from '../engine/contract';
-import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER, MAX_外国人_一軍, CPU_AUTO_MANAGE_INTERVAL, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX, FIELDING_POSITIONS, OPTIMAL_PITCHER_COUNT } from '../constants';
+import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER, MAX_外国人_一軍, CPU_AUTO_MANAGE_INTERVAL, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX, FIELDING_POSITIONS, OPTIMAL_PITCHER_COUNT, MIN_ACTIVE_CATCHERS } from '../constants';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 
 // 守備コーチボーナス: 怪我回復速度 UP
@@ -111,7 +111,10 @@ function cpuAutoManageTeam(team) {
     const batterOver = Math.max(0, players.filter(p => !p.isPitcher).length - TARGET_BATTERS);
     const demoted = new Set();
     const applyDemote = (candidates, limit) => {
+      // 捕手が MIN_ACTIVE_CATCHERS 名以下なら降格対象から除外
+      const activeCatcherCount = () => players.filter(p => !p.isPitcher && p.pos === '捕手' && !demoted.has(p.id)).length;
       [...candidates].sort((a, b) => effScore(a, false) - effScore(b, false)).slice(0, limit).forEach(p => {
+        if (!p.isPitcher && p.pos === '捕手' && activeCatcherCount() <= MIN_ACTIVE_CATCHERS) return;
         players = players.filter(q => q.id !== p.id);
         newFarm = [...newFarm, { ...p, registrationCooldownDays: REGISTRATION_COOLDOWN_DAYS }];
         demoted.add(p.id);
@@ -206,6 +209,29 @@ function cpuAutoManageTeam(team) {
         if (!weakRP) break;
         players = [...players.filter(p => p.id !== weakRP.id), sp];
         newFarm = [...newFarm.filter(p => p.id !== sp.id), { ...weakRP, registrationCooldownDays: REGISTRATION_COOLDOWN_DAYS }];
+      }
+    }
+  }
+
+  // ── 1.6 捕手最低 MIN_ACTIVE_CATCHERS 名確保 ──
+  // 一軍捕手が不足していたら farm から昇格。空き枠がなければ最弱の非捕手野手と入れ替え。
+  {
+    const activeCatchers = () => players.filter(p => !p.isPitcher && p.pos === '捕手' && (p.injuryDaysLeft ?? 0) === 0);
+    const farmCatchers = () => newFarm.filter(p => !p.isPitcher && p.pos === '捕手' && canPromote(p))
+      .sort((a, b) => effScore(b, true) - effScore(a, true));
+    while (activeCatchers().length < MIN_ACTIVE_CATCHERS) {
+      const fc = farmCatchers()[0];
+      if (!fc) break;
+      if (players.length < MAX_ROSTER) {
+        players = [...players, fc];
+        newFarm = newFarm.filter(p => p.id !== fc.id);
+      } else {
+        const weakBatter = players
+          .filter(p => !p.isPitcher && p.pos !== '捕手')
+          .sort((a, b) => effScore(a, false) - effScore(b, false))[0];
+        if (!weakBatter) break;
+        players = [...players.filter(p => p.id !== weakBatter.id), fc];
+        newFarm = [...newFarm.filter(p => p.id !== fc.id), { ...weakBatter, registrationCooldownDays: REGISTRATION_COOLDOWN_DAYS }];
       }
     }
   }

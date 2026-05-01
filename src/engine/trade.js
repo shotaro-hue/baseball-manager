@@ -1,4 +1,5 @@
 import { rng } from '../utils';
+import { MIN_TOTAL_BY_POS, MIN_ACTIVE_CATCHERS } from '../constants';
 
 /* ═══════════════════════════════════════════════
    TRADE SYSTEM
@@ -30,7 +31,7 @@ const MODE_WEIGHTS = {
 
 function getFrontOfficePlan(team) {
   const mode = FRONT_OFFICE_MODES.includes(team?.frontOfficePlan?.mode) ? team.frontOfficePlan.mode : 'neutral';
-  return { mode, confidence: team?.frontOfficePlan?.confidence ?? 0.5, updatedAtDay: team?.frontOfficePlan?.updatedAtDay ?? 0, reasons: team?.frontOfficePlan?.reasons || [], rebuildYears: team?.frontOfficePlan?.rebuildYears ?? 0 };
+  return { mode, confidence: team?.frontOfficePlan?.confidence ?? 0.5, updatedAtDay: team?.frontOfficePlan?.updatedAtDay ?? 0, reasons: team?.frontOfficePlan?.reasons || [], rebuildYears: team?.frontOfficePlan?.rebuildYears ?? 0, positionNeeds: team?.frontOfficePlan?.positionNeeds || [] };
 }
 
 export function getFrontOfficePlanPublic(team) {
@@ -67,12 +68,17 @@ function weightedPlayerValue(p, mode = 'neutral') {
 }
 
 export function analyzeTeamNeeds(team) {
+  const allPlayers = [...(team.players || []), ...(team.farm || [])];
   const pitchers = team.players.filter((p) => p.isPitcher);
   const starters = pitchers.filter((p) => p.subtype === '先発');
   const relievers = pitchers.filter((p) => p.subtype === '中継ぎ');
   const closers = pitchers.filter((p) => p.subtype === '抑え');
   const batters = team.players.filter((p) => !p.isPitcher);
-  const catchers = batters.filter((p) => p.pos === '捕手');
+
+  // ポジション別の合計人数（一軍+二軍）
+  const allBatters = allPlayers.filter((p) => !p.isPitcher);
+  const totalByPos = (pos) => allBatters.filter((p) => p.pos === pos).length;
+  const activeCatchers = batters.filter((p) => p.pos === '捕手').length;
 
   const avgV = pitchers.length
     ? pitchers.reduce((sum, p) => sum + (p.pitching?.velocity || 50), 0) / pitchers.length
@@ -89,18 +95,37 @@ export function analyzeTeamNeeds(team) {
     : 0;
 
   const needs = [];
+
+  // ── 投手ニーズ ──
   if (starters.length < 4) needs.push({ type: '先発投手が不足', score: 30 + (4 - starters.length) * 10, horizon: 'short' });
   if (primeStarters < 3) needs.push({ type: '先発ローテの主力層が薄い', score: 24 + (3 - primeStarters) * 8, horizon: 'mid' });
   if (youngStarters < 2) needs.push({ type: '将来の先発候補を育成したい', score: 20 + (2 - youngStarters) * 8, horizon: 'long' });
   if (closers.length === 0) needs.push({ type: '抑え不在', score: 25, horizon: 'short' });
   if (relievers.length < 3) needs.push({ type: '中継ぎ不足', score: 15 + (3 - relievers.length) * 5, horizon: 'short' });
   if (avgV < 60) needs.push({ type: '投手陣の球威強化', score: Math.round((60 - avgV) * 0.5), horizon: 'mid' });
-  if (catchers.length === 0) needs.push({ type: '捕手補強が急務', score: 28, horizon: 'short' });
+
+  // ── ポジション別最低人数チェック（一軍+二軍合計） ──
+  // 捕手: 一軍登録に最低 MIN_ACTIVE_CATCHERS 名、合計 MIN_TOTAL_BY_POS["捕手"] 名
+  const catcherTotal = totalByPos('捕手');
+  const catcherMin = MIN_TOTAL_BY_POS['捕手'];
+  if (activeCatchers < MIN_ACTIVE_CATCHERS) {
+    needs.push({ type: '捕手補強が急務', score: 35 + (MIN_ACTIVE_CATCHERS - activeCatchers) * 8, horizon: 'short' });
+  } else if (catcherTotal < catcherMin) {
+    needs.push({ type: '捕手補強が急務', score: 28 + (catcherMin - catcherTotal) * 5, horizon: 'short' });
+  }
+
+  // 遊撃・二塁・三塁の薄さ（合計人数が最低ラインを下回る場合）
+  for (const [pos, label] of [['遊撃手', '遊撃手'], ['二塁手', '二塁手'], ['三塁手', '三塁手']]) {
+    const min = MIN_TOTAL_BY_POS[pos] ?? 2;
+    const cnt = totalByPos(pos);
+    if (cnt < min) needs.push({ type: `${label}補強が必要`, score: 20 + (min - cnt) * 6, horizon: 'short' });
+  }
+
   if (avgC < 60) needs.push({ type: 'ミート力の向上', score: Math.round((60 - avgC) * 0.5), horizon: 'mid' });
   if (avgAge > 30 || veteranShare > 0.35) needs.push({ type: '若手の補充が急務', score: Math.round((avgAge - 30) * 5) + Math.round(veteranShare * 10), horizon: 'long' });
   if (needs.length === 0) needs.push({ type: 'バランス型の補強', score: 10, horizon: 'mid' });
 
-  return needs.sort((a, b) => b.score - a.score).slice(0, 3);
+  return needs.sort((a, b) => b.score - a.score).slice(0, 5);
 }
 
 function calcNeedFitScore(player, needs) {
@@ -120,6 +145,12 @@ function calcNeedFitScore(player, needs) {
     } else if (n.type.includes('球威') && player.isPitcher) {
       gain += (player.pitching?.velocity || 50) >= 65 ? n.score * 0.6 : n.score * 0.2;
     } else if (n.type.includes('捕手') && !player.isPitcher && player.pos === '捕手') {
+      gain += n.score;
+    } else if (n.type.includes('遊撃手補強') && !player.isPitcher && player.pos === '遊撃手') {
+      gain += n.score;
+    } else if (n.type.includes('二塁手補強') && !player.isPitcher && player.pos === '二塁手') {
+      gain += n.score;
+    } else if (n.type.includes('三塁手補強') && !player.isPitcher && player.pos === '三塁手') {
       gain += n.score;
     } else if (n.type.includes('ミート') && !player.isPitcher) {
       gain += (player.batting?.contact || 50) >= 62 ? n.score * 0.6 : n.score * 0.2;
@@ -143,8 +174,11 @@ export function evalTradeForCpu(cpuTeam, give, receive, cashDiff) {
   const rv = receive.reduce((s, p) => s + weightedPlayerValue(p, mode), 0);
   let diff = gv - rv + (cashDiff || 0) / 100000;
   const needs = analyzeTeamNeeds(cpuTeam);
+  // ポジション緊急ニーズがある場合はトレード受け入れ閾値を引き上げ（より積極的に取引）
+  const posUrgent = needs.some((n) => (n.type.includes('捕手') || n.type.includes('遊撃手') || n.type.includes('二塁手') || n.type.includes('三塁手')) && n.horizon === 'short');
   give.forEach((p) => {
     diff += calcNeedFitScore(p, needs) * 0.15;
+    if (posUrgent && calcNeedFitScore(p, needs) > 0) diff += 5;
     if ((p.age || 25) <= 23) diff += 5;
     if (mode === 'rebuild' && (p.age || 25) <= 26) diff += 7;
   });
@@ -242,13 +276,20 @@ export function evaluateFrontOfficePlan(team, allTeams, gameDay = 0) {
   const rebuildYears = isNewSeason
     ? (prev.mode === 'rebuild' && mode === 'rebuild' ? prevRebuildYears + 1 : mode === 'rebuild' ? 1 : 0)
     : prevRebuildYears;
+
+  // ── ポジション補強ニーズ（再建/コンテンドより優先して把握） ──
+  const posNeeds = analyzeTeamNeeds(team).filter(
+    (n) => n.type.includes('捕手') || n.type.includes('遊撃手') || n.type.includes('二塁手') || n.type.includes('三塁手')
+  );
+
   const reasons = [];
   if (mode === 'contend') reasons.push('高勝率・順位優位');
   if (mode === 'rebuild') reasons.push('高齢化と成績低迷');
   if (mode === 'retool') reasons.push('短期再編の必要性');
   if (mode === 'rebuild' && rebuildYears >= 2) reasons.push(`再建${rebuildYears}年目・勝負年へ準備中`);
+  if (posNeeds.length > 0) reasons.push(`ポジション補強優先: ${posNeeds.map((n) => n.type).join('・')}`);
   if (!reasons.length) reasons.push('戦力評価を継続');
-  return { mode, confidence: Math.max(contendIndex, rebuildIndex), updatedAtDay: gameDay, reasons, rebuildYears };
+  return { mode, confidence: Math.max(contendIndex, rebuildIndex), updatedAtDay: gameDay, reasons, rebuildYears, positionNeeds: posNeeds };
 }
 
 /**
