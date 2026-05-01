@@ -5,6 +5,19 @@
 
 ---
 
+### 2026-05-01 — CPUフロントAI強化 + 球団方針UI（feat）
+
+**仕様本文への影響あり（§4 CPU AI・§6 トレード）**
+
+- `getFrontOfficePlan`（`trade.js`）: `rebuildYears`・`prospectDepth` をリビルド判定に追加、新シーズン検出バグ修正
+- `getFrontOfficePlanPublic(team)` を公開エクスポートとして追加
+- `weightedPlayerValue(p, mode)`: contend/retool/rebuild/neutral 4モードで選手評価を差別化
+- `generateCpuOffer`・`generateCpuCpuTrade`: mode に基づく選手価値で買い手/売り手を判定
+- farm 選手もトレード候補に含める（rebuild 球団は farm を売らない）
+- `processCpuFaBids`（`contract.js`）: rebuild 時は若手(≤25歳)に+15, 老齢(≥32歳)に-10; contend 時はベテラン(≥29歳)に+10
+- `StandingsTab.jsx`: 「🏢 球団方針」ボタン追加 — 各CPU球団のモード(🏆/🔧/🔄/⚖️)・トレード姿勢・再建年数・理由を表示
+- `src/constants.js` に FA モードボーナス定数 3件追加（`CPU_FA_REBUILD_YOUNG_BONUS` 等）
+
 ### 2026-05-01 — スプリングトレーニング + 選手比較UI（feat）
 
 **仕様本文への影響あり（§3 画面フロー・§4 ゲームシステム追加）**

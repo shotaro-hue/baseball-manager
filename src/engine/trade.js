@@ -30,7 +30,11 @@ const MODE_WEIGHTS = {
 
 function getFrontOfficePlan(team) {
   const mode = FRONT_OFFICE_MODES.includes(team?.frontOfficePlan?.mode) ? team.frontOfficePlan.mode : 'neutral';
-  return { mode, confidence: team?.frontOfficePlan?.confidence ?? 0.5, updatedAtDay: team?.frontOfficePlan?.updatedAtDay ?? 0, reasons: team?.frontOfficePlan?.reasons || [] };
+  return { mode, confidence: team?.frontOfficePlan?.confidence ?? 0.5, updatedAtDay: team?.frontOfficePlan?.updatedAtDay ?? 0, reasons: team?.frontOfficePlan?.reasons || [], rebuildYears: team?.frontOfficePlan?.rebuildYears ?? 0 };
+}
+
+export function getFrontOfficePlanPublic(team) {
+  return getFrontOfficePlan(team);
 }
 
 function getPlayerCurrentValue(p) {
@@ -161,18 +165,23 @@ export function evalTradeForCpu(cpuTeam, give, receive, cashDiff) {
 }
 
 export function generateCpuOffer(cpuTeam, myTeam) {
+  const plan = getFrontOfficePlan(cpuTeam);
+  const mode = plan.mode;
   const mp = myTeam.players.filter((p) => !p.injury);
   const cp = cpuTeam.players.filter((p) => !p.injury);
   if (!mp.length || !cp.length) return null;
   const needs = analyzeTeamNeeds(cpuTeam);
+  // モード別の重み付き価値で狙う選手を選定
   const want = mp
-    .map((p) => ({ p, score: tradeValue(p) + calcNeedFitScore(p, needs) * 0.25 }))
+    .map((p) => ({ p, score: weightedPlayerValue(p, mode) + calcNeedFitScore(p, needs) * 0.25 }))
     .sort((a, b) => b.score - a.score)[0]?.p;
   if (!want) return null;
-  const wv = tradeValue(want);
-  const offer = cp.map((p) => ({ p, d: Math.abs(tradeValue(p) - wv) })).sort((a, b) => a.d - b.d)[0]?.p;
+  const wv = weightedPlayerValue(want, mode);
+  const offer = cp
+    .map((p) => ({ p, d: Math.abs(weightedPlayerValue(p, mode) - wv) }))
+    .sort((a, b) => a.d - b.d)[0]?.p;
   if (!offer) return null;
-  const vd = tradeValue(offer) - wv;
+  const vd = weightedPlayerValue(offer, mode) - wv;
   return { from: cpuTeam, want: [want], offer: [offer], cash: vd < -10 ? Math.abs(vd) * 500000 : 0 };
 }
 
@@ -201,7 +210,10 @@ export function classifyTeam(team, allTeams) {
 export function evaluateFrontOfficePlan(team, allTeams, gameDay = 0) {
   const prev = getFrontOfficePlan(team);
   const freezeDays = 30;
-  if (gameDay - prev.updatedAtDay < freezeDays) return prev;
+  // 新シーズン検出: updatedAtDay がcurrent gameDayより大きい場合はシーズンリセット
+  const isNewSeason = prev.updatedAtDay > 0 && gameDay < prev.updatedAtDay;
+  const effectiveUpdatedAt = isNewSeason ? 0 : prev.updatedAtDay;
+  if (gameDay - effectiveUpdatedAt < freezeDays) return { ...prev, updatedAtDay: effectiveUpdatedAt };
   const leagueTeams = allTeams.filter((t) => t.league === team.league).sort((a, b) => b.wins - a.wins);
   const rank = Math.max(1, leagueTeams.findIndex((t) => t.id === team.id) + 1);
   const totalGames = (team.wins || 0) + (team.losses || 0);
@@ -211,23 +223,32 @@ export function evaluateFrontOfficePlan(team, allTeams, gameDay = 0) {
   const youngRatio = players.length ? players.filter((p) => (p.age || 25) <= 25).length / players.length : 0;
   const oldRatio = players.length ? players.filter((p) => (p.age || 25) >= 30).length / players.length : 0;
   const expiringCore = players.filter((p) => (p.core || tradeValue(p) >= 70) && (p.contractYearsLeft || 1) <= 1).length;
+  // ファームの将来価値スコア（prospect depth）
+  const farm = team.farm || [];
+  const prospectDepth = farm.length ? farm.reduce((s, p) => s + (p.potential || 50), 0) / farm.length / 100 : 0;
   const rankScore = Math.max(0, 1 - (rank - 1) / 5);
   const trendScore = Math.max(0, Math.min(1, (winPct - 0.35) / 0.35));
   const runDiffScore = Math.max(0, Math.min(1, (runDiff + 80) / 160));
   const contractSecurity = Math.max(0, 1 - expiringCore / 5);
   const primeAgeBalance = Math.max(0, 1 - Math.abs(youngRatio - 0.4) - Math.max(0, oldRatio - 0.35));
   const contendIndex = 0.3 * rankScore + 0.25 * trendScore + 0.2 * runDiffScore + 0.15 * contractSecurity + 0.1 * primeAgeBalance;
-  const rebuildIndex = 0.35 * oldRatio + 0.25 * Math.min(1, expiringCore / 4) + 0.25 * (1 - trendScore) + 0.15 * youngRatio;
+  const rebuildIndex = 0.3 * oldRatio + 0.2 * Math.min(1, expiringCore / 4) + 0.25 * (1 - trendScore) + 0.15 * youngRatio + 0.1 * prospectDepth;
   let mode = 'neutral';
   if (contendIndex >= 0.62) mode = 'contend';
   else if (rebuildIndex >= 0.6 && contendIndex < 0.5) mode = 'rebuild';
   else if (contendIndex >= 0.5 || rebuildIndex >= 0.5) mode = 'retool';
+  // 再建継続年数: 前回も rebuild だった場合のみインクリメント（シーズン跨ぎ検出）
+  const prevRebuildYears = prev.rebuildYears || 0;
+  const rebuildYears = isNewSeason
+    ? (prev.mode === 'rebuild' && mode === 'rebuild' ? prevRebuildYears + 1 : mode === 'rebuild' ? 1 : 0)
+    : prevRebuildYears;
   const reasons = [];
   if (mode === 'contend') reasons.push('高勝率・順位優位');
   if (mode === 'rebuild') reasons.push('高齢化と成績低迷');
   if (mode === 'retool') reasons.push('短期再編の必要性');
+  if (mode === 'rebuild' && rebuildYears >= 2) reasons.push(`再建${rebuildYears}年目・勝負年へ準備中`);
   if (!reasons.length) reasons.push('戦力評価を継続');
-  return { mode, confidence: Math.max(contendIndex, rebuildIndex), updatedAtDay: gameDay, reasons };
+  return { mode, confidence: Math.max(contendIndex, rebuildIndex), updatedAtDay: gameDay, reasons, rebuildYears };
 }
 
 /**
@@ -246,19 +267,26 @@ export function generateCpuCpuTrade(allTeams) {
   if (!sellerCandidates.length) return null;
   const seller = sellerCandidates[rng(0, sellerCandidates.length - 1)];
 
-  const sellerVets = seller.players
-    .filter((p) => !p.injury && (p.age || 25) >= 28)
-    .sort((a, b) => tradeValue(b) - tradeValue(a));
+  const sellerMode = getFrontOfficePlan(seller).mode;
+  const buyerMode = getFrontOfficePlan(buyer).mode;
+
+  // 売り手: 一軍ベテラン + ファームも候補に含める（再建チームはファームprospectを出さない）
+  const sellerPool = [
+    ...seller.players.filter((p) => !p.injury && (p.age || 25) >= 27),
+    ...(sellerMode === 'rebuild' ? [] : (seller.farm || []).filter((p) => !p.injury && (p.age || 25) >= 28)),
+  ].sort((a, b) => weightedPlayerValue(b, sellerMode) - weightedPlayerValue(a, sellerMode));
+
+  // 買い手: 若手prospect（将来価値重視）
   const buyerProspects = buyer.players
-    .filter((p) => !p.injury && (p.age || 25) <= 25)
-    .sort((a, b) => tradeValue(b) - tradeValue(a));
+    .filter((p) => !p.injury && (p.age || 25) <= 27)
+    .sort((a, b) => weightedPlayerValue(b, buyerMode) - weightedPlayerValue(a, buyerMode));
 
-  if (!sellerVets.length || !buyerProspects.length) return null;
+  if (!sellerPool.length || !buyerProspects.length) return null;
 
-  const buyerGets = sellerVets[0];
+  const buyerGets = sellerPool[0];
   const sellerGets = buyerProspects[0];
-  const valueDiff = Math.abs(tradeValue(buyerGets) - tradeValue(sellerGets));
-  if (valueDiff > 30) return null;
+  const valueDiff = Math.abs(weightedPlayerValue(buyerGets, buyerMode) - weightedPlayerValue(sellerGets, sellerMode));
+  if (valueDiff > 35) return null;
 
   return {
     buyerId: buyer.id,
