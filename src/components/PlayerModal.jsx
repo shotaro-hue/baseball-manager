@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { fmtSal, fmtAvg, fmtIP } from '../utils';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 import { CareerTable } from './tabs/CareerTable';
+import { SprayChart } from './tabs/SprayChart';
 
 /* ═══════════════════════════════════════════════
    PLAYER DETAIL MODAL
@@ -35,53 +36,45 @@ function AbilityBar({label, value, color="#60a5fa"}){
   );
 }
 
-function sanitizeRatio(value) {
+
+function clampNormalized(value, min, max) {
   const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return 0;
-  return Math.min(1, Math.max(0, numeric));
+  if (!Number.isFinite(numeric)) return null;
+  if (max <= min) return null;
+  const normalized = (numeric - min) / (max - min);
+  return Math.min(1, Math.max(0, normalized));
 }
 
-function SprayDistributionChart({ leftRatio, centerRatio, rightRatio }) {
-  const safeLeft = sanitizeRatio(leftRatio);
-  const safeCenter = sanitizeRatio(centerRatio);
-  const safeRight = sanitizeRatio(rightRatio);
-  const total = safeLeft + safeCenter + safeRight;
-  const normalizedLeft = total > 0 ? safeLeft / total : 0;
-  const normalizedCenter = total > 0 ? safeCenter / total : 0;
-  const normalizedRight = total > 0 ? safeRight / total : 0;
-  const hasData = total > 0;
+function mapResultToHitType(result) {
+  const normalizedResult = typeof result === "string" ? result.trim().toUpperCase() : "";
+  if (normalizedResult === "1B") return "single";
+  if (normalizedResult === "2B") return "double";
+  if (normalizedResult === "3B") return "triple";
+  if (normalizedResult === "HR") return "homeRun";
+  return "out";
+}
 
-  const leftRadius = 8 + normalizedLeft * 20;
-  const centerRadius = 8 + normalizedCenter * 20;
-  const rightRadius = 8 + normalizedRight * 20;
+function toSprayChartEvents(sprayPoints) {
+  if (!Array.isArray(sprayPoints)) return [];
 
-  return (
-    <div style={{ marginTop: 8 }}>
-      <div style={{ fontSize: 9, color: "#64748b", marginBottom: 4 }}>
-        着弾分布図【＝外野方向ごとの打球の偏りを図で可視化】
-      </div>
-      <svg viewBox="0 0 260 150" style={{ width: "100%", display: "block", borderRadius: 8, background: "rgba(12,122,62,.15)", border: "1px solid rgba(255,255,255,.08)" }}>
-        <line x1="130" y1="140" x2="16" y2="26" stroke="rgba(255,255,255,.4)" strokeWidth="1.2" />
-        <line x1="130" y1="140" x2="244" y2="26" stroke="rgba(255,255,255,.4)" strokeWidth="1.2" />
-        <path d="M 36 122 Q 130 18 224 122" fill="none" stroke="rgba(148,163,184,.7)" strokeWidth="2" />
-        <path d="M 58 118 Q 130 38 202 118" fill="none" stroke="rgba(148,163,184,.35)" strokeWidth="1.2" />
-        <line x1="130" y1="140" x2="130" y2="22" stroke="rgba(255,255,255,.25)" strokeDasharray="3 3" strokeWidth="1" />
-        <text x="54" y="20" fontSize="9" fill="#e2e8f0" textAnchor="middle">左翼方向</text>
-        <text x="130" y="13" fontSize="9" fill="#fde68a" textAnchor="middle">中堅方向</text>
-        <text x="206" y="20" fontSize="9" fill="#e2e8f0" textAnchor="middle">右翼方向</text>
+  return sprayPoints
+    .map((point, index) => {
+      const normalizedDistance = clampNormalized(point?.dist, 0, 160);
+      const normalizedAngle = clampNormalized(point?.sprayAngle, 0, 90);
 
-        <circle cx="74" cy="84" r={leftRadius} fill="rgba(96,165,250,.55)" stroke="#60a5fa" strokeWidth="1.5" />
-        <circle cx="130" cy="62" r={centerRadius} fill="rgba(245,194,66,.55)" stroke="#f5c842" strokeWidth="1.5" />
-        <circle cx="186" cy="84" r={rightRadius} fill="rgba(52,211,153,.55)" stroke="#34d399" strokeWidth="1.5" />
+      // ⚠️ 不正値は描画に渡さず除外して無害化する
+      if (!Number.isFinite(normalizedDistance) || !Number.isFinite(normalizedAngle)) {
+        return null;
+      }
 
-        {!hasData && (
-          <text x="130" y="96" fontSize="10" fill="#cbd5e1" textAnchor="middle">
-            データ不足
-          </text>
-        )}
-      </svg>
-    </div>
-  );
+      return {
+        id: point?.id ?? `spray-point-${index}`,
+        x: normalizedAngle,
+        y: normalizedDistance,
+        hitType: mapResultToHitType(point?.result),
+      };
+    })
+    .filter(Boolean);
 }
 
 // 守備適正ダイヤモンド
@@ -328,11 +321,7 @@ export function PlayerModal({player:p, teamName, isMyTeam, onSetConvertTarget, o
                 <StatRow label="ゴロ率" value={sb.gbPct>0?`${(sb.gbPct*100).toFixed(1)}%`:"---"}/>
                 <StatRow label="ライナー率" value={sb.ldPct>0?`${(sb.ldPct*100).toFixed(1)}%`:"---"}/>
                 <StatRow label="フライ率" value={sb.fbPct>0?`${(sb.fbPct*100).toFixed(1)}%`:"---"}/>
-                <SprayDistributionChart
-                  leftRatio={sb.pullPct}
-                  centerRatio={sb.centerPct}
-                  rightRatio={sb.oppositePct}
-                />
+                <SprayChart events={toSprayChartEvents(Array.isArray(p?.stats?.sprayPoints) ? p.stats.sprayPoints : [])} />
               </div>
             )}
 

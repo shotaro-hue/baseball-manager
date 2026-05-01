@@ -12,6 +12,12 @@ const DEFAULT_STYLE = { color: "#6b7280", label: "その他" };
 const CHART_SIZE = 260;
 const CHART_PADDING = 18;
 const DOT_RADIUS = 4;
+const FOUL_ANGLE_RAD = Math.PI / 4;
+const HOME_X = CHART_SIZE / 2;
+const HOME_Y = CHART_SIZE - CHART_PADDING;
+const FIELD_RADIUS = CHART_SIZE / 2 - CHART_PADDING;
+const WARNING_TRACK_RADIUS = FIELD_RADIUS * 0.92;
+const INFIELD_RADIUS = FIELD_RADIUS * 0.42;
 
 function normalizeCoordinate(value) {
   const numeric = Number(value);
@@ -31,6 +37,7 @@ function sanitizeEvents(events) {
       const y = normalizeCoordinate(event?.y);
       const hitType = typeof event?.hitType === "string" ? event.hitType : "out";
 
+      // ⚠️ 不正値は描画に渡さず除外して無害化する
       if (!Number.isFinite(x) || !Number.isFinite(y)) {
         return null;
       }
@@ -45,8 +52,27 @@ function sanitizeEvents(events) {
     .filter(Boolean);
 }
 
+function polarToPoint(angleRad, radius) {
+  return {
+    x: HOME_X + radius * Math.cos(angleRad),
+    y: HOME_Y - radius * Math.sin(angleRad),
+  };
+}
+
+function toChartPoint(event) {
+  const clampedX = Math.min(1, Math.max(0, event.x));
+  const clampedY = Math.min(1, Math.max(0, event.y));
+  const angle = Math.PI - FOUL_ANGLE_RAD - clampedX * (Math.PI - FOUL_ANGLE_RAD * 2);
+  const radius = clampedY * FIELD_RADIUS;
+  return polarToPoint(angle, radius);
+}
+
 export function SprayChart({ events }) {
   const safeEvents = sanitizeEvents(events);
+  const leftFoulPoint = polarToPoint(Math.PI - FOUL_ANGLE_RAD, FIELD_RADIUS);
+  const rightFoulPoint = polarToPoint(FOUL_ANGLE_RAD, FIELD_RADIUS);
+  const infieldLeftPoint = polarToPoint(Math.PI - FOUL_ANGLE_RAD, INFIELD_RADIUS);
+  const infieldRightPoint = polarToPoint(FOUL_ANGLE_RAD, INFIELD_RADIUS);
 
   if (safeEvents.length === 0) {
     return (
@@ -62,17 +88,48 @@ export function SprayChart({ events }) {
       <div className="card-h">スプレーチャート</div>
       <svg viewBox={`0 0 ${CHART_SIZE} ${CHART_SIZE}`} width="100%" height="260" role="img" aria-label="打球方向チャート">
         <rect x="0" y="0" width={CHART_SIZE} height={CHART_SIZE} fill="rgba(255,255,255,0.02)" rx="8" />
-        <line x1={CHART_SIZE / 2} y1={CHART_SIZE - CHART_PADDING} x2={CHART_PADDING} y2={CHART_PADDING} stroke="rgba(255,255,255,0.12)" />
-        <line x1={CHART_SIZE / 2} y1={CHART_SIZE - CHART_PADDING} x2={CHART_SIZE - CHART_PADDING} y2={CHART_PADDING} stroke="rgba(255,255,255,0.12)" />
+
+        {/* 外野芝 */}
+        <path
+          d={`M ${leftFoulPoint.x} ${leftFoulPoint.y} A ${FIELD_RADIUS} ${FIELD_RADIUS} 0 0 1 ${rightFoulPoint.x} ${rightFoulPoint.y} L ${HOME_X} ${HOME_Y} Z`}
+          fill="rgba(34,197,94,0.08)"
+          stroke="rgba(74,222,128,0.22)"
+          strokeWidth="1"
+        />
+
+        {/* フェンス【＝本塁打ライン】 */}
+        <path
+          d={`M ${leftFoulPoint.x} ${leftFoulPoint.y} A ${FIELD_RADIUS} ${FIELD_RADIUS} 0 0 1 ${rightFoulPoint.x} ${rightFoulPoint.y}`}
+          fill="none"
+          stroke="rgba(248,113,113,0.9)"
+          strokeWidth="2.2"
+        />
+
+        {/* ウォーニングトラック【＝フェンス手前の帯】 */}
+        <path
+          d={`M ${polarToPoint(Math.PI - FOUL_ANGLE_RAD, WARNING_TRACK_RADIUS).x} ${polarToPoint(Math.PI - FOUL_ANGLE_RAD, WARNING_TRACK_RADIUS).y} A ${WARNING_TRACK_RADIUS} ${WARNING_TRACK_RADIUS} 0 0 1 ${polarToPoint(FOUL_ANGLE_RAD, WARNING_TRACK_RADIUS).x} ${polarToPoint(FOUL_ANGLE_RAD, WARNING_TRACK_RADIUS).y}`}
+          fill="none"
+          stroke="rgba(251,191,36,0.35)"
+          strokeWidth="1.2"
+          strokeDasharray="3 3"
+        />
+
+        {/* ファウルライン */}
+        <line x1={HOME_X} y1={HOME_Y} x2={leftFoulPoint.x} y2={leftFoulPoint.y} stroke="rgba(255,255,255,0.28)" strokeWidth="1.2" />
+        <line x1={HOME_X} y1={HOME_Y} x2={rightFoulPoint.x} y2={rightFoulPoint.y} stroke="rgba(255,255,255,0.28)" strokeWidth="1.2" />
+
+        {/* 内野弧 */}
+        <path
+          d={`M ${infieldLeftPoint.x} ${infieldLeftPoint.y} A ${INFIELD_RADIUS} ${INFIELD_RADIUS} 0 0 1 ${infieldRightPoint.x} ${infieldRightPoint.y}`}
+          fill="none"
+          stroke="rgba(255,255,255,0.18)"
+          strokeWidth="1"
+        />
 
         {safeEvents.map((event) => {
           const style = HIT_TYPE_STYLES[event.hitType] ?? DEFAULT_STYLE;
-          const clampedX = Math.min(1, Math.max(0, event.x));
-          const clampedY = Math.min(1, Math.max(0, event.y));
-          const px = CHART_PADDING + clampedX * (CHART_SIZE - CHART_PADDING * 2);
-          const py = CHART_SIZE - CHART_PADDING - clampedY * (CHART_SIZE - CHART_PADDING * 2);
-
-          return <circle key={event.id} cx={px} cy={py} r={DOT_RADIUS} fill={style.color} opacity={0.72} />;
+          const point = toChartPoint(event);
+          return <circle key={event.id} cx={point.x} cy={point.y} r={DOT_RADIUS} fill={style.color} opacity={0.78} />;
         })}
       </svg>
 
