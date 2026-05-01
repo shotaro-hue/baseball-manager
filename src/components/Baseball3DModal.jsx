@@ -122,6 +122,9 @@ function StadiumGeometry({ stadium }) {
       <Text position={[0, 7, safeCf + 14]} fontSize={3.2} color="#fde68a" anchorX="center" anchorY="middle">
         {safeCf}m
       </Text>
+      <Text position={[0, 2.3, -8]} fontSize={2.2} color="#cbd5e1" anchorX="center" anchorY="middle">
+        捕手視点（左=LF / 右=RF）
+      </Text>
       <mesh position={[MOUND[0], MOUND[1], MOUND[2]]}>
         <cylinderGeometry args={[2.7, 2.7, 0.35, 24]} />
         <meshStandardMaterial color="#9a7040" />
