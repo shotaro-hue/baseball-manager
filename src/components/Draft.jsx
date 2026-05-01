@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import React from "react";
-import { POSITIONS, DRAFT_ROUNDS, DRAFT_COMMENTS_MY, DRAFT_COMMENTS_CPU, DRAFT_LOTTERY_MAX_ROUNDS } from '../constants';
+import { POSITIONS, DRAFT_ROUNDS, DRAFT_COMMENTS_MY, DRAFT_COMMENTS_CPU, DRAFT_LOTTERY_MAX_ROUNDS, MAX_SHIHAKA_TOTAL } from '../constants';
 import { rng, clamp, scoutedValue } from '../utils';
 import { analyzeTeamNeeds } from '../engine/trade';
 import { draftOverallComment, recommendForTeam } from '../engine/draft';
@@ -125,6 +125,10 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
   const [round1Result,setRound1Result]=React.useState({});
 
   const myTeam=teams.find(t=>t.id===myId);
+  const myShihaikaCount = ((myTeam?.players || []).length + (myTeam?.farm || []).filter(p => !p?.育成).length);
+  const myDraftedCount = Object.values(confirmedPicks).filter(p => Number(p?._r1winner ?? myId) === Number(myId)).length;
+  const myRemainingSlots = Math.max(0, MAX_SHIHAKA_TOTAL - myShihaikaCount - myDraftedCount);
+  const canMyTeamDraft = myRemainingSlots > 0;
   const amIActive=activeTeams.some(t=>t.id===myId);
   const priorUsedIds=new Set(Object.values(confirmedPicks).filter(Boolean).map(p=>p.id));
   const roundPool=pool.filter(p=>!p._drafted&&!priorUsedIds.has(p.id));
@@ -161,6 +165,7 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
 
   // 一斉発表フェーズへ（自チームが外れていないラウンドではmyPick不要）
   const handleAnnounce=()=>{
+    if(amIActive && !canMyTeamDraft) return;
     if(!myPick&&amIActive) return;
     const cpu=buildCpuPicks();
     setCpuPicks(cpu);
@@ -304,8 +309,13 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
           <div style={{fontSize:11,color:"#94a3b8",marginBottom:10}}>全球団が同時発表します。被りはくじ引きで決定。</div>
           <div className="card" style={{marginBottom:10}}>
             <div className="card-h">{myTeam?.name} — {roundLabel}選手</div>
+            {!canMyTeamDraft&&(
+              <div style={{padding:"8px 6px",fontSize:11,color:"#f87171"}}>
+                ⚠️ 支配下登録人数が上限（{MAX_SHIHAKA_TOTAL}名）に到達しているため、ドラフト指名はできません。
+              </div>
+            )}
             {roundPool.slice(0,20).map(p=>(
-              <div key={p.id} onClick={()=>setMyPick(p)} style={{padding:"7px 6px",borderBottom:"1px solid rgba(255,255,255,.04)",cursor:"pointer",background:myPick?.id===p.id?"rgba(245,200,66,.08)":undefined}}>
+              <div key={p.id} onClick={()=>{if(canMyTeamDraft)setMyPick(p);}} style={{padding:"7px 6px",borderBottom:"1px solid rgba(255,255,255,.04)",cursor:canMyTeamDraft?"pointer":"not-allowed",opacity:canMyTeamDraft?1:0.5,background:myPick?.id===p.id?"rgba(245,200,66,.08)":undefined}}>
                 <div className="fsb">
                   <div>
                     <span style={{fontWeight:700,fontSize:13,color:myPick?.id===p.id?"#f5c842":"#e0d4bf"}}>{p.name}</span>
@@ -317,8 +327,8 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone}){
               </div>
             ))}
           </div>
-          <button className="btn btn-gold" style={{width:"100%",padding:"12px 0",opacity:myPick?1:0.4}} onClick={handleAnnounce}>
-            {myPick?`${myPick.name} を${roundLabel} →`:"選手を選んでください"}
+          <button className="btn btn-gold" style={{width:"100%",padding:"12px 0",opacity:(myPick&&canMyTeamDraft)?1:0.4}} onClick={handleAnnounce}>
+            {!canMyTeamDraft?"指名不可（支配下上限）":myPick?`${myPick.name} を${roundLabel} →`:"選手を選んでください"}
           </button>
         </>
       ):(
@@ -480,6 +490,11 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoS
     ...pool.filter(p=>p._drafted&&Number(p._r1winner)===Number(myId)),
     ...pool.filter(p=>Number(drafted[p.id])===Number(myId)),
   ];
+  const myTeam = teams.find(t => Number(t.id) === Number(myId));
+  const myCurrentShihaikaCount = ((myTeam?.players || []).length + (myTeam?.farm || []).filter(p => !p?.育成).length);
+  const myTotalDrafted = myPicks.length;
+  const myRemainingSlots = Math.max(0, MAX_SHIHAKA_TOTAL - myCurrentShihaikaCount - myTotalDrafted);
+  const canMyTeamDraft = myRemainingSlots > 0;
   const doScout=pid=>{if(scoutPt<=0||scouted.has(pid)) return;setScouted(prev=>new Set([...prev,pid]));setScoutPt(n=>n-1);};
   const announce=(msg,color="#f5c842")=>{setAnnouncement({msg,color});setTimeout(()=>setAnnouncement(null),2200);};
   const doPick=(pick,isMe)=>{
@@ -521,7 +536,15 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoS
     const pick=surprise?avail[rng(4,Math.min(8,avail.length-1))]:scored[0].p;
     doPick(pick,false);
   };
-  const myPick=pid=>{const pick=pool.find(p=>p.id===pid);if(!pick||isPickedAfterRound1(pick.id)||!isMyTurn) return;doPick(pick,true);};
+  const myPick=pid=>{
+    if(!canMyTeamDraft){
+      announce(`⚠️ 支配下登録人数が上限（${MAX_SHIHAKA_TOTAL}名）に到達しているため、指名できません。`,"#f87171");
+      return;
+    }
+    const pick=pool.find(p=>p.id===pid);
+    if(!pick||isPickedAfterRound1(pick.id)||!isMyTurn) return;
+    doPick(pick,true);
+  };
   // 通常CPU自動指名（autoSkip中は無効）
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(()=>{if(effectiveAutoSkip||isMyTurn||done||pickIdx>=draftOrderFiltered.length) return;const t=setTimeout(cpuPick,350);return()=>clearTimeout(t);},[pickIdx,isMyTurn,done,effectiveAutoSkip]);
@@ -617,6 +640,9 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoS
               <div className="card-h" style={{marginBottom:6}}>{isMyTurn?<span style={{color:"#f5c842",fontWeight:700}}>🔔 あなたの番！</span>:<span style={{color:"#94a3b8"}}>{current?.team.emoji} {current?.team.name} が選択中…</span>}<span style={{float:"right",fontSize:10,color:"#374151"}}>{current?.round+1}巡目</span></div>
               <div style={{display:"flex",alignItems:"center",gap:8,padding:"5px 8px",background:"rgba(167,139,250,.08)",borderRadius:5,marginBottom:8,fontSize:11}}>
                 <span style={{color:"#a78bfa"}}>🔍 スカウトPT</span><span style={{fontWeight:700,color:scoutPt>0?"#f5c842":"#f87171"}}>{scoutPt}</span><span style={{color:"#374151",fontSize:10}}>残</span>
+              </div>
+              <div style={{fontSize:10,color:canMyTeamDraft?"#94a3b8":"#f87171",marginBottom:8}}>
+                支配下登録: {myCurrentShihaikaCount + myTotalDrafted}/{MAX_SHIHAKA_TOTAL}（残り {myRemainingSlots}）
               </div>
               <div className="draft-pool">
                 {availPool.slice(0,22).map(p=>{const isSc=scouted.has(p.id);const ov=ovView(p);const rs=p.readinessScore??50;const rsColor=rs>=65?"#34d399":rs>=45?"#94a3b8":"#a78bfa";return(<div key={p.id} className="draft-pick" style={{background:p.spotlight?"rgba(249,115,22,.04)":undefined,borderLeft:p.spotlight?"2px solid #f97316":undefined,opacity:isMyTurn?1:.55}}>
