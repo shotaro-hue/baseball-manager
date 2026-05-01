@@ -3,8 +3,9 @@ import {
   ACCEPT_THRESHOLD, MIN_SALARY_SHIHAKA, MIN_SALARY_IKUSEI,
   ACTIVE_ROSTER_FA_DAYS_PER_YEAR, MAX_外国人_一軍,
   MAX_ROSTER, CPU_FA_BUDGET_RESERVE_RATIO, CPU_FA_MIN_SCORE,
+  CPU_FA_REBUILD_YOUNG_BONUS, CPU_FA_REBUILD_OLD_PENALTY, CPU_FA_CONTEND_VET_BONUS,
 } from '../constants';
-import { tradeValue, analyzeTeamNeeds } from './trade';
+import { tradeValue, analyzeTeamNeeds, getFrontOfficePlanPublic } from './trade';
 
 /* ═══════════════════════════════════════════════
    FA 資格閾値 (NPB公式準拠・累積日数方式)
@@ -231,6 +232,8 @@ export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = nu
       if (team.budget - reserve < MIN_SALARY_SHIHAKA) continue;
 
       const needs = analyzeTeamNeeds(team);
+      const plan = getFrontOfficePlanPublic(team);
+      const foMode = plan.mode;
       const candidates = remainingPool
         .filter((p) => !signedPlayers.has(p.id))
         .map((p) => {
@@ -238,7 +241,14 @@ export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = nu
           if (team.budget - reserve < salary) return null;
           const r = evalOffer(p, { salary, years: 1 }, team, allTeams);
           const needBonus = calcNeedMatch(p, needs);
-          return { pid: p.id, score: r.total + needBonus * 0.3, salary };
+          let modeBonus = 0;
+          if (foMode === 'rebuild') {
+            if ((p.age || 25) <= 25) modeBonus += CPU_FA_REBUILD_YOUNG_BONUS;
+            if ((p.age || 25) >= 32) modeBonus -= CPU_FA_REBUILD_OLD_PENALTY;
+          } else if (foMode === 'contend') {
+            if ((p.age || 25) >= 29) modeBonus += CPU_FA_CONTEND_VET_BONUS;
+          }
+          return { pid: p.id, score: r.total + needBonus * 0.3 + modeBonus, salary };
         })
         .filter((c) => c && c.score >= CPU_FA_MIN_SCORE)
         .sort((a, b) => b.score - a.score);
