@@ -634,7 +634,7 @@ export function useSeasonFlow(gs) {
         rf:t.rf+r.score.my,ra:t.ra+r.score.opp,
         rotIdx:t.rotIdx+1,
       };
-      updated.players=applyGameStatsFromLog(updated.players, r.log||[], true, won);
+      updated.players=applyGameStatsFromLog(updated.players, r.log||[], true, won, gameDay);
       updated.players=applyPostGameCondition(updated.players, r.log||[], true, gameDay);
       updated.players=tickInjuries(updated.players);
       updated.players=tickPositionTraining(updated.players);
@@ -669,7 +669,7 @@ export function useSeasonFlow(gs) {
         rf:t.rf+r.score.opp,
         ra:t.ra+r.score.my,
       };
-      updated.players=applyGameStatsFromLog(updated.players,r.log||[],false,!won&&!drew);
+      updated.players=applyGameStatsFromLog(updated.players,r.log||[],false,!won&&!drew, gameDay);
       updated.players=applyPostGameCondition(updated.players,r.log||[],false,gameDay);
       updated.players=tickInjuries(updated.players);
       const newInj=checkForInjuries(updated.players, year);
@@ -710,12 +710,12 @@ export function useSeasonFlow(gs) {
         Object.assign(a,applyPopularityDelta(a,aWon,cdrew));Object.assign(b,applyPopularityDelta(b,!aWon&&!cdrew,cdrew));
         const aRev=calcRevenue(a);a.budget=(a.budget??0)+aRev.ticket+aRev.sponsor+aRev.merch;a.revenueThisSeason=(a.revenueThisSeason??0)+aRev.ticket+aRev.sponsor+aRev.merch;
         const bRev=calcRevenue(b);b.budget=(b.budget??0)+bRev.ticket+bRev.sponsor+bRev.merch;b.revenueThisSeason=(b.revenueThisSeason??0)+bRev.ticket+bRev.sponsor+bRev.merch;
-        a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon);
+        a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon, gameDay);
         a.players=applyPostGameCondition(a.players,cr.log||[],true,gameDay);
         a.players=tickInjuries(a.players);
         const aInj=checkForInjuries(a.players,year);
         a.players=applyInjuriesToPlayers(a.players,aInj,year);
-        b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew);
+        b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew, gameDay);
         b.players=applyPostGameCondition(b.players,cr.log||[],false,gameDay);
         b.players=tickInjuries(b.players);
         const bInj=checkForInjuries(b.players,year);
@@ -889,13 +889,13 @@ export function useSeasonFlow(gs) {
         Object.assign(a,applyPopularityDelta(a,aWon,cdrew));Object.assign(b,applyPopularityDelta(b,!aWon&&!cdrew,cdrew));
         const aRevB=calcRevenue(a);a.budget=(a.budget??0)+aRevB.ticket+aRevB.sponsor+aRevB.merch;a.revenueThisSeason=(a.revenueThisSeason??0)+aRevB.ticket+aRevB.sponsor+aRevB.merch;
         const bRevB=calcRevenue(b);b.budget=(b.budget??0)+bRevB.ticket+bRevB.sponsor+bRevB.merch;b.revenueThisSeason=(b.revenueThisSeason??0)+bRevB.ticket+bRevB.sponsor+bRevB.merch;
-        a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon);
+        a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon, gameDay);
         a.players=applyPostGameCondition(a.players,cr.log||[],true,newDay);
         a.players=tickInjuries(a.players);
         a.players=a.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
         const aInj=checkForInjuries(a.players, year);
         a.players=applyInjuriesToPlayers(a.players, aInj, year);
-        b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew);
+        b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew, gameDay);
         b.players=applyPostGameCondition(b.players,cr.log||[],false,newDay);
         b.players=tickInjuries(b.players);
         b.players=b.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
@@ -934,7 +934,7 @@ export function useSeasonFlow(gs) {
         else{myT.losses++;myT.rf+=r.score.my;myT.ra+=r.score.opp;}
         Object.assign(myT,applyPopularityDelta(myT,won,drew));
         myT.rotIdx++;
-        myT.players=applyGameStatsFromLog(myT.players, r.log||[], true, won);
+        myT.players=applyGameStatsFromLog(myT.players, r.log||[], true, won, newDay);
         myT.players=applyPostGameCondition(myT.players, r.log||[], true, newDay);
         myT.players=tickInjuries(myT.players);
         myT.players=tickPositionTraining(myT.players);
@@ -962,7 +962,7 @@ export function useSeasonFlow(gs) {
           else if(drew){oppT.draws++;oppT.rf+=r.score.opp;oppT.ra+=r.score.my;}
           else{oppT.wins++;oppT.rf+=r.score.opp;oppT.ra+=r.score.my;}
           Object.assign(oppT,applyPopularityDelta(oppT,!won&&!drew,drew));
-          oppT.players=applyGameStatsFromLog(oppT.players,r.log||[],false,!won&&!drew);
+          oppT.players=applyGameStatsFromLog(oppT.players,r.log||[],false,!won&&!drew, newDay);
           oppT.players=applyPostGameCondition(oppT.players,r.log||[],false,newDay);
           oppT.players=tickInjuries(oppT.players);
           const oppInj=checkForInjuries(oppT.players, year);
@@ -1091,7 +1091,7 @@ export function useSeasonFlow(gs) {
         rf:t.rf+gsResult.score.my,ra:t.ra+gsResult.score.opp,
         rotIdx:t.rotIdx+1,
       };
-      updated.players=applyGameStatsFromLog(updated.players, gsResult.log, true, won);
+      updated.players=applyGameStatsFromLog(updated.players, gsResult.log, true, won, gameDay);
       updated.players=applyPostGameCondition(updated.players, gsResult.log, true, gameDay);
       updated.players=tickInjuries(updated.players);
       updated.players=tickPositionTraining(updated.players);
@@ -1121,7 +1121,7 @@ export function useSeasonFlow(gs) {
         rf:t.rf+gsResult.score.opp,
         ra:t.ra+gsResult.score.my,
       };
-      updated.players=applyGameStatsFromLog(updated.players,gsResult.log,false,!won&&!drew);
+      updated.players=applyGameStatsFromLog(updated.players,gsResult.log,false,!won&&!drew, gameDay);
       updated.players=applyPostGameCondition(updated.players,gsResult.log,false,gameDay);
       updated.players=tickInjuries(updated.players);
       const newInj=checkForInjuries(updated.players, year);
@@ -1158,12 +1158,12 @@ export function useSeasonFlow(gs) {
         Object.assign(a,applyPopularityDelta(a,aWon,cdrew));Object.assign(b,applyPopularityDelta(b,!aWon&&!cdrew,cdrew));
         const aRevT=calcRevenue(a);a.budget=(a.budget??0)+aRevT.ticket+aRevT.sponsor+aRevT.merch;a.revenueThisSeason=(a.revenueThisSeason??0)+aRevT.ticket+aRevT.sponsor+aRevT.merch;
         const bRevT=calcRevenue(b);b.budget=(b.budget??0)+bRevT.ticket+bRevT.sponsor+bRevT.merch;b.revenueThisSeason=(b.revenueThisSeason??0)+bRevT.ticket+bRevT.sponsor+bRevT.merch;
-        a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon);
+        a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon, gameDay);
         a.players=applyPostGameCondition(a.players,cr.log||[],true,gameDay);
         a.players=tickInjuries(a.players);
         const aInj=checkForInjuries(a.players,year);
         a.players=applyInjuriesToPlayers(a.players,aInj,year);
-        b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew);
+        b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew, gameDay);
         b.players=applyPostGameCondition(b.players,cr.log||[],false,gameDay);
         b.players=tickInjuries(b.players);
         const bInj=checkForInjuries(b.players,year);
