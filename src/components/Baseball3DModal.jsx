@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Line, Text } from '@react-three/drei';
-import { calcLandingZone, calcTrajectory } from '../engine/physics';
+import { calcLandingZone, calcTrajectory, resolveFieldSideBySprayAngle } from '../engine/physics';
 
 const HOME = [0, 0.12, 0];
 const FIRST = [19.4, 0.12, 19.4];
@@ -78,7 +78,14 @@ function BallTrajectory({ ev, la, sprayAngle }) {
   const ballRef = useRef();
   const shadowRef = useRef();
   const [frame, setFrame] = useState(0);
-  const azimuth = ((sprayAngle - 45) * Math.PI) / 180;
+  const side = useMemo(() => resolveFieldSideBySprayAngle(sprayAngle), [sprayAngle]);
+  const azimuth = useMemo(() => {
+    const centerRelativeAngle = sanitizeNumber(sprayAngle, 45) - 45;
+    const sideSign = side.key === 'left' ? -1 : side.key === 'right' ? 1 : 0;
+    const angleMagnitude = Math.abs(centerRelativeAngle);
+    const normalizedCenterRelativeAngle = sideSign === 0 ? 0 : sideSign * angleMagnitude;
+    return (normalizedCenterRelativeAngle * Math.PI) / 180;
+  }, [side.key, sprayAngle]);
 
   const trajectory3D = useMemo(() => {
     const points2D = calcTrajectory(ev, la);
@@ -131,7 +138,8 @@ export default function Baseball3DModal({ event, stadium, onClose }) {
       const safeSpray = sanitizeNumber(normalizedEvent.sprayAngle, 45);
       const safeDist = sanitizeNumber(normalizedEvent.dist);
       const safeZone = calcLandingZone(safeDist, safeSpray, stadium ?? {});
-      return { safeEv, safeLa, safeSpray, safeDist, safeZone };
+      const safeFieldSide = resolveFieldSideBySprayAngle(safeSpray);
+      return { safeEv, safeLa, safeSpray, safeDist, safeZone, safeFieldSide };
     } catch (_) {
       return null;
     }
@@ -184,6 +192,7 @@ export default function Baseball3DModal({ event, stadium, onClose }) {
                 <div className="sim-chip">打球速度: <strong>{safeData?.safeEv ?? 0}</strong> km/h</div>
                 <div className="sim-chip">打球角度: <strong>{safeData?.safeLa ?? 0}</strong>°</div>
                 <div className="sim-chip">方向角: <strong>{safeData?.safeSpray ?? 45}</strong>°</div>
+                <div className="sim-chip">打球方向: <strong>{safeData?.safeFieldSide?.label ?? '中堅'}</strong></div>
                 <div className="sim-chip">推定飛距離: <strong>{safeData?.safeDist ?? 0}</strong> m</div>
                 <div className="sim-chip">着弾: <strong>{safeData?.safeZone ?? '不明'}</strong></div>
               </div>

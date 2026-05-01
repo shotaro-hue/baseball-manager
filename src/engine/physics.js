@@ -63,14 +63,25 @@ export function calcSprayAngle(result) {
   return rngf(0, 90);
 }
 
-export function calcLandingZone(dist, sprayAngle, stadium) {
-  const side = sprayAngle < 30 ? '左翼' : sprayAngle > 60 ? '右翼' : '中堅';
-  const targetFence = sprayAngle < 30 ? stadium.lf : sprayAngle > 60 ? stadium.rf : stadium.cf;
+export function resolveFieldSideBySprayAngle(sprayAngle) {
+  // ⚠️ セキュリティ: 不正な入力値の混入を防ぐため、有限数のみ受け付ける
+  const numericAngle = Number(sprayAngle);
+  const safeAngle = Number.isFinite(numericAngle) ? numericAngle : 45;
+  const clampedAngle = Math.min(90, Math.max(0, safeAngle));
 
-  if (dist >= targetFence + 8) return `${side}スタンド`;
-  if (dist >= targetFence - 3) return `${side}フェンス直撃`;
-  if (dist >= targetFence * 0.7) return `${side}深めフェアゾーン`;
-  return `${side}フェアゾーン`;
+  if (clampedAngle < 30) return { key: 'left', label: '左翼' };
+  if (clampedAngle > 60) return { key: 'right', label: '右翼' };
+  return { key: 'center', label: '中堅' };
+}
+
+export function calcLandingZone(dist, sprayAngle, stadium) {
+  const side = resolveFieldSideBySprayAngle(sprayAngle);
+  const targetFence = side.key === 'left' ? stadium.lf : side.key === 'right' ? stadium.rf : stadium.cf;
+
+  if (dist >= targetFence + 8) return `${side.label}スタンド`;
+  if (dist >= targetFence - 3) return `${side.label}フェンス直撃`;
+  if (dist >= targetFence * 0.7) return `${side.label}深めフェアゾーン`;
+  return `${side.label}フェアゾーン`;
 }
 
 export function calcTrajectory(ev, la, options = {}) {

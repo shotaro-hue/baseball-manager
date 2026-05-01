@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calcBallDist, calcTrajectory } from '../physics';
+import { calcBallDist, calcTrajectory, resolveFieldSideBySprayAngle } from '../physics';
 import { lookupBallDist } from '../physicsLookup';
 
 describe('physics flight simulation', () => {
@@ -78,5 +78,17 @@ describe('lookupBallDist', () => {
 
   it('HR-range returns ≥ typical NPB CF fence (122m)', () => {
     expect(lookupBallDist(108, 30)).toBeGreaterThanOrEqual(122);
+  });
+});
+
+describe('resolveFieldSideBySprayAngle', () => {
+  it('maps representative and boundary angles to left/center/right correctly', () => {
+    expect(resolveFieldSideBySprayAngle(0)).toMatchObject({ key: 'left', label: '左翼' });
+    expect(resolveFieldSideBySprayAngle(29.9)).toMatchObject({ key: 'left', label: '左翼' });
+    expect(resolveFieldSideBySprayAngle(30)).toMatchObject({ key: 'center', label: '中堅' });
+    expect(resolveFieldSideBySprayAngle(45)).toMatchObject({ key: 'center', label: '中堅' });
+    expect(resolveFieldSideBySprayAngle(60)).toMatchObject({ key: 'center', label: '中堅' });
+    expect(resolveFieldSideBySprayAngle(60.1)).toMatchObject({ key: 'right', label: '右翼' });
+    expect(resolveFieldSideBySprayAngle(90)).toMatchObject({ key: 'right', label: '右翼' });
   });
 });
