@@ -17,7 +17,8 @@ export function simulateFlight(ev, la, options = {}) {
   const windOut = environment.windOut ?? 0;
   const releaseHeight = options.releaseHeight ?? config.releaseHeight;
 
-  const evMs = ev * 0.44704;
+    // EVはkm/hで統一し、物理計算直前にm/sへ変換
+  const evMs = ev / 3.6;
   const laRad = la * (Math.PI / 180);
   let vx = evMs * Math.cos(laRad) + windOut;
   let vy = evMs * Math.sin(laRad);

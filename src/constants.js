@@ -357,11 +357,11 @@ export const FOREIGN_NATIONALITIES = [
 
 // ── 物理演算打撃シミュレーション定数（Phase 1） ──────────────────────────────
 export const PHYSICS_BAT = {
-  // NPB実測値に基づくEVレンジ: 弱打=72mph, 平均=88mph, 強打=105+mph
-  EV_FLOOR: 72,
-  EV_POWER_SCALE: 33,
-  EV_STUFF_SCALE: 14,
-  EV_NOISE: 8,
+  // NPB実測値に基づくEVレンジ（km/h）: 弱打=116km/h, 平均=142km/h, 強打=169+km/h
+  EV_FLOOR: 116,
+  EV_POWER_SCALE: 53,
+  EV_STUFF_SCALE: 23,
+  EV_NOISE: 13,
 
   LA_FLY_MID: 18,
   LA_CONTACT_MID: 12,
