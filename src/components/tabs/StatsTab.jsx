@@ -4,6 +4,7 @@ import { fmtAvg, fmtPct, fmtIP } from '../../utils';
 import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
 import { ThCell, HandBadge } from '../ui';
 import { CareerTable } from './CareerTable';
+import { SprayChart } from './SprayChart';
 
 export function StatsTab({teams,myId}){
   const [view,setView]=useState("batter");
@@ -48,6 +49,7 @@ export function StatsTab({teams,myId}){
             </div>
           </div>
           <CareerTable player={sel}/>
+          {sel && !sel.isPitcher && <SprayChart events={sel.stats?.battedBallEvents} />}
         </div>
       )}
       {view==="batter"&&(
