@@ -6,14 +6,98 @@ import { ThCell, HandBadge } from '../ui';
 import { CareerTable } from './CareerTable';
 import { SprayChart } from './SprayChart';
 
+const RANGE_FILTERS = {
+  LAST30: 'last30',
+  SEASON: 'season',
+  CAREER: 'career',
+};
+
+const RESULT_FILTERS = {
+  ALL: 'all',
+  HIT: 'hit',
+  HR: 'hr',
+  OUT: 'out',
+};
+
+const HIT_TYPES = {
+  single: 'single',
+  double: 'double',
+  triple: 'triple',
+  homeRun: 'homeRun',
+  out: 'out',
+};
+
+function sanitizeRangeFilter(value) {
+  const validValues = Object.values(RANGE_FILTERS);
+  return validValues.includes(value) ? value : RANGE_FILTERS.SEASON;
+}
+
+function sanitizeResultFilter(value) {
+  const validValues = Object.values(RESULT_FILTERS);
+  return validValues.includes(value) ? value : RESULT_FILTERS.ALL;
+}
+
+function normalizeGameDayValue(rawGameDay, fallbackIndex) {
+  const num = Number(rawGameDay);
+  if (Number.isFinite(num)) return num;
+
+  const parsed = Date.parse(rawGameDay);
+  if (Number.isFinite(parsed)) return parsed;
+
+  return fallbackIndex;
+}
+
+function filterBattedBallEvents(events, rangeFilter, resultFilter) {
+  if (!Array.isArray(events)) return [];
+
+  const normalizedRangeFilter = sanitizeRangeFilter(rangeFilter);
+  const normalizedResultFilter = sanitizeResultFilter(resultFilter);
+
+  const sortedEvents = events
+    .map((event, index) => ({
+      ...event,
+      __originIndex: index,
+      __gameDayValue: normalizeGameDayValue(event?.gameDay, index),
+    }))
+    .sort((a, b) => {
+      if (b.__gameDayValue !== a.__gameDayValue) {
+        return b.__gameDayValue - a.__gameDayValue;
+      }
+      return b.__originIndex - a.__originIndex;
+    });
+
+  const rangeFilteredEvents = (() => {
+    if (normalizedRangeFilter === RANGE_FILTERS.CAREER) return sortedEvents;
+    if (normalizedRangeFilter === RANGE_FILTERS.LAST30) return sortedEvents.slice(0, 30);
+    return sortedEvents;
+  })();
+
+  return rangeFilteredEvents.filter((event) => {
+    const hitType = typeof event?.hitType === 'string' ? event.hitType : null;
+    const isHit = hitType === HIT_TYPES.single || hitType === HIT_TYPES.double || hitType === HIT_TYPES.triple || hitType === HIT_TYPES.homeRun;
+
+    if (normalizedResultFilter === RESULT_FILTERS.HIT) return isHit;
+    if (normalizedResultFilter === RESULT_FILTERS.HR) return hitType === HIT_TYPES.homeRun;
+    if (normalizedResultFilter === RESULT_FILTERS.OUT) return hitType === HIT_TYPES.out;
+
+    // ⚠️ 未知の hitType は「all」扱いで除外せず、安全側にフォールバックする
+    return true;
+  });
+}
+
 export function StatsTab({teams,myId}){
   const [view,setView]=useState("batter");
   const [selId,setSelId]=useState(null);
   const [openTip,setOpenTip]=useState(null);
+  const [rangeFilter,setRangeFilter]=useState(RANGE_FILTERS.SEASON);
+  const [resultFilter,setResultFilter]=useState(RESULT_FILTERS.ALL);
   const myTeam=teams.find(t=>t.id===myId);
   const batters=myTeam.players.filter(p=>!p.isPitcher);
   const pitchers=myTeam.players.filter(p=>p.isPitcher);
   const sel=myTeam.players.find(p=>p.id===selId);
+  const filteredSprayEvents = !sel || sel.isPitcher
+    ? []
+    : filterBattedBallEvents(sel.stats?.battedBallEvents, rangeFilter, resultFilter);
   const radar=sel?(sel.isPitcher?[
     {s:"球速",v:sel.pitching.velocity},
     {s:"制球",v:sel.pitching.control},
@@ -48,8 +132,37 @@ export function StatsTab({teams,myId}){
               {sel.isPitcher?(()=>{const sp=saberPitcher(sel.stats);return[["防御率",sp.ERA],["奪三振",sel.stats.Kp],["WHIP",sp.WHIP],["FIP",sp.FIP],["xFIP",sp.xFIP],["三振率",fmtPct(sp.Kpct)],["四球率",fmtPct(sp.BBpct)],["WAR",sp.WAR]].map(([l,v])=><div key={l} className="fsb" style={{padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.03)"}}><span style={{color:"#374151"}}>{l}</span><span className="mono" style={{color:"#94a3b8"}}>{v}</span></div>);})():(()=>{const sb=saberBatter(sel.stats);return[["打率",fmtAvg(sel.stats.H,sel.stats.AB)],["OPS",sb.OPS.toFixed(3)],["wOBA",sb.wOBA.toFixed(3)],["wRC+",sb.wRCp],["ISO",sb.ISO.toFixed(3)],["四球率",fmtPct(sb.BBpct)],["三振率",fmtPct(sb.Kpct)],["打球速度",sb.EVavg>0?sb.EVavg+"km/h":"---"],["WAR",sb.WAR]].map(([l,v])=><div key={l} className="fsb" style={{padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.03)"}}><span style={{color:"#374151"}}>{l}</span><span className="mono" style={{color:"#94a3b8"}}>{v}</span></div>);})()}
             </div>
           </div>
+          {!sel.isPitcher && (
+            <div style={{display:"flex",gap:10,flexWrap:"wrap",margin:"8px 0 4px"}}>
+              <label style={{fontSize:12,color:"#374151",display:"inline-flex",alignItems:"center",gap:6}}>
+                期間
+                <select
+                  value={rangeFilter}
+                  onChange={(e)=>setRangeFilter(sanitizeRangeFilter(e.target.value))}
+                  style={{fontSize:12,padding:"2px 6px"}}
+                >
+                  <option value={RANGE_FILTERS.LAST30}>直近30打球</option>
+                  <option value={RANGE_FILTERS.SEASON}>シーズン</option>
+                  <option value={RANGE_FILTERS.CAREER}>通算</option>
+                </select>
+              </label>
+              <label style={{fontSize:12,color:"#374151",display:"inline-flex",alignItems:"center",gap:6}}>
+                結果
+                <select
+                  value={resultFilter}
+                  onChange={(e)=>setResultFilter(sanitizeResultFilter(e.target.value))}
+                  style={{fontSize:12,padding:"2px 6px"}}
+                >
+                  <option value={RESULT_FILTERS.ALL}>すべて</option>
+                  <option value={RESULT_FILTERS.HIT}>ヒット</option>
+                  <option value={RESULT_FILTERS.HR}>本塁打</option>
+                  <option value={RESULT_FILTERS.OUT}>アウト</option>
+                </select>
+              </label>
+            </div>
+          )}
           <CareerTable player={sel}/>
-          {sel && !sel.isPitcher && <SprayChart events={sel.stats?.battedBallEvents} />}
+          {sel && !sel.isPitcher && <SprayChart events={filteredSprayEvents} />}
         </div>
       )}
       {view==="batter"&&(
