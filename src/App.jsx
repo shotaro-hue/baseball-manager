@@ -455,7 +455,7 @@ export default function App(){
     )}
     {tab==="finance"&&<FinanceTab team={myTeam} onStadiumUpgrade={gs.handleStadiumUpgrade} onTicketPriceChange={gs.handleSetTicketPrice} gameDay={gameDay} onPlayerClick={gs.handlePlayerClick}/>}
     {tab==="standings"&&<StandingsTab teams={teams} myId={myId} onTeamClick={gs.handleTeamClick}/>}
-    {tab==="stats"&&<StatsTab teams={teams} myId={myId}/>}
+    {tab==="stats"&&<StatsTab teams={teams} myId={myId} onPlayerClick={gs.handlePlayerClick}/>}
     {tab==="leaderboard"&&<LeaderboardTab teams={teams} myId={myId} gameDay={gameDay}/>}
     {tab==="balance"&&<BalanceTab teams={teams} myTeam={myTeam} upd={upd} myId={myId}/>}
 
