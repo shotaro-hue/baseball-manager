@@ -5,6 +5,22 @@
 
 ---
 
+### 2026-05-01 — 物理演算打撃シミュレーション Phase 3（df51cf8）
+
+**仕様本文への影響なし（内部実装のみ）**
+
+- physResult の走塁・得点への完全反映（Phase 2 残件）
+  - d→hr 昇格時にランナー全員生還・rbi 正確加算
+  - hr→d 降格時に打者 2 塁止まり・d の進塁ルールを適用
+- lookup table 化（EV 60〜115 × LA -10〜50°、3416 エントリ）
+  - scripts/gen-physics-lookup.js で事前生成
+  - simulation.js の calcBallDist を O(1) の lookupBallDist に置換
+- モンテカルロ検証スクリプト（scripts/monte-carlo-validate.js）
+  - 25 打者×投手ペア × 2000 打席 = 50000 打席を検証
+  - HR率・K率・BB率が NPB 2024 許容範囲に収まることを確認
+
+---
+
 ### 2026-04-30 — fix: 飛距離過大・150mシングル問題を修正
 
 **仕様本文への影響なし（内部バグ修正のみ）**

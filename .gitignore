@@ -13,3 +13,5 @@ dist/
 .env.*.local
 test-results/
 playwright-report/
+
+scripts/mc-results.json

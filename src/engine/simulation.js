@@ -1,6 +1,7 @@
 import { rng, rngf, clamp } from '../utils';
 import { PITCH_NORM, PITCH_HARD_CAP, FATIGUE_WARNING, FATIGUE_LIMIT, PHYSICS_BAT } from '../constants';
-import { calcBallDist, calcSprayAngle } from './physics';
+import { calcSprayAngle } from './physics';
+import { lookupBallDist } from './physicsLookup';
 
 /* ================================================================
    SIMULATION ENGINE v4.0
@@ -537,7 +538,20 @@ function processAtBat(gs, strategy = 'normal') {
     : 50;
   const situation     = { runnersOnBase: gs.bases.some(Boolean), runnersInScoring: gs.bases[1]||gs.bases[2], lateGame: gs.inning>=7, closeGame: Math.abs((gs.score?.my||0)-(gs.score?.opp||0))<=2, fieldingLevel, pitchCount, teamMorale: gs.teamMorale||60, stadium: gs.stadium, pitcherHand: pitcher?.hand || 'right', pitchingPolicy: isMyAtBat ? 'normal' : (gs.pitchingPolicy || 'normal'), coachBonuses: isMyAtBat ? {} : (gs.coachBonuses || {}) };
 
-  let { result, pitches, pitchType, zone, isIntentional, pitchLog } = simAtBat(batter, pitcher, strategy, pitchCount, situation, gs.leagueEnv);
+  let { result: initialResult, pitches, pitchType, zone, isIntentional, pitchLog } = simAtBat(batter, pitcher, strategy, pitchCount, situation, gs.leagueEnv);
+
+  let ev = 0, la = 0;
+  if (!['k', 'bb', 'hbp'].includes(initialResult)) {
+    ({ ev, la } = generateContactEVLA(batter, pitcher));
+    if (initialResult === 'hr') la = clamp(la, PHYSICS_BAT.LA_HR_MIN, PHYSICS_BAT.LA_HR_MAX);
+    else if (initialResult === 'd') la = clamp(la, PHYSICS_BAT.LA_D_MIN, PHYSICS_BAT.LA_D_MAX);
+    else if (initialResult === 't') la = clamp(la, PHYSICS_BAT.LA_T_MIN, PHYSICS_BAT.LA_T_MAX);
+    else if (initialResult === 's') la = clamp(la, PHYSICS_BAT.LA_S_MIN, PHYSICS_BAT.LA_S_MAX);
+  }
+  const dist = ev > 0 ? lookupBallDist(ev, la) : 0;
+  const sprayAngle = ev > 0 ? calcSprayAngle(initialResult) : 45;
+  const stadium = situation.stadium ? STADIUMS[situation.stadium] : null;
+  let result = adjustResultByPhysics(initialResult, dist, sprayAngle, stadium);
 
   let newBases = [...gs.bases];
   let runs = 0, rbi = 0, outs = gs.outs, momentumDelta = 0;
@@ -619,21 +633,7 @@ function processAtBat(gs, strategy = 'normal') {
   let newMyPC=gs.myPitchCount, newOpPC=gs.opPitchCount;
   if (isMyAtBat) newOpPC+=pitches; else newMyPC+=pitches;
 
-  // 打球指標 (EV / 打球角度) — インプレー結果のみ計算
-  // Phase 1: 結果ではなく打者タイプ×投手stuffから先行生成
-  let ev = 0, la = 0;
-  if (!['k', 'bb', 'hbp'].includes(result)) {
-    ({ ev, la } = generateContactEVLA(batter, pitcher));
-    if (result === 'hr') la = clamp(la, PHYSICS_BAT.LA_HR_MIN, PHYSICS_BAT.LA_HR_MAX);
-    else if (result === 'd') la = clamp(la, PHYSICS_BAT.LA_D_MIN, PHYSICS_BAT.LA_D_MAX);
-    else if (result === 't') la = clamp(la, PHYSICS_BAT.LA_T_MIN, PHYSICS_BAT.LA_T_MAX);
-    else if (result === 's') la = clamp(la, PHYSICS_BAT.LA_S_MIN, PHYSICS_BAT.LA_S_MAX);
-  }
-  const dist = ev > 0 ? calcBallDist(ev, la) : 0;
-  const sprayAngle = ev > 0 ? calcSprayAngle(result) : 45;
-  const stadium = situation.stadium ? STADIUMS[situation.stadium] : null;
-  const physResult = adjustResultByPhysics(result, dist, sprayAngle, stadium);
-  const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, pitcherId:pitcher?.id, result:physResult, ev, la, dist, sprayAngle, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog, pitchType, zone, scorers };
+  const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, pitcherId:pitcher?.id, result, ev, la, dist, sprayAngle, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog, pitchType, zone, scorers };
   const nextMyPitcherState = isMyAtBat
     ? gs.myPitcherState
     : { ...(gs.myPitcherState || makePitcherState(gs.inning, gs.isTop)), battersFaced: (gs.myPitcherState?.battersFaced || 0) + 1 };
