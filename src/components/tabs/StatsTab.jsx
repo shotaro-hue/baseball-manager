@@ -85,7 +85,7 @@ function filterBattedBallEvents(events, rangeFilter, resultFilter) {
   });
 }
 
-export function StatsTab({teams,myId}){
+export function StatsTab({teams,myId,onPlayerClick}){
   const [view,setView]=useState("batter");
   const [selId,setSelId]=useState(null);
   const [openTip,setOpenTip]=useState(null);
@@ -191,7 +191,7 @@ export function StatsTab({teams,myId}){
               <tbody>
                 {batters.sort((a,b)=>saberBatter(b.stats).OPS-saberBatter(a.stats).OPS).map(p=>{const sb=saberBatter(p.stats);return(
                   <tr key={p.id} style={{cursor:"pointer"}} onClick={()=>setSelId(p.id)}>
-                    <td style={{fontWeight:700,fontSize:12,color:selId===p.id?"#f5c842":undefined}}>{p.name}</td>
+                    <td style={{fontWeight:700,fontSize:12,color:selId===p.id?"#f5c842":undefined}}><span style={{cursor:"pointer",color:"#60a5fa"}} onClick={(e)=>{e.stopPropagation();onPlayerClick?.(p,myTeam?.name);}}>{p.name}</span></td>
                     <td className="mono">{p.stats.PA}</td>
                     <td className="mono">{fmtAvg(p.stats.H,p.stats.AB)}</td>
                     <td className="mono" style={{color:sb.OPS>=.850?"#34d399":sb.OPS>=.700?"#f5c842":undefined}}>{sb.OPS>0?sb.OPS.toFixed(3):"---"}</td>
@@ -240,7 +240,7 @@ export function StatsTab({teams,myId}){
               <tbody>
                 {pitchers.sort((a,b)=>saberPitcher(a.stats).ERA-saberPitcher(b.stats).ERA).map(p=>{const sp=saberPitcher(p.stats);return(
                   <tr key={p.id} style={{cursor:"pointer"}} onClick={()=>setSelId(p.id)}>
-                    <td style={{fontWeight:700,fontSize:12,color:selId===p.id?"#f5c842":undefined}}>{p.name}<HandBadge p={p}/></td>
+                    <td style={{fontWeight:700,fontSize:12,color:selId===p.id?"#f5c842":undefined}}><span style={{cursor:"pointer",color:"#60a5fa"}} onClick={(e)=>{e.stopPropagation();onPlayerClick?.(p,myTeam?.name);}}>{p.name}</span><HandBadge p={p}/></td>
                     <td style={{fontSize:10,color:"#374151"}}>{p.subtype}</td>
                     <td className="mono" style={{color:"#34d399"}}>{p.stats.W}</td><td className="mono" style={{color:"#f87171"}}>{p.stats.L}</td>
                     <td className="mono" style={{color:p.stats.SV>0?"#34d399":undefined}}>{p.stats.SV||"-"}</td>

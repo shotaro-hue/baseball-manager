@@ -13,13 +13,22 @@ const CHART_SIZE = 260;
 const CHART_PADDING = 18;
 const DOT_RADIUS = 4;
 
+function normalizeCoordinate(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  // 0〜1 保存形式と 0〜100 旧形式の両方を吸収する
+  if (numeric >= 0 && numeric <= 1) return numeric;
+  if (numeric >= 0 && numeric <= 100) return numeric / 100;
+  return null;
+}
+
 function sanitizeEvents(events) {
   if (!Array.isArray(events)) return [];
 
   return events
     .map((event, index) => {
-      const x = Number(event?.x);
-      const y = Number(event?.y);
+      const x = normalizeCoordinate(event?.x);
+      const y = normalizeCoordinate(event?.y);
       const hitType = typeof event?.hitType === "string" ? event.hitType : "out";
 
       if (!Number.isFinite(x) || !Number.isFinite(y)) {
@@ -58,10 +67,10 @@ export function SprayChart({ events }) {
 
         {safeEvents.map((event) => {
           const style = HIT_TYPE_STYLES[event.hitType] ?? DEFAULT_STYLE;
-          const clampedX = Math.min(100, Math.max(0, event.x));
-          const clampedY = Math.min(100, Math.max(0, event.y));
-          const px = CHART_PADDING + (clampedX / 100) * (CHART_SIZE - CHART_PADDING * 2);
-          const py = CHART_SIZE - CHART_PADDING - (clampedY / 100) * (CHART_SIZE - CHART_PADDING * 2);
+          const clampedX = Math.min(1, Math.max(0, event.x));
+          const clampedY = Math.min(1, Math.max(0, event.y));
+          const px = CHART_PADDING + clampedX * (CHART_SIZE - CHART_PADDING * 2);
+          const py = CHART_SIZE - CHART_PADDING - clampedY * (CHART_SIZE - CHART_PADDING * 2);
 
           return <circle key={event.id} cx={px} cy={py} r={DOT_RADIUS} fill={style.color} opacity={0.72} />;
         })}
