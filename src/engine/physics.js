@@ -1,7 +1,54 @@
 import { rngf } from '../utils';
-import { DEFAULT_PHYSICS_PRESET, PHYSICS_PRESETS } from './physicsConstants';
+import { DEFAULT_ENVIRONMENT, DEFAULT_PHYSICS_PRESET, PHYSICS_PRESETS } from './physicsConstants';
 
 const EPSILON = 0.0001;
+const ENV_BOUNDS = {
+  windOut: { min: -30, max: 30 },
+  airDensity: { min: 0.7, max: 1.5 },
+  temperatureC: { min: -40, max: 55 },
+  altitudeM: { min: -430, max: 6000 },
+};
+
+function toFiniteNumber(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function sanitizeEnvironmentValue(fieldName, rawValue, defaultValue, bounds) {
+  const numericValue = toFiniteNumber(rawValue);
+  if (numericValue === null) {
+    if (rawValue !== undefined) {
+      console.warn(`[physics] environment.${fieldName} が無効値のため既定値へフォールバックしました`, { rawValue, defaultValue });
+    }
+    return defaultValue;
+  }
+
+  const clampedValue = Math.min(bounds.max, Math.max(bounds.min, numericValue));
+  if (clampedValue !== numericValue) {
+    console.warn(`[physics] environment.${fieldName} を安全範囲へクランプしました`, {
+      rawValue: numericValue,
+      safeValue: clampedValue,
+      min: bounds.min,
+      max: bounds.max,
+    });
+  }
+  return clampedValue;
+}
+
+export function sanitizeEnvironment(rawEnv = {}) {
+  const safeRawEnv = rawEnv && typeof rawEnv === 'object' ? rawEnv : {};
+  if (safeRawEnv !== rawEnv) {
+    console.warn('[physics] environment がオブジェクトではないため既定値へフォールバックしました', { rawEnv });
+  }
+
+  return {
+    windOut: sanitizeEnvironmentValue('windOut', safeRawEnv.windOut, DEFAULT_ENVIRONMENT.windOut, ENV_BOUNDS.windOut),
+    airDensity: sanitizeEnvironmentValue('airDensity', safeRawEnv.airDensity, DEFAULT_ENVIRONMENT.airDensity, ENV_BOUNDS.airDensity),
+    temperatureC: sanitizeEnvironmentValue('temperatureC', safeRawEnv.temperatureC, DEFAULT_ENVIRONMENT.temperatureC, ENV_BOUNDS.temperatureC),
+    altitudeM: sanitizeEnvironmentValue('altitudeM', safeRawEnv.altitudeM, DEFAULT_ENVIRONMENT.altitudeM, ENV_BOUNDS.altitudeM),
+  };
+}
+
 
 function getPhysicsConfig(options = {}) {
   const preset = PHYSICS_PRESETS[options.preset ?? DEFAULT_PHYSICS_PRESET] ?? PHYSICS_PRESETS[DEFAULT_PHYSICS_PRESET];
@@ -13,8 +60,8 @@ function getPhysicsConfig(options = {}) {
 
 export function simulateFlight(ev, la, options = {}) {
   const config = getPhysicsConfig(options);
-  const environment = options.environment ?? {};
-  const windOut = environment.windOut ?? 0;
+  const environment = sanitizeEnvironment(options.environment);
+  const windOut = environment.windOut;
   const releaseHeight = options.releaseHeight ?? config.releaseHeight;
 
     // EVはkm/hで統一し、物理計算直前にm/sへ変換
