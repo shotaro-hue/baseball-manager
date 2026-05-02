@@ -45,12 +45,27 @@ function clampNormalized(value, min, max) {
   return Math.min(1, Math.max(0, normalized));
 }
 
-function mapResultToHitType(result) {
+function mapResultToHitType(result, point = {}) {
   const normalizedResult = typeof result === "string" ? result.trim().toUpperCase() : "";
+  const dist = Number(point?.dist);
+  const fenceDistance = Number(point?.fenceDistance);
+  const isHrByTrajectory = point?.isHrByTrajectory === true;
+
+  const looksLikeValidHr =
+    isHrByTrajectory ||
+    (normalizedResult === "HR" &&
+      Number.isFinite(dist) &&
+      Number.isFinite(fenceDistance) &&
+      dist >= fenceDistance);
+
   if (normalizedResult === "1B") return "single";
   if (normalizedResult === "2B") return "double";
   if (normalizedResult === "3B") return "triple";
-  if (normalizedResult === "HR") return "homeRun";
+  if (normalizedResult === "HR" && looksLikeValidHr) return "homeRun";
+
+  // HR表記なのにフェンス未達なら、可視化上はHR扱いしない
+  if (normalizedResult === "HR") return "out";
+
   return "out";
 }
 
@@ -59,10 +74,24 @@ function toSprayChartEvents(sprayPoints) {
 
   return sprayPoints
     .map((point, index) => {
-      const normalizedDistance = clampNormalized(point?.dist, 0, 160);
-      const normalizedAngle = clampNormalized(point?.sprayAngle, 0, 90);
+      const safeDist = Number.isFinite(Number(point?.dist))
+        ? Math.max(0, Math.min(220, Number(point.dist)))
+        : null;
 
-      // ⚠️ 不正値は描画に渡さず除外して無害化する
+      const safeSpray = Number.isFinite(Number(point?.sprayAngle))
+        ? Math.max(0, Math.min(90, Number(point.sprayAngle)))
+        : null;
+
+      const safeFenceDistance = Number.isFinite(Number(point?.fenceDistance))
+        ? Math.max(85, Math.min(140, Number(point.fenceDistance)))
+        : 100;
+
+      const maxDisplayDistance = Math.max(110, safeFenceDistance * 1.18);
+
+      const normalizedDistance = clampNormalized(safeDist, 0, maxDisplayDistance);
+      const normalizedAngle = clampNormalized(safeSpray, 0, 90);
+      const fenceRatio = clampNormalized(safeFenceDistance, 0, maxDisplayDistance);
+
       if (!Number.isFinite(normalizedDistance) || !Number.isFinite(normalizedAngle)) {
         return null;
       }
@@ -71,7 +100,9 @@ function toSprayChartEvents(sprayPoints) {
         id: point?.id ?? `spray-point-${index}`,
         x: normalizedAngle,
         y: normalizedDistance,
-        hitType: mapResultToHitType(point?.result),
+        fenceRatio,
+        hitType: mapResultToHitType(point?.result, point),
+        isHrByTrajectory: point?.isHrByTrajectory === true,
       };
     })
     .filter(Boolean);
