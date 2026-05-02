@@ -161,6 +161,12 @@ export default function App(){
 
   const activeSection = PRIMARY_SECTIONS.find(section => section.id === currentPrimarySection) || PRIMARY_SECTIONS[0];
 
+  const parseSafeBatchCount = (rawValue, allowedOptions, fallbackValue) => {
+    const parsed = Number.parseInt(String(rawValue), 10);
+    if (!Number.isFinite(parsed)) return fallbackValue;
+    return allowedOptions.includes(parsed) ? parsed : fallbackValue;
+  };
+
   const foreignFaPool = faPool.filter(p => p.isForeign);
   const domesticFaPool = faPool.filter(p => !p.isForeign);
   const foreignActiveCount = myTeam?.players?.filter(p => p.isForeign).length || 0;
@@ -271,7 +277,27 @@ export default function App(){
   const g=(myTeam?.wins||0)+(myTeam?.losses||0);
   const remain=SEASON_GAMES-g;
 
-  return(<><div className="app"><div className="hub">
+  return(<><div className="app"><div className="app-layout">
+    <aside className="primary-sidebar" aria-label="メインナビゲーション">
+      <div className="primary-sidebar-title">監督メニュー</div>
+      <div className="primary-sidebar-list">
+        {PRIMARY_SECTIONS.map((section) => {
+          const badgeTab = section.id === "inbox" ? "mailbox" : section.id === "rosterOps" ? "contract" : null;
+          const badge = badgeTab ? tabBadges[badgeTab] : null;
+          return (
+            <button
+              key={section.id}
+              className={`primary-sidebar-btn ${currentPrimarySection===section.id?"on":""}`}
+              onClick={()=>handlePrimarySectionChange(section.id)}
+            >
+              <span className="primary-sidebar-icon">{section.icon}</span>
+              <span>{section.label}</span>
+              {badge&&<span className="primary-sidebar-badge" style={{background:badge.color}}>{badge.n}</span>}
+            </button>
+          );
+        })}
+      </div>
+    </aside><div className="hub">
     <div className="topbar">
       <span style={{fontSize:26}}>{myTeam?.emoji}</span>
       <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14,color:myTeam?.color}}>{myTeam?.name}</div><div style={{fontSize:10,color:"#374151"}}>{year}年 {(d=>d.month+"月"+d.day+"日")(gameDayToDate(gameDay,schedule))} / 第{gameDay}戦{schedule?.[gameDay]?.isInterleague?" 🔄交流戦":""} / 残り{remain}試合</div></div>
@@ -300,7 +326,7 @@ export default function App(){
           const ed=gameDayToDate(Math.min(gameDay+eff-1,SEASON_GAMES),schedule);
           return(
             <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5,background:"linear-gradient(135deg,#071a2c,#0d2840)",border:"1px solid rgba(96,165,250,.5)",borderRadius:10,padding:"8px 6px"}}>
-              <select value={eff} onChange={e=>setBatchCount(parseInt(e.target.value))} style={{width:"100%",background:"rgba(15,23,42,.9)",border:"1px solid rgba(96,165,250,.4)",color:"#93c5fd",borderRadius:4,fontSize:11,fontWeight:700,padding:"3px 4px",fontFamily:"'Share Tech Mono',monospace",cursor:"pointer"}}>
+              <select value={eff} onChange={e=>setBatchCount(parseSafeBatchCount(e.target.value, opts, eff))} style={{width:"100%",background:"rgba(15,23,42,.9)",border:"1px solid rgba(96,165,250,.4)",color:"#93c5fd",borderRadius:4,fontSize:11,fontWeight:700,padding:"3px 4px",fontFamily:"'Share Tech Mono',monospace",cursor:"pointer"}}>
                 {opts.map(n=>{const d=gameDayToDate(Math.min(gameDay+n-1,SEASON_GAMES),schedule);return<option key={n} value={n}>{n}試合{d?` (〜${d.month}/${d.day})`:""}</option>;})}
               </select>
               {sd&&ed&&<div style={{fontSize:9,color:"#7dd3fc"}}>{sd.month}/{sd.day} 〜 {ed.month}/{ed.day}</div>}
@@ -506,5 +532,5 @@ export default function App(){
         次へ進む
       </button>
     </div>
-  </div></div></>);
+  </div></div></div></>);
 }
