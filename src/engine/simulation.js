@@ -1,6 +1,6 @@
 import { rng, rngf, clamp } from '../utils';
 import { PITCH_NORM, PITCH_HARD_CAP, FATIGUE_WARNING, FATIGUE_LIMIT, PHYSICS_BAT } from '../constants';
-import { calcSprayAngle, resolveFieldSideBySprayAngle, simulateFlight } from './physics';
+import { calcSprayAngle, resolveFieldSideBySprayAngle, sanitizeEnvironment, simulateFlight } from './physics';
 
 /* ================================================================
    SIMULATION ENGINE v4.0
@@ -314,7 +314,6 @@ function applyBatterSituation(bat, situation) {
 
 const MIN_HR_CLEARANCE = 2; // フェンスを明確に越えた打球を本塁打扱いにする閾値（m）
 const SAFE_STADIUM_DIMENSION = 100;
-const SAFE_WIND_OUT = 0;
 const SAFE_EV = 135;
 const SAFE_LA = 12;
 
@@ -334,13 +333,11 @@ function resolveBattedBallOutcomeFromPhysics(batter, pitcher, stadium, environme
   const { ev: generatedEv, la: generatedLa } = generateContactEVLA(batter, pitcher);
   const ev = Number.isFinite(generatedEv) ? generatedEv : SAFE_EV;
   const la = Number.isFinite(generatedLa) ? generatedLa : SAFE_LA;
-  // ⚠️ セキュリティ: 風情報は外部入力の可能性があるため、有限数を必須化して無害化する
-  const windOutRaw = Number(environment?.windOut);
-  const safeWindOut = Number.isFinite(windOutRaw) ? windOutRaw : SAFE_WIND_OUT;
+  const safeEnvironment = sanitizeEnvironment(environment);
 
   const trajectory = simulateFlight(ev, la, {
     ...options,
-    environment: { ...environment, windOut: safeWindOut },
+    environment: safeEnvironment,
   });
   const distanceRaw = Number(trajectory?.distance);
   const distance = Number.isFinite(distanceRaw) ? distanceRaw : 0;
@@ -593,10 +590,17 @@ function processAtBat(gs, strategy = 'normal') {
   let { result: initialResult, pitches, pitchType, zone, isIntentional, pitchLog } = simAtBat(batter, pitcher, strategy, pitchCount, situation, gs.leagueEnv);
 
   const stadium = situation.stadium ? STADIUMS[situation.stadium] : null;
+  const weather = gs?.weather ?? {};
+  const environment = sanitizeEnvironment({
+    windOut: weather.windOut,
+    airDensity: weather.airDensity,
+    temperatureC: weather.temperatureC,
+    altitudeM: stadium?.altitudeM ?? weather.altitudeM,
+  });
   let result = initialResult;
   let physicsMeta = { ev: 0, la: 0, distance: 0, sprayAngle: 45, trajectory: [] };
   if (initialResult === 'inplay') {
-    const resolved = resolveBattedBallOutcomeFromPhysics(batter, pitcher, stadium, { windOut: gs?.weather?.windOut ?? 0 }, {});
+    const resolved = resolveBattedBallOutcomeFromPhysics(batter, pitcher, stadium, environment, {});
     result = applyStadiumFactor(resolved.result, batter, stadium);
     physicsMeta = resolved.physicsMeta;
   }
