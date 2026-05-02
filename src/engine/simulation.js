@@ -1,6 +1,6 @@
 import { rng, rngf, clamp } from '../utils';
 import { PITCH_NORM, PITCH_HARD_CAP, FATIGUE_WARNING, FATIGUE_LIMIT, PHYSICS_BAT } from '../constants';
-import { calcSprayAngle, resolveFieldSideBySprayAngle, simulateFlight } from './physics';
+import { calcSprayAngle, classifyBattedBallType, resolveFieldSideBySprayAngle, simulateFlight } from './physics';
 
 /* ================================================================
    SIMULATION ENGINE v4.0
@@ -330,6 +330,37 @@ function inferReplayTypeFromResult(result) {
   return result || 'batted_ball';
 }
 
+function estimateFielderIntercept(distance, ballType, spraySide, rngProvider = rngf) {
+  // ⚠️ セキュリティ: 全入力を検証し、想定外値を安全な既定値に変換
+  const safeDistanceRaw = Number(distance);
+  const safeDistance = Number.isFinite(safeDistanceRaw) ? clamp(safeDistanceRaw, 0, 200) : 0;
+  const safeBallType = ['grounder', 'liner', 'fly'].includes(ballType) ? ballType : 'liner';
+  const safeSpraySide = ['left', 'center', 'right'].includes(spraySide) ? spraySide : 'center';
+  const safeRng = typeof rngProvider === 'function' ? rngProvider : rngf;
+
+  let interceptRate = 0.6;
+  if (safeBallType === 'fly') {
+    // 深い外野フライほど捕球率を下げる簡易モデル
+    interceptRate = safeDistance >= 105 ? 0.3 : safeDistance >= 90 ? 0.45 : 0.62;
+  } else if (safeBallType === 'liner') {
+    // ライナーは安打寄り（捕球されにくい）
+    interceptRate = safeDistance >= 70 ? 0.28 : 0.38;
+  } else if (safeBallType === 'grounder') {
+    // ゴロは内野安打/ゴロアウトの分岐
+    interceptRate = safeDistance <= 30 ? 0.78 : safeDistance <= 45 ? 0.62 : 0.4;
+  }
+
+  if (safeSpraySide === 'center') interceptRate += 0.04;
+  else interceptRate -= 0.03;
+
+  const clampedRate = clamp(interceptRate, 0.05, 0.95);
+  const randomRoll = safeRng(0, 1);
+  return {
+    caught: randomRoll < clampedRate,
+    interceptRate: clampedRate,
+  };
+}
+
 function resolveBattedBallOutcomeFromPhysics(batter, pitcher, stadium, environment = {}, options = {}) {
   const { ev: generatedEv, la: generatedLa } = generateContactEVLA(batter, pitcher);
   const ev = Number.isFinite(generatedEv) ? generatedEv : SAFE_EV;
@@ -349,6 +380,7 @@ function resolveBattedBallOutcomeFromPhysics(batter, pitcher, stadium, environme
   const sprayAngleRaw = calcSprayAngle('inplay');
   const sprayAngle = Number.isFinite(sprayAngleRaw) ? sprayAngleRaw : 45;
   const side = resolveFieldSideBySprayAngle(sprayAngle);
+  const ballType = classifyBattedBallType(la);
 
   const safeStadium = {
     lf: Number.isFinite(Number(stadium?.lf)) ? Number(stadium.lf) : SAFE_STADIUM_DIMENSION,
@@ -360,19 +392,35 @@ function resolveBattedBallOutcomeFromPhysics(batter, pitcher, stadium, environme
   let result = 'out';
   if (distance >= fenceDistance + MIN_HR_CLEARANCE) {
     result = 'hr';
-  } else if (la <= -5) {
-    result = 'out';
-  } else if (la >= 18 && distance >= 95) {
-    result = 'd';
-  } else if (la >= -2 && distance >= 45) {
-    result = 's';
   } else {
-    result = 'out';
+    const rngProvider = typeof options?.rngProvider === 'function' ? options.rngProvider : rngf;
+    const intercept = estimateFielderIntercept(distance, ballType, side.key, rngProvider);
+    if (intercept.caught) {
+      result = 'out';
+    } else if (ballType === 'fly') {
+      result = distance >= 90 ? 'd' : 's';
+    } else if (ballType === 'liner') {
+      result = distance >= 80 ? 'd' : 's';
+    } else {
+      // grounder
+      result = distance <= 35 ? 'out' : 's';
+    }
+
+    // 段階移行の安全弁: 既存 BASELINE を補正係数として残し、結果分布を急変させない
+    const singleBoost = BASELINE.s / (BASELINE.s + BASELINE.out);
+    const doubleBoost = BASELINE.d / Math.max(BASELINE.d + BASELINE.s, 0.0001);
+    const tripleBoost = BASELINE.t / Math.max(BASELINE.t + BASELINE.d + BASELINE.s, 0.0001);
+    const outBoost = BASELINE.out / (BASELINE.out + BASELINE.s);
+    const reroll = rngProvider(0, 1);
+    if (result === 'out' && reroll > outBoost + 0.02) result = 's';
+    if (result === 's' && reroll < singleBoost * 0.12) result = 'out';
+    if (result === 's' && reroll > 1 - doubleBoost * 0.35) result = 'd';
+    if (result === 'd' && reroll > 1 - tripleBoost * 0.18) result = 't';
   }
 
   return {
     result,
-    physicsMeta: { ev, la, distance, sprayAngle, trajectory: points },
+    physicsMeta: { ev, la, distance, sprayAngle, trajectory: points, ballType },
   };
 }
 
@@ -910,4 +958,4 @@ export function runFarmSeason(teams) {
   });
 }
 
-export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, matchupScore, calcFatigue, calcEffectiveFatigue, PITCH_TYPES, BASELINE, ABILITY_RANGE, generateContactEVLA as _generateContactEVLA_TEST, getFenceDistanceBySpray as _getFenceDistanceBySpray_TEST, adjustResultByPhysics as _adjustResultByPhysics_TEST, resolveBattedBallOutcomeFromPhysics as _resolveBattedBallOutcomeFromPhysics_TEST };
+export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, matchupScore, calcFatigue, calcEffectiveFatigue, PITCH_TYPES, BASELINE, ABILITY_RANGE, generateContactEVLA as _generateContactEVLA_TEST, getFenceDistanceBySpray as _getFenceDistanceBySpray_TEST, adjustResultByPhysics as _adjustResultByPhysics_TEST, resolveBattedBallOutcomeFromPhysics as _resolveBattedBallOutcomeFromPhysics_TEST, estimateFielderIntercept as _estimateFielderIntercept_TEST };
