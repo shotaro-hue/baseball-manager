@@ -16,7 +16,7 @@ import { TeamDetailScreen } from './components/TeamDetailScreen';
 import { PressConferenceModal } from './components/PressConferenceModal';
 import { AllStarScreen } from './components/AllStarScreen';
 import { DashboardTab } from './components/DashboardTab';
-import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab, ScheduleTab, BalanceTab, LeaderboardTab } from './components/Tabs';
+import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab, ScheduleTab, BalanceTab, LeaderboardTab, GameActionTab } from './components/Tabs';
 import {
   SEASON_GAMES, MAX_外国人_一軍, MAX_ROSTER, TEAM_DEFS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
   POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD,
@@ -31,7 +31,7 @@ import { useOffseason } from './hooks/useOffseason';
 
 const PRIMARY_SECTIONS = [
   { id: "home", label: "ホーム", icon: "🏠", defaultTab: "dashboard", tabs: [["dashboard", "概況"]] },
-  { id: "game", label: "試合", icon: "⚾", defaultTab: "schedule", tabs: [["schedule", "日程"]] },
+  { id: "game", label: "試合", icon: "⚾", defaultTab: "game_action", tabs: [["game_action", "采配"], ["schedule", "日程"]] },
   { id: "rosterOps", label: "編成", icon: "🧩", defaultTab: "roster", tabs: [["roster", "ロースター"], ["trade", "トレード"], ["contract", "契約"], ["fa", "FA"], ["scout", "スカウト"]] },
   { id: "analysis", label: "分析", icon: "📊", defaultTab: "stats", tabs: [["stats", "成績"], ["leaderboard", "ランキング"], ["standings", "順位"], ["records", "記録"], ["finance", "財務"], ["balance", "リーグ分析"]] },
   { id: "inbox", label: "受信箱", icon: "📨", defaultTab: "mailbox", tabs: [["mailbox", "メール"], ["news", "ニュース"], ["alumni", "歴代"]] },
@@ -363,6 +363,7 @@ export default function App(){
     <ErrorBoundary key={tab}>
     {tab==="dashboard"&&<DashboardTab myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year} recentResults={gs.recentResults} mailbox={mailbox} faPool={faPool} onTabSwitch={handleTabChange}/>}
     {tab==="roster"&&<RosterTab team={myTeam} onToggle={gs.toggleLineup} onReplaceLineup={gs.replaceLineup} onSetLineupOrder={gs.setLineupOrder} onSetRosterDhMode={gs.setRosterDhMode} onSetPlayerPosition={gs.setPlayerPosition} onSetStarter={gs.setStarter} onPromo={gs.promote} onDemo={gs.demote} onSetTrainingFocus={gs.setTrainingFocus} onConvertIkusei={gs.convertIkusei} onMoveRotation={gs.moveRotation} onRemoveFromRotation={gs.removeFromRotation} onSetPitchingPattern={gs.setPitchingPattern} onReplaceRotation={gs.replaceRotation} onReplaceFullRoster={gs.replaceFullRoster} onPlayerClick={gs.handlePlayerClick} onSetDevGoal={gs.setDevGoal} onPlayerTalk={gs.handlePlayerTalk} onSetConvertTarget={gs.setConvertTarget} gameDay={gameDay}/>}
+    {tab==="game_action"&&<GameActionTab/>}
     {tab==="schedule"&&<ScheduleTab schedule={schedule} gameDay={gameDay} myTeam={myTeam} teams={teams} year={year} gameResultsMap={gs.gameResultsMap} allStarDone={gs.allStarDone} allStarResult={gs.allStarResult} allStarTriggerDay={gs.allStarTriggerDay} scheduleArchive={gs.scheduleArchive||[]} onResultClick={dayNo=>{const r=gs.gameResultsMap[dayNo];if(r){sf.setGameResult({score:{my:r.myScore,opp:r.oppScore},log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:r.oppTeam,won:r.won,gameNo:dayNo,_source:"schedule"});setScreen("result");}}}/>}
     {tab==="records"&&<RecordsTab history={gs.seasonHistory}/>}
     {tab==="news"&&<NewsTab news={news} onInterview={gs.handleInterview} seasonHistory={gs.seasonHistory} currentYear={year}/>}
