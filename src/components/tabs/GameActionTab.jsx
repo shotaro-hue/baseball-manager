@@ -14,6 +14,24 @@ function sanitizeActionId(rawActionId) {
   return allowedActionIds.has(actionId) ? actionId : null;
 }
 
+function MiniField({ runners }) {
+  const safeRunners = {
+    first: Boolean(runners?.first),
+    second: Boolean(runners?.second),
+    third: Boolean(runners?.third),
+  };
+
+  return (
+    <div className="mini-field" aria-label="簡易フィールド">
+      <div className="mini-field-mound" aria-hidden="true">●</div>
+      <div className="mini-field-base home" aria-label="ホームベース">H</div>
+      <div className={`mini-field-base first ${safeRunners.first ? 'active' : ''}`} aria-label="一塁">1</div>
+      <div className={`mini-field-base second ${safeRunners.second ? 'active' : ''}`} aria-label="二塁">2</div>
+      <div className={`mini-field-base third ${safeRunners.third ? 'active' : ''}`} aria-label="三塁">3</div>
+    </div>
+  );
+}
+
 export function GameActionTab() {
   const [gameLog, setGameLog] = useState(['試合開始: 7回裏 1アウト 一・三塁']);
 
@@ -41,47 +59,58 @@ export function GameActionTab() {
     <section className="card" style={{ display: 'grid', gap: 12 }}>
       <div className="card-h">試合（重要場面采配）</div>
 
-      <div className="card2" style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-        <strong>{mockGameState.scoreboard.awayTeam} {mockGameState.scoreboard.awayScore} - {mockGameState.scoreboard.homeScore} {mockGameState.scoreboard.homeTeam}</strong>
-        <span className="chip cb">{mockGameState.scoreboard.inningLabel}</span>
-      </div>
+      <div className="game-action-layout">
+        <div className="card2 game-score-card">
+          <strong>{mockGameState.scoreboard.awayTeam} {mockGameState.scoreboard.awayScore} - {mockGameState.scoreboard.homeScore} {mockGameState.scoreboard.homeTeam}</strong>
+          <span className="chip cb">{mockGameState.scoreboard.inningLabel}</span>
+        </div>
 
-      <div className="card2" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <span className="chip cb">B {mockGameState.count.balls}</span>
-        <span className="chip cb">S {mockGameState.count.strikes}</span>
-        <span className="chip cb">O {mockGameState.count.outs}</span>
-        <span className={`chip ${mockGameState.runners.first ? 'cg' : 'cb'}`}>一塁</span>
-        <span className={`chip ${mockGameState.runners.second ? 'cg' : 'cb'}`}>二塁</span>
-        <span className={`chip ${mockGameState.runners.third ? 'cg' : 'cb'}`}>三塁</span>
-      </div>
+        <div className="card2 game-count-card">
+          <div className="game-count-chips">
+            <span className="chip cb">B {mockGameState.count.balls}</span>
+            <span className="chip cb">S {mockGameState.count.strikes}</span>
+            <span className="chip cb">O {mockGameState.count.outs}</span>
+          </div>
+          <div className="game-runner-chips">
+            <span className={`chip ${mockGameState.runners.first ? 'cg' : 'cb'}`}>一塁</span>
+            <span className={`chip ${mockGameState.runners.second ? 'cg' : 'cb'}`}>二塁</span>
+            <span className={`chip ${mockGameState.runners.third ? 'cg' : 'cb'}`}>三塁</span>
+          </div>
+        </div>
 
-      <div className="card2" style={{ display: 'grid', gap: 4 }}>
-        <div>打者: {mockGameState.matchup.batter} vs 投手: {mockGameState.matchup.pitcher}</div>
-        <div style={{ color: riskTone.color, fontWeight: 700 }}>危険度: {riskTone.label}</div>
-        <div style={{ color: '#94a3b8', fontSize: 12 }}>{mockGameState.matchup.advice}</div>
-      </div>
-
-      <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
-        {mockGameState.actions.map((action) => (
-          <button
-            key={action.id}
-            type="button"
-            className="sim-btn"
-            style={{ margin: 0, minHeight: 44 }}
-            onClick={() => handleActionClick(action.id)}
-          >
-            {action.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="card2" style={{ display: 'grid', gap: 6 }}>
-        <div style={{ fontWeight: 700 }}>試合ログ</div>
-        <ul style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 4 }}>
-          {gameLog.slice(0, 8).map((item, index) => (
-            <li key={`${item}-${index}`} style={{ fontSize: 12, color: '#cbd5e1' }}>{item}</li>
+        <div className="card2 game-actions-card">
+          {mockGameState.actions.map((action) => (
+            <button
+              key={action.id}
+              type="button"
+              className="sim-btn"
+              style={{ margin: 0, minHeight: 44 }}
+              onClick={() => handleActionClick(action.id)}
+            >
+              {action.label}
+            </button>
           ))}
-        </ul>
+        </div>
+
+        <div className="card2 game-matchup-card">
+          <div>打者: {mockGameState.matchup.batter} vs 投手: {mockGameState.matchup.pitcher}</div>
+          <div style={{ color: riskTone.color, fontWeight: 700 }}>危険度: {riskTone.label}</div>
+          <div style={{ color: '#94a3b8', fontSize: 12 }}>{mockGameState.matchup.advice}</div>
+        </div>
+
+        <div className="card2 game-field-card">
+          <div style={{ fontWeight: 700 }}>塁状況</div>
+          <MiniField runners={mockGameState.runners} />
+        </div>
+
+        <div className="card2 game-log-card">
+          <div style={{ fontWeight: 700 }}>試合ログ</div>
+          <ul style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 4 }}>
+            {gameLog.slice(0, 8).map((item, index) => (
+              <li key={`${item}-${index}`} style={{ fontSize: 12, color: '#cbd5e1' }}>{item}</li>
+            ))}
+          </ul>
+        </div>
       </div>
     </section>
   );
