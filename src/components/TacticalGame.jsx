@@ -178,12 +178,30 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   const maxInn=Math.max(9,gs.inning);
   const innings=Array.from({length:maxInn},(_,i)=>i+1);
 
+  const opFatigue=calcEffectiveFatigue(gs.opPitchCount,gs.opPitcher);
+
   return(
     <div className="app">
       <div className="gscreen">
-        {/* LEFT: Main area */}
-        <div>
-          {/* Scoreboard */}
+
+        {/* ═══════════ 1. スコア ═══════════ */}
+        <section className="tg-section">
+          <div className="tg-section-label">① スコア</div>
+
+          {/* Score hero — 一瞬で点差が分かる */}
+          <div className="tg-score-hero">
+            <div>
+              <div className="tg-score-num" style={{color:gs.score.my>=gs.score.opp?"#f5c842":"#94a3b8"}}>{gs.score.my}</div>
+              <div className="tg-score-team" style={{color:myTeam.color}}>{myTeam.emoji} {myTeam.short}</div>
+            </div>
+            <div className="tg-score-divider">{gs.inning}回{gs.isTop?"表":"裏"}</div>
+            <div>
+              <div className="tg-score-num" style={{color:gs.score.opp>gs.score.my?"#f87171":"#94a3b8"}}>{gs.score.opp}</div>
+              <div className="tg-score-team" style={{color:oppTeam.color}}>{oppTeam.emoji} {oppTeam.short}</div>
+            </div>
+          </div>
+
+          {/* Compact scoreboard (inning-by-inning) */}
           <div className="scoreboard">
             <table className="sct">
               <thead><tr>
@@ -205,8 +223,13 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
               </tbody>
             </table>
           </div>
+        </section>
 
-          {/* Stop Banner */}
+        {/* ═══════════ 2. 状況 ═══════════ */}
+        <section className="tg-section">
+          <div className="tg-section-label">② 状況</div>
+
+          {/* Stop banner — 判断を促す */}
           {gs.stopped&&gs.stopData&&(
             <div className={`stop-banner ${gs.stopData.priority>=3?"danger":gs.stopData.reason==="scoring_chance"?"chance":"warning"}`}>
               <div style={{fontWeight:700,fontSize:14,marginBottom:4}}>{gs.stopData.label}</div>
@@ -220,89 +243,109 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
             </div>
           )}
 
-          {/* 攻守バナー */}
+          {/* 攻守 + ダイヤモンド + アウト */}
           <div className={`side-banner ${gs.isTop?"defending":"attacking"}`}>
-            <div style={{fontSize:26}}>{gs.isTop?"🛡️":"⚔️"}</div>
+            <div style={{fontSize:32}}>{gs.isTop?"🛡️":"⚔️"}</div>
             <div style={{flex:1}}>
-              <div className="side-banner-main">{gs.isTop?"守備中":"攻撃中"} — {gs.inning}回{gs.isTop?"表":"裏"}</div>
+              <div className="side-banner-main">{gs.isTop?"守備中":"攻撃中"}</div>
               <div className="side-banner-sub">
-                {gs.isTop?`${oppTeam.short}の攻撃 / 自チーム投手: ${curPitcher?.name||"—"}`:`自チームの攻撃 / ${gs.outs}アウト`}
+                {gs.bases.filter(Boolean).length>0?`${gs.bases.filter(Boolean).length}人の走者`:"走者なし"} ・ {gs.outs}アウト
+                {(gs.bases[1]||gs.bases[2])&&<span style={{color:"#f5c842",marginLeft:6}}>🔥 得点圏</span>}
               </div>
             </div>
-            <div style={{textAlign:"right"}}>
-              <div style={{fontSize:9,color:"#94a3b8",letterSpacing:".1em",marginBottom:2}}>{gs.isTop?"相手打者":"次打者"}</div>
-              <div style={{fontSize:14,fontWeight:700}}>{nextBatter?.name||"—"}</div>
-              {(()=>{const bs=getGameBattingStats(gs.log,nextBatter?.id);if(!bs)return<div style={{fontSize:9,color:"#94a3b8"}}>まだ打席なし</div>;return<div style={{fontSize:10,fontFamily:"'Share Tech Mono',monospace",color:"#e2e8f0"}}>{bs.ab}打{bs.h}安打{bs.hr>0?` ${bs.hr}HR`:""}</div>;})()}
-            </div>
-          </div>
-
-          {/* Diamond + Game Info */}
-          <div style={{display:"flex",gap:14,alignItems:"flex-start",marginBottom:10,flexWrap:"wrap"}}>
-            {/* Diamond */}
             <div style={{textAlign:"center"}}>
-              <div className="diamond">
+              <div className="diamond" style={{margin:"0 auto"}}>
                 <div className="base bH"/><div className={`base b1 ${gs.bases[0]?"on":""}`}/>
                 <div className={`base b2 ${gs.bases[1]?"on":""}`}/><div className={`base b3 ${gs.bases[2]?"on":""}`}/>
               </div>
-              <div className="odots">{[0,1,2].map(i=><div key={i} className={`odot ${i<gs.outs?"on":""}`}/>)}</div>
-              <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:22,color:"#374151",marginTop:4}}>
-                {gs.inning}回{gs.isTop?"表":"裏"}
-              </div>
-            </div>
-            {/* Score big */}
-            <div style={{flex:1,textAlign:"center",padding:"8px 0"}}>
-              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:38,color:gs.score.my>gs.score.opp?"#f5c842":gs.score.my<gs.score.opp?"#f87171":"#94a3b8"}}>
-                {gs.score.my} <span style={{color:"#1e2d3d",fontSize:22}}>–</span> {gs.score.opp}
-              </div>
-            </div>
-            {/* Pitcher info */}
-            <div className="card2" style={{minWidth:160,margin:0}}>
-              <div style={{fontSize:9,color:"#374151",letterSpacing:".2em",marginBottom:6}}>自チーム投手</div>
-              <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>{curPitcher?.name||"—"}</div>
-              <div style={{fontSize:10,color:"#374151",marginBottom:4}}>球数: <span style={{fontFamily:"monospace",color:calcEffectiveFatigue(gs.myPitchCount,gs.myPitcher)>=FATIGUE_WARNING?"#f87171":"#f5c842"}}>{gs.myPitchCount}</span>球</div>
-              {(()=>{const ps=getGamePitchingStats(gs.log,curPitcher?.id);if(!ps)return null;return<div className="gstat" style={{marginBottom:6}}>{ps.bf}打者 <span style={{color:"#a78bfa"}}>{ps.k}K</span> <span style={{color:"#f87171"}}>{ps.ha}被安打</span> <span style={{color:"#fbbf24"}}>{ps.ra}失点</span></div>;})()}
-              <div style={{fontSize:9,color:"#374151",marginBottom:3}}>疲労度</div>
-              <div style={{display:"flex",alignItems:"center",gap:6}}>
-                <div className="fat-bar" style={{flex:1}}>
-                  <div className="fat-fill" style={{width:`${fatigue}%`,background:fatigueColor}}/>
-                </div>
-                <span style={{fontFamily:"monospace",fontSize:10,color:fatigueColor,width:28}}>{fatigue}%</span>
-              </div>
-              <div style={{marginTop:6,fontSize:9,color:"#374151"}}>球速<OV v={curPitcher?.pitching?.velocity||0}/> 制球<OV v={curPitcher?.pitching?.control||0}/></div>
-              <div style={{marginTop:8,fontSize:9,color:"#374151",letterSpacing:".1em",marginBottom:4}}>投球方針</div>
-              <div style={{display:"flex",gap:3,flexWrap:"wrap"}}>
-                {PITCHING_POLICY_OPTS.map(opt=>(
-                  <button key={opt.id} onClick={()=>changePitchingPolicy(opt.id)} style={{padding:"3px 7px",fontSize:9,borderRadius:4,cursor:"pointer",border:pitchingPolicy===opt.id?"1px solid #f5c842":"1px solid rgba(255,255,255,.1)",background:pitchingPolicy===opt.id?"rgba(245,200,66,.15)":"rgba(255,255,255,.04)",color:pitchingPolicy===opt.id?"#f5c842":"#94a3b8",whiteSpace:"nowrap"}}>
-                    {opt.icon} {opt.label}
-                  </button>
-                ))}
-              </div>
+              <div className="odots" style={{marginTop:4}}>{[0,1,2].map(i=><div key={i} className={`odot ${i<gs.outs?"on":""}`}/>)}</div>
             </div>
           </div>
 
-          {/* Next batter matchup */}
-          <div className="card2" style={{marginBottom:10}}>
-            <div className="fsb">
+          {/* 自チーム投手 status */}
+          <div className="card2" style={{margin:0}}>
+            <div className="fsb" style={{marginBottom:6}}>
               <div>
-                <span style={{fontSize:9,color:"#374151",letterSpacing:".15em"}}>次打者vs投手</span>
-                <span style={{fontSize:12,fontWeight:700,marginLeft:8}}>{nextBatter?.name||"—"}</span>
+                <span style={{fontSize:9,color:"var(--dim)",letterSpacing:".2em",textTransform:"uppercase"}}>自チーム投手</span>
+                <span style={{fontWeight:700,fontSize:14,marginLeft:8}}>{curPitcher?.name||"—"}</span>
               </div>
+              <span style={{fontFamily:"monospace",fontSize:11,color:fatigue>=FATIGUE_WARNING?"#f87171":"#f5c842"}}>{gs.myPitchCount}球</span>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+              <div className="fat-bar" style={{flex:1}}>
+                <div className="fat-fill" style={{width:`${fatigue}%`,background:fatigueColor}}/>
+              </div>
+              <span style={{fontFamily:"monospace",fontSize:11,color:fatigueColor,width:36,textAlign:"right"}}>{fatigue}%</span>
+            </div>
+            {(()=>{const ps=getGamePitchingStats(gs.log,curPitcher?.id);if(!ps)return null;return<div className="gstat" style={{marginBottom:8}}>{ps.bf}打者 <span style={{color:"#a78bfa"}}>{ps.k}K</span> <span style={{color:"#f87171"}}>{ps.ha}被安打</span> <span style={{color:"#fbbf24"}}>{ps.ra}失点</span></div>;})()}
+            <div style={{display:"flex",gap:10,marginBottom:8,flexWrap:"wrap"}}>
+              <span style={{fontSize:11}}>球速<OV v={curPitcher?.pitching?.velocity||0}/></span>
+              <span style={{fontSize:11}}>制球<OV v={curPitcher?.pitching?.control||0}/></span>
+              <span style={{fontSize:11}}>変化<OV v={curPitcher?.pitching?.breaking||0}/></span>
+            </div>
+            <div style={{fontSize:9,color:"var(--dim)",letterSpacing:".15em",marginBottom:4,textTransform:"uppercase"}}>投球方針</div>
+            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+              {PITCHING_POLICY_OPTS.map(opt=>(
+                <button key={opt.id} onClick={()=>changePitchingPolicy(opt.id)} style={{padding:"5px 10px",fontSize:10,borderRadius:6,cursor:"pointer",border:pitchingPolicy===opt.id?"1px solid #f5c842":"1px solid rgba(255,255,255,.1)",background:pitchingPolicy===opt.id?"rgba(245,200,66,.15)":"rgba(255,255,255,.04)",color:pitchingPolicy===opt.id?"#f5c842":"#94a3b8",whiteSpace:"nowrap"}}>
+                  {opt.icon} {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ═══════════ 3. 対戦 ═══════════ */}
+        <section className="tg-section">
+          <div className="tg-section-label">③ 対戦</div>
+
+          {/* Matchup card — pitcher vs batter side-by-side */}
+          <div className="card2" style={{margin:0}}>
+            <div className="fsb" style={{marginBottom:8}}>
+              <span style={{fontSize:9,color:"var(--dim)",letterSpacing:".2em",textTransform:"uppercase"}}>{gs.isTop?"自投手 vs 相手打者":"相手投手 vs 自打者"}</span>
               <span className={`matchup-badge ${muClass}`}>{muLabel} ({mu>0?"+":""}{mu})</span>
             </div>
-            {nextBatter?.batting&&<div style={{display:"flex",gap:10,marginTop:6}}>
-              <span style={{fontSize:10}}>ミート<OV v={nextBatter.batting.contact}/></span>
-              <span style={{fontSize:10}}>長打<OV v={nextBatter.batting.power}/></span>
-              <span style={{fontSize:10}}>選球<OV v={nextBatter.batting.eye}/></span>
-            </div>}
-            {(()=>{const bs=getGameBattingStats(gs.log,nextBatter?.id);if(!bs)return<div className="gstat" style={{marginTop:4}}>まだ打席なし</div>;return<div className="gstat" style={{marginTop:4}}>今日: <span>{bs.ab}打{bs.h}安打</span>{bs.hr>0&&<> <span style={{color:"var(--gold)"}}>{bs.hr}HR</span></>}{bs.rbi>0&&<> <span>{bs.rbi}打点</span></>}{bs.bb>0&&<> <span>{bs.bb}四球</span></>}</div>;})()}
+            <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:"var(--sp-1)",alignItems:"center"}}>
+              {/* 投手 */}
+              <div>
+                <div style={{fontSize:9,color:"var(--dim)",letterSpacing:".15em",marginBottom:3,textTransform:"uppercase"}}>投手</div>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>
+                  {gs.isTop?(curPitcher?.name||"—"):(gs.opPitcher?.name||"—")}
+                  <HandBadge p={gs.isTop?curPitcher:gs.opPitcher}/>
+                </div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  <span style={{fontSize:10}}>球速<OV v={(gs.isTop?curPitcher:gs.opPitcher)?.pitching?.velocity||0}/></span>
+                  <span style={{fontSize:10}}>制球<OV v={(gs.isTop?curPitcher:gs.opPitcher)?.pitching?.control||0}/></span>
+                </div>
+                <div style={{fontSize:9,color:"var(--dim)",marginTop:4}}>
+                  疲労 {gs.isTop?fatigue:opFatigue}%
+                </div>
+              </div>
+
+              <div style={{textAlign:"center",fontSize:18,color:"var(--dim)"}}>VS</div>
+
+              {/* 打者 */}
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:9,color:"var(--dim)",letterSpacing:".15em",marginBottom:3,textTransform:"uppercase"}}>打者</div>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>{nextBatter?.name||"—"}</div>
+                {nextBatter?.batting&&<div style={{display:"flex",gap:6,justifyContent:"flex-end",flexWrap:"wrap"}}>
+                  <span style={{fontSize:10}}>ミート<OV v={nextBatter.batting.contact}/></span>
+                  <span style={{fontSize:10}}>長打<OV v={nextBatter.batting.power}/></span>
+                </div>}
+                {(()=>{const bs=getGameBattingStats(gs.log,nextBatter?.id);if(!bs)return<div style={{fontSize:9,color:"var(--dim)",marginTop:4}}>本日初打席</div>;return<div className="gstat" style={{marginTop:4}}>{bs.ab}打{bs.h}安打{bs.hr>0?` ${bs.hr}HR`:""}</div>;})()}
+              </div>
+            </div>
           </div>
+        </section>
+
+        {/* ═══════════ 4. 操作 ═══════════ */}
+        <section className="tg-section">
+          <div className="tg-section-label">④ 操作 ・ ログ</div>
 
           {/* Event Log */}
-          {modalWarning && <div className="notif nwarn" style={{marginTop:8}}>{modalWarning}</div>}
+          {modalWarning && <div className="notif nwarn">{modalWarning}</div>}
           <div className="evlog" ref={logRef}>
             {gs.log.map((e,i)=>{
               if(e.result==="change") return <div key={i} style={{padding:"3px 8px",fontSize:10,color:"#a78bfa",borderLeft:"3px solid #a78bfa",margin:"4px 0"}}>{e.text}</div>;
-              const isInnHdr=false;
               const cls=e.result==="hr"?"evi-hr":IS_HIT(e.result)?"evi-hit":IS_OUT(e.result)?"evi-out":"";
               return(
                 <div key={i} className={`evi ${cls}`}>
@@ -320,11 +363,40 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
             })}
           </div>
 
-          {/* Menus appear above sticky bar */}
+          {/* Bench / Bullpen quick reference */}
+          <details className="card2" style={{margin:0}}>
+            <summary style={{cursor:"pointer",fontSize:11,color:"var(--dim)",letterSpacing:".15em",textTransform:"uppercase",listStyle:"none"}}>
+              控え選手 ▸ ベンチ {gs.myBench.length} ・ ブルペン {gs.myBullpen.length}
+            </summary>
+            <div className="tg-quick-row" style={{marginTop:8}}>
+              <div>
+                <div style={{fontSize:9,color:"var(--dim)",marginBottom:4}}>ベンチ ({gs.myBench.length})</div>
+                {gs.myBench.length===0&&<div style={{color:"#1e2d3d",fontSize:11}}>なし</div>}
+                {gs.myBench.slice(0,6).map(p=>(
+                  <div key={p.id} className="bench-item">
+                    <span style={{fontSize:11,flex:1}}>{p.name}</span>
+                    <span style={{fontSize:9,color:"#374151"}}>{p.pos}</span>
+                    <OV v={Math.round((p.batting.contact+p.batting.power)/2)}/>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <div style={{fontSize:9,color:"var(--dim)",marginBottom:4}}>ブルペン ({gs.myBullpen.length})</div>
+                {gs.myBullpen.length===0&&<div style={{color:"#1e2d3d",fontSize:11}}>なし</div>}
+                {gs.myBullpen.slice(0,4).map(p=>(
+                  <div key={p.id} className="bench-item">
+                    <span style={{fontSize:11,flex:1}}>{p.name}<HandBadge p={p}/></span>
+                    <span style={{fontSize:9,color:"#374151"}}>{p.subtype}</span>
+                    <OV v={p.pitching.velocity}/>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </details>
 
           {/* PITCHER CHANGE MENU */}
           {showMenu==="pitcher"&&(
-            <div className="card" style={{marginTop:10}}>
+            <div className="card" style={{margin:0}}>
               <div className="card-h">投手交代 — ブルペンから選択</div>
               {gs.myBullpen.length===0&&<p style={{color:"#374151",fontSize:12}}>投手がいません</p>}
               {gs.myBullpen.map(p=>{
@@ -355,20 +427,18 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
 
           {/* PINCH HITTER MENU */}
           {showMenu==="pinch"&&(
-            <div className="card" style={{marginTop:10}}>
+            <div className="card" style={{margin:0}}>
               <div className="card-h">代打 — ベンチから選択</div>
               <div style={{fontSize:10,color:"#374151",marginBottom:8}}>次打者: <span style={{color:"#f5c842"}}>{nextBatter?.name}</span>（ミート:{nextBatter?.batting?.contact}）と交代</div>
               {gs.myBench.length===0&&<p style={{color:"#374151",fontSize:12}}>ベンチに選手がいません</p>}
               {gs.myBench.map(p=>{
                 const mu2=matchupScore(p,gs.isTop?curPitcher:gs.opPitcher);
-                const sb=saberBatter(p.stats);
                 return(
                   <div key={p.id} className="card2" style={{cursor:"pointer"}} onClick={()=>setSelectedPH(p.id)}>
                     <div className="fsb">
                       <div>
                         <span style={{fontWeight:700,fontSize:13}}>{p.name}</span>
                         <span style={{fontSize:10,color:"#374151",marginLeft:8}}>{p.pos} / {p.age}歳</span>
-                        
                       </div>
                       <div style={{display:"flex",gap:6,alignItems:"center"}}>
                         <span className={`matchup-badge ${mu2>15?"mu-adv":mu2>-15?"mu-even":"mu-dis"}`} style={{fontSize:9}}>{mu2>0?"+":""}{mu2}</span>
@@ -391,7 +461,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
 
           {/* STRATEGY MENU */}
           {showMenu==="strategy"&&(
-            <div className="card" style={{marginTop:10}}>
+            <div className="card" style={{margin:0}}>
               <div className="card-h">作戦指示</div>
               <div className="strat-grid">
                 {STRATEGY_OPTS.map(s=>(
@@ -409,89 +479,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
               </div>
             </div>
           )}
-        </div>{/* end LEFT */}
-
-        {/* RIGHT: Info Panel */}
-        <div>
-          {/* Current inning summary */}
-          <div className="card">
-            <div className="card-h">得点状況</div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-              {gs.inningSummary.map((s,i)=>(
-                <div key={i} style={{textAlign:"center",minWidth:32}}>
-                  <div style={{fontSize:8,color:"#1e2d3d"}}>{s.inning}{s.isTop?"表":"裏"}</div>
-                  <div style={{fontFamily:"monospace",fontSize:14,color:s.runs>0?(!s.isTop?"#f5c842":"#34d399"):"#1e2d3d"}}>{s.runs}</div>
-                </div>
-              ))}
-              {gs.inningSummary.length===0&&<span style={{color:"#1e2d3d",fontSize:11}}>試合開始前</span>}
-            </div>
-            <div className="divider"/>
-            <div style={{display:"flex",gap:10,justifyContent:"center"}}>
-              <div style={{textAlign:"center"}}>
-                <div style={{fontSize:9,color:"#374151",marginBottom:3}}>自チーム</div>
-                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:26,color:"#f5c842"}}>{gs.score.my}</div>
-              </div>
-              <div style={{alignSelf:"center",color:"#1e2d3d",fontSize:18}}>—</div>
-              <div style={{textAlign:"center"}}>
-                <div style={{fontSize:9,color:"#374151",marginBottom:3}}>相手</div>
-                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:26,color:"#94a3b8"}}>{gs.score.opp}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* 得点圏サマリー */}
-          <div className="card">
-            <div className="card-h">得点圏状況</div>
-            <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:8}}>
-              <div className="diamond" style={{width:60,height:60}}>
-                <div className="base bH" style={{width:10,height:10}}/><div className={`base b1 ${gs.bases[0]?"on":""}`} style={{width:10,height:10}}/><div className={`base b2 ${gs.bases[1]?"on":""}`} style={{width:10,height:10}}/><div className={`base b3 ${gs.bases[2]?"on":""}`} style={{width:10,height:10}}/>
-              </div>
-              <div>
-                <div style={{fontSize:11,color:"#374151"}}>{gs.bases.filter(Boolean).length>0?`${gs.bases.filter(Boolean).length}人の走者あり`:"走者なし"}</div>
-                {(gs.bases[1]||gs.bases[2])&&<div style={{fontSize:10,color:"#f5c842",marginTop:2}}>🔥 得点圏にランナー</div>}
-                <div style={{fontSize:10,color:"#374151",marginTop:2}}>{gs.outs}アウト</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Bench remaining */}
-          <div className="card">
-            <div className="card-h">ベンチ残り ({gs.myBench.length}人)</div>
-            {gs.myBench.length===0&&<p style={{color:"#1e2d3d",fontSize:11}}>なし</p>}
-            {gs.myBench.slice(0,6).map(p=>(
-              <div key={p.id} className="bench-item">
-                <span style={{fontSize:11,flex:1}}>{p.name}</span>
-                <span style={{fontSize:9,color:"#374151"}}>{p.pos}</span>
-                <OV v={Math.round((p.batting.contact+p.batting.power)/2)}/>
-              </div>
-            ))}
-            <div className="divider"/>
-            <div style={{fontSize:9,color:"#374151",marginBottom:4}}>ブルペン ({gs.myBullpen.length}人)</div>
-            {gs.myBullpen.slice(0,4).map(p=>(
-              <div key={p.id} className="bench-item">
-                <span style={{fontSize:11,flex:1}}>{p.name}<HandBadge p={p}/></span>
-                <span style={{fontSize:9,color:"#374151"}}>{p.subtype}</span>
-                <OV v={p.pitching.velocity}/>
-              </div>
-            ))}
-          </div>
-
-          {/* Opponent pitcher */}
-          <div className="card">
-            <div className="card-h">相手投手</div>
-            <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>{gs.opPitcher?.name||"—"}<HandBadge p={gs.opPitcher}/></div>
-            <div style={{display:"flex",gap:8,marginBottom:6}}>
-              <span style={{fontSize:11}}>球速<OV v={gs.opPitcher?.pitching?.velocity||0}/></span>
-              <span style={{fontSize:11}}>制球<OV v={gs.opPitcher?.pitching?.control||0}/></span>
-              <span style={{fontSize:11}}>変化<OV v={gs.opPitcher?.pitching?.breaking||0}/></span>
-            </div>
-            <div style={{fontSize:10,color:"#374151"}}>球数: <span style={{color:"#94a3b8",fontFamily:"monospace"}}>{gs.opPitchCount}球</span></div>
-            <div style={{fontSize:9,color:"#374151",marginTop:3}}>疲労</div>
-            <div className="fat-bar" style={{marginTop:3}}>
-              <div className="fat-fill" style={{width:`${calcEffectiveFatigue(gs.opPitchCount,gs.opPitcher)}%`,background:"#f87171"}}/>
-            </div>
-          </div>
-        </div>
+        </section>
       </div>
       {/* STICKY CONTROL BAR - always visible at bottom */}
       <div className="ctrl-bar">
