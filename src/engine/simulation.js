@@ -97,12 +97,12 @@ export const DEFAULT_LEAGUE_ENV = {
   bbMod: 0.96,  // 投高打低緩和: 四球率 5.6%→7.3% 目標 (旧: 1.00)
   kMod: 0.89,   // 投高打低緩和: 三振過剰を抑制 (旧: 1.00)
   hitMod: 1.02, // legacy: 物理結果には適用しない（互換維持のため保持）
-  evMod: 0.94,
-  laMod: -3,
-  barrelRateMod: 0.7,
-  hardRateMod: 0.82,
+  evMod: 0.97,
+  laMod: -1.8,
+  barrelRateMod: 0.82,
+  hardRateMod: 0.89,
   wallHeightMod: 1.1,
-  catchMod: 0.90,
+  catchMod: 0.89,
   label: '通常',
 };
 
