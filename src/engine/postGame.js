@@ -42,8 +42,16 @@ function buildBattedBallEvent(e, gameDay) {
 
   const safeSpray = Number.isFinite(e.sprayAngle) ? Math.max(0, Math.min(90, Number(e.sprayAngle))) : 45;
   const safeDist = Number.isFinite(e.dist) ? Math.max(0, Math.min(220, Number(e.dist))) : 0;
+  const safeFenceDistance = Number.isFinite(e?.physicsMeta?.fenceDistance)
+    ? Math.max(85, Math.min(140, Number(e.physicsMeta.fenceDistance)))
+    : 100;
+
+  const maxDisplayDistance = Math.max(110, safeFenceDistance * 1.18);
+
   const x = normalizeBattedBallCoordinate(safeSpray / 90, 0.5);
-  const y = normalizeBattedBallCoordinate(safeDist / 220, 0);
+  const y = normalizeBattedBallCoordinate(safeDist / maxDisplayDistance, 0);
+  const fenceRatio = normalizeBattedBallCoordinate(safeFenceDistance / maxDisplayDistance, 0.82);
+
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
 
   return {
@@ -54,6 +62,11 @@ function buildBattedBallEvent(e, gameDay) {
     hitType: mapHitTypeFromResult(e.result),
     exitVelo: Number(e.ev),
     launchAngle: Number.isFinite(e.la) ? Number(e.la) : 0,
+    distance: safeDist,
+    sprayAngle: safeSpray,
+    fenceDistance: safeFenceDistance,
+    fenceRatio,
+    isHrByTrajectory: Boolean(e?.physicsMeta?.isHrByTrajectory),
   };
 }
 
@@ -263,7 +276,19 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0) 
         // ⚠️ セキュリティ: ログ由来値は有限数に検証し、安全な範囲へ丸めて保持する
         const safeDist = Number.isFinite(e.dist) ? Math.max(0, Math.min(220, Number(e.dist))) : 0;
         const safeSpray = Number.isFinite(e.sprayAngle) ? Math.max(0, Math.min(90, Number(e.sprayAngle))) : 45;
-        newSprayPoints.push({ dist: safeDist, sprayAngle: safeSpray, result: String(e.result || 'out') });
+        const safeFenceDistance = Number.isFinite(e?.physicsMeta?.fenceDistance)
+          ? Math.max(85, Math.min(140, Number(e.physicsMeta.fenceDistance)))
+          : null;
+        
+        const safeIsHrByTrajectory = Boolean(e?.physicsMeta?.isHrByTrajectory);
+        
+        newSprayPoints.push({
+          dist: safeDist,
+          sprayAngle: safeSpray,
+          result: String(e.result || 'out'),
+          fenceDistance: safeFenceDistance,
+          isHrByTrajectory: safeIsHrByTrajectory,
+        });
         const event = buildBattedBallEvent(e, gameDay);
         if (event) newBattedBallEvents.push(event);
       }
