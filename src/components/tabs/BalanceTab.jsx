@@ -124,7 +124,7 @@ function StatusBadge({ val, baseline, invert = false }) {
 }
 
 // ── メインコンポーネント ──────────────────────────────────────
-export function BalanceTab({ teams, myTeam, upd, myId }) {
+export function BalanceTab({ teams, myTeam }) {
   const [simRows, setSimRows] = useState([]);
   const [busy, setBusy]       = useState(false);
   const [mcBusy, setMcBusy] = useState(false);
@@ -132,11 +132,6 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
   const [mcRows, setMcRows] = useState([]);
 
   const leagueEnv = myTeam?.leagueEnv || DEFAULT_LEAGUE_ENV;
-
-  const resetKnobs = useCallback(() => {
-    if (!upd || !myId) return;
-    upd(myId, t => ({ ...t, leagueEnv: { ...DEFAULT_LEAGUE_ENV } }));
-  }, [upd, myId]);
 
   // Section 1: リーグ全体集計
   const league = useMemo(() => {
@@ -224,6 +219,36 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
     }, 10);
   }, [mcBusy, leagueEnv]);
 
+  const monteCarloRecommendation = useMemo(() => {
+    if (!Array.isArray(mcRows) || mcRows.length === 0) return null;
+    const validRows = mcRows.filter((row) => Number.isFinite(row?.teamHrPerGame));
+    if (validRows.length === 0) return null;
+    const avgTeamHrPerGame = validRows.reduce((sum, row) => sum + row.teamHrPerGame, 0) / validRows.length;
+    const baselineTeamHrPerGame = BASELINE.hr * 38;
+    const ratio = baselineTeamHrPerGame > 0 ? avgTeamHrPerGame / baselineTeamHrPerGame : 1;
+    const percentGap = (ratio - 1) * 100;
+
+    let recommendation = '現状維持';
+    let adjustmentDirection = '調整不要';
+    if (ratio > 1.15) {
+      recommendation = '長打抑制を推奨';
+      adjustmentDirection = '打球の強さを下げる方向';
+    } else if (ratio < 0.85) {
+      recommendation = '長打増加を推奨';
+      adjustmentDirection = '打球の強さを上げる方向';
+    }
+
+    return {
+      avgTeamHrPerGame,
+      baselineTeamHrPerGame,
+      ratio,
+      percentGap,
+      recommendation,
+      adjustmentDirection,
+      recommendedMultiplier: Number.isFinite(ratio) && ratio > 0 ? 1 / ratio : 1,
+    };
+  }, [mcRows]);
+
   return (
     <div>
 
@@ -308,6 +333,23 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
             </tbody>
           </table>
         </div>
+        {monteCarloRecommendation && (
+          <div style={{ marginTop: 10, fontSize: 11, color: '#d1d5db', lineHeight: 1.6 }}>
+            <div>
+              基準比較: 平均 team HR/game は <span className="mono">{monteCarloRecommendation.avgTeamHrPerGame.toFixed(2)}</span>、
+              2024NPB基準は <span className="mono">{monteCarloRecommendation.baselineTeamHrPerGame.toFixed(2)}</span> です。
+            </div>
+            <div>
+              乖離率【＝基準との差の割合】: <span className="mono">{monteCarloRecommendation.percentGap >= 0 ? '+' : ''}{monteCarloRecommendation.percentGap.toFixed(1)}%</span> /
+              推奨: <b>{monteCarloRecommendation.recommendation}</b>（{monteCarloRecommendation.adjustmentDirection}）。
+            </div>
+            <div>
+              推奨調整量【＝目標値へ近づける倍率】:
+              <span className="mono"> ×{monteCarloRecommendation.recommendedMultiplier.toFixed(3)}</span>
+              （1.000に近いほど微調整で十分）。
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ═══════════════════════════════════════
@@ -374,21 +416,7 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
       </div>
 
       {/* ═══════════════════════════════════════
-          Section 3: リーグ環境ノブ
-      ═══════════════════════════════════════ */}
-      {myTeam && upd && (
-        <div className="card">
-          <div className="card-h">🎛️ リーグ環境設定（物理演算主導のため廃止予定）</div>
-          <p style={{ fontSize: 11, color: '#f5c842', margin: '4px 0 10px' }}>
-            ⚠️ 現在の物理演算主導方針では、係数スライダーはバランス検証を混乱させるため非表示化しました。<br />
-            調整は「物理HR Monte Carlo検証」の結果を見ながら、EV/LA/contactQuality 側で行ってください。
-          </p>
-          <button className="bsm" style={{ background: 'rgba(255,255,255,.08)', fontSize: 10 }} onClick={resetKnobs}>係数を既定値へリセット</button>
-        </div>
-      )}
-
-      {/* ═══════════════════════════════════════
-          Section 4: バランス設定値（エンジン定数）
+          Section 3: バランス設定値（エンジン定数）
       ═══════════════════════════════════════ */}
       <div className="card">
         <div className="card-h">⚙️ 現在のバランス設定値（エンジン定数）</div>
