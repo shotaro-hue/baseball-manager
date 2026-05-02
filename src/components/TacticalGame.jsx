@@ -5,6 +5,7 @@ import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 import { initGameState, matchupScore, calcEffectiveFatigue, processAtBat, endHalfInning, checkStopCondition, STADIUMS, TEAM_STADIUM } from '../engine/simulation';
 import { OV, CondBadge, HandBadge, PitchBadge } from './ui';
 import Baseball3DModal from './Baseball3DModal';
+import PhysicsInsightPanel from './game/PhysicsInsightPanel';
 
 
 
@@ -179,6 +180,8 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   const innings=Array.from({length:maxInn},(_,i)=>i+1);
 
   const opFatigue=calcEffectiveFatigue(gs.opPitchCount,gs.opPitcher);
+  const lastPlay = gs.log.length > 0 ? gs.log[gs.log.length - 1] : null;
+  const safePhysicsMeta = (lastPlay && typeof lastPlay === "object" && !Array.isArray(lastPlay)) ? lastPlay.physicsMeta : null;
 
   return(
     <div className="app">
@@ -343,6 +346,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
 
           {/* Event Log */}
           {modalWarning && <div className="notif nwarn">{modalWarning}</div>}
+          {safePhysicsMeta && <PhysicsInsightPanel physicsMeta={safePhysicsMeta} />}
           <div className="evlog" ref={logRef}>
             {gs.log.map((e,i)=>{
               if(e.result==="change") return <div key={i} style={{padding:"3px 8px",fontSize:10,color:"#a78bfa",borderLeft:"3px solid #a78bfa",margin:"4px 0"}}>{e.text}</div>;
