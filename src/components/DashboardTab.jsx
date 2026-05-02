@@ -61,7 +61,7 @@ export function DashboardTab({ myTeam, teams, schedule, gameDay, recentResults, 
 
   return (
     <div className="manager-dashboard-grid">
-      <TodayGameCard todayGame={todayGame} gameDay={gameDay} onGoGame={() => onTabSwitch('schedule')} />
+      <TodayGameCard todayGame={todayGame} gameDay={gameDay} onGoGame={() => onTabSwitch('game_action')} />
       <RecommendationCard items={recommendationItems} onTabSwitch={onTabSwitch} />
       <TeamConditionCard
         runDiff={runDiff}
