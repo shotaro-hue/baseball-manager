@@ -9,6 +9,7 @@ const HIT_TYPE_STYLES = {
 };
 
 const DEFAULT_STYLE = { color: "#6b7280", label: "その他" };
+const DEFAULT_FENCE_RATIO = 0.84;
 const CHART_SIZE = 260;
 const CHART_PADDING = 18;
 const DOT_RADIUS = 4;
@@ -37,7 +38,11 @@ function sanitizeEvents(events) {
       const y = normalizeCoordinate(event?.y);
       const hitType = typeof event?.hitType === "string" ? event.hitType : "out";
 
-      // ⚠️ 不正値は描画に渡さず除外して無害化する
+      const rawFenceRatio = Number(event?.fenceRatio);
+      const fenceRatio = Number.isFinite(rawFenceRatio)
+        ? Math.min(0.95, Math.max(0.55, rawFenceRatio))
+        : DEFAULT_FENCE_RATIO;
+
       if (!Number.isFinite(x) || !Number.isFinite(y)) {
         return null;
       }
@@ -47,6 +52,7 @@ function sanitizeEvents(events) {
         x,
         y,
         hitType,
+        fenceRatio,
       };
     })
     .filter(Boolean);
@@ -69,8 +75,16 @@ function toChartPoint(event) {
 
 export function SprayChart({ events }) {
   const safeEvents = sanitizeEvents(events);
-  const leftFoulPoint = polarToPoint(Math.PI - FOUL_ANGLE_RAD, FIELD_RADIUS);
-  const rightFoulPoint = polarToPoint(FOUL_ANGLE_RAD, FIELD_RADIUS);
+  const avgFenceRatio =
+  safeEvents.length > 0
+    ? safeEvents.reduce((sum, event) => sum + (Number.isFinite(event.fenceRatio) ? event.fenceRatio : DEFAULT_FENCE_RATIO), 0) / safeEvents.length
+    : DEFAULT_FENCE_RATIO;
+  
+  const fenceRadius = FIELD_RADIUS * avgFenceRatio;
+  const warningTrackRadius = fenceRadius * 0.92;
+  
+  const leftFoulPoint = polarToPoint(Math.PI - FOUL_ANGLE_RAD, fenceRadius);
+  const rightFoulPoint = polarToPoint(FOUL_ANGLE_RAD, fenceRadius);
   const infieldLeftPoint = polarToPoint(Math.PI - FOUL_ANGLE_RAD, INFIELD_RADIUS);
   const infieldRightPoint = polarToPoint(FOUL_ANGLE_RAD, INFIELD_RADIUS);
 
@@ -107,7 +121,7 @@ export function SprayChart({ events }) {
 
         {/* ウォーニングトラック【＝フェンス手前の帯】 */}
         <path
-          d={`M ${polarToPoint(Math.PI - FOUL_ANGLE_RAD, WARNING_TRACK_RADIUS).x} ${polarToPoint(Math.PI - FOUL_ANGLE_RAD, WARNING_TRACK_RADIUS).y} A ${WARNING_TRACK_RADIUS} ${WARNING_TRACK_RADIUS} 0 0 1 ${polarToPoint(FOUL_ANGLE_RAD, WARNING_TRACK_RADIUS).x} ${polarToPoint(FOUL_ANGLE_RAD, WARNING_TRACK_RADIUS).y}`}
+          d={`M ${polarToPoint(Math.PI - FOUL_ANGLE_RAD, warningTrackRadius).x} ${polarToPoint(Math.PI - FOUL_ANGLE_RAD, warningTrackRadius).y} A ${warningTrackRadius} ${warningTrackRadius} 0 0 1 ${polarToPoint(FOUL_ANGLE_RAD, warningTrackRadius).x} ${polarToPoint(FOUL_ANGLE_RAD, warningTrackRadius).y}`}
           fill="none"
           stroke="rgba(251,191,36,0.35)"
           strokeWidth="1.2"
