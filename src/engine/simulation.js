@@ -1,6 +1,6 @@
 import { rng, rngf, clamp } from '../utils';
 import { PITCH_NORM, PITCH_HARD_CAP, FATIGUE_WARNING, FATIGUE_LIMIT, PHYSICS_BAT } from '../constants';
-import { calcSprayAngle, resolveFieldSideBySprayAngle, sanitizeEnvironment, simulateFlight } from './physics';
+import { calcSprayAngle, classifyBattedBallType, resolveFieldSideBySprayAngle, sanitizeEnvironment, simulateFlight } from './physics';
 
 /* ================================================================
    SIMULATION ENGINE v4.0
