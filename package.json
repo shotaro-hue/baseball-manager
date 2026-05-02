@@ -9,7 +9,8 @@
     "tunnel": "lt --port 5173",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "validate:physics-hr": "vitest run scripts/validate-physics-hr.test.js"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",

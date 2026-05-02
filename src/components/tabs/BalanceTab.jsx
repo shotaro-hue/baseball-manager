@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { simAtBat, BASELINE, ABILITY_RANGE, DEFAULT_LEAGUE_ENV } from '../../engine/simulation';
+import { simAtBat, BASELINE, ABILITY_RANGE, DEFAULT_LEAGUE_ENV, _resolveBattedBallOutcomeFromPhysics_TEST, STADIUMS } from '../../engine/simulation';
 
 /* ================================================================
    BALANCE TAB
@@ -36,17 +36,25 @@ function mkPit(a) {
 // ── N 打席シミュレーション ────────────────────────────────────
 function runPASim(bat, pit, n, leagueEnv = DEFAULT_LEAGUE_ENV) {
   const c = {};
-  for (let i = 0; i < n; i++) {
-    const { result } = simAtBat(bat, pit, 'normal', 0, {}, leagueEnv);
-    c[result] = (c[result] || 0) + 1;
+  const safeN = Number.isFinite(Number(n)) ? Math.max(1, Math.floor(Number(n))) : 1;
+  const stadium = STADIUMS.tokyo_dome;
+  for (let i = 0; i < safeN; i++) {
+    const { result } = simAtBat(bat, pit, 'normal', 0, { stadium: 'tokyo_dome' }, leagueEnv);
+    if (result === 'inplay') {
+      const resolved = _resolveBattedBallOutcomeFromPhysics_TEST(bat, pit, stadium, {}, {});
+      const finalResult = resolved?.result || 'out';
+      c[finalResult] = (c[finalResult] || 0) + 1;
+    } else {
+      c[result] = (c[result] || 0) + 1;
+    }
   }
   const h  = (c.s || 0) + (c.d || 0) + (c.t || 0) + (c.hr || 0);
-  const ab = n - (c.bb || 0) - (c.hbp || 0);
+  const ab = safeN - (c.bb || 0) - (c.hbp || 0);
   return {
     ba:    ab > 0 ? h / ab : 0,
-    kPct:  (c.k  || 0) / n,
-    bbPct: (c.bb || 0) / n,
-    hrPct: (c.hr || 0) / n,
+    kPct:  (c.k  || 0) / safeN,
+    bbPct: (c.bb || 0) / safeN,
+    hrPct: (c.hr || 0) / safeN,
   };
 }
 
@@ -86,6 +94,9 @@ const KNOB_DEFS = [
 export function BalanceTab({ teams, myTeam, upd, myId }) {
   const [simRows, setSimRows] = useState([]);
   const [busy, setBusy]       = useState(false);
+  const [mcBusy, setMcBusy] = useState(false);
+  const [mcError, setMcError] = useState('');
+  const [mcRows, setMcRows] = useState([]);
 
   const leagueEnv = myTeam?.leagueEnv || DEFAULT_LEAGUE_ENV;
 
@@ -159,6 +170,61 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
     return good ? '#34d399' : '#f87171';
   };
 
+  const doMonteCarloValidation = useCallback(() => {
+    if (mcBusy) return;
+    setMcBusy(true);
+    setMcError('');
+    setTimeout(() => {
+      try {
+        const TOTAL_PA = 8000;
+        const stadium = STADIUMS.tokyo_dome;
+        const pitcher = { pitching: { velocity: 60, breaking: 60, control: 60 }, condition: 100, morale: 70 };
+        const profiles = [
+          { label: 'power70', batting: { power: 70, contact: 55, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 } },
+          { label: 'power80', batting: { power: 80, contact: 58, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 } },
+          { label: 'power90', batting: { power: 90, contact: 60, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 } },
+        ];
+        const nextRows = profiles.map((profile) => {
+          const counter = { pa: 0, bip: 0, hr: 0, evSum: 0, laSum: 0, distSum: 0, q: { weak: 0, normal: 0, solid: 0, hard: 0, barrel: 0 } };
+          for (let i = 0; i < TOTAL_PA; i += 1) {
+            const atBat = simAtBat({ batting: profile.batting, condition: 100, morale: 70 }, pitcher, 'normal', 0, { stadium: 'tokyo_dome' }, leagueEnv);
+            const resolved = atBat.result === 'inplay'
+              ? _resolveBattedBallOutcomeFromPhysics_TEST({ batting: profile.batting, condition: 100, morale: 70 }, pitcher, stadium, {}, {})
+              : { result: atBat.result, physicsMeta: null };
+            const physicsMeta = resolved?.physicsMeta || {};
+            const quality = ['weak', 'normal', 'solid', 'hard', 'barrel'].includes(physicsMeta.quality) ? physicsMeta.quality : 'normal';
+            counter.pa += 1;
+            if (atBat.result === 'inplay') counter.bip += 1;
+            if (resolved.result === 'hr') counter.hr += 1;
+            counter.evSum += Number(physicsMeta.ev) || 0;
+            counter.laSum += Number(physicsMeta.la) || 0;
+            counter.distSum += Number(physicsMeta.distance) || 0;
+            if (atBat.result === 'inplay') counter.q[quality] += 1;
+          }
+          const hrPerBip = counter.hr / Math.max(counter.bip, 1);
+          const hrPerPa = counter.hr / Math.max(counter.pa, 1);
+          return {
+            label: profile.label,
+            pa: counter.pa,
+            hrPerBip,
+            hrPerPa,
+            teamHrPerGame: hrPerPa * 38,
+            avgEv: counter.evSum / Math.max(counter.bip, 1),
+            avgLa: counter.laSum / Math.max(counter.bip, 1),
+            avgDistance: counter.distSum / Math.max(counter.bip, 1),
+            qualityRate: Object.fromEntries(Object.entries(counter.q).map(([k, v]) => [k, v / Math.max(counter.bip, 1)])),
+          };
+        });
+        setMcRows(nextRows);
+      } catch (error) {
+        // ⚠️ セキュリティ: 例外を握り潰さず、機密情報を含まない安全な文言で表示
+        setMcError(error instanceof Error ? error.message : 'Monte Carlo検証で不明なエラーが発生しました。');
+      } finally {
+        setMcBusy(false);
+      }
+    }, 10);
+  }, [mcBusy, leagueEnv]);
+
   return (
     <div>
 
@@ -212,6 +278,37 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
             </table>
           </div>
         )}
+      </div>
+
+      <div className="card">
+        <div className="card-h" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>🧪 物理HR Monte Carlo検証（リーグ分析タブ内実行）</span>
+          <button className="bsm bga" onClick={doMonteCarloValidation} disabled={mcBusy}>
+            {mcBusy ? '検証中…' : '▶ 検証実行'}
+          </button>
+        </div>
+        <p style={{ fontSize: 11, color: '#374151', margin: '4px 0 8px' }}>
+          HR/BIP【＝本塁打 ÷ インプレー打球数】や平均EV【＝打球初速】・LA【＝打球角度】を、ゲーム画面上で直接確認できます。
+        </p>
+        {mcError && <div style={{ fontSize: 11, color: '#f87171', marginBottom: 8 }}>⚠️ {mcError}</div>}
+        <div style={{ overflowX: 'auto' }}>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>プロファイル</th><th>PA</th><th>HR/BIP</th><th>HR/PA</th><th>team HR/game</th><th>平均EV</th><th>平均LA</th><th>平均飛距離</th>
+              </tr>
+            </thead>
+            <tbody>
+              {!mcBusy && mcRows.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', fontSize: 11, color: '#374151' }}>「検証実行」を押すと結果が表示されます</td></tr>}
+              {mcBusy && <tr><td colSpan={8} style={{ textAlign: 'center', color: '#f5c842' }}>検証中…</td></tr>}
+              {mcRows.map((row) => (
+                <tr key={row.label}>
+                  <td>{row.label}</td><td className="mono">{row.pa.toLocaleString()}</td><td className="mono">{(row.hrPerBip * 100).toFixed(2)}%</td><td className="mono">{(row.hrPerPa * 100).toFixed(2)}%</td><td className="mono">{row.teamHrPerGame.toFixed(2)}</td><td className="mono">{row.avgEv.toFixed(1)}</td><td className="mono">{row.avgLa.toFixed(1)}</td><td className="mono">{row.avgDistance.toFixed(1)}m</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* ═══════════════════════════════════════
