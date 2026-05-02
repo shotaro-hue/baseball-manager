@@ -685,6 +685,17 @@ function checkStopCondition(gs) {
   return null;
 }
 
+
+function replacePitcherInBattingOrder(lineup, currentPitcherId, nextPitcher) {
+  // 入力値検証【＝想定外の値を弾いて安全に処理する】
+  if (!Array.isArray(lineup) || !nextPitcher?.id) return lineup;
+  const pitcherSlotIndex = lineup.findIndex(p => p?.id === currentPitcherId && p?.isPitcher);
+  if (pitcherSlotIndex === -1) return lineup;
+  const nextLineup = [...lineup];
+  nextLineup[pitcherSlotIndex] = nextPitcher;
+  return nextLineup;
+}
+
 // バッチシム用: 先発→中継ぎ→セットアッパー→抑えの流れを意識して自動継投
 function autoSwapPitcher(gs, side) {
   const pitcher = side === 'my' ? gs.myPitcher : gs.opPitcher;
@@ -751,9 +762,25 @@ function autoSwapPitcher(gs, side) {
   const resetState = makePitcherState(gs.inning, gs.isTop);
 
   if (side === 'my') {
-    return { ...gs, myPitcher: nextPitcher, myBullpen: newBullpen, myPitchCount: 0, myPitcherState: resetState };
+    const nextMyLineup = replacePitcherInBattingOrder(gs.myLineup, pitcher?.id, nextPitcher);
+    return {
+      ...gs,
+      myPitcher: nextPitcher,
+      myLineup: nextMyLineup,
+      myBullpen: newBullpen,
+      myPitchCount: 0,
+      myPitcherState: resetState,
+    };
   }
-  return { ...gs, opPitcher: nextPitcher, opBullpen: newBullpen, opPitchCount: 0, opPitcherState: resetState };
+  const nextOpLineup = replacePitcherInBattingOrder(gs.opLineup, pitcher?.id, nextPitcher);
+  return {
+    ...gs,
+    opPitcher: nextPitcher,
+    opLineup: nextOpLineup,
+    opBullpen: newBullpen,
+    opPitchCount: 0,
+    opPitcherState: resetState,
+  };
 }
 
 /**
