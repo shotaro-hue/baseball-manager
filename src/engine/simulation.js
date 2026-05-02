@@ -312,7 +312,7 @@ function applyBatterSituation(bat, situation) {
 }
 
 
-const MIN_HR_CLEARANCE = 2; // フェンスを明確に越えた打球を本塁打扱いにする閾値（m）
+const MIN_HR_CLEARANCE = 4; // 打高是正: フェンス越え判定を厳格化しHR過多を抑制
 const SAFE_STADIUM_DIMENSION = 100;
 const SAFE_EV = 135;
 const SAFE_LA = 12;
@@ -337,22 +337,22 @@ function estimateFielderIntercept(distance, ballType, spraySide, rngProvider = r
   const safeSpraySide = ['left', 'center', 'right'].includes(spraySide) ? spraySide : 'center';
   const safeRng = typeof rngProvider === 'function' ? rngProvider : rngf;
 
-  let interceptRate = 0.6;
+  let interceptRate = 0.64;
   if (safeBallType === 'fly') {
     // 深い外野フライほど捕球率を下げる簡易モデル
-    interceptRate = safeDistance >= 105 ? 0.3 : safeDistance >= 90 ? 0.45 : 0.62;
+    interceptRate = safeDistance >= 105 ? 0.34 : safeDistance >= 90 ? 0.50 : 0.66;
   } else if (safeBallType === 'liner') {
     // ライナーは安打寄り（捕球されにくい）
-    interceptRate = safeDistance >= 70 ? 0.28 : 0.38;
+    interceptRate = safeDistance >= 70 ? 0.34 : 0.44;
   } else if (safeBallType === 'grounder') {
     // ゴロは内野安打/ゴロアウトの分岐
-    interceptRate = safeDistance <= 30 ? 0.78 : safeDistance <= 45 ? 0.62 : 0.4;
+    interceptRate = safeDistance <= 30 ? 0.80 : safeDistance <= 45 ? 0.66 : 0.44;
   }
 
   if (safeSpraySide === 'center') interceptRate += 0.04;
   else interceptRate -= 0.03;
 
-  const clampedRate = clamp(interceptRate, 0.05, 0.95);
+  const clampedRate = clamp(interceptRate, 0.08, 0.95);
   const randomRoll = safeRng(0, 1);
   return {
     caught: randomRoll < clampedRate,
@@ -409,10 +409,10 @@ function resolveBattedBallOutcomeFromPhysics(batter, pitcher, stadium, environme
     const tripleBoost = BASELINE.t / Math.max(BASELINE.t + BASELINE.d + BASELINE.s, 0.0001);
     const outBoost = BASELINE.out / (BASELINE.out + BASELINE.s);
     const reroll = rngProvider(0, 1);
-    if (result === 'out' && reroll > outBoost + 0.02) result = 's';
-    if (result === 's' && reroll < singleBoost * 0.12) result = 'out';
-    if (result === 's' && reroll > 1 - doubleBoost * 0.35) result = 'd';
-    if (result === 'd' && reroll > 1 - tripleBoost * 0.18) result = 't';
+    if (result === 'out' && reroll > outBoost + 0.05) result = 's';
+    if (result === 's' && reroll < singleBoost * 0.22) result = 'out';
+    if (result === 's' && reroll > 1 - doubleBoost * 0.24) result = 'd';
+    if (result === 'd' && reroll > 1 - tripleBoost * 0.12) result = 't';
   }
 
   return {
