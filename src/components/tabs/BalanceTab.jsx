@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { simAtBat, BASELINE, ABILITY_RANGE, DEFAULT_LEAGUE_ENV } from '../../engine/simulation';
+import { simAtBat, BASELINE, ABILITY_RANGE, DEFAULT_LEAGUE_ENV, _resolveBattedBallOutcomeFromPhysics_TEST, STADIUMS } from '../../engine/simulation';
 
 /* ================================================================
    BALANCE TAB
@@ -36,17 +36,66 @@ function mkPit(a) {
 // ── N 打席シミュレーション ────────────────────────────────────
 function runPASim(bat, pit, n, leagueEnv = DEFAULT_LEAGUE_ENV) {
   const c = {};
-  for (let i = 0; i < n; i++) {
-    const { result } = simAtBat(bat, pit, 'normal', 0, {}, leagueEnv);
-    c[result] = (c[result] || 0) + 1;
+  const safeN = Number.isFinite(Number(n)) ? Math.max(1, Math.floor(Number(n))) : 1;
+  const stadium = STADIUMS.tokyo_dome;
+  for (let i = 0; i < safeN; i++) {
+    const { result } = simAtBat(bat, pit, 'normal', 0, { stadium: 'tokyo_dome' }, leagueEnv);
+    if (result === 'inplay') {
+      const resolved = _resolveBattedBallOutcomeFromPhysics_TEST(bat, pit, stadium, {}, {});
+      const finalResult = resolved?.result || 'out';
+      c[finalResult] = (c[finalResult] || 0) + 1;
+    } else {
+      c[result] = (c[result] || 0) + 1;
+    }
   }
   const h  = (c.s || 0) + (c.d || 0) + (c.t || 0) + (c.hr || 0);
-  const ab = n - (c.bb || 0) - (c.hbp || 0);
+  const ab = safeN - (c.bb || 0) - (c.hbp || 0);
   return {
     ba:    ab > 0 ? h / ab : 0,
-    kPct:  (c.k  || 0) / n,
-    bbPct: (c.bb || 0) / n,
-    hrPct: (c.hr || 0) / n,
+    kPct:  (c.k  || 0) / safeN,
+    bbPct: (c.bb || 0) / safeN,
+    hrPct: (c.hr || 0) / safeN,
+  };
+}
+
+function simulatePhysicsProfile(batter, pitcher, totalPa, leagueEnv = DEFAULT_LEAGUE_ENV) {
+  // ⚠️ セキュリティ: 入力値を検証して無害化【＝異常値を安全な範囲へ補正】
+  const safePa = Number.isFinite(Number(totalPa)) ? Math.max(1, Math.floor(Number(totalPa))) : 1;
+  const safeBatter = batter && typeof batter === 'object' ? batter : mkBat(50);
+  const safePitcher = pitcher && typeof pitcher === 'object' ? pitcher : mkPit(60);
+  const stadium = STADIUMS.tokyo_dome;
+  const count = { pa: 0, bip: 0, hr: 0, k: 0, bb: 0, hbp: 0, out: 0, s: 0, d: 0, t: 0, evSum: 0, laSum: 0, distSum: 0, q: { weak: 0, normal: 0, solid: 0, hard: 0, barrel: 0 } };
+  for (let i = 0; i < safePa; i += 1) {
+    const atBat = simAtBat(safeBatter, safePitcher, 'normal', 0, { stadium: 'tokyo_dome' }, leagueEnv);
+    const paResult = atBat?.result || 'out';
+    count.pa += 1;
+    if (paResult === 'k' || paResult === 'bb' || paResult === 'hbp') {
+      count[paResult] += 1;
+      continue;
+    }
+    if (paResult !== 'inplay') continue;
+    count.bip += 1;
+    const resolved = _resolveBattedBallOutcomeFromPhysics_TEST(safeBatter, safePitcher, stadium, {}, {});
+    const resolvedResult = resolved?.result || 'out';
+    if (count[resolvedResult] !== undefined) count[resolvedResult] += 1;
+    const meta = resolved?.physicsMeta || {};
+    const quality = ['weak', 'normal', 'solid', 'hard', 'barrel'].includes(meta.quality) ? meta.quality : 'normal';
+    count.evSum += Number(meta.ev) || 0;
+    count.laSum += Number(meta.la) || 0;
+    count.distSum += Number(meta.distance) || 0;
+    count.q[quality] += 1;
+  }
+  const denominatorBip = Math.max(1, count.bip);
+  return {
+    pa: count.pa,
+    bip: count.bip,
+    hrPerBip: count.hr / denominatorBip,
+    hrPerPa: count.hr / Math.max(1, count.pa),
+    teamHrPerGame: (count.hr / Math.max(1, count.pa)) * 38,
+    avgEv: count.evSum / denominatorBip,
+    avgLa: count.laSum / denominatorBip,
+    avgDistance: count.distSum / denominatorBip,
+    qualityRate: Object.fromEntries(Object.entries(count.q).map(([k, v]) => [k, v / denominatorBip])),
   };
 }
 
@@ -74,27 +123,15 @@ function StatusBadge({ val, baseline, invert = false }) {
   return <span style={{ color, fontSize: 10, fontWeight: 700 }}>{text}</span>;
 }
 
-// ── リーグ環境ノブ定義 ─────────────────────────────────────
-const KNOB_DEFS = [
-  { key: 'kMod',   label: '三振率補正',   desc: '1.0=基準, <1で投手の三振が減る（打者有利）',   min: 0.70, max: 1.30, step: 0.01, invertColor: true  },
-  { key: 'hitMod', label: '安打率補正',   desc: '1.0=基準, >1で安打が増える（打者有利）',       min: 0.70, max: 1.30, step: 0.01, invertColor: false },
-  { key: 'hrMod',  label: '本塁打率補正', desc: '1.0=基準, >1でホームランが増える（打者有利）', min: 0.70, max: 1.50, step: 0.01, invertColor: false },
-  { key: 'bbMod',  label: '四球率補正',   desc: '1.0=基準, >1で四球が増える（打者有利）',       min: 0.70, max: 1.30, step: 0.01, invertColor: false },
-];
-
 // ── メインコンポーネント ──────────────────────────────────────
 export function BalanceTab({ teams, myTeam, upd, myId }) {
   const [simRows, setSimRows] = useState([]);
   const [busy, setBusy]       = useState(false);
+  const [mcBusy, setMcBusy] = useState(false);
+  const [mcError, setMcError] = useState('');
+  const [mcRows, setMcRows] = useState([]);
 
   const leagueEnv = myTeam?.leagueEnv || DEFAULT_LEAGUE_ENV;
-
-  const setKnob = useCallback((key, raw) => {
-    if (!upd || !myId) return;
-    const value = parseFloat(raw);
-    if (isNaN(value)) return;
-    upd(myId, t => ({ ...t, leagueEnv: { ...(t.leagueEnv || DEFAULT_LEAGUE_ENV), [key]: value } }));
-  }, [upd, myId]);
 
   const resetKnobs = useCallback(() => {
     if (!upd || !myId) return;
@@ -159,6 +196,34 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
     return good ? '#34d399' : '#f87171';
   };
 
+  const doMonteCarloValidation = useCallback(() => {
+    if (mcBusy) return;
+    setMcBusy(true);
+    setMcError('');
+    setTimeout(() => {
+      try {
+        const TOTAL_PA = 8000;
+        const stadium = STADIUMS.tokyo_dome;
+        const pitcher = { pitching: { velocity: 60, breaking: 60, control: 60 }, condition: 100, morale: 70 };
+        const profiles = [
+          { label: 'power70', batting: { power: 70, contact: 55, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 } },
+          { label: 'power80', batting: { power: 80, contact: 58, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 } },
+          { label: 'power90', batting: { power: 90, contact: 60, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 } },
+        ];
+        const nextRows = profiles.map((profile) => ({
+          label: profile.label,
+          ...simulatePhysicsProfile({ batting: profile.batting, condition: 100, morale: 70 }, pitcher, TOTAL_PA, leagueEnv),
+        }));
+        setMcRows(nextRows);
+      } catch (error) {
+        // ⚠️ セキュリティ: 例外を握り潰さず、機密情報を含まない安全な文言で表示
+        setMcError(error instanceof Error ? error.message : 'Monte Carlo検証で不明なエラーが発生しました。');
+      } finally {
+        setMcBusy(false);
+      }
+    }, 10);
+  }, [mcBusy, leagueEnv]);
+
   return (
     <div>
 
@@ -212,6 +277,37 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
             </table>
           </div>
         )}
+      </div>
+
+      <div className="card">
+        <div className="card-h" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>🧪 物理HR Monte Carlo検証（リーグ分析タブ内実行）</span>
+          <button className="bsm bga" onClick={doMonteCarloValidation} disabled={mcBusy}>
+            {mcBusy ? '検証中…' : '▶ 検証実行'}
+          </button>
+        </div>
+        <p style={{ fontSize: 11, color: '#374151', margin: '4px 0 8px' }}>
+          HR/BIP【＝本塁打 ÷ インプレー打球数】や平均EV【＝打球初速】・LA【＝打球角度】を、ゲーム画面上で直接確認できます。
+        </p>
+        {mcError && <div style={{ fontSize: 11, color: '#f87171', marginBottom: 8 }}>⚠️ {mcError}</div>}
+        <div style={{ overflowX: 'auto' }}>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>プロファイル</th><th>PA</th><th>BIP</th><th>HR/BIP</th><th>HR/PA</th><th>team HR/game</th><th>平均EV</th><th>平均LA</th><th>平均飛距離</th>
+              </tr>
+            </thead>
+            <tbody>
+              {!mcBusy && mcRows.length === 0 && <tr><td colSpan={9} style={{ textAlign: 'center', fontSize: 11, color: '#374151' }}>「検証実行」を押すと結果が表示されます</td></tr>}
+              {mcBusy && <tr><td colSpan={9} style={{ textAlign: 'center', color: '#f5c842' }}>検証中…</td></tr>}
+              {mcRows.map((row) => (
+                <tr key={row.label}>
+                  <td>{row.label}</td><td className="mono">{row.pa.toLocaleString()}</td><td className="mono">{row.bip.toLocaleString()}</td><td className="mono">{(row.hrPerBip * 100).toFixed(2)}%</td><td className="mono">{(row.hrPerPa * 100).toFixed(2)}%</td><td className="mono">{row.teamHrPerGame.toFixed(2)}</td><td className="mono">{row.avgEv.toFixed(1)}</td><td className="mono">{row.avgLa.toFixed(1)}</td><td className="mono">{row.avgDistance.toFixed(1)}m</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* ═══════════════════════════════════════
@@ -282,48 +378,12 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
       ═══════════════════════════════════════ */}
       {myTeam && upd && (
         <div className="card">
-          <div className="card-h" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span>🎛️ リーグ環境設定</span>
-            <button className="bsm" style={{ background: 'rgba(255,255,255,.08)', fontSize: 10 }} onClick={resetKnobs}>
-              リセット
-            </button>
-          </div>
-          <p style={{ fontSize: 11, color: '#374151', margin: '4px 0 10px' }}>
-            シミュレーションエンジンに適用されるリーグ全体の環境係数を調整できます。<br />
-            変更は次の試合から反映されます。
+          <div className="card-h">🎛️ リーグ環境設定（物理演算主導のため廃止予定）</div>
+          <p style={{ fontSize: 11, color: '#f5c842', margin: '4px 0 10px' }}>
+            ⚠️ 現在の物理演算主導方針では、係数スライダーはバランス検証を混乱させるため非表示化しました。<br />
+            調整は「物理HR Monte Carlo検証」の結果を見ながら、EV/LA/contactQuality 側で行ってください。
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {KNOB_DEFS.map(({ key, label, desc, min, max, step, invertColor }) => {
-              const val = leagueEnv[key] ?? DEFAULT_LEAGUE_ENV[key];
-              const diff = val - 1.00;
-              const isNeutral = Math.abs(diff) < 0.005;
-              const isBatterFavor = invertColor ? diff < -0.005 : diff > 0.005;
-              const dotColor = isNeutral ? '#94a3b8' : isBatterFavor ? '#34d399' : '#f87171';
-              return (
-                <div key={key}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontWeight: 700, fontSize: 12, minWidth: 80 }}>{label}</span>
-                    <span className="mono" style={{ color: dotColor, fontSize: 13, minWidth: 36 }}>{val.toFixed(2)}</span>
-                    <span style={{ fontSize: 10, color: dotColor }}>
-                      {isNeutral ? '基準値' : isBatterFavor ? '打者有利' : '投手有利'}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 10, color: '#374151', minWidth: 28 }}>{min.toFixed(2)}</span>
-                    <input
-                      type="range"
-                      min={min} max={max} step={step}
-                      value={val}
-                      onChange={e => setKnob(key, e.target.value)}
-                      style={{ flex: 1, accentColor: dotColor }}
-                    />
-                    <span style={{ fontSize: 10, color: '#374151', minWidth: 28 }}>{max.toFixed(2)}</span>
-                  </div>
-                  <div style={{ fontSize: 10, color: '#374151', marginTop: 2 }}>{desc}</div>
-                </div>
-              );
-            })}
-          </div>
+          <button className="bsm" style={{ background: 'rgba(255,255,255,.08)', fontSize: 10 }} onClick={resetKnobs}>係数を既定値へリセット</button>
         </div>
       )}
 
