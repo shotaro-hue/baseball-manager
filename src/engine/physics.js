@@ -105,6 +105,16 @@ export function calcBallDist(ev, la, options = {}) {
   return simulateFlight(ev, la, options).distance;
 }
 
+export function classifyBattedBallType(la) {
+  // ⚠️ セキュリティ: 外部入力値を明示的に検証し、非数値は安全な既定値へフォールバック
+  const launchAngleRaw = Number(la);
+  const launchAngle = Number.isFinite(launchAngleRaw) ? launchAngleRaw : 10;
+
+  if (launchAngle < 8) return 'grounder';
+  if (launchAngle <= 25) return 'liner';
+  return 'fly';
+}
+
 export function calcSprayAngle(result) {
   if (result === 'hr') return rngf(10, 80);
   if (result === 't') return rngf(25, 65);
