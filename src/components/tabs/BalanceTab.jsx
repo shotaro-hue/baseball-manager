@@ -114,6 +114,22 @@ function Diff({ val, baseline, fmt, invert = false }) {
   );
 }
 
+
+
+const LEAGUE_ENV_SLIDER_CONFIG = [
+  { key: 'hitMod', label: '安打補正', min: 0.7, max: 1.3, step: 0.01, desc: 'インプレー打球の安打寄与を補正' },
+  { key: 'hrMod', label: '本塁打補正', min: 0.7, max: 1.3, step: 0.01, desc: '本塁打発生率を補正' },
+  { key: 'kMod', label: '三振補正', min: 0.7, max: 1.3, step: 0.01, desc: '三振発生率を補正' },
+  { key: 'bbMod', label: '四球補正', min: 0.7, max: 1.3, step: 0.01, desc: '四球発生率を補正' },
+];
+
+function sanitizeLeagueEnvValue(rawValue, min, max, fallback) {
+  const numericValue = Number(rawValue);
+  const safeFallback = Number.isFinite(Number(fallback)) ? Number(fallback) : 1;
+  if (!Number.isFinite(numericValue)) return safeFallback;
+  return Math.min(max, Math.max(min, numericValue));
+}
+
 function StatusBadge({ val, baseline, invert = false }) {
   const d = val - baseline;
   if (Math.abs(d) < baseline * 0.10) return <span style={{ color: '#94a3b8', fontSize: 10 }}>正常</span>;
@@ -124,7 +140,7 @@ function StatusBadge({ val, baseline, invert = false }) {
 }
 
 // ── メインコンポーネント ──────────────────────────────────────
-export function BalanceTab({ teams, myTeam }) {
+export function BalanceTab({ teams, myTeam, upd, myId }) {
   const [simRows, setSimRows] = useState([]);
   const [busy, setBusy]       = useState(false);
   const [mcBusy, setMcBusy] = useState(false);
@@ -132,6 +148,27 @@ export function BalanceTab({ teams, myTeam }) {
   const [mcRows, setMcRows] = useState([]);
 
   const leagueEnv = myTeam?.leagueEnv || DEFAULT_LEAGUE_ENV;
+
+  const handleLeagueEnvSliderChange = useCallback((key, rawValue) => {
+    const sliderDef = LEAGUE_ENV_SLIDER_CONFIG.find((item) => item.key === key);
+    if (!sliderDef || typeof upd !== 'function' || !myId) return;
+    const sanitizedValue = sanitizeLeagueEnvValue(rawValue, sliderDef.min, sliderDef.max, leagueEnv[key]);
+    upd(myId, (team) => ({
+      ...team,
+      leagueEnv: {
+        ...(team?.leagueEnv || DEFAULT_LEAGUE_ENV),
+        [key]: Number(sanitizedValue.toFixed(2)),
+      },
+    }));
+  }, [leagueEnv, myId, upd]);
+
+  const handleResetLeagueEnv = useCallback(() => {
+    if (typeof upd !== 'function' || !myId) return;
+    upd(myId, (team) => ({
+      ...team,
+      leagueEnv: { ...DEFAULT_LEAGUE_ENV },
+    }));
+  }, [myId, upd]);
 
   // Section 1: リーグ全体集計
   const league = useMemo(() => {
@@ -352,6 +389,41 @@ export function BalanceTab({ teams, myTeam }) {
         )}
       </div>
 
+
+      <div className="card">
+        <div className="card-h" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span>🎛️ リーグ補正スライダー（即時反映）</span>
+          <button className="bsm bga" onClick={handleResetLeagueEnv}>デフォルトへ戻す</button>
+        </div>
+        <p style={{ fontSize: 11, color: '#374151', margin: '4px 0 10px' }}>
+          推奨値を見るだけでなく、ここで直接調整できます。調整後はクイックシム【＝簡易シミュレーション】とMonte Carlo【＝乱数を多数回試す検証】へ即時反映されます。
+        </p>
+        <div style={{ display: 'grid', gap: 10 }}>
+          {LEAGUE_ENV_SLIDER_CONFIG.map((slider) => {
+            const currentValue = sanitizeLeagueEnvValue(leagueEnv[slider.key], slider.min, slider.max, DEFAULT_LEAGUE_ENV[slider.key]);
+            return (
+              <div key={slider.key} style={{ border: '1px solid rgba(148,163,184,.25)', borderRadius: 8, padding: 10 }}>
+                <div className="fsb" style={{ marginBottom: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700 }}>{slider.label}</div>
+                  <div className="mono" style={{ color: '#f5c842' }}>{currentValue.toFixed(2)}</div>
+                </div>
+                <input
+                  type="range"
+                  min={slider.min}
+                  max={slider.max}
+                  step={slider.step}
+                  value={currentValue}
+                  onChange={(event) => handleLeagueEnvSliderChange(slider.key, event.target.value)}
+                  aria-label={slider.label}
+                  style={{ width: '100%' }}
+                />
+                <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4 }}>{slider.desc}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* ═══════════════════════════════════════
           Section 2: クイックシム検証
       ═══════════════════════════════════════ */}
@@ -480,7 +552,7 @@ export function BalanceTab({ teams, myTeam }) {
           </table>
         </div>
         <p style={{ fontSize: 10, color: '#374151', marginTop: 8 }}>
-          ※ 値を変更するには <code style={{ background: 'rgba(255,255,255,.06)', padding: '1px 4px', borderRadius: 3 }}>src/engine/simulation.js</code> の ABILITY_RANGE を編集してください。
+          ※ ABILITY_RANGE はエンジン定数です。ゲーム内で調整できるのは上段のリーグ補正スライダー（leagueEnv）で、ここに表示される値は参照専用です。
         </p>
       </div>
 
