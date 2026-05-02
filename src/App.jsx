@@ -15,6 +15,7 @@ import { TeamDetailScreen } from './components/TeamDetailScreen';
 import { PressConferenceModal } from './components/PressConferenceModal';
 import { AllStarScreen } from './components/AllStarScreen';
 import { DashboardTab } from './components/DashboardTab';
+import { TacticalGameScreen } from './components/TacticalGame';
 import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab, ScheduleTab, BalanceTab, LeaderboardTab, GameActionTab } from './components/Tabs';
 import {
   SEASON_GAMES, MAX_外国人_一軍, MAX_ROSTER, TEAM_DEFS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
@@ -221,6 +222,8 @@ export default function App(){
 
   if(screen==="result"&&gameResult){const _src=gameResult._source;const _retScreen=_src==="batch"?"batch_result":"hub";const _retLabel=_src==="batch"?"← バッチ結果に戻る":_src==="schedule"?"← 日程に戻る":"次の試合へ →";return(<><ResultScreen gsResult={gameResult} myTeam={myTeam} oppTeam={gameResult.oppTeam} gameDay={gameResult.gameNo??gameDay-1} onNext={()=>setScreen(_retScreen)} nextLabel={_retLabel}/></>);}
 
+
+  if(screen==="tactical_game"&&currentOpp) return(<><ErrorBoundary onReset={()=>setScreen("hub")}><TacticalGameScreen myTeam={myTeam} oppTeam={currentOpp} onGameEnd={sf.handleTacticalGameEnd}/></ErrorBoundary></>);
   if(screen==="allstar"&&allStarResult) return(<>
     <AllStarScreen
       year={year}
@@ -361,7 +364,7 @@ export default function App(){
     <ErrorBoundary key={tab}>
     {tab==="dashboard"&&<DashboardTab myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year} recentResults={gs.recentResults} mailbox={mailbox} faPool={faPool} onTabSwitch={handleTabChange}/>}
     {tab==="roster"&&<RosterTab team={myTeam} onToggle={gs.toggleLineup} onReplaceLineup={gs.replaceLineup} onSetLineupOrder={gs.setLineupOrder} onSetRosterDhMode={gs.setRosterDhMode} onSetPlayerPosition={gs.setPlayerPosition} onSetStarter={gs.setStarter} onPromo={gs.promote} onDemo={gs.demote} onSetTrainingFocus={gs.setTrainingFocus} onConvertIkusei={gs.convertIkusei} onMoveRotation={gs.moveRotation} onRemoveFromRotation={gs.removeFromRotation} onSetPitchingPattern={gs.setPitchingPattern} onReplaceRotation={gs.replaceRotation} onReplaceFullRoster={gs.replaceFullRoster} onPlayerClick={gs.handlePlayerClick} onSetDevGoal={gs.setDevGoal} onPlayerTalk={gs.handlePlayerTalk} onSetConvertTarget={gs.setConvertTarget} gameDay={gameDay}/>}
-    {tab==="game_action"&&<GameActionTab/>}
+    {tab==="game_action"&&<GameActionTab onOpenTactical={sf.handleStartGame}/>}
     {tab==="schedule"&&<ScheduleTab schedule={schedule} gameDay={gameDay} myTeam={myTeam} teams={teams} year={year} gameResultsMap={gs.gameResultsMap} allStarDone={gs.allStarDone} allStarResult={gs.allStarResult} allStarTriggerDay={gs.allStarTriggerDay} scheduleArchive={gs.scheduleArchive||[]} onResultClick={dayNo=>{const r=gs.gameResultsMap[dayNo];if(r){sf.setGameResult({score:{my:r.myScore,opp:r.oppScore},log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:r.oppTeam,won:r.won,gameNo:dayNo,_source:"schedule"});setScreen("result");}}}/>}
     {tab==="records"&&<RecordsTab history={gs.seasonHistory}/>}
     {tab==="news"&&<NewsTab news={news} onInterview={gs.handleInterview} seasonHistory={gs.seasonHistory} currentYear={year}/>}
