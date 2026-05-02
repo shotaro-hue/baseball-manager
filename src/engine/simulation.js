@@ -1,6 +1,9 @@
 import { rng, rngf, clamp } from '../utils';
 import { PITCH_NORM, PITCH_HARD_CAP, FATIGUE_WARNING, FATIGUE_LIMIT, PHYSICS_BAT } from '../constants';
 import { calcSprayAngle, classifyBattedBallType, resolveFieldSideBySprayAngle, sanitizeEnvironment, simulateFlight } from './physics';
+import { STADIUMS, TEAM_STADIUM } from './stadiums';
+import { getFenceDistanceBySpray, evaluateTrajectoryAgainstPark, evaluateAcrossParks } from './parkEffects';
+import { analyzeEnvironmentEffect } from './battedBallAnalysis';
 
 /* ================================================================
    SIMULATION ENGINE v4.0
@@ -74,23 +77,6 @@ function applyPitchingPolicy(probs, policy) {
 // ═══════════════════════════════════════════════════════════════
 //  SECTION 3: 環境レイヤー（球場・リーグ係数）
 // ═══════════════════════════════════════════════════════════════
-
-export const STADIUMS = {
-  jingu:      { name: '神宮球場',           lf: 97,  cf: 120, rf: 97,  hrMod: 1.15, type: 'outdoor' },
-  yokohama:   { name: '横浜スタジアム',     lf: 94,  cf: 117, rf: 94,  hrMod: 1.20, type: 'outdoor' },
-  mazda:      { name: 'マツダスタジアム',   lf: 101, cf: 122, rf: 100, hrMod: 0.95, type: 'outdoor' },
-  hanshin:    { name: '甲子園',             lf: 95,  cf: 118, rf: 95,  hrMod: 0.90, type: 'outdoor' },
-  tokyo_dome: { name: '東京ドーム',         lf: 100, cf: 122, rf: 100, hrMod: 1.05, type: 'dome'    },
-  nagoya:     { name: 'バンテリンドーム',   lf: 100, cf: 122, rf: 100, hrMod: 0.85, type: 'dome'    },
-  paypaydome: { name: 'みずほペイペイドーム', lf: 100, cf: 122, rf: 100, hrMod: 1.00, type: 'dome'  },
-  rakuten:    { name: '楽天モバイル',       lf: 100, cf: 122, rf: 100, hrMod: 1.00, type: 'outdoor' },
-  seibu:      { name: 'ベルーナドーム',     lf: 98,  cf: 118, rf: 98,  hrMod: 1.05, type: 'dome'    },
-  zozopark:   { name: 'ZOZOマリン',         lf: 99,  cf: 122, rf: 99,  hrMod: 0.95, type: 'outdoor' },
-  escon:      { name: 'エスコンフィールド', lf: 96,  cf: 120, rf: 96,  hrMod: 1.10, type: 'dome'    },
-  kyocera:    { name: '京セラドーム',       lf: 100, cf: 122, rf: 100, hrMod: 0.90, type: 'dome'    },
-};
-
-export const TEAM_STADIUM = { 0:'jingu', 1:'yokohama', 2:'mazda', 3:'hanshin', 4:'tokyo_dome', 5:'nagoya', 6:'paypaydome', 7:'rakuten', 8:'seibu', 9:'zozopark', 10:'escon', 11:'kyocera' };
 
 export const DEFAULT_LEAGUE_ENV = {
   hrMod: 0.88,  // legacy: 物理結果には適用しない（互換維持のため保持）
@@ -298,21 +284,6 @@ const SAFE_STADIUM_DIMENSION = 100;
 const SAFE_EV = 135;
 const SAFE_LA = 12;
 
-function getFenceDistanceBySpray(stadium, sprayAngle) {
-  if (!stadium) return null;
-  const angle = clamp(Number(sprayAngle), 0, 90);
-  const lf = Number(stadium.lf);
-  const cf = Number(stadium.cf);
-  const rf = Number(stadium.rf);
-  if (![lf, cf, rf].every(Number.isFinite)) return null;
-  if (angle <= 45) {
-    const t = angle / 45;
-    return lf + (cf - lf) * Math.sin(t * Math.PI / 2);
-  }
-  const t = (angle - 45) / 45;
-  return cf + (rf - cf) * (1 - Math.cos(t * Math.PI / 2));
-}
-
 function sampleContactQuality(batter, pitcher, rngProvider = rngf, leagueEnv = DEFAULT_LEAGUE_ENV) {
   const safeLeagueEnv = { ...DEFAULT_LEAGUE_ENV, ...(leagueEnv || {}) };
   const power = clamp(Number(batter?.batting?.power ?? 50), 1, 99);
@@ -493,9 +464,20 @@ function resolveBattedBallOutcomeFromPhysicsForBalance(batter, pitcher, stadium,
     if (result === 'd' && reroll > 1 - tripleBoost * 0.12) result = 't';
   }
 
+  const park = evaluateTrajectoryAgainstPark({ trajectory: points, sprayAngleDeg: sprayAngle, stadium: { ...stadium, id: stadium?.id, name: stadium?.name }, wallHeightM: effectiveWallHeight });
+  const crossPark = evaluateAcrossParks({ trajectory: points, sprayAngleDeg: sprayAngle, stadiums: STADIUMS, currentStadiumId: stadium?.id });
+  const environmentAnalysis = analyzeEnvironmentEffect({ ev, la, options, actualEnvironment: safeEnvironment });
+
   return {
     result,
-    physicsMeta: { ev, la, distance, sprayAngle, trajectory: points, ballType, quality: quality || 'normal', fenceDistance, hrCheck, isHrByTrajectory: hrCheck.isHomeRun },
+    physicsMeta: { ev, la, distance, sprayAngle, trajectory: points, ballType, quality: quality || 'normal', fenceDistance, hrCheck, isHrByTrajectory: hrCheck.isHomeRun,
+      physics: { exitVelocityKmh: ev, launchAngleDeg: la, sprayAngleDeg: sprayAngle, landingDistanceM: distance, hangTimeSec: null, apexHeightM: null, trajectoryPoints: points, yAtFenceM: hrCheck.yAtFence, yAtFencePlus3m: hrCheck.yAtFencePlus3m },
+      park: { ...park, isHomeRun: park.isHomeRun, wallClearanceM: park.wallClearanceM },
+      environment: { windOutKmh: safeEnvironment.windOut, temperatureC: safeEnvironment.temperatureC, altitudeM: safeEnvironment.altitudeM, airDensity: safeEnvironment.airDensity, ...environmentAnalysis },
+      crossPark, evaluation: { contactQuality: quality || 'normal', nearHomeRun: false, noDoubter: false, barelyHomeRun: false, parkAdjustedValue: 0, tags: [] },
+      commentary: { short: '', detail: '', tags: [] },
+      display: { distanceRatio: distance / 150, fenceRatio: fenceDistance / 150, warnings: [] },
+    },
   };
 }
 const resolveBattedBallOutcomeFromPhysics = resolveBattedBallOutcomeFromPhysicsForBalance;
@@ -1046,4 +1028,4 @@ export function runFarmSeason(teams) {
   });
 }
 
-export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, matchupScore, calcFatigue, calcEffectiveFatigue, PITCH_TYPES, BASELINE, BASELINE_PA, BASELINE_TARGET_RATES, ABILITY_RANGE, resolveBattedBallOutcomeFromPhysicsForBalance, generateContactEVLA as _generateContactEVLA_TEST, getFenceDistanceBySpray as _getFenceDistanceBySpray_TEST, adjustResultByPhysics as _adjustResultByPhysics_TEST, resolveBattedBallOutcomeFromPhysics as _resolveBattedBallOutcomeFromPhysics_TEST, estimateFielderIntercept as _estimateFielderIntercept_TEST, checkHomeRunByTrajectory as _checkHomeRunByTrajectory_TEST };
+export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, matchupScore, calcFatigue, calcEffectiveFatigue, PITCH_TYPES, BASELINE, BASELINE_PA, BASELINE_TARGET_RATES, ABILITY_RANGE, STADIUMS, TEAM_STADIUM, resolveBattedBallOutcomeFromPhysicsForBalance, generateContactEVLA as _generateContactEVLA_TEST, getFenceDistanceBySpray as _getFenceDistanceBySpray_TEST, adjustResultByPhysics as _adjustResultByPhysics_TEST, resolveBattedBallOutcomeFromPhysics as _resolveBattedBallOutcomeFromPhysics_TEST, estimateFielderIntercept as _estimateFielderIntercept_TEST, checkHomeRunByTrajectory as _checkHomeRunByTrajectory_TEST };

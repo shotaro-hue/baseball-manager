@@ -80,9 +80,11 @@ export function simulateFlight(ev, la, options = {}) {
   const baseAirDensity = 1.225;
   const temperatureK = 273.15 + environment.temperatureC;
   const safeTemperatureK = Number.isFinite(temperatureK) && temperatureK > 0 ? temperatureK : 293.15;
+  const rawEnvironment = options.environment && typeof options.environment === 'object' ? options.environment : {};
+  const hasExplicitAirDensity = Number.isFinite(Number(rawEnvironment.airDensity));
   let computedAirDensity = Number(environment.airDensity);
-  if (!Number.isFinite(computedAirDensity)) {
-    const seaLevelDensityAtTemp = baseAirDensity * (288.15 / safeTemperatureK);
+  if (!hasExplicitAirDensity || !Number.isFinite(computedAirDensity)) {
+    const seaLevelDensityAtTemp = baseAirDensity * (293.15 / safeTemperatureK);
     const altitudeRatio = Math.exp(-environment.altitudeM / 8500);
     computedAirDensity = seaLevelDensityAtTemp * altitudeRatio;
   }
