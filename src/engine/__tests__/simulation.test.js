@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { calcEffectiveFatigue, calcFatigue, matchupScore, initGameState, _generateContactEVLA_TEST, _getFenceDistanceBySpray_TEST, _adjustResultByPhysics_TEST, _resolveBattedBallOutcomeFromPhysics_TEST } from '../simulation';
+import { calcEffectiveFatigue, calcFatigue, matchupScore, initGameState, _generateContactEVLA_TEST, _getFenceDistanceBySpray_TEST, _adjustResultByPhysics_TEST, _resolveBattedBallOutcomeFromPhysics_TEST, _checkHomeRunByTrajectory_TEST } from '../simulation';
 import { applyGameStatsFromLog } from '../postGame';
 import { emptyStats } from '../player';
 import { PHYSICS_BAT } from '../../constants';
@@ -104,7 +104,7 @@ describe('generateContactEVLA', () => {
     const contBat = { batting: { power: 30, contact: 80 } };
     const pit = { pitching: { velocity: 50, breaking: 50 } };
 
-    const sample = (batter) => Array.from({ length: 200 }, () => _generateContactEVLA_TEST(batter, pit).ev)
+    const sample = (batter) => Array.from({ length: 600 }, () => _generateContactEVLA_TEST(batter, pit).ev)
       .reduce((a, b) => a + b, 0) / 200;
 
     expect(sample(powerBat)).toBeGreaterThan(sample(contBat));
@@ -115,7 +115,7 @@ describe('generateContactEVLA', () => {
     const weakPit = { pitching: { velocity: 1, breaking: 1 } };
     const strongPit = { pitching: { velocity: 99, breaking: 99 } };
 
-    const sample = (pitcher) => Array.from({ length: 200 }, () => _generateContactEVLA_TEST(batter, pitcher).ev)
+    const sample = (pitcher) => Array.from({ length: 600 }, () => _generateContactEVLA_TEST(batter, pitcher).ev)
       .reduce((a, b) => a + b, 0) / 200;
 
     expect(sample(strongPit)).toBeLessThan(sample(weakPit));
@@ -191,8 +191,39 @@ describe('physicsMeta integration', () => {
       return distances.reduce((sum, d) => sum + d, 0) / distances.length;
     };
 
-    const headwindAverage = sampleAverageDistance(-3);
-    const tailwindAverage = sampleAverageDistance(3);
+    const headwindAverage = sampleAverageDistance(-10);
+    const tailwindAverage = sampleAverageDistance(10);
     expect(tailwindAverage).toBeGreaterThanOrEqual(headwindAverage + 2);
+  });
+});
+
+
+describe('checkHomeRunByTrajectory', () => {
+  const buildPoints = (xValues, yValues) => xValues.map((x, idx) => [x, yValues[idx]]);
+
+  it('飛距離がフェンス超過でも壁高未満なら非HR', () => {
+    const points = buildPoints([0, 122, 126, 132], [1.0, 3.2, 2.8, 0]);
+    const result = _checkHomeRunByTrajectory_TEST(points, 122, 3.5);
+    expect(result.isHomeRun).toBe(false);
+  });
+
+  it('フェンス地点で壁高超えかつ3m奥でも浮いていればHR', () => {
+    const points = buildPoints([0, 122, 125, 132], [1.0, 3.9, 0.8, 0]);
+    const result = _checkHomeRunByTrajectory_TEST(points, 122, 3.5);
+    expect(result.isHomeRun).toBe(true);
+  });
+
+  it('フェンス手前で着地している打球は非HR', () => {
+    const points = buildPoints([0, 90, 118], [1.0, 2.0, 0]);
+    const result = _checkHomeRunByTrajectory_TEST(points, 122, 3.5);
+    expect(result.isHomeRun).toBe(false);
+  });
+
+  it('同一打球でも壁高が高い球場ではHRになりにくい', () => {
+    const points = buildPoints([0, 122, 125, 132], [1.0, 4.1, 0.7, 0]);
+    const lowWall = _checkHomeRunByTrajectory_TEST(points, 122, 1.0);
+    const highWall = _checkHomeRunByTrajectory_TEST(points, 122, 5.0);
+    expect(lowWall.isHomeRun).toBe(true);
+    expect(highWall.isHomeRun).toBe(false);
   });
 });
