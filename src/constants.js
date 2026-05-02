@@ -357,30 +357,30 @@ export const FOREIGN_NATIONALITIES = [
 
 // ── 物理演算打撃シミュレーション定数（Phase 1） ──────────────────────────────
 export const PHYSICS_BAT = {
-  // NPB実測値に基づくEVレンジ（km/h）: 弱打=116km/h, 平均=142km/h, 強打=169+km/h
-  EV_FLOOR: 116,
-  EV_POWER_SCALE: 53,
-  EV_STUFF_SCALE: 23,
-  EV_NOISE: 13,
-
-  LA_FLY_MID: 18,
-  LA_CONTACT_MID: 8,
-  LA_GROUND_MID: 5,
-  LA_DEFAULT_MID: 8,
-  LA_NOISE: 16,
-  LA_MIN: -10,
-  LA_MAX: 45,
-
-  LA_HR_MIN: 22,
-  LA_HR_MAX: 38,
-  LA_D_MIN: 10,
-  LA_D_MAX: 28,
-  LA_T_MIN: 5,
-  LA_T_MAX: 22,
-  LA_S_MIN: 3,
-  LA_S_MAX: 22,
-
-  FLY_POWER_THRESHOLD: 65,
-  GROUND_POWER_THRESHOLD: 35,
-  CONTACT_THRESHOLD: 65,
+  CONTACT_QUALITY: {
+    WEAK_BASE: 0.36,
+    HARD_BASE: 0.12,
+    BARREL_BASE: 0.025,
+    BARREL_MAX: 0.10,
+  },
+  EV: {
+    MIN: 50,
+    MAX: 190,
+    POWER_TO_HARD_EV: 0.35,
+    POWER_TO_BARREL_EV: 0.42,
+    CONTACT_WEAK_REDUCTION: 0.18,
+  },
+  LA: {
+    MIN: -25,
+    MAX: 55,
+    WEAK_OPTIONS: [-10, 3, 45],
+    NORMAL_MID: 6,
+    SOLID_MID: 11,
+    HARD_MID: 15,
+    BARREL_MID: 24,
+  },
+  HR: {
+    MIN_CLEARANCE: 0,
+    WALL_HEIGHT: 3.2,
+  },
 };
