@@ -173,11 +173,14 @@ describe('physicsMeta integration', () => {
     }
   });
 
-  it('physicsMeta に quality / fenceDistance / isHrByTrajectory が含まれる', () => {
+  it('physicsMeta に quality / fenceDistance / hrCheck / isHrByTrajectory が含まれる', () => {
     const resolved = _resolveBattedBallOutcomeFromPhysics_TEST(batter, pitcher, stadium, { windOut: 0 }, { config: { evNoise: 0, laNoise: 0 } });
     expect(['weak', 'normal', 'solid', 'hard', 'barrel']).toContain(resolved.physicsMeta.quality);
     expect(typeof resolved.physicsMeta.fenceDistance).toBe('number');
     expect(typeof resolved.physicsMeta.isHrByTrajectory).toBe('boolean');
+    expect(typeof resolved.physicsMeta.hrCheck).toBe('object');
+    expect(typeof resolved.physicsMeta.hrCheck?.isHomeRun).toBe('boolean');
+    expect(typeof resolved.physicsMeta.hrCheck?.fenceDistance).toBe('number');
   });
 
     it('向かい風/追い風で平均飛距離が逆方向に変化する（±2m許容）', () => {

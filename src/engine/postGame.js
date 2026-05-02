@@ -42,9 +42,15 @@ function buildBattedBallEvent(e, gameDay) {
 
   const safeSpray = Number.isFinite(e.sprayAngle) ? Math.max(0, Math.min(90, Number(e.sprayAngle))) : 45;
   const safeDist = Number.isFinite(e.dist) ? Math.max(0, Math.min(220, Number(e.dist))) : 0;
-  const safeFenceDistance = Number.isFinite(e?.physicsMeta?.fenceDistance)
-    ? Math.max(85, Math.min(140, Number(e.physicsMeta.fenceDistance)))
+  const hrCheckFenceDistance = Number(e?.physicsMeta?.hrCheck?.fenceDistance);
+  const rawFenceDistance = Number.isFinite(hrCheckFenceDistance)
+    ? hrCheckFenceDistance
+    : Number(e?.physicsMeta?.fenceDistance);
+  const safeFenceDistance = Number.isFinite(rawFenceDistance)
+    ? Math.max(85, Math.min(140, Number(rawFenceDistance)))
     : 100;
+  const rawClearance = Number(e?.physicsMeta?.hrCheck?.clearance);
+  const safeHrClearance = Number.isFinite(rawClearance) ? Math.max(-20, Math.min(60, rawClearance)) : null;
 
   const maxDisplayDistance = Math.max(110, safeFenceDistance * 1.18);
 
@@ -67,6 +73,7 @@ function buildBattedBallEvent(e, gameDay) {
     fenceDistance: safeFenceDistance,
     fenceRatio,
     isHrByTrajectory: Boolean(e?.physicsMeta?.isHrByTrajectory),
+    hrClearance: safeHrClearance,
   };
 }
 
