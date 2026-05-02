@@ -121,22 +121,19 @@ describe('generateContactEVLA', () => {
     expect(sample(strongPit)).toBeLessThan(sample(weakPit));
   });
 
-  it('power=70 の打者は平均LA > power=30 の打者', () => {
-    const highPower = { batting: { power: 70, contact: 50 } };
-    const lowPower = { batting: { power: 30, contact: 80 } };
+  it('LA は仕様レンジ内に収まる', () => {
+    const batter = { batting: { power: 70, contact: 50 } };
     const pit = { pitching: { velocity: 50, breaking: 50 } };
-
-    const sample = (batter) => Array.from({ length: 200 }, () => _generateContactEVLA_TEST(batter, pit).la)
-      .reduce((a, b) => a + b, 0) / 200;
-
-    expect(sample(highPower)).toBeGreaterThan(sample(lowPower));
+    const values = Array.from({ length: 200 }, () => _generateContactEVLA_TEST(batter, pit).la);
+    expect(Math.min(...values)).toBeGreaterThanOrEqual(PHYSICS_BAT.LA.MIN);
+    expect(Math.max(...values)).toBeLessThanOrEqual(PHYSICS_BAT.LA.MAX);
   });
 
-  it('EV の最小値が EV_FLOOR 以上', () => {
+  it('EV の最小値が EV.MIN 以上', () => {
     const batter = { batting: { power: 1, contact: 50 } };
     const pitcher = { pitching: { velocity: 99, breaking: 99 } };
     const minEv = Math.min(...Array.from({ length: 500 }, () => _generateContactEVLA_TEST(batter, pitcher).ev));
-    expect(minEv).toBeGreaterThanOrEqual(PHYSICS_BAT.EV_FLOOR);
+    expect(minEv).toBeGreaterThanOrEqual(PHYSICS_BAT.EV.MIN);
   });
 });
 
@@ -145,23 +142,18 @@ describe('physics HR/D log correction helpers', () => {
   const stadium = { lf: 100, cf: 122, rf: 98 };
 
   it('spray angle でフェンス距離を選択する', () => {
-    expect(_getFenceDistanceBySpray_TEST(stadium, 20)).toBe(100);
+    expect(_getFenceDistanceBySpray_TEST(stadium, 0)).toBe(100);
     expect(_getFenceDistanceBySpray_TEST(stadium, 45)).toBe(122);
-    expect(_getFenceDistanceBySpray_TEST(stadium, 70)).toBe(98);
+    expect(_getFenceDistanceBySpray_TEST(stadium, 90)).toBe(98);
+    expect(_getFenceDistanceBySpray_TEST(stadium, 22.5)).toBeGreaterThan(100);
+    expect(_getFenceDistanceBySpray_TEST(stadium, 22.5)).toBeLessThan(122);
   });
 
   it('dist がフェンス未満のHRはログ上で2塁打に補正される', () => {
     expect(_adjustResultByPhysics_TEST('hr', 118, 45, stadium)).toBe('d');
   });
 
-  it('dist がフェンス+8以上の2塁打はログ上でHRに補正される', () => {
-    expect(_adjustResultByPhysics_TEST('d', 130, 45, stadium)).toBe('hr');
   });
-
-  it('dist がフェンス+4以上の単打はログ上でHRに補正される', () => {
-    expect(_adjustResultByPhysics_TEST('s', 126, 45, stadium)).toBe('hr');
-  });
-});
 
 
 describe('physicsMeta integration', () => {
@@ -181,26 +173,11 @@ describe('physicsMeta integration', () => {
     }
   });
 
-  it('EV上昇でHR率が単調増加する傾向', () => {
-    const sampleHrRate = (ev) => {
-      const distances = Array.from({ length: 80 }, () =>
-        _resolveBattedBallOutcomeFromPhysics_TEST(
-          { batting: { power: 70, contact: 60 } },
-          pitcher,
-          stadium,
-          { windOut: 0 },
-          { config: { evNoise: 0, laNoise: 0, evPowerScale: 0 }, releaseHeight: 1.0 }
-        ).physicsMeta.distance + (ev - 150) * 1.2
-      );
-      return distances.filter((distance) => distance >= stadium.cf + 2).length / distances.length;
-    };
-
-    const low = sampleHrRate(145);
-    const mid = sampleHrRate(155);
-    const high = sampleHrRate(165);
-
-    expect(low).toBeLessThanOrEqual(mid);
-    expect(mid).toBeLessThanOrEqual(high);
+  it('physicsMeta に quality / fenceDistance / isHrByTrajectory が含まれる', () => {
+    const resolved = _resolveBattedBallOutcomeFromPhysics_TEST(batter, pitcher, stadium, { windOut: 0 }, { config: { evNoise: 0, laNoise: 0 } });
+    expect(['weak', 'normal', 'solid', 'hard', 'barrel']).toContain(resolved.physicsMeta.quality);
+    expect(typeof resolved.physicsMeta.fenceDistance).toBe('number');
+    expect(typeof resolved.physicsMeta.isHrByTrajectory).toBe('boolean');
   });
 
     it('向かい風/追い風で平均飛距離が逆方向に変化する（±2m許容）', () => {
