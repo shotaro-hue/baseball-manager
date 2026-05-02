@@ -58,6 +58,14 @@ function getPhysicsConfig(options = {}) {
   };
 }
 
+
+
+export function sanitizeEnvironment(environment = {}) {
+  const numericWindOut = Number(environment?.windOut);
+  return {
+    windOut: Number.isFinite(numericWindOut) ? numericWindOut : 0,
+  };
+}
 export function simulateFlight(ev, la, options = {}) {
   const config = getPhysicsConfig(options);
   const environment = sanitizeEnvironment(options.environment);

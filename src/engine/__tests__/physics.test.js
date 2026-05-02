@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calcBallDist, calcTrajectory, resolveFieldSideBySprayAngle } from '../physics';
+import { calcBallDist, calcTrajectory, resolveFieldSideBySprayAngle, sanitizeEnvironment, simulateFlight } from '../physics';
 import { lookupBallDist } from '../physicsLookup';
 
 describe('physics flight simulation', () => {
@@ -90,5 +90,22 @@ describe('resolveFieldSideBySprayAngle', () => {
     expect(resolveFieldSideBySprayAngle(60)).toMatchObject({ key: 'center', label: '中堅' });
     expect(resolveFieldSideBySprayAngle(60.1)).toMatchObject({ key: 'right', label: '右翼' });
     expect(resolveFieldSideBySprayAngle(90)).toMatchObject({ key: 'right', label: '右翼' });
+  });
+});
+
+
+describe('sanitizeEnvironment', () => {
+  it('異常値を安全なデフォルトにフォールバックする', () => {
+    expect(sanitizeEnvironment({ windOut: 'invalid' })).toEqual({ windOut: 0 });
+    expect(sanitizeEnvironment({ windOut: Infinity })).toEqual({ windOut: 0 });
+    expect(sanitizeEnvironment({ windOut: null })).toEqual({ windOut: 0 });
+  });
+});
+
+describe('simulateFlight', () => {
+  it('終点高度が0以下で収束する', () => {
+    const { points } = simulateFlight(161, 25);
+    const lastPoint = points[points.length - 1];
+    expect(lastPoint[1]).toBeLessThanOrEqual(0);
   });
 });

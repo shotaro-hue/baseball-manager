@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getFaThreshold, evalOffer, processCpuFaBids } from '../contract';
+import { initGameState, processAtBat } from '../simulation';
 
 describe('getFaThreshold', () => {
   it('高卒は国内FA 960日 (8年×120)', () => {
@@ -163,5 +164,38 @@ describe('processCpuFaBids multi-signing', () => {
     const updatedCpu = res.updatedTeams.find((t) => t.id === 1);
     const signedIds = updatedCpu.players.map((p) => p.id);
     expect(signedIds).toContain('faS');
+  });
+});
+
+
+describe('API contract: 打席返却オブジェクト', () => {
+  it('processAtBat のログに physicsMeta が必須で含まれる', () => {
+    const makeTeam = (id, pitcherId, batterId) => ({
+      id,
+      lineup: [batterId],
+      rotation: [pitcherId],
+      rotIdx: 0,
+      players: [
+        { id: pitcherId, name: `P-${pitcherId}`, isPitcher: true, subtype: '先発', pitching: { velocity: 60, control: 60, breaking: 60, stamina: 60 } },
+        { id: batterId, name: `B-${batterId}`, isPitcher: false, batting: { contact: 60, power: 60, eye: 60 } },
+      ],
+    });
+
+    const myTeam = makeTeam('my', 'myp', 'myb');
+    const oppTeam = makeTeam('opp', 'oppP', 'oppB');
+
+    const gs = initGameState(myTeam, oppTeam);
+    const next = processAtBat(gs, 'normal');
+
+    expect(next.log.length).toBeGreaterThan(0);
+    const atBat = next.log[next.log.length - 1];
+    expect(atBat).toHaveProperty('physicsMeta');
+    expect(atBat.physicsMeta).toMatchObject({
+      ev: expect.any(Number),
+      la: expect.any(Number),
+      distance: expect.any(Number),
+      sprayAngle: expect.any(Number),
+      trajectory: expect.any(Array),
+    });
   });
 });
