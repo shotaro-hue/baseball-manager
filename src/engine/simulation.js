@@ -685,10 +685,16 @@ function processAtBat(gs, strategy = 'normal') {
   let result = initialResult;
   let physicsMeta = { ev: 0, la: 0, distance: 0, sprayAngle: 45, trajectory: [] };
   if (initialResult === 'inplay') {
-    const resolved = resolveBattedBallOutcomeFromPhysics(batter, pitcher, stadium, environment, {});
-    result = resolved.result;
-    physicsMeta = resolved.physicsMeta;
-  }
+  const resolved = resolveBattedBallOutcomeFromPhysics(
+    batter,
+    pitcher,
+    stadium,
+    environment,
+    { leagueEnv: gs.leagueEnv || DEFAULT_LEAGUE_ENV }
+  );
+  result = resolved.result;
+  physicsMeta = resolved.physicsMeta;
+}
 
   let newBases = [...gs.bases];
   let runs = 0, rbi = 0, outs = gs.outs, momentumDelta = 0;
