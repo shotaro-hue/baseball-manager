@@ -254,3 +254,24 @@ body{background:var(--bg);}
 .mode-card.auto:hover{border-color:var(--green);background:rgba(52,211,153,.04);}
 @keyframes fi{from{opacity:0;transform:translateX(-5px);}to{opacity:1;transform:none;}}
 @keyframes pulse2{0%,100%{opacity:1;}50%{opacity:.6;}}
+
+.manager-dashboard-grid{display:grid;grid-template-columns:1fr;gap:14px;overflow-x:hidden;}
+.dashboard-order-game{order:1;}
+.dashboard-order-recommendation{order:2;}
+.dashboard-order-condition{order:3;}
+.dashboard-order-kpi{order:4;}
+.dashboard-order-featured{order:5;}
+@media (min-width:768px){
+  .manager-dashboard-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .dashboard-order-game,.dashboard-order-recommendation,.dashboard-order-condition,.dashboard-order-kpi,.dashboard-order-featured{order:initial;}
+  .dashboard-order-kpi{grid-column:1 / -1;}
+  .dashboard-order-featured{grid-column:1 / -1;}
+}
+@media (min-width:1024px){
+  .manager-dashboard-grid{grid-template-columns:repeat(12,minmax(0,1fr));}
+  .dashboard-order-game{grid-column:span 7;}
+  .dashboard-order-recommendation{grid-column:span 5;}
+  .dashboard-order-kpi{grid-column:span 12;}
+  .dashboard-order-condition{grid-column:span 6;}
+  .dashboard-order-featured{grid-column:span 6;}
+}
