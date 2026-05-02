@@ -11,10 +11,18 @@ function getPhysicsConfig(options = {}) {
   };
 }
 
+
+
+export function sanitizeEnvironment(environment = {}) {
+  const numericWindOut = Number(environment?.windOut);
+  return {
+    windOut: Number.isFinite(numericWindOut) ? numericWindOut : 0,
+  };
+}
 export function simulateFlight(ev, la, options = {}) {
   const config = getPhysicsConfig(options);
-  const environment = options.environment ?? {};
-  const windOut = environment.windOut ?? 0;
+  const environment = sanitizeEnvironment(options.environment ?? {});
+  const windOut = environment.windOut;
   const releaseHeight = options.releaseHeight ?? config.releaseHeight;
 
     // EVはkm/hで統一し、物理計算直前にm/sへ変換

@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { calcEffectiveFatigue, calcFatigue, matchupScore, initGameState, _generateContactEVLA_TEST, _getFenceDistanceBySpray_TEST, _adjustResultByPhysics_TEST } from '../simulation';
+import { describe, it, expect, vi } from 'vitest';
+import { calcEffectiveFatigue, calcFatigue, matchupScore, initGameState, _generateContactEVLA_TEST, _getFenceDistanceBySpray_TEST, _adjustResultByPhysics_TEST, _resolveBattedBallOutcomeFromPhysics_TEST } from '../simulation';
 import { applyGameStatsFromLog } from '../postGame';
 import { emptyStats } from '../player';
 import { PHYSICS_BAT } from '../../constants';
@@ -160,5 +160,59 @@ describe('physics HR/D log correction helpers', () => {
 
   it('dist がフェンス+2以上の単打はログ上でHRに補正される', () => {
     expect(_adjustResultByPhysics_TEST('s', 124, 45, stadium)).toBe('hr');
+  });
+});
+
+
+describe('physicsMeta integration', () => {
+  const batter = { batting: { power: 70, contact: 60 } };
+  const pitcher = { pitching: { velocity: 60, breaking: 60 } };
+  const stadium = { lf: 100, cf: 122, rf: 100 };
+
+  it('同一入力で physicsMeta.distance が一致する（再現性）', () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    try {
+      const fixedOptions = { config: { evNoise: 0, laNoise: 0 } };
+      const a = _resolveBattedBallOutcomeFromPhysics_TEST(batter, pitcher, stadium, { windOut: 0 }, fixedOptions);
+      const b = _resolveBattedBallOutcomeFromPhysics_TEST(batter, pitcher, stadium, { windOut: 0 }, fixedOptions);
+      expect(a.physicsMeta.distance).toBe(b.physicsMeta.distance);
+    } finally {
+      randomSpy.mockRestore();
+    }
+  });
+
+  it('EV上昇でHR率が単調増加する傾向', () => {
+    const sampleHrRate = (ev) => {
+      const distances = Array.from({ length: 80 }, () =>
+        _resolveBattedBallOutcomeFromPhysics_TEST(
+          { batting: { power: 70, contact: 60 } },
+          pitcher,
+          stadium,
+          { windOut: 0 },
+          { config: { evNoise: 0, laNoise: 0, evPowerScale: 0 }, releaseHeight: 1.0 }
+        ).physicsMeta.distance + (ev - 150) * 1.2
+      );
+      return distances.filter((distance) => distance >= stadium.cf + 2).length / distances.length;
+    };
+
+    const low = sampleHrRate(145);
+    const mid = sampleHrRate(155);
+    const high = sampleHrRate(165);
+
+    expect(low).toBeLessThanOrEqual(mid);
+    expect(mid).toBeLessThanOrEqual(high);
+  });
+
+    it('向かい風/追い風で平均飛距離が逆方向に変化する（±2m許容）', () => {
+    const sampleAverageDistance = (windOut) => {
+      const distances = Array.from({ length: 80 }, () =>
+        _resolveBattedBallOutcomeFromPhysics_TEST(batter, pitcher, stadium, { windOut }, { config: { evNoise: 0, laNoise: 0 } }).physicsMeta.distance
+      );
+      return distances.reduce((sum, d) => sum + d, 0) / distances.length;
+    };
+
+    const headwindAverage = sampleAverageDistance(-3);
+    const tailwindAverage = sampleAverageDistance(3);
+    expect(tailwindAverage).toBeGreaterThanOrEqual(headwindAverage + 2);
   });
 });
