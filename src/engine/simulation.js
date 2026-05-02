@@ -18,16 +18,22 @@ import { calcSprayAngle, classifyBattedBallType, resolveFieldSideBySprayAngle, s
 //  ※キャリブレーションでもここは変えない
 // ═══════════════════════════════════════════════════════════════
 
-const BASELINE = {
+const BASELINE_PA = {
   bb:  0.0727,
   hbp: 0.0095,
   k:   0.1990,
+};
+
+const BASELINE_TARGET_RATES = {
   hr:  0.0175,
   d:   0.0369,
   t:   0.0042,
   s:   0.1656,
   out: 0.4946,
 };
+
+const BASELINE = { ...BASELINE_PA, ...BASELINE_TARGET_RATES }; // deprecated: 既存UI互換
+
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -36,13 +42,9 @@ const BASELINE = {
 // ═══════════════════════════════════════════════════════════════
 
 const ABILITY_RANGE = {
-  eye:       { lo: 0.030, mid: BASELINE.bb,  hi: 0.130 },
-  contact:   { lo: 0.100, mid: BASELINE.s,   hi: 0.240 }, // 打率過剰抑制: 上位層の打率を NPB 実績に近づける (旧: 0.260)
-  power:     { lo: 0.003, mid: BASELINE.hr,  hi: 0.050 },
-  speed:     { lo: 0.003, mid: BASELINE.t,   hi: 0.012 },
-  p_control: { lo: 0.130, mid: BASELINE.bb,  hi: 0.030 },
-  p_stuff:   { lo: 0.120, mid: BASELINE.k,   hi: 0.265 }, // 投高打低緩和: 最上位投手の K 率天井を引き下げ (旧: 0.300)
-  p_power:   { lo: 0.030, mid: BASELINE.hr,  hi: 0.005 },
+  eye:       { lo: 0.030, mid: BASELINE_PA.bb,  hi: 0.130 },
+  p_control: { lo: 0.130, mid: BASELINE_PA.bb,  hi: 0.030 },
+  p_stuff:   { lo: 0.120, mid: BASELINE_PA.k,   hi: 0.265 }, // 投高打低緩和: 最上位投手の K 率天井を引き下げ (旧: 0.300)
 };
 
 function abilityToProb(ability, range) {
@@ -60,9 +62,9 @@ function mergeProb(batterProb, pitcherProb) {
 function applyPitchingPolicy(probs, policy) {
   if (!policy || policy === 'normal') return probs;
   const m = { ...probs };
-  if (policy === 'fastball') { m.hr *= 1.10; m.k   *= 1.15; m.bb  *= 1.12; }
-  if (policy === 'breaking') { m.k  *= 1.20; m.out *= 1.10; m.hr  *= 0.85; }
-  if (policy === 'control')  { m.bb *= 0.65; m.k   *= 0.88; m.s   *= 1.08; }
+  if (policy === 'fastball') { m.k *= 1.15; m.bb *= 1.12; }
+  if (policy === 'breaking') { m.k *= 1.20; m.inplay *= 0.95; }
+  if (policy === 'control')  { m.bb *= 0.65; m.k *= 0.88; }
   const sum = Object.values(m).reduce((a, b) => a + b, 0);
   Object.keys(m).forEach(k => { m[k] /= sum; });
   return m;
@@ -91,10 +93,10 @@ export const STADIUMS = {
 export const TEAM_STADIUM = { 0:'jingu', 1:'yokohama', 2:'mazda', 3:'hanshin', 4:'tokyo_dome', 5:'nagoya', 6:'paypaydome', 7:'rakuten', 8:'seibu', 9:'zozopark', 10:'escon', 11:'kyocera' };
 
 export const DEFAULT_LEAGUE_ENV = {
-  hrMod: 0.88,  // HR過多是正: リーグ全体の被本塁打率をNPB基準へ戻すため下方補正
+  hrMod: 0.88,  // legacy: 物理結果には適用しない（互換維持のため保持）
   bbMod: 1.30,  // 投高打低緩和: 四球率 5.6%→7.3% 目標 (旧: 1.00)
   kMod: 0.89,   // 投高打低緩和: 三振過剰を抑制 (旧: 1.00)
-  hitMod: 1.02, // 打率過剰抑制: 全体打率を引き下げつつ投高打低への逆振れ防止 (旧: 1.10)
+  hitMod: 1.02, // legacy: 物理結果には適用しない（互換維持のため保持）
   evMod: 1,
   laMod: 0,
   barrelRateMod: 1,
@@ -110,41 +112,30 @@ export const DEFAULT_LEAGUE_ENV = {
 // ═══════════════════════════════════════════════════════════════
 
 function calcPAProbs(bat, pit, leagueEnv = DEFAULT_LEAGUE_ENV) {
-  const batEye     = bat?.batting?.eye     || 50;
+  const batEye = bat?.batting?.eye || 50;
   const batContact = bat?.batting?.contact || 50;
-  const batPower   = bat?.batting?.power   || 50;
-  const batSpeed   = bat?.batting?.speed   || 50;
-  const pitControl = pit?.pitching?.control  || 50;
-  const pitStuff   = ((pit?.pitching?.velocity || 50) + (pit?.pitching?.breaking || 50)) / 2;
-  const pitVel     = pit?.pitching?.velocity || 50;
+  const pitControl = pit?.pitching?.control || 50;
+  const pitStuff = ((pit?.pitching?.velocity || 50) + (pit?.pitching?.breaking || 50)) / 2;
 
-  const batBB = abilityToProb(batEye,     ABILITY_RANGE.eye);
-  const batS  = abilityToProb(batContact, ABILITY_RANGE.contact);
-  const batHR = abilityToProb(batPower,   ABILITY_RANGE.power);
-  const batT  = abilityToProb(batSpeed,   ABILITY_RANGE.speed);
-
+  const batBB = abilityToProb(batEye, ABILITY_RANGE.eye);
   const pitBB = abilityToProb(pitControl, ABILITY_RANGE.p_control);
-  const pitK  = abilityToProb(pitStuff,   ABILITY_RANGE.p_stuff);
-  const pitHR = abilityToProb(pitVel,     ABILITY_RANGE.p_power);
+  const pitK = abilityToProb(pitStuff, ABILITY_RANGE.p_stuff);
 
-  let bb  = mergeProb(batBB, pitBB) * leagueEnv.bbMod;
-  let k   = mergeProb(BASELINE.k * (1 - (batContact - 50) / 200), pitK) * leagueEnv.kMod;
-  let hr  = mergeProb(batHR, pitHR) * leagueEnv.hrMod;
-  let s   = batS * (1 - (pitStuff - 50) / 400) * leagueEnv.hitMod; // 投高打低緩和: 投手 stuff による安打抑制を緩和 (旧: / 300)
-  let d   = BASELINE.d * (batPower / 50) * 0.7 + BASELINE.d * 0.3 * leagueEnv.hitMod;
-  let t   = batT;
-  let hbp = BASELINE.hbp;
+  let bb = mergeProb(batBB, pitBB) * leagueEnv.bbMod;
+  let k = mergeProb(BASELINE_PA.k * (1 - (batContact - 50) / 200), pitK) * leagueEnv.kMod;
+  let hbp = BASELINE_PA.hbp;
 
-  // STEP1安全弁: k+bb+hbpの合計が1を超えた場合、比率を保ちながらスケールダウン
-  const nonBatSum = k + bb + hbp;
-  if (nonBatSum > 1) { const nbs = 1 / nonBatSum; k *= nbs; bb *= nbs; hbp *= nbs; }
+  const nonBattedBallSum = bb + k + hbp;
+  const inplay = Math.max(0, 1 - nonBattedBallSum);
+  if (inplay <= 0) {
+    const safeScale = 1 / Math.max(nonBattedBallSum, 0.0001);
+    bb *= safeScale;
+    k *= safeScale;
+    hbp *= safeScale;
+    return { bb, hbp, k, inplay: 0 };
+  }
 
-  const raw   = { bb, hbp, k, hr, d, t, s };
-  const total = Object.values(raw).reduce((a, b) => a + b, 0);
-  const scale = total > 1 ? 1 / total : 1;
-  const out   = Math.max(0, 1 - total * scale);
-
-  return { bb: bb*scale, hbp: hbp*scale, k: k*scale, hr: hr*scale, d: d*scale, t: t*scale, s: s*scale, out };
+  return { bb, hbp, k, inplay };
 }
 
 
@@ -232,10 +223,8 @@ function selectZoneForResult(result, bat) {
 //  SECTION 7: 球場ファクター
 // ═══════════════════════════════════════════════════════════════
 
-function applyStadiumFactor(result, bat, stadium) {
-  if (!stadium) return result;
-  if (result === 'hr') return rngf(0, 1) > stadium.hrMod ? 'd' : 'hr';
-  if (result === 'd'  && rngf(0, 1) < (stadium.hrMod - 1) * 0.3) return 'hr';
+function applyStadiumFactor(result) {
+  // deprecated: 物理演算移行後は使用しない。互換エクスポートのため残置。
   return result;
 }
 
@@ -263,6 +252,7 @@ function simAtBat(bat, pit, strategy = 'normal', pitchCount = 0, situation = {},
     result = rngf(0, 1) < 0.65 ? 'sac' : 'out';
   }
 
+  // 注記: pitchType/zone は演出用で、確定した結果から逆算して割り当てている。
   const pitchType = selectPitchForResult(result, pit);
   const zone      = selectZoneForResult(result, bat);
   const pitches   = estimatePitchCount(result);
@@ -452,11 +442,10 @@ function resolveBattedBallOutcomeFromPhysicsForBalance(batter, pitcher, stadium,
       result = distance <= 35 ? 'out' : 's';
     }
 
-    // 段階移行の安全弁: 既存 BASELINE を補正係数として残し、結果分布を急変させない
-    const singleBoost = BASELINE.s / (BASELINE.s + BASELINE.out);
-    const doubleBoost = BASELINE.d / Math.max(BASELINE.d + BASELINE.s, 0.0001);
-    const tripleBoost = BASELINE.t / Math.max(BASELINE.t + BASELINE.d + BASELINE.s, 0.0001);
-    const outBoost = BASELINE.out / (BASELINE.out + BASELINE.s);
+    // 段階移行の安全弁: 既存ターゲット率を用いて2塁打/3塁打のみ最小限補正。
+    // TODO(物理演算全面化): doubleBoost/tripleBoost は将来的に打球速度・角度・走力由来へ移行する。
+    const doubleBoost = BASELINE_TARGET_RATES.d / Math.max(BASELINE_TARGET_RATES.d + BASELINE_TARGET_RATES.s, 0.0001);
+    const tripleBoost = BASELINE_TARGET_RATES.t / Math.max(BASELINE_TARGET_RATES.t + BASELINE_TARGET_RATES.d + BASELINE_TARGET_RATES.s, 0.0001);
     const reroll = rngProvider(0, 1);
     // 打高是正: アウト→単打変換を廃止。物理演算+捕球率でBABIPを決定する。
     if (result === 's' && reroll > 1 - doubleBoost * 0.24) result = 'd';
@@ -471,11 +460,12 @@ function resolveBattedBallOutcomeFromPhysicsForBalance(batter, pitcher, stadium,
 const resolveBattedBallOutcomeFromPhysics = resolveBattedBallOutcomeFromPhysicsForBalance;
 
 function adjustResultByPhysics(result, dist, sprayAngle, stadium) {
+  // deprecated: 現行フローでは未使用。テスト互換のため従来ロジックを維持。
   if (!stadium || !Number.isFinite(dist)) return result;
   const fenceDistance = getFenceDistanceBySpray(stadium, sprayAngle);
   if (!Number.isFinite(fenceDistance)) return result;
   if (result === 'hr' && dist < fenceDistance) return 'd';
-    return result;
+  return result;
 }
 
 function estimatePitchCount(result) {
@@ -696,7 +686,7 @@ function processAtBat(gs, strategy = 'normal') {
   let physicsMeta = { ev: 0, la: 0, distance: 0, sprayAngle: 45, trajectory: [] };
   if (initialResult === 'inplay') {
     const resolved = resolveBattedBallOutcomeFromPhysics(batter, pitcher, stadium, environment, {});
-    result = applyStadiumFactor(resolved.result, batter, stadium);
+    result = resolved.result;
     physicsMeta = resolved.physicsMeta;
   }
 
@@ -1009,4 +999,4 @@ export function runFarmSeason(teams) {
   });
 }
 
-export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, matchupScore, calcFatigue, calcEffectiveFatigue, PITCH_TYPES, BASELINE, ABILITY_RANGE, resolveBattedBallOutcomeFromPhysicsForBalance, generateContactEVLA as _generateContactEVLA_TEST, getFenceDistanceBySpray as _getFenceDistanceBySpray_TEST, adjustResultByPhysics as _adjustResultByPhysics_TEST, resolveBattedBallOutcomeFromPhysics as _resolveBattedBallOutcomeFromPhysics_TEST, estimateFielderIntercept as _estimateFielderIntercept_TEST };
+export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, matchupScore, calcFatigue, calcEffectiveFatigue, PITCH_TYPES, BASELINE, BASELINE_PA, BASELINE_TARGET_RATES, ABILITY_RANGE, resolveBattedBallOutcomeFromPhysicsForBalance, generateContactEVLA as _generateContactEVLA_TEST, getFenceDistanceBySpray as _getFenceDistanceBySpray_TEST, adjustResultByPhysics as _adjustResultByPhysics_TEST, resolveBattedBallOutcomeFromPhysics as _resolveBattedBallOutcomeFromPhysics_TEST, estimateFielderIntercept as _estimateFielderIntercept_TEST };
