@@ -32,7 +32,7 @@ function MiniField({ runners }) {
   );
 }
 
-export function GameActionTab() {
+export function GameActionTab({ onOpenTactical }) {
   const [gameLog, setGameLog] = useState(['試合開始: 7回裏 1アウト 一・三塁']);
 
   const riskTone = useMemo(() => riskToneMap[mockGameState.matchup.riskLevel] || riskToneMap.medium, []);
@@ -57,7 +57,22 @@ export function GameActionTab() {
 
   return (
     <section className="card" style={{ display: 'grid', gap: 12 }}>
-      <div className="card-h">試合（重要場面采配）</div>
+      <div className="card-h" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+        <span>試合（重要場面采配）</span>
+        <button
+          type="button"
+          className="bsm bga"
+          onClick={() => {
+            if (typeof onOpenTactical !== "function") {
+              setGameLog((prev) => ["⚠️ 試合画面を開く処理が未設定です。", ...prev]);
+              return;
+            }
+            onOpenTactical();
+          }}
+        >
+          本命試合画面へ
+        </button>
+      </div>
 
       <div className="game-action-layout">
         <div className="card2 game-score-card">
