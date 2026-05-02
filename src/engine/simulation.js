@@ -167,38 +167,21 @@ function sampleResult(probs) {
 //  確率テーブルによる結果（hr/s/d/out 等）には干渉しない。
 // ═══════════════════════════════════════════════════════════════
 
-function generateContactEVLA(batter, pitcher) {
-  const power = batter?.batting?.power || 50;
-  const contact = batter?.batting?.contact || 50;
-  const pitVel = pitcher?.pitching?.velocity || 50;
-  const pitBrk = pitcher?.pitching?.breaking || 50;
-  const pitStuff = (pitVel + pitBrk) / 2;
-
-  const evBase = PHYSICS_BAT.EV_FLOOR
-    + (power / 99) * PHYSICS_BAT.EV_POWER_SCALE
-    - ((pitStuff - 50) / 49) * PHYSICS_BAT.EV_STUFF_SCALE;
-  const ev = Math.round(
-    clamp(
-      evBase + rngf(-PHYSICS_BAT.EV_NOISE, PHYSICS_BAT.EV_NOISE),
-      PHYSICS_BAT.EV_FLOOR,
-      PHYSICS_BAT.EV_FLOOR + PHYSICS_BAT.EV_POWER_SCALE + PHYSICS_BAT.EV_NOISE
-    ) * 10
-  ) / 10;
-
-  const laMid = power >= PHYSICS_BAT.FLY_POWER_THRESHOLD ? PHYSICS_BAT.LA_FLY_MID
-    : power <= PHYSICS_BAT.GROUND_POWER_THRESHOLD ? PHYSICS_BAT.LA_GROUND_MID
-    : contact >= PHYSICS_BAT.CONTACT_THRESHOLD ? PHYSICS_BAT.LA_CONTACT_MID
-    : PHYSICS_BAT.LA_DEFAULT_MID;
-  const la = Math.round(
-    clamp(
-      rngf(laMid - PHYSICS_BAT.LA_NOISE, laMid + PHYSICS_BAT.LA_NOISE),
-      PHYSICS_BAT.LA_MIN,
-      PHYSICS_BAT.LA_MAX
-    ) * 10
-  ) / 10;
-
-  return { ev, la };
+function generateContactEVLA(batter, pitcher, options = {}) {
+  const rngProvider = typeof options?.rngProvider === 'function' ? options.rngProvider : rngf;
+  const power = clamp(Number(batter?.batting?.power ?? 50), 1, 99);
+  const contact = clamp(Number(batter?.batting?.contact ?? 50), 1, 99);
+  const quality = sampleContactQuality(batter, pitcher, rngProvider);
+  const evRanges = { weak: [55, 115], normal: [95, 140], solid: [120, 155], hard: [135, 170], barrel: [145, 190] };
+  const laRanges = { weak: [-20, 55], normal: [-10, 30], solid: [0, 32], hard: [5, 35], barrel: [18, 34] };
+  const [evMin, evMax] = evRanges[quality] || evRanges.normal;
+  const [laMin, laMax] = laRanges[quality] || laRanges.normal;
+  const evPowerBoost = quality === 'hard' ? PHYSICS_BAT.EV.POWER_TO_HARD_EV : quality === 'barrel' ? PHYSICS_BAT.EV.POWER_TO_BARREL_EV : 0.12;
+  const ev = Math.round(clamp(rngProvider(evMin, evMax) + (power - 50) * evPowerBoost * 0.18 - (50 - contact) * PHYSICS_BAT.EV.CONTACT_WEAK_REDUCTION * 0.08, PHYSICS_BAT.EV.MIN, PHYSICS_BAT.EV.MAX) * 10) / 10;
+  const la = Math.round(clamp(rngProvider(laMin, laMax) + ((contact - 50) / 49) * 1.8, PHYSICS_BAT.LA.MIN, PHYSICS_BAT.LA.MAX) * 10) / 10;
+  return { ev, la, quality };
 }
+
 
 
 
@@ -312,16 +295,47 @@ function applyBatterSituation(bat, situation) {
 }
 
 
-const MIN_HR_CLEARANCE = 4; // 打高是正: フェンス越え判定を厳格化しHR過多を抑制
 const SAFE_STADIUM_DIMENSION = 100;
 const SAFE_EV = 135;
 const SAFE_LA = 12;
 
 function getFenceDistanceBySpray(stadium, sprayAngle) {
   if (!stadium) return null;
-  if (sprayAngle < 30) return stadium.lf;
-  if (sprayAngle > 60) return stadium.rf;
-  return stadium.cf;
+  const angle = clamp(Number(sprayAngle), 0, 90);
+  const lf = Number(stadium.lf);
+  const cf = Number(stadium.cf);
+  const rf = Number(stadium.rf);
+  if (![lf, cf, rf].every(Number.isFinite)) return null;
+  if (angle <= 45) {
+    const t = angle / 45;
+    return lf + (cf - lf) * Math.sin(t * Math.PI / 2);
+  }
+  const t = (angle - 45) / 45;
+  return cf + (rf - cf) * (1 - Math.cos(t * Math.PI / 2));
+}
+
+function sampleContactQuality(batter, pitcher, rngProvider = rngf) {
+  const power = clamp(Number(batter?.batting?.power ?? 50), 1, 99);
+  const contact = clamp(Number(batter?.batting?.contact ?? 50), 1, 99);
+  const pitStuff = clamp((Number(pitcher?.pitching?.velocity ?? 50) + Number(pitcher?.pitching?.breaking ?? 50)) / 2, 1, 99);
+  const safeRng = typeof rngProvider === 'function' ? rngProvider : rngf;
+  let weak = PHYSICS_BAT.CONTACT_QUALITY.WEAK_BASE - ((contact - 50) / 49) * 0.10 + ((pitStuff - 50) / 49) * 0.03;
+  let hard = PHYSICS_BAT.CONTACT_QUALITY.HARD_BASE + ((power - 50) / 49) * 0.08 - ((pitStuff - 50) / 49) * 0.02;
+  let barrel = PHYSICS_BAT.CONTACT_QUALITY.BARREL_BASE + ((power - 50) / 49) * 0.03 + ((contact - 50) / 49) * 0.015 - ((pitStuff - 50) / 49) * 0.01;
+  barrel = clamp(barrel, 0.01, PHYSICS_BAT.CONTACT_QUALITY.BARREL_MAX);
+  weak = clamp(weak, 0.18, 0.55);
+  hard = clamp(hard, 0.05, 0.25);
+  const solid = clamp(0.22 + ((contact - 50) / 49) * 0.05 + ((power - 50) / 49) * 0.02, 0.12, 0.30);
+  const normal = Math.max(0.01, 1 - (weak + solid + hard + barrel));
+  const weights = { weak, normal, solid, hard, barrel };
+  const total = Object.values(weights).reduce((a, b) => a + b, 0);
+  const roll = safeRng(0, 1);
+  let cum = 0;
+  for (const [key, value] of Object.entries(weights)) {
+    cum += value / total;
+    if (roll <= cum) return key;
+  }
+  return 'normal';
 }
 
 function inferReplayTypeFromResult(result) {
@@ -360,8 +374,26 @@ function estimateFielderIntercept(distance, ballType, spraySide, rngProvider = r
   };
 }
 
+function isHomeRunByTrajectory(points, fenceDistance, wallHeight = PHYSICS_BAT.HR.WALL_HEIGHT) {
+  if (!Array.isArray(points) || points.length < 2 || !Number.isFinite(fenceDistance)) return false;
+  for (let i = 1; i < points.length; i += 1) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    const x1 = Number(prev?.x ?? prev?.distance ?? prev?.[0]);
+    const y1 = Number(prev?.y ?? prev?.height ?? prev?.[1]);
+    const x2 = Number(curr?.x ?? curr?.distance ?? curr?.[0]);
+    const y2 = Number(curr?.y ?? curr?.height ?? curr?.[1]);
+    if (![x1, y1, x2, y2].every(Number.isFinite)) continue;
+    if ((x1 <= fenceDistance && x2 >= fenceDistance) || (x2 <= fenceDistance && x1 >= fenceDistance)) {
+      const t = x2 === x1 ? 0 : (fenceDistance - x1) / (x2 - x1);
+      return y1 + (y2 - y1) * t >= wallHeight;
+    }
+  }
+  return false;
+}
+
 function resolveBattedBallOutcomeFromPhysics(batter, pitcher, stadium, environment = {}, options = {}) {
-  const { ev: generatedEv, la: generatedLa } = generateContactEVLA(batter, pitcher);
+  const { ev: generatedEv, la: generatedLa, quality } = generateContactEVLA(batter, pitcher, options);
   const ev = Number.isFinite(generatedEv) ? generatedEv : SAFE_EV;
   const la = Number.isFinite(generatedLa) ? generatedLa : SAFE_LA;
   const safeEnvironment = sanitizeEnvironment(environment);
@@ -384,10 +416,11 @@ function resolveBattedBallOutcomeFromPhysics(batter, pitcher, stadium, environme
     cf: Number.isFinite(Number(stadium?.cf)) ? Number(stadium.cf) : SAFE_STADIUM_DIMENSION,
     rf: Number.isFinite(Number(stadium?.rf)) ? Number(stadium.rf) : SAFE_STADIUM_DIMENSION,
   };
-  const fenceDistance = side.key === 'left' ? safeStadium.lf : side.key === 'right' ? safeStadium.rf : safeStadium.cf;
+  const fenceDistance = getFenceDistanceBySpray(safeStadium, sprayAngle);
 
   let result = 'out';
-  if (distance >= fenceDistance + MIN_HR_CLEARANCE) {
+  const isHrByTrajectory = isHomeRunByTrajectory(points, fenceDistance);
+  if (isHrByTrajectory) {
     result = 'hr';
   } else {
     const rngProvider = typeof options?.rngProvider === 'function' ? options.rngProvider : rngf;
@@ -416,7 +449,7 @@ function resolveBattedBallOutcomeFromPhysics(batter, pitcher, stadium, environme
 
   return {
     result,
-    physicsMeta: { ev, la, distance, sprayAngle, trajectory: points, ballType },
+    physicsMeta: { ev, la, distance, sprayAngle, trajectory: points, ballType, quality: quality || 'normal', fenceDistance, isHrByTrajectory },
   };
 }
 
@@ -425,9 +458,7 @@ function adjustResultByPhysics(result, dist, sprayAngle, stadium) {
   const fenceDistance = getFenceDistanceBySpray(stadium, sprayAngle);
   if (!Number.isFinite(fenceDistance)) return result;
   if (result === 'hr' && dist < fenceDistance) return 'd';
-  if (dist >= fenceDistance + MIN_HR_CLEARANCE && ['s', 'd', 't'].includes(result)) return 'hr';
-  if (result === 'd' && dist >= fenceDistance + 8) return 'hr';
-  return result;
+    return result;
 }
 
 function estimatePitchCount(result) {
