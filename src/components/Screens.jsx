@@ -20,27 +20,15 @@ export function ModeSelectScreen({myTeam,oppTeam,gameDay,onSelect,onBack}){
           <span style={{fontSize:22}}>{oppTeam?.emoji}</span>
         </div>
 
-        <div className="mode-card tactical" onClick={()=>onSelect("tactical")}>
-          <div style={{fontSize:42,marginBottom:10}}>🎮</div>
-          <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:28,color:"#f5c842",letterSpacing:".1em",marginBottom:6}}>
-            采配モード
-          </div>
-          <div style={{fontSize:12,color:"#4b5563",lineHeight:1.6}}>
-            重要局面で自動停止。<br/>
-            投手交代・代打・作戦を自分で指示。<br/>
-            <span style={{color:"#f5c842",fontSize:11}}>★ じっくり遊びたい人向け</span>
-          </div>
-        </div>
-
         <div className="mode-card auto" onClick={()=>onSelect("auto")}>
           <div style={{fontSize:42,marginBottom:10}}>⚡</div>
           <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:28,color:"#34d399",letterSpacing:".1em",marginBottom:6}}>
             オートシムモード
           </div>
           <div style={{fontSize:12,color:"#4b5563",lineHeight:1.6}}>
-            試合を自動で進めて結果だけ確認。<br/>
-            すばやくシーズンを進めたい時に。<br/>
-            <span style={{color:"#34d399",fontSize:11}}>★ サクサク進めたい人向け</span>
+            既存の試合進行画面【＝現在の標準UI】で結果を確認。<br/>
+            試合は自動で進み、シーズン運営に集中できます。<br/>
+            <span style={{color:"#34d399",fontSize:11}}>★ 現在はこちらのモードのみ利用可能</span>
           </div>
         </div>
 
