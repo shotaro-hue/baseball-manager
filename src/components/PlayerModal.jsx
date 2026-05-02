@@ -46,25 +46,25 @@ function clampNormalized(value, min, max) {
 }
 
 function mapResultToHitType(result, point = {}) {
-  const normalizedResult = typeof result === "string" ? result.trim().toUpperCase() : "";
+  const normalizedResult = typeof result === "string" ? result.trim().toLowerCase() : "";
   const dist = Number(point?.dist);
   const fenceDistance = Number(point?.fenceDistance);
   const isHrByTrajectory = point?.isHrByTrajectory === true;
 
   const looksLikeValidHr =
     isHrByTrajectory ||
-    (normalizedResult === "HR" &&
+    (normalizedResult === "hr" &&
       Number.isFinite(dist) &&
       Number.isFinite(fenceDistance) &&
       dist >= fenceDistance);
 
-  if (normalizedResult === "1B") return "single";
-  if (normalizedResult === "2B") return "double";
-  if (normalizedResult === "3B") return "triple";
-  if (normalizedResult === "HR" && looksLikeValidHr) return "homeRun";
+  if (["s", "1b", "single"].includes(normalizedResult)) return "single";
+  if (["d", "2b", "double"].includes(normalizedResult)) return "double";
+  if (["t", "3b", "triple"].includes(normalizedResult)) return "triple";
+  if (["hr", "homerun"].includes(normalizedResult) && looksLikeValidHr) return "homeRun";
 
   // HR表記なのにフェンス未達なら、可視化上はHR扱いしない
-  if (normalizedResult === "HR") return "out";
+  if (["hr", "homerun"].includes(normalizedResult)) return "out";
 
   return "out";
 }
@@ -102,6 +102,8 @@ function toSprayChartEvents(sprayPoints) {
         y: normalizedDistance,
         fenceRatio,
         hitType: mapResultToHitType(point?.result, point),
+        hrClearance: Number.isFinite(Number(point?.hrClearance)) ? Number(point.hrClearance) : null,
+        fenceDistance: Number.isFinite(Number(point?.fenceDistance)) ? Number(point.fenceDistance) : null,
         isHrByTrajectory: point?.isHrByTrajectory === true,
       };
     })
