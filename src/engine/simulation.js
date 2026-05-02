@@ -95,6 +95,12 @@ export const DEFAULT_LEAGUE_ENV = {
   bbMod: 1.30,  // 投高打低緩和: 四球率 5.6%→7.3% 目標 (旧: 1.00)
   kMod: 0.89,   // 投高打低緩和: 三振過剰を抑制 (旧: 1.00)
   hitMod: 1.02, // 打率過剰抑制: 全体打率を引き下げつつ投高打低への逆振れ防止 (旧: 1.10)
+  evMod: 1,
+  laMod: 0,
+  barrelRateMod: 1,
+  hardRateMod: 1,
+  wallHeightMod: 1,
+  catchMod: 1,
   label: '通常',
 };
 
@@ -169,16 +175,19 @@ function sampleResult(probs) {
 
 function generateContactEVLA(batter, pitcher, options = {}) {
   const rngProvider = typeof options?.rngProvider === 'function' ? options.rngProvider : rngf;
+  const safeLeagueEnv = { ...DEFAULT_LEAGUE_ENV, ...(options?.leagueEnv || {}) };
   const power = clamp(Number(batter?.batting?.power ?? 50), 1, 99);
   const contact = clamp(Number(batter?.batting?.contact ?? 50), 1, 99);
-  const quality = sampleContactQuality(batter, pitcher, rngProvider);
+  const quality = sampleContactQuality(batter, pitcher, rngProvider, safeLeagueEnv);
   const evRanges = { weak: [55, 115], normal: [95, 140], solid: [120, 155], hard: [135, 170], barrel: [145, 190] };
   const laRanges = { weak: [-20, 55], normal: [-10, 30], solid: [0, 32], hard: [5, 35], barrel: [18, 34] };
   const [evMin, evMax] = evRanges[quality] || evRanges.normal;
   const [laMin, laMax] = laRanges[quality] || laRanges.normal;
   const evPowerBoost = quality === 'hard' ? PHYSICS_BAT.EV.POWER_TO_HARD_EV : quality === 'barrel' ? PHYSICS_BAT.EV.POWER_TO_BARREL_EV : 0.12;
-  const ev = Math.round(clamp(rngProvider(evMin, evMax) + (power - 50) * evPowerBoost * 0.18 - (50 - contact) * PHYSICS_BAT.EV.CONTACT_WEAK_REDUCTION * 0.08, PHYSICS_BAT.EV.MIN, PHYSICS_BAT.EV.MAX) * 10) / 10;
-  const la = Math.round(clamp(rngProvider(laMin, laMax) + ((contact - 50) / 49) * 1.8, PHYSICS_BAT.LA.MIN, PHYSICS_BAT.LA.MAX) * 10) / 10;
+  const rawEv = rngProvider(evMin, evMax) + (power - 50) * evPowerBoost * 0.18 - (50 - contact) * PHYSICS_BAT.EV.CONTACT_WEAK_REDUCTION * 0.08;
+  const rawLa = rngProvider(laMin, laMax) + ((contact - 50) / 49) * 1.8;
+  const ev = Math.round(clamp(rawEv * safeLeagueEnv.evMod, PHYSICS_BAT.EV.MIN, PHYSICS_BAT.EV.MAX) * 10) / 10;
+  const la = Math.round(clamp(rawLa + safeLeagueEnv.laMod, PHYSICS_BAT.LA.MIN, PHYSICS_BAT.LA.MAX) * 10) / 10;
   return { ev, la, quality };
 }
 
@@ -314,7 +323,8 @@ function getFenceDistanceBySpray(stadium, sprayAngle) {
   return cf + (rf - cf) * (1 - Math.cos(t * Math.PI / 2));
 }
 
-function sampleContactQuality(batter, pitcher, rngProvider = rngf) {
+function sampleContactQuality(batter, pitcher, rngProvider = rngf, leagueEnv = DEFAULT_LEAGUE_ENV) {
+  const safeLeagueEnv = { ...DEFAULT_LEAGUE_ENV, ...(leagueEnv || {}) };
   const power = clamp(Number(batter?.batting?.power ?? 50), 1, 99);
   const contact = clamp(Number(batter?.batting?.contact ?? 50), 1, 99);
   const pitStuff = clamp((Number(pitcher?.pitching?.velocity ?? 50) + Number(pitcher?.pitching?.breaking ?? 50)) / 2, 1, 99);
@@ -322,7 +332,8 @@ function sampleContactQuality(batter, pitcher, rngProvider = rngf) {
   let weak = PHYSICS_BAT.CONTACT_QUALITY.WEAK_BASE - ((contact - 50) / 49) * 0.10 + ((pitStuff - 50) / 49) * 0.03;
   let hard = PHYSICS_BAT.CONTACT_QUALITY.HARD_BASE + ((power - 50) / 49) * 0.08 - ((pitStuff - 50) / 49) * 0.02;
   let barrel = PHYSICS_BAT.CONTACT_QUALITY.BARREL_BASE + ((power - 50) / 49) * 0.03 + ((contact - 50) / 49) * 0.015 - ((pitStuff - 50) / 49) * 0.01;
-  barrel = clamp(barrel, 0.01, PHYSICS_BAT.CONTACT_QUALITY.BARREL_MAX);
+  hard = clamp(hard * safeLeagueEnv.hardRateMod, 0.05, 0.35);
+  barrel = clamp(barrel * safeLeagueEnv.barrelRateMod, 0.003, 0.12);
   weak = clamp(weak, 0.18, 0.55);
   hard = clamp(hard, 0.05, 0.25);
   const solid = clamp(0.22 + ((contact - 50) / 49) * 0.05 + ((power - 50) / 49) * 0.02, 0.12, 0.30);
@@ -392,8 +403,9 @@ function isHomeRunByTrajectory(points, fenceDistance, wallHeight = PHYSICS_BAT.H
   return false;
 }
 
-function resolveBattedBallOutcomeFromPhysics(batter, pitcher, stadium, environment = {}, options = {}) {
-  const { ev: generatedEv, la: generatedLa, quality } = generateContactEVLA(batter, pitcher, options);
+function resolveBattedBallOutcomeFromPhysicsForBalance(batter, pitcher, stadium, environment = {}, options = {}) {
+  const safeLeagueEnv = { ...DEFAULT_LEAGUE_ENV, ...(options?.leagueEnv || {}) };
+  const { ev: generatedEv, la: generatedLa, quality } = generateContactEVLA(batter, pitcher, { ...options, leagueEnv: safeLeagueEnv });
   const ev = Number.isFinite(generatedEv) ? generatedEv : SAFE_EV;
   const la = Number.isFinite(generatedLa) ? generatedLa : SAFE_LA;
   const safeEnvironment = sanitizeEnvironment(environment);
@@ -419,13 +431,17 @@ function resolveBattedBallOutcomeFromPhysics(batter, pitcher, stadium, environme
   const fenceDistance = getFenceDistanceBySpray(safeStadium, sprayAngle);
 
   let result = 'out';
-  const isHrByTrajectory = isHomeRunByTrajectory(points, fenceDistance);
+  const effectiveWallHeight = PHYSICS_BAT.HR.WALL_HEIGHT * safeLeagueEnv.wallHeightMod;
+  const isHrByTrajectory = isHomeRunByTrajectory(points, fenceDistance, effectiveWallHeight);
   if (isHrByTrajectory) {
     result = 'hr';
   } else {
     const rngProvider = typeof options?.rngProvider === 'function' ? options.rngProvider : rngf;
     const intercept = estimateFielderIntercept(distance, ballType, side.key, rngProvider);
+    const catchAdjusted = rngProvider(0, 1) < clamp(intercept.interceptRate * safeLeagueEnv.catchMod, 0.05, 0.98);
     if (intercept.caught) {
+      result = catchAdjusted ? 'out' : 's';
+    } else if (catchAdjusted) {
       result = 'out';
     } else if (ballType === 'fly') {
       result = distance >= 90 ? 'd' : 's';
@@ -452,6 +468,7 @@ function resolveBattedBallOutcomeFromPhysics(batter, pitcher, stadium, environme
     physicsMeta: { ev, la, distance, sprayAngle, trajectory: points, ballType, quality: quality || 'normal', fenceDistance, isHrByTrajectory },
   };
 }
+const resolveBattedBallOutcomeFromPhysics = resolveBattedBallOutcomeFromPhysicsForBalance;
 
 function adjustResultByPhysics(result, dist, sprayAngle, stadium) {
   if (!stadium || !Number.isFinite(dist)) return result;
@@ -992,4 +1009,4 @@ export function runFarmSeason(teams) {
   });
 }
 
-export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, matchupScore, calcFatigue, calcEffectiveFatigue, PITCH_TYPES, BASELINE, ABILITY_RANGE, generateContactEVLA as _generateContactEVLA_TEST, getFenceDistanceBySpray as _getFenceDistanceBySpray_TEST, adjustResultByPhysics as _adjustResultByPhysics_TEST, resolveBattedBallOutcomeFromPhysics as _resolveBattedBallOutcomeFromPhysics_TEST, estimateFielderIntercept as _estimateFielderIntercept_TEST };
+export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, matchupScore, calcFatigue, calcEffectiveFatigue, PITCH_TYPES, BASELINE, ABILITY_RANGE, resolveBattedBallOutcomeFromPhysicsForBalance, generateContactEVLA as _generateContactEVLA_TEST, getFenceDistanceBySpray as _getFenceDistanceBySpray_TEST, adjustResultByPhysics as _adjustResultByPhysics_TEST, resolveBattedBallOutcomeFromPhysics as _resolveBattedBallOutcomeFromPhysics_TEST, estimateFielderIntercept as _estimateFielderIntercept_TEST };

@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { simAtBat, BASELINE, ABILITY_RANGE, DEFAULT_LEAGUE_ENV, _resolveBattedBallOutcomeFromPhysics_TEST, STADIUMS } from '../../engine/simulation';
+import { simAtBat, BASELINE, DEFAULT_LEAGUE_ENV, resolveBattedBallOutcomeFromPhysicsForBalance, STADIUMS } from '../../engine/simulation';
 
 /* ================================================================
    BALANCE TAB
@@ -41,7 +41,7 @@ function runPASim(bat, pit, n, leagueEnv = DEFAULT_LEAGUE_ENV) {
   for (let i = 0; i < safeN; i++) {
     const { result } = simAtBat(bat, pit, 'normal', 0, { stadium: 'tokyo_dome' }, leagueEnv);
     if (result === 'inplay') {
-      const resolved = _resolveBattedBallOutcomeFromPhysics_TEST(bat, pit, stadium, {}, {});
+      const resolved = resolveBattedBallOutcomeFromPhysicsForBalance(bat, pit, stadium, {}, { leagueEnv });
       const finalResult = resolved?.result || 'out';
       c[finalResult] = (c[finalResult] || 0) + 1;
     } else {
@@ -75,7 +75,7 @@ function simulatePhysicsProfile(batter, pitcher, totalPa, leagueEnv = DEFAULT_LE
     }
     if (paResult !== 'inplay') continue;
     count.bip += 1;
-    const resolved = _resolveBattedBallOutcomeFromPhysics_TEST(safeBatter, safePitcher, stadium, {}, {});
+    const resolved = resolveBattedBallOutcomeFromPhysicsForBalance(safeBatter, safePitcher, stadium, {}, { leagueEnv });
     const resolvedResult = resolved?.result || 'out';
     if (count[resolvedResult] !== undefined) count[resolvedResult] += 1;
     const meta = resolved?.physicsMeta || {};
@@ -117,8 +117,12 @@ function Diff({ val, baseline, fmt, invert = false }) {
 
 
 const LEAGUE_ENV_SLIDER_CONFIG = [
-  { key: 'hitMod', label: '安打補正', min: 0.7, max: 1.3, step: 0.01, desc: 'インプレー打球の安打寄与を補正' },
-  { key: 'hrMod', label: '本塁打補正', min: 0.7, max: 1.3, step: 0.01, desc: '本塁打発生率を補正' },
+  { key: 'evMod', label: 'EV補正', min: 0.9, max: 1.1, step: 0.01, desc: '打球速度全体を補正' },
+  { key: 'laMod', label: 'LA補正', min: -5, max: 5, step: 0.1, desc: '打球角度へ加算補正' },
+  { key: 'barrelRateMod', label: 'バレル率補正', min: 0.5, max: 1.5, step: 0.01, desc: 'バレル発生率を補正' },
+  { key: 'hardRateMod', label: '強打球率補正', min: 0.7, max: 1.3, step: 0.01, desc: 'hard発生率を補正' },
+  { key: 'wallHeightMod', label: 'フェンス高さ補正', min: 0.8, max: 1.3, step: 0.01, desc: 'HR判定の厳しさを補正' },
+  { key: 'catchMod', label: '捕球補正', min: 0.8, max: 1.2, step: 0.01, desc: '外野守備の捕球成功率を補正' },
   { key: 'kMod', label: '三振補正', min: 0.7, max: 1.3, step: 0.01, desc: '三振発生率を補正' },
   { key: 'bbMod', label: '四球補正', min: 0.7, max: 1.3, step: 0.01, desc: '四球発生率を補正' },
 ];
@@ -147,7 +151,7 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
   const [mcError, setMcError] = useState('');
   const [mcRows, setMcRows] = useState([]);
 
-  const leagueEnv = myTeam?.leagueEnv || DEFAULT_LEAGUE_ENV;
+  const leagueEnv = { ...DEFAULT_LEAGUE_ENV, ...(myTeam?.leagueEnv || {}) };
 
   const handleLeagueEnvSliderChange = useCallback((key, rawValue) => {
     const sliderDef = LEAGUE_ENV_SLIDER_CONFIG.find((item) => item.key === key);
@@ -203,7 +207,7 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
   const doSim = useCallback(() => {
     setBusy(true);
     setTimeout(() => {
-      const N = 800;
+      const N = 10000;
       setSimRows([
         { label: '平均打者 (50) vs 平均投手 (55)', ...runPASim(mkBat(50), mkPit(55), N, leagueEnv) },
         { label: '強打者 (70) vs 強投手 (70)',     ...runPASim(mkBat(70), mkPit(70), N, leagueEnv) },
@@ -234,13 +238,15 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
     setMcError('');
     setTimeout(() => {
       try {
-        const TOTAL_PA = 8000;
+        const TOTAL_PA = 10000;
         const stadium = STADIUMS.tokyo_dome;
         const pitcher = { pitching: { velocity: 60, breaking: 60, control: 60 }, condition: 100, morale: 70 };
         const profiles = [
-          { label: 'power70', batting: { power: 70, contact: 55, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 } },
-          { label: 'power80', batting: { power: 80, contact: 58, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 } },
-          { label: 'power90', batting: { power: 90, contact: 60, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 } },
+          { label: '平均打者', batting: { power: 50, contact: 50, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 } },
+          { label: '準主力', batting: { power: 60, contact: 55, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 } },
+          { label: '中距離', batting: { power: 70, contact: 55, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 } },
+          { label: '主力長距離', batting: { power: 80, contact: 58, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 } },
+          { label: '球界トップ級', batting: { power: 90, contact: 60, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 } },
         ];
         const nextRows = profiles.map((profile) => ({
           label: profile.label,
@@ -429,13 +435,13 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
       ═══════════════════════════════════════ */}
       <div className="card">
         <div className="card-h" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>🎯 クイックシム（800 PA × 3 パターン）</span>
+          <span>🎯 クイックシム（10,000 PA × 3 パターン）</span>
           <button className="bsm bga" onClick={doSim} disabled={busy}>
             {busy ? '計算中…' : '▶ 実行'}
           </button>
         </div>
         <p style={{ fontSize: 11, color: '#374151', margin: '4px 0 8px' }}>
-          現在のエンジン設定で合成選手を800打席シミュレーション。NPBベースラインとの乖離を確認できます。
+          現在のエンジン設定で合成選手を10,000打席シミュレーション。NPBベースラインとの乖離を確認できます。
         </p>
         <div style={{ overflowX: 'auto' }}>
           <table className="tbl">
@@ -491,70 +497,22 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
           Section 3: バランス設定値（エンジン定数）
       ═══════════════════════════════════════ */}
       <div className="card">
-        <div className="card-h">⚙️ 現在のバランス設定値（エンジン定数）</div>
+        <div className="card-h">⚙️ 現在の物理定数と補正値</div>
         <div style={{ overflowX: 'auto' }}>
           <table className="tbl">
-            <thead>
-              <tr>
-                <th>設定項目</th>
-                <th>現在値</th>
-                <th>NPB基準</th>
-                <th>説明</th>
-              </tr>
-            </thead>
+            <thead><tr><th>設定項目</th><th>現在値</th><th>初期値</th><th>説明</th></tr></thead>
             <tbody>
-              <tr>
-                <td>
-                  <div style={{ fontWeight: 700, fontSize: 12 }}>一流打者 安打率天井</div>
-                  <div style={{ fontSize: 10, color: '#374151' }}>contact=99</div>
-                </td>
-                <td className="mono" style={{ color: '#f5c842' }}>{pct(ABILITY_RANGE.contact.hi)}</td>
-                <td className="mono" style={{ color: '#374151' }}>{pct(BASELINE.s)}</td>
-                <td style={{ fontSize: 10, color: '#374151' }}>最優秀打者が単打を打てる確率の天井</td>
-              </tr>
-              <tr>
-                <td>
-                  <div style={{ fontWeight: 700, fontSize: 12 }}>最上位投手 K率上限</div>
-                  <div style={{ fontSize: 10, color: '#374151' }}>p_stuff=99</div>
-                </td>
-                <td className="mono" style={{ color: '#f5c842' }}>{pct(ABILITY_RANGE.p_stuff.hi)}</td>
-                <td className="mono" style={{ color: '#374151' }}>{pct(BASELINE.k)}</td>
-                <td style={{ fontSize: 10, color: '#374151' }}>最強投手の三振確率の上限（高すぎると投高打低）</td>
-              </tr>
-              <tr>
-                <td>
-                  <div style={{ fontWeight: 700, fontSize: 12 }}>一流打者 HR率天井</div>
-                  <div style={{ fontSize: 10, color: '#374151' }}>power=99</div>
-                </td>
-                <td className="mono" style={{ color: '#f5c842' }}>{pct(ABILITY_RANGE.power.hi)}</td>
-                <td className="mono" style={{ color: '#374151' }}>{pct(BASELINE.hr)}</td>
-                <td style={{ fontSize: 10, color: '#374151' }}>最強打者の本塁打確率の上限</td>
-              </tr>
-              <tr>
-                <td>
-                  <div style={{ fontWeight: 700, fontSize: 12 }}>一流打者 四球率天井</div>
-                  <div style={{ fontSize: 10, color: '#374151' }}>eye=99</div>
-                </td>
-                <td className="mono" style={{ color: '#f5c842' }}>{pct(ABILITY_RANGE.eye.hi)}</td>
-                <td className="mono" style={{ color: '#374151' }}>{pct(BASELINE.bb)}</td>
-                <td style={{ fontSize: 10, color: '#374151' }}>最高選球眼の打者が四球を選べる確率の天井</td>
-              </tr>
-              <tr>
-                <td>
-                  <div style={{ fontWeight: 700, fontSize: 12 }}>単打抑制係数</div>
-                  <div style={{ fontSize: 10, color: '#374151' }}>pitStuff=80 の効果</div>
-                </td>
-                <td className="mono" style={{ color: '#f5c842' }}>÷400 → −7.5%</td>
-                <td className="mono" style={{ color: '#374151' }}>旧: ÷300 → −10%</td>
-                <td style={{ fontSize: 10, color: '#374151' }}>エース投手が相手安打率を下げる最大効果（小さいほど打者有利）</td>
-              </tr>
+              {LEAGUE_ENV_SLIDER_CONFIG.map((item) => (
+                <tr key={`env-${item.key}`}>
+                  <td>{item.label}</td>
+                  <td className="mono" style={{ color: '#f5c842' }}>{Number(leagueEnv[item.key] ?? 0).toFixed(2)}</td>
+                  <td className="mono" style={{ color: '#374151' }}>{Number(DEFAULT_LEAGUE_ENV[item.key] ?? 0).toFixed(2)}</td>
+                  <td style={{ fontSize: 10, color: '#374151' }}>{item.desc}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
-        </div>
-        <p style={{ fontSize: 10, color: '#374151', marginTop: 8 }}>
-          ※ ABILITY_RANGE はエンジン定数です。ゲーム内で調整できるのは上段のリーグ補正スライダー（leagueEnv）で、ここに表示される値は参照専用です。
-        </p>
-      </div>
+        </div></div>
 
     </div>
   );
