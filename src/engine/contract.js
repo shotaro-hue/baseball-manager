@@ -1,9 +1,17 @@
-import { clamp } from '../utils';
+import { clamp, rng } from '../utils';
 import {
   ACCEPT_THRESHOLD, MIN_SALARY_SHIHAKA, MIN_SALARY_IKUSEI,
   ACTIVE_ROSTER_FA_DAYS_PER_YEAR, MAX_外国人_一軍,
   MAX_ROSTER, CPU_FA_BUDGET_RESERVE_RATIO, CPU_FA_MIN_SCORE,
   CPU_FA_REBUILD_YOUNG_BONUS, CPU_FA_REBUILD_OLD_PENALTY, CPU_FA_CONTEND_VET_BONUS,
+  MAX_SALARY_CUT_RATIO, MIN_OFFER_RATIO, CPU_RENEWAL_ROUNDS,
+  CPU_TEAM_OFFER_HIGH_TV_RAISE, CPU_TEAM_OFFER_MID_TV_RAISE, CPU_TEAM_OFFER_LOW_TV_RAISE,
+  CPU_TEAM_ROUND2_GAP_CLOSE, CPU_TEAM_ROUND3_GAP_CLOSE,
+  PLAYER_DEMAND_RAISE_ELITE, PLAYER_DEMAND_RAISE_GOOD, PLAYER_DEMAND_RAISE_OK,
+  PLAYER_DEMAND_MONEY_EXTRA, PLAYER_RESISTANCE_HIGH_MORALE, PLAYER_RESISTANCE_LOW_MORALE,
+  NEGOTIATION_MORALE_ACCEPT_BONUS, NEGOTIATION_MORALE_CUT_PENALTY,
+  NEGOTIATION_MORALE_FORCE_PENALTY, NEGOTIATION_MORALE_ROUND_HIT,
+  NEGOTIATION_TRUST_HAPPY, NEGOTIATION_TRUST_HOLDOUT, NEGOTIATION_TRUST_RELEASED,
 } from '../constants';
 import { tradeValue, analyzeTeamNeeds, getFrontOfficePlanPublic } from './trade';
 
@@ -18,6 +26,140 @@ export function getFaThreshold(player) {
   return {
     domestic: base * ACTIVE_ROSTER_FA_DAYS_PER_YEAR,
     overseas: 9 * ACTIVE_ROSTER_FA_DAYS_PER_YEAR,
+  };
+}
+
+/* ═══════════════════════════════════════════════
+   PLAYER DEMAND CALCULATION
+   選手が要求する年俸・抵抗係数を算出する
+═══════════════════════════════════════════════ */
+
+export function calcPlayerDemand(player) {
+  const stats = player.stats || {};
+  const p     = player.personality || {};
+
+  // パフォーマンスティア判定
+  let tier;
+  if (player.isPitcher) {
+    const ip  = stats.IP || 0;
+    const era = (stats.BF || 0) > 0 ? (stats.ER || 0) / Math.max(ip, 0.1) * 9 : 9;
+    if      (ip >= 120 && era <= 2.80) tier = 'elite';
+    else if (ip >= 80  && era <= 4.00) tier = 'good';
+    else if (ip >= 40)                 tier = 'ok';
+    else                               tier = 'poor';
+  } else {
+    const pa  = stats.PA || 0;
+    const obp = pa > 0
+      ? ((stats.H || 0) + (stats.BB || 0) + (stats.HBP || 0))
+        / Math.max(1, (stats.AB || 0) + (stats.BB || 0) + (stats.HBP || 0) + (stats.SF || 0))
+      : 0.300;
+    if      (pa >= 400 && obp >= 0.370) tier = 'elite';
+    else if (pa >= 300 && obp >= 0.330) tier = 'good';
+    else if (pa >= 200)                 tier = 'ok';
+    else                                tier = 'poor';
+  }
+
+  // 基本要求増額率
+  let raise = tier === 'elite' ? PLAYER_DEMAND_RAISE_ELITE + (p.money || 50) / 100 * 0.20
+            : tier === 'good'  ? PLAYER_DEMAND_RAISE_GOOD
+            : tier === 'ok'    ? PLAYER_DEMAND_RAISE_OK
+            :                    0.00;
+
+  if ((p.money || 50) > 70) raise += PLAYER_DEMAND_MONEY_EXTRA;
+
+  const morale = player.morale ?? 70;
+  if (morale >= 80) raise += 0.05;
+  if (morale <= 40) raise -= 0.05;
+  raise = clamp(raise, -0.10, 0.55);
+
+  // 抵抗係数（高いほど強気: 1ラウンド目の受諾閾値が上がる）
+  let resistance = 0.50;
+  if ((p.money || 50) >= 70)                     resistance += 0.15;
+  if (morale >= PLAYER_RESISTANCE_HIGH_MORALE)   resistance += 0.15;
+  if (morale <= PLAYER_RESISTANCE_LOW_MORALE)    resistance -= 0.20;
+  if ((player.serviceYears || 0) >= 8)           resistance += 0.10;
+  resistance = clamp(resistance, 0.10, 0.95);
+
+  const demandSalary    = Math.max(MIN_SALARY_SHIHAKA, Math.round(player.salary * (1 + raise) / 100) * 100);
+  const minAcceptSalary = Math.max(MIN_SALARY_SHIHAKA, Math.round(player.salary * MIN_OFFER_RATIO / 100) * 100);
+
+  return { demandSalary, minAcceptSalary, resistanceFactor: resistance };
+}
+
+/* ═══════════════════════════════════════════════
+   MULTI-ROUND NEGOTIATION SIMULATION
+   CPU球団と選手間の交渉を最大3ラウンドでシミュレートする
+═══════════════════════════════════════════════ */
+
+export function simulateNegotiationRounds(player, team, allTeams, demandSalary, resistanceFactor) {
+  const minAllowed = Math.max(
+    MIN_SALARY_SHIHAKA,
+    Math.round(player.salary * MIN_OFFER_RATIO / 100) * 100,
+  );
+  const threshold = getFaThreshold(player);
+  const days      = player.daysOnActiveRoster ?? (player.serviceYears ?? 0) * ACTIVE_ROSTER_FA_DAYS_PER_YEAR;
+  const isFA      = days >= threshold.domestic;
+
+  let budget      = team.budget;
+  let moraleDelta = 0;
+  let trustDelta  = 0;
+
+  const tv = tradeValue(player);
+  const r1raise = tv >= 70 ? CPU_TEAM_OFFER_HIGH_TV_RAISE
+                : tv >= 50 ? CPU_TEAM_OFFER_MID_TV_RAISE
+                :            CPU_TEAM_OFFER_LOW_TV_RAISE;
+
+  const initialOffer = Math.max(minAllowed, Math.round(player.salary * (1 + r1raise) / 100) * 100);
+  const gap          = Math.max(0, demandSalary - initialOffer);
+
+  for (let round = 1; round <= CPU_RENEWAL_ROUNDS; round++) {
+    let offered;
+    if      (round === 1) offered = initialOffer;
+    else if (round === 2) offered = Math.min(demandSalary, Math.round((initialOffer + gap * CPU_TEAM_ROUND2_GAP_CLOSE) / 100) * 100);
+    else                  offered = Math.min(demandSalary, Math.round((initialOffer + gap * CPU_TEAM_ROUND3_GAP_CLOSE) / 100) * 100);
+    offered = clamp(offered, minAllowed, demandSalary);
+
+    if (budget < offered) {
+      return isFA
+        ? { result: 'fa_declared', finalSalary: 0, years: 0, rounds: round, moraleDelta: -6, trustDelta: NEGOTIATION_TRUST_RELEASED }
+        : { result: 'released',   finalSalary: 0, years: 0, rounds: round, moraleDelta: -10, trustDelta: NEGOTIATION_TRUST_RELEASED };
+    }
+
+    const score = evalOffer(player, { salary: offered, years: 1 }, team, allTeams).total;
+    // 1ラウンド目は抵抗係数で閾値を引き上げる（強気な選手は簡単に折れない）
+    const acceptScore = round === 1
+      ? ACCEPT_THRESHOLD + Math.round(resistanceFactor * 20)
+      : ACCEPT_THRESHOLD;
+
+    if (score >= acceptScore) {
+      if (offered >= demandSalary)        moraleDelta += NEGOTIATION_MORALE_ACCEPT_BONUS;
+      if (offered < player.salary * 0.90) moraleDelta += NEGOTIATION_MORALE_CUT_PENALTY;
+      if (round > 1)                      moraleDelta += NEGOTIATION_MORALE_ROUND_HIT * (round - 1);
+      trustDelta = round === 1 ? NEGOTIATION_TRUST_HAPPY : NEGOTIATION_TRUST_HOLDOUT;
+      const years = player.age <= 28 ? rng(1, 2) : 1;
+      return { result: 'signed', finalSalary: offered, years, rounds: round, moraleDelta, trustDelta };
+    }
+  }
+
+  // 3ラウンド決裂
+  if (!isFA && budget >= minAllowed) {
+    // 非FA: 球団保有権 → 最低提示額で強制更改
+    return {
+      result: 'signed',
+      finalSalary: minAllowed,
+      years: 1,
+      rounds: CPU_RENEWAL_ROUNDS,
+      moraleDelta: NEGOTIATION_MORALE_FORCE_PENALTY + NEGOTIATION_MORALE_ROUND_HIT * 2,
+      trustDelta: NEGOTIATION_TRUST_HOLDOUT,
+    };
+  }
+  return {
+    result: isFA ? 'fa_declared' : 'released',
+    finalSalary: 0,
+    years: 0,
+    rounds: CPU_RENEWAL_ROUNDS,
+    moraleDelta: -6,
+    trustDelta: NEGOTIATION_TRUST_RELEASED,
   };
 }
 
@@ -102,23 +244,7 @@ export function cpuRenewContracts(teams, myId, allTeams) {
       const days = p.daysOnActiveRoster ?? (p.serviceYears ?? 0) * ACTIVE_ROSTER_FA_DAYS_PER_YEAR;
       const overseas = p.personality?.overseas || 0;
 
-      // FA資格なし: 球団側から再契約を強制提示 (選手は国内FA権を持っていない)
-      if (days < threshold.domestic) {
-        const salary = Math.max(MIN_SALARY_SHIHAKA, Math.round(p.salary * 1.02)); // 支配下最低年俸を保証
-        if (budget >= salary) {
-          players = players.map(x => x.id === p.id
-            ? { ...x, salary, contractYears: 1, contractYearsLeft: 1 }
-            : x
-          );
-          budget -= salary;
-        } else {
-          players = players.filter(x => x.id !== p.id);
-          newFaPlayers.push({ ...p, isFA: true });
-        }
-        continue;
-      }
-
-      // 海外志向かつ海外FA資格あり: NPB離脱
+      // 海外志向かつ海外FA資格あり: NPB離脱（変更なし）
       if (overseas >= 70 && days >= threshold.overseas) {
         players = players.filter(x => x.id !== p.id);
         news.push({
@@ -131,7 +257,7 @@ export function cpuRenewContracts(teams, myId, allTeams) {
         continue;
       }
 
-      // 海外志向かつ国内FA資格はあるが海外FA資格なし: 国内FAをスキップして待機
+      // 海外志向かつ国内FA資格はあるが海外FA資格なし: 国内FAをスキップして待機（変更なし）
       if (overseas >= 70 && days < threshold.overseas) {
         const salary = Math.max(MIN_SALARY_SHIHAKA, Math.round(p.salary * 1.03));
         if (budget >= salary) {
@@ -147,28 +273,40 @@ export function cpuRenewContracts(teams, myId, allTeams) {
         continue;
       }
 
-      const raise = tradeValue(p) >= 70 ? 1.15 : 1.0;
-      const salary = Math.max(MIN_SALARY_SHIHAKA, Math.round(p.salary * raise));
-      const years = p.age <= 28 ? 2 : 1;
-      const result = evalOffer(p, { salary, years }, t, allTeams);
+      // 非FA / FA資格あり: マルチラウンド交渉シミュレーション
+      const { demandSalary, resistanceFactor } = calcPlayerDemand(p);
+      const neg = simulateNegotiationRounds(p, { ...t, budget }, allTeams, demandSalary, resistanceFactor);
 
-      if (result.total >= ACCEPT_THRESHOLD && budget >= salary) {
-        players = players.map(x => x.id === p.id
-          ? { ...x, salary, contractYears: years, contractYearsLeft: years }
-          : x
-        );
-        budget -= salary;
+      if (neg.result === 'signed') {
+        players = players.map(x => x.id === p.id ? {
+          ...x,
+          salary: neg.finalSalary,
+          contractYears: neg.years,
+          contractYearsLeft: neg.years,
+          morale: clamp((x.morale ?? 70) + neg.moraleDelta, 20, 100),
+          trust:  clamp((x.trust  ?? 50) + neg.trustDelta,  0, 100),
+        } : x);
+        budget -= neg.finalSalary;
       } else {
-        // FA宣言 (国内FA資格あり)
         players = players.filter(x => x.id !== p.id);
         newFaPlayers.push({ ...p, isFA: true });
-        news.push({
-          type: 'season',
-          headline: `【FA】${p.name}（${t.name}）が国内FA宣言`,
-          source: '野球速報',
-          dateLabel: '',
-          body: `${p.name}選手（${p.age}歳）が国内FA権を行使した。`,
-        });
+        if (neg.result === 'fa_declared') {
+          news.push({
+            type: 'season',
+            headline: `【FA】${p.name}（${t.name}）が国内FA宣言`,
+            source: '野球速報',
+            dateLabel: '',
+            body: `${p.name}選手（${p.age}歳）が国内FA権を行使した。`,
+          });
+        } else {
+          news.push({
+            type: 'season',
+            headline: `【戦力外】${p.name}（${t.name}）が自由契約`,
+            source: '野球速報',
+            dateLabel: '',
+            body: `${p.name}選手（${p.age}歳）が${t.name}を自由契約となった。`,
+          });
+        }
       }
     }
 

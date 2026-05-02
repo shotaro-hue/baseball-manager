@@ -7,7 +7,7 @@ import { generateSeasonSchedule, calcAllStarTriggerDay } from './engine/schedule
 import { SEASON_PARAMS, getDefaultParams } from './data/scheduleParams.js';
 import { TacticalGameScreen } from './components/TacticalGame';
 import { BatchResultScreen } from './components/BatchResult';
-import { ModeSelectScreen, ResultScreen, RetirePhaseScreen, WaiverPhaseScreen, WaiverResultScreen, GrowthSummaryScreen, NewSeasonScreen, SpringTrainingScreen } from './components/Screens';
+import { ModeSelectScreen, ResultScreen, RetirePhaseScreen, WaiverPhaseScreen, WaiverResultScreen, GrowthSummaryScreen, NewSeasonScreen, SpringTrainingScreen, ContractRenewalPhaseScreen } from './components/Screens';
 import { DraftPreviewScreen, DraftLotteryScreen, DraftScreen, DraftReviewScreen } from './components/Draft';
 import { PlayoffScreen } from './components/PlayoffScreen';
 import { RetireModal } from './components/RetireModal';
@@ -94,7 +94,7 @@ export default function App(){
     allStarResult,
   } = gs;
   const { gameResult, currentOpp, batchResults, batchMeta, playoff, setPlayoff } = sf;
-  const { developmentSummary, newSeasonInfo, draftPool, setDraftPool, draftResult, setDraftResult, draftAllocation, setDraftAllocation, waiverClaimResults } = os;
+  const { developmentSummary, newSeasonInfo, draftPool, setDraftPool, draftResult, setDraftResult, draftAllocation, setDraftAllocation, waiverClaimResults, contractRenewalDemands } = os;
   const [agentNeg, setAgentNeg] = useState(null);
   const [draftAutoSkip, setDraftAutoSkip] = useState(false);
   const [sectionLastTab, setSectionLastTab] = useState(() => (
@@ -227,6 +227,7 @@ export default function App(){
   </>);
 
   if(screen==="retire_phase") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><RetirePhaseScreen teams={teams} myId={myId} year={year} onNext={os.handleRetirePhaseNext}/></ErrorBoundary></>);
+  if(screen==="contract_renewal_phase") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><ContractRenewalPhaseScreen teams={teams} myId={myId} year={year} demands={contractRenewalDemands||{}} onSign={os.handleContractRenewalSign} onRelease={(pid)=>{const p=myTeam?.players.find(x=>x.id===pid);upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid)}));if(p){setFaPool(prev=>[...prev,{...p,isFA:true}]);addToHistory(myId,p,"戦力外");addNews({type:"season",headline:`【戦力外】${p.name}選手に戦力外通告`,source:"野球速報",dateLabel:`${year}年`,body:`${p.name}選手（${p.age}歳）が戦力外通告を受けた。`});notify(`${p.name}を戦力外通告しました`,"warn");}}} onNext={os.handleContractRenewalPhaseNext}/></ErrorBoundary></>);
   if(screen==="development_phase") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><GrowthSummaryScreen summary={developmentSummary} year={year} onNext={()=>setScreen("waiver_phase")}/></ErrorBoundary></>);
   if(screen==="waiver_phase") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><WaiverPhaseScreen teams={teams} myId={myId} year={year} onRelease={(pid)=>{const p=myTeam?.players.find(x=>x.id===pid);const popPenalty=(p?.salary??0)>POP_RELEASE_SALARY_THRESHOLD?POP_RELEASE_PENALTY:0;upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),popularity:Math.min(100,Math.max(0,(t.popularity??50)+popPenalty))}));if(p) setFaPool(prev=>[...prev,{...p,isFA:true}]);}} onNext={os.handleWaiverPhaseNext}/></ErrorBoundary></> );
   if(screen==="waiver_result") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><WaiverResultScreen results={waiverClaimResults} year={year} onNext={()=>setScreen("draft_preview")}/></ErrorBoundary></>);

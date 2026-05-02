@@ -2,7 +2,7 @@ import { useState } from "react";
 import { uid, clamp, rng, rngf, fmtM } from '../utils';
 import { emptyStats, rollRetire, developPlayers, generateForeignFaPool } from '../engine/player';
 import { calcSeasonAwards, updateRecords, checkHallOfFame } from '../engine/awards';
-import { evalOffer, cpuRenewContracts, processCpuFaBids, getFaThreshold } from '../engine/contract';
+import { evalOffer, cpuRenewContracts, processCpuFaBids, getFaThreshold, calcPlayerDemand } from '../engine/contract';
 import { initDraftPool } from '../engine/draft';
 import { calcPostingRequestProb, calcPostingBid, POSTING_FEE_RATE } from '../engine/posting';
 import { calcOffseasonPopDelta, driftPopularity } from '../engine/fanSentiment';
@@ -44,6 +44,8 @@ export function useOffseason(gs) {
   const [draftResult, setDraftResult] = useState(null);
   const [draftAllocation, setDraftAllocation] = useState({pitcher:50,batter:50});
   const [waiverClaimResults, setWaiverClaimResults] = useState(null);
+  const [contractRenewalDemands, setContractRenewalDemands] = useState(null);
+  // { [playerId]: { demandSalary, minAcceptSalary, resistanceFactor } }
 
   // careerLogをコンパクト形式で保存（evSum/evN等の不要フィールドを除外）
   const mkCareerEntry = (s, ps, yr, teamId, teamName) => {
@@ -429,36 +431,74 @@ export function useOffseason(gs) {
       const cpuAlumni=cpuRetiredPlayers.map(p=>({...p,exitYear:year,exitReason:"引退",tenure:p.serviceYears||1}));
       return{...t,players:postingPlayers,farm:farmAfterIkusei,history:[...(t.history||[]),...cpuAlumni]};
     });
-    const renewResult=cpuRenewContracts(developedTeams,myId,developedTeams);
-    const finalTeams=renewResult.updatedTeams;
-    // ── オフシーズン人気変動 ──
-    const makeLeagueRanking=(lg)=>[...finalTeams.filter(t=>t.league===lg)].sort((a,b)=>{const pa=a.wins/Math.max(1,a.wins+a.losses);const pb=b.wins/Math.max(1,b.wins+b.losses);return pb-pa||(b.rf-b.ra)-(a.rf-a.ra);});
-    const seRanks=makeLeagueRanking("セ");const paRanks=makeLeagueRanking("パ");
-    const championId=seasonHistory.championships.at(-1)?.championId??null;
-    const csIds=new Set([...seRanks.slice(0,3).map(t=>t.id),...paRanks.slice(0,3).map(t=>t.id)]);
-    const teamsWithPop=finalTeams.map(t=>{
-      const leagueRanks=t.league==="セ"?seRanks:paRanks;
-      const rank=leagueRanks.findIndex(r=>r.id===t.id)+1;
-      const isPennant=rank===1;
-      const delta=calcOffseasonPopDelta(rank,leagueRanks.length,t.id===championId,isPennant,csIds.has(t.id));
-      return{...t,popularity:driftPopularity(Math.min(100,Math.max(0,(t.popularity??50)+delta))),winStreak:0,loseStreak:0};
-    });
-    setTeams(teamsWithPop);
-    setFaPool(prev=>[...prev,...renewResult.newFaPlayers]);
-    renewResult.news.forEach(n=>addNews(n));
+    // CPU契約更改は contract_renewal_phase 完了後に実行（フェーズ分離）
+    // 自チーム満了選手の要求額を事前計算して state に保持
+    const myDeveloped=developedTeams.find(t=>t.id===myId);
+    const expiringMine=(myDeveloped?.players||[]).filter(p=>p.contractYearsLeft===0&&!p.isRetired&&!p._retireNow);
+    const demands={};
+    for(const p of expiringMine) demands[p.id]=calcPlayerDemand(p);
+    setContractRenewalDemands(demands);
+    setTeams(developedTeams);
     setDevelopmentSummary(mySummary);
-    const awards=calcSeasonAwards(finalTeams,year);
-    const {records:newRec,broken:brokenRecs}=updateRecords(seasonHistory.records,finalTeams);
+    const awards=calcSeasonAwards(developedTeams,year);
+    const {records:newRec,broken:brokenRecs}=updateRecords(seasonHistory.records,developedTeams);
     if(brokenRecs.length>0){const recLabel={singleSeasonHR:"シーズン本塁打",singleSeasonAVG:"シーズン打率",singleSeasonK:"シーズン奪三振"};const fmtVal=r=>r.type==="singleSeasonAVG"?`.${String(Math.round(r.value*1000)).padStart(3,"0")}`:r.type==="singleSeasonK"?`${r.value}奪三振`:`${r.value}本塁打`;const fmtOld=r=>r.type==="singleSeasonAVG"?`.${String(Math.round(r.oldValue*1000)).padStart(3,"0")}`:r.type==="singleSeasonK"?`${r.oldValue}奪三振`:`${r.oldValue}本塁打`;brokenRecs.forEach(r=>addNews({type:"record",headline:`🏅 ${r.playerName}（${r.teamName}）が${recLabel[r.type]}記録を更新！`,source:"NPB記録部",dateLabel:`${year}年`,body:`${r.playerName}（${r.teamName}）が${year}年シーズンに${fmtVal(r)}を記録し、従来の${recLabel[r.type]}記録（${fmtOld(r)}）を塗り替えた。`}));}
-    const allAlumni=finalTeams.flatMap(t=>t.history||[]);
+    const allAlumni=developedTeams.flatMap(t=>t.history||[]);
     const newInductees=checkHallOfFame(seasonHistory.hallOfFame,allAlumni,year);
     const newHoF=[...seasonHistory.hallOfFame,...newInductees];
     if(newInductees.length>0){newInductees.forEach(h=>{setMailbox(prev=>[...prev,{id:uid(),type:"hof",read:false,title:"🏛 殿堂入り: "+h.playerName,from:"球団殿堂委員会",dateLabel:year+"年",timestamp:Date.now(),body:h.playerName+"選手が"+year+"年度の球団殿堂入りを果たした。"+[h.careerHR>0?"通算"+h.careerHR+"本塁打":"",h.careerW>0?"通算"+h.careerW+"勝":"",h.careerPA>0?"通算"+h.careerPA+"打席":""].filter(Boolean).join(" / ")}]);});}
-    const makeRanking=(lg)=>finalTeams.filter(t=>t.league===lg).sort((a,b)=>{const pa=a.wins/Math.max(1,a.wins+a.losses);const pb=b.wins/Math.max(1,b.wins+b.losses);return pb-pa||(b.rf-b.ra)-(a.rf-a.ra);}).map(t=>({id:t.id,name:t.name,emoji:t.emoji,wins:t.wins,losses:t.losses,rf:t.rf,ra:t.ra}));
+    const makeRanking=(lg)=>developedTeams.filter(t=>t.league===lg).sort((a,b)=>{const pa=a.wins/Math.max(1,a.wins+a.losses);const pb=b.wins/Math.max(1,b.wins+b.losses);return pb-pa||(b.rf-b.ra)-(a.rf-a.ra);}).map(t=>({id:t.id,name:t.name,emoji:t.emoji,wins:t.wins,losses:t.losses,rf:t.rf,ra:t.ra}));
     const standingsSnap={year,central:makeRanking("セ"),pacific:makeRanking("パ"),titles:awards.titles,playerAwards:{mvpCentral:awards.mvp?.central,mvpPacific:awards.mvp?.pacific,sawamura:awards.sawamura,rookie:awards.rookie}};
     setSeasonHistory(prev=>({...prev,awards:[...prev.awards,awards],records:newRec,hallOfFame:newHoF,standingsHistory:[...(prev.standingsHistory||[]),standingsSnap]}));
     const retiredMyNames=decisions?Object.entries(decisions).filter(([,d])=>d==="accepted"||d==="retain_failed").map(([pid])=>myTeam?.players.find(x=>x.id===pid)?.name).filter(Boolean):[];
     setNewSeasonInfo({retiredNames:retiredMyNames,year:year+1,draftCount:0,draftNames:[]});
+    setScreen("contract_renewal_phase");
+  };
+
+  // 契約更改フェーズ: 合意確定（ダイアログUI側から呼ばれる）
+  const handleContractRenewalSign = (pid, finalSalary, years, moraleDelta, trustDelta) => {
+    const p = myTeam?.players.find(x => x.id === pid);
+    upd(myId, t => ({
+      ...t,
+      players: t.players.map(x => x.id === pid ? {
+        ...x,
+        salary: finalSalary,
+        contractYears: years,
+        contractYearsLeft: years,
+        morale: clamp((x.morale ?? 70) + (moraleDelta || 0), 20, 100),
+        trust:  clamp((x.trust  ?? 50) + (trustDelta  || 0), 0, 100),
+      } : x),
+    }));
+    if (p) {
+      addNews({ type: 'season', headline: `【契約更改】${p.name}（${myTeam?.name}）が${years}年契約`, source: '野球速報', dateLabel: `${year}年`, body: `${p.name}選手（${p.age}歳）が${myTeam?.name}と${years}年契約（${finalSalary}万円）を結んだ。` });
+    }
+  };
+
+  // 契約更改フェーズ完了: CPU球団の更改シミュ + 人気計算 → development_phase へ
+  const handleContractRenewalPhaseNext = () => {
+    const renewResult = cpuRenewContracts(teams, myId, teams);
+    const postCpuTeams = renewResult.updatedTeams;
+    // オフシーズン人気変動（handleRetirePhaseNextから移動）
+    const makeLeagueRanking = (lg) => [...postCpuTeams.filter(t => t.league === lg)].sort((a, b) => {
+      const pa = a.wins / Math.max(1, a.wins + a.losses);
+      const pb = b.wins / Math.max(1, b.wins + b.losses);
+      return pb - pa || (b.rf - b.ra) - (a.rf - a.ra);
+    });
+    const seRanks = makeLeagueRanking("セ");
+    const paRanks = makeLeagueRanking("パ");
+    const championId = seasonHistory.championships?.at(-1)?.championId ?? null;
+    const csIds = new Set([...seRanks.slice(0, 3).map(t => t.id), ...paRanks.slice(0, 3).map(t => t.id)]);
+    const teamsWithPop = postCpuTeams.map(t => {
+      const leagueRanks = t.league === "セ" ? seRanks : paRanks;
+      const rank = leagueRanks.findIndex(r => r.id === t.id) + 1;
+      const isPennant = rank === 1;
+      const delta = calcOffseasonPopDelta(rank, leagueRanks.length, t.id === championId, isPennant, csIds.has(t.id));
+      return { ...t, popularity: driftPopularity(Math.min(100, Math.max(0, (t.popularity ?? 50) + delta))), winStreak: 0, loseStreak: 0 };
+    });
+    setTeams(teamsWithPop);
+    setFaPool(prev => [...prev, ...renewResult.newFaPlayers]);
+    renewResult.news.forEach(n => addNews(n));
+    setContractRenewalDemands(null);
     setScreen("development_phase");
   };
 
@@ -511,10 +551,13 @@ export function useOffseason(gs) {
     draftResult, setDraftResult,
     draftAllocation, setDraftAllocation,
     waiverClaimResults,
+    contractRenewalDemands,
     handleNextYear,
     handleDraftComplete,
     handleSpringTrainingComplete,
     handleContractOffer,
+    handleContractRenewalSign,
+    handleContractRenewalPhaseNext,
     handleTrade,
     acceptCpuOffer,
     declineCpuOffer,
