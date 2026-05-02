@@ -18,3 +18,11 @@ export const DEFAULT_ENVIRONMENT = {
   temperatureC: 20,
   altitudeM: 0,
 };
+
+
+export const NEUTRAL_ENVIRONMENT = {
+  windOut: 0,
+  airDensity: 1.225,
+  temperatureC: 20,
+  altitudeM: 0,
+};
