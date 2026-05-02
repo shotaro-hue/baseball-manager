@@ -339,14 +339,14 @@ function estimateFielderIntercept(distance, ballType, spraySide, rngProvider = r
 
   let interceptRate = 0.64;
   if (safeBallType === 'fly') {
-    // 深い外野フライほど捕球率を下げる簡易モデル
-    interceptRate = safeDistance >= 105 ? 0.34 : safeDistance >= 90 ? 0.50 : 0.66;
+    // 打高是正: フライは大半が捕球される（NPB実績 BABIP ~0.12）
+    interceptRate = safeDistance >= 105 ? 0.55 : safeDistance >= 90 ? 0.78 : 0.88;
   } else if (safeBallType === 'liner') {
-    // ライナーは安打寄り（捕球されにくい）
-    interceptRate = safeDistance >= 70 ? 0.34 : 0.44;
+    // ライナーは安打寄りだが捕球率を引き上げてBABIP~0.48に是正
+    interceptRate = safeDistance >= 70 ? 0.45 : 0.55;
   } else if (safeBallType === 'grounder') {
     // ゴロは内野安打/ゴロアウトの分岐
-    interceptRate = safeDistance <= 30 ? 0.80 : safeDistance <= 45 ? 0.66 : 0.44;
+    interceptRate = safeDistance <= 30 ? 0.83 : safeDistance <= 45 ? 0.70 : 0.52;
   }
 
   if (safeSpraySide === 'center') interceptRate += 0.04;
@@ -409,8 +409,7 @@ function resolveBattedBallOutcomeFromPhysics(batter, pitcher, stadium, environme
     const tripleBoost = BASELINE.t / Math.max(BASELINE.t + BASELINE.d + BASELINE.s, 0.0001);
     const outBoost = BASELINE.out / (BASELINE.out + BASELINE.s);
     const reroll = rngProvider(0, 1);
-    if (result === 'out' && reroll > outBoost + 0.05) result = 's';
-    if (result === 's' && reroll < singleBoost * 0.22) result = 'out';
+    // 打高是正: アウト→単打変換を廃止。物理演算+捕球率でBABIPを決定する。
     if (result === 's' && reroll > 1 - doubleBoost * 0.24) result = 'd';
     if (result === 'd' && reroll > 1 - tripleBoost * 0.12) result = 't';
   }

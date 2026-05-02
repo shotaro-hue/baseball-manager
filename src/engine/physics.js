@@ -113,7 +113,7 @@ export function classifyBattedBallType(la) {
   const launchAngle = Number.isFinite(launchAngleRaw) ? launchAngleRaw : 10;
 
   if (launchAngle < 8) return 'grounder';
-  if (launchAngle <= 25) return 'liner';
+  if (launchAngle <= 18) return 'liner';
   return 'fly';
 }
 

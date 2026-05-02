@@ -158,8 +158,8 @@ describe('physics HR/D log correction helpers', () => {
     expect(_adjustResultByPhysics_TEST('d', 130, 45, stadium)).toBe('hr');
   });
 
-  it('dist がフェンス+2以上の単打はログ上でHRに補正される', () => {
-    expect(_adjustResultByPhysics_TEST('s', 124, 45, stadium)).toBe('hr');
+  it('dist がフェンス+4以上の単打はログ上でHRに補正される', () => {
+    expect(_adjustResultByPhysics_TEST('s', 126, 45, stadium)).toBe('hr');
   });
 });
 
