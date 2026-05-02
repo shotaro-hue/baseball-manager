@@ -63,22 +63,34 @@ function getPhysicsConfig(options = {}) {
 export function simulateFlight(ev, la, options = {}) {
   const config = getPhysicsConfig(options);
   const environment = sanitizeEnvironment(options.environment);
-  const windOut = environment.windOut;
+  const windOutKmh = environment.windOut;
+  const windOutMs = windOutKmh / 3.6;
   const releaseHeight = options.releaseHeight ?? config.releaseHeight;
 
     // EVはkm/hで統一し、物理計算直前にm/sへ変換
   const evMs = ev / 3.6;
   const laRad = la * (Math.PI / 180);
-  let vx = evMs * Math.cos(laRad) + windOut;
+  let vx = evMs * Math.cos(laRad) + windOutMs;
   let vy = evMs * Math.sin(laRad);
   let x = 0;
   let y = releaseHeight;
 
   const points = [[0, releaseHeight]];
 
+  const baseAirDensity = 1.225;
+  const temperatureK = 273.15 + environment.temperatureC;
+  const safeTemperatureK = Number.isFinite(temperatureK) && temperatureK > 0 ? temperatureK : 293.15;
+  let computedAirDensity = Number(environment.airDensity);
+  if (!Number.isFinite(computedAirDensity)) {
+    const seaLevelDensityAtTemp = baseAirDensity * (288.15 / safeTemperatureK);
+    const altitudeRatio = Math.exp(-environment.altitudeM / 8500);
+    computedAirDensity = seaLevelDensityAtTemp * altitudeRatio;
+  }
+  const airDensityRatio = Math.min(1.35, Math.max(0.75, computedAirDensity / baseAirDensity));
+
   for (let i = 1; i <= config.maxSteps; i += 1) {
     const speed = Math.max(EPSILON, Math.hypot(vx, vy));
-    const dragAccel = config.dragCoeff * speed * speed;
+    const dragAccel = config.dragCoeff * airDensityRatio * speed * speed;
     vx -= dragAccel * (vx / speed) * config.dt;
     vy -= (config.gravity + dragAccel * (vy / speed)) * config.dt;
 

@@ -18,6 +18,7 @@ const getFieldZone = (e) => {
 };
 
 const MAX_BATTED_BALL_EVENTS = 500;
+const SPRAY_CHART_MAX_DISTANCE = 150;
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, value));
@@ -52,13 +53,21 @@ function buildBattedBallEvent(e, gameDay) {
   const rawClearance = Number(e?.physicsMeta?.hrCheck?.clearance);
   const safeHrClearance = Number.isFinite(rawClearance) ? Math.max(-20, Math.min(60, rawClearance)) : null;
 
-  const maxDisplayDistance = Math.max(110, safeFenceDistance * 1.18);
+  const maxDisplayDistance = SPRAY_CHART_MAX_DISTANCE;
 
   const x = normalizeBattedBallCoordinate(safeSpray / 90, 0.5);
   const y = normalizeBattedBallCoordinate(safeDist / maxDisplayDistance, 0);
   const fenceRatio = normalizeBattedBallCoordinate(safeFenceDistance / maxDisplayDistance, 0.82);
 
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+
+  const isHomeRun = e.result === "hr" || Boolean(e?.physicsMeta?.isHrByTrajectory);
+  const warningReasons = [];
+  if (!Number.isFinite(rawFenceDistance)) warningReasons.push("fenceDistanceM が不正です");
+  if (!Number.isFinite(y) || y < 0 || y > 1) warningReasons.push("distanceRatio が不正です");
+  if (!Number.isFinite(fenceRatio) || fenceRatio < 0 || fenceRatio > 1) warningReasons.push("fenceRatio が不正です");
+  if (isHomeRun && y + 0.02 < fenceRatio) warningReasons.push("HR打球がフェンス内側に表示されています");
+  if (!isHomeRun && y - 0.02 > fenceRatio) warningReasons.push("非HR打球がフェンス外側に表示されています");
 
   return {
     playerId: e.batId,
@@ -74,6 +83,8 @@ function buildBattedBallEvent(e, gameDay) {
     fenceRatio,
     isHrByTrajectory: Boolean(e?.physicsMeta?.isHrByTrajectory),
     hrClearance: safeHrClearance,
+    isDisplayInconsistent: warningReasons.length > 0,
+    warningReasons,
   };
 }
 

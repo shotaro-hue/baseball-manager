@@ -52,6 +52,10 @@ function sanitizeEvents(events) {
       const rawFenceDistance = Number(event?.fenceDistance);
       const fenceDistance = Number.isFinite(rawFenceDistance) ? rawFenceDistance : null;
 
+      const warningReasons = Array.isArray(event?.warningReasons)
+        ? event.warningReasons.filter((reason) => typeof reason === "string" && reason.length > 0)
+        : [];
+
       return {
         id: event?.id ?? `spray-${index}`,
         x,
@@ -60,6 +64,8 @@ function sanitizeEvents(events) {
         fenceRatio,
         hrClearance,
         fenceDistance,
+        isDisplayInconsistent: Boolean(event?.isDisplayInconsistent) || warningReasons.length > 0,
+        warningReasons,
       };
     })
     .filter(Boolean);
@@ -94,6 +100,9 @@ export function SprayChart({ events }) {
   const rightFoulPoint = polarToPoint(FOUL_ANGLE_RAD, fenceRadius);
   const infieldLeftPoint = polarToPoint(Math.PI - FOUL_ANGLE_RAD, INFIELD_RADIUS);
   const infieldRightPoint = polarToPoint(FOUL_ANGLE_RAD, INFIELD_RADIUS);
+  const warnings = safeEvents
+    .filter((event) => event.isDisplayInconsistent)
+    .flatMap((event) => event.warningReasons.map((reason) => `${event.id}: ${reason}`));
 
   if (safeEvents.length === 0) {
     return (
@@ -160,6 +169,15 @@ export function SprayChart({ events }) {
           );
         })}
       </svg>
+
+      {warnings.length > 0 && (
+        <div style={{ marginTop: 8, fontSize: 11, color: "#fca5a5", lineHeight: 1.5 }}>
+          <div>表示警告: {warnings.length}件</div>
+          {warnings.slice(0, 3).map((warning) => (
+            <div key={warning}>- {warning}</div>
+          ))}
+        </div>
+      )}
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 8 }}>
         {Object.entries(HIT_TYPE_STYLES).map(([key, item]) => (
