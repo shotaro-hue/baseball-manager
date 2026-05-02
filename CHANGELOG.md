@@ -5,6 +5,15 @@
 
 ---
 
+### 2026-05-02 — fix: simulation.js の classifyBattedBallType 未import による ReferenceError 修正
+
+**仕様本文への影響なし（内部バグ修正のみ）**
+
+- 根本原因: `classifyBattedBallType` が `physics.js` に追加されたが `simulation.js` の import 文に含まれておらず、1打席進む操作でエラーバウンダリが発動していた
+- 修正内容: `src/engine/simulation.js` 3行目の import 文に `classifyBattedBallType` を追加
+
+---
+
 ### 2026-05-01 — fix: 打球速度表示単位を km/h に統一（UI表記のみ）
 
 **仕様本文への影響なし（表示文言の修正のみ）**
