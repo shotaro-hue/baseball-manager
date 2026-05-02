@@ -30,6 +30,11 @@ function normalizeBattedBallCoordinate(rawValue, fallbackValue = 0) {
   return clamp01(Number(rawValue));
 }
 
+
+function sanitizeMetaObject(value) {
+  return value && typeof value === 'object' ? value : {};
+}
+
 function mapHitTypeFromResult(result) {
   if (result === 's') return 'single';
   if (result === 'd') return 'double';
@@ -85,6 +90,13 @@ function buildBattedBallEvent(e, gameDay) {
     hrClearance: safeHrClearance,
     isDisplayInconsistent: warningReasons.length > 0,
     warningReasons,
+    physics: sanitizeMetaObject(e?.physicsMeta?.physics),
+    park: sanitizeMetaObject(e?.physicsMeta?.park),
+    environment: sanitizeMetaObject(e?.physicsMeta?.environment),
+    crossPark: sanitizeMetaObject(e?.physicsMeta?.crossPark),
+    evaluation: sanitizeMetaObject(e?.physicsMeta?.evaluation),
+    commentary: sanitizeMetaObject(e?.physicsMeta?.commentary),
+    displayWarnings: warningReasons,
   };
 }
 
