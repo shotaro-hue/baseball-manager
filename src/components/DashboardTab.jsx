@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { fmtM, gameDayToDate } from '../utils';
 import { getMyMatchup } from '../engine/scheduleGen';
 import { MAX_ROSTER } from '../constants';
+import { TodayGameCard, RecommendationCard, TeamConditionCard, DashboardKpiGrid, FeaturedPlayersCard } from './dashboard/ManagerDashboardCards';
 
 export function DashboardTab({ myTeam, teams, schedule, gameDay, recentResults, mailbox, faPool, onTabSwitch }) {
   const leagueStandings = useMemo(() => {
@@ -52,72 +53,25 @@ export function DashboardTab({ myTeam, teams, schedule, gameDay, recentResults, 
   const rpg = (myTeam.rf ?? 0) / Math.max(1, myTeam.wins + myTeam.losses);
   const rapg = (myTeam.ra ?? 0) / Math.max(1, myTeam.wins + myTeam.losses);
 
-  const toneClassByName = { good: 'cg', warning: 'cy', danger: 'cr', neutral: 'cb' };
+
+
+  const featuredPlayers = [...myTeam.players]
+    .sort((a, b) => (b.war ?? 0) - (a.war ?? 0))
+    .slice(0, 3);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
-      <div className="card">
-        <div className="card-h">今日の試合</div>
-        {todayGame ? (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 30 }}>{todayGame.opponent?.emoji}</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 16, fontWeight: 700 }}>{todayGame.opponent?.name}</div>
-                <div style={{ color: '#94a3b8', fontSize: 11 }}>{todayGame.date.month}月{todayGame.date.day}日（第{gameDay + 1}戦）</div>
-              </div>
-              <span className={`chip ${todayGame.isHome ? 'cg' : 'cb'}`}>{todayGame.isHome ? 'ホーム' : 'アウェイ'}</span>
-            </div>
-            <button className="sim-btn" onClick={() => onTabSwitch('schedule')} style={{ marginTop: 12, marginBottom: 0 }}>試合へ</button>
-          </>
-        ) : <div style={{ color: '#94a3b8' }}>本日の試合はありません</div>}
-      </div>
-
-      <div className="card">
-        <div className="card-h">今日のおすすめ采配</div>
-        <div style={{ display: 'grid', gap: 8 }}>
-          {recommendationItems.map((item, idx) => (
-            <button key={`${item.title}-${idx}`} onClick={() => onTabSwitch(item.tab)} className="action-item" style={{ borderLeftColor: item.tone === 'danger' ? '#f87171' : item.tone === 'warning' ? '#f5c842' : '#34d399' }}>
-              <div>
-                <div style={{ fontWeight: 700 }}>{item.title}</div>
-                <div style={{ fontSize: 11, color: '#94a3b8' }}>{item.reason}</div>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="g2">
-        <div className="card stat-tile"><div className="stat-tile-lbl">順位</div><div className="stat-tile-val">{leagueStandings.rank}位</div></div>
-        <div className="card stat-tile"><div className="stat-tile-lbl">勝敗</div><div className="stat-tile-val">{myTeam.wins}-{myTeam.losses}</div></div>
-        <div className="card stat-tile"><div className="stat-tile-lbl">得点 R/G</div><div className="stat-tile-val">{rpg.toFixed(2)}</div></div>
-        <div className="card stat-tile"><div className="stat-tile-lbl">失点 RA/G</div><div className="stat-tile-val">{rapg.toFixed(2)}</div></div>
-      </div>
-
-      <div className="card">
-        <div className="card-h">チーム状態</div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <span className={`chip ${runDiff >= 20 ? 'cg' : runDiff <= -20 ? 'cr' : 'cy'}`}>得失差 {runDiff >= 0 ? '+' : ''}{runDiff}</span>
-          <span className={`chip ${recentWins >= recentLosses ? 'cg' : 'cr'}`}>直近成績 {recentWins}勝{recentLosses}敗</span>
-          <span className={`chip ${winPct >= '.550' ? 'cg' : winPct < '.450' ? 'cr' : 'cb'}`}>勝率 {winPct}</span>
-          <span className={`chip ${toneClassByName.neutral}`}>予算 {fmtM(myTeam.budget ?? 0)}</span>
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="card-h">注目選手</div>
-        <div style={{ display: 'grid', gap: 8 }}>
-          {[...myTeam.players]
-            .sort((a, b) => (b.war ?? 0) - (a.war ?? 0))
-            .slice(0, 3)
-            .map(p => (
-              <div key={p.id} className="card2" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>{p.name}（{p.pos}）</span>
-                <span className="mono">WAR {((p.war ?? 0)).toFixed(1)}</span>
-              </div>
-            ))}
-        </div>
-      </div>
+    <div className="manager-dashboard-grid">
+      <TodayGameCard todayGame={todayGame} gameDay={gameDay} onGoGame={() => onTabSwitch('schedule')} />
+      <RecommendationCard items={recommendationItems} onTabSwitch={onTabSwitch} />
+      <TeamConditionCard
+        runDiff={runDiff}
+        recentWins={recentWins}
+        recentLosses={recentLosses}
+        winPct={winPct}
+        budgetLabel={fmtM(myTeam.budget ?? 0)}
+      />
+      <DashboardKpiGrid rank={leagueStandings.rank} wins={myTeam.wins} losses={myTeam.losses} rpg={rpg} rapg={rapg} />
+      <FeaturedPlayersCard players={featuredPlayers} />
     </div>
   );
 }
