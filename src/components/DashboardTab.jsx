@@ -33,16 +33,16 @@ export function DashboardTab({ myTeam, teams, schedule, gameDay, year, recentRes
     if (!myTeam) return [];
     const list = [];
     const over = myTeam.players.filter(p => !p.isIkusei).length - MAX_ROSTER;
-    if (over > 0) list.push({ color: "#f87171", label: `ロースター枠超過 +${over}人`, tab: "roster" });
+    if (over > 0) list.push({ color: "#f87171", label: `ロースター枠超過 +${over}人`, hint: "編成 → ロースター", tab: "roster" });
     const expiring = myTeam.players.filter(p => (p.contractYearsLeft ?? 99) <= 1 && !p.isIkusei).length;
-    if (expiring > 0) list.push({ color: "#f5c842", label: `契約満了 ${expiring}人`, tab: "contract" });
+    if (expiring > 0) list.push({ color: "#f5c842", label: `契約満了 ${expiring}人`, hint: "更新交渉が必要", tab: "contract" });
     const trades = mailbox.filter(m => m.type === "trade" && !m.resolved && !m.read).length;
-    if (trades > 0) list.push({ color: "#f97316", label: `トレードオファー ${trades}件`, tab: "mailbox" });
+    if (trades > 0) list.push({ color: "#f97316", label: `トレードオファー ${trades}件`, hint: "受諾 / 拒否を判断", tab: "mailbox" });
     const unread = mailbox.filter(m => !m.read && m.type !== "trade").length;
-    if (unread > 0) list.push({ color: "#f5c842", label: `未読メール ${unread}件`, tab: "mailbox" });
+    if (unread > 0) list.push({ color: "#f5c842", label: `未読メール ${unread}件`, hint: "受信箱を確認", tab: "mailbox" });
     const injured = myTeam.players.filter(p => (p.injuryDaysLeft ?? 0) > 0).length;
-    if (injured > 0) list.push({ color: "#fb923c", label: `負傷中 ${injured}人`, tab: "roster" });
-    if (faPool.length > 0) list.push({ color: "#94a3b8", label: `FA市場 ${faPool.length}人`, tab: "fa" });
+    if (injured > 0) list.push({ color: "#fb923c", label: `負傷中 ${injured}人`, hint: "登録抹消を検討", tab: "roster" });
+    if (faPool.length > 0) list.push({ color: "#94a3b8", label: `FA市場 ${faPool.length}人`, hint: "補強候補を確認", tab: "fa" });
     return list;
   }, [myTeam, mailbox, faPool]);
 
@@ -60,124 +60,140 @@ export function DashboardTab({ myTeam, teams, schedule, gameDay, year, recentRes
     ? (myTeam.wins / (myTeam.wins + myTeam.losses)).toFixed(3).replace(/^0/, "")
     : ".000";
   const runDiff = (myTeam.rf ?? 0) - (myTeam.ra ?? 0);
+  const rankClass = leagueStandings.rank === 1 ? "rank-1" : leagueStandings.rank === 2 ? "rank-2" : leagueStandings.rank === 3 ? "rank-3" : "rank-low";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
 
-      {/* チーム概況 */}
-      <div className="card">
-        <div className="card-h">📊 チーム概況</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6, marginTop: 6 }}>
-          <Stat label="順位" value={`${leagueStandings.rank}位`} color={leagueStandings.rank === 1 ? "#f5c842" : undefined} />
-          <Stat label="GB" value={leagueStandings.rank === 1 ? "—" : leagueStandings.gb.toFixed(1)} />
-          <Stat label="勝率" value={winPct} />
-          <Stat label="得失差" value={(runDiff >= 0 ? "+" : "") + runDiff} color={runDiff > 0 ? "#4ade80" : runDiff < 0 ? "#f87171" : undefined} />
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginTop: 6 }}>
-          <Stat label="勝" value={myTeam.wins} />
-          <Stat label="敗" value={myTeam.losses} />
-          <Stat label="予算" value={fmtM(myTeam.budget ?? 0)} />
-        </div>
-      </div>
-
-      {/* 次の試合 + 直近5試合 */}
-      <div className="card">
-        <div style={{ display: "grid", gridTemplateColumns: nextGame ? "1fr 1fr" : "1fr", gap: 10 }}>
-          {/* 次の試合 */}
-          <div>
-            <div className="card-h" style={{ marginBottom: 6 }}>⚾ 次の試合</div>
-            {nextGame ? (
-              <div style={{ fontSize: 13 }}>
-                <div style={{ fontWeight: 700, fontSize: 15 }}>
-                  {nextGame.opp?.emoji} {nextGame.opp?.name}
-                </div>
-                <div style={{ color: "#9ca3af", fontSize: 11, marginTop: 2 }}>
-                  {nextGame.date.month}月{nextGame.date.day}日（第{gameDay + 1}戦）
-                  {" "}{nextGame.isHome ? "🏟 ホーム" : "🚌 アウェイ"}
-                  {nextGame.isInterleague && " 🔄交流戦"}
-                </div>
-              </div>
-            ) : (
-              <div style={{ color: "#9ca3af", fontSize: 12 }}>試合なし</div>
-            )}
-          </div>
-
-          {/* 直近5試合 */}
-          <div>
-            <div className="card-h" style={{ marginBottom: 6 }}>📈 直近5試合</div>
-            {recentResults.length > 0 ? (
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                {recentResults.map((r, i) => (
-                  <div key={i} title={`vs ${r.oppName}  ${r.myScore}-${r.oppScore}`}
-                    style={{
-                      background: r.drew ? "#6b7280" : r.won ? "#166534" : "#7f1d1d",
-                      color: "#fff", borderRadius: 4, padding: "3px 7px",
-                      fontSize: 11, fontWeight: 700, cursor: "default"
-                    }}>
-                    {r.drew ? "△" : r.won ? "○" : "●"}{r.myScore}-{r.oppScore}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ color: "#9ca3af", fontSize: 12 }}>試合結果なし</div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* オーナー目標・信頼度 */}
-      <div className="card">
-        <div className="card-h">🎯 オーナー目標・信頼度</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 3 }}>今季目標</div>
-            <span style={{ fontSize: 14, fontWeight: 700, color: GOAL_COLORS[ownerGoal] }}>{GOAL_LABELS[ownerGoal]}</span>
-          </div>
-          <div style={{ flex: 2 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-              <span style={{ fontSize: 11, color: "#9ca3af" }}>オーナー信頼度</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: trustColor }}>{ownerTrust} — {trustLabel}</span>
+      {/* ─── HERO: 順位・勝率・得失差を3層スケールで ─── */}
+      <div className="card" style={{ padding: 0, overflow: "hidden", borderColor: "rgba(245,200,66,.12)" }}>
+        <div className="hero-block">
+          <div style={{ textAlign: "center" }}>
+            <div className="hero-meta" style={{ marginBottom: 4 }}>{myTeam.league}リーグ</div>
+            <div className={`hero-rank ${rankClass}`}>
+              {leagueStandings.rank}<span className="hero-rank-suffix">位</span>
             </div>
-            <div style={{ background: "#0d1f35", borderRadius: 4, height: 8, overflow: "hidden" }}>
-              <div style={{ width: `${ownerTrust}%`, height: "100%", background: trustColor, borderRadius: 4, transition: ".3s" }} />
+            <div className="hero-meta" style={{ marginTop: 6 }}>
+              {leagueStandings.rank === 1 ? "首位" : `首位と ${leagueStandings.gb.toFixed(1)} 差`}
             </div>
-            {ownerTrust < 30 && <div style={{ fontSize: 10, color: "#f87171", marginTop: 3 }}>⚠ 翌年予算 -20%</div>}
-            {ownerTrust > 80 && <div style={{ fontSize: 10, color: "#34d399", marginTop: 3 }}>✓ 翌年予算 +15%</div>}
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-1)" }}>
+            <div className="hero-stat-row">
+              <div className="hero-stat">
+                <div className="hero-stat-num" style={{ color: "var(--gold)" }}>{winPct}</div>
+                <div className="hero-stat-lbl">勝率</div>
+              </div>
+              <div className="hero-stat">
+                <div className="hero-stat-num">
+                  <span style={{ color: "#34d399" }}>{myTeam.wins}</span>
+                  <span style={{ color: "var(--dim)", margin: "0 4px" }}>—</span>
+                  <span style={{ color: "#f87171" }}>{myTeam.losses}</span>
+                </div>
+                <div className="hero-stat-lbl">勝 / 敗</div>
+              </div>
+              <div className="hero-stat">
+                <div className="hero-stat-num" style={{ color: runDiff > 0 ? "#34d399" : runDiff < 0 ? "#f87171" : "var(--text)" }}>
+                  {runDiff >= 0 ? "+" : ""}{runDiff}
+                </div>
+                <div className="hero-stat-lbl">得失差</div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ textAlign: "right" }}>
+            <div className="hero-meta">予算</div>
+            <div className="hero-stat-num" style={{ color: "var(--gold)", fontSize: 18 }}>{fmtM(myTeam.budget ?? 0)}</div>
           </div>
         </div>
+
+        {/* Recent 5 games strip */}
+        {recentResults.length > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-1)", padding: "var(--sp-1) var(--sp-2)", borderTop: "1px solid rgba(255,255,255,.04)" }}>
+            <span className="hero-meta" style={{ flexShrink: 0 }}>直近</span>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              {recentResults.map((r, i) => (
+                <div key={i} title={`vs ${r.oppName}  ${r.myScore}-${r.oppScore}`}
+                  style={{
+                    background: r.drew ? "#475569" : r.won ? "#166534" : "#7f1d1d",
+                    color: "#fff", borderRadius: 4, padding: "3px 7px",
+                    fontSize: 11, fontWeight: 700, fontFamily: "'Share Tech Mono',monospace",
+                  }}>
+                  {r.drew ? "△" : r.won ? "○" : "●"}{r.myScore}-{r.oppScore}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* 要対応アクション */}
+      {/* ─── 要対応 ─ 判断と行動を分離 ─── */}
       {actions.length > 0 && (
-        <div className="card">
-          <div className="card-h">⚠️ 要対応アクション</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 6 }}>
+        <div className="card" style={{ borderColor: "rgba(248,113,113,.18)" }}>
+          <div className="card-h" style={{ display: "flex", alignItems: "center", gap: 6, color: "#fca5a5" }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#f87171" }} />
+            要対応 — {actions.length}件
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-1)" }}>
             {actions.map((a, i) => (
               <button key={i} onClick={() => onTabSwitch(a.tab)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  background: "transparent", border: `1px solid ${a.color}22`,
-                  borderLeft: `3px solid ${a.color}`, borderRadius: 4,
-                  padding: "5px 10px", cursor: "pointer", textAlign: "left",
-                  color: "#e5e7eb", fontSize: 12
-                }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: a.color, flexShrink: 0 }} />
-                {a.label}
-                <span style={{ marginLeft: "auto", color: "#6b7280", fontSize: 11 }}>→</span>
+                className="action-item"
+                style={{ borderLeftColor: a.color }}>
+                <span className="action-dot" style={{ background: a.color }} />
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ fontWeight: 600 }}>{a.label}</span>
+                  {a.hint && <span style={{ fontSize: 10, color: "var(--dim)" }}>{a.hint}</span>}
+                </div>
+                <span className="action-arrow">→</span>
               </button>
             ))}
           </div>
         </div>
       )}
-    </div>
-  );
-}
 
-function Stat({ label, value, color }) {
-  return (
-    <div style={{ textAlign: "center", background: "#0d1f35", borderRadius: 6, padding: "6px 4px" }}>
-      <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 16, fontWeight: 700, color: color ?? "#e5e7eb" }}>{value}</div>
+      {/* ─── 次の試合 ─ 単独カード ─── */}
+      <div className="card">
+        <div className="card-h">⚾ 次の試合</div>
+        {nextGame ? (
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
+            <span style={{ fontSize: 32 }}>{nextGame.opp?.emoji}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: 16, color: nextGame.opp?.color }}>{nextGame.opp?.name}</div>
+              <div style={{ color: "#94a3b8", fontSize: 11, marginTop: 4, letterSpacing: ".05em" }}>
+                {nextGame.date.month}月{nextGame.date.day}日（第{gameDay + 1}戦）
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+              <span className={`chip ${nextGame.isHome ? "cg" : "cb"}`}>{nextGame.isHome ? "🏟 ホーム" : "🚌 アウェイ"}</span>
+              {nextGame.isInterleague && <span className="chip cp">🔄 交流戦</span>}
+            </div>
+          </div>
+        ) : (
+          <div style={{ color: "#94a3b8", fontSize: 12 }}>試合なし</div>
+        )}
+      </div>
+
+      {/* ─── オーナー目標・信頼度 ─── */}
+      <div className="card">
+        <div className="card-h">🎯 オーナー目標 ・ 信頼度</div>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
+          <div style={{ flex: 1 }}>
+            <div className="hero-stat-lbl" style={{ marginBottom: 4 }}>今季目標</div>
+            <span style={{ fontSize: 16, fontWeight: 700, color: GOAL_COLORS[ownerGoal] }}>{GOAL_LABELS[ownerGoal]}</span>
+          </div>
+          <div style={{ flex: 2 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              <span className="hero-stat-lbl">信頼度</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: trustColor }}>{ownerTrust} — {trustLabel}</span>
+            </div>
+            <div style={{ background: "#0d1f35", borderRadius: 4, height: 8, overflow: "hidden" }}>
+              <div style={{ width: `${ownerTrust}%`, height: "100%", background: trustColor, borderRadius: 4, transition: ".3s" }} />
+            </div>
+            {ownerTrust < 30 && <div style={{ fontSize: 10, color: "#f87171", marginTop: 4 }}>⚠ 翌年予算 -20%</div>}
+            {ownerTrust > 80 && <div style={{ fontSize: 10, color: "#34d399", marginTop: 4 }}>✓ 翌年予算 +15%</div>}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

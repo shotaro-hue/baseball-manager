@@ -101,10 +101,10 @@ export function StandingsTab({ teams, myId, onTeamClick }) {
       ) : (
         <div className="card">
           <div style={{ overflowX: "auto" }}>
-            <table className="tbl">
+            <table className="tbl standings-tbl">
               <thead>
                 <tr>
-                  <th>順位</th><th>チーム</th><th>試合</th>
+                  <th style={{ width: 56 }}>順位</th><th>チーム</th><th>試合</th>
                   <th style={{ color: "#34d399" }}>勝</th>
                   <th style={{ color: "#f87171" }}>敗</th>
                   <th>勝率</th><th>G差</th><th>得点</th><th>失点</th><th>得失差</th>
@@ -115,10 +115,16 @@ export function StandingsTab({ teams, myId, onTeamClick }) {
                   const g = t.wins + t.losses + t.draws;
                   const gb = i === 0 ? "—" : (((top.wins - t.wins) + (t.losses - top.losses)) / 2).toFixed(1);
                   const isMe = t.id === myId;
+                  const rankCls = i === 0 ? "rank-1" : i === 1 ? "rank-2" : i === 2 ? "rank-3" : "rank-low";
+                  // 3-tier size: top-3 = hero, mid = major, lower = meta
+                  const rankSize = i < 3 ? 32 : 22;
+                  const winPct = t.wins + t.losses > 0 ? "." + String(Math.round(t.wins / (t.wins + t.losses) * 1000)).padStart(3, "0") : "---";
                   return (
-                    <tr key={t.id} style={{ background: isMe ? "rgba(245,200,66,.04)" : undefined }}>
-                      <td>
-                        <span className="mono" style={{ color: i === 0 ? "#ffd700" : i === 1 ? "#94a3b8" : i === 2 ? "#b45309" : "#1e2d3d", fontWeight: 700, fontSize: 15 }}>{i + 1}</span>
+                    <tr key={t.id} style={{ background: isMe ? "rgba(245,200,66,.05)" : undefined, borderLeft: isMe ? "3px solid var(--gold)" : "3px solid transparent" }}>
+                      <td style={{ paddingLeft: 10 }}>
+                        <span className={rankCls} style={{ fontFamily: "'Bebas Neue',cursive", fontSize: rankSize, fontWeight: 400, lineHeight: 1, letterSpacing: 0 }}>
+                          {i + 1}
+                        </span>
                       </td>
                       <td>
                         <button
@@ -126,14 +132,14 @@ export function StandingsTab({ teams, myId, onTeamClick }) {
                           style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontWeight: "inherit", padding: 0 }}
                         >
                           <span style={{ color: t.color, marginRight: 5 }}>{t.emoji}</span>
-                          <span style={{ fontWeight: isMe ? 700 : 400, color: isMe ? "#f5c842" : undefined }}>{t.name}{isMe && " ★"}</span>
+                          <span style={{ fontWeight: isMe ? 700 : 500, color: isMe ? "#f5c842" : undefined }}>{t.name}{isMe && " ★"}</span>
                         </button>
                       </td>
                       <td className="mono">{g}</td>
                       <td className="mono" style={{ color: "#34d399" }}>{t.wins}</td>
                       <td className="mono" style={{ color: "#f87171" }}>{t.losses}</td>
-                      <td className="mono">{t.wins + t.losses > 0 ? "." + String(Math.round(t.wins / (t.wins + t.losses) * 1000)).padStart(3, "0") : "---"}</td>
-                      <td className="mono" style={{ color: "#374151" }}>{gb}</td>
+                      <td className="mono" style={{ fontSize: i < 3 ? 14 : 12, fontWeight: i < 3 ? 700 : 400, color: i < 3 ? "var(--gold)" : undefined }}>{winPct}</td>
+                      <td className="mono" style={{ color: i === 0 ? "var(--gold)" : "#94a3b8" }}>{gb}</td>
                       <td className="mono">{t.rf}</td>
                       <td className="mono">{t.ra}</td>
                       <td className="mono" style={{ color: (t.rf - t.ra) > 0 ? "#34d399" : (t.rf - t.ra) < 0 ? "#f87171" : "#374151" }}>
