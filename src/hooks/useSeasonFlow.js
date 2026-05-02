@@ -556,7 +556,18 @@ export function useSeasonFlow(gs) {
       }
     }
 
-    return lineup.slice(0, limit);
+    const fixedLineup = lineup.slice(0, limit);
+
+    // DHなしは9番に投手を固定し、投手にも打席を回す
+    if (!useDh) {
+      const starterId = team.rotation?.[team.rotIdx % Math.max(team.rotation?.length || 0, 1)];
+      const starter = (team.players || []).find(p => p.id === starterId && p.isPitcher && !p.isIkusei)
+        || (team.players || []).find(p => p.isPitcher && !p.isIkusei)
+        || null;
+      if (starter) return [...fixedLineup, starter.id];
+    }
+
+    return fixedLineup;
   };
 
   const applyDhToTeam = (team, useDh) => ({ ...team, lineup: buildSimLineup(team, useDh) });

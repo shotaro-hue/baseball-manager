@@ -265,7 +265,6 @@ export function useGameState() {
     const p=myTeam.players.find(x=>x.id===pid);
     const dhMode = myTeam.rosterDhMode ?? myTeam.dhEnabled;
     const maxLineup = dhMode ? 9 : 8;
-    if(p?.isPitcher){notify("投手は打線に入れられません","warn");return;}
     if(p?.injury){notify("故障中は出場不可","warn");return;}
     if(!inL&&myTeam.lineup.length>=maxLineup){notify(`打線は最大${maxLineup}人です`,"warn");return;}
     if(inL&&myTeam.lineup.length<=4){notify("最低4人必要です","warn");return;}
@@ -298,7 +297,6 @@ export function useGameState() {
   const setLineupOrder = useCallback((pid, order) => {
     if (!myTeam) return;
     const p = myTeam.players.find(x => x.id === pid);
-    if (p?.isPitcher) { notify("投手は打線に入れられません", "warn"); return; }
     if ((p?.injuryDaysLeft ?? 0) > 0) { notify("故障中は出場不可", "warn"); return; }
     if (order === 0 && myTeam.lineup.length <= 4) { notify("最低4人必要です", "warn"); return; }
 
