@@ -47,12 +47,19 @@ function sanitizeEvents(events) {
         return null;
       }
 
+      const rawClearance = Number(event?.hrClearance);
+      const hrClearance = Number.isFinite(rawClearance) ? rawClearance : null;
+      const rawFenceDistance = Number(event?.fenceDistance);
+      const fenceDistance = Number.isFinite(rawFenceDistance) ? rawFenceDistance : null;
+
       return {
         id: event?.id ?? `spray-${index}`,
         x,
         y,
         hitType,
         fenceRatio,
+        hrClearance,
+        fenceDistance,
       };
     })
     .filter(Boolean);
@@ -143,7 +150,14 @@ export function SprayChart({ events }) {
         {safeEvents.map((event) => {
           const style = HIT_TYPE_STYLES[event.hitType] ?? DEFAULT_STYLE;
           const point = toChartPoint(event);
-          return <circle key={event.id} cx={point.x} cy={point.y} r={DOT_RADIUS} fill={style.color} opacity={0.78} />;
+          const titleText = event.hitType === "homeRun"
+            ? `本塁打: クリアランス【＝フェンス超過高】${event.hrClearance ?? "N/A"}m / フェンス${event.fenceDistance ?? "N/A"}m`
+            : `${style.label}: 推定飛距離プロット`;
+          return (
+            <circle key={event.id} cx={point.x} cy={point.y} r={DOT_RADIUS} fill={style.color} opacity={0.78}>
+              <title>{titleText}</title>
+            </circle>
+          );
         })}
       </svg>
 

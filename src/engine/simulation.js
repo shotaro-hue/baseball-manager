@@ -375,8 +375,24 @@ function estimateFielderIntercept(distance, ballType, spraySide, rngProvider = r
   };
 }
 
-function isHomeRunByTrajectory(points, fenceDistance, wallHeight = PHYSICS_BAT.HR.WALL_HEIGHT) {
-  if (!Array.isArray(points) || points.length < 2 || !Number.isFinite(fenceDistance)) return false;
+function checkHomeRunByTrajectory(points, fenceDistance, wallHeight = PHYSICS_BAT.HR.WALL_HEIGHT) {
+  const safeWallHeightRaw = Number(wallHeight);
+  const safeWallHeight = Number.isFinite(safeWallHeightRaw) ? Math.max(0, safeWallHeightRaw) : PHYSICS_BAT.HR.WALL_HEIGHT;
+  const fallback = {
+    isHomeRun: false,
+    yAtFence: Number.NaN,
+    yAtFencePlus3m: Number.NaN,
+    wallHeight: safeWallHeight,
+    clearance: Number.NaN,
+    fenceDistance: Number.isFinite(Number(fenceDistance)) ? Number(fenceDistance) : Number.NaN,
+  };
+
+  const safeFenceDistanceRaw = Number(fenceDistance);
+  const safeFenceDistance = Number.isFinite(safeFenceDistanceRaw) ? Math.max(0, safeFenceDistanceRaw) : Number.NaN;
+  if (!Array.isArray(points) || points.length < 2 || !Number.isFinite(safeFenceDistance)) return fallback;
+
+  let yAtFence = Number.NaN;
+  let yAtFencePlus3m = Number.NaN;
   for (let i = 1; i < points.length; i += 1) {
     const prev = points[i - 1];
     const curr = points[i];
@@ -385,12 +401,37 @@ function isHomeRunByTrajectory(points, fenceDistance, wallHeight = PHYSICS_BAT.H
     const x2 = Number(curr?.x ?? curr?.distance ?? curr?.[0]);
     const y2 = Number(curr?.y ?? curr?.height ?? curr?.[1]);
     if (![x1, y1, x2, y2].every(Number.isFinite)) continue;
-    if ((x1 <= fenceDistance && x2 >= fenceDistance) || (x2 <= fenceDistance && x1 >= fenceDistance)) {
-      const t = x2 === x1 ? 0 : (fenceDistance - x1) / (x2 - x1);
-      return y1 + (y2 - y1) * t >= wallHeight;
+
+    const crossesFence = (x1 <= safeFenceDistance && x2 >= safeFenceDistance) || (x2 <= safeFenceDistance && x1 >= safeFenceDistance);
+    if (crossesFence && !Number.isFinite(yAtFence)) {
+      const tFence = x2 === x1 ? 0 : (safeFenceDistance - x1) / (x2 - x1);
+      yAtFence = y1 + (y2 - y1) * tFence;
     }
+
+    const fencePlusDistance = safeFenceDistance + 3;
+    const crossesFencePlus = (x1 <= fencePlusDistance && x2 >= fencePlusDistance) || (x2 <= fencePlusDistance && x1 >= fencePlusDistance);
+    if (crossesFencePlus && !Number.isFinite(yAtFencePlus3m)) {
+      const tFencePlus = x2 === x1 ? 0 : (fencePlusDistance - x1) / (x2 - x1);
+      yAtFencePlus3m = y1 + (y2 - y1) * tFencePlus;
+    }
+
+    if (Number.isFinite(yAtFence) && Number.isFinite(yAtFencePlus3m)) break;
   }
-  return false;
+
+  const clearance = Number.isFinite(yAtFence) ? yAtFence - safeWallHeight : Number.NaN;
+  const isHomeRun = Number.isFinite(yAtFence)
+    && Number.isFinite(yAtFencePlus3m)
+    && yAtFence >= safeWallHeight
+    && yAtFencePlus3m >= 0.5;
+
+  return {
+    isHomeRun,
+    yAtFence,
+    yAtFencePlus3m,
+    wallHeight: safeWallHeight,
+    clearance,
+    fenceDistance: safeFenceDistance,
+  };
 }
 
 function resolveBattedBallOutcomeFromPhysicsForBalance(batter, pitcher, stadium, environment = {}, options = {}) {
@@ -422,8 +463,8 @@ function resolveBattedBallOutcomeFromPhysicsForBalance(batter, pitcher, stadium,
 
   let result = 'out';
   const effectiveWallHeight = PHYSICS_BAT.HR.WALL_HEIGHT * safeLeagueEnv.wallHeightMod;
-  const isHrByTrajectory = isHomeRunByTrajectory(points, fenceDistance, effectiveWallHeight);
-  if (isHrByTrajectory) {
+  const hrCheck = checkHomeRunByTrajectory(points, fenceDistance, effectiveWallHeight);
+  if (hrCheck.isHomeRun) {
     result = 'hr';
   } else {
     const rngProvider = typeof options?.rngProvider === 'function' ? options.rngProvider : rngf;
@@ -454,7 +495,7 @@ function resolveBattedBallOutcomeFromPhysicsForBalance(batter, pitcher, stadium,
 
   return {
     result,
-    physicsMeta: { ev, la, distance, sprayAngle, trajectory: points, ballType, quality: quality || 'normal', fenceDistance, isHrByTrajectory },
+    physicsMeta: { ev, la, distance, sprayAngle, trajectory: points, ballType, quality: quality || 'normal', fenceDistance, hrCheck, isHrByTrajectory: hrCheck.isHomeRun },
   };
 }
 const resolveBattedBallOutcomeFromPhysics = resolveBattedBallOutcomeFromPhysicsForBalance;
