@@ -96,9 +96,38 @@ describe('resolveFieldSideBySprayAngle', () => {
 
 describe('sanitizeEnvironment', () => {
   it('異常値を安全なデフォルトにフォールバックする', () => {
-    expect(sanitizeEnvironment({ windOut: 'invalid' })).toEqual({ windOut: 0 });
-    expect(sanitizeEnvironment({ windOut: Infinity })).toEqual({ windOut: 0 });
-    expect(sanitizeEnvironment({ windOut: null })).toEqual({ windOut: 0 });
+    expect(sanitizeEnvironment({ windOut: 'invalid' })).toEqual({
+      windOut: 0,
+      airDensity: 1.225,
+      temperatureC: 20,
+      altitudeM: 0,
+    });
+    expect(sanitizeEnvironment({ windOut: Infinity })).toEqual({
+      windOut: 0,
+      airDensity: 1.225,
+      temperatureC: 20,
+      altitudeM: 0,
+    });
+    expect(sanitizeEnvironment({ windOut: null })).toEqual({
+      windOut: 0,
+      airDensity: 1.225,
+      temperatureC: 20,
+      altitudeM: 0,
+    });
+  });
+
+  it('範囲外の値を安全範囲にクランプする', () => {
+    expect(sanitizeEnvironment({
+      windOut: 999,
+      airDensity: 9,
+      temperatureC: -100,
+      altitudeM: -1000,
+    })).toEqual({
+      windOut: 30,
+      airDensity: 1.5,
+      temperatureC: -40,
+      altitudeM: -430,
+    });
   });
 });
 
