@@ -177,7 +177,7 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
     setTimeout(() => {
       try {
         const TOTAL_PA = 8000;
-        const stadium = STADIUMS.tokyo_dome;
+        const stadium = { lf: 100, cf: 122, rf: 100 };
         const pitcher = { pitching: { velocity: 60, breaking: 60, control: 60 }, condition: 100, morale: 70 };
         const profiles = [
           { label: 'power70', batting: { power: 70, contact: 55, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 } },
@@ -187,19 +187,16 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
         const nextRows = profiles.map((profile) => {
           const counter = { pa: 0, bip: 0, hr: 0, evSum: 0, laSum: 0, distSum: 0, q: { weak: 0, normal: 0, solid: 0, hard: 0, barrel: 0 } };
           for (let i = 0; i < TOTAL_PA; i += 1) {
-            const atBat = simAtBat({ batting: profile.batting, condition: 100, morale: 70 }, pitcher, 'normal', 0, { stadium: 'tokyo_dome' }, leagueEnv);
-            const resolved = atBat.result === 'inplay'
-              ? _resolveBattedBallOutcomeFromPhysics_TEST({ batting: profile.batting, condition: 100, morale: 70 }, pitcher, stadium, {}, {})
-              : { result: atBat.result, physicsMeta: null };
-            const physicsMeta = resolved?.physicsMeta || {};
+            const result = simAtBat({ batting: profile.batting, condition: 100, morale: 70 }, pitcher, 'normal', 0, { stadium: 'tokyo_dome' }, leagueEnv);
+            const physicsMeta = result?.physicsMeta || {};
             const quality = ['weak', 'normal', 'solid', 'hard', 'barrel'].includes(physicsMeta.quality) ? physicsMeta.quality : 'normal';
             counter.pa += 1;
-            if (atBat.result === 'inplay') counter.bip += 1;
-            if (resolved.result === 'hr') counter.hr += 1;
+            counter.bip += 1;
+            if (result.result === 'hr') counter.hr += 1;
             counter.evSum += Number(physicsMeta.ev) || 0;
             counter.laSum += Number(physicsMeta.la) || 0;
             counter.distSum += Number(physicsMeta.distance) || 0;
-            if (atBat.result === 'inplay') counter.q[quality] += 1;
+            counter.q[quality] += 1;
           }
           const hrPerBip = counter.hr / Math.max(counter.bip, 1);
           const hrPerPa = counter.hr / Math.max(counter.pa, 1);
