@@ -10,3 +10,11 @@ export const PHYSICS_PRESETS = {
 };
 
 export const DEFAULT_PHYSICS_PRESET = 'sim';
+
+
+export const DEFAULT_ENVIRONMENT = {
+  windOut: 0,
+  airDensity: 1.225,
+  temperatureC: 20,
+  altitudeM: 0,
+};
