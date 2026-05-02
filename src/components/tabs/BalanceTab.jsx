@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { simAtBat, BASELINE, ABILITY_RANGE, DEFAULT_LEAGUE_ENV } from '../../engine/simulation';
+import { simAtBat, BASELINE, ABILITY_RANGE, DEFAULT_LEAGUE_ENV, _resolveBattedBallOutcomeFromPhysics_TEST, STADIUMS } from '../../engine/simulation';
 
 /* ================================================================
    BALANCE TAB
@@ -36,17 +36,25 @@ function mkPit(a) {
 // ── N 打席シミュレーション ────────────────────────────────────
 function runPASim(bat, pit, n, leagueEnv = DEFAULT_LEAGUE_ENV) {
   const c = {};
-  for (let i = 0; i < n; i++) {
-    const { result } = simAtBat(bat, pit, 'normal', 0, {}, leagueEnv);
-    c[result] = (c[result] || 0) + 1;
+  const safeN = Number.isFinite(Number(n)) ? Math.max(1, Math.floor(Number(n))) : 1;
+  const stadium = STADIUMS.tokyo_dome;
+  for (let i = 0; i < safeN; i++) {
+    const { result } = simAtBat(bat, pit, 'normal', 0, { stadium: 'tokyo_dome' }, leagueEnv);
+    if (result === 'inplay') {
+      const resolved = _resolveBattedBallOutcomeFromPhysics_TEST(bat, pit, stadium, {}, {});
+      const finalResult = resolved?.result || 'out';
+      c[finalResult] = (c[finalResult] || 0) + 1;
+    } else {
+      c[result] = (c[result] || 0) + 1;
+    }
   }
   const h  = (c.s || 0) + (c.d || 0) + (c.t || 0) + (c.hr || 0);
-  const ab = n - (c.bb || 0) - (c.hbp || 0);
+  const ab = safeN - (c.bb || 0) - (c.hbp || 0);
   return {
     ba:    ab > 0 ? h / ab : 0,
-    kPct:  (c.k  || 0) / n,
-    bbPct: (c.bb || 0) / n,
-    hrPct: (c.hr || 0) / n,
+    kPct:  (c.k  || 0) / safeN,
+    bbPct: (c.bb || 0) / safeN,
+    hrPct: (c.hr || 0) / safeN,
   };
 }
 
