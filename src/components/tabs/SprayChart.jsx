@@ -112,7 +112,7 @@ export function SprayChart({ events }) {
 
         {/* 外野芝 */}
         <path
-          d={`M ${leftFoulPoint.x} ${leftFoulPoint.y} A ${FIELD_RADIUS} ${FIELD_RADIUS} 0 0 1 ${rightFoulPoint.x} ${rightFoulPoint.y} L ${HOME_X} ${HOME_Y} Z`}
+          d={`M ${leftFoulPoint.x} ${leftFoulPoint.y} A ${fenceRadius} ${fenceRadius} 0 0 1 ${rightFoulPoint.x} ${rightFoulPoint.y} L ${HOME_X} ${HOME_Y} Z`}
           fill="rgba(34,197,94,0.08)"
           stroke="rgba(74,222,128,0.22)"
           strokeWidth="1"
@@ -120,7 +120,7 @@ export function SprayChart({ events }) {
 
         {/* フェンス【＝本塁打ライン】 */}
         <path
-          d={`M ${leftFoulPoint.x} ${leftFoulPoint.y} A ${FIELD_RADIUS} ${FIELD_RADIUS} 0 0 1 ${rightFoulPoint.x} ${rightFoulPoint.y}`}
+          d={`M ${leftFoulPoint.x} ${leftFoulPoint.y} A ${fenceRadius} ${fenceRadius} 0 0 1 ${rightFoulPoint.x} ${rightFoulPoint.y}`}
           fill="none"
           stroke="rgba(248,113,113,0.9)"
           strokeWidth="2.2"
