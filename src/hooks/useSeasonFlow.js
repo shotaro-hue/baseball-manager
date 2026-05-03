@@ -317,6 +317,7 @@ export function useSeasonFlow(gs) {
   const [playoff, setPlayoff] = useState(null);
   const [currentGameTeams, setCurrentGameTeams] = useState(null);
   const [batchProgress, setBatchProgress] = useState(null);
+  const isBatchCancelledRef = useRef(false);
   const pendingPlayoffRef = useRef(false);
 
   const prevMyPlayersRef = useRef(null);
@@ -839,10 +840,49 @@ export function useSeasonFlow(gs) {
     return same.findIndex(t => t.id === teamId) + 1;
   };
 
+  useEffect(() => {
+    return () => {
+      // アンマウント時にバッチを中断して暴走を防止
+      isBatchCancelledRef.current = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    // 画面遷移時にバッチ処理を安全に停止
+    if (batchProgress && screen !== "season") {
+      isBatchCancelledRef.current = true;
+    }
+  }, [batchProgress, screen]);
+
   // バッチ処理の共通ロジック
   const runBatchGames = async (count, autoManageMyTeam=false) => {
     if(!myTeam) return;
-    setBatchProgress({ current: 0, total: count });
+    const safeCount = Number.isInteger(count) && count > 0 ? count : 0;
+    if (safeCount <= 0) return;
+    const CHUNK_SIZE = 4;
+    const BATCH_BOX_SCORES_LIMIT = 60;
+    const shrinkBoxScore = (entry) => {
+      if (!entry) return null;
+      const { homeId, awayId, dayNo, cr, bs, homeName, awayName } = entry;
+      return {
+        homeId,
+        awayId,
+        dayNo,
+        cr: { won: cr?.won, score: cr?.score },
+        bs: bs ? {
+          inningScores: bs.inningScores,
+          homeBatting: bs.homeBatting,
+          awayBatting: bs.awayBatting,
+          homePitching: bs.homePitching,
+          awayPitching: bs.awayPitching,
+        } : null,
+        homeName,
+        awayName,
+      };
+    };
+    isBatchCancelledRef.current = false;
+    setBatchProgress({ current: 0, total: safeCount });
+    try {
     let newTeams=[...teams.map(t=>({...t,players:[...t.players.map(p=>({...p,stats:{...p.stats}}))],...(t.id===myId?{}:{})}))];
     const results=[];
     let newDay=gameDay;
@@ -862,7 +902,11 @@ export function useSeasonFlow(gs) {
     const batchNewsItems = []; // 試合結果ニュース
     const batchBoxScores = []; // { homeId, awayId, dayNo, cr, homePlayers, awayPlayers, homeName, awayName }
 
-    for(let g=0;g<count;g++){
+    for(let chunkStart=0; chunkStart<safeCount; chunkStart+=CHUNK_SIZE){
+      if (isBatchCancelledRef.current) break;
+      const chunkEnd = Math.min(chunkStart + CHUNK_SIZE, safeCount);
+      for(let g=chunkStart; g<chunkEnd; g++){
+      if (isBatchCancelledRef.current) break;
       // CPU_AUTO_MANAGE_INTERVAL 日ごとに全球団のロスター・打順・ローテを最適化
       // autoManageMyTeam=true の場合は自チームも対象に含める
       if(newDay % CPU_AUTO_MANAGE_INTERVAL === 0){
@@ -881,7 +925,7 @@ export function useSeasonFlow(gs) {
         const aPlayersSnap=[...a.players]; const bPlayersSnap=[...b.players]; // 名前解決用スナップショット
         const cr=quickSimGame(applyDhToTeam(a, useDh),applyDhToTeam(b, useDh));
         const bs=computeBoxScore(cr.log||[],cr.inningSummary||[],aPlayersSnap,bPlayersSnap,cr.score.my,cr.score.opp);
-        batchBoxScores.push({homeId:a.id,awayId:b.id,dayNo:newDay,cr,bs,homePlayers:aPlayersSnap,awayPlayers:bPlayersSnap,homeName:a.name,awayName:b.name});
+        batchBoxScores.push(shrinkBoxScore({homeId:a.id,awayId:b.id,dayNo:newDay,cr,bs,homePlayers:aPlayersSnap,awayPlayers:bPlayersSnap,homeName:a.name,awayName:b.name}));
         const cdrew=cr.score.my===cr.score.opp;
         const aWon=cr.won;
         // 注目CPU試合を収集（大差 or 接戦）
@@ -940,7 +984,7 @@ export function useSeasonFlow(gs) {
         const useDh = scheduleMatchup.isHome ? !!myT.dhEnabled : !!opp.dhEnabled;
         const myTPlayersSnap=[...myT.players]; const oppPlayersSnap=[...opp.players];
         const r=quickSimGame(applyDhToTeam(myT, useDh),applyDhToTeam(opp, useDh));
-        batchBoxScores.push({homeId:myT.id,awayId:opp.id,dayNo:newDay,cr:r,homePlayers:myTPlayersSnap,awayPlayers:oppPlayersSnap,homeName:myT.name,awayName:opp.name});
+        batchBoxScores.push(shrinkBoxScore({homeId:myT.id,awayId:opp.id,dayNo:newDay,cr:r,homePlayers:myTPlayersSnap,awayPlayers:oppPlayersSnap,homeName:myT.name,awayName:opp.name}));
         const won=r.score.my>r.score.opp;
         const drew=r.score.my===r.score.opp;
         if(won){myT.wins++;myT.rf+=r.score.my;myT.ra+=r.score.opp;}
@@ -1014,8 +1058,15 @@ export function useSeasonFlow(gs) {
         }
       }
       newDay++;
-      setBatchProgress({ current: g + 1, total: count });
-      await new Promise(r => setTimeout(r, 0));
+      if (batchBoxScores.length > BATCH_BOX_SCORES_LIMIT) {
+        const overflow = batchBoxScores.length - BATCH_BOX_SCORES_LIMIT;
+        for (let i = 0; i < overflow; i++) {
+          batchBoxScores[i] = shrinkBoxScore(batchBoxScores[i]);
+        }
+      }
+      }
+      setBatchProgress({ current: chunkEnd, total: safeCount });
+      await new Promise(requestAnimationFrame);
     }
 
     // ループ後処理前にブラウザへ制御を返す（モバイルのウォッチドッグ対策）
@@ -1096,15 +1147,25 @@ export function useSeasonFlow(gs) {
         if(!patches[awayId]) patches[awayId]={};
         patches[awayId][dayNo]={won:!hWon&&!drew,drew,myScore:cr.score.opp,oppScore:cr.score.my,oppName:homeName,oppId:homeId,homeId,awayId,inningScores:bs?.inningScores,myBatting:bs?.awayBatting,oppBatting:bs?.homeBatting,myPitching:bs?.awayPitching,oppPitching:bs?.homePitching};
       }
+      if (Object.keys(patches).length === 0) return prev;
       const next={...prev};
       for(const[teamId,days]of Object.entries(patches)){
         next[teamId]={...(prev[teamId]||{}),...days};
       }
       return next;
     });
-    setBatchProgress(null);
+    if (isBatchCancelledRef.current) {
+      notify("⚠️ バッチ処理は画面遷移または終了操作により中断されました", "warn");
+      return;
+    }
     if(newDay-1>=SEASON_GAMES){const withFarm=runFarmSeason(newTeams);setTeams(withFarm);setPlayoff(initPlayoff(withFarm));setScreen("playoff");}
     else setScreen("batch_result");
+    } catch (error) {
+      console.error("runBatchGames error:", error);
+      notify("⚠️ バッチ処理中にエラーが発生しました。進行を中断しました。", "error");
+    } finally {
+      setBatchProgress(null);
+    }
   };
 
   // Game over callback from TacticalGameScreen
