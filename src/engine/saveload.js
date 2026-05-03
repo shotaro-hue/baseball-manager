@@ -94,12 +94,44 @@ function validateAndMigrateSave(state) {
   return { ok: true, state: { ...state, teams } };
 }
 
+// ── セーブデータ圧縮 ──────────────────────────────
+// battedBallEvents（最大500件/選手）が全12チーム×30選手分蓄積されると
+// バックアップ3世代込みで localStorage 上限を超えるため保存前に削減する
+
+function slimPlayer(p, keepBatted = 50) {
+  if (!p?.stats) return p;
+  return {
+    ...p,
+    stats: {
+      ...p.stats,
+      battedBallEvents: keepBatted > 0
+        ? (p.stats.battedBallEvents ?? []).slice(-keepBatted)
+        : [],
+      sprayPoints: keepBatted > 0
+        ? (p.stats.sprayPoints ?? [])
+        : [],
+    },
+  };
+}
+
+function slimForSave(state) {
+  return {
+    ...state,
+    mailbox: (state.mailbox ?? []).slice(-100),
+    teams: (state.teams ?? []).map(t => ({
+      ...t,
+      players: (t.players ?? []).map(p => slimPlayer(p, 50)),
+      history: (t.history ?? []).map(p => slimPlayer(p, 0)),
+    })),
+    faPool: (state.faPool ?? []).map(p => slimPlayer(p, 0)),
+  };
+}
+
 // ── 公開 API ────────────────────────────────────
 
 export function saveGame(state) {
-  try {
-    rotateBk();
-    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+  const slim = slimForSave(state);
+  const writeMeta = () => {
     const myTeam = state.teams?.find(t => t.id === state.myId);
     localStorage.setItem(META_KEY, JSON.stringify({
       teamName:  myTeam?.name  ?? '不明',
@@ -110,11 +142,27 @@ export function saveGame(state) {
       losses:    myTeam?.losses ?? 0,
       savedAt:   new Date().toLocaleString('ja-JP'),
     }));
+  };
+  try {
+    rotateBk();
+    localStorage.setItem(SAVE_KEY, JSON.stringify(slim));
+    writeMeta();
     return { ok: true };
   } catch (e) {
     const quota = e instanceof DOMException && e.name === 'QuotaExceededError';
-    console.error(quota ? 'Save failed: storage quota exceeded' : 'Save failed:', e);
-    return { ok: false, quota };
+    if (quota) {
+      // バックアップ回転を諦めて直接上書き保存を試みる
+      try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify(slim));
+        writeMeta();
+        return { ok: true };
+      } catch {
+        console.error('Save failed: storage quota exceeded');
+        return { ok: false, quota: true };
+      }
+    }
+    console.error('Save failed:', e);
+    return { ok: false, quota: false };
   }
 }
 
