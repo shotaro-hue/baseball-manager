@@ -1028,7 +1028,7 @@ export function SpringTrainingScreen({ year, myTeam, springData, onComplete }) {
 
 function buildAcceptText(sal) {
   const opts = [
-    `「わかりました。${fmtM(sal)}でお願いします。」`,
+    `「わかりました。${fmtSal(sal)}でお願いします。」`,
     `「その条件で契約させていただきます。」`,
     `「ありがとうございます。チームの期待に応えます。」`,
   ];
@@ -1036,7 +1036,7 @@ function buildAcceptText(sal) {
 }
 
 function buildCounterText(offered, counter) {
-  return `「${fmtM(offered)}では少し...${fmtM(counter)}であれば前向きに考えます。」`;
+  return `「${fmtSal(offered)}では少し...${fmtSal(counter)}であれば前向きに考えます。」`;
 }
 
 function buildFaDeclareText() {
@@ -1083,7 +1083,7 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, onSign,
     const logs = dialogLogs[p.id] || [];
     const round = logs.filter(l => l.from === 'team').length + 1;
 
-    appendLog(p.id, { from: 'team', text: `「${fmtM(offerSal)}、${offerYrs}年ではいかがでしょうか？」`, salary: offerSal, years: offerYrs });
+    appendLog(p.id, { from: 'team', text: `「${fmtSal(offerSal)}、${offerYrs}年ではいかがでしょうか？」`, salary: offerSal, years: offerYrs });
 
     if (settled[p.id]) return;
 
@@ -1159,7 +1159,7 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, onSign,
               }}
             >
               <div style={{ fontWeight: 700, fontSize: 13 }}>{p.name}</div>
-              <div style={{ fontSize: 11, color: '#6b7280' }}>{p.pos} {p.age}歳 / {fmtM(p.salary)}</div>
+              <div style={{ fontSize: 11, color: '#6b7280' }}>{p.pos} {p.age}歳 / {fmtSal(p.salary)}</div>
               <div style={{ fontSize: 11, marginTop: 3 }}>{statusBadge(p)}</div>
               {settled[p.id] === 'rejected' && (
                 <button
@@ -1186,9 +1186,9 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, onSign,
                   <span style={{ fontWeight: 700, fontSize: 15 }}>{selectedPlayer.name}</span>
                   <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 8 }}>{selectedPlayer.pos} {selectedPlayer.age}歳</span>
                 </div>
-                <div style={{ fontSize: 12, color: '#6b7280' }}>現年俸: {fmtM(selectedPlayer.salary)}</div>
+                <div style={{ fontSize: 12, color: '#6b7280' }}>現年俸: {fmtSal(selectedPlayer.salary)}</div>
                 <div style={{ fontSize: 12, color: '#d97706', fontWeight: 600 }}>
-                  要求推定: {fmtM(selectedDemand.demandSalary || selectedPlayer.salary)}
+                  要求推定: {fmtSal(selectedDemand.demandSalary || selectedPlayer.salary)}
                 </div>
                 <div style={{ fontSize: 11, color: '#9ca3af' }}>
                   morale {Math.round(selectedPlayer.morale ?? 70)} / trust {Math.round(selectedPlayer.trust ?? 50)}
