@@ -32,7 +32,12 @@ const UNKNOWN_END_YEAR_FALLBACK = 2027; // 終了年不明時は2シーズン残
 
 function normalizeContractKey(raw) {
   if (typeof raw !== 'string') return '';
-  return raw.replace(/[\s　]+/g, '').trim();
+  const normalized = raw
+    .normalize('NFKC')
+    .replace(/[﨑]/g, '崎')
+    .replace(/[塚]/g, '塚')
+    .replace(/[髙]/g, '高');
+  return normalized.replace(/[\s　]+/g, '').trim();
 }
 
 function validateYearOrNull(yearValue) {
