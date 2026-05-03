@@ -881,8 +881,7 @@ export function useSeasonFlow(gs) {
         const aPlayersSnap=[...a.players]; const bPlayersSnap=[...b.players]; // 名前解決用スナップショット
         const cr=quickSimGame(applyDhToTeam(a, useDh),applyDhToTeam(b, useDh));
         const bs=computeBoxScore(cr.log||[],cr.inningSummary||[],aPlayersSnap,bPlayersSnap,cr.score.my,cr.score.opp);
-        // cr.log は computeBoxScore 後に不要なので参照を持たない（143試合 × 6組 × 80イベント = ~70k オブジェクトのメモリ節約）
-        batchBoxScores.push({homeId:a.id,awayId:b.id,dayNo:newDay,won:cr.won,score:cr.score,bs,homeName:a.name,awayName:b.name});
+        batchBoxScores.push({homeId:a.id,awayId:b.id,dayNo:newDay,cr,bs,homePlayers:aPlayersSnap,awayPlayers:bPlayersSnap,homeName:a.name,awayName:b.name});
         const cdrew=cr.score.my===cr.score.opp;
         const aWon=cr.won;
         // 注目CPU試合を収集（大差 or 接戦）
@@ -1085,23 +1084,22 @@ export function useSeasonFlow(gs) {
     setBatchResults(gameResults);
     gs.setRecentResults(prev=>[...gameResults.map(r=>({won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp,gameNo:r.gameNo})).reverse(),...prev].slice(0,5));
     gs.setGameResultsMap(prev=>{const next={...prev};gameResults.forEach(r=>{next[r.gameNo]={won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:r.oppTeam};});return next;});
-    await new Promise(r => setTimeout(r, 0));
-    setAllTeamResultsMap(prev=>{
-      // チームごとの差分を先にまとめてから1回だけスプレッド（O(n²)→O(n)）
-      const patches={};
-      for(const{homeId,awayId,dayNo,won,score,bs,homeName,awayName}of batchBoxScores){
-        const hWon=won; const drew=score.my===score.opp;
-        if(!patches[homeId]) patches[homeId]={};
-        patches[homeId][dayNo]={won:hWon,drew,myScore:score.my,oppScore:score.opp,oppName:awayName,oppId:awayId,homeId,awayId,...(bs||{})};
-        if(!patches[awayId]) patches[awayId]={};
-        patches[awayId][dayNo]={won:!hWon&&!drew,drew,myScore:score.opp,oppScore:score.my,oppName:homeName,oppId:homeId,homeId,awayId,inningScores:bs?.inningScores,myBatting:bs?.awayBatting,oppBatting:bs?.homeBatting,myPitching:bs?.awayPitching,oppPitching:bs?.homePitching};
-      }
-      const next={...prev};
-      for(const[teamId,days]of Object.entries(patches)){
-        next[teamId]={...(prev[teamId]||{}),...days};
-      }
-      return next;
-    });
+    // setAllTeamResultsMap を 30件ずつチャンクに分けて yield しながら処理
+    // （一括処理だと 858件 × チーム履歴スプレッドで モバイルが長時間ブロックされるため）
+    const BS_CHUNK = 30;
+    for(let ci=0;ci<batchBoxScores.length;ci+=BS_CHUNK){
+      const chunk=batchBoxScores.slice(ci,ci+BS_CHUNK);
+      setAllTeamResultsMap(prev=>{
+        const next={...prev};
+        for(const{homeId,awayId,dayNo,cr,bs,homeName,awayName}of chunk){
+          const hWon=cr.won; const drew=cr.score.my===cr.score.opp;
+          next[homeId]={...(next[homeId]||{}),[dayNo]:{won:hWon,drew,myScore:cr.score.my,oppScore:cr.score.opp,oppName:awayName,oppId:awayId,homeId,awayId,...(bs||{})}};
+          next[awayId]={...(next[awayId]||{}),[dayNo]:{won:!hWon&&!drew,drew,myScore:cr.score.opp,oppScore:cr.score.my,oppName:homeName,oppId:homeId,homeId,awayId,inningScores:bs?.inningScores,myBatting:bs?.awayBatting,oppBatting:bs?.homeBatting,myPitching:bs?.awayPitching,oppPitching:bs?.homePitching}};
+        }
+        return next;
+      });
+      await new Promise(r=>setTimeout(r,0));
+    }
     setBatchProgress(null);
     if(newDay-1>=SEASON_GAMES){const withFarm=runFarmSeason(newTeams);setTeams(withFarm);setPlayoff(initPlayoff(withFarm));setScreen("playoff");}
     else setScreen("batch_result");
