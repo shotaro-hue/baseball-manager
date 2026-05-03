@@ -10,11 +10,32 @@ const META_KEY     = 'baseball_manager_v1_meta';
 const BACKUP_KEY_1 = 'baseball_manager_v1_bk1';
 const BACKUP_KEY_2 = 'baseball_manager_v1_bk2';
 const isDevEnv = import.meta.env.DEV;
+const PERF_LOG_KEY = 'baseball_manager_save_perf_logs';
+const MAX_PERF_LOGS = 30;
 
 function logPerf(label, startedAt) {
   if (!isDevEnv || !Number.isFinite(startedAt)) return;
   const elapsedMs = performance.now() - startedAt;
   console.log(`[Perf] ${label}: ${elapsedMs.toFixed(1)}ms`);
+}
+
+function appendSavePerfLog(log) {
+  if (!isDevEnv || !log || typeof log !== 'object') return;
+  try {
+    const raw = localStorage.getItem(PERF_LOG_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    const logs = Array.isArray(parsed) ? parsed : [];
+    logs.push(log);
+    const limited = logs.slice(-MAX_PERF_LOGS);
+    localStorage.setItem(PERF_LOG_KEY, JSON.stringify(limited));
+  } catch (e) {
+    console.warn('Save perf log write failed:', e);
+  }
+}
+
+function safeElapsedMs(startedAt) {
+  if (!isDevEnv || !Number.isFinite(startedAt)) return 0;
+  return performance.now() - startedAt;
 }
 
 // ── バックアップローテーション ──────────────────
@@ -108,7 +129,10 @@ function compress(state) {
   const stringifyStart = isDevEnv ? performance.now() : 0;
   const json = JSON.stringify(state);
   logPerf('saveGame.stringify', stringifyStart);
-  return LZString.compressToUTF16(json);
+  const compressStart = isDevEnv ? performance.now() : 0;
+  const compressed = LZString.compressToUTF16(json);
+  logPerf('saveGame.compressToUTF16', compressStart);
+  return { compressed, jsonLength: json.length, compressedLength: compressed?.length ?? 0 };
 }
 
 function decompress(raw) {
@@ -129,9 +153,16 @@ function decompress(raw) {
 }
 
 export function saveGame(state) {
+  // ⚠️ 入力値検証: 想定外の形式を保存しない（破損セーブ防止）
+  if (!state || typeof state !== 'object' || !Array.isArray(state.teams)) {
+    console.error('Save failed: invalid state payload');
+    return { ok: false, quota: false, reason: 'invalid_state' };
+  }
   const saveGameStart = isDevEnv ? performance.now() : 0;
-  const compressed = compress(state);
+  const perfBreakdown = {};
+  const { compressed, jsonLength, compressedLength } = compress(state);
   const writeMeta = () => {
+    const metaStart = isDevEnv ? performance.now() : 0;
     const myTeam = state.teams?.find(t => t.id === state.myId);
     localStorage.setItem(META_KEY, JSON.stringify({
       teamName:  myTeam?.name  ?? '不明',
@@ -142,13 +173,22 @@ export function saveGame(state) {
       losses:    myTeam?.losses ?? 0,
       savedAt:   new Date().toLocaleString('ja-JP'),
     }));
+    perfBreakdown.writeMetaMs = safeElapsedMs(metaStart);
   };
   try {
+    const rotateStart = isDevEnv ? performance.now() : 0;
     rotateBk();
+    perfBreakdown.rotateBackupMs = safeElapsedMs(rotateStart);
     const setItemStart = isDevEnv ? performance.now() : 0;
     localStorage.setItem(SAVE_KEY, compressed);
+    perfBreakdown.writeMainSaveMs = safeElapsedMs(setItemStart);
     logPerf('saveGame.localStorage.setItem', setItemStart);
     writeMeta();
+    perfBreakdown.totalMs = safeElapsedMs(saveGameStart);
+    perfBreakdown.jsonLength = jsonLength;
+    perfBreakdown.compressedLength = compressedLength;
+    appendSavePerfLog({ at: new Date().toISOString(), ...perfBreakdown });
+    if (isDevEnv) console.table({ saveGame: perfBreakdown });
     logPerf('saveGame', saveGameStart);
     return { ok: true };
   } catch (e) {
@@ -160,6 +200,12 @@ export function saveGame(state) {
         localStorage.setItem(SAVE_KEY, compressed);
         logPerf('saveGame.localStorage.setItem', setItemStart);
         writeMeta();
+        perfBreakdown.writeMainSaveMs = safeElapsedMs(setItemStart);
+        perfBreakdown.totalMs = safeElapsedMs(saveGameStart);
+        perfBreakdown.jsonLength = jsonLength;
+        perfBreakdown.compressedLength = compressedLength;
+        appendSavePerfLog({ at: new Date().toISOString(), fallbackOverwrite: true, ...perfBreakdown });
+        if (isDevEnv) console.table({ saveGameFallback: perfBreakdown });
         logPerf('saveGame', saveGameStart);
         return { ok: true };
       } catch {
@@ -170,6 +216,64 @@ export function saveGame(state) {
     console.error('Save failed:', e);
     return { ok: false, quota: false };
   }
+}
+
+export function getSavePerfLogs() {
+  try {
+    const raw = localStorage.getItem(PERF_LOG_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function clearSavePerfLogs() {
+  try {
+    localStorage.removeItem(PERF_LOG_KEY);
+    return { ok: true };
+  } catch (e) {
+    console.error('Clear save perf logs failed:', e);
+    return { ok: false };
+  }
+}
+
+export function getSavePerfSummary() {
+  const logs = getSavePerfLogs();
+  if (!Array.isArray(logs) || logs.length === 0) {
+    return {
+      count: 0,
+      average: null,
+      slowest: null,
+    };
+  }
+  const safeNumber = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
+  const sum = logs.reduce((acc, row) => ({
+    totalMs: acc.totalMs + safeNumber(row.totalMs),
+    rotateBackupMs: acc.rotateBackupMs + safeNumber(row.rotateBackupMs),
+    writeMainSaveMs: acc.writeMainSaveMs + safeNumber(row.writeMainSaveMs),
+    writeMetaMs: acc.writeMetaMs + safeNumber(row.writeMetaMs),
+    jsonLength: acc.jsonLength + safeNumber(row.jsonLength),
+    compressedLength: acc.compressedLength + safeNumber(row.compressedLength),
+  }), {
+    totalMs: 0,
+    rotateBackupMs: 0,
+    writeMainSaveMs: 0,
+    writeMetaMs: 0,
+    jsonLength: 0,
+    compressedLength: 0,
+  });
+  const average = {
+    totalMs: sum.totalMs / logs.length,
+    rotateBackupMs: sum.rotateBackupMs / logs.length,
+    writeMainSaveMs: sum.writeMainSaveMs / logs.length,
+    writeMetaMs: sum.writeMetaMs / logs.length,
+    jsonLength: sum.jsonLength / logs.length,
+    compressedLength: sum.compressedLength / logs.length,
+  };
+  const slowest = logs.reduce((prev, current) => (safeNumber(current.totalMs) > safeNumber(prev?.totalMs) ? current : prev), logs[0]);
+  return { count: logs.length, average, slowest };
 }
 
 export function loadGame() {
