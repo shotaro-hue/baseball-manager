@@ -31,7 +31,7 @@ import { useOffseason } from './hooks/useOffseason';
 
 const PRIMARY_SECTIONS = [
   { id: "home", label: "ホーム", icon: "🏠", defaultTab: "dashboard", tabs: [["dashboard", "概況"]] },
-  { id: "game", label: "試合", icon: "⚾", defaultTab: "schedule", tabs: [["schedule", "日程"]] },
+  { id: "game", label: "日程", icon: "⚾", defaultTab: "schedule", tabs: [["schedule", "日程"]] },
   { id: "rosterOps", label: "編成", icon: "🧩", defaultTab: "roster", tabs: [["roster", "ロースター"], ["trade", "トレード"], ["contract", "契約"], ["fa", "FA"], ["scout", "スカウト"]] },
   { id: "analysis", label: "分析", icon: "📊", defaultTab: "stats", tabs: [["stats", "成績"], ["leaderboard", "ランキング"], ["standings", "順位"], ["records", "記録"], ["finance", "財務"], ["balance", "リーグ分析"]] },
   { id: "inbox", label: "受信箱", icon: "📨", defaultTab: "mailbox", tabs: [["mailbox", "メール"], ["news", "ニュース"], ["alumni", "歴代"]] },
