@@ -9,6 +9,13 @@ const SAVE_KEY     = 'baseball_manager_v1';
 const META_KEY     = 'baseball_manager_v1_meta';
 const BACKUP_KEY_1 = 'baseball_manager_v1_bk1';
 const BACKUP_KEY_2 = 'baseball_manager_v1_bk2';
+const isDevEnv = import.meta.env.DEV;
+
+function logPerf(label, startedAt) {
+  if (!isDevEnv || !Number.isFinite(startedAt)) return;
+  const elapsedMs = performance.now() - startedAt;
+  console.log(`[Perf] ${label}: ${elapsedMs.toFixed(1)}ms`);
+}
 
 // ── バックアップローテーション ──────────────────
 // 保存前に呼ぶ: bk1→bk2, 現在→bk1
@@ -98,19 +105,31 @@ function validateAndMigrateSave(state) {
 // ── 公開 API ────────────────────────────────────
 
 function compress(state) {
-  return LZString.compressToUTF16(JSON.stringify(state));
+  const stringifyStart = isDevEnv ? performance.now() : 0;
+  const json = JSON.stringify(state);
+  logPerf('saveGame.stringify', stringifyStart);
+  return LZString.compressToUTF16(json);
 }
 
 function decompress(raw) {
   // 既存の非圧縮セーブとの後方互換: 展開失敗時は生 JSON として扱う
   try {
     const decompressed = LZString.decompressFromUTF16(raw);
-    if (decompressed) return JSON.parse(decompressed);
+    if (decompressed) {
+      const parseStart = isDevEnv ? performance.now() : 0;
+      const parsed = JSON.parse(decompressed);
+      logPerf('loadGame.parse', parseStart);
+      return parsed;
+    }
   } catch { /* fall through */ }
-  return JSON.parse(raw);
+  const parseStart = isDevEnv ? performance.now() : 0;
+  const parsed = JSON.parse(raw);
+  logPerf('loadGame.parse', parseStart);
+  return parsed;
 }
 
 export function saveGame(state) {
+  const saveGameStart = isDevEnv ? performance.now() : 0;
   const compressed = compress(state);
   const writeMeta = () => {
     const myTeam = state.teams?.find(t => t.id === state.myId);
@@ -126,16 +145,22 @@ export function saveGame(state) {
   };
   try {
     rotateBk();
+    const setItemStart = isDevEnv ? performance.now() : 0;
     localStorage.setItem(SAVE_KEY, compressed);
+    logPerf('saveGame.localStorage.setItem', setItemStart);
     writeMeta();
+    logPerf('saveGame', saveGameStart);
     return { ok: true };
   } catch (e) {
     const quota = e instanceof DOMException && e.name === 'QuotaExceededError';
     if (quota) {
       // バックアップ回転を諦めて直接上書き保存を試みる
       try {
+        const setItemStart = isDevEnv ? performance.now() : 0;
         localStorage.setItem(SAVE_KEY, compressed);
+        logPerf('saveGame.localStorage.setItem', setItemStart);
         writeMeta();
+        logPerf('saveGame', saveGameStart);
         return { ok: true };
       } catch {
         console.error('Save failed: storage quota exceeded');
@@ -148,6 +173,7 @@ export function saveGame(state) {
 }
 
 export function loadGame() {
+  const loadGameStart = isDevEnv ? performance.now() : 0;
   const candidates = [
     { key: SAVE_KEY,     label: 'primary' },
     { key: BACKUP_KEY_1, label: 'backup-1' },
@@ -155,12 +181,15 @@ export function loadGame() {
   ];
   for (const { key, label } of candidates) {
     try {
+      const getItemStart = isDevEnv ? performance.now() : 0;
       const raw = localStorage.getItem(key);
+      logPerf('loadGame.localStorage.getItem', getItemStart);
       if (!raw) continue;
       const state = decompress(raw);
       const result = validateAndMigrateSave(state);
       if (result.ok) {
         if (key !== SAVE_KEY) console.warn(`Loaded from ${label}`);
+        logPerf('loadGame', loadGameStart);
         return result.state;
       }
       console.warn(`Validation failed for ${label}`);

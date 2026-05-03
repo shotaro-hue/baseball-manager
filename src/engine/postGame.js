@@ -19,6 +19,13 @@ const getFieldZone = (e) => {
 
 const MAX_BATTED_BALL_EVENTS = 500;
 const SPRAY_CHART_MAX_DISTANCE = 150;
+const isDevEnv = import.meta.env.DEV;
+
+function logPerf(label, startedAt) {
+  if (!isDevEnv || !Number.isFinite(startedAt)) return;
+  const elapsedMs = performance.now() - startedAt;
+  console.log(`[Perf] ${label}: ${elapsedMs.toFixed(1)}ms`);
+}
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, value));
@@ -232,6 +239,7 @@ export function computeBoxScore(log, inningSummary, homeTeamPlayers, awayTeamPla
 
 // 試合ログから選手成績を反映
 export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0) {
+  const sprayChartGenerationStart = isDevEnv ? performance.now() : 0;
   const myAtBats = log.filter((e) => e.scorer === isMyTeam && e.batId && e.result && e.result !== "change");
   const myPitchABs = log.filter((e) => e.scorer === !isMyTeam && e.pitcherId && e.result && e.result !== "change" && !e.isStolenBase);
 
@@ -412,6 +420,7 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0) 
       return { ...p, stats: s };
     });
   }
+  logPerf('sprayChartGeneration', sprayChartGenerationStart);
   return updated;
 }
 

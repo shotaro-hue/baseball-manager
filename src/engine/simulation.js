@@ -5,6 +5,13 @@ import { STADIUMS, TEAM_STADIUM } from './stadiums';
 import { getFenceDistanceBySpray, evaluateTrajectoryAgainstPark, evaluateAcrossParks } from './parkEffects';
 import { analyzeEnvironmentEffect } from './battedBallAnalysis';
 
+const isDevEnv = import.meta.env.DEV;
+function logPerf(label, startedAt) {
+  if (!isDevEnv || !Number.isFinite(startedAt)) return;
+  const elapsedMs = performance.now() - startedAt;
+  console.log(`[Perf] ${label}: ${elapsedMs.toFixed(1)}ms`);
+}
+
 /* ================================================================
    SIMULATION ENGINE v4.0
    設計方針：
@@ -406,16 +413,19 @@ function checkHomeRunByTrajectory(points, fenceDistance, wallHeight = PHYSICS_BA
 }
 
 function resolveBattedBallOutcomeFromPhysicsForBalance(batter, pitcher, stadium, environment = {}, options = {}) {
+  const totalStart = isDevEnv ? performance.now() : 0;
   const safeLeagueEnv = { ...DEFAULT_LEAGUE_ENV, ...(options?.leagueEnv || {}) };
   const { ev: generatedEv, la: generatedLa, quality } = generateContactEVLA(batter, pitcher, { ...options, leagueEnv: safeLeagueEnv });
   const ev = Number.isFinite(generatedEv) ? generatedEv : SAFE_EV;
   const la = Number.isFinite(generatedLa) ? generatedLa : SAFE_LA;
   const safeEnvironment = sanitizeEnvironment(environment);
 
+  const physicsCalculationStart = isDevEnv ? performance.now() : 0;
   const trajectory = simulateFlight(ev, la, {
     ...options,
     environment: safeEnvironment,
   });
+  logPerf('physicsCalculation', physicsCalculationStart);
   const distanceRaw = Number(trajectory?.distance);
   const distance = Number.isFinite(distanceRaw) ? distanceRaw : 0;
   const points = Array.isArray(trajectory?.points) ? trajectory.points : [];
@@ -434,7 +444,9 @@ function resolveBattedBallOutcomeFromPhysicsForBalance(batter, pitcher, stadium,
 
   let result = 'out';
   const effectiveWallHeight = PHYSICS_BAT.HR.WALL_HEIGHT * safeLeagueEnv.wallHeightMod;
+  const homeRunJudgmentStart = isDevEnv ? performance.now() : 0;
   const hrCheck = checkHomeRunByTrajectory(points, fenceDistance, effectiveWallHeight);
+  logPerf('homeRunJudgmentByStadium', homeRunJudgmentStart);
   if (hrCheck.isHomeRun) {
     result = 'hr';
   } else {
@@ -466,7 +478,11 @@ function resolveBattedBallOutcomeFromPhysicsForBalance(batter, pitcher, stadium,
 
   const park = evaluateTrajectoryAgainstPark({ trajectory: points, sprayAngleDeg: sprayAngle, stadium: { ...stadium, id: stadium?.id, name: stadium?.name }, wallHeightM: effectiveWallHeight });
   const crossPark = evaluateAcrossParks({ trajectory: points, sprayAngleDeg: sprayAngle, stadiums: STADIUMS, currentStadiumId: stadium?.id });
+  const environmentAdjustmentStart = isDevEnv ? performance.now() : 0;
   const environmentAnalysis = analyzeEnvironmentEffect({ ev, la, options, actualEnvironment: safeEnvironment });
+  logPerf('environmentAdjustment', environmentAdjustmentStart);
+
+  logPerf('battedBallPhysicsCalculation', totalStart);
 
   return {
     result,
@@ -658,6 +674,7 @@ function initGameState(myTeam, oppTeam) {
  * @returns {Object} 更新後のゲーム状態
  */
 function processAtBat(gs, strategy = 'normal') {
+  const plateAppearanceStart = isDevEnv ? performance.now() : 0;
   if (!gs.myLineup.length || !gs.opLineup.length) return gs; // STEP2安全弁: 空lineup guard
   const isMyAtBat  = !gs.isTop;
   const batter     = isMyAtBat ? gs.myLineup[gs.myBatIdx % gs.myLineup.length] : gs.opLineup[gs.opBatIdx % gs.opLineup.length];
@@ -807,7 +824,9 @@ function processAtBat(gs, strategy = 'normal') {
     ? { ...(gs.opPitcherState || makePitcherState(gs.inning, gs.isTop)), battersFaced: (gs.opPitcherState?.battersFaced || 0) + 1 }
     : gs.opPitcherState;
 
-  return { ...gs, outs, bases:newBases, score:newScore, log:[...gs.log,logEntry], myBatIdx:isMyAtBat?gs.myBatIdx+1:gs.myBatIdx, opBatIdx:!isMyAtBat?gs.opBatIdx+1:gs.opBatIdx, myPitchCount:newMyPC, opPitchCount:newOpPC, myPitcherState:nextMyPitcherState, opPitcherState:nextOpPitcherState, momentum:newMomentum, myInningRuns:!gs.isTop?gs.myInningRuns+runs:gs.myInningRuns, opInningRuns:gs.isTop?gs.opInningRuns+runs:gs.opInningRuns, stopped:false, stopReason:null, pendingStrategy:'normal' };
+  const nextState = { ...gs, outs, bases:newBases, score:newScore, log:[...gs.log,logEntry], myBatIdx:isMyAtBat?gs.myBatIdx+1:gs.myBatIdx, opBatIdx:!isMyAtBat?gs.opBatIdx+1:gs.opBatIdx, myPitchCount:newMyPC, opPitchCount:newOpPC, myPitcherState:nextMyPitcherState, opPitcherState:nextOpPitcherState, momentum:newMomentum, myInningRuns:!gs.isTop?gs.myInningRuns+runs:gs.myInningRuns, opInningRuns:gs.isTop?gs.opInningRuns+runs:gs.opInningRuns, stopped:false, stopReason:null, pendingStrategy:'normal' };
+  logPerf('simulatePlateAppearance', plateAppearanceStart);
+  return nextState;
 }
 
 function endHalfInning(gs) {
@@ -952,6 +971,7 @@ function autoSwapPitcher(gs, side) {
  * @returns {{ score: {my:number, opp:number}, won: boolean, log: Object[], inningSummary: Object[] }}
  */
 function quickSimGame(myTeam, oppTeam) {
+  const simulateGameStart = isDevEnv ? performance.now() : 0;
   let gs = initGameState(myTeam, oppTeam);
   while (!gs.gameOver) {
     // 守備側チームの自動継投（球数・終盤・ピンチを両チーム対称に処理）
@@ -968,7 +988,9 @@ function quickSimGame(myTeam, oppTeam) {
     gs=processAtBat(gs, autoStrategy);
     if (gs.outs>=3) gs=endHalfInning(gs);
   }
-  return { score:gs.score, won:gs.score.my>gs.score.opp, log:gs.log, inningSummary:gs.inningSummary };
+  const result = { score:gs.score, won:gs.score.my>gs.score.opp, log:gs.log, inningSummary:gs.inningSummary };
+  logPerf('simulateGame', simulateGameStart);
+  return result;
 }
 
 // ── 二軍簡易シミュレーション ──────────────────────────────
