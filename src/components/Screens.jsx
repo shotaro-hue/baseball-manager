@@ -1052,8 +1052,13 @@ function buildRetryText() {
 }
 
 function calcCounterOffer(offered, demand, round) {
+  const safeOffered = Number.isFinite(Number(offered)) ? Math.max(0, Math.round(Number(offered))) : 0;
+  const safeDemand = Number.isFinite(Number(demand)) ? Math.max(0, Math.round(Number(demand))) : 0;
   const ratio = round === 1 ? 0.95 : 1.0;
-  return Math.round(demand * ratio / 100) * 100;
+  const demandBasedCounter = Math.round((safeDemand * ratio) / 100) * 100;
+  // 提示済み金額より低い逆提案を防止する（最低+100万円）
+  const floorFromOffer = safeOffered + 100;
+  return Math.max(floorFromOffer, demandBasedCounter);
 }
 
 export function ContractRenewalPhaseScreen({ teams, myId, year, demands, onSign, onRelease, onNext }) {
@@ -1311,7 +1316,12 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, onSign,
         </div>
         <button
           className="btn btn-gold"
-          onClick={onNext}
+          onClick={() => {
+            const faDeclaredPlayerIds = expiringPlayers
+              .filter(p => settled[p.id] === "fa")
+              .map(p => p.id);
+            onNext(faDeclaredPlayerIds);
+          }}
           disabled={!canAdvance}
           style={{ padding: '10px 24px', fontSize: 14, fontWeight: 700, opacity: canAdvance ? 1 : 0.4, cursor: canAdvance ? 'pointer' : 'not-allowed' }}
         >
