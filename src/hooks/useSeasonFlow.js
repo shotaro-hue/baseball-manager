@@ -317,6 +317,7 @@ export function useSeasonFlow(gs) {
   const [playoff, setPlayoff] = useState(null);
   const [currentGameTeams, setCurrentGameTeams] = useState(null);
   const [batchProgress, setBatchProgress] = useState(null);
+  const BATCH_PROGRESS_EMA_ALPHA = 0.25; // 指数移動平均【＝急な変化をなだらかにする平均】の平滑化係数
   const pendingPlayoffRef = useRef(false);
 
   const prevMyPlayersRef = useRef(null);
@@ -815,7 +816,9 @@ export function useSeasonFlow(gs) {
   // 任意試合数まとめてオートシム
   const handleBatchSim = (count, autoManageMyTeam=false) => {
     if(!myTeam) return;
-    const actual=Math.min(count ?? BATCH, SEASON_GAMES-(gameDay-1));
+    const requestedCount = Number.isFinite(count) ? Math.floor(count) : BATCH;
+    const safeRequestedCount = Math.max(0, requestedCount);
+    const actual=Math.min(safeRequestedCount, SEASON_GAMES-(gameDay-1));
     if(actual<=0) return;
     runBatchGames(actual, autoManageMyTeam);
   };
@@ -842,7 +845,32 @@ export function useSeasonFlow(gs) {
   // バッチ処理の共通ロジック
   const runBatchGames = async (count, autoManageMyTeam=false) => {
     if(!myTeam) return;
-    setBatchProgress({ current: 0, total: count });
+    const safeCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+    if (safeCount <= 0) {
+      notify("⚠️ バッチ試合数が不正なため処理を中止しました", "warn");
+      return;
+    }
+    const startedAt = Date.now();
+    let smoothedAvgMsPerGame = 0;
+    const updateBatchProgress = (current, total, phase) => {
+      const safeTotal = Math.max(1, Number.isFinite(total) ? Math.floor(total) : 1);
+      const safeCurrent = Math.max(0, Math.min(Number.isFinite(current) ? Math.floor(current) : 0, safeTotal));
+      const elapsedMs = Math.max(0, Date.now() - startedAt);
+      const instantAvgMsPerGame = safeCurrent > 0 ? elapsedMs / safeCurrent : 0;
+      smoothedAvgMsPerGame = smoothedAvgMsPerGame <= 0
+        ? instantAvgMsPerGame
+        : (BATCH_PROGRESS_EMA_ALPHA * instantAvgMsPerGame) + ((1 - BATCH_PROGRESS_EMA_ALPHA) * smoothedAvgMsPerGame);
+      const etaSec = safeCurrent >= safeTotal ? 0 : ((safeTotal - safeCurrent) * smoothedAvgMsPerGame) / 1000;
+      setBatchProgress({
+        current: safeCurrent,
+        total: safeTotal,
+        startedAt,
+        avgMsPerGame: Number.isFinite(smoothedAvgMsPerGame) ? Math.max(0, smoothedAvgMsPerGame) : 0,
+        etaSec: Number.isFinite(etaSec) ? Math.max(0, etaSec) : 0,
+        phase: typeof phase === "string" && phase.trim() ? phase : "試合計算",
+      });
+    };
+    updateBatchProgress(0, safeCount, "試合計算");
     let newTeams=[...teams.map(t=>({...t,players:[...t.players.map(p=>({...p,stats:{...p.stats}}))],...(t.id===myId?{}:{})}))];
     const results=[];
     let newDay=gameDay;
@@ -862,7 +890,7 @@ export function useSeasonFlow(gs) {
     const batchNewsItems = []; // 試合結果ニュース
     const batchBoxScores = []; // { homeId, awayId, dayNo, cr, homePlayers, awayPlayers, homeName, awayName }
 
-    for(let g=0;g<count;g++){
+    for(let g=0;g<safeCount;g++){
       // CPU_AUTO_MANAGE_INTERVAL 日ごとに全球団のロスター・打順・ローテを最適化
       // autoManageMyTeam=true の場合は自チームも対象に含める
       if(newDay % CPU_AUTO_MANAGE_INTERVAL === 0){
@@ -1014,15 +1042,18 @@ export function useSeasonFlow(gs) {
         }
       }
       newDay++;
-      setBatchProgress({ current: g + 1, total: count });
+      updateBatchProgress(g + 1, safeCount, "試合計算");
       await new Promise(r => setTimeout(r, 0));
     }
 
     // ループ後処理前にブラウザへ制御を返す（モバイルのウォッチドッグ対策）
+    updateBatchProgress(safeCount, safeCount, "集計中");
     await new Promise(r => setTimeout(r, 0));
+    updateBatchProgress(safeCount, safeCount, "保存");
     const nextMailbox = batchTradeMails.length ? [...mailbox, ...batchTradeMails] : mailbox;
     const batchSaveResult=saveGame({teams:newTeams,myId,gameDay:newDay,year,faPool:newFaPool,faYears,seasonHistory,news,mailbox:nextMailbox});
     if(batchSaveResult.ok) setSaveExists(true);
+    updateBatchProgress(safeCount, safeCount, "結果集計");
     results.filter(r=>r.type==='trade_news').forEach(r=>{
       addNews({
         type:'trade',
@@ -1086,6 +1117,7 @@ export function useSeasonFlow(gs) {
     gs.setGameResultsMap(prev=>{const next={...prev};gameResults.forEach(r=>{next[r.gameNo]={won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:r.oppTeam};});return next;});
     // チームごとの差分を先にまとめてから1回だけ setAllTeamResultsMap を呼ぶ（O(n)）
     // チャンク分割版は await ごとに React が再レンダリングし、モバイルで著しく遅かった
+    updateBatchProgress(safeCount, safeCount, "マップ反映");
     await new Promise(r => setTimeout(r, 0));
     setAllTeamResultsMap(prev=>{
       const patches={};

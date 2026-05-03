@@ -345,7 +345,10 @@ export default function App(){
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,background:"linear-gradient(135deg,#071a2c,#0d2840)",border:"1px solid rgba(96,165,250,.5)",borderRadius:10,padding:"8px 6px",minWidth:80}}>
             <div style={{fontSize:9,color:"#7dd3fc",letterSpacing:".05em"}}>シミュレーション中</div>
             <div style={{fontSize:13,color:"#60a5fa",fontWeight:700,fontFamily:"'Share Tech Mono',monospace"}}>{sf.batchProgress.current}/{sf.batchProgress.total}</div>
+            <div style={{fontSize:9,color:"#93c5fd"}}>残り約{Math.max(0, Math.round(sf.batchProgress.etaSec ?? 0))}秒</div>
+            <div style={{fontSize:9,color:"#7dd3fc"}}>フェーズ: {sf.batchProgress.phase ?? "試合計算"}</div>
             <div style={{width:"100%",height:4,background:"rgba(96,165,250,.2)",borderRadius:2}}><div style={{height:"100%",background:"#60a5fa",borderRadius:2,width:`${Math.round(sf.batchProgress.current/sf.batchProgress.total*100)}%`,transition:"width .1s"}}/></div>
+            {sf.batchProgress.current>=sf.batchProgress.total&&<div style={{fontSize:8,color:"#bfdbfe"}}>100%後も後処理を継続中</div>}
           </div>
         )}
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5,background:"linear-gradient(135deg,#1a0730,#2d0f50)",border:"1px solid rgba(167,139,250,.5)",borderRadius:10,padding:"8px 6px"}}>
