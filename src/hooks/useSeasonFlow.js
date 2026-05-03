@@ -13,6 +13,7 @@ import { saveGame } from '../engine/saveload';
 import { processCpuFaBids } from '../engine/contract';
 import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER, MAX_外国人_一軍, CPU_AUTO_MANAGE_INTERVAL, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX, FIELDING_POSITIONS, OPTIMAL_PITCHER_COUNT, MIN_ACTIVE_CATCHERS } from '../constants';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
+import { BATCH_SIM_MESSAGE_TYPE } from '../workers/batchSimulationProtocol';
 
 // 守備コーチボーナス: 怪我回復速度 UP
 function applyDefenseCoachRecovery(players, coaches) {
@@ -848,6 +849,22 @@ export function useSeasonFlow(gs) {
     return same.findIndex(t => t.id === teamId) + 1;
   };
 
+  // TacticalGame向けバッチ試合のWorker実行
+  const simulateBatchGamesInWorker = (games, onProgress) => new Promise((resolve, reject) => {
+    const safeGames = Array.isArray(games) ? games.filter(g => g && g.homeTeam && g.awayTeam) : [];
+    const worker = new Worker(new URL('../workers/tacticalBatchWorker.js', import.meta.url), { type: 'module' });
+    const taskId = `tactical-batch-${Date.now()}-${Math.random()}`;
+    worker.onmessage = (event) => {
+      const msg = event?.data;
+      if (!msg || msg?.payload?.taskId !== taskId) return;
+      if (msg.type === BATCH_SIM_MESSAGE_TYPE.PROGRESS && typeof onProgress === 'function') onProgress(msg.payload);
+      if (msg.type === BATCH_SIM_MESSAGE_TYPE.DONE) { worker.terminate(); resolve(msg.payload?.detailResults || []); }
+      if (msg.type === BATCH_SIM_MESSAGE_TYPE.ERROR) { worker.terminate(); reject(new Error(msg.payload?.message || 'Workerエラー')); }
+    };
+    worker.onerror = (error) => { worker.terminate(); reject(new Error(error?.message || 'Worker起動エラー')); };
+    worker.postMessage({ type: BATCH_SIM_MESSAGE_TYPE.START, payload: { taskId, games: safeGames } });
+  });
+
   // バッチ処理の共通ロジック
   const runBatchGames = async (count, autoManageMyTeam=false) => {
     if(!myTeam) return;
@@ -931,7 +948,9 @@ export function useSeasonFlow(gs) {
         if(!a||!b) continue;
         const useDh = !!a.dhEnabled;
         const aPlayersSnap=[...a.players]; const bPlayersSnap=[...b.players]; // 名前解決用スナップショット
-        const cr=quickSimGame(applyDhToTeam(a, useDh),applyDhToTeam(b, useDh));
+        const cpuSimResults = await simulateBatchGamesInWorker([{ gameId: `${newDay}-${a.id}-${b.id}`, homeTeam: applyDhToTeam(a, useDh), awayTeam: applyDhToTeam(b, useDh) }]);
+        const cr = cpuSimResults[0]?.result;
+        if (!cr) throw new Error('CPU試合シミュレーション結果が取得できませんでした');
         const bs=computeBoxScore(cr.log||[],cr.inningSummary||[],aPlayersSnap,bPlayersSnap,cr.score.my,cr.score.opp);
         batchBoxScores.push(makeCompactBoxScoreRecord({ homeId:a.id, awayId:b.id, dayNo:newDay, cr, bs, homeName:a.name, awayName:b.name }));
         if (batchBoxScores.length > MAX_BATCH_BOX_SCORE_KEEP) batchBoxScores.splice(0, batchBoxScores.length - MAX_BATCH_BOX_SCORE_KEEP);
@@ -992,7 +1011,11 @@ export function useSeasonFlow(gs) {
       if(scheduleMatchup && opp && myT){
         const useDh = scheduleMatchup.isHome ? !!myT.dhEnabled : !!opp.dhEnabled;
         const myTPlayersSnap=[...myT.players]; const oppPlayersSnap=[...opp.players];
-        const r=quickSimGame(applyDhToTeam(myT, useDh),applyDhToTeam(opp, useDh));
+        const mySimResults = await simulateBatchGamesInWorker([{ gameId: `${newDay}-${myT.id}-${opp.id}`, homeTeam: applyDhToTeam(myT, useDh), awayTeam: applyDhToTeam(opp, useDh) }], (progress) => {
+          if (progress?.completedPa) updateBatchProgress(Math.min(g + (progress.completedPa / 1200), safeCount), safeCount, '試合計算');
+        });
+        const r = mySimResults[0]?.result;
+        if (!r) throw new Error('自チーム試合シミュレーション結果が取得できませんでした');
         batchBoxScores.push(makeCompactBoxScoreRecord({ homeId:myT.id, awayId:opp.id, dayNo:newDay, cr:r, bs:null, homeName:myT.name, awayName:opp.name }));
         if (batchBoxScores.length > MAX_BATCH_BOX_SCORE_KEEP) batchBoxScores.splice(0, batchBoxScores.length - MAX_BATCH_BOX_SCORE_KEEP);
         const won=r.score.my>r.score.opp;
