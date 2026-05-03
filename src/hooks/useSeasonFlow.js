@@ -319,6 +319,7 @@ export function useSeasonFlow(gs) {
   const [batchProgress, setBatchProgress] = useState(null);
   const BATCH_PROGRESS_EMA_ALPHA = 0.25; // 指数移動平均【＝急な変化をなだらかにする平均】の平滑化係数
   const pendingPlayoffRef = useRef(false);
+  const isBatchCancelledRef = useRef(false);
 
   const prevMyPlayersRef = useRef(null);
   const prevMyFarmRef = useRef(null);
@@ -334,6 +335,11 @@ export function useSeasonFlow(gs) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[teams]);
+
+  // アンマウント【＝画面からコンポーネントが取り除かれること】時にバッチ処理を中断
+  useEffect(() => () => {
+    isBatchCancelledRef.current = true;
+  }, []);
 
   // 自動降格・回復通知: myTeam の players/farm 変化を検知して通知
   useEffect(()=>{
@@ -870,6 +876,18 @@ export function useSeasonFlow(gs) {
         phase: typeof phase === "string" && phase.trim() ? phase : "試合計算",
       });
     };
+    isBatchCancelledRef.current = false;
+    const CHUNK_SIZE = 3;
+    const MAX_BATCH_BOX_SCORE_KEEP = 120;
+    const makeCompactBoxScoreRecord = ({ homeId, awayId, dayNo, cr, bs, homeName, awayName }) => ({
+      homeId, awayId, dayNo, cr, homeName, awayName,
+      inningScores: bs?.inningScores,
+      homeBatting: bs?.homeBatting,
+      awayBatting: bs?.awayBatting,
+      homePitching: bs?.homePitching,
+      awayPitching: bs?.awayPitching,
+    });
+
     updateBatchProgress(0, safeCount, "試合計算");
     let newTeams=[...teams.map(t=>({...t,players:[...t.players.map(p=>({...p,stats:{...p.stats}}))],...(t.id===myId?{}:{})}))];
     const results=[];
@@ -888,9 +906,15 @@ export function useSeasonFlow(gs) {
     const batchInjuries = [];
     const cpuHighlights = [];
     const batchNewsItems = []; // 試合結果ニュース
-    const batchBoxScores = []; // { homeId, awayId, dayNo, cr, homePlayers, awayPlayers, homeName, awayName }
+    const batchBoxScores = []; // 最小フィールドのみ保持してメモリ使用量を抑制
 
-    for(let g=0;g<safeCount;g++){
+    let completedSuccessfully = false;
+    try {
+      for(let chunkStart=0; chunkStart<safeCount; chunkStart+=CHUNK_SIZE){
+        if (isBatchCancelledRef.current) break;
+        const chunkEnd = Math.min(chunkStart + CHUNK_SIZE, safeCount);
+        for(let g=chunkStart; g<chunkEnd; g++){
+          if (isBatchCancelledRef.current) break;
       // CPU_AUTO_MANAGE_INTERVAL 日ごとに全球団のロスター・打順・ローテを最適化
       // autoManageMyTeam=true の場合は自チームも対象に含める
       if(newDay % CPU_AUTO_MANAGE_INTERVAL === 0){
@@ -909,7 +933,8 @@ export function useSeasonFlow(gs) {
         const aPlayersSnap=[...a.players]; const bPlayersSnap=[...b.players]; // 名前解決用スナップショット
         const cr=quickSimGame(applyDhToTeam(a, useDh),applyDhToTeam(b, useDh));
         const bs=computeBoxScore(cr.log||[],cr.inningSummary||[],aPlayersSnap,bPlayersSnap,cr.score.my,cr.score.opp);
-        batchBoxScores.push({homeId:a.id,awayId:b.id,dayNo:newDay,cr,bs,homePlayers:aPlayersSnap,awayPlayers:bPlayersSnap,homeName:a.name,awayName:b.name});
+        batchBoxScores.push(makeCompactBoxScoreRecord({ homeId:a.id, awayId:b.id, dayNo:newDay, cr, bs, homeName:a.name, awayName:b.name }));
+        if (batchBoxScores.length > MAX_BATCH_BOX_SCORE_KEEP) batchBoxScores.splice(0, batchBoxScores.length - MAX_BATCH_BOX_SCORE_KEEP);
         const cdrew=cr.score.my===cr.score.opp;
         const aWon=cr.won;
         // 注目CPU試合を収集（大差 or 接戦）
@@ -968,7 +993,8 @@ export function useSeasonFlow(gs) {
         const useDh = scheduleMatchup.isHome ? !!myT.dhEnabled : !!opp.dhEnabled;
         const myTPlayersSnap=[...myT.players]; const oppPlayersSnap=[...opp.players];
         const r=quickSimGame(applyDhToTeam(myT, useDh),applyDhToTeam(opp, useDh));
-        batchBoxScores.push({homeId:myT.id,awayId:opp.id,dayNo:newDay,cr:r,homePlayers:myTPlayersSnap,awayPlayers:oppPlayersSnap,homeName:myT.name,awayName:opp.name});
+        batchBoxScores.push(makeCompactBoxScoreRecord({ homeId:myT.id, awayId:opp.id, dayNo:newDay, cr:r, bs:null, homeName:myT.name, awayName:opp.name }));
+        if (batchBoxScores.length > MAX_BATCH_BOX_SCORE_KEEP) batchBoxScores.splice(0, batchBoxScores.length - MAX_BATCH_BOX_SCORE_KEEP);
         const won=r.score.my>r.score.opp;
         const drew=r.score.my===r.score.opp;
         if(won){myT.wins++;myT.rf+=r.score.my;myT.ra+=r.score.opp;}
@@ -1041,10 +1067,16 @@ export function useSeasonFlow(gs) {
           setAllStarResult({ rosters, gameResult: asResult });
         }
       }
-      newDay++;
-      updateBatchProgress(g + 1, safeCount, "試合計算");
-      await new Promise(r => setTimeout(r, 0));
-    }
+          newDay++;
+        }
+        updateBatchProgress(Math.min(chunkEnd, safeCount), safeCount, "試合計算");
+        await new Promise(requestAnimationFrame);
+      }
+
+      if (isBatchCancelledRef.current) {
+        notify("⚠️ バッチ処理を中止しました", "warn");
+        return;
+      }
 
     // ループ後処理前にブラウザへ制御を返す（モバイルのウォッチドッグ対策）
     updateBatchProgress(safeCount, safeCount, "集計中");
@@ -1121,20 +1153,36 @@ export function useSeasonFlow(gs) {
     await new Promise(r => setTimeout(r, 0));
     setAllTeamResultsMap(prev=>{
       const patches={};
-      for(const{homeId,awayId,dayNo,cr,bs,homeName,awayName}of batchBoxScores){
+      for(const{homeId,awayId,dayNo,cr,inningScores,homeBatting,awayBatting,homePitching,awayPitching,homeName,awayName}of batchBoxScores){
         const hWon=cr.won; const drew=cr.score.my===cr.score.opp;
         if(!patches[homeId]) patches[homeId]={};
-        patches[homeId][dayNo]={won:hWon,drew,myScore:cr.score.my,oppScore:cr.score.opp,oppName:awayName,oppId:awayId,homeId,awayId,...(bs||{})};
+        patches[homeId][dayNo]={won:hWon,drew,myScore:cr.score.my,oppScore:cr.score.opp,oppName:awayName,oppId:awayId,homeId,awayId,inningScores,myBatting:homeBatting,oppBatting:awayBatting,myPitching:homePitching,oppPitching:awayPitching};
         if(!patches[awayId]) patches[awayId]={};
-        patches[awayId][dayNo]={won:!hWon&&!drew,drew,myScore:cr.score.opp,oppScore:cr.score.my,oppName:homeName,oppId:homeId,homeId,awayId,inningScores:bs?.inningScores,myBatting:bs?.awayBatting,oppBatting:bs?.homeBatting,myPitching:bs?.awayPitching,oppPitching:bs?.homePitching};
+        patches[awayId][dayNo]={won:!hWon&&!drew,drew,myScore:cr.score.opp,oppScore:cr.score.my,oppName:homeName,oppId:homeId,homeId,awayId,inningScores,myBatting:awayBatting,oppBatting:homeBatting,myPitching:awayPitching,oppPitching:homePitching};
       }
-      const next={...prev};
+      let next = prev;
       for(const[teamId,days]of Object.entries(patches)){
-        next[teamId]={...(prev[teamId]||{}),...days};
+        const currentTeamMap = prev[teamId] || {};
+        let hasDiff = false;
+        for (const [dayKey, dayValue] of Object.entries(days)) {
+          if (currentTeamMap[dayKey] !== dayValue) { hasDiff = true; break; }
+        }
+        if (!hasDiff) continue;
+        next = {
+          ...next,
+          [teamId]: { ...currentTeamMap, ...days },
+        };
       }
       return next;
     });
-    setBatchProgress(null);
+    completedSuccessfully = true;
+    } catch (error) {
+      console.error("runBatchGames failed", error);
+      notify("⚠️ バッチ処理中にエラーが発生しました", "error");
+    } finally {
+      setBatchProgress(null);
+    }
+    if (!completedSuccessfully) return;
     if(newDay-1>=SEASON_GAMES){const withFarm=runFarmSeason(newTeams);setTeams(withFarm);setPlayoff(initPlayoff(withFarm));setScreen("playoff");}
     else setScreen("batch_result");
   };
