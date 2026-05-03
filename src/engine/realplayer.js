@@ -7,6 +7,26 @@ import { emptyStats, makePlayer, applyPositionFields } from './player';
    実成績 → ゲーム内能力値（30〜95スケール）に変換
 ═══════════════════════════════════════════════ */
 
+// NPB現実準拠の契約年数割り当て
+// salary: 万円単位。単年主流、高年俸ほど複数年の可能性が上がる
+function assignContract(salary) {
+  const roll = rng(1, 100);
+  let years;
+  if (salary >= 30000) {
+    years = roll <= 20 ? 1 : roll <= 55 ? 2 : roll <= 85 ? 3 : 4;
+  } else if (salary >= 10000) {
+    years = roll <= 40 ? 1 : roll <= 80 ? 2 : 3;
+  } else if (salary >= 5000) {
+    years = roll <= 65 ? 1 : roll <= 93 ? 2 : 3;
+  } else if (salary >= 2000) {
+    years = roll <= 82 ? 1 : 2;
+  } else {
+    years = roll <= 95 ? 1 : 2;
+  }
+  const yearsLeft = years === 1 ? 1 : rng(1, years);
+  return { contractYears: years, contractYearsLeft: yearsLeft };
+}
+
 // 線形スケール変換
 function sc(val, inMin, inMax, outMin, outMax) {
   if (inMax === inMin) return Math.round((outMin + outMax) / 2);
@@ -142,7 +162,7 @@ export function realBatterToPlayer(b, teamDef) {
     potential: clamp(sc(OPS, 0.60, 1.05, 55, 96) + rng(-5, 8), 55, 99),
     isPitcher: false, isForeign,
     salary: salary ?? 5000000,
-    contractYears: rng(1, 4), contractYearsLeft: rng(1, 3),
+    ...assignContract(salary ?? 5000000),
     育成: false, isFA: false,
     condition: rng(85, 100),
     injury: null, injuryDaysLeft: 0,
@@ -206,7 +226,7 @@ export function realPitcherToPlayer(p, teamDef) {
     hand,
     subtype,
     salary: salary ?? 5000000,
-    contractYears: rng(1, 4), contractYearsLeft: rng(1, 3),
+    ...assignContract(salary ?? 5000000),
     育成: false, isFA: false,
     condition: rng(85, 100),
     injury: null, injuryDaysLeft: 0,
