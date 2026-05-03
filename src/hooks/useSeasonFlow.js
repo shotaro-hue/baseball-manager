@@ -316,6 +316,7 @@ export function useSeasonFlow(gs) {
   const [batchMeta, setBatchMeta] = useState(null);
   const [playoff, setPlayoff] = useState(null);
   const [currentGameTeams, setCurrentGameTeams] = useState(null);
+  const [batchProgress, setBatchProgress] = useState(null);
   const pendingPlayoffRef = useRef(false);
 
   const prevMyPlayersRef = useRef(null);
@@ -839,8 +840,9 @@ export function useSeasonFlow(gs) {
   };
 
   // バッチ処理の共通ロジック
-  const runBatchGames = (count, autoManageMyTeam=false) => {
+  const runBatchGames = async (count, autoManageMyTeam=false) => {
     if(!myTeam) return;
+    setBatchProgress({ current: 0, total: count });
     let newTeams=[...teams.map(t=>({...t,players:[...t.players.map(p=>({...p,stats:{...p.stats}}))],...(t.id===myId?{}:{})}))];
     const results=[];
     let newDay=gameDay;
@@ -1011,6 +1013,8 @@ export function useSeasonFlow(gs) {
         }
       }
       newDay++;
+      setBatchProgress({ current: g + 1, total: count });
+      await new Promise(r => setTimeout(r, 0));
     }
 
     const nextMailbox = batchTradeMails.length ? [...mailbox, ...batchTradeMails] : mailbox;
@@ -1087,6 +1091,7 @@ export function useSeasonFlow(gs) {
       }
       return next;
     });
+    setBatchProgress(null);
     if(newDay-1>=SEASON_GAMES){const withFarm=runFarmSeason(newTeams);setTeams(withFarm);setPlayoff(initPlayoff(withFarm));setScreen("playoff");}
     else setScreen("batch_result");
   };
@@ -1256,6 +1261,7 @@ export function useSeasonFlow(gs) {
     batchResults, setBatchResults,
     batchMeta, setBatchMeta,
     playoff, setPlayoff,
+    batchProgress,
     handleStartGame,
     handleModeSelect,
     handleAutoSimEnd,
