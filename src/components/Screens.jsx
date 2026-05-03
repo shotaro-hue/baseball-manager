@@ -1063,7 +1063,7 @@ function calcCounterOffer(offered, demand, round) {
 
 export function ContractRenewalPhaseScreen({ teams, myId, year, demands, onSign, onRelease, onNext }) {
   const myTeam = teams?.find(t => t.id === myId);
-  const expiringPlayers = (myTeam?.players || []).filter(p => p.contractYearsLeft === 0 && !p.isRetired && !p._retireNow);
+  const expiringPlayers = (myTeam?.players || []).filter(p => (p.contractYearsLeft ?? 99) <= 1 && !p.isRetired && !p._retireNow);
 
   const [selectedId, setSelectedId] = useState(null);
   const [offerSal, setOfferSal] = useState(0);

@@ -434,7 +434,7 @@ export function useOffseason(gs) {
     // CPU契約更改は contract_renewal_phase 完了後に実行（フェーズ分離）
     // 自チーム満了選手の要求額を事前計算して state に保持
     const myDeveloped=developedTeams.find(t=>t.id===myId);
-    const expiringMine=(myDeveloped?.players||[]).filter(p=>p.contractYearsLeft===0&&!p.isRetired&&!p._retireNow);
+    const expiringMine=(myDeveloped?.players||[]).filter(p=>(p.contractYearsLeft??99)<=1&&!p.isRetired&&!p._retireNow);
     const demands={};
     for(const p of expiringMine) demands[p.id]=calcPlayerDemand(p);
     setContractRenewalDemands(demands);
