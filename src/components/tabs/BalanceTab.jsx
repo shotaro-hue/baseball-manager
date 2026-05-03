@@ -187,7 +187,23 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
       if (msg.type === 'PROGRESS') {
         setMcProgress({ completedPa: msg.payload.completedPa, totalPa: msg.payload.totalPa });
       } else if (msg.type === 'DONE') {
-        setMcRows(Array.isArray(msg.payload.detailResults) ? msg.payload.detailResults : []);
+        // ⚠️ セキュリティ: Workerメッセージを検証して不正形データを除外【＝表示崩れと実行時エラーを防止】
+        const safeRows = Array.isArray(msg.payload?.detailResults)
+          ? msg.payload.detailResults
+              .filter((row) => row && typeof row === 'object' && typeof row.label === 'string')
+              .map((row) => ({
+                label: row.label,
+                pa: Number.isFinite(Number(row.pa)) ? Number(row.pa) : 0,
+                bip: Number.isFinite(Number(row.bip)) ? Number(row.bip) : 0,
+                hrPerBip: Number.isFinite(Number(row.hrPerBip)) ? Number(row.hrPerBip) : 0,
+                hrPerPa: Number.isFinite(Number(row.hrPerPa)) ? Number(row.hrPerPa) : 0,
+                teamHrPerGame: Number.isFinite(Number(row.teamHrPerGame)) ? Number(row.teamHrPerGame) : 0,
+                avgEv: Number.isFinite(Number(row.avgEv)) ? Number(row.avgEv) : 0,
+                avgLa: Number.isFinite(Number(row.avgLa)) ? Number(row.avgLa) : 0,
+                avgDistance: Number.isFinite(Number(row.avgDistance)) ? Number(row.avgDistance) : 0,
+              }))
+          : [];
+        setMcRows(safeRows);
         setMcBusy(false);
         setMcProgress(null);
         taskIdRef.current = null;
@@ -378,14 +394,14 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
                 {mcRows.map((row) => (
                   <tr key={row.label}>
                     <td>{row.label}</td>
-                    <td>{row.result?.pa ?? '-'}</td>
-                    <td>{row.result?.bip ?? '-'}</td>
-                    <td>{pct(row.result?.hrPerBip ?? 0)}</td>
-                    <td>{pct(row.result?.hrPerPa ?? 0)}</td>
-                    <td>{(row.result?.teamHrPerGame ?? 0).toFixed(2)}</td>
-                    <td>{(row.result?.avgEv ?? 0).toFixed(1)}</td>
-                    <td>{(row.result?.avgLa ?? 0).toFixed(1)}</td>
-                    <td>{(row.result?.avgDistance ?? 0).toFixed(1)}</td>
+                    <td>{row.pa ?? '-'}</td>
+                    <td>{row.bip ?? '-'}</td>
+                    <td>{pct(row.hrPerBip ?? 0)}</td>
+                    <td>{pct(row.hrPerPa ?? 0)}</td>
+                    <td>{(row.teamHrPerGame ?? 0).toFixed(2)}</td>
+                    <td>{(row.avgEv ?? 0).toFixed(1)}</td>
+                    <td>{(row.avgLa ?? 0).toFixed(1)}</td>
+                    <td>{(row.avgDistance ?? 0).toFixed(1)}</td>
                   </tr>
                 ))}
               </tbody>
