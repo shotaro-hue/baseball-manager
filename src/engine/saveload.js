@@ -1,3 +1,5 @@
+import { resolveInitialContractYears } from './realplayer';
+
 /* ═══════════════════════════════════════════════
    SAVE / LOAD — localStorage
 ═══════════════════════════════════════════════ */
@@ -48,6 +50,33 @@ function migratePlayer(p) {
 }
 
 // ── セーブデータのバリデーション＆マイグレーション ──
+
+
+function shouldFixInitialContractInSave(state) {
+  const safeYear = Number(state?.year);
+  const safeDay = Number(state?.gameDay);
+  return Number.isFinite(safeYear) && safeYear === 2026 && Number.isFinite(safeDay) && safeDay <= 1;
+}
+
+function migrateInitialContractYears(player, teamName, state) {
+  if (!shouldFixInitialContractInSave(state)) return player;
+  if (!player || typeof player !== 'object') return player;
+
+  const currentYears = Number(player.contractYears ?? 1);
+  const currentLeft = Number(player.contractYearsLeft ?? 1);
+  const isSingleYear = currentYears <= 1 && currentLeft <= 1;
+  if (!isSingleYear) return player;
+
+  const resolvedYears = resolveInitialContractYears(teamName, player.name);
+  if (!Number.isFinite(resolvedYears) || resolvedYears <= 1) return player;
+
+  return {
+    ...player,
+    contractYears: resolvedYears,
+    contractYearsLeft: resolvedYears,
+  };
+}
+
 function validateAndMigrateSave(state) {
   if (!state || !Array.isArray(state.teams) || !state.myId || !state.year) {
     return { ok: false };
@@ -60,7 +89,7 @@ function validateAndMigrateSave(state) {
     pitchingPattern:    t.pitchingPattern    ?? {},
     stadiumLevel:       t.stadiumLevel       ?? 0,
     revenueThisSeason:  t.revenueThisSeason  ?? 0,
-    players: Array.isArray(t.players) ? t.players.map(migratePlayer) : [],
+    players: Array.isArray(t.players) ? t.players.map(migratePlayer).map(p => migrateInitialContractYears(p, t.name, state)) : [],
   }));
   return { ok: true, state: { ...state, teams } };
 }
