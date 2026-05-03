@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { simAtBat, BASELINE, DEFAULT_LEAGUE_ENV, resolveBattedBallOutcomeFromPhysicsForBalance, STADIUMS } from '../../engine/simulation';
+import { BATCH_SIM_MESSAGE_TYPE } from '../../workers/batchSimulationProtocol';
 
 /* ================================================================
    BALANCE TAB
@@ -184,19 +185,21 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
     worker.onmessage = (event) => {
       const msg = event.data;
       if (!msg || !taskIdRef.current || msg?.payload?.taskId !== taskIdRef.current) return;
-      if (msg.type === 'PROGRESS') {
+      if (msg.type === BATCH_SIM_MESSAGE_TYPE.START) {
+        setMcProgress((prev) => prev || { completedPa: 0, totalPa: 0 });
+      } else if (msg.type === BATCH_SIM_MESSAGE_TYPE.PROGRESS) {
         setMcProgress({ completedPa: msg.payload.completedPa, totalPa: msg.payload.totalPa });
-      } else if (msg.type === 'DONE') {
+      } else if (msg.type === BATCH_SIM_MESSAGE_TYPE.DONE) {
         setMcRows(Array.isArray(msg.payload.detailResults) ? msg.payload.detailResults : []);
         setMcBusy(false);
         setMcProgress(null);
         taskIdRef.current = null;
-      } else if (msg.type === 'ERROR') {
+      } else if (msg.type === BATCH_SIM_MESSAGE_TYPE.ERROR) {
         setMcError(msg.payload?.message || 'Workerエラーが発生しました。');
         setMcBusy(false);
         setMcProgress(null);
         taskIdRef.current = null;
-      } else if (msg.type === 'CANCEL') {
+      } else if (msg.type === BATCH_SIM_MESSAGE_TYPE.CANCEL) {
         setMcBusy(false);
         setMcProgress(null);
         taskIdRef.current = null;
@@ -278,7 +281,7 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
     ];
     const taskId = `mc-${Date.now()}`;
     taskIdRef.current = taskId;
-    workerRef.current.postMessage({ type: 'START', payload: { taskId, profiles, leagueEnv, seed: Date.now() } });
+    workerRef.current.postMessage({ type: BATCH_SIM_MESSAGE_TYPE.START, payload: { taskId, profiles, leagueEnv, seed: Date.now() } });
   }, [leagueEnv, mcBusy]);
 
 

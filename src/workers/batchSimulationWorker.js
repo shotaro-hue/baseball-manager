@@ -1,5 +1,7 @@
 import { simAtBat, DEFAULT_LEAGUE_ENV, resolveBattedBallOutcomeFromPhysicsForBalance, STADIUMS } from '../engine/simulation';
-const PROGRESS_INTERVAL_PA = 100;
+import { BATCH_SIM_MESSAGE_TYPE, BATCH_SIM_PROGRESS_INTERVAL_PA } from './batchSimulationProtocol';
+
+const PROGRESS_INTERVAL_PA = BATCH_SIM_PROGRESS_INTERVAL_PA;
 let activeTaskId = null;
 let cancelRequested = false;
 const createSeededRandom = (seed) => { let state = (seed >>> 0) || 1; return () => ((state = (1664525 * state + 1013904223) >>> 0) / 0x100000000); };
@@ -25,10 +27,13 @@ function simulateProfile(batter, pitcher, totalPa, leagueEnv, randomFn) {
 self.onmessage = (event) => {
   const message = event.data;
   try {
-    if (message?.type === 'CANCEL') { if (activeTaskId && message.payload?.taskId === activeTaskId) cancelRequested = true; return; }
-    if (message?.type !== 'START') return;
+    if (message?.type === BATCH_SIM_MESSAGE_TYPE.CANCEL) { if (activeTaskId && message.payload?.taskId === activeTaskId) cancelRequested = true; return; }
+    if (message?.type !== BATCH_SIM_MESSAGE_TYPE.START) return;
     const { taskId, profiles, leagueEnv, seed } = message.payload || {};
     if (!taskId || !Array.isArray(profiles)) throw new Error('不正なSTARTメッセージです');
+
+    self.postMessage({ type: BATCH_SIM_MESSAGE_TYPE.START, payload: { taskId } });
+
     activeTaskId = taskId; cancelRequested = false;
     const randomFn = Number.isFinite(Number(seed)) ? createSeededRandom(Number(seed)) : Math.random;
     const safeLeagueEnv = { ...DEFAULT_LEAGUE_ENV, ...(leagueEnv || {}) };
@@ -42,7 +47,7 @@ self.onmessage = (event) => {
         const currentPa = Math.min(PROGRESS_INTERVAL_PA, remaining);
         aggregate.push(simulateProfile(profile.batter, profile.pitcher, currentPa, safeLeagueEnv, randomFn));
         remaining -= currentPa; donePa += currentPa;
-        self.postMessage({ type: 'PROGRESS', payload: { taskId, completedPa: donePa, totalPa: totalPaAll } });
+        self.postMessage({ type: BATCH_SIM_MESSAGE_TYPE.PROGRESS, payload: { taskId, completedPa: donePa, totalPa: totalPaAll } });
       }
       const merged = aggregate.reduce((acc, row) => {
         if (!acc) return { ...row };
@@ -57,10 +62,10 @@ self.onmessage = (event) => {
       }, null);
       detailResults.push({ label: profile.label, ...(merged || simulateProfile(profile.batter, profile.pitcher, 1, safeLeagueEnv, randomFn)) });
     }
-    if (cancelRequested) { self.postMessage({ type: 'CANCEL', payload: { taskId } }); activeTaskId = null; return; }
-    self.postMessage({ type: 'DONE', payload: { taskId, summary: { profileCount: detailResults.length, totalPa: donePa }, detailResults } });
+    if (cancelRequested) { self.postMessage({ type: BATCH_SIM_MESSAGE_TYPE.CANCEL, payload: { taskId } }); activeTaskId = null; return; }
+    self.postMessage({ type: BATCH_SIM_MESSAGE_TYPE.DONE, payload: { taskId, summary: { profileCount: detailResults.length, totalPa: donePa }, detailResults } });
     activeTaskId = null;
   } catch (error) {
-    self.postMessage({ type: 'ERROR', payload: { taskId: message?.payload?.taskId || null, message: error instanceof Error ? error.message : 'Workerエラー' } }); activeTaskId = null;
+    self.postMessage({ type: BATCH_SIM_MESSAGE_TYPE.ERROR, payload: { taskId: message?.payload?.taskId || null, message: error instanceof Error ? error.message : 'Workerエラー' } }); activeTaskId = null;
   }
 };
