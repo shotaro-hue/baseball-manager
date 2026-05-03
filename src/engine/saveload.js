@@ -1,3 +1,4 @@
+import LZString from 'lz-string';
 import { resolveInitialContractYears } from './realplayer';
 
 /* ═══════════════════════════════════════════════
@@ -96,10 +97,22 @@ function validateAndMigrateSave(state) {
 
 // ── 公開 API ────────────────────────────────────
 
-export function saveGame(state) {
+function compress(state) {
+  return LZString.compressToUTF16(JSON.stringify(state));
+}
+
+function decompress(raw) {
+  // 既存の非圧縮セーブとの後方互換: 展開失敗時は生 JSON として扱う
   try {
-    rotateBk();
-    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+    const decompressed = LZString.decompressFromUTF16(raw);
+    if (decompressed) return JSON.parse(decompressed);
+  } catch { /* fall through */ }
+  return JSON.parse(raw);
+}
+
+export function saveGame(state) {
+  const compressed = compress(state);
+  const writeMeta = () => {
     const myTeam = state.teams?.find(t => t.id === state.myId);
     localStorage.setItem(META_KEY, JSON.stringify({
       teamName:  myTeam?.name  ?? '不明',
@@ -110,11 +123,27 @@ export function saveGame(state) {
       losses:    myTeam?.losses ?? 0,
       savedAt:   new Date().toLocaleString('ja-JP'),
     }));
+  };
+  try {
+    rotateBk();
+    localStorage.setItem(SAVE_KEY, compressed);
+    writeMeta();
     return { ok: true };
   } catch (e) {
     const quota = e instanceof DOMException && e.name === 'QuotaExceededError';
-    console.error(quota ? 'Save failed: storage quota exceeded' : 'Save failed:', e);
-    return { ok: false, quota };
+    if (quota) {
+      // バックアップ回転を諦めて直接上書き保存を試みる
+      try {
+        localStorage.setItem(SAVE_KEY, compressed);
+        writeMeta();
+        return { ok: true };
+      } catch {
+        console.error('Save failed: storage quota exceeded');
+        return { ok: false, quota: true };
+      }
+    }
+    console.error('Save failed:', e);
+    return { ok: false, quota: false };
   }
 }
 
@@ -128,7 +157,7 @@ export function loadGame() {
     try {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
-      const state = JSON.parse(raw);
+      const state = decompress(raw);
       const result = validateAndMigrateSave(state);
       if (result.ok) {
         if (key !== SAVE_KEY) console.warn(`Loaded from ${label}`);
