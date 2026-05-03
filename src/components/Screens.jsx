@@ -1,7 +1,10 @@
 import { useState } from "react";
-import { TEAM_DEFS } from '../constants';
-import { fmtSal, fmtM, fmtAvg } from '../utils';
+import { TEAM_DEFS, ACCEPT_THRESHOLD, CPU_RENEWAL_ROUNDS,
+  NEGOTIATION_MORALE_ACCEPT_BONUS, NEGOTIATION_MORALE_CUT_PENALTY,
+  NEGOTIATION_MORALE_ROUND_HIT, NEGOTIATION_TRUST_HAPPY, NEGOTIATION_TRUST_HOLDOUT } from '../constants';
+import { fmtSal, fmtM, fmtAvg, clamp } from '../utils';
 import { calcRetireWill } from '../engine/player';
+import { evalOffer, getFaThreshold } from '../engine/contract';
 import { OV, CondBadge, HandBadge } from './ui';
 
 
@@ -1013,6 +1016,263 @@ export function SpringTrainingScreen({ year, myTeam, springData, onComplete }) {
             スキップして開幕
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   CONTRACT RENEWAL PHASE SCREEN
+   オフシーズン契約更改フェーズ: 対話形式で交渉
+═══════════════════════════════════════════════ */
+
+function buildAcceptText(sal) {
+  const opts = [
+    `「わかりました。${fmtM(sal)}でお願いします。」`,
+    `「その条件で契約させていただきます。」`,
+    `「ありがとうございます。チームの期待に応えます。」`,
+  ];
+  return opts[Math.floor(Math.random() * opts.length)];
+}
+
+function buildCounterText(offered, counter) {
+  return `「${fmtM(offered)}では少し...${fmtM(counter)}であれば前向きに考えます。」`;
+}
+
+function buildFaDeclareText() {
+  return `「FA権を行使し、市場に出ることにします。お世話になりました。」`;
+}
+
+function buildFinalRejectText() {
+  return `「申し訳ありませんが、この条件での更改は難しいです。」`;
+}
+
+function calcCounterOffer(offered, demand, round) {
+  const ratio = round === 1 ? 0.95 : 1.0;
+  return Math.round(demand * ratio / 100) * 100;
+}
+
+export function ContractRenewalPhaseScreen({ teams, myId, year, demands, onSign, onRelease, onNext }) {
+  const myTeam = teams?.find(t => t.id === myId);
+  const expiringPlayers = (myTeam?.players || []).filter(p => p.contractYearsLeft === 0 && !p.isRetired && !p._retireNow);
+
+  const [selectedId, setSelectedId] = useState(null);
+  const [offerSal, setOfferSal] = useState(0);
+  const [offerYrs, setOfferYrs] = useState(1);
+  const [dialogLogs, setDialogLogs] = useState({});
+  const [settled, setSettled] = useState({});
+
+  const selectedPlayer = expiringPlayers.find(p => p.id === selectedId);
+  const selectedDemand = selectedId ? (demands?.[selectedId] || {}) : {};
+
+  const appendLog = (pid, entry) => {
+    setDialogLogs(prev => ({ ...prev, [pid]: [...(prev[pid] || []), entry] }));
+  };
+
+  const handleSelect = (p) => {
+    setSelectedId(p.id);
+    const d = demands?.[p.id];
+    setOfferSal(d?.demandSalary || p.salary);
+    setOfferYrs(1);
+  };
+
+  const handleDialogOffer = () => {
+    if (!selectedPlayer || !offerSal) return;
+    const p = selectedPlayer;
+    const { demandSalary = p.salary, minAcceptSalary = Math.round(p.salary * 0.6), resistanceFactor = 0.5 } = selectedDemand;
+    const logs = dialogLogs[p.id] || [];
+    const round = logs.filter(l => l.from === 'team').length + 1;
+
+    appendLog(p.id, { from: 'team', text: `「${fmtM(offerSal)}、${offerYrs}年ではいかがでしょうか？」`, salary: offerSal, years: offerYrs });
+
+    if (settled[p.id]) return;
+
+    const score = evalOffer(p, { salary: offerSal, years: offerYrs }, myTeam, teams).total;
+    const acceptScore = round === 1
+      ? ACCEPT_THRESHOLD + Math.round(resistanceFactor * 20)
+      : ACCEPT_THRESHOLD;
+
+    if (score >= acceptScore) {
+      const moraleDelta = offerSal >= demandSalary ? NEGOTIATION_MORALE_ACCEPT_BONUS
+                        : offerSal < p.salary * 0.90 ? NEGOTIATION_MORALE_CUT_PENALTY : 0;
+      const extraRounds = Math.max(0, round - 1);
+      const finalMorale = clamp(moraleDelta + NEGOTIATION_MORALE_ROUND_HIT * extraRounds, -30, 10);
+      const trustDelta  = round === 1 ? NEGOTIATION_TRUST_HAPPY : NEGOTIATION_TRUST_HOLDOUT;
+      appendLog(p.id, { from: 'player', text: buildAcceptText(offerSal), accepted: true });
+      setSettled(prev => ({ ...prev, [p.id]: 'signed' }));
+      onSign(p.id, offerSal, offerYrs, finalMorale, trustDelta);
+    } else if (round >= CPU_RENEWAL_ROUNDS) {
+      const threshold = getFaThreshold(p);
+      const days = p.daysOnActiveRoster ?? (p.serviceYears ?? 0) * 120;
+      const isFA = days >= threshold.domestic;
+      if (isFA) {
+        appendLog(p.id, { from: 'player', text: buildFaDeclareText(), accepted: false });
+        setSettled(prev => ({ ...prev, [p.id]: 'fa' }));
+      } else {
+        appendLog(p.id, { from: 'player', text: buildFinalRejectText(), accepted: false });
+        setSettled(prev => ({ ...prev, [p.id]: 'rejected' }));
+      }
+    } else {
+      const counter = Math.max(minAcceptSalary, calcCounterOffer(offerSal, demandSalary, round));
+      appendLog(p.id, { from: 'player', text: buildCounterText(offerSal, counter) });
+      setOfferSal(counter);
+    }
+  };
+
+  const canAdvance = expiringPlayers.every(p => (dialogLogs[p.id] || []).length > 0 || settled[p.id]);
+
+  const statusBadge = (p) => {
+    const s = settled[p.id];
+    if (s === 'signed')   return <span style={{ color: '#16a34a', fontWeight: 700 }}>✅ 合意</span>;
+    if (s === 'fa')       return <span style={{ color: '#7c3aed', fontWeight: 700 }}>🚪 FA宣言</span>;
+    if (s === 'rejected') return <span style={{ color: '#dc2626', fontWeight: 700 }}>❌ 拒否</span>;
+    if (s === 'released') return <span style={{ color: '#6b7280', fontWeight: 700 }}>📋 戦力外</span>;
+    if ((dialogLogs[p.id] || []).length > 0) return <span style={{ color: '#d97706', fontWeight: 700 }}>💬 交渉中</span>;
+    return <span style={{ color: '#6b7280' }}>📩 未交渉</span>;
+  };
+
+  return (
+    <div className="app" style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box' }}>
+      <div style={{ padding: '0 16px 12px', borderBottom: '1px solid #e5e7eb' }}>
+        <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: 26, color: '#f5c842', letterSpacing: '.1em' }}>
+          契約更改フェーズ
+        </div>
+        <div style={{ fontSize: 12, color: '#6b7280' }}>{year}年オフシーズン — 満了選手と年俸交渉を行ってください</div>
+      </div>
+
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        {/* 左: 選手リスト */}
+        <div style={{ width: 200, borderRight: '1px solid #e5e7eb', overflowY: 'auto', padding: '8px 0', flexShrink: 0 }}>
+          {expiringPlayers.length === 0 && (
+            <div style={{ padding: '16px', color: '#6b7280', fontSize: 12 }}>満了選手なし</div>
+          )}
+          {expiringPlayers.map(p => (
+            <div
+              key={p.id}
+              onClick={() => handleSelect(p)}
+              style={{
+                padding: '10px 12px',
+                cursor: 'pointer',
+                borderLeft: selectedId === p.id ? '3px solid #f5c842' : '3px solid transparent',
+                background: selectedId === p.id ? '#fefce8' : 'transparent',
+                borderBottom: '1px solid #f3f4f6',
+              }}
+            >
+              <div style={{ fontWeight: 700, fontSize: 13 }}>{p.name}</div>
+              <div style={{ fontSize: 11, color: '#6b7280' }}>{p.pos} {p.age}歳 / {fmtM(p.salary)}</div>
+              <div style={{ fontSize: 11, marginTop: 3 }}>{statusBadge(p)}</div>
+              {settled[p.id] === 'rejected' && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setSettled(prev => ({ ...prev, [p.id]: 'released' })); onRelease(p.id); }}
+                  style={{ marginTop: 4, fontSize: 10, padding: '2px 6px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 3, cursor: 'pointer', color: '#dc2626' }}
+                >
+                  戦力外
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* 右: 交渉ダイアログ */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+          {!selectedPlayer ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, color: '#9ca3af', fontSize: 14 }}>
+              左の選手を選択して交渉を開始
+            </div>
+          ) : (
+            <>
+              <div style={{ padding: '10px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div>
+                  <span style={{ fontWeight: 700, fontSize: 15 }}>{selectedPlayer.name}</span>
+                  <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 8 }}>{selectedPlayer.pos} {selectedPlayer.age}歳</span>
+                </div>
+                <div style={{ fontSize: 12, color: '#6b7280' }}>現年俸: {fmtM(selectedPlayer.salary)}</div>
+                <div style={{ fontSize: 12, color: '#d97706', fontWeight: 600 }}>
+                  要求推定: {fmtM(selectedDemand.demandSalary || selectedPlayer.salary)}
+                </div>
+                <div style={{ fontSize: 11, color: '#9ca3af' }}>
+                  morale {Math.round(selectedPlayer.morale ?? 70)} / trust {Math.round(selectedPlayer.trust ?? 50)}
+                </div>
+              </div>
+
+              <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {(dialogLogs[selectedPlayer.id] || []).length === 0 && (
+                  <div style={{ color: '#9ca3af', fontSize: 12, textAlign: 'center', marginTop: 32 }}>
+                    下のフォームからオファーを出してください
+                  </div>
+                )}
+                {(dialogLogs[selectedPlayer.id] || []).map((log, i) => (
+                  <div key={i} style={{ display: 'flex', flexDirection: log.from === 'team' ? 'row-reverse' : 'row', gap: 8, alignItems: 'flex-start' }}>
+                    <div style={{ fontSize: 18, flexShrink: 0 }}>{log.from === 'team' ? '💬' : '🧢'}</div>
+                    <div style={{
+                      background: log.from === 'team' ? '#1e3a5f' : '#f3f4f6',
+                      color: log.from === 'team' ? '#fff' : '#111',
+                      borderRadius: 10,
+                      padding: '8px 12px',
+                      maxWidth: '75%',
+                      fontSize: 13,
+                      lineHeight: 1.5,
+                    }}>
+                      <div style={{ fontSize: 10, color: log.from === 'team' ? '#93c5fd' : '#6b7280', marginBottom: 3 }}>
+                        {log.from === 'team' ? myTeam?.name : `${selectedPlayer.name}（代理人）`}
+                      </div>
+                      {log.text}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {!settled[selectedPlayer.id] && (
+                <div style={{ borderTop: '1px solid #e5e7eb', padding: '12px 16px', background: '#f9fafb', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, color: '#6b7280' }}>年俸</span>
+                  <input
+                    type="number"
+                    value={offerSal}
+                    onChange={e => setOfferSal(Number(e.target.value))}
+                    step={100}
+                    min={selectedDemand.minAcceptSalary || 420}
+                    style={{ width: 90, padding: '4px 6px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 13, textAlign: 'right' }}
+                  />
+                  <span style={{ fontSize: 12 }}>万円</span>
+                  <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 8 }}>年数</span>
+                  <select
+                    value={offerYrs}
+                    onChange={e => setOfferYrs(Number(e.target.value))}
+                    style={{ padding: '4px 6px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 13 }}
+                  >
+                    <option value={1}>1年</option>
+                    <option value={2}>2年</option>
+                    <option value={3}>3年</option>
+                  </select>
+                  <button className="btn btn-primary" onClick={handleDialogOffer} style={{ padding: '6px 16px', fontSize: 13 }}>
+                    オファーを出す
+                  </button>
+                  <button
+                    onClick={() => { setSettled(prev => ({ ...prev, [selectedPlayer.id]: 'released' })); onRelease(selectedPlayer.id); }}
+                    style={{ padding: '6px 12px', fontSize: 12, background: 'none', border: '1px solid #fca5a5', borderRadius: 4, color: '#dc2626', cursor: 'pointer' }}
+                  >
+                    戦力外
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      <div style={{ padding: '12px 16px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontSize: 12, color: '#6b7280' }}>
+          {expiringPlayers.filter(p => settled[p.id] === 'signed').length} / {expiringPlayers.length} 名と合意
+          {!canAdvance && <span style={{ marginLeft: 8, color: '#d97706' }}>— 全選手に対応後に次フェーズへ進めます</span>}
+        </div>
+        <button
+          className="btn btn-gold"
+          onClick={onNext}
+          disabled={!canAdvance}
+          style={{ padding: '10px 24px', fontSize: 14, fontWeight: 700, opacity: canAdvance ? 1 : 0.4, cursor: canAdvance ? 'pointer' : 'not-allowed' }}
+        >
+          CPU交渉・次フェーズへ →
+        </button>
       </div>
     </div>
   );
