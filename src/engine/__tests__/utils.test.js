@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clamp, fmtAvg, fmtIP, fmtM, fmtSal } from '../../utils';
+import { clamp, fmtAvg, fmtIP, fmtM, fmtSal, fmtEra } from '../../utils';
 
 describe('clamp', () => {
   it('上限を超えた値を上限に丸める', () => {
@@ -60,6 +60,16 @@ describe('fmtSal', () => {
     expect(fmtSal(3000)).toBe('3,000万円');
   });
   it('1億円以上は億円単位で表示する', () => {
-    expect(fmtSal(12000)).toBe('1.2億円');
+    expect(fmtSal(12000)).toBe('1.20億円');
+  });
+});
+
+
+describe('fmtEra', () => {
+  it('防御率を常に小数点第2位で表示する', () => {
+    expect(fmtEra(3)).toBe('3.00');
+  });
+  it('無効値は --- を返す', () => {
+    expect(fmtEra(0)).toBe('---');
   });
 });

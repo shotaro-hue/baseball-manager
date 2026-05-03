@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { fmtAvg, fmtIP, fmtPct } from "../../utils";
+import { fmtAvg, fmtIP, fmtPct, fmtEra } from "../../utils";
 import { saberBatter, saberPitcher } from "../../engine/sabermetrics";
 import { SEASON_GAMES } from "../../constants";
 
@@ -28,7 +28,7 @@ const PITCHER_COLS = [
   { key: "HLD",   label: "H",      fmt: p => p.stats.HLD || "-",                                                         asc: false },
   { key: "QS",    label: "QS",    fmt: p => p.stats.QS || "-",                                                           asc: false },
   { key: "IP",    label: "投球回", fmt: p => p.stats.IP>0?fmtIP(p.stats.IP):"---",                                       asc: false, num: p => p.stats.IP },
-  { key: "ERA",   label: "防御率", fmt: p => { const v=saberPitcher(p.stats).ERA; return v>0?v:"---"; },                  asc: true,  isRate: true, num: p => saberPitcher(p.stats).ERA || 999 },
+  { key: "ERA",   label: "防御率", fmt: p => { const v=saberPitcher(p.stats).ERA; return fmtEra(v); },                  asc: true,  isRate: true, num: p => saberPitcher(p.stats).ERA || 999 },
   { key: "Kp",    label: "奪三振", fmt: p => p.stats.Kp || "-",                                                          asc: false },
   { key: "WHIP",  label: "WHIP",  fmt: p => { const v=saberPitcher(p.stats).WHIP; return v>0?v:"---"; },                 asc: true,  isRate: true, num: p => saberPitcher(p.stats).WHIP || 999 },
   { key: "FIP",   label: "FIP",   fmt: p => { const v=saberPitcher(p.stats).FIP; return v>0?v:"---"; },                  asc: true,  isRate: true, num: p => saberPitcher(p.stats).FIP || 999 },

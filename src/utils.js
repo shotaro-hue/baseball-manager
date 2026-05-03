@@ -30,7 +30,13 @@ export const fmtM = (v) =>
       ? (v / 10000).toFixed(0) + "万円"
       : v + "円";
 
-export const fmtSal = (v) => v >= 10000 ? (v / 10000).toFixed(1) + "億円" : v.toLocaleString() + "万円";
+export const fmtSal = (v) => v >= 10000 ? (v / 10000).toFixed(2) + "億円" : v.toLocaleString() + "万円";
+
+export const fmtEra = (era) => {
+  const safeEra = Number(era);
+  if (!Number.isFinite(safeEra) || safeEra <= 0) return "---";
+  return safeEra.toFixed(2);
+};
 
 // 投球回表記: 6.333...→"6.1"、6.666...→"6.2"、7.0→"7.0"
 export const fmtIP = (v) => {
