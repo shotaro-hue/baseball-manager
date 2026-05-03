@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { STRATEGY_OPTS, PITCHING_POLICY_OPTS, RLABEL, IS_HIT, IS_OUT, BATCH, FATIGUE_WARNING } from '../constants';
-import { fmtAvg, fmtPct } from '../utils';
+import { fmtAvg, fmtPct, fmtEra } from '../utils';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 import { initGameState, matchupScore, calcEffectiveFatigue, processAtBat, endHalfInning, checkStopCondition, STADIUMS, TEAM_STADIUM } from '../engine/simulation';
 import { OV, CondBadge, HandBadge, PitchBadge } from './ui';
@@ -419,7 +419,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
                       <span style={{fontSize:11}}>球速<OV v={p.pitching.velocity}/></span>
                       <span style={{fontSize:11}}>制球<OV v={p.pitching.control}/></span>
                       <span style={{fontSize:11}}>変化<OV v={p.pitching.breaking}/></span>
-                      <span style={{fontSize:10,color:"#374151"}}>防御率:{sp.ERA>0?sp.ERA:"--"}</span>
+                      <span style={{fontSize:10,color:"#374151"}}>防御率:{fmtEra(sp.ERA)}</span>
                     </div>
                     <CondBadge p={p}/>
                   </div>

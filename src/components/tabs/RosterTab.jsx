@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { MAX_ROSTER, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL, DEV_GOALS_BATTER, DEV_GOALS_PITCHER, TALK_COOLDOWN_DAYS, POSITIONS, FIELDING_POSITIONS, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX, OPTIMAL_PITCHER_COUNT } from '../../constants';
-import { fmtAvg, fmtSal } from '../../utils';
+import { fmtAvg, fmtSal, fmtEra } from '../../utils';
 import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
 import { OV, CondBadge, HandBadge } from '../ui';
 
@@ -454,7 +454,7 @@ export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetR
               <span style={{color:"#94a3b8"}}>制球</span><span style={{color:"#e0d4bf",fontFamily:"monospace"}}>{p.pitching?.control??50}</span>
               <span style={{color:"#94a3b8"}}>変化</span><span style={{color:"#e0d4bf",fontFamily:"monospace"}}>{p.pitching?.breaking??50}</span>
               <span style={{color:"#94a3b8"}}>Cond</span><span style={{color:(p.condition??70)>=80?"#34d399":(p.condition??70)>=60?"#f5c842":"#f87171",fontFamily:"monospace"}}>{p.condition??70}</span>
-              <span style={{color:"#94a3b8"}}>ERA</span><span style={{color:sp.ERA>0&&sp.ERA<3?"#34d399":sp.ERA<4?"#f5c842":sp.ERA>0?"#f87171":"#374151",fontFamily:"monospace"}}>{sp.ERA>0?sp.ERA:"---"}</span>
+              <span style={{color:"#94a3b8"}}>ERA</span><span style={{color:sp.ERA>0&&sp.ERA<3?"#34d399":sp.ERA<4?"#f5c842":sp.ERA>0?"#f87171":"#374151",fontFamily:"monospace"}}>{fmtEra(sp.ERA)}</span>
               <span style={{color:"#94a3b8"}}>WHIP</span><span style={{color:sp.WHIP>0&&sp.WHIP<1.0?"#34d399":sp.WHIP<1.3?"#f5c842":sp.WHIP>0?"#94a3b8":"#374151",fontFamily:"monospace"}}>{sp.WHIP>0?sp.WHIP:"---"}</span>
             </div>
           );
@@ -485,7 +485,7 @@ export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetR
                       <span style={{fontSize:9,color:"#94a3b8"}}>球速</span><span style={{fontSize:10,color:"#e0d4bf",fontFamily:"monospace"}}>{p.pitching?.velocity??50}</span>
                       <span style={{fontSize:9,color:"#94a3b8"}}>制球</span><span style={{fontSize:10,color:"#e0d4bf",fontFamily:"monospace"}}>{p.pitching?.control??50}</span>
                       <span style={{fontSize:9,color:"#94a3b8"}}>変化</span><span style={{fontSize:10,color:"#e0d4bf",fontFamily:"monospace"}}>{p.pitching?.breaking??50}</span>
-                      <span style={{fontSize:9,color:"#94a3b8"}}>ERA</span><span style={{fontSize:10,color:sp.ERA>0&&sp.ERA<3?"#34d399":sp.ERA<4?"#f5c842":sp.ERA>0?"#f87171":"#374151",fontFamily:"monospace"}}>{sp.ERA>0?sp.ERA:"---"}</span>
+                      <span style={{fontSize:9,color:"#94a3b8"}}>ERA</span><span style={{fontSize:10,color:sp.ERA>0&&sp.ERA<3?"#34d399":sp.ERA<4?"#f5c842":sp.ERA>0?"#f87171":"#374151",fontFamily:"monospace"}}>{fmtEra(sp.ERA)}</span>
                       <span style={{fontSize:9,color:"#94a3b8"}}>WHIP</span><span style={{fontSize:10,color:sp.WHIP>0&&sp.WHIP<1.0?"#34d399":sp.WHIP<1.3?"#f5c842":sp.WHIP>0?"#94a3b8":"#374151",fontFamily:"monospace"}}>{sp.WHIP>0?sp.WHIP:"---"}</span>
                       <span style={{fontSize:9,color:"#94a3b8"}}>{p.stats.W}勝{p.stats.L}敗</span>
                       <select style={{fontSize:9,background:"#0d1b2a",color:"#94a3b8",border:"1px solid #1e3a5f",borderRadius:3,padding:"1px 2px"}} value={p.trainingFocus||""} onChange={e=>onSetTrainingFocus&&onSetTrainingFocus(p.id,e.target.value||null)}>{TRAINING_OPTIONS.filter(([k])=>!["contact","power","eye","speed","arm","defense"].includes(k)).map(([k,l])=><option key={k} value={k}>{l}</option>)}</select>
@@ -566,7 +566,7 @@ export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetR
                       <div style={{paddingLeft:22,width:"100%",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
                         <span style={{fontSize:9,color:"#94a3b8"}}>球速</span><span style={{fontSize:10,color:"#e0d4bf",fontFamily:"monospace"}}>{p.pitching?.velocity??50}</span>
                         <span style={{fontSize:9,color:"#94a3b8"}}>制球</span><span style={{fontSize:10,color:"#e0d4bf",fontFamily:"monospace"}}>{p.pitching?.control??50}</span>
-                        <span style={{fontSize:9,color:"#94a3b8"}}>ERA</span><span style={{fontSize:10,color:sp.ERA>0&&sp.ERA<3?"#34d399":sp.ERA<4?"#f5c842":sp.ERA>0?"#f87171":"#374151",fontFamily:"monospace"}}>{sp.ERA>0?sp.ERA:"---"}</span>
+                        <span style={{fontSize:9,color:"#94a3b8"}}>ERA</span><span style={{fontSize:10,color:sp.ERA>0&&sp.ERA<3?"#34d399":sp.ERA<4?"#f5c842":sp.ERA>0?"#f87171":"#374151",fontFamily:"monospace"}}>{fmtEra(sp.ERA)}</span>
                         <span style={{fontSize:9,color:"#94a3b8"}}>WHIP</span><span style={{fontSize:10,color:sp.WHIP>0&&sp.WHIP<1.0?"#34d399":sp.WHIP<1.3?"#f5c842":sp.WHIP>0?"#94a3b8":"#374151",fontFamily:"monospace"}}>{sp.WHIP>0?sp.WHIP:"---"}</span>
                         <select style={{fontSize:9,background:"#0d1b2a",color:"#94a3b8",border:"1px solid #1e3a5f",borderRadius:3,padding:"1px 2px"}} value={p.trainingFocus||""} onChange={e=>onSetTrainingFocus&&onSetTrainingFocus(p.id,e.target.value||null)}>{TRAINING_OPTIONS.filter(([k])=>!["contact","power","eye","speed","arm","defense"].includes(k)).map(([k,l])=><option key={k} value={k}>{l}</option>)}</select>
                       </div>
