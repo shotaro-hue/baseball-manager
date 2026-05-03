@@ -880,7 +880,8 @@ export function useSeasonFlow(gs) {
         const useDh = !!a.dhEnabled;
         const aPlayersSnap=[...a.players]; const bPlayersSnap=[...b.players]; // 名前解決用スナップショット
         const cr=quickSimGame(applyDhToTeam(a, useDh),applyDhToTeam(b, useDh));
-        batchBoxScores.push({homeId:a.id,awayId:b.id,dayNo:newDay,cr,homePlayers:aPlayersSnap,awayPlayers:bPlayersSnap,homeName:a.name,awayName:b.name});
+        const bs=computeBoxScore(cr.log||[],cr.inningSummary||[],aPlayersSnap,bPlayersSnap,cr.score.my,cr.score.opp);
+        batchBoxScores.push({homeId:a.id,awayId:b.id,dayNo:newDay,cr,bs,homeName:a.name,awayName:b.name});
         const cdrew=cr.score.my===cr.score.opp;
         const aWon=cr.won;
         // 注目CPU試合を収集（大差 or 接戦）
@@ -1017,6 +1018,8 @@ export function useSeasonFlow(gs) {
       await new Promise(r => setTimeout(r, 0));
     }
 
+    // ループ後処理前にブラウザへ制御を返す（モバイルのウォッチドッグ対策）
+    await new Promise(r => setTimeout(r, 0));
     const nextMailbox = batchTradeMails.length ? [...mailbox, ...batchTradeMails] : mailbox;
     const batchSaveResult=saveGame({teams:newTeams,myId,gameDay:newDay,year,faPool:newFaPool,faYears,seasonHistory,news,mailbox:nextMailbox});
     if(batchSaveResult.ok) setSaveExists(true);
@@ -1081,10 +1084,10 @@ export function useSeasonFlow(gs) {
     setBatchResults(gameResults);
     gs.setRecentResults(prev=>[...gameResults.map(r=>({won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp,gameNo:r.gameNo})).reverse(),...prev].slice(0,5));
     gs.setGameResultsMap(prev=>{const next={...prev};gameResults.forEach(r=>{next[r.gameNo]={won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:r.oppTeam};});return next;});
+    await new Promise(r => setTimeout(r, 0));
     setAllTeamResultsMap(prev=>{
       const next={...prev};
-      for(const{homeId,awayId,dayNo,cr,homePlayers,awayPlayers,homeName,awayName}of batchBoxScores){
-        const bs=computeBoxScore(cr.log||[],cr.inningSummary||[],homePlayers,awayPlayers,cr.score.my,cr.score.opp);
+      for(const{homeId,awayId,dayNo,cr,bs,homeName,awayName}of batchBoxScores){
         const hWon=cr.won; const drew=cr.score.my===cr.score.opp;
         next[homeId]={...(next[homeId]||{}),[dayNo]:{won:hWon,drew,myScore:cr.score.my,oppScore:cr.score.opp,oppName:awayName,oppId:awayId,homeId,awayId,...(bs||{})}};
         next[awayId]={...(next[awayId]||{}),[dayNo]:{won:!hWon&&!drew,drew,myScore:cr.score.opp,oppScore:cr.score.my,oppName:homeName,oppId:homeId,homeId,awayId,inningScores:bs?.inningScores,myBatting:bs?.awayBatting,oppBatting:bs?.homeBatting,myPitching:bs?.awayPitching,oppPitching:bs?.homePitching}};
