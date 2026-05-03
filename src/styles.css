@@ -13,7 +13,7 @@
 body{background:var(--bg);}
 .app{min-height:100vh;background:linear-gradient(160deg,#04101c,#071422 60%,#040d18);color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:13px;}
 .title{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 16px;position:relative;overflow:hidden;}
-.title::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 100% 40% at 50% 110%,rgba(10,50,25,.5),transparent);}
+.title::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 100% 40% at 50% 110%,rgba(10,50,25,.5),transparent);pointer-events:none;}
 .tlogo{font-family:'Bebas Neue',cursive;font-size:clamp(42px,10vw,88px);line-height:1;color:var(--gold);text-shadow:0 0 80px rgba(245,200,66,.4),0 3px 0 #000;z-index:1;position:relative;letter-spacing:.05em;text-align:center;}
 .tsub{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dim);letter-spacing:.5em;text-align:center;margin:4px 0 26px;z-index:1;position:relative;}
 .tgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;max-width:780px;width:100%;z-index:1;position:relative;}
