@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { simAtBat, BASELINE, DEFAULT_LEAGUE_ENV, resolveBattedBallOutcomeFromPhysicsForBalance, STADIUMS } from '../../engine/simulation';
 
 /* ================================================================
@@ -150,6 +150,9 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
   const [mcBusy, setMcBusy] = useState(false);
   const [mcError, setMcError] = useState('');
   const [mcRows, setMcRows] = useState([]);
+  const [mcProgress, setMcProgress] = useState(null);
+  const workerRef = useRef(null);
+  const taskIdRef = useRef(null);
 
   const leagueEnv = { ...DEFAULT_LEAGUE_ENV, ...(myTeam?.leagueEnv || {}) };
 
@@ -174,6 +177,33 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
     }));
   }, [myId, upd]);
 
+
+  useEffect(() => {
+    const worker = new Worker(new URL('../../workers/batchSimulationWorker.js', import.meta.url), { type: 'module' });
+    workerRef.current = worker;
+    worker.onmessage = (event) => {
+      const msg = event.data;
+      if (!msg || !taskIdRef.current || msg?.payload?.taskId !== taskIdRef.current) return;
+      if (msg.type === 'PROGRESS') {
+        setMcProgress({ completedPa: msg.payload.completedPa, totalPa: msg.payload.totalPa });
+      } else if (msg.type === 'DONE') {
+        setMcRows(Array.isArray(msg.payload.detailResults) ? msg.payload.detailResults : []);
+        setMcBusy(false);
+        setMcProgress(null);
+        taskIdRef.current = null;
+      } else if (msg.type === 'ERROR') {
+        setMcError(msg.payload?.message || 'Workerエラーが発生しました。');
+        setMcBusy(false);
+        setMcProgress(null);
+        taskIdRef.current = null;
+      } else if (msg.type === 'CANCEL') {
+        setMcBusy(false);
+        setMcProgress(null);
+        taskIdRef.current = null;
+      }
+    };
+    return () => { worker.terminate(); };
+  }, []);
   // Section 1: リーグ全体集計
   const league = useMemo(() => {
     let PA = 0, H = 0, AB = 0, HR = 0, K = 0, BB = 0, IP = 0, ER = 0;
@@ -233,287 +263,22 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
   };
 
   const doMonteCarloValidation = useCallback(() => {
-    if (mcBusy) return;
+    if (mcBusy || !workerRef.current) return;
     setMcBusy(true);
     setMcError('');
-    setTimeout(() => {
-      try {
-        const TOTAL_PA = 10000;
-        const stadium = STADIUMS.tokyo_dome;
-        const pitcher = { pitching: { velocity: 60, breaking: 60, control: 60 }, condition: 100, morale: 70 };
-        const profiles = [
-          { label: '平均打者', batting: { power: 50, contact: 50, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 } },
-          { label: '準主力', batting: { power: 60, contact: 55, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 } },
-          { label: '中距離', batting: { power: 70, contact: 55, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 } },
-          { label: '主力長距離', batting: { power: 80, contact: 58, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 } },
-          { label: '球界トップ級', batting: { power: 90, contact: 60, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 } },
-        ];
-        const nextRows = profiles.map((profile) => ({
-          label: profile.label,
-          ...simulatePhysicsProfile({ batting: profile.batting, condition: 100, morale: 70 }, pitcher, TOTAL_PA, leagueEnv),
-        }));
-        setMcRows(nextRows);
-      } catch (error) {
-        // ⚠️ セキュリティ: 例外を握り潰さず、機密情報を含まない安全な文言で表示
-        setMcError(error instanceof Error ? error.message : 'Monte Carlo検証で不明なエラーが発生しました。');
-      } finally {
-        setMcBusy(false);
-      }
-    }, 10);
-  }, [mcBusy, leagueEnv]);
-
-  const monteCarloRecommendation = useMemo(() => {
-    if (!Array.isArray(mcRows) || mcRows.length === 0) return null;
-    const validRows = mcRows.filter((row) => Number.isFinite(row?.teamHrPerGame));
-    if (validRows.length === 0) return null;
-    const avgTeamHrPerGame = validRows.reduce((sum, row) => sum + row.teamHrPerGame, 0) / validRows.length;
-    const baselineTeamHrPerGame = BASELINE.hr * 38;
-    const ratio = baselineTeamHrPerGame > 0 ? avgTeamHrPerGame / baselineTeamHrPerGame : 1;
-    const percentGap = (ratio - 1) * 100;
-
-    let recommendation = '現状維持';
-    let adjustmentDirection = '調整不要';
-    if (ratio > 1.15) {
-      recommendation = '長打抑制を推奨';
-      adjustmentDirection = '打球の強さを下げる方向';
-    } else if (ratio < 0.85) {
-      recommendation = '長打増加を推奨';
-      adjustmentDirection = '打球の強さを上げる方向';
-    }
-
-    return {
-      avgTeamHrPerGame,
-      baselineTeamHrPerGame,
-      ratio,
-      percentGap,
-      recommendation,
-      adjustmentDirection,
-      recommendedMultiplier: Number.isFinite(ratio) && ratio > 0 ? 1 / ratio : 1,
-    };
-  }, [mcRows]);
-
-  return (
-    <div>
-
-      {/* ═══════════════════════════════════════
-          Section 1: シーズン実績（リーグ全体）
-      ═══════════════════════════════════════ */}
-      <div className="card">
-        <div className="card-h">
-          📊 シーズン実績（リーグ全体）
-          {league && (
-            <span style={{ fontSize: 10, color: '#374151', marginLeft: 8 }}>
-              {league.PA.toLocaleString()} PA 集計
-            </span>
-          )}
-        </div>
-        {!league ? (
-          <p style={{ color: '#374151', fontSize: 12, margin: '6px 0 0' }}>
-            試合が進むと集計されます（目安: 5試合以上）
-          </p>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>指標</th>
-                  <th>実績値</th>
-                  <th>NPB基準</th>
-                  <th>差</th>
-                  <th>状態</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { label: '打率',   val: league.ba,    baseline: REF.ba,    fmtV: ba3,  fmtD: baFmt,  invert: false },
-                  { label: '三振率', val: league.kPct,  baseline: REF.kPct,  fmtV: pct,  fmtD: ppFmt,  invert: true  },
-                  { label: '四球率', val: league.bbPct, baseline: REF.bbPct, fmtV: pct,  fmtD: ppFmt,  invert: false },
-                  { label: 'HR率',   val: league.hrPct, baseline: REF.hrPct, fmtV: pct,  fmtD: ppFmt,  invert: false },
-                  ...(league.era != null
-                    ? [{ label: 'ERA', val: league.era, baseline: REF.era, fmtV: v => v.toFixed(2), fmtD: eraFmt, invert: false }]
-                    : []),
-                ].map(({ label, val, baseline, fmtV, fmtD, invert }) => (
-                  <tr key={label}>
-                    <td>{label}</td>
-                    <td className="mono">{fmtV(val)}</td>
-                    <td className="mono" style={{ color: '#374151' }}>{fmtV(baseline)}</td>
-                    <td><Diff val={val} baseline={baseline} fmt={fmtD} invert={invert} /></td>
-                    <td><StatusBadge val={val} baseline={baseline} invert={invert} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      <div className="card">
-        <div className="card-h" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>🧪 物理HR Monte Carlo検証（リーグ分析タブ内実行）</span>
-          <button className="bsm bga" onClick={doMonteCarloValidation} disabled={mcBusy}>
-            {mcBusy ? '検証中…' : '▶ 検証実行'}
-          </button>
-        </div>
-        <p style={{ fontSize: 11, color: '#374151', margin: '4px 0 8px' }}>
-          HR/BIP【＝本塁打 ÷ インプレー打球数】や平均EV【＝打球初速】・LA【＝打球角度】を、ゲーム画面上で直接確認できます。
-        </p>
-        {mcError && <div style={{ fontSize: 11, color: '#f87171', marginBottom: 8 }}>⚠️ {mcError}</div>}
-        <div style={{ overflowX: 'auto' }}>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>プロファイル</th><th>PA</th><th>BIP</th><th>HR/BIP</th><th>HR/PA</th><th>team HR/game</th><th>平均EV</th><th>平均LA</th><th>平均飛距離</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!mcBusy && mcRows.length === 0 && <tr><td colSpan={9} style={{ textAlign: 'center', fontSize: 11, color: '#374151' }}>「検証実行」を押すと結果が表示されます</td></tr>}
-              {mcBusy && <tr><td colSpan={9} style={{ textAlign: 'center', color: '#f5c842' }}>検証中…</td></tr>}
-              {mcRows.map((row) => (
-                <tr key={row.label}>
-                  <td>{row.label}</td><td className="mono">{row.pa.toLocaleString()}</td><td className="mono">{row.bip.toLocaleString()}</td><td className="mono">{(row.hrPerBip * 100).toFixed(2)}%</td><td className="mono">{(row.hrPerPa * 100).toFixed(2)}%</td><td className="mono">{row.teamHrPerGame.toFixed(2)}</td><td className="mono">{row.avgEv.toFixed(1)}</td><td className="mono">{row.avgLa.toFixed(1)}</td><td className="mono">{row.avgDistance.toFixed(1)}m</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {monteCarloRecommendation && (
-          <div style={{ marginTop: 10, fontSize: 11, color: '#d1d5db', lineHeight: 1.6 }}>
-            <div>
-              基準比較: 平均 team HR/game は <span className="mono">{monteCarloRecommendation.avgTeamHrPerGame.toFixed(2)}</span>、
-              2024NPB基準は <span className="mono">{monteCarloRecommendation.baselineTeamHrPerGame.toFixed(2)}</span> です。
-            </div>
-            <div>
-              乖離率【＝基準との差の割合】: <span className="mono">{monteCarloRecommendation.percentGap >= 0 ? '+' : ''}{monteCarloRecommendation.percentGap.toFixed(1)}%</span> /
-              推奨: <b>{monteCarloRecommendation.recommendation}</b>（{monteCarloRecommendation.adjustmentDirection}）。
-            </div>
-            <div>
-              推奨調整量【＝目標値へ近づける倍率】:
-              <span className="mono"> ×{monteCarloRecommendation.recommendedMultiplier.toFixed(3)}</span>
-              （1.000に近いほど微調整で十分）。
-            </div>
-          </div>
-        )}
-      </div>
+    setMcProgress({ completedPa: 0, totalPa: 50000 });
+    const TOTAL_PA = 10000;
+    const pitcher = { pitching: { velocity: 60, breaking: 60, control: 60 }, condition: 100, morale: 70 };
+    const profiles = [
+      { label: '平均打者', batter: { batting: { power: 50, contact: 50, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 }, condition: 100, morale: 70 }, pitcher, totalPa: TOTAL_PA },
+      { label: '準主力', batter: { batting: { power: 60, contact: 55, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 }, condition: 100, morale: 70 }, pitcher, totalPa: TOTAL_PA },
+      { label: '中距離', batter: { batting: { power: 70, contact: 55, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 }, condition: 100, morale: 70 }, pitcher, totalPa: TOTAL_PA },
+      { label: '主力長距離', batter: { batting: { power: 80, contact: 58, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 }, condition: 100, morale: 70 }, pitcher, totalPa: TOTAL_PA },
+      { label: '球界トップ級', batter: { batting: { power: 90, contact: 60, eye: 50, speed: 50, clutch: 50, vsLeft: 50, breakingBall: 50 }, condition: 100, morale: 70 }, pitcher, totalPa: TOTAL_PA },
+    ];
+    const taskId = `mc-${Date.now()}`;
+    taskIdRef.current = taskId;
+    workerRef.current.postMessage({ type: 'START', payload: { taskId, profiles, leagueEnv, seed: Date.now() } });
+  }, [leagueEnv, mcBusy]);
 
 
-      <div className="card">
-        <div className="card-h" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <span>🎛️ リーグ補正スライダー（即時反映）</span>
-          <button className="bsm bga" onClick={handleResetLeagueEnv}>デフォルトへ戻す</button>
-        </div>
-        <p style={{ fontSize: 11, color: '#374151', margin: '4px 0 10px' }}>
-          推奨値を見るだけでなく、ここで直接調整できます。調整後はクイックシム【＝簡易シミュレーション】とMonte Carlo【＝乱数を多数回試す検証】へ即時反映されます。
-        </p>
-        <div style={{ display: 'grid', gap: 10 }}>
-          {LEAGUE_ENV_SLIDER_CONFIG.map((slider) => {
-            const currentValue = sanitizeLeagueEnvValue(leagueEnv[slider.key], slider.min, slider.max, DEFAULT_LEAGUE_ENV[slider.key]);
-            return (
-              <div key={slider.key} style={{ border: '1px solid rgba(148,163,184,.25)', borderRadius: 8, padding: 10 }}>
-                <div className="fsb" style={{ marginBottom: 6 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700 }}>{slider.label}</div>
-                  <div className="mono" style={{ color: '#f5c842' }}>{currentValue.toFixed(2)}</div>
-                </div>
-                <input
-                  type="range"
-                  min={slider.min}
-                  max={slider.max}
-                  step={slider.step}
-                  value={currentValue}
-                  onChange={(event) => handleLeagueEnvSliderChange(slider.key, event.target.value)}
-                  aria-label={slider.label}
-                  style={{ width: '100%' }}
-                />
-                <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4 }}>{slider.desc}</div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ═══════════════════════════════════════
-          Section 2: クイックシム検証
-      ═══════════════════════════════════════ */}
-      <div className="card">
-        <div className="card-h" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>🎯 クイックシム（10,000 PA × 3 パターン）</span>
-          <button className="bsm bga" onClick={doSim} disabled={busy}>
-            {busy ? '計算中…' : '▶ 実行'}
-          </button>
-        </div>
-        <p style={{ fontSize: 11, color: '#374151', margin: '4px 0 8px' }}>
-          現在のエンジン設定で合成選手を10,000打席シミュレーション。NPBベースラインとの乖離を確認できます。
-        </p>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>マッチアップ</th>
-                <th>打率</th>
-                <th>K率</th>
-                <th>BB率</th>
-                <th>HR率</th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* NPB基準行 */}
-              <tr style={{ opacity: 0.6 }}>
-                <td style={{ fontSize: 11, fontStyle: 'italic' }}>NPBベースライン (2024)</td>
-                <td className="mono">{ba3(REF.ba)}</td>
-                <td className="mono">{pct(REF.kPct)}</td>
-                <td className="mono">{pct(REF.bbPct)}</td>
-                <td className="mono">{pct(REF.hrPct)}</td>
-              </tr>
-              {/* 状態表示 */}
-              {!busy && simRows.length === 0 && (
-                <tr>
-                  <td colSpan={5} style={{ color: '#374151', fontSize: 11, textAlign: 'center', padding: '12px 0' }}>
-                    「実行」を押すと結果が表示されます
-                  </td>
-                </tr>
-              )}
-              {busy && (
-                <tr>
-                  <td colSpan={5} style={{ color: '#f5c842', textAlign: 'center', padding: '12px 0' }}>
-                    計算中…
-                  </td>
-                </tr>
-              )}
-              {/* シム結果行 */}
-              {simRows.map(r => (
-                <tr key={r.label}>
-                  <td style={{ fontSize: 11 }}>{r.label}</td>
-                  <td className="mono" style={{ color: batColor(r.ba,    REF.ba,    false) }}>{ba3(r.ba)}</td>
-                  <td className="mono" style={{ color: batColor(r.kPct,  REF.kPct,  true)  }}>{pct(r.kPct)}</td>
-                  <td className="mono">{pct(r.bbPct)}</td>
-                  <td className="mono" style={{ color: batColor(r.hrPct, REF.hrPct, false) }}>{pct(r.hrPct)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* ═══════════════════════════════════════
-          Section 3: バランス設定値（エンジン定数）
-      ═══════════════════════════════════════ */}
-      <div className="card">
-        <div className="card-h">⚙️ 現在の物理定数と補正値</div>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="tbl">
-            <thead><tr><th>設定項目</th><th>現在値</th><th>初期値</th><th>説明</th></tr></thead>
-            <tbody>
-              {LEAGUE_ENV_SLIDER_CONFIG.map((item) => (
-                <tr key={`env-${item.key}`}>
-                  <td>{item.label}</td>
-                  <td className="mono" style={{ color: '#f5c842' }}>{Number(leagueEnv[item.key] ?? 0).toFixed(2)}</td>
-                  <td className="mono" style={{ color: '#374151' }}>{Number(DEFAULT_LEAGUE_ENV[item.key] ?? 0).toFixed(2)}</td>
-                  <td style={{ fontSize: 10, color: '#374151' }}>{item.desc}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div></div>
-
-    </div>
-  );
-}
