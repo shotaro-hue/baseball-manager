@@ -103,6 +103,7 @@ export default function App(){
   const [currentPrimarySection, setCurrentPrimarySection] = useState("home");
   const [batchCount, setBatchCount] = useState(5);
   const [batchAutoManage, setBatchAutoManage] = useState(false);
+  const [seasonAutoManage, setSeasonAutoManage] = useState(false);
 
   useEffect(() => {
     const sectionId = TAB_TO_SECTION[tab];
@@ -340,12 +341,18 @@ export default function App(){
             </div>
           );
         })()}
-        <button className="sim-btn" style={{margin:0,fontSize:12,background:"linear-gradient(135deg,#1a0730,#2d0f50)",borderColor:"rgba(167,139,250,.5)",color:"#a78bfa"}} onClick={()=>sf.handleSeasonSim(batchAutoManage)}>
-          🚀 残り全{remain}試合<br/>
-          <span style={{fontSize:9,opacity:.7}}>
-            {(()=>{const s=gameDayToDate(gameDay,schedule);const e=gameDayToDate(SEASON_GAMES,schedule);return s&&e?`${s.month}/${s.day}〜${e.month}/${e.day}`:"シーズン一括";})()}
-          </span>
-        </button>
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5,background:"linear-gradient(135deg,#1a0730,#2d0f50)",border:"1px solid rgba(167,139,250,.5)",borderRadius:10,padding:"8px 6px"}}>
+          <label style={{display:"flex",alignItems:"center",gap:4,fontSize:9,color:seasonAutoManage?"#c4b5fd":"#6b7280",cursor:"pointer",userSelect:"none"}}>
+            <input type="checkbox" checked={seasonAutoManage} onChange={e=>setSeasonAutoManage(e.target.checked)} style={{accentColor:"#a78bfa",cursor:"pointer"}}/>
+            自動編成も実行
+          </label>
+          <button className="sim-btn" style={{margin:0,fontSize:12,width:"100%",background:"transparent",border:"none",boxShadow:"none",color:"#a78bfa",padding:"2px 4px"}} onClick={()=>sf.handleSeasonSim(seasonAutoManage)}>
+            🚀 残り全{remain}試合<br/>
+            <span style={{fontSize:9,opacity:.7}}>
+              {(()=>{const s=gameDayToDate(gameDay,schedule);const e=gameDayToDate(SEASON_GAMES,schedule);return s&&e?`${s.month}/${s.day}〜${e.month}/${e.day}`:"シーズン一括";})()}
+            </span>
+          </button>
+        </div>
       </div>
     )}
 
