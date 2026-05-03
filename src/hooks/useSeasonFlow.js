@@ -881,7 +881,8 @@ export function useSeasonFlow(gs) {
         const aPlayersSnap=[...a.players]; const bPlayersSnap=[...b.players]; // 名前解決用スナップショット
         const cr=quickSimGame(applyDhToTeam(a, useDh),applyDhToTeam(b, useDh));
         const bs=computeBoxScore(cr.log||[],cr.inningSummary||[],aPlayersSnap,bPlayersSnap,cr.score.my,cr.score.opp);
-        batchBoxScores.push({homeId:a.id,awayId:b.id,dayNo:newDay,cr,bs,homeName:a.name,awayName:b.name});
+        // cr.log は computeBoxScore 後に不要なので参照を持たない（143試合 × 6組 × 80イベント = ~70k オブジェクトのメモリ節約）
+        batchBoxScores.push({homeId:a.id,awayId:b.id,dayNo:newDay,won:cr.won,score:cr.score,bs,homeName:a.name,awayName:b.name});
         const cdrew=cr.score.my===cr.score.opp;
         const aWon=cr.won;
         // 注目CPU試合を収集（大差 or 接戦）
@@ -1086,11 +1087,18 @@ export function useSeasonFlow(gs) {
     gs.setGameResultsMap(prev=>{const next={...prev};gameResults.forEach(r=>{next[r.gameNo]={won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:r.oppTeam};});return next;});
     await new Promise(r => setTimeout(r, 0));
     setAllTeamResultsMap(prev=>{
+      // チームごとの差分を先にまとめてから1回だけスプレッド（O(n²)→O(n)）
+      const patches={};
+      for(const{homeId,awayId,dayNo,won,score,bs,homeName,awayName}of batchBoxScores){
+        const hWon=won; const drew=score.my===score.opp;
+        if(!patches[homeId]) patches[homeId]={};
+        patches[homeId][dayNo]={won:hWon,drew,myScore:score.my,oppScore:score.opp,oppName:awayName,oppId:awayId,homeId,awayId,...(bs||{})};
+        if(!patches[awayId]) patches[awayId]={};
+        patches[awayId][dayNo]={won:!hWon&&!drew,drew,myScore:score.opp,oppScore:score.my,oppName:homeName,oppId:homeId,homeId,awayId,inningScores:bs?.inningScores,myBatting:bs?.awayBatting,oppBatting:bs?.homeBatting,myPitching:bs?.awayPitching,oppPitching:bs?.homePitching};
+      }
       const next={...prev};
-      for(const{homeId,awayId,dayNo,cr,bs,homeName,awayName}of batchBoxScores){
-        const hWon=cr.won; const drew=cr.score.my===cr.score.opp;
-        next[homeId]={...(next[homeId]||{}),[dayNo]:{won:hWon,drew,myScore:cr.score.my,oppScore:cr.score.opp,oppName:awayName,oppId:awayId,homeId,awayId,...(bs||{})}};
-        next[awayId]={...(next[awayId]||{}),[dayNo]:{won:!hWon&&!drew,drew,myScore:cr.score.opp,oppScore:cr.score.my,oppName:homeName,oppId:homeId,homeId,awayId,inningScores:bs?.inningScores,myBatting:bs?.awayBatting,oppBatting:bs?.homeBatting,myPitching:bs?.awayPitching,oppPitching:bs?.homePitching}};
+      for(const[teamId,days]of Object.entries(patches)){
+        next[teamId]={...(prev[teamId]||{}),...days};
       }
       return next;
     });
