@@ -475,8 +475,39 @@ export function useOffseason(gs) {
   };
 
   // 契約更改フェーズ完了: CPU球団の更改シミュ + 人気計算 → development_phase へ
-  const handleContractRenewalPhaseNext = () => {
-    const renewResult = cpuRenewContracts(teams, myId, teams);
+  const handleContractRenewalPhaseNext = (faDeclaredPlayerIds = []) => {
+    const safeDeclaredIds = Array.isArray(faDeclaredPlayerIds)
+      ? [...new Set(faDeclaredPlayerIds.filter(id => typeof id === "string" && id.trim().length > 0))]
+      : [];
+
+    const declaredIdSet = new Set(safeDeclaredIds);
+    const declaredPlayers = (myTeam?.players || []).filter(p => declaredIdSet.has(p.id));
+
+    if (declaredPlayers.length > 0) {
+      upd(myId, t => ({
+        ...t,
+        players: t.players.filter(p => !declaredIdSet.has(p.id)),
+      }));
+      setFaPool(prev => [
+        ...prev,
+        ...declaredPlayers.map(p => ({ ...p, isFA: true, contractYearsLeft: 0 })),
+      ]);
+      declaredPlayers.forEach(p => {
+        addToHistory(myId, p, "FA宣言");
+        addNews({
+          type: 'season',
+          headline: `【FA】${p.name}（${myTeam?.name}）が国内FA宣言`,
+          source: '野球速報',
+          dateLabel: `${year}年`,
+          body: `${p.name}選手（${p.age}歳）が国内FA権を行使し、FA市場へ移行した。`,
+        });
+      });
+    }
+
+    const baseTeams = declaredIdSet.size > 0
+      ? teams.map(t => (t.id === myId ? { ...t, players: t.players.filter(p => !declaredIdSet.has(p.id)) } : t))
+      : teams;
+    const renewResult = cpuRenewContracts(baseTeams, myId, baseTeams);
     const postCpuTeams = renewResult.updatedTeams;
     // オフシーズン人気変動（handleRetirePhaseNextから移動）
     const makeLeagueRanking = (lg) => [...postCpuTeams.filter(t => t.league === lg)].sort((a, b) => {
