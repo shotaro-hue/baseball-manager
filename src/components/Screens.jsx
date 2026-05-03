@@ -1047,6 +1047,10 @@ function buildFinalRejectText() {
   return `「申し訳ありませんが、この条件での更改は難しいです。」`;
 }
 
+function buildRetryText() {
+  return `「一度持ち帰って検討します。日を改めてお話ししましょう。」`;
+}
+
 function calcCounterOffer(offered, demand, round) {
   const ratio = round === 1 ? 0.95 : 1.0;
   return Math.round(demand * ratio / 100) * 100;
@@ -1061,6 +1065,7 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, onSign,
   const [offerYrs, setOfferYrs] = useState(1);
   const [dialogLogs, setDialogLogs] = useState({});
   const [settled, setSettled] = useState({});
+  const [retryCount, setRetryCount] = useState({});
 
   const selectedPlayer = expiringPlayers.find(p => p.id === selectedId);
   const selectedDemand = selectedId ? (demands?.[selectedId] || {}) : {};
@@ -1077,30 +1082,33 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, onSign,
   };
 
   const handleDialogOffer = () => {
-    if (!selectedPlayer || !offerSal) return;
+    if (!selectedPlayer) return;
+    const sanitizedOfferSal = Number.isFinite(Number(offerSal)) ? Math.round(Number(offerSal)) : 0;
+    if (sanitizedOfferSal <= 0) return;
     const p = selectedPlayer;
     const { demandSalary = p.salary, minAcceptSalary = Math.round(p.salary * 0.6), resistanceFactor = 0.5 } = selectedDemand;
     const logs = dialogLogs[p.id] || [];
     const round = logs.filter(l => l.from === 'team').length + 1;
 
-    appendLog(p.id, { from: 'team', text: `「${fmtSal(offerSal)}、${offerYrs}年ではいかがでしょうか？」`, salary: offerSal, years: offerYrs });
+    appendLog(p.id, { from: 'team', text: `「${fmtSal(sanitizedOfferSal)}、${offerYrs}年ではいかがでしょうか？」`, salary: sanitizedOfferSal, years: offerYrs });
 
     if (settled[p.id]) return;
 
-    const score = evalOffer(p, { salary: offerSal, years: offerYrs }, myTeam, teams).total;
+    const isDemandMet = sanitizedOfferSal >= demandSalary && offerYrs >= 1;
+    const score = evalOffer(p, { salary: sanitizedOfferSal, years: offerYrs }, myTeam, teams).total;
     const acceptScore = round === 1
       ? ACCEPT_THRESHOLD + Math.round(resistanceFactor * 20)
       : ACCEPT_THRESHOLD;
 
-    if (score >= acceptScore) {
-      const moraleDelta = offerSal >= demandSalary ? NEGOTIATION_MORALE_ACCEPT_BONUS
-                        : offerSal < p.salary * 0.90 ? NEGOTIATION_MORALE_CUT_PENALTY : 0;
+    if (isDemandMet || score >= acceptScore) {
+      const moraleDelta = sanitizedOfferSal >= demandSalary ? NEGOTIATION_MORALE_ACCEPT_BONUS
+                        : sanitizedOfferSal < p.salary * 0.90 ? NEGOTIATION_MORALE_CUT_PENALTY : 0;
       const extraRounds = Math.max(0, round - 1);
       const finalMorale = clamp(moraleDelta + NEGOTIATION_MORALE_ROUND_HIT * extraRounds, -30, 10);
       const trustDelta  = round === 1 ? NEGOTIATION_TRUST_HAPPY : NEGOTIATION_TRUST_HOLDOUT;
-      appendLog(p.id, { from: 'player', text: buildAcceptText(offerSal), accepted: true });
+      appendLog(p.id, { from: 'player', text: buildAcceptText(sanitizedOfferSal), accepted: true });
       setSettled(prev => ({ ...prev, [p.id]: 'signed' }));
-      onSign(p.id, offerSal, offerYrs, finalMorale, trustDelta);
+      onSign(p.id, sanitizedOfferSal, offerYrs, finalMorale, trustDelta);
     } else if (round >= CPU_RENEWAL_ROUNDS) {
       const threshold = getFaThreshold(p);
       const days = p.daysOnActiveRoster ?? (p.serviceYears ?? 0) * 120;
@@ -1110,22 +1118,36 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, onSign,
         setSettled(prev => ({ ...prev, [p.id]: 'fa' }));
       } else {
         appendLog(p.id, { from: 'player', text: buildFinalRejectText(), accepted: false });
-        setSettled(prev => ({ ...prev, [p.id]: 'rejected' }));
+        appendLog(p.id, { from: 'player', text: buildRetryText(), accepted: false });
+        setSettled(prev => ({ ...prev, [p.id]: 'cooldown' }));
       }
     } else {
-      const counter = Math.max(minAcceptSalary, calcCounterOffer(offerSal, demandSalary, round));
-      appendLog(p.id, { from: 'player', text: buildCounterText(offerSal, counter) });
+      const counter = Math.max(minAcceptSalary, calcCounterOffer(sanitizedOfferSal, demandSalary, round));
+      appendLog(p.id, { from: 'player', text: buildCounterText(sanitizedOfferSal, counter) });
       setOfferSal(counter);
     }
   };
 
-  const canAdvance = expiringPlayers.every(p => (dialogLogs[p.id] || []).length > 0 || settled[p.id]);
+  const canAdvance = expiringPlayers.every(p => {
+    const status = settled[p.id];
+    return status && status !== 'cooldown';
+  });
+
+  const handleRetryNegotiation = (player) => {
+    if (!player) return;
+    setRetryCount(prev => ({ ...prev, [player.id]: (prev[player.id] || 0) + 1 }));
+    setSettled(prev => ({ ...prev, [player.id]: undefined }));
+    setDialogLogs(prev => ({ ...prev, [player.id]: [] }));
+    const d = demands?.[player.id];
+    const nextOffer = Math.max(Math.round((d?.minAcceptSalary || player.salary * 0.6)), Math.round((d?.demandSalary || player.salary) * 0.95));
+    setOfferSal(nextOffer);
+  };
 
   const statusBadge = (p) => {
     const s = settled[p.id];
     if (s === 'signed')   return <span style={{ color: '#16a34a', fontWeight: 700 }}>✅ 合意</span>;
     if (s === 'fa')       return <span style={{ color: '#7c3aed', fontWeight: 700 }}>🚪 FA宣言</span>;
-    if (s === 'rejected') return <span style={{ color: '#dc2626', fontWeight: 700 }}>❌ 拒否</span>;
+    if (s === 'cooldown') return <span style={{ color: '#f59e0b', fontWeight: 700 }}>⏳ 再交渉待ち</span>;
     if (s === 'released') return <span style={{ color: '#6b7280', fontWeight: 700 }}>📋 戦力外</span>;
     if ((dialogLogs[p.id] || []).length > 0) return <span style={{ color: '#d97706', fontWeight: 700 }}>💬 交渉中</span>;
     return <span style={{ color: '#6b7280' }}>📩 未交渉</span>;
@@ -1161,12 +1183,20 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, onSign,
               <div style={{ fontWeight: 700, fontSize: 13 }}>{p.name}</div>
               <div style={{ fontSize: 11, color: '#6b7280' }}>{p.pos} {p.age}歳 / {fmtSal(p.salary)}</div>
               <div style={{ fontSize: 11, marginTop: 3 }}>{statusBadge(p)}</div>
-              {settled[p.id] === 'rejected' && (
+              {settled[p.id] === 'cooldown' && (
                 <button
                   onClick={(e) => { e.stopPropagation(); setSettled(prev => ({ ...prev, [p.id]: 'released' })); onRelease(p.id); }}
                   style={{ marginTop: 4, fontSize: 10, padding: '2px 6px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 3, cursor: 'pointer', color: '#dc2626' }}
                 >
                   戦力外
+                </button>
+              )}
+              {settled[p.id] === 'cooldown' && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleRetryNegotiation(p); }}
+                  style={{ marginTop: 4, marginLeft: 4, fontSize: 10, padding: '2px 6px', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 3, cursor: 'pointer', color: '#b45309' }}
+                >
+                  再交渉
                 </button>
               )}
             </div>
@@ -1191,8 +1221,22 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, onSign,
                   要求推定: {fmtSal(selectedDemand.demandSalary || selectedPlayer.salary)}
                 </div>
                 <div style={{ fontSize: 11, color: '#9ca3af' }}>
-                  morale {Math.round(selectedPlayer.morale ?? 70)} / trust {Math.round(selectedPlayer.trust ?? 50)}
+                  morale {Math.round(selectedPlayer.morale ?? 70)} / trust {Math.round(selectedPlayer.trust ?? 50)} / 再交渉 {retryCount[selectedPlayer.id] || 0} 回
                 </div>
+              </div>
+
+              <div style={{ padding: '8px 16px', borderBottom: '1px solid #e5e7eb', background: '#fff' }}>
+                {selectedPlayer.isPitcher ? (
+                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12, color: '#334155' }}>
+                    <span>能力: 球速 {selectedPlayer.pitching?.velocity ?? 50} / 制球 {selectedPlayer.pitching?.control ?? 50} / 変化 {selectedPlayer.pitching?.breaking ?? 50} / スタミナ {selectedPlayer.pitching?.stamina ?? 50}</span>
+                    <span>成績: 防御率 {(selectedPlayer.stats?.IP || 0) > 0 ? (((selectedPlayer.stats?.ER || 0) / ((selectedPlayer.stats?.IP || 1) / 9)).toFixed(2)) : '-.--'} / 勝 {selectedPlayer.stats?.W || 0} / S {selectedPlayer.stats?.SV || 0}</span>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12, color: '#334155' }}>
+                    <span>能力: ミート {selectedPlayer.batting?.contact ?? 50} / 長打 {selectedPlayer.batting?.power ?? 50} / 選球 {selectedPlayer.batting?.eye ?? 50} / 走力 {selectedPlayer.batting?.speed ?? 50}</span>
+                    <span>成績: 打率 {(selectedPlayer.stats?.AB || 0) > 0 ? fmtAvg(selectedPlayer.stats?.H || 0, selectedPlayer.stats?.AB || 0) : '.---'} / 本塁打 {selectedPlayer.stats?.HR || 0} / 打点 {selectedPlayer.stats?.RBI || 0} / OPS {(((selectedPlayer.stats?.AB || 0) > 0) ? (((selectedPlayer.stats?.H || 0) + (selectedPlayer.stats?.BB || 0)) / ((selectedPlayer.stats?.AB || 0) + (selectedPlayer.stats?.BB || 0))) : 0).toFixed(3)}</span>
+                  </div>
+                )}
               </div>
 
               <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
