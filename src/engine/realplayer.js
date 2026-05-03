@@ -48,7 +48,7 @@ function validateYearOrNull(yearValue) {
   return y;
 }
 
-function resolveInitialContractYears(teamName, playerName) {
+export function resolveInitialContractYears(teamName, playerName) {
   const safeTeam = normalizeContractKey(teamName);
   const safePlayer = normalizeContractKey(playerName);
   if (!safeTeam || !safePlayer) return 1;
