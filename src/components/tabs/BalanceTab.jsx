@@ -282,3 +282,119 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
   }, [leagueEnv, mcBusy]);
 
 
+
+  const cancelMonteCarloValidation = useCallback(() => {
+    if (!mcBusy || !workerRef.current || !taskIdRef.current) return;
+    workerRef.current.postMessage({ type: 'CANCEL', payload: { taskId: taskIdRef.current } });
+  }, [mcBusy]);
+
+  return (
+    <section className="card" style={{ display: 'grid', gap: 12 }}>
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <h3 style={{ margin: 0 }}>バランス検証</h3>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="btn" onClick={doSim} disabled={busy || mcBusy}>
+            {busy ? '実行中…' : 'クイックシム実行'}
+          </button>
+          <button className="btn" onClick={doMonteCarloValidation} disabled={busy || mcBusy}>
+            {mcBusy ? '検証中…' : 'Monte Carlo検証'}
+          </button>
+          <button className="btn" onClick={cancelMonteCarloValidation} disabled={!mcBusy}>
+            検証キャンセル
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+        <div className="chip">BA: {league ? ba3(league.ba) : '-'} {league && <StatusBadge val={league.ba} baseline={REF.ba} />}</div>
+        <div className="chip">K%: {league ? pct(league.kPct) : '-'} {league && <StatusBadge val={league.kPct} baseline={REF.kPct} invert />}</div>
+        <div className="chip">BB%: {league ? pct(league.bbPct) : '-'} {league && <StatusBadge val={league.bbPct} baseline={REF.bbPct} />}</div>
+        <div className="chip">HR%: {league ? pct(league.hrPct) : '-'} {league && <StatusBadge val={league.hrPct} baseline={REF.hrPct} />}</div>
+        <div className="chip">ERA: {league?.era != null ? league.era.toFixed(2) : '-'} {league?.era != null && <StatusBadge val={league.era} baseline={REF.era} invert />}</div>
+      </div>
+
+      <div style={{ overflowX: 'auto' }}>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>ケース</th><th>BA</th><th>ΔBA</th><th>K%</th><th>ΔK%</th><th>BB%</th><th>ΔBB%</th><th>HR%</th><th>ΔHR%</th>
+            </tr>
+          </thead>
+          <tbody>
+            {simRows.map((r) => (
+              <tr key={r.label}>
+                <td>{r.label}</td>
+                <td style={{ color: batColor(r.ba, REF.ba) }}>{ba3(r.ba)}</td>
+                <td><Diff val={r.ba} baseline={REF.ba} fmt={baFmt} /></td>
+                <td style={{ color: batColor(r.kPct, REF.kPct, true) }}>{pct(r.kPct)}</td>
+                <td><Diff val={r.kPct} baseline={REF.kPct} fmt={ppFmt} invert /></td>
+                <td style={{ color: batColor(r.bbPct, REF.bbPct) }}>{pct(r.bbPct)}</td>
+                <td><Diff val={r.bbPct} baseline={REF.bbPct} fmt={ppFmt} /></td>
+                <td style={{ color: batColor(r.hrPct, REF.hrPct) }}>{pct(r.hrPct)}</td>
+                <td><Diff val={r.hrPct} baseline={REF.hrPct} fmt={ppFmt} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <section style={{ display: 'grid', gap: 8 }}>
+        <h4 style={{ margin: 0 }}>リーグ環境パラメータ</h4>
+        {LEAGUE_ENV_SLIDER_CONFIG.map((sliderDef) => {
+          const currentValue = sanitizeLeagueEnvValue(leagueEnv[sliderDef.key], sliderDef.min, sliderDef.max, 1);
+          return (
+            <div key={sliderDef.key} style={{ display: 'grid', gap: 4 }}>
+              <label htmlFor={`league-env-${sliderDef.key}`}>{sliderDef.label}: {currentValue.toFixed(2)} <span style={{ color: '#94a3b8' }}>（{sliderDef.desc}）</span></label>
+              <input
+                id={`league-env-${sliderDef.key}`}
+                type="range"
+                min={sliderDef.min}
+                max={sliderDef.max}
+                step={sliderDef.step}
+                value={currentValue}
+                onChange={(event) => handleLeagueEnvSliderChange(sliderDef.key, event.target.value)}
+              />
+            </div>
+          );
+        })}
+        <div>
+          <button className="btn" onClick={handleResetLeagueEnv} disabled={busy || mcBusy}>デフォルトに戻す</button>
+        </div>
+      </section>
+
+      {mcError && <div style={{ color: '#f87171' }}>{mcError}</div>}
+      {mcProgress && <div style={{ color: '#94a3b8' }}>進捗: {mcProgress.completedPa} / {mcProgress.totalPa}</div>}
+      {mcRows.length > 0 && (
+        <section>
+          <h4 style={{ marginTop: 0 }}>Monte Carlo結果</h4>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>プロファイル</th><th>PA</th><th>BIP</th><th>HR/BIP</th><th>HR/PA</th><th>推定チームHR/G</th><th>平均EV</th><th>平均LA</th><th>平均飛距離</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mcRows.map((row) => (
+                  <tr key={row.label}>
+                    <td>{row.label}</td>
+                    <td>{row.result?.pa ?? '-'}</td>
+                    <td>{row.result?.bip ?? '-'}</td>
+                    <td>{pct(row.result?.hrPerBip ?? 0)}</td>
+                    <td>{pct(row.result?.hrPerPa ?? 0)}</td>
+                    <td>{(row.result?.teamHrPerGame ?? 0).toFixed(2)}</td>
+                    <td>{(row.result?.avgEv ?? 0).toFixed(1)}</td>
+                    <td>{(row.result?.avgLa ?? 0).toFixed(1)}</td>
+                    <td>{(row.result?.avgDistance ?? 0).toFixed(1)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+    </section>
+  );
+}
+
+export default BalanceTab;
