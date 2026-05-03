@@ -7,6 +7,57 @@ import { emptyStats, makePlayer, applyPositionFields } from './player';
    実成績 → ゲーム内能力値（30〜95スケール）に変換
 ═══════════════════════════════════════════════ */
 
+
+
+// 2026年開幕時点の複数年契約の終了年テーブル（キー: チーム名::選手名）
+// 値は「契約が切れるシーズン年」。例: 2026 は2026シーズン終了で満了を意味する。
+// ⚠️ 外部ソースで終了年が不明な選手は null とし、後段で保守値を適用する。
+const MULTI_YEAR_CONTRACT_END_YEAR_2026 = new Map([
+  ['読売ジャイアンツ::中川　皓太', 2026], ['読売ジャイアンツ::高梨　雄平', 2027], ['読売ジャイアンツ::吉川　尚輝', 2027], ['読売ジャイアンツ::丸　佳浩', 2027], ['読売ジャイアンツ::甲斐　拓也', 2029],
+  ['中日ドラゴンズ::柳　裕也', 2028], ['中日ドラゴンズ::藤嶋　健人', 2028], ['中日ドラゴンズ::高橋　周平', 2026],
+  ['東京ヤクルトスワローズ::田口　麗斗', 2026], ['東京ヤクルトスワローズ::中村　悠平', 2027], ['東京ヤクルトスワローズ::山田　哲人', 2027],
+  ['広島東洋カープ::菊池　涼介', 2026], ['広島東洋カープ::大瀬良　大地', 2026],
+  ['阪神タイガース::岩崎　優', 2026], ['阪神タイガース::岩貞　祐太', 2026], ['阪神タイガース::坂本　誠志郎', 2028], ['阪神タイガース::近本　光司', 2030], ['阪神タイガース::大山　悠輔', 2029], ['阪神タイガース::西　勇輝', 2026],
+  ['横浜DeNAベイスターズ::山﨑　康晃', 2028], ['横浜DeNAベイスターズ::森原　康平', 2027], ['横浜DeNAベイスターズ::宮﨑　敏郎', 2027], ['横浜DeNAベイスターズ::佐野　恵太', 2027], ['横浜DeNAベイスターズ::筒香　嘉智', 2026],
+  ['北海道日本ハムファイターズ::加藤　貴之', 2027], ['北海道日本ハムファイターズ::有原　航平', 2029], ['北海道日本ハムファイターズ::山﨑　福也', 2027],
+  ['埼玉西武ライオンズ::外崎　修汰', 2026], ['埼玉西武ライオンズ::源田　壮亮', 2027],
+  ['福岡ソフトバンクホークス::近藤　健介', 2029], ['福岡ソフトバンクホークス::山川　穂高', 2027], ['福岡ソフトバンクホークス::柳田　悠岐', 2026], ['福岡ソフトバンクホークス::周東　佑京', 2030], ['福岡ソフトバンクホークス::上沢　直之', 2028], ['福岡ソフトバンクホークス::牧原　大成', 2026],
+  ['東北楽天ゴールデンイーグルス::辛島　航', 2026], ['東北楽天ゴールデンイーグルス::浅村　栄斗', 2026],
+  ['千葉ロッテマリーンズ::西野　勇士', 2027], ['千葉ロッテマリーンズ::中村　奨吾', 2026], ['千葉ロッテマリーンズ::岡　大海', 2026],
+  ['オリックス・バファローズ::森　友哉', 2026], ['オリックス・バファローズ::西川　龍馬', 2027], ['オリックス・バファローズ::若月　健矢', null], ['オリックス・バファローズ::岩嵜　翔', 2026], ['オリックス・バファローズ::西野　真弘', 2026],
+]);
+
+const GAME_START_YEAR = 2026;
+const UNKNOWN_END_YEAR_FALLBACK = 2027; // 終了年不明時は2シーズン残っている前提
+
+function normalizeContractKey(raw) {
+  if (typeof raw !== 'string') return '';
+  return raw.replace(/[\s　]+/g, '').trim();
+}
+
+function validateYearOrNull(yearValue) {
+  if (yearValue === null) return null;
+  if (typeof yearValue !== 'number' || !Number.isFinite(yearValue)) return null;
+  const y = Math.floor(yearValue);
+  if (y < GAME_START_YEAR || y > GAME_START_YEAR + 10) return null;
+  return y;
+}
+
+function resolveInitialContractYears(teamName, playerName) {
+  const safeTeam = normalizeContractKey(teamName);
+  const safePlayer = normalizeContractKey(playerName);
+  if (!safeTeam || !safePlayer) return 1;
+
+  const key = `${safeTeam}::${safePlayer}`;
+  const rawEndYear = MULTI_YEAR_CONTRACT_END_YEAR_2026.get(key);
+  if (rawEndYear === undefined) return 1;
+
+  const validatedEndYear = validateYearOrNull(rawEndYear);
+  const resolvedEndYear = validatedEndYear ?? UNKNOWN_END_YEAR_FALLBACK;
+  const yearsLeft = resolvedEndYear - GAME_START_YEAR + 1;
+  return clamp(yearsLeft, 1, 7);
+}
+
 // 線形スケール変換
 function sc(val, inMin, inMax, outMin, outMax) {
   if (inMax === inMin) return Math.round((outMin + outMax) / 2);
@@ -142,7 +193,7 @@ export function realBatterToPlayer(b, teamDef) {
     potential: clamp(sc(OPS, 0.60, 1.05, 55, 96) + rng(-5, 8), 55, 99),
     isPitcher: false, isForeign,
     salary: salary ?? 5000000,
-    contractYears: rng(1, 4), contractYearsLeft: rng(1, 3),
+    contractYears: resolveInitialContractYears(teamDef.name, name), contractYearsLeft: resolveInitialContractYears(teamDef.name, name),
     育成: false, isFA: false,
     condition: rng(85, 100),
     injury: null, injuryDaysLeft: 0,
@@ -206,7 +257,7 @@ export function realPitcherToPlayer(p, teamDef) {
     hand,
     subtype,
     salary: salary ?? 5000000,
-    contractYears: rng(1, 4), contractYearsLeft: rng(1, 3),
+    contractYears: resolveInitialContractYears(teamDef.name, name), contractYearsLeft: resolveInitialContractYears(teamDef.name, name),
     育成: false, isFA: false,
     condition: rng(85, 100),
     injury: null, injuryDaysLeft: 0,
