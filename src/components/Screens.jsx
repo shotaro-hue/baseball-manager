@@ -20,15 +20,47 @@ export function ModeSelectScreen({myTeam,oppTeam,gameDay,onSelect,onBack}){
           <span style={{fontSize:22}}>{oppTeam?.emoji}</span>
         </div>
 
-        <div className="mode-card auto" onClick={()=>onSelect("auto")}>
-          <div style={{fontSize:42,marginBottom:10}}>⚡</div>
-          <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:28,color:"#34d399",letterSpacing:".1em",marginBottom:6}}>
-            オートシムモード
+        <div style={{display:"grid",gap:14,width:"100%",maxWidth:520,marginBottom:8}}>
+          <div
+            className="mode-card tactical"
+            role="button"
+            tabIndex={0}
+            onClick={()=>onSelect?.("tactical")}
+            onKeyDown={(event)=>{
+              if(event.key!=="Enter"&&event.key!==" ") return;
+              event.preventDefault();
+              onSelect?.("tactical");
+            }}
+          >
+            <div style={{fontSize:42,marginBottom:10}}>🎮</div>
+            <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:28,color:"#f5c842",letterSpacing:".1em",marginBottom:6}}>
+              戦術モード
+            </div>
+            <div style={{fontSize:12,color:"#4b5563",lineHeight:1.6}}>
+              既存の TacticalGame 画面【＝打席ごとの指示ができる対戦UI】を利用して試合を進行します。<br/>
+              継投・代打・作戦を手動で判断したい場合はこちらを選択してください。
+            </div>
           </div>
-          <div style={{fontSize:12,color:"#4b5563",lineHeight:1.6}}>
-            既存の試合進行画面【＝現在の標準UI】で結果を確認。<br/>
-            試合は自動で進み、シーズン運営に集中できます。<br/>
-            <span style={{color:"#34d399",fontSize:11}}>★ 現在はこちらのモードのみ利用可能</span>
+
+          <div
+            className="mode-card auto"
+            role="button"
+            tabIndex={0}
+            onClick={()=>onSelect?.("auto")}
+            onKeyDown={(event)=>{
+              if(event.key!=="Enter"&&event.key!==" ") return;
+              event.preventDefault();
+              onSelect?.("auto");
+            }}
+          >
+            <div style={{fontSize:42,marginBottom:10}}>⚡</div>
+            <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:28,color:"#34d399",letterSpacing:".1em",marginBottom:6}}>
+              オートシムモード
+            </div>
+            <div style={{fontSize:12,color:"#4b5563",lineHeight:1.6}}>
+              既存の試合進行画面【＝現在の標準UI】で結果を確認。<br/>
+              試合は自動で進み、シーズン運営に集中できます。
+            </div>
           </div>
         </div>
 
