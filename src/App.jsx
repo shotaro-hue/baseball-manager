@@ -337,16 +337,23 @@ export default function App(){
                 <input type="checkbox" checked={batchAutoManage} onChange={e=>setBatchAutoManage(e.target.checked)} style={{accentColor:"#34d399",cursor:"pointer"}}/>
                 自動編成も実行
               </label>
-              <button style={{background:"transparent",border:"none",color:"#60a5fa",fontSize:11,cursor:"pointer",padding:"2px 4px",fontFamily:"'Bebas Neue',cursive",letterSpacing:".15em"}} onClick={()=>sf.handleBatchSim(eff,batchAutoManage)}>⚡ まとめてシム</button>
+              <button style={{background:"transparent",border:"none",color:"#60a5fa",fontSize:11,cursor:sf.batchProgress?"not-allowed":"pointer",padding:"2px 4px",fontFamily:"'Bebas Neue',cursive",letterSpacing:".15em",opacity:sf.batchProgress?0.5:1}} disabled={!!sf.batchProgress} onClick={()=>sf.handleBatchSim(eff,batchAutoManage)}>⚡ まとめてシム</button>
             </div>
           );
         })()}
+        {sf.batchProgress&&(
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,background:"linear-gradient(135deg,#071a2c,#0d2840)",border:"1px solid rgba(96,165,250,.5)",borderRadius:10,padding:"8px 6px",minWidth:80}}>
+            <div style={{fontSize:9,color:"#7dd3fc",letterSpacing:".05em"}}>シミュレーション中</div>
+            <div style={{fontSize:13,color:"#60a5fa",fontWeight:700,fontFamily:"'Share Tech Mono',monospace"}}>{sf.batchProgress.current}/{sf.batchProgress.total}</div>
+            <div style={{width:"100%",height:4,background:"rgba(96,165,250,.2)",borderRadius:2}}><div style={{height:"100%",background:"#60a5fa",borderRadius:2,width:`${Math.round(sf.batchProgress.current/sf.batchProgress.total*100)}%`,transition:"width .1s"}}/></div>
+          </div>
+        )}
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5,background:"linear-gradient(135deg,#1a0730,#2d0f50)",border:"1px solid rgba(167,139,250,.5)",borderRadius:10,padding:"8px 6px"}}>
           <label style={{display:"flex",alignItems:"center",gap:4,fontSize:9,color:seasonAutoManage?"#c4b5fd":"#6b7280",cursor:"pointer",userSelect:"none"}}>
             <input type="checkbox" checked={seasonAutoManage} onChange={e=>setSeasonAutoManage(e.target.checked)} style={{accentColor:"#a78bfa",cursor:"pointer"}}/>
             自動編成も実行
           </label>
-          <button className="sim-btn" style={{margin:0,fontSize:12,width:"100%",background:"transparent",border:"none",boxShadow:"none",color:"#a78bfa",padding:"2px 4px"}} onClick={()=>sf.handleSeasonSim(seasonAutoManage)}>
+          <button className="sim-btn" style={{margin:0,fontSize:12,width:"100%",background:"transparent",border:"none",boxShadow:"none",color:"#a78bfa",padding:"2px 4px",opacity:sf.batchProgress?0.5:1}} disabled={!!sf.batchProgress} onClick={()=>sf.handleSeasonSim(seasonAutoManage)}>
             🚀 残り全{remain}試合<br/>
             <span style={{fontSize:9,opacity:.7}}>
               {(()=>{const s=gameDayToDate(gameDay,schedule);const e=gameDayToDate(SEASON_GAMES,schedule);return s&&e?`${s.month}/${s.day}〜${e.month}/${e.day}`:"シーズン一括";})()}
