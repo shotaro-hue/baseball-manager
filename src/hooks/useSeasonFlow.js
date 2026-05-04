@@ -877,6 +877,7 @@ export function useSeasonFlow(gs) {
       });
     };
     isBatchCancelledRef.current = false;
+    gs.setIsAutoSaveSuspended(true);
     const CHUNK_SIZE = 3;
     const MAX_BATCH_BOX_SCORE_KEEP = 120;
     const makeCompactBoxScoreRecord = ({ homeId, awayId, dayNo, cr, bs, homeName, awayName }) => ({
@@ -1083,7 +1084,7 @@ export function useSeasonFlow(gs) {
     await new Promise(r => setTimeout(r, 0));
     updateBatchProgress(safeCount, safeCount, "保存");
     const nextMailbox = batchTradeMails.length ? [...mailbox, ...batchTradeMails] : mailbox;
-    const batchSaveResult=saveGame({teams:newTeams,myId,gameDay:newDay,year,faPool:newFaPool,faYears,seasonHistory,news,mailbox:nextMailbox});
+    const batchSaveResult=saveGame({teams:newTeams,myId,gameDay:newDay,year,faPool:newFaPool,faYears,seasonHistory,news,mailbox:nextMailbox},{skipBackupRotation:true,preferMainSave:true});
     if(batchSaveResult.ok) setSaveExists(true);
     updateBatchProgress(safeCount, safeCount, "結果集計");
     results.filter(r=>r.type==='trade_news').forEach(r=>{
@@ -1181,6 +1182,7 @@ export function useSeasonFlow(gs) {
       notify("⚠️ バッチ処理中にエラーが発生しました", "error");
     } finally {
       setBatchProgress(null);
+      gs.setIsAutoSaveSuspended(false);
     }
     if (!completedSuccessfully) return;
     if(newDay-1>=SEASON_GAMES){const withFarm=runFarmSeason(newTeams);setTeams(withFarm);setPlayoff(initPlayoff(withFarm));setScreen("playoff");}

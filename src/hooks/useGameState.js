@@ -2,7 +2,7 @@ import { useState, useReducer, useMemo, useCallback, useEffect } from "react";
 import { gameStateReducer, G } from './gameStateReducer';
 import { uid, clamp, rng, pname, scoutedValue, fmtSal } from '../utils';
 import { buildTeam, makePlayer, resolveTrainingFocusFromGoal, generateForeignFaPool } from '../engine/player';
-import { saveGame, hasSave } from '../engine/saveload';
+import { saveGame, hasSave, getAutoSaveIntervalMs } from '../engine/saveload';
 import { generateSeasonSchedule, calcAllStarTriggerDay } from '../engine/scheduleGen';
 import { buildRealTeam } from '../engine/realplayer';
 import { NPB2025_ROSTERS } from '../data/npb2025';
@@ -60,6 +60,9 @@ export function useGameState() {
   const [allStarDone, setAllStarDone] = useState(false);
   const [allStarResult, setAllStarResult] = useState(null);
   const [allStarTriggerDay, setAllStarTriggerDay] = useState(72);
+  const [isAutoSaveSuspended, setIsAutoSaveSuspended] = useState(false);
+  const [saveDirty, setSaveDirty] = useState(false);
+  const [lastAutoSaveAt, setLastAutoSaveAt] = useState(0);
 
   // gameDay が進んだとき、記者会見インターバルを超えていれば会見イベントをセット
   useEffect(()=>{
@@ -187,17 +190,25 @@ export function useGameState() {
     });
   },[mailbox, gameDay, myTeam, myId, upd, notify, addToHistory, setFaPool, year]);
 
+  useEffect(()=>{
+    if(!myId) return;
+    setSaveDirty(true);
+  },[teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox]);
+
   // オートセーブ（hubに戻った時）
   useEffect(()=>{
-    if(screen!=='hub') return;
+    if(screen!=='hub' || isAutoSaveSuspended || !saveDirty) return;
+    const now = Date.now();
+    const intervalMs = getAutoSaveIntervalMs();
+    if (lastAutoSaveAt > 0 && now - lastAutoSaveAt < intervalMs) return;
     const result=saveGame({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox});
-    if(result.ok){setSaveExists(true);notify('💾 オートセーブ','ok');}
+    if(result.ok){setSaveExists(true);setSaveDirty(false);setLastAutoSaveAt(now);notify('💾 オートセーブ','ok');}
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[screen]);
+  },[screen,isAutoSaveSuspended,saveDirty,lastAutoSaveAt,teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox]);
 
   const handleSave = useCallback(()=>{
     const result=saveGame({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox});
-    if(result.ok) setSaveExists(true);
+    if(result.ok){ setSaveExists(true); setSaveDirty(false); }
     notify(result.ok?'💾 セーブしました':result.quota?'💾 ストレージ容量が不足しています':'セーブに失敗しました',result.ok?'ok':'warn');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,notify]);
@@ -535,6 +546,8 @@ export function useGameState() {
     allStarDone, setAllStarDone,
     allStarResult, setAllStarResult,
     allStarTriggerDay, setAllStarTriggerDay,
+    isAutoSaveSuspended, setIsAutoSaveSuspended,
+    saveDirty, setSaveDirty,
     // derived
     myTeam,
     tabBadges,
