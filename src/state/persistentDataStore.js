@@ -3,6 +3,11 @@
 function sanitizeArray(input) {
   return Array.isArray(input) ? input : [];
 }
+function sanitizePositiveInteger(input, fallback) {
+  const value = Number(input);
+  if (Number.isInteger(value) && value > 0) return value;
+  return fallback;
+}
 
 function toSafeId(value) {
   if (typeof value === 'string' || typeof value === 'number') return String(value);
@@ -34,6 +39,35 @@ export function createPersistentDataStore(initialData = {}) {
   };
 
   return {
+    selectNewsList(options = {}) {
+      const safeNews = sanitizeArray(store.news);
+      const safeOptions = options && typeof options === 'object' ? options : {};
+      const limit = sanitizePositiveInteger(safeOptions.limit, safeNews.length || 50);
+      return safeNews.slice(0, limit);
+    },
+    selectMailboxList(options = {}) {
+      const safeMailbox = sanitizeArray(store.mailbox);
+      const safeOptions = options && typeof options === 'object' ? options : {};
+      const limit = sanitizePositiveInteger(safeOptions.limit, safeMailbox.length || 50);
+      return safeMailbox.slice(0, limit);
+    },
+    selectUnreadMailboxCount(currentGameDay) {
+      const safeMailbox = sanitizeArray(store.mailbox);
+      const safeGameDay = Number.isFinite(Number(currentGameDay)) ? Number(currentGameDay) : 0;
+      return safeMailbox.reduce((count, item) => {
+        if (!item || typeof item !== 'object') return count;
+        const deliverOnDay = Number(item.deliverOnDay ?? 0);
+        if (item.read === false && deliverOnDay <= safeGameDay) return count + 1;
+        return count;
+      }, 0);
+    },
+    selectLatestNewsId() {
+      const safeNews = sanitizeArray(store.news);
+      if (safeNews.length === 0) return '';
+      const latest = safeNews[0];
+      if (!latest || typeof latest !== 'object') return '';
+      return toSafeId(latest.id);
+    },
     setSeasonHistory(nextValue) {
       store.seasonHistory = nextValue && typeof nextValue === 'object' ? nextValue : {};
       return store.seasonHistory;

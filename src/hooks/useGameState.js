@@ -121,6 +121,18 @@ export function useGameState() {
     setSaveRevision(prev=>prev+1);
     setSaveDirty(true);
   },[]);
+  const getNewsBySelector = useCallback((options = {}) => {
+    return persistentStoreRef.current.selectNewsList(options);
+  }, []);
+  const getMailboxBySelector = useCallback((options = {}) => {
+    return persistentStoreRef.current.selectMailboxList(options);
+  }, []);
+  const getUnreadMailboxCount = useCallback((currentGameDay) => {
+    return persistentStoreRef.current.selectUnreadMailboxCount(currentGameDay);
+  }, []);
+  const getLatestNewsId = useCallback(() => {
+    return persistentStoreRef.current.selectLatestNewsId();
+  }, []);
 
   // gameDay が進んだとき、記者会見インターバルを超えていれば会見イベントをセット
   useEffect(()=>{
@@ -638,6 +650,10 @@ export function useGameState() {
     saveDirty, setSaveDirty,
     saveRevision, setSaveRevision,
     persistentSummaries,
+    getNewsBySelector,
+    getMailboxBySelector,
+    getUnreadMailboxCount,
+    getLatestNewsId,
     markSaveDirty,
     // derived
     myTeam,

@@ -105,6 +105,10 @@ export default function App(){
   const [batchCount, setBatchCount] = useState(5);
   const [batchAutoManage, setBatchAutoManage] = useState(false);
   const [seasonAutoManage, setSeasonAutoManage] = useState(false);
+  const mailboxForView = gs.getMailboxBySelector({ limit: 200 });
+  const newsForView = gs.getNewsBySelector({ limit: 200 });
+  const unreadMailboxCount = gs.getUnreadMailboxCount(gameDay);
+  const latestNewsId = gs.getLatestNewsId();
 
   useEffect(() => {
     const sectionId = TAB_TO_SECTION[tab];
@@ -381,12 +385,12 @@ export default function App(){
     </div>
 
     <ErrorBoundary key={tab}>
-    {tab==="dashboard"&&<DashboardTab myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year} recentResults={gs.recentResults} mailbox={mailbox} faPool={faPool} onTabSwitch={handleTabChange}/>}
+    {tab==="dashboard"&&<DashboardTab myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year} recentResults={gs.recentResults} mailbox={mailboxForView} faPool={faPool} onTabSwitch={handleTabChange} unreadMailboxCount={unreadMailboxCount} latestNewsId={latestNewsId}/>}
     {tab==="roster"&&<RosterTab team={myTeam} onToggle={gs.toggleLineup} onReplaceLineup={gs.replaceLineup} onSetLineupOrder={gs.setLineupOrder} onSetRosterDhMode={gs.setRosterDhMode} onSetPlayerPosition={gs.setPlayerPosition} onSetStarter={gs.setStarter} onPromo={gs.promote} onDemo={gs.demote} onSetTrainingFocus={gs.setTrainingFocus} onConvertIkusei={gs.convertIkusei} onMoveRotation={gs.moveRotation} onRemoveFromRotation={gs.removeFromRotation} onSetPitchingPattern={gs.setPitchingPattern} onReplaceRotation={gs.replaceRotation} onReplaceFullRoster={gs.replaceFullRoster} onPlayerClick={gs.handlePlayerClick} onSetDevGoal={gs.setDevGoal} onPlayerTalk={gs.handlePlayerTalk} onSetConvertTarget={gs.setConvertTarget} gameDay={gameDay}/>}
     {tab==="schedule"&&<ScheduleTab schedule={schedule} gameDay={gameDay} myTeam={myTeam} teams={teams} year={year} gameResultsMap={gs.gameResultsMap} allStarDone={gs.allStarDone} allStarResult={gs.allStarResult} allStarTriggerDay={gs.allStarTriggerDay} scheduleArchive={gs.scheduleArchive||[]} onResultClick={dayNo=>{const r=gs.gameResultsMap[dayNo];if(r){sf.setGameResult({score:{my:r.myScore,opp:r.oppScore},log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:r.oppTeam,won:r.won,gameNo:dayNo,_source:"schedule"});setScreen("result");}}}/>}
     {tab==="records"&&<RecordsTab history={gs.seasonHistory}/>}
-    {tab==="news"&&<NewsTab news={news} onInterview={gs.handleInterview} seasonHistory={gs.seasonHistory} currentYear={year}/>}
-    {tab==="mailbox"&&<MailboxTab mailbox={mailbox} onRead={os.handleMailRead} onAction={os.handleMailAction} teams={teams} myTeam={myTeam} onTrade={os.handleTrade} onTeamClick={gs.handleTeamClick} gameDay={gameDay}/>}
+    {tab==="news"&&<NewsTab news={newsForView} onInterview={gs.handleInterview} seasonHistory={gs.seasonHistory} currentYear={year}/>}
+    {tab==="mailbox"&&<MailboxTab mailbox={mailboxForView} onRead={os.handleMailRead} onAction={os.handleMailAction} teams={teams} myTeam={myTeam} onTrade={os.handleTrade} onTeamClick={gs.handleTeamClick} gameDay={gameDay}/>}
     {tab==="trade"&&(()=>{const pendingTrades=mailbox.filter(m=>m.type==="trade"&&!m.resolved);return<TradeTab myTeam={myTeam} teams={teams} onTrade={os.handleTrade} cpuOffers={pendingTrades.map(m=>m.offer)} onAcceptOffer={(idx)=>os.handleMailAction(pendingTrades[idx].id,"accept")} onDeclineOffer={(idx)=>os.handleMailAction(pendingTrades[idx].id,"decline")} deadlinePassed={(()=>{const d=gameDayToDate(gameDay,schedule);return d?d.month>TRADE_DEADLINE_MONTH:gameDay>95;})()} onPlayerClick={gs.handlePlayerClick}/>;})()}
     {tab==="contract"&&<ContractTab team={myTeam} allTeams={teams} year={year} onOffer={os.handleContractOffer} onRelease={pid=>{const p=myTeam?.players.find(x=>x.id===pid);const popPenalty=(p?.salary??0)>POP_RELEASE_SALARY_THRESHOLD?POP_RELEASE_PENALTY:0;upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),popularity:Math.min(100,Math.max(0,(t.popularity??50)+popPenalty))}));if(p){addToHistory(myId,p,"自由契約");setFaPool(prev=>[...prev,{...p,isFA:true}]);}notify("放出しました","warn");}}/>}
     {tab==="alumni"&&<AlumniTab myTeam={myTeam}/>}
