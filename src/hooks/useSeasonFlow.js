@@ -506,23 +506,26 @@ export function useSeasonFlow(gs) {
     }));
   };
 
-  const publishAllStarNews = (asResult, dayLabel) => {
-    if (!asResult) return;
-    addNews({
+  const buildAllStarNewsItems = (asResult, dayLabel) => {
+    if (!asResult) return [];
+    return [{
       type: 'allstar',
       headline: `【オールスター第1戦】セ${asResult.game1.score.ce} - パ${asResult.game1.score.pa}`,
       source: 'NPB公式',
       dateLabel: `${year}年 ${dayLabel}日目`,
       body: `開催球場: ${asResult.venue}
 セ・リーグ選抜 ${asResult.game1.score.ce} - ${asResult.game1.score.pa} パ・リーグ選抜。MVP: ${asResult.game1.mvp?.name || '未選出'}。`,
-    });
-    addNews({
+    },{
       type: 'allstar',
       headline: `【オールスター第2戦】セ${asResult.game2.score.ce} - パ${asResult.game2.score.pa}`,
       source: 'NPB公式',
       dateLabel: `${year}年 ${dayLabel + 1}日目`,
       body: `セ・リーグ選抜 ${asResult.game2.score.ce} - ${asResult.game2.score.pa} パ・リーグ選抜。MVP: ${asResult.game2.mvp?.name || '未選出'}。`,
-    });
+    }];
+  };
+
+  const publishAllStarNews = (asResult, dayLabel) => {
+    buildAllStarNewsItems(asResult, dayLabel).forEach((item) => addNews(item));
   };
 
   // ポジション優先順（不足時の自動補完に使用）
@@ -907,6 +910,7 @@ export function useSeasonFlow(gs) {
     const batchInjuries = [];
     const cpuHighlights = [];
     const batchNewsItems = []; // 試合結果ニュース
+    let batchAllStarNewsItems = [];
     const batchBoxScores = []; // 最小フィールドのみ保持してメモリ使用量を抑制
 
     let completedSuccessfully = false;
@@ -1063,7 +1067,7 @@ export function useSeasonFlow(gs) {
         const asResult=runAllStarGame(rosters, year);
         newTeams=applyAllStarSelections(newTeams, rosters);
         allStarDoneLocal=true;
-        publishAllStarNews(asResult, newDay);
+        batchAllStarNewsItems = buildAllStarNewsItems(asResult, newDay);
         if(myId){
           setAllStarResult({ rosters, gameResult: asResult });
         }
@@ -1092,9 +1096,30 @@ export function useSeasonFlow(gs) {
         dateLabel:`${year}年 ${r.day}日目`,
         body:r.body,
       }));
+    const transferEntries = results
+      .filter(r=>r.type==='trade_news')
+      .map(r=>({
+        year,
+        day: r.day,
+        type: "trade",
+        headline: `【CPU間トレード】${r.sellerName} ↔ ${r.buyerName}`,
+        fromTeam: r.sellerName,
+        toTeam: r.buyerName,
+        playersIn: [r.buyerGetsName],
+        playersOut: [r.sellerGetsName],
+        detail: r.body,
+      }));
+    const allStarNewsItems = [...batchAllStarNewsItems];
     // バッチ試合結果ニュース（古い順に追加 → ニュースタブは新しい順表示）
     const gameNewsItems = [...batchNewsItems].reverse();
-    const nextNews = [...tradeNewsItems, ...gameNewsItems, ...batchForeignSignNews, ...news];
+    const nowTimestamp = Date.now();
+    const normalizedBatchNews = [...tradeNewsItems, ...gameNewsItems, ...batchForeignSignNews, ...allStarNewsItems]
+      .map((item, index) => ({
+        ...item,
+        id: uid(),
+        timestamp: nowTimestamp - index,
+      }));
+    const nextNews = [...normalizedBatchNews, ...news].slice(0,50);
 
     let nextMailbox = batchTradeMails.length ? [...mailbox, ...batchTradeMails] : [...mailbox];
     if(batchForeignSignings.length){
@@ -1118,6 +1143,12 @@ export function useSeasonFlow(gs) {
       }];
     }
 
+    const existingSeasonHistory = seasonHistory && typeof seasonHistory === 'object' ? seasonHistory : {};
+    const existingTransfers = Array.isArray(existingSeasonHistory.transfers) ? existingSeasonHistory.transfers : [];
+    const nextSeasonHistory = {
+      ...existingSeasonHistory,
+      transfers: [...existingTransfers, ...transferEntries],
+    };
     const nextState = {
       teams:newTeams,
       myId,
@@ -1125,7 +1156,7 @@ export function useSeasonFlow(gs) {
       year,
       faPool:newFaPool,
       faYears,
-      seasonHistory,
+      seasonHistory:nextSeasonHistory,
       news:nextNews,
       mailbox:nextMailbox,
     };
@@ -1137,19 +1168,7 @@ export function useSeasonFlow(gs) {
       console.warn('[BatchSave] saveGame failed at batch end', batchSaveResult);
     }
     updateBatchProgress(safeCount, safeCount, "結果集計");
-    results.filter(r=>r.type==='trade_news').forEach(r=>{
-      addTransferLog({
-        year,
-        day: r.day,
-        type: "trade",
-        headline: `【CPU間トレード】${r.sellerName} ↔ ${r.buyerName}`,
-        fromTeam: r.sellerName,
-        toTeam: r.buyerName,
-        playersIn: [r.buyerGetsName],
-        playersOut: [r.sellerGetsName],
-        detail: r.body,
-      });
-    });
+    transferEntries.forEach((entry)=> addTransferLog(entry));
     if(batchTradeMails.length){
       notify(`📨 バッチ中にトレードオファーが${batchTradeMails.length}件届きました`,'ok');
     }
@@ -1159,6 +1178,7 @@ export function useSeasonFlow(gs) {
     if(newFaPool.length!==faPool.length) setFaPool(newFaPool);
     setNews(nextNews);
     setMailbox(nextMailbox);
+    upd({ seasonHistory: nextSeasonHistory });
     setTeams(newTeams);
     setGameDay(newDay);
     if(allStarDoneLocal) setAllStarDone(true);
