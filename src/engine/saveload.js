@@ -159,6 +159,109 @@ function getJsonByteSize(value) {
   }
 }
 
+
+function collectObjectFieldSizes(target, fieldNames) {
+  const fieldSizes = [];
+  fieldNames.forEach((fieldName) => {
+    const fieldValue = target?.[fieldName];
+    const byteSize = getJsonByteSize(fieldValue);
+    if (byteSize >= 0) fieldSizes.push({ key: fieldName, byteSize });
+  });
+  return fieldSizes;
+}
+
+function summarizeTopObjectFields(target, limit = 5) {
+  if (!target || typeof target !== 'object' || Array.isArray(target)) return [];
+  return Object.keys(target)
+    .map((key) => ({ key, byteSize: getJsonByteSize(target[key]) }))
+    .filter((entry) => entry.byteSize >= 0)
+    .sort((a, b) => b.byteSize - a.byteSize)
+    .slice(0, limit);
+}
+
+function logTeamsBreakdownSize(state) {
+  if (!isDevEnv || !state || !Array.isArray(state.teams)) return;
+  const teamsTotalSize = getJsonByteSize(state.teams);
+  if (teamsTotalSize >= 0) {
+    console.info(`[SaveSize:teams] total: ${formatJsonSizeInMb(teamsTotalSize)}`);
+  }
+
+  state.teams.forEach((team) => {
+    if (!team || typeof team !== 'object') return;
+    const teamName = team.name ?? 'Unknown';
+    const teamId = team.id ?? 'unknown';
+    const teamSize = getJsonByteSize(team);
+    console.info(`[SaveSize:team] id=${teamId} name=${teamName} total=${formatJsonSizeInMb(teamSize)}`);
+
+    const targetTeamFields = [
+      'players', 'farm', 'lineup', 'lineupDh', 'lineupNoDh', 'rotation',
+      'pitchingPattern', 'coaches', 'staff', 'contracts', 'stats', 'gameLogs',
+      'resultLogs', 'results', 'matchLogs', 'gameResultLogs',
+    ];
+    const knownFieldSizes = collectObjectFieldSizes(team, targetTeamFields);
+    const knownFieldKeys = new Set(targetTeamFields);
+    const unknownLargeFields = Object.keys(team)
+      .filter((key) => !knownFieldKeys.has(key))
+      .map((key) => ({ key, byteSize: getJsonByteSize(team[key]) }))
+      .filter((entry) => entry.byteSize >= 50 * 1024)
+      .sort((a, b) => b.byteSize - a.byteSize)
+      .slice(0, 8);
+
+    const teamFieldSummary = knownFieldSizes
+      .sort((a, b) => b.byteSize - a.byteSize)
+      .map((entry) => `${entry.key}=${formatJsonSizeInMb(entry.byteSize)}`)
+      .join(' ');
+    const unknownSummary = unknownLargeFields.length > 0
+      ? unknownLargeFields.map((entry) => `${entry.key}=${formatJsonSizeInMb(entry.byteSize)}`).join(' ')
+      : 'none';
+    console.info(`[SaveSize:team.fields] ${teamName} ${teamFieldSummary} unknownLargeFields=${unknownSummary}`);
+
+    const players = Array.isArray(team.players) ? team.players : [];
+    const farm = Array.isArray(team.farm) ? team.farm : [];
+    const rosterPlayers = [...players, ...farm].filter((player) => player && typeof player === 'object');
+    const playersSize = getJsonByteSize(players);
+    const farmSize = getJsonByteSize(farm);
+    const totalPlayerCount = rosterPlayers.length;
+    const averagePlayerByteSize = totalPlayerCount > 0
+      ? rosterPlayers.reduce((sum, player) => sum + Math.max(getJsonByteSize(player), 0), 0) / totalPlayerCount
+      : 0;
+    console.info(`[SaveSize:team.players] ${teamName} playersTotal=${formatJsonSizeInMb(playersSize)} farmTotal=${formatJsonSizeInMb(farmSize)} averagePlayer=${formatJsonSizeInMb(averagePlayerByteSize)}`);
+
+    const topPlayers = rosterPlayers
+      .map((player) => ({ player, byteSize: getJsonByteSize(player) }))
+      .filter((entry) => entry.byteSize >= 0)
+      .sort((a, b) => b.byteSize - a.byteSize)
+      .slice(0, 10);
+
+    topPlayers.forEach(({ player, byteSize }, index) => {
+      const playerName = player.name ?? `unknown-${index + 1}`;
+      const playerFieldSizes = collectObjectFieldSizes(player, [
+        'stats', 'injuryHistory', 'batting', 'pitching', 'gameLogs', 'battedBallLogs',
+        'physicsLogs', 'seasonStats', 'careerStats',
+      ]);
+      const knownPlayerFieldKeys = new Set(['stats', 'injuryHistory', 'batting', 'pitching', 'gameLogs', 'battedBallLogs', 'physicsLogs', 'seasonStats', 'careerStats']);
+      const playerUnknownLarge = Object.keys(player)
+        .filter((key) => !knownPlayerFieldKeys.has(key))
+        .map((key) => ({ key, byteSize: getJsonByteSize(player[key]) }))
+        .filter((entry) => entry.byteSize >= 10 * 1024)
+        .sort((a, b) => b.byteSize - a.byteSize)
+        .slice(0, 5);
+      const playerFieldSummary = playerFieldSizes
+        .sort((a, b) => b.byteSize - a.byteSize)
+        .map((entry) => `${entry.key}=${formatJsonSizeInMb(entry.byteSize)}`)
+        .join(' ');
+      const playerUnknownSummary = playerUnknownLarge.length > 0
+        ? playerUnknownLarge.map((entry) => `${entry.key}=${formatJsonSizeInMb(entry.byteSize)}`).join(' ')
+        : 'none';
+      console.info(`[SaveSize:player.top] ${teamName} rank=${index + 1} name=${playerName} total=${formatJsonSizeInMb(byteSize)} ${playerFieldSummary} unknownLargeFields=${playerUnknownSummary}`);
+      const topObjectFields = summarizeTopObjectFields(player, 3)
+        .map((entry) => `${entry.key}=${formatJsonSizeInMb(entry.byteSize)}`)
+        .join(' ');
+      console.info(`[SaveSize:player.top.fields] ${teamName} name=${playerName} topFields=${topObjectFields}`);
+    });
+  });
+}
+
 function logTopLevelSaveSize(state) {
   if (!state || typeof state !== 'object' || Array.isArray(state)) return;
   const measuredEntries = [];
@@ -226,6 +329,7 @@ export function saveGame(state, options = {}) {
   }
   const serializeStart = isDevEnv ? performance.now() : 0;
   logTopLevelSaveSize(safeState);
+  logTeamsBreakdownSize(safeState);
   const json = JSON.stringify(safeState);
   logPerf('saveGame.stringify', serializeStart);
   let compressed = json;
