@@ -852,7 +852,33 @@ export function useSeasonFlow(gs) {
     if(!myTeam) return;
     const count=SEASON_GAMES-(gameDay-1);
     if(count<=0) return;
-    runBatchGames(count, autoManageMyTeam);
+    try {
+      const taskId = uid();
+      seasonProgressTaskIdRef.current = taskId;
+      if (seasonProgressWorkerRef.current) seasonProgressWorkerRef.current.terminate();
+      const worker = new SeasonProgressWorker();
+      seasonProgressWorkerRef.current = worker;
+      worker.onmessage = (event) => {
+        const message = event?.data;
+        if (!message || typeof message !== "object") return;
+        if (message.type === "PROGRESS" && message.payload?.taskId === seasonProgressTaskIdRef.current) {
+          const safeTotal = Math.max(1, Number(message.payload.total) || 1);
+          const safeCurrent = Math.max(0, Math.min(safeTotal, Number(message.payload.current) || 0));
+          setBatchProgress((prev)=>({ ...(prev||{}), current:safeCurrent, total:safeTotal, etaSec:Math.max(0,safeTotal-safeCurrent), phase:message.payload.phase||"試合計算" }));
+        }
+      };
+      worker.postMessage({ type: "START", payload: { taskId, totalGames: count, intervalMs: 120 } });
+    } catch (error) {
+      console.error("season progress worker init failed", error);
+    }
+    runBatchGames(count, autoManageMyTeam).finally(()=>{
+      if (seasonProgressWorkerRef.current) {
+        seasonProgressWorkerRef.current.postMessage({ type: "CANCEL" });
+        seasonProgressWorkerRef.current.terminate();
+        seasonProgressWorkerRef.current = null;
+      }
+      seasonProgressTaskIdRef.current = null;
+    });
   };
 
   // リーグ内順位を計算（batchMeta用）
