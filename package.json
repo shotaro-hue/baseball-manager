@@ -9,7 +9,19 @@
     "tunnel": "lt --port 5173",
     "build": "vite build",
     "preview": "vite preview",
+
     "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run src",
+    "test:integration": "vitest run src/engine scripts",
+    "test:physics-hr": "vitest run scripts/validate-physics-hr.test.js",
+
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+
+    "test:all": "npm run test && npm run test:e2e",
+
     "validate:physics-hr": "vitest run scripts/validate-physics-hr.test.js"
   },
   "dependencies": {
