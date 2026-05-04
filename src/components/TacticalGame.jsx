@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { STRATEGY_OPTS, PITCHING_POLICY_OPTS, RLABEL, IS_HIT, IS_OUT, BATCH, FATIGUE_WARNING } from '../constants';
 import { fmtAvg, fmtPct, fmtEra } from '../utils';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
@@ -9,27 +9,36 @@ import PhysicsInsightPanel from './game/PhysicsInsightPanel';
 
 
 
-function getGameBattingStats(log, playerId) {
-  if (!playerId) return null;
-  const entries = log.filter(e => e.batId === playerId && e.result !== 'change');
-  if (!entries.length) return null;
-  const ab = entries.filter(e => !['bb','hbp','sac','sf'].includes(e.result)).length;
-  const h = entries.filter(e => IS_HIT(e.result)).length;
-  const hr = entries.filter(e => e.result === 'hr').length;
-  const rbi = entries.reduce((s,e) => s + (e.rbi||0), 0);
-  const bb = entries.filter(e => e.result === 'bb' || e.result === 'hbp').length;
-  return { pa: entries.length, ab, h, hr, rbi, bb };
+
+function buildBattingStatsMap(log) {
+  const map = new Map();
+  for (const e of log) {
+    if (!e || e.result === 'change' || !e.batId) continue;
+    const current = map.get(e.batId) || { pa: 0, ab: 0, h: 0, hr: 0, rbi: 0, bb: 0 };
+    current.pa += 1;
+    if (!['bb', 'hbp', 'sac', 'sf'].includes(e.result)) current.ab += 1;
+    if (IS_HIT(e.result)) current.h += 1;
+    if (e.result === 'hr') current.hr += 1;
+    current.rbi += e.rbi || 0;
+    if (e.result === 'bb' || e.result === 'hbp') current.bb += 1;
+    map.set(e.batId, current);
+  }
+  return map;
 }
 
-function getGamePitchingStats(log, pitcherId) {
-  if (!pitcherId) return null;
-  const entries = log.filter(e => e.pitcherId === pitcherId && e.result !== 'change');
-  if (!entries.length) return null;
-  const k = entries.filter(e => e.result === 'k').length;
-  const ha = entries.filter(e => IS_HIT(e.result)).length;
-  const ra = entries.reduce((s,e) => s + (e.rbi||0), 0);
-  const bb = entries.filter(e => e.result === 'bb' || e.result === 'hbp').length;
-  return { bf: entries.length, k, ha, ra, bb };
+function buildPitchingStatsMap(log) {
+  const map = new Map();
+  for (const e of log) {
+    if (!e || e.result === 'change' || !e.pitcherId) continue;
+    const current = map.get(e.pitcherId) || { bf: 0, k: 0, ha: 0, ra: 0, bb: 0 };
+    current.bf += 1;
+    if (e.result === 'k') current.k += 1;
+    if (IS_HIT(e.result)) current.ha += 1;
+    current.ra += e.rbi || 0;
+    if (e.result === 'bb' || e.result === 'hbp') current.bb += 1;
+    map.set(e.pitcherId, current);
+  }
+  return map;
 }
 
 export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
@@ -66,7 +75,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   },[autoRunning,gs]);
 
   // 手動1打席進める
-  const advance=(strategy="normal")=>{
+  const advance = useCallback((strategy="normal")=>{
     setGs(prev=>{
       if(prev.stopped||prev.gameOver) return prev;
       if(prev.outs>=3) return endHalfInning(prev);
@@ -77,13 +86,13 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
       return next;
     });
     setShowMenu(null);setSelectedStrat("normal");
-  };
+  },[]);
 
   // 続行（停止解除）
-  const resume=()=>{setGs(prev=>({...prev,stopped:false,stopReason:null,stopData:null}));setShowMenu(null);setAutoRunning(true);};
+  const resume = useCallback(()=>{setGs(prev=>({...prev,stopped:false,stopReason:null,stopData:null}));setShowMenu(null);setAutoRunning(true);},[]);
 
   // 投球方針変更
-  const changePitchingPolicy=pol=>{setPitchingPolicy(pol);setGs(prev=>({...prev,pitchingPolicy:pol}));};
+  const changePitchingPolicy = useCallback((pol)=>{setPitchingPolicy(pol);setGs(prev=>({...prev,pitchingPolicy:pol}));},[]);
 
   // 投手交代
   const changePitcher=rpId=>{
@@ -106,8 +115,10 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
     setShowMenu(null);setSelectedPH(null);setAutoRunning(true);
   };
 
-  const currentStadiumKey = TEAM_STADIUM[gs.homeTeamId];
-  const currentStadium = STADIUMS[currentStadiumKey] || STADIUMS.tokyo_dome;
+  const currentStadium = useMemo(() => {
+    const currentStadiumKey = TEAM_STADIUM[gs.homeTeamId];
+    return STADIUMS[currentStadiumKey] || STADIUMS.tokyo_dome;
+  }, [gs.homeTeamId]);
 
   function normalizeReplayEvent(event) {
     // ⚠️ セキュリティ: 外部入力由来の可能性があるため、必ず型と数値を検証してからUIに渡す
@@ -173,11 +184,19 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   const muLabel=mu>15?"⚡ 有利":mu>-15?"⚖️ 互角":"💀 不利";
   const muClass=mu>15?"mu-adv":mu>-15?"mu-even":"mu-dis";
 
-  // Build scoreboard
-  const inningScores={};
-  gs.inningSummary.forEach(s=>{if(!inningScores[s.inning]) inningScores[s.inning]={top:"-",bot:"-"};if(s.isTop) inningScores[s.inning].top=s.runs;else inningScores[s.inning].bot=s.runs;});
-  const maxInn=Math.max(9,gs.inning);
-  const innings=Array.from({length:maxInn},(_,i)=>i+1);
+  const { inningScores, innings } = useMemo(() => {
+    const scores = {};
+    gs.inningSummary.forEach(s => {
+      if (!scores[s.inning]) scores[s.inning] = { top: "-", bot: "-" };
+      if (s.isTop) scores[s.inning].top = s.runs;
+      else scores[s.inning].bot = s.runs;
+    });
+    const maxInn = Math.max(9, gs.inning);
+    return { inningScores: scores, innings: Array.from({ length: maxInn }, (_, i) => i + 1) };
+  }, [gs.inningSummary, gs.inning]);
+
+  const battingStatsMap = useMemo(() => buildBattingStatsMap(gs.log), [gs.log]);
+  const pitchingStatsMap = useMemo(() => buildPitchingStatsMap(gs.log), [gs.log]);
 
   const opFatigue=calcEffectiveFatigue(gs.opPitchCount,gs.opPitcher);
   const lastPlay = gs.log.length > 0 ? gs.log[gs.log.length - 1] : null;
@@ -280,7 +299,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
               </div>
               <span style={{fontFamily:"monospace",fontSize:11,color:fatigueColor,width:36,textAlign:"right"}}>{fatigue}%</span>
             </div>
-            {(()=>{const ps=getGamePitchingStats(gs.log,curPitcher?.id);if(!ps)return null;return<div className="gstat" style={{marginBottom:8}}>{ps.bf}打者 <span style={{color:"#a78bfa"}}>{ps.k}K</span> <span style={{color:"#f87171"}}>{ps.ha}被安打</span> <span style={{color:"#fbbf24"}}>{ps.ra}失点</span></div>;})()}
+            {(()=>{const ps=pitchingStatsMap.get(curPitcher?.id);if(!ps)return null;return<div className="gstat" style={{marginBottom:8}}>{ps.bf}打者 <span style={{color:"#a78bfa"}}>{ps.k}K</span> <span style={{color:"#f87171"}}>{ps.ha}被安打</span> <span style={{color:"#fbbf24"}}>{ps.ra}失点</span></div>;})()}
             <div style={{display:"flex",gap:10,marginBottom:8,flexWrap:"wrap"}}>
               <span style={{fontSize:11}}>球速<OV v={curPitcher?.pitching?.velocity||0}/></span>
               <span style={{fontSize:11}}>制球<OV v={curPitcher?.pitching?.control||0}/></span>
@@ -334,7 +353,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
                   <span style={{fontSize:10}}>ミート<OV v={nextBatter.batting.contact}/></span>
                   <span style={{fontSize:10}}>長打<OV v={nextBatter.batting.power}/></span>
                 </div>}
-                {(()=>{const bs=getGameBattingStats(gs.log,nextBatter?.id);if(!bs)return<div style={{fontSize:9,color:"var(--dim)",marginTop:4}}>本日初打席</div>;return<div className="gstat" style={{marginTop:4}}>{bs.ab}打{bs.h}安打{bs.hr>0?` ${bs.hr}HR`:""}</div>;})()}
+                {(()=>{const bs=battingStatsMap.get(nextBatter?.id);if(!bs)return<div style={{fontSize:9,color:"var(--dim)",marginTop:4}}>本日初打席</div>;return<div className="gstat" style={{marginTop:4}}>{bs.ab}打{bs.h}安打{bs.hr>0?` ${bs.hr}HR`:""}</div>;})()}
               </div>
             </div>
           </div>
@@ -454,7 +473,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
                       <span style={{fontSize:11}}>長打<OV v={p.batting.power}/></span>
                       <span style={{fontSize:11}}>選球<OV v={p.batting.eye}/></span>
                       <span style={{fontSize:10,color:"#374151"}}>打率:{fmtAvg(p.stats.H,p.stats.AB)}</span>
-                      {(()=>{const bs=getGameBattingStats(gs.log,p.id);if(!bs)return null;return<span className="gstat" style={{marginLeft:4}}>{bs.ab}打{bs.h}安</span>;})()}
+                      {(()=>{const bs=battingStatsMap.get(p.id);if(!bs)return null;return<span className="gstat" style={{marginLeft:4}}>{bs.ab}打{bs.h}安</span>;})()}
                     </div>
                   </div>
                 );
