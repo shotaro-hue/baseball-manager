@@ -13,6 +13,7 @@ const isDevEnv = import.meta.env.DEV;
 const PERF_LOG_KEY = 'baseball_manager_save_perf_logs';
 const MAX_PERF_LOGS = 30;
 const BACKUP_ROTATE_INTERVAL_MS = 5 * 60 * 1000;
+const AUTO_SAVE_INTERVAL_MS = 60 * 1000;
 const LAST_BACKUP_ROTATE_KEY = 'baseball_manager_v1_last_rotate_at';
 
 function logPerf(label, startedAt) {
@@ -171,13 +172,16 @@ function decompress(raw) {
   return parsed;
 }
 
-export function saveGame(state) {
+export function saveGame(state, options = {}) {
   // ⚠️ 入力値検証: 想定外の形式を保存しない（破損セーブ防止）
   if (!state || typeof state !== 'object' || !Array.isArray(state.teams)) {
     console.error('Save failed: invalid state payload');
     return { ok: false, quota: false, reason: 'invalid_state' };
   }
   const saveGameStart = isDevEnv ? performance.now() : 0;
+  const skipCompression = options?.skipCompression === true;
+  const skipBackupRotation = options?.skipBackupRotation === true;
+  const preferMainSave = options?.preferMainSave !== false;
   const perfBreakdown = {};
   let safeState;
   try {
@@ -186,7 +190,18 @@ export function saveGame(state) {
     console.error('Save failed: sanitize state error', e);
     return { ok: false, quota: false, reason: 'sanitize_state_failed' };
   }
-  const { compressed, jsonLength, compressedLength } = compress(safeState);
+  const serializeStart = isDevEnv ? performance.now() : 0;
+  const json = JSON.stringify(safeState);
+  logPerf('saveGame.stringify', serializeStart);
+  let compressed = json;
+  let compressedLength = json.length;
+  if (!skipCompression) {
+    const compressStart = isDevEnv ? performance.now() : 0;
+    compressed = LZString.compressToUTF16(json);
+    compressedLength = compressed?.length ?? 0;
+    logPerf('saveGame.compressToUTF16', compressStart);
+  }
+  const jsonLength = json.length;
   const writeMeta = () => {
     const metaStart = isDevEnv ? performance.now() : 0;
     const myTeam = safeState.teams?.find(t => t.id === safeState.myId);
@@ -202,7 +217,7 @@ export function saveGame(state) {
     perfBreakdown.writeMetaMs = safeElapsedMs(metaStart);
   };
   try {
-    if (shouldRotateBackupNow()) {
+    if (!skipBackupRotation && shouldRotateBackupNow()) {
       const rotateStart = isDevEnv ? performance.now() : 0;
       rotateBk();
       perfBreakdown.rotateBackupMs = safeElapsedMs(rotateStart);
@@ -224,6 +239,22 @@ export function saveGame(state) {
   } catch (e) {
     const quota = e instanceof DOMException && e.name === 'QuotaExceededError';
     if (quota) {
+      // ⚠️ 容量超過時は古いバックアップから削除し、main save を優先する
+      const cleanupBackupKeys = [BACKUP_KEY_2, BACKUP_KEY_1];
+      for (const key of cleanupBackupKeys) {
+        try {
+          localStorage.removeItem(key);
+          if (preferMainSave) {
+            const retryStart = isDevEnv ? performance.now() : 0;
+            localStorage.setItem(SAVE_KEY, compressed);
+            logPerf('saveGame.localStorage.setItem', retryStart);
+            writeMeta();
+            return { ok: true, recoveredFromQuota: true };
+          }
+        } catch (cleanupErr) {
+          console.warn('Backup cleanup failed:', cleanupErr);
+        }
+      }
       // バックアップ回転を諦めて直接上書き保存を試みる
       try {
         const setItemStart = isDevEnv ? performance.now() : 0;
@@ -332,6 +363,11 @@ export function loadGame() {
     }
   }
   return null;
+}
+
+
+export function getAutoSaveIntervalMs() {
+  return AUTO_SAVE_INTERVAL_MS;
 }
 
 export function hasSave() {
