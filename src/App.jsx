@@ -49,8 +49,8 @@ export default function App(){
   const sf = useSeasonFlow(gs);
   const os = useOffseason(gs);
 
-  const handleLoad = () => {
-    const saved = loadGame();
+  const handleLoad = async () => {
+    const saved = await loadGame();
     if(!saved){ gs.notify('セーブデータがありません','warn'); return; }
     const normalizedTeams = (saved.teams || []).map(t => {
       const nonPitcherIds = (t.players || []).filter(p => !p.isPitcher).map(p => p.id);

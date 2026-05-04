@@ -201,13 +201,16 @@ export function useGameState() {
     const now = Date.now();
     const intervalMs = getAutoSaveIntervalMs();
     if (lastAutoSaveAt > 0 && now - lastAutoSaveAt < intervalMs) return;
-    const result=saveGame({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox});
-    if(result.ok){setSaveExists(true);setSaveDirty(false);setLastAutoSaveAt(now);notify('💾 オートセーブ','ok');}
+    saveGame({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox}).then((result)=>{
+      if(result.ok){setSaveExists(true);setSaveDirty(false);setLastAutoSaveAt(now);notify('💾 オートセーブ','ok');}
+    }).catch((error)=>{
+      console.error('Auto save failed:', error);
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[screen,isAutoSaveSuspended,saveDirty,lastAutoSaveAt,teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox]);
 
-  const handleSave = useCallback(()=>{
-    const result=saveGame({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox});
+  const handleSave = useCallback(async ()=>{
+    const result=await saveGame({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox});
     if(result.ok){ setSaveExists(true); setSaveDirty(false); }
     notify(result.ok?'💾 セーブしました':result.quota?'💾 ストレージ容量が不足しています':'セーブに失敗しました',result.ok?'ok':'warn');
   // eslint-disable-next-line react-hooks/exhaustive-deps
