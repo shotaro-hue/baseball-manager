@@ -303,6 +303,7 @@ export function useSeasonFlow(gs) {
     notify, upd, addNews, addTransferLog, pushResult,
     setMailbox, setNews, setRetireModal,
     faPool, setFaPool, faYears, seasonHistory, setSeasonHistory, news, mailbox,
+    saveRevision, setSaveRevision,
     setSaveExists, cpuTradeOffers,
     allStarDone, setAllStarDone, allStarResult, setAllStarResult,
     allStarTriggerDay,
@@ -1161,9 +1162,11 @@ export function useSeasonFlow(gs) {
       seasonHistory:nextSeasonHistory,
       news:nextNews,
       mailbox:nextMailbox,
+      saveRevision: (Number(saveRevision) || 0) + 1,
     };
     const batchSaveResult=await saveGame(nextState,{skipBackupRotation:true,preferMainSave:true});
     if(batchSaveResult.ok){
+      setSaveRevision((prev)=>prev+1);
       setSaveExists(true);
       console.info('[BatchSave] saveGame completed once at batch end', { gameDay: newDay, teamCount: newTeams.length });
     }else{

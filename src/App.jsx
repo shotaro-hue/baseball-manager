@@ -75,6 +75,7 @@ export default function App(){
     gs.setSeasonHistory(saved.seasonHistory||{awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[]});
     gs.setNews(saved.news||[]);
     gs.setMailbox(saved.mailbox||[]);
+    gs.setSaveRevision(Number(saved.saveRevision)||0);
     gs.setCpuTradeOffers([]);
     sf.setPlayoff(null);
     os.setDraftPool(null);
