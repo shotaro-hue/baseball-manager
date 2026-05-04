@@ -15,6 +15,7 @@ const MAX_PERF_LOGS = 30;
 const BACKUP_ROTATE_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_SAVE_INTERVAL_MS = 60 * 1000;
 const LAST_BACKUP_ROTATE_KEY = 'baseball_manager_v1_last_rotate_at';
+const SAVE_SIZE_DETAIL_THRESHOLD_BYTES = 1024 * 1024;
 
 function logPerf(label, startedAt) {
   if (!isDevEnv || !Number.isFinite(startedAt)) return;
@@ -143,6 +144,78 @@ function sanitizeSaveState(state) {
   return JSON.parse(JSON.stringify(state));
 }
 
+function formatJsonSizeInMb(byteSize) {
+  if (!Number.isFinite(byteSize) || byteSize < 0) return '0.00MB';
+  return `${(byteSize / (1024 * 1024)).toFixed(2)}MB`;
+}
+
+function getJsonByteSize(value) {
+  try {
+    const serializedValue = JSON.stringify(value);
+    if (typeof serializedValue !== 'string') return 0;
+    return new TextEncoder().encode(serializedValue).length;
+  } catch (e) {
+    console.warn('[SaveSize] JSONサイズ計測に失敗しました:', e);
+    return -1;
+  }
+}
+
+function logTopLevelSaveSize(state) {
+  if (!state || typeof state !== 'object' || Array.isArray(state)) return;
+  const measuredEntries = [];
+  Object.keys(state).forEach((topLevelKey) => {
+    const keyByteSize = getJsonByteSize(state[topLevelKey]);
+    if (keyByteSize < 0) {
+      console.warn(`[SaveSize] ${topLevelKey}: 計測失敗`);
+      return;
+    }
+    measuredEntries.push({ key: topLevelKey, byteSize: keyByteSize });
+  });
+  const totalByteSize = measuredEntries.reduce((sum, entry) => sum + entry.byteSize, 0);
+  measuredEntries
+    .sort((a, b) => b.byteSize - a.byteSize)
+    .forEach(({ key, byteSize }) => {
+      const sharePercent = totalByteSize > 0 ? ((byteSize / totalByteSize) * 100).toFixed(1) : '0.0';
+      console.info(`[SaveSize] ${key}: ${formatJsonSizeInMb(byteSize)} (${sharePercent}%)`);
+      if (byteSize >= SAVE_SIZE_DETAIL_THRESHOLD_BYTES) {
+        logNestedSaveSizeDetails(key, state[key], byteSize);
+      }
+    });
+}
+
+function logNestedSaveSizeDetails(parentKey, value, parentByteSize) {
+  if (!value || typeof value !== 'object') return;
+  const childEntries = [];
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      if (!item || typeof item !== 'object') return;
+      Object.keys(item).forEach((childKey) => {
+        const fullKey = `${parentKey}[].${childKey}`;
+        const childSize = getJsonByteSize(item[childKey]);
+        if (childSize < 0) return;
+        const existing = childEntries.find(entry => entry.key === fullKey);
+        if (existing) existing.byteSize += childSize;
+        else childEntries.push({ key: fullKey, byteSize: childSize });
+      });
+      // 配列が非常に長いケースでのログ計測コスト抑制【＝速度低下防止】
+      if (index >= 99) return;
+    });
+  } else {
+    Object.keys(value).forEach((childKey) => {
+      const childSize = getJsonByteSize(value[childKey]);
+      if (childSize < 0) return;
+      childEntries.push({ key: `${parentKey}.${childKey}`, byteSize: childSize });
+    });
+  }
+  childEntries
+    .sort((a, b) => b.byteSize - a.byteSize)
+    .slice(0, 8)
+    .forEach(({ key, byteSize }) => {
+      const ratio = parentByteSize > 0 ? ((byteSize / parentByteSize) * 100).toFixed(1) : '0.0';
+      console.info(`[SaveSizeDetail] ${key}: ${formatJsonSizeInMb(byteSize)} (${ratio}% of ${parentKey})`);
+    });
+}
+
 // ── 公開 API ────────────────────────────────────
 
 function compress(state) {
@@ -191,6 +264,7 @@ export function saveGame(state, options = {}) {
     return { ok: false, quota: false, reason: 'sanitize_state_failed' };
   }
   const serializeStart = isDevEnv ? performance.now() : 0;
+  logTopLevelSaveSize(safeState);
   const json = JSON.stringify(safeState);
   logPerf('saveGame.stringify', serializeStart);
   let compressed = json;
