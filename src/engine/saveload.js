@@ -257,14 +257,48 @@ function sanitizeSaveState(state) {
   return JSON.parse(JSON.stringify(state));
 }
 
-function buildSavableState(state) {
+function buildSavableState(state, options = {}) {
+  const enableProfile = options?.enableProfile === true;
+  const profile = {
+    careerLogTrimMs: 0,
+    rosterPlayerCount: 0,
+    trimmedPlayerCount: 0,
+    trimmedEntries: 0,
+  };
   const safeState = sanitizeSaveState(state);
   safeState.teams = safeState.teams.map((team) => ({
     ...team,
-    players: Array.isArray(team.players) ? team.players.map((player) => trimCareerLogWithSummary(player, MAX_CAREER_LOG_ENTRIES)) : [],
-    farm: Array.isArray(team.farm) ? team.farm.map((player) => trimCareerLogWithSummary(player, MAX_CAREER_LOG_ENTRIES)) : [],
+    players: Array.isArray(team.players) ? team.players.map((player) => {
+      if (!enableProfile) return trimCareerLogWithSummary(player, MAX_CAREER_LOG_ENTRIES);
+      const trimStart = performance.now();
+      const trimmedPlayer = trimCareerLogWithSummary(player, MAX_CAREER_LOG_ENTRIES);
+      profile.careerLogTrimMs += performance.now() - trimStart;
+      profile.rosterPlayerCount += 1;
+      const beforeCount = Array.isArray(player?.careerLog) ? player.careerLog.length : 0;
+      const afterCount = Array.isArray(trimmedPlayer?.careerLog) ? trimmedPlayer.careerLog.length : 0;
+      if (beforeCount > afterCount) {
+        profile.trimmedPlayerCount += 1;
+        profile.trimmedEntries += (beforeCount - afterCount);
+      }
+      return trimmedPlayer;
+    }) : [],
+    farm: Array.isArray(team.farm) ? team.farm.map((player) => {
+      if (!enableProfile) return trimCareerLogWithSummary(player, MAX_CAREER_LOG_ENTRIES);
+      const trimStart = performance.now();
+      const trimmedPlayer = trimCareerLogWithSummary(player, MAX_CAREER_LOG_ENTRIES);
+      profile.careerLogTrimMs += performance.now() - trimStart;
+      profile.rosterPlayerCount += 1;
+      const beforeCount = Array.isArray(player?.careerLog) ? player.careerLog.length : 0;
+      const afterCount = Array.isArray(trimmedPlayer?.careerLog) ? trimmedPlayer.careerLog.length : 0;
+      if (beforeCount > afterCount) {
+        profile.trimmedPlayerCount += 1;
+        profile.trimmedEntries += (beforeCount - afterCount);
+      }
+      return trimmedPlayer;
+    }) : [],
   }));
-  return safeState;
+  if (!enableProfile) return safeState;
+  return { safeState, profile };
 }
 
 function formatJsonSize(byteSize) {
@@ -559,7 +593,12 @@ export function analyzeSaveBottleneck(state, options = {}) {
   try {
     const startedAt = performance.now();
     const buildStart = performance.now();
-    const safeState = buildSavableState(state);
+    const buildResult = buildSavableState(state, { enableProfile: true });
+    const safeState = buildResult?.safeState;
+    const careerLogProfile = buildResult?.profile ?? null;
+    if (!safeState || typeof safeState !== 'object') {
+      return { ok: false, reason: 'build_savable_state_failed' };
+    }
     const buildSavableStateMs = performance.now() - buildStart;
 
     const stringifyStart = performance.now();
@@ -588,8 +627,14 @@ export function analyzeSaveBottleneck(state, options = {}) {
       compressedLength,
       breakdown: {
         buildSavableStateMs,
+        careerLogTrimMs: Number(careerLogProfile?.careerLogTrimMs ?? 0),
         stringifyMs,
         compressMs,
+      },
+      careerLogProfile: {
+        rosterPlayerCount: Number(careerLogProfile?.rosterPlayerCount ?? 0),
+        trimmedPlayerCount: Number(careerLogProfile?.trimmedPlayerCount ?? 0),
+        trimmedEntries: Number(careerLogProfile?.trimmedEntries ?? 0),
       },
       bottleneck,
     };
