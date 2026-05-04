@@ -301,7 +301,7 @@ export function useSeasonFlow(gs) {
     gameDay, setGameDay, year,
     schedule, setScreen,
     notify, upd, addNews, addTransferLog, pushResult,
-    setMailbox, setRetireModal,
+    setMailbox, setNews, setRetireModal,
     faPool, setFaPool, faYears, seasonHistory, news, mailbox,
     setSaveExists, cpuTradeOffers,
     allStarDone, setAllStarDone, allStarResult, setAllStarResult,
@@ -1083,18 +1083,61 @@ export function useSeasonFlow(gs) {
     updateBatchProgress(safeCount, safeCount, "集計中");
     await new Promise(r => setTimeout(r, 0));
     updateBatchProgress(safeCount, safeCount, "保存");
-    const nextMailbox = batchTradeMails.length ? [...mailbox, ...batchTradeMails] : mailbox;
-    const batchSaveResult=saveGame({teams:newTeams,myId,gameDay:newDay,year,faPool:newFaPool,faYears,seasonHistory,news,mailbox:nextMailbox},{skipBackupRotation:true,preferMainSave:true});
-    if(batchSaveResult.ok) setSaveExists(true);
-    updateBatchProgress(safeCount, safeCount, "結果集計");
-    results.filter(r=>r.type==='trade_news').forEach(r=>{
-      addNews({
+    const tradeNewsItems = results
+      .filter(r=>r.type==='trade_news')
+      .map(r=>({
         type:'trade',
         headline:r.headline,
         source:'Baseball Times',
         dateLabel:`${year}年 ${r.day}日目`,
         body:r.body,
-      });
+      }));
+    // バッチ試合結果ニュース（古い順に追加 → ニュースタブは新しい順表示）
+    const gameNewsItems = [...batchNewsItems].reverse();
+    const nextNews = [...tradeNewsItems, ...gameNewsItems, ...batchForeignSignNews, ...news];
+
+    let nextMailbox = batchTradeMails.length ? [...mailbox, ...batchTradeMails] : [...mailbox];
+    if(batchForeignSignings.length){
+      const byTeam=new Map();
+      for(const c of batchForeignSignings){
+        if(!byTeam.has(c.teamId)) byTeam.set(c.teamId,{teamId:c.teamId,teamName:c.teamName,teamEmoji:c.teamEmoji,players:[]});
+        byTeam.get(c.teamId).players.push(`${c.player.name}（${c.player.pos}）`);
+      }
+      const signings=Array.from(byTeam.values());
+      nextMailbox=[...nextMailbox,{
+        id:uid(),
+        type:'cpu_fa_summary',
+        read:false,
+        title:`【バッチ補強情報】${signings.length}球団が選手補強`,
+        subject:`【バッチ補強情報】${signings.length}球団が選手補強`,
+        from:'スカウト部',
+        dateLabel:`${year}年 ${newDay-1}日目まで`,
+        timestamp:Date.now(),
+        body:'バッチシム中に他球団で補強がありました。球団名をクリックして詳細ロスターを確認できます。',
+        signings,
+      }];
+    }
+
+    const nextState = {
+      teams:newTeams,
+      myId,
+      gameDay:newDay,
+      year,
+      faPool:newFaPool,
+      faYears,
+      seasonHistory,
+      news:nextNews,
+      mailbox:nextMailbox,
+    };
+    const batchSaveResult=saveGame(nextState,{skipBackupRotation:true,preferMainSave:true});
+    if(batchSaveResult.ok){
+      setSaveExists(true);
+      console.info('[BatchSave] saveGame completed once at batch end', { gameDay: newDay, teamCount: newTeams.length });
+    }else{
+      console.warn('[BatchSave] saveGame failed at batch end', batchSaveResult);
+    }
+    updateBatchProgress(safeCount, safeCount, "結果集計");
+    results.filter(r=>r.type==='trade_news').forEach(r=>{
       addTransferLog({
         year,
         day: r.day,
@@ -1107,35 +1150,15 @@ export function useSeasonFlow(gs) {
         detail: r.body,
       });
     });
-    // バッチ試合結果ニュース（古い順に追加 → ニュースタブは新しい順表示）
-    [...batchNewsItems].reverse().forEach(item=>addNews(item));
-    batchForeignSignNews.forEach(item=>addNews(item));
     if(batchTradeMails.length){
-      setMailbox(prev=>[...prev,...batchTradeMails]);
       notify(`📨 バッチ中にトレードオファーが${batchTradeMails.length}件届きました`,'ok');
     }
     if(batchForeignSignings.length){
-      const byTeam=new Map();
-      for(const c of batchForeignSignings){
-        if(!byTeam.has(c.teamId)) byTeam.set(c.teamId,{teamId:c.teamId,teamName:c.teamName,teamEmoji:c.teamEmoji,players:[]});
-        byTeam.get(c.teamId).players.push(`${c.player.name}（${c.player.pos}）`);
-      }
-      const signings=Array.from(byTeam.values());
-      setMailbox(prev=>[...prev,{
-        id:uid(),
-        type:'cpu_fa_summary',
-        read:false,
-        title:`【バッチ補強情報】${signings.length}球団が選手補強`,
-        subject:`【バッチ補強情報】${signings.length}球団が選手補強`,
-        from:'スカウト部',
-        dateLabel:`${year}年 ${newDay-1}日目まで`,
-        timestamp:Date.now(),
-        body:'バッチシム中に他球団で補強がありました。球団名をクリックして詳細ロスターを確認できます。',
-        signings,
-      }]);
       notify(`🗞 バッチ中に他球団の補強が${batchForeignSignings.length}件ありました`,'ok');
     }
     if(newFaPool.length!==faPool.length) setFaPool(newFaPool);
+    setNews(nextNews);
+    setMailbox(nextMailbox);
     setTeams(newTeams);
     setGameDay(newDay);
     if(allStarDoneLocal) setAllStarDone(true);
