@@ -16,7 +16,7 @@ const BACKUP_ROTATE_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_SAVE_INTERVAL_MS = 60 * 1000;
 const LAST_BACKUP_ROTATE_KEY = 'baseball_manager_v1_last_rotate_at';
 const SAVE_SIZE_DEBUG_KEY = 'baseball_manager_debug_save_size';
-const SAVE_DATA_VERSION = 2;
+const SAVE_DATA_VERSION = 3;
 const IDB_NAME = 'baseball_manager_storage';
 const IDB_VERSION = 1;
 const IDB_STORES = {
@@ -231,6 +231,7 @@ function sanitizeSaveState(state) {
   }
   const {
     seasonHistory, news, mailbox,
+    saveRevision,
     ...rest
   } = state;
   const teams = state.teams.map((team) => ({
@@ -246,7 +247,7 @@ function sanitizeSaveState(state) {
       recentCareerLog: normalizeRecentCareerLog(p),
     })) : [],
   }));
-  return { ...rest, teams, seasonHistory, news, mailbox };
+  return { ...rest, teams, seasonHistory, news, mailbox, saveRevision: sanitizeNumber(saveRevision, 0) };
 }
 
 function formatJsonSize(byteSize) {
@@ -735,6 +736,7 @@ export async function loadGame() {
           state.seasonHistory = (await idbRead(IDB_STORES.chunks, 'seasonHistory')) ?? state.seasonHistory;
           state.news = (await idbRead(IDB_STORES.chunks, 'news')) ?? state.news;
           state.mailbox = (await idbRead(IDB_STORES.chunks, 'mailbox')) ?? state.mailbox;
+          state.saveRevision = sanitizeNumber(state.saveRevision, 0);
         } catch (e) {
           console.warn('IndexedDB load failed. Fallback to localStorage payload.', e);
         }
