@@ -221,12 +221,17 @@ function PositionDiamond({player, convertTarget, onSetConvertTarget}){
 
 export function PlayerModal({player:p, teamName, isMyTeam, onSetConvertTarget, onClose}){
   const [localConvertTarget, setLocalConvertTarget] = useState(p?.convertTarget ?? null);
+  const [activeSection, setActiveSection] = useState("profile");
 
   useEffect(()=>{
     const handler=(e)=>{if(e.key==="Escape")onClose();};
     window.addEventListener("keydown",handler);
     return()=>window.removeEventListener("keydown",handler);
   },[onClose]);
+
+  useEffect(() => {
+    setActiveSection("profile");
+  }, [p?.id]);
 
   if(!p) return null;
 
@@ -250,6 +255,13 @@ export function PlayerModal({player:p, teamName, isMyTeam, onSetConvertTarget, o
     onSetConvertTarget?.(p.id, pos);
   };
 
+  // ⚠️ 文字列の長さを制限し、意図しない過大入力の描画負荷を回避する
+  const safePlayerName = String(p?.name ?? "").slice(0, 60);
+  const safeTeamName = typeof teamName === "string" ? teamName.slice(0, 80) : "";
+  const safeSubtype = typeof p?.subtype === "string" ? p.subtype.slice(0, 30) : "";
+  const safeInjury = typeof p?.injury === "string" ? p.injury.slice(0, 40) : "";
+  const safeInjuryPart = typeof p?.injuryPart === "string" ? p.injuryPart.slice(0, 20) : "";
+
   return(
     <div
       style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.78)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 16px"}}
@@ -261,16 +273,16 @@ export function PlayerModal({player:p, teamName, isMyTeam, onSetConvertTarget, o
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
           <div>
             <div style={{fontSize:16,fontWeight:700,color:"#e0d4bf",marginBottom:2}}>
-              {p.name}
+              {safePlayerName}
               {p.isForeign&&<span style={{fontSize:9,background:"rgba(96,165,250,.15)",color:"#60a5fa",border:"1px solid rgba(96,165,250,.3)",borderRadius:3,padding:"1px 5px",marginLeft:6}}>外国人</span>}
               {p.育成&&<span style={{fontSize:9,background:"rgba(167,139,250,.15)",color:"#a78bfa",border:"1px solid rgba(167,139,250,.3)",borderRadius:3,padding:"1px 5px",marginLeft:4}}>育成</span>}
             </div>
             <div style={{fontSize:11,color:"#374151"}}>
               {p.age}歳 / {p.pos}
-              {p.isPitcher&&p.subtype&&p.subtype!==p.pos&&<span style={{marginLeft:6,color:"#374151"}}>（{p.subtype}）</span>}
+              {p.isPitcher&&safeSubtype&&safeSubtype!==p.pos&&<span style={{marginLeft:6,color:"#374151"}}>（{safeSubtype}）</span>}
               {p.isPitcher&&<span style={{marginLeft:6,color:p.hand==="left"?"#a78bfa":"#94a3b8"}}>{p.hand==="left"?"左投":"右投"}</span>}
             </div>
-            {teamName&&<div style={{fontSize:10,color:"#60a5fa",marginTop:2}}>{teamName}</div>}
+            {safeTeamName&&<div style={{fontSize:10,color:"#60a5fa",marginTop:2}}>{safeTeamName}</div>}
           </div>
           <button
             onClick={onClose}
@@ -284,106 +296,25 @@ export function PlayerModal({player:p, teamName, isMyTeam, onSetConvertTarget, o
           <span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(255,255,255,.05)",color:"#94a3b8"}}>在籍 {Math.floor(days/FA_DAYS)||p.serviceYears||0} 年目</span>
           <span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(255,255,255,.05)",color:p.isFA?"#f5c842":"#94a3b8"}}>{faLabel}</span>
           {foreignExemptDays>0&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(96,165,250,.08)",color:"#60a5fa",border:"1px solid rgba(96,165,250,.25)"}}>外国人枠免除まで {foreignExemptDays}日</span>}
-          {(p.injuryDaysLeft??0)>0&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(248,113,113,.1)",color:"#f87171",border:"1px solid rgba(248,113,113,.3)"}}>🤕 {p.injury}{p.injuryPart ? ` [${p.injuryPart}]` : ''} 残{p.injuryDaysLeft}試合</span>}
+          {(p.injuryDaysLeft??0)>0&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(248,113,113,.1)",color:"#f87171",border:"1px solid rgba(248,113,113,.3)"}}>🤕 {safeInjury}{safeInjuryPart ? ` [${safeInjuryPart}]` : ''} 残{p.injuryDaysLeft}試合</span>}
         </div>
 
-        {/* 2カラムレイアウト */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12,minWidth:0}}>
+        {/* セクション切替 */}
+        <div style={{display:"flex",gap:8,marginBottom:12}}>
+          <button onClick={()=>setActiveSection("profile")} style={{flex:1,borderRadius:8,padding:"8px 10px",cursor:"pointer",border:activeSection==="profile"?"1px solid #60a5fa":"1px solid rgba(255,255,255,.12)",background:activeSection==="profile"?"rgba(96,165,250,.15)":"rgba(255,255,255,.04)",color:activeSection==="profile"?"#93c5fd":"#94a3b8",fontSize:11,fontWeight:700}}>能力・プロフィール</button>
+          <button onClick={()=>setActiveSection("stats")} style={{flex:1,borderRadius:8,padding:"8px 10px",cursor:"pointer",border:activeSection==="stats"?"1px solid #34d399":"1px solid rgba(255,255,255,.12)",background:activeSection==="stats"?"rgba(52,211,153,.14)":"rgba(255,255,255,.04)",color:activeSection==="stats"?"#6ee7b7":"#94a3b8",fontSize:11,fontWeight:700}}>成績</button>
+        </div>
 
-          {/* 能力値 */}
+        {activeSection==="profile"&&(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12,minWidth:0}}>
           <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}>
             <div style={{fontSize:10,color:"#374151",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>能力値</div>
-            {p.isPitcher?(
-              <>
-                <AbilityBar label="球速" value={p.pitching.velocity}/>
-                <AbilityBar label="制球" value={p.pitching.control}/>
-                <AbilityBar label="スタミナ" value={p.pitching.stamina}/>
-                <AbilityBar label="変化球" value={p.pitching.breaking}/>
-                <AbilityBar label="球種" value={p.pitching.variety}/>
-                <AbilityBar label="ピンチ" value={p.pitching.clutchP}/>
-              </>
-            ):(
-              <>
-                <AbilityBar label="ミート" value={p.batting.contact}/>
-                <AbilityBar label="長打" value={p.batting.power}/>
-                <AbilityBar label="走力" value={p.batting.speed}/>
-                <AbilityBar label="守備" value={p.batting.defense}/>
-                <AbilityBar label="選球眼" value={p.batting.eye}/>
-                <AbilityBar label="クラッチ" value={p.batting.clutch}/>
-              </>
-            )}
-            <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",justifyContent:"space-between"}}>
-              <span style={{fontSize:9,color:"#374151"}}>潜在能力</span>
-              <span style={{fontSize:10,color:"#a78bfa",fontFamily:"monospace",fontWeight:700}}>{p.potential}</span>
-            </div>
+            {p.isPitcher?(<><AbilityBar label="球速" value={p.pitching.velocity}/><AbilityBar label="制球" value={p.pitching.control}/><AbilityBar label="スタミナ" value={p.pitching.stamina}/><AbilityBar label="変化球" value={p.pitching.breaking}/><AbilityBar label="球種" value={p.pitching.variety}/><AbilityBar label="ピンチ" value={p.pitching.clutchP}/></>):(<><AbilityBar label="ミート" value={p.batting.contact}/><AbilityBar label="長打" value={p.batting.power}/><AbilityBar label="走力" value={p.batting.speed}/><AbilityBar label="守備" value={p.batting.defense}/><AbilityBar label="選球眼" value={p.batting.eye}/><AbilityBar label="クラッチ" value={p.batting.clutch}/></>)}
+            <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",justifyContent:"space-between"}}><span style={{fontSize:9,color:"#374151"}}>潜在能力</span><span style={{fontSize:10,color:"#a78bfa",fontFamily:"monospace",fontWeight:700}}>{p.potential}</span></div>
           </div>
+          <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#374151",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>契約</div><StatRow label="年俸" value={fmtSal(p.salary)} color="#f5c842"/><StatRow label="残年数" value={`${p.contractYearsLeft}年`} color={p.contractYearsLeft===0?"#f87171":undefined}/><div style={{marginTop:6,paddingTop:6,borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",justifyContent:"space-between"}}><span style={{fontSize:9,color:"#374151"}}>モラル</span><span style={{fontSize:10,fontFamily:"monospace",color:(p.morale??70)>=80?"#34d399":(p.morale??70)>=60?"#f5c842":"#f87171"}}>{p.morale??70}</span></div><div style={{marginTop:4,display:"flex",justifyContent:"space-between"}}><span style={{fontSize:9,color:"#374151"}}>コンディション</span><span style={{fontSize:10,fontFamily:"monospace",color:(p.condition??70)>=80?"#34d399":(p.condition??70)>=60?"#f5c842":"#f87171"}}>{p.condition??70}</span></div></div>
+        </div>)}
 
-          {/* 今季成績 + 契約 */}
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px",flex:1}}>
-              <div style={{fontSize:10,color:"#374151",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>今季成績</div>
-              {p.isPitcher?(
-                <>
-                  <StatRow label="防御率" value={sp.ERA>0?sp.ERA:"---"} color={sp.ERA>0&&sp.ERA<3?"#34d399":sp.ERA<4?"#f5c842":sp.ERA>0?"#f87171":undefined}/>
-                  <StatRow label="勝-敗" value={`${p.stats.W}-${p.stats.L}`}/>
-                  <StatRow label="投球回" value={p.stats.IP>0?fmtIP(p.stats.IP):"---"}/>
-                  <StatRow label="奪三振" value={p.stats.Kp||0}/>
-                  <StatRow label="WHIP" value={sp.WHIP>0?sp.WHIP:"---"} color={sp.WHIP>0&&sp.WHIP<1.0?"#34d399":sp.WHIP<1.3?"#f5c842":undefined}/>
-                  <StatRow label="セーブ" value={p.stats.SV||0}/>
-                  <StatRow label="H" value={p.stats.HLD||0}/>
-                </>
-              ):(
-                <>
-                  <StatRow label="打率" value={fmtAvg(p.stats.H,p.stats.AB)} color={p.stats.AB>0&&(p.stats.H/p.stats.AB)>=.300?"#34d399":(p.stats.H/p.stats.AB)>=.250?"#f5c842":undefined}/>
-                  <StatRow label="本塁打" value={p.stats.HR} color={p.stats.HR>=20?"#f5c842":undefined}/>
-                  <StatRow label="打点" value={p.stats.RBI}/>
-                  <StatRow label="OPS" value={sb.OPS>0?sb.OPS.toFixed(3):"---"} color={sb.OPS>=.850?"#34d399":sb.OPS>=.700?"#f5c842":undefined}/>
-                  <StatRow label="盗塁" value={p.stats.SB||0}/>
-                  <StatRow label="出塁率" value={sb.OBP>0?sb.OBP.toFixed(3):"---"}/>
-                  <StatRow label="強打球率" value={sb.hardHitPct>0?`${(sb.hardHitPct*100).toFixed(1)}%`:"---"} color={sb.hardHitPct>=0.4?"#34d399":undefined}/>
-                </>
-              )}
-            </div>
-
-            {!p.isPitcher&&(
-              <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}>
-                <div style={{fontSize:10,color:"#374151",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>打球傾向分析</div>
-                <StatRow label="左翼方向" value={sb.pullPct>0?`${(sb.pullPct*100).toFixed(1)}%`:"---"}/>
-                <StatRow label="中堅方向" value={sb.centerPct>0?`${(sb.centerPct*100).toFixed(1)}%`:"---"}/>
-                <StatRow label="右翼方向" value={sb.oppositePct>0?`${(sb.oppositePct*100).toFixed(1)}%`:"---"}/>
-                <StatRow label="ゴロ率" value={sb.gbPct>0?`${(sb.gbPct*100).toFixed(1)}%`:"---"}/>
-                <StatRow label="ライナー率" value={sb.ldPct>0?`${(sb.ldPct*100).toFixed(1)}%`:"---"}/>
-                <StatRow label="フライ率" value={sb.fbPct>0?`${(sb.fbPct*100).toFixed(1)}%`:"---"}/>
-                <SprayChart events={toSprayChartEvents(Array.isArray(p?.stats?.sprayPoints) ? p.stats.sprayPoints : [])} />
-              </div>
-            )}
-
-            <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}>
-              <div style={{fontSize:10,color:"#374151",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>契約</div>
-              <StatRow label="年俸" value={fmtSal(p.salary)} color="#f5c842"/>
-              <StatRow label="残年数" value={`${p.contractYearsLeft}年`} color={p.contractYearsLeft===0?"#f87171":undefined}/>
-              <div style={{marginTop:6,paddingTop:6,borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",justifyContent:"space-between"}}>
-                <span style={{fontSize:9,color:"#374151"}}>モラル</span>
-                <span style={{fontSize:10,fontFamily:"monospace",color:(p.morale??70)>=80?"#34d399":(p.morale??70)>=60?"#f5c842":"#f87171"}}>{p.morale??70}</span>
-              </div>
-              <div style={{marginTop:4,display:"flex",justifyContent:"space-between"}}>
-                <span style={{fontSize:9,color:"#374151"}}>コンディション</span>
-                <span style={{fontSize:10,fontFamily:"monospace",color:(p.condition??70)>=80?"#34d399":(p.condition??70)>=60?"#f5c842":"#f87171"}}>{p.condition??70}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 守備適正ダイヤモンド（野手のみ） */}
-        {!p.isPitcher&&(
-          <div style={{marginBottom:12}}>
-            <PositionDiamond
-              player={p}
-              convertTarget={localConvertTarget}
-              onSetConvertTarget={isMyTeam ? handleConvert : null}
-            />
-          </div>
-        )}
+        {activeSection==="stats"&&(<div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12,minWidth:0}}><div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#374151",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>今季成績</div>{p.isPitcher?(<><StatRow label="防御率" value={sp.ERA>0?sp.ERA:"---"} color={sp.ERA>0&&sp.ERA<3?"#34d399":sp.ERA<4?"#f5c842":sp.ERA>0?"#f87171":undefined}/><StatRow label="勝-敗" value={`${p.stats.W}-${p.stats.L}`}/><StatRow label="投球回" value={p.stats.IP>0?fmtIP(p.stats.IP):"---"}/><StatRow label="奪三振" value={p.stats.Kp||0}/><StatRow label="WHIP" value={sp.WHIP>0?sp.WHIP:"---"} color={sp.WHIP>0&&sp.WHIP<1.0?"#34d399":sp.WHIP<1.3?"#f5c842":undefined}/><StatRow label="セーブ" value={p.stats.SV||0}/><StatRow label="H" value={p.stats.HLD||0}/></>):(<><StatRow label="打率" value={fmtAvg(p.stats.H,p.stats.AB)} color={p.stats.AB>0&&(p.stats.H/p.stats.AB)>=.300?"#34d399":(p.stats.H/p.stats.AB)>=.250?"#f5c842":undefined}/><StatRow label="本塁打" value={p.stats.HR} color={p.stats.HR>=20?"#f5c842":undefined}/><StatRow label="打点" value={p.stats.RBI}/><StatRow label="OPS" value={sb.OPS>0?sb.OPS.toFixed(3):"---"} color={sb.OPS>=.850?"#34d399":sb.OPS>=.700?"#f5c842":undefined}/><StatRow label="盗塁" value={p.stats.SB||0}/><StatRow label="出塁率" value={sb.OBP>0?sb.OBP.toFixed(3):"---"}/><StatRow label="強打球率" value={sb.hardHitPct>0?`${(sb.hardHitPct*100).toFixed(1)}%`:"---"} color={sb.hardHitPct>=0.4?"#34d399":undefined}/></>)}</div>{!p.isPitcher&&(<div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#374151",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>打球傾向分析</div><StatRow label="左翼方向" value={sb.pullPct>0?`${(sb.pullPct*100).toFixed(1)}%`:"---"}/><StatRow label="中堅方向" value={sb.centerPct>0?`${(sb.centerPct*100).toFixed(1)}%`:"---"}/><StatRow label="右翼方向" value={sb.oppositePct>0?`${(sb.oppositePct*100).toFixed(1)}%`:"---"}/><StatRow label="ゴロ率" value={sb.gbPct>0?`${(sb.gbPct*100).toFixed(1)}%`:"---"}/><StatRow label="ライナー率" value={sb.ldPct>0?`${(sb.ldPct*100).toFixed(1)}%`:"---"}/><StatRow label="フライ率" value={sb.fbPct>0?`${(sb.fbPct*100).toFixed(1)}%`:"---"}/><SprayChart events={toSprayChartEvents(Array.isArray(p?.stats?.sprayPoints) ? p.stats.sprayPoints : [])} /></div>)}</div>)}
 
         {/* 年度別・通算成績 */}
         <CareerTable player={p}/>
