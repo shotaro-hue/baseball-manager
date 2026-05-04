@@ -1,5 +1,15 @@
 import { saberBatter, saberPitcher } from './sabermetrics';
 
+function getCareerSummary(player) {
+  const summary = player?.careerLogSummary && typeof player.careerLogSummary === 'object' ? player.careerLogSummary : {};
+  return {
+    totalHomeRuns: Number(summary.totalHomeRuns || 0) || 0,
+    totalGames: Number(summary.totalGames || 0) || 0,
+    totalPlateAppearances: Number(summary.totalPlateAppearances || summary.totalGames || 0) || 0,
+    totalWins: Number(summary.totalWins || 0) || 0,
+  };
+}
+
 /* ═══════════════════════════════════════════════
    AWARDS & RECORDS ENGINE
    シーズン表彰・歴代記録・殿堂システム
@@ -98,7 +108,8 @@ function pickSawamura(pitchers) {
 
 function pickRookie(allPlayers) {
   const rookies = allPlayers.filter(p => {
-    const careerAB = (p.careerLog || []).reduce((s, y) => s + (y.stats?.AB || 0) + (y.stats?.BF || 0), 0);
+    const careerSummary = getCareerSummary(p);
+    const careerAB = careerSummary.totalPlateAppearances;
     return p.age <= 27 && careerAB < 60;
   });
   const scored = rookies.map(p => {
@@ -205,12 +216,12 @@ export function updateRecords(records, teams) {
       }
 
       // 通算本塁打
-      const careerHR = (p.careerLog || []).reduce((sum, y) => sum + (y.stats?.HR || 0), s.HR || 0);
+      const careerHR = getCareerSummary(p).totalHomeRuns + (s.HR || 0);
       if (careerHR > (newRec.careerHR[p.id]?.value || 0))
         newRec.careerHR[p.id] = { value: careerHR, playerName: p.name };
 
       // 通算勝利数
-      const careerW = (p.careerLog || []).reduce((sum, y) => sum + (y.stats?.W || 0), s.W || 0);
+      const careerW = getCareerSummary(p).totalWins + (s.W || 0);
       if (careerW > (newRec.careerW[p.id]?.value || 0))
         newRec.careerW[p.id] = { value: careerW, playerName: p.name };
     }
@@ -226,15 +237,17 @@ export function checkHallOfFame(hallOfFame, allAlumni, year) {
     if (existing.has(p.id)) return false;
     const retireYear = p.exitYear || (year - 3);
     if (year - retireYear < 2) return false;
-    const careerHR = (p.careerLog || []).reduce((s, y) => s + (y.stats?.HR || 0), 0);
-    const careerW  = (p.careerLog || []).reduce((s, y) => s + (y.stats?.W  || 0), 0);
-    const careerPA = (p.careerLog || []).reduce((s, y) => s + (y.stats?.PA || 0), 0);
+    const summary = getCareerSummary(p);
+    const careerHR = summary.totalHomeRuns;
+    const careerW  = summary.totalWins;
+    const careerPA = summary.totalPlateAppearances;
     return careerHR >= 200 || careerW >= 100 || careerPA >= 3000;
   });
   return candidates.slice(0, 3).map(p => {
-    const careerHR = (p.careerLog || []).reduce((s, y) => s + (y.stats?.HR || 0), 0);
-    const careerW  = (p.careerLog || []).reduce((s, y) => s + (y.stats?.W  || 0), 0);
-    const careerPA = (p.careerLog || []).reduce((s, y) => s + (y.stats?.PA || 0), 0);
+    const summary = getCareerSummary(p);
+    const careerHR = summary.totalHomeRuns;
+    const careerW  = summary.totalWins;
+    const careerPA = summary.totalPlateAppearances;
     return { playerId: p.id, playerName: p.name, inductYear: year, careerHR, careerW, careerPA };
   });
 }
