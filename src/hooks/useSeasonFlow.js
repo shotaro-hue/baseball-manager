@@ -296,6 +296,36 @@ function cpuAutoManageTeam(team) {
 }
 
 export function useSeasonFlow(gs) {
+  function detectLowEndDevice() {
+    try {
+      const nav = typeof navigator !== 'undefined' ? navigator : null;
+      if (!nav) return false;
+      const ua = String(nav.userAgent || '').toLowerCase();
+      const isMobile = /iphone|ipad|ipod|android|mobile/.test(ua);
+      const cores = Number(nav.hardwareConcurrency || 0);
+      const lowCoreDevice = Number.isFinite(cores) && cores > 0 && cores <= 4;
+      return isMobile || lowCoreDevice;
+    } catch (error) {
+      console.warn('低スペック端末判定に失敗しました:', error);
+      return false;
+    }
+  }
+
+  function waitForNextFrame() {
+    return new Promise((resolve) => {
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => resolve());
+        return;
+      }
+      setTimeout(resolve, 0);
+    });
+  }
+
+  function waitMs(ms) {
+    const safeMs = Number.isFinite(ms) ? Math.max(0, Math.floor(ms)) : 0;
+    return new Promise((resolve) => setTimeout(resolve, safeMs));
+  }
+
   const {
     teams, setTeams, myId, myTeam,
     gameDay, setGameDay, year,
@@ -881,8 +911,10 @@ export function useSeasonFlow(gs) {
     };
     isBatchCancelledRef.current = false;
     gs.setIsAutoSaveSuspended(true);
-    const CHUNK_SIZE = 3;
-    const MAX_BATCH_BOX_SCORE_KEEP = 120;
+    const isLowEndDevice = detectLowEndDevice();
+    const CHUNK_SIZE = isLowEndDevice ? 1 : 3;
+    const MAX_BATCH_BOX_SCORE_KEEP = isLowEndDevice ? 40 : 120;
+    const THROTTLE_WAIT_MS = isLowEndDevice ? 12 : 0;
     const makeCompactBoxScoreRecord = ({ homeId, awayId, dayNo, cr, bs, homeName, awayName }) => ({
       homeId, awayId, dayNo, cr, homeName, awayName,
       inningScores: bs?.inningScores,
@@ -1075,7 +1107,11 @@ export function useSeasonFlow(gs) {
           newDay++;
         }
         updateBatchProgress(Math.min(chunkEnd, safeCount), safeCount, "試合計算");
-        await new Promise(requestAnimationFrame);
+        await waitForNextFrame();
+        if (THROTTLE_WAIT_MS > 0) {
+          // ⚠️ モバイル端末のメインスレッド詰まり【＝UI停止】を避けるため、短時間スリープを挟む。
+          await waitMs(THROTTLE_WAIT_MS);
+        }
       }
 
       if (isBatchCancelledRef.current) {
