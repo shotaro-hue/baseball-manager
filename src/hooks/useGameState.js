@@ -75,10 +75,10 @@ export function useGameState() {
   const [retireRole, setRetireRole] = useState(null);
   const [gameState, dispatch] = useReducer(gameStateReducer, { teams: INIT_TEAMS, gameDay: 1, year: 2026, myId: null });
   const { teams, gameDay, year, myId } = gameState;
-  const setTeams   = useCallback((n) => dispatch({ type: G.SET_TEAMS,    teams: (prev) => slimTeamsForState(typeof n === 'function' ? n(prev) : n) }),    []);
-  const setGameDay = useCallback((n) => dispatch({ type: G.SET_GAME_DAY, day:   n }),    []);
-  const setYear    = useCallback((n) => dispatch({ type: G.SET_YEAR,     year:  n }),    []);
-  const setMyId    = useCallback((id) => dispatch({ type: G.SET_MY_ID,   myId:  id }),   []);
+  const setTeams   = useCallback((n) => { dispatch({ type: G.SET_TEAMS, teams: (prev) => slimTeamsForState(typeof n === 'function' ? n(prev) : n) }); markSaveDirty(); },    [markSaveDirty]);
+  const setGameDay = useCallback((n) => { dispatch({ type: G.SET_GAME_DAY, day: n }); markSaveDirty(); }, [markSaveDirty]);
+  const setYear    = useCallback((n) => { dispatch({ type: G.SET_YEAR, year: n }); markSaveDirty(); }, [markSaveDirty]);
+  const setMyId    = useCallback((id) => { dispatch({ type: G.SET_MY_ID, myId: id }); if(id) markSaveDirty(); }, [markSaveDirty]);
   const [tab, setTab] = useState("dashboard");
   const [faPool, setFaPool] = useState(() => generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX)));
   const [faYears, setFaYears] = useState({});
@@ -101,6 +101,11 @@ export function useGameState() {
   const [saveDirty, setSaveDirty] = useState(false);
   const [lastAutoSaveAt, setLastAutoSaveAt] = useState(0);
   const [saveRevision, setSaveRevision] = useState(0);
+
+  const markSaveDirty = useCallback(()=>{
+    setSaveRevision(prev=>prev+1);
+    setSaveDirty(true);
+  },[]);
 
   // gameDay が進んだとき、記者会見インターバルを超えていれば会見イベントをセット
   useEffect(()=>{
@@ -142,7 +147,7 @@ export function useGameState() {
   },[myTeam,mailbox,faPool,news,gameDay]);
 
   const notify = useCallback((msg,type="ok")=>{setNotif({msg,type});setTimeout(()=>setNotif(null),3500);},[]);
-  const upd = useCallback((id, fn) => dispatch({ type: G.UPD_TEAM, id, fn: (team) => slimTeamForState(fn(team)) }), []);
+  const upd = useCallback((id, fn) => { dispatch({ type: G.UPD_TEAM, id, fn: (team) => slimTeamForState(fn(team)) }); markSaveDirty(); }, [markSaveDirty]);
 
   const pushResult = useCallback((won,drew,oppName,myScore,oppScore,gameNo)=>{
     setRecentResults(prev=>[{won,drew,oppName,myScore,oppScore,gameNo},...prev].slice(0,5));
@@ -150,11 +155,13 @@ export function useGameState() {
 
   const pushGameResult = useCallback((gameNo, result)=>{
     setGameResultsMap(prev=>({...prev,[gameNo]:result}));
-  },[]);
+    markSaveDirty();
+  },[markSaveDirty]);
 
   const addNews = useCallback((article)=>{
     setNews(prev=>[{id:uid(),timestamp:Date.now(),...article},...prev].slice(0,50));
-  },[]);
+    markSaveDirty();
+  },[markSaveDirty]);
 
   const addToHistory = useCallback((teamId,player,exitReason)=>{
     if(!player) return;
@@ -233,12 +240,6 @@ export function useGameState() {
     });
   },[mailbox, gameDay, myTeam, myId, upd, notify, addToHistory, setFaPool, year]);
 
-  useEffect(()=>{
-    if(!myId) return;
-    setSaveRevision(prev=>prev+1);
-    setSaveDirty(true);
-  },[teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox]);
-
   // オートセーブ（hubに戻った時）
   useEffect(()=>{
     if(screen!=='hub' || isAutoSaveSuspended || !saveDirty) return;
@@ -251,7 +252,7 @@ export function useGameState() {
       console.error('Auto save failed:', error);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[screen,isAutoSaveSuspended,saveDirty,lastAutoSaveAt,teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision]);
+  },[screen,isAutoSaveSuspended,saveDirty,lastAutoSaveAt,saveRevision]);
 
   const handleSave = useCallback(async ()=>{
     const result=await saveGame({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision});
@@ -596,6 +597,7 @@ export function useGameState() {
     isAutoSaveSuspended, setIsAutoSaveSuspended,
     saveDirty, setSaveDirty,
     saveRevision, setSaveRevision,
+    markSaveDirty,
     // derived
     myTeam,
     tabBadges,
