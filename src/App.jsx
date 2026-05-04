@@ -229,7 +229,22 @@ export default function App(){
   if(screen==="result"&&gameResult){const _src=gameResult._source;const _retScreen=_src==="batch"?"batch_result":"hub";const _retLabel=_src==="batch"?"← バッチ結果に戻る":_src==="schedule"?"← 日程に戻る":"次の試合へ →";return(<><ResultScreen gsResult={gameResult} myTeam={myTeam} oppTeam={gameResult.oppTeam} gameDay={gameResult.gameNo??gameDay-1} onNext={()=>setScreen(_retScreen)} nextLabel={_retLabel}/></>);}
 
 
-  if(screen==="tactical_game"&&currentOpp) return(<><ErrorBoundary onReset={()=>setScreen("hub")}><TacticalGameScreen myTeam={myTeam} oppTeam={currentOpp} onGameEnd={sf.handleTacticalGameEnd}/></ErrorBoundary></>);
+  if(screen==="tactical_game"){
+    if(!currentOpp || !myTeam){
+      return (
+        <div className="app">
+          <div className="rw">
+            <div className="rtitle rlose">試合画面を開けません</div>
+            <div style={{ marginBottom: 20, color: "#94a3b8", fontSize: 13 }}>
+              対戦データが不足しているため、試合を開始できませんでした。日程画面から再試行してください。
+            </div>
+            <button className="btn btn-gold" onClick={()=>setScreen("hub")}>日程画面へ戻る</button>
+          </div>
+        </div>
+      );
+    }
+    return(<><ErrorBoundary onReset={()=>setScreen("hub")}><TacticalGameScreen myTeam={myTeam} oppTeam={currentOpp} onGameEnd={sf.handleTacticalGameEnd}/></ErrorBoundary></>);
+  }
   if(screen==="allstar"&&allStarResult) return(<>
     <AllStarScreen
       year={year}
