@@ -278,11 +278,10 @@ describe('physicsMeta integration', () => {
       return distances.reduce((sum, distance) => sum + distance, 0) / distances.length;
     };
 
-    // 現行simulation実装では windOut が小さい方向ほど飛距離が伸びる。
-    // そのため windOut=-10 を追い風相当、windOut=10 を向かい風相当として検証する。
-    const tailwindAverage = sampleAverageDistance(-10);
-    const headwindAverage = sampleAverageDistance(10);
-
+    // windOut > 0 を外野方向への追い風、windOut < 0 を向かい風として検証する。
+    const headwindAverage = sampleAverageDistance(-10);
+    const tailwindAverage = sampleAverageDistance(10);
+    
     expect(tailwindAverage).toBeGreaterThanOrEqual(headwindAverage + 2);
   });
 });
