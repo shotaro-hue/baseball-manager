@@ -825,7 +825,13 @@ export function getAutoSaveIntervalMs() {
 }
 
 export function hasSave() {
-  return !!localStorage.getItem(SAVE_KEY);
+  try {
+    return !!localStorage.getItem(SAVE_KEY);
+  } catch (error) {
+    // ⚠️ セキュリティ: ブラウザ設定によりStorage API【＝ブラウザ内保存機能】が拒否される場合があるため、必ず例外を握りつぶして初期表示を継続する
+    console.warn('hasSave failed. Falling back to no-save mode.', error);
+    return false;
+  }
 }
 
 export function getSaveMeta() {
