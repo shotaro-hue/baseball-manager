@@ -476,25 +476,72 @@ function normalizeRecentCareerLog(player) {
 }
 
 async function appendRecentCareerLogsToIndexedDb(state) {
-  const players = [];
+  const entriesByPlayer = new Map();
   (state?.teams || []).forEach((team) => {
     ['players', 'farm'].forEach((bucket) => {
       (team?.[bucket] || []).forEach((player) => {
-        if (player?.id) players.push(player);
+        const playerId = normalizePlayerId(String(player?.id || ''));
+        if (!playerId) return;
+        const recentCareerLog = normalizeRecentCareerLog(player);
+        if (recentCareerLog.length === 0) return;
+        const existing = entriesByPlayer.get(playerId) || [];
+        entriesByPlayer.set(playerId, [...existing, ...recentCareerLog]);
       });
     });
   });
-  for (const player of players) {
-    const recentCareerLog = normalizeRecentCareerLog(player);
-    if (recentCareerLog.length === 0) continue;
-    const stored = await idbRead(IDB_STORES.careerLogs, player.id);
-    const storedLog = Array.isArray(stored) ? stored : [];
-    const existingYears = new Set(storedLog.map((row) => sanitizeYear(row?.year)).filter((year) => year > 0));
-    const appendRows = recentCareerLog.filter((row) => !existingYears.has(sanitizeYear(row?.year)));
-    if (appendRows.length > 0) {
-      await idbWrite(IDB_STORES.careerLogs, player.id, [...storedLog, ...appendRows]);
-    }
-  }
+  if (entriesByPlayer.size === 0) return;
+  await upsertCareerLogEntriesBatch(entriesByPlayer);
+}
+
+
+
+function normalizePlayerId(playerId) {
+  return typeof playerId === 'string' ? playerId.trim() : '';
+}
+
+async function upsertCareerLogEntriesBatch(entriesByPlayer) {
+  const db = await openSaveDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORES.careerLogs, 'readwrite');
+    const store = tx.objectStore(IDB_STORES.careerLogs);
+    const queue = entriesByPlayer instanceof Map ? Array.from(entriesByPlayer.entries()) : [];
+
+    const readCurrent = (playerId) => new Promise((res, rej) => {
+      const req = store.get(playerId);
+      req.onsuccess = () => res(Array.isArray(req.result) ? req.result : []);
+      req.onerror = () => rej(req.error || new Error('IndexedDB read failed'));
+    });
+
+    const writeNext = (playerId, value) => new Promise((res, rej) => {
+      const req = store.put(value, playerId);
+      req.onsuccess = () => res(true);
+      req.onerror = () => rej(req.error || new Error('IndexedDB write failed'));
+    });
+
+    (async () => {
+      for (const [playerIdRaw, rows] of queue) {
+        const playerId = normalizePlayerId(playerIdRaw);
+        if (!playerId || !Array.isArray(rows) || rows.length === 0) continue;
+        const existing = await readCurrent(playerId);
+        const byYear = new Map();
+        for (const row of existing) {
+          const year = sanitizeYear(row?.year);
+          if (year > 0) byYear.set(year, row);
+        }
+        for (const row of rows) {
+          const year = sanitizeYear(row?.year);
+          if (year <= 0) continue;
+          byYear.set(year, row);
+        }
+        const merged = Array.from(byYear.values()).sort((a, b) => sanitizeYear(a?.year) - sanitizeYear(b?.year));
+        await writeNext(playerId, merged);
+      }
+    })().catch((error) => reject(error));
+
+    tx.oncomplete = () => { db.close(); resolve({ ok: true }); };
+    tx.onerror = () => { db.close(); reject(tx.error || new Error('IndexedDB batch upsert failed')); };
+    tx.onabort = () => { db.close(); reject(tx.error || new Error('IndexedDB batch upsert aborted')); };
+  });
 }
 
 export async function saveGame(state, options = {}) {
@@ -758,20 +805,35 @@ export async function loadPlayerCareerLogById(playerId) {
 }
 
 export async function appendCareerEntryToIndexedDb(playerId, careerEntry) {
-  const normalizedPlayerId = typeof playerId === 'string' ? playerId.trim() : '';
+  const normalizedPlayerId = normalizePlayerId(playerId);
   if (!normalizedPlayerId || !careerEntry || typeof careerEntry !== 'object') return { ok: false };
   try {
-    const loaded = await idbRead(IDB_STORES.careerLogs, normalizedPlayerId);
-    const existing = Array.isArray(loaded) ? loaded : [];
-    const year = sanitizeYear(careerEntry.year);
-    const deduped = existing.filter((row) => sanitizeYear(row?.year) !== year);
-    deduped.push(careerEntry);
-    deduped.sort((a, b) => sanitizeYear(a?.year) - sanitizeYear(b?.year));
-    await idbWrite(IDB_STORES.careerLogs, normalizedPlayerId, deduped);
+    const entriesByPlayer = new Map([[normalizedPlayerId, [careerEntry]]]);
+    await upsertCareerLogEntriesBatch(entriesByPlayer);
     return { ok: true };
   } catch (e) {
     console.warn('Career log append failed:', e);
     return { ok: false };
+  }
+}
+
+export async function appendCareerEntriesToIndexedDb(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) return { ok: true, appendedPlayers: 0 };
+  const entriesByPlayer = new Map();
+  for (const item of entries) {
+    const playerId = normalizePlayerId(item?.playerId);
+    const careerEntry = item?.careerEntry;
+    if (!playerId || !careerEntry || typeof careerEntry !== 'object') continue;
+    const existing = entriesByPlayer.get(playerId) || [];
+    entriesByPlayer.set(playerId, [...existing, careerEntry]);
+  }
+  if (entriesByPlayer.size === 0) return { ok: false, appendedPlayers: 0 };
+  try {
+    await upsertCareerLogEntriesBatch(entriesByPlayer);
+    return { ok: true, appendedPlayers: entriesByPlayer.size };
+  } catch (e) {
+    console.warn('Career log batch append failed:', e);
+    return { ok: false, appendedPlayers: 0 };
   }
 }
 
