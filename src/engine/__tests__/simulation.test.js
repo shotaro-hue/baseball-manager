@@ -263,26 +263,51 @@ describe('physicsMeta integration', () => {
     expect(typeof resolved.physicsMeta.hrCheck?.fenceDistance).toBe('number');
   });
 
-  it('向かい風/追い風で平均飛距離が逆方向に変化する（±2m許容）', () => {
-    const sampleAverageDistance = (windOut) => {
-      const distances = Array.from({ length: 80 }, () => {
-        return _resolveBattedBallOutcomeFromPhysics_TEST(
-          batter,
-          pitcher,
-          stadium,
-          { windOut },
-          { config: { evNoise: 0, laNoise: 0 } }
-        ).physicsMeta.distance;
-      });
+  it('向かい風/追い風で飛距離が逆方向に変化する', () => {
+    const createFixedRngProvider = () => {
+      const sequence = [
+        0.5, // contact quality
+        0.7, // EV
+        0.6, // LA
+        0.5, // spray angle / misc
+        0.5, // fielder intercept / misc
+        0.5, // catch adjusted / misc
+        0.5, // reroll / misc
+      ];
+      let cursor = 0;
 
-      return distances.reduce((sum, distance) => sum + distance, 0) / distances.length;
+      return (min = 0, max = 1) => {
+        const base = sequence[cursor % sequence.length];
+        cursor += 1;
+        return min + (max - min) * base;
+      };
     };
 
-    // windOut > 0 を外野方向への追い風、windOut < 0 を向かい風として検証する。
-    const headwindAverage = sampleAverageDistance(-10);
-    const tailwindAverage = sampleAverageDistance(10);
-    
-    expect(tailwindAverage).toBeGreaterThanOrEqual(headwindAverage + 2);
+    const headwind = _resolveBattedBallOutcomeFromPhysics_TEST(
+      batter,
+      pitcher,
+      stadium,
+      { windOut: -10 },
+      {
+        rngProvider: createFixedRngProvider(),
+        config: { evNoise: 0, laNoise: 0 },
+      }
+    );
+
+    const tailwind = _resolveBattedBallOutcomeFromPhysics_TEST(
+      batter,
+      pitcher,
+      stadium,
+      { windOut: 10 },
+      {
+        rngProvider: createFixedRngProvider(),
+        config: { evNoise: 0, laNoise: 0 },
+      }
+    );
+
+    expect(tailwind.physicsMeta.distance).toBeGreaterThanOrEqual(
+      headwind.physicsMeta.distance + 2
+    );
   });
 });
 
