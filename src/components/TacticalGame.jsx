@@ -52,9 +52,19 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   const [modal3D,setModal3D]=useState(null);
   const [modalWarning,setModalWarning]=useState('');
   const logRef=useRef(null);
+  const [visibleLogIds, setVisibleLogIds] = useState([]);
+
+  // 表示ログIDのみを保持して、全ログの常時描画を避ける
+  useEffect(()=>{
+    const safeLen = Array.isArray(gs.log) ? gs.log.length : 0;
+    const start = Math.max(0, safeLen - 120);
+    const ids = [];
+    for(let i=start;i<safeLen;i+=1){ ids.push(i); }
+    setVisibleLogIds(ids);
+  },[gs.log]);
 
   // Auto-scroll log
-  useEffect(()=>{if(logRef.current) logRef.current.scrollTop=logRef.current.scrollHeight;},[gs.log.length]);
+  useEffect(()=>{if(logRef.current) logRef.current.scrollTop=logRef.current.scrollHeight;},[visibleLogIds]);
 
   // Auto-advance: 自動進行モード
   useEffect(()=>{
@@ -367,7 +377,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
           {modalWarning && <div className="notif nwarn">{modalWarning}</div>}
           {safePhysicsMeta && <PhysicsInsightPanel physicsMeta={safePhysicsMeta} />}
           <div className="evlog" ref={logRef}>
-            {gs.log.map((e,i)=>{
+            {visibleLogIds.map((i)=>{ const e = gs.log[i]; if(!e) return null;
               if(e.result==="change") return <div key={i} style={{padding:"3px 8px",fontSize:10,color:"#a78bfa",borderLeft:"3px solid #a78bfa",margin:"4px 0"}}>{e.text}</div>;
               const cls=e.result==="hr"?"evi-hr":IS_HIT(e.result)?"evi-hit":IS_OUT(e.result)?"evi-out":"";
               return(
