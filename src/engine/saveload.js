@@ -12,6 +12,8 @@ const BACKUP_KEY_2 = 'baseball_manager_v1_bk2';
 const isDevEnv = import.meta.env.DEV;
 const PERF_LOG_KEY = 'baseball_manager_save_perf_logs';
 const MAX_PERF_LOGS = 30;
+const BACKUP_ROTATE_INTERVAL_MS = 5 * 60 * 1000;
+const LAST_BACKUP_ROTATE_KEY = 'baseball_manager_v1_last_rotate_at';
 
 function logPerf(label, startedAt) {
   if (!isDevEnv || !Number.isFinite(startedAt)) return;
@@ -46,9 +48,17 @@ function rotateBk() {
     if (bk1) localStorage.setItem(BACKUP_KEY_2, bk1);
     const cur = localStorage.getItem(SAVE_KEY);
     if (cur) localStorage.setItem(BACKUP_KEY_1, cur);
+    localStorage.setItem(LAST_BACKUP_ROTATE_KEY, String(Date.now()));
   } catch (e) {
     console.warn('Backup rotation failed:', e);
   }
+}
+
+function shouldRotateBackupNow() {
+  const lastRotateRaw = localStorage.getItem(LAST_BACKUP_ROTATE_KEY);
+  const lastRotateAt = Number(lastRotateRaw);
+  if (!Number.isFinite(lastRotateAt) || lastRotateAt <= 0) return true;
+  return Date.now() - lastRotateAt >= BACKUP_ROTATE_INTERVAL_MS;
 }
 
 // ── 選手フィールドのマイグレーション ──────────────
@@ -123,6 +133,15 @@ function validateAndMigrateSave(state) {
   return { ok: true, state: { ...state, teams } };
 }
 
+function sanitizeSaveState(state) {
+  if (!state || typeof state !== 'object' || !Array.isArray(state.teams)) {
+    throw new Error('Invalid state for saving');
+  }
+  // ⚠️ セキュリティ: 保存時に意図しないプロトタイプ汚染【＝Objectの継承先改ざん】を避けるため、
+  // JSONシリアライズ可能なデータのみを抽出する。
+  return JSON.parse(JSON.stringify(state));
+}
+
 // ── 公開 API ────────────────────────────────────
 
 function compress(state) {
@@ -160,15 +179,22 @@ export function saveGame(state) {
   }
   const saveGameStart = isDevEnv ? performance.now() : 0;
   const perfBreakdown = {};
-  const { compressed, jsonLength, compressedLength } = compress(state);
+  let safeState;
+  try {
+    safeState = sanitizeSaveState(state);
+  } catch (e) {
+    console.error('Save failed: sanitize state error', e);
+    return { ok: false, quota: false, reason: 'sanitize_state_failed' };
+  }
+  const { compressed, jsonLength, compressedLength } = compress(safeState);
   const writeMeta = () => {
     const metaStart = isDevEnv ? performance.now() : 0;
-    const myTeam = state.teams?.find(t => t.id === state.myId);
+    const myTeam = safeState.teams?.find(t => t.id === safeState.myId);
     localStorage.setItem(META_KEY, JSON.stringify({
       teamName:  myTeam?.name  ?? '不明',
       teamEmoji: myTeam?.emoji ?? '⚾',
-      year:      state.year,
-      gameDay:   state.gameDay,
+      year:      safeState.year,
+      gameDay:   safeState.gameDay,
       wins:      myTeam?.wins  ?? 0,
       losses:    myTeam?.losses ?? 0,
       savedAt:   new Date().toLocaleString('ja-JP'),
@@ -176,9 +202,13 @@ export function saveGame(state) {
     perfBreakdown.writeMetaMs = safeElapsedMs(metaStart);
   };
   try {
-    const rotateStart = isDevEnv ? performance.now() : 0;
-    rotateBk();
-    perfBreakdown.rotateBackupMs = safeElapsedMs(rotateStart);
+    if (shouldRotateBackupNow()) {
+      const rotateStart = isDevEnv ? performance.now() : 0;
+      rotateBk();
+      perfBreakdown.rotateBackupMs = safeElapsedMs(rotateStart);
+    } else {
+      perfBreakdown.rotateBackupMs = 0;
+    }
     const setItemStart = isDevEnv ? performance.now() : 0;
     localStorage.setItem(SAVE_KEY, compressed);
     perfBreakdown.writeMainSaveMs = safeElapsedMs(setItemStart);
