@@ -475,25 +475,6 @@ function normalizeRecentCareerLog(player) {
   return source.slice(-MAX_RECENT_CAREER_LOG_YEARS);
 }
 
-async function appendRecentCareerLogsToIndexedDb(state) {
-  const entriesByPlayer = new Map();
-  (state?.teams || []).forEach((team) => {
-    ['players', 'farm'].forEach((bucket) => {
-      (team?.[bucket] || []).forEach((player) => {
-        const playerId = normalizePlayerId(String(player?.id || ''));
-        if (!playerId) return;
-        const recentCareerLog = normalizeRecentCareerLog(player);
-        if (recentCareerLog.length === 0) return;
-        const existing = entriesByPlayer.get(playerId) || [];
-        entriesByPlayer.set(playerId, [...existing, ...recentCareerLog]);
-      });
-    });
-  });
-  if (entriesByPlayer.size === 0) return;
-  await upsertCareerLogEntriesBatch(entriesByPlayer);
-}
-
-
 
 function normalizePlayerId(playerId) {
   return typeof playerId === 'string' ? playerId.trim() : '';
@@ -564,7 +545,6 @@ export async function saveGame(state, options = {}) {
   }
   try {
     await persistLargeDataToIndexedDb(safeState);
-    await appendRecentCareerLogsToIndexedDb(safeState);
   } catch (e) {
     console.error('Save failed: IndexedDB write error', e);
     return { ok: false, quota: false, reason: 'indexeddb_write_failed' };

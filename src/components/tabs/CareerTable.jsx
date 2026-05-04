@@ -17,10 +17,13 @@ export function CareerTable({player}){
       setIsLoading(true);
       try{
         const detailLog=await loadPlayerCareerLogById(String(player?.id||""));
-        if(alive) setLog(Array.isArray(detailLog)?detailLog:[]);
+        const fallbackRecentLog = Array.isArray(player?.recentCareerLog) ? player.recentCareerLog : [];
+        const nextLog = Array.isArray(detailLog) && detailLog.length > 0 ? detailLog : fallbackRecentLog;
+        if(alive) setLog(nextLog);
       }catch(e){
         console.warn("careerLog詳細の読み込みに失敗しました:",e);
-        if(alive) setLog([]);
+        const fallbackRecentLog = Array.isArray(player?.recentCareerLog) ? player.recentCareerLog : [];
+        if(alive) setLog(fallbackRecentLog);
       }finally{
         if(alive) setIsLoading(false);
       }
