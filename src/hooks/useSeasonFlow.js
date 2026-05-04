@@ -302,7 +302,7 @@ export function useSeasonFlow(gs) {
     schedule, setScreen,
     notify, upd, addNews, addTransferLog, pushResult,
     setMailbox, setNews, setRetireModal,
-    faPool, setFaPool, faYears, seasonHistory, news, mailbox,
+    faPool, setFaPool, faYears, seasonHistory, setSeasonHistory, news, mailbox,
     setSaveExists, cpuTradeOffers,
     allStarDone, setAllStarDone, allStarResult, setAllStarResult,
     allStarTriggerDay,
@@ -1099,6 +1099,8 @@ export function useSeasonFlow(gs) {
     const transferEntries = results
       .filter(r=>r.type==='trade_news')
       .map(r=>({
+        id: uid(),
+        timestamp: Date.now(),
         year,
         day: r.day,
         type: "trade",
@@ -1147,7 +1149,7 @@ export function useSeasonFlow(gs) {
     const existingTransfers = Array.isArray(existingSeasonHistory.transfers) ? existingSeasonHistory.transfers : [];
     const nextSeasonHistory = {
       ...existingSeasonHistory,
-      transfers: [...existingTransfers, ...transferEntries],
+      transfers: [...existingTransfers, ...transferEntries].slice(-400),
     };
     const nextState = {
       teams:newTeams,
@@ -1168,7 +1170,6 @@ export function useSeasonFlow(gs) {
       console.warn('[BatchSave] saveGame failed at batch end', batchSaveResult);
     }
     updateBatchProgress(safeCount, safeCount, "結果集計");
-    transferEntries.forEach((entry)=> addTransferLog(entry));
     if(batchTradeMails.length){
       notify(`📨 バッチ中にトレードオファーが${batchTradeMails.length}件届きました`,'ok');
     }
@@ -1178,7 +1179,7 @@ export function useSeasonFlow(gs) {
     if(newFaPool.length!==faPool.length) setFaPool(newFaPool);
     setNews(nextNews);
     setMailbox(nextMailbox);
-    upd({ seasonHistory: nextSeasonHistory });
+    setSeasonHistory(nextSeasonHistory);
     setTeams(newTeams);
     setGameDay(newDay);
     if(allStarDoneLocal) setAllStarDone(true);
