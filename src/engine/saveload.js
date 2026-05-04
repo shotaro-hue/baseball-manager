@@ -25,7 +25,7 @@ const IDB_STORES = {
 };
 
 // 将来対応予定: CareerTable / awards 側が summary 集計を参照するまでは、careerLog 詳細は 120 件保持する。
-const MAX_CAREER_LOG_ENTRIES = 120;
+const MAX_RECENT_CAREER_LOG_YEARS = 3;
 
 function sanitizeNumber(value, fallback = 0) {
   const safeFallback = Number.isFinite(Number(fallback)) ? Number(fallback) : 0;
@@ -183,6 +183,8 @@ function shouldRotateBackupNow() {
 
 // ── 選手フィールドのマイグレーション ──────────────
 function migratePlayer(p) {
+  const legacyCareerLog = Array.isArray(p.careerLog) ? p.careerLog : [];
+  const recentCareerLog = Array.isArray(p.recentCareerLog) ? p.recentCareerLog : legacyCareerLog.slice(-MAX_RECENT_CAREER_LOG_YEARS);
   const migratedStats = {
     ...(p.stats ?? {}),
     sprayPoints: Array.isArray(p?.stats?.sprayPoints) ? p.stats.sprayPoints : [],
@@ -199,9 +201,10 @@ function migratePlayer(p) {
     injuryDaysLeft:     p.injuryDaysLeft     ?? 0,
     growthPhase:        p.growthPhase        ?? 'peak',
     recentPitchingDays: p.recentPitchingDays ?? [],
-    careerLog:          p.careerLog          ?? [],
-    trimmedCareerLogSummary: mergeCareerLogSummary(createEmptyCareerLogSummary(), p.trimmedCareerLogSummary ?? p.careerLogSummary),
-    careerLogSummary:   mergeCareerLogSummary(createEmptyCareerLogSummary(), p.trimmedCareerLogSummary ?? p.careerLogSummary),
+    careerLog:          [],
+    recentCareerLog:    recentCareerLog.slice(-MAX_RECENT_CAREER_LOG_YEARS),
+    trimmedCareerLogSummary: mergeCareerLogSummary(createEmptyCareerLogSummary(), p.trimmedCareerLogSummary ?? p.careerLogSummary ?? buildCareerLogSummary(legacyCareerLog)),
+    careerLogSummary:   mergeCareerLogSummary(createEmptyCareerLogSummary(), p.trimmedCareerLogSummary ?? p.careerLogSummary ?? buildCareerLogSummary(legacyCareerLog)),
     peakAbilities:      p.peakAbilities      ?? null,
     stats:              migratedStats,
     stats2:             p.stats2             ?? { PA:0, H:0, HR:0, W:0, IP:0, ER:0, K:0 },
@@ -478,19 +481,38 @@ async function persistLargeDataToIndexedDb(state) {
   const seasonHistory = state?.seasonHistory ?? {};
   const news = Array.isArray(state?.news) ? state.news : [];
   const mailbox = Array.isArray(state?.mailbox) ? state.mailbox : [];
-  const careerEntries = [];
-  (state?.teams || []).forEach((team) => {
-    ['players', 'farm'].forEach((bucket) => {
-      (team?.[bucket] || []).forEach((p) => {
-        if (!p?.id) return;
-        careerEntries.push({ key: p.id, value: Array.isArray(p.careerLog) ? p.careerLog : [] });
-      });
-    });
-  });
   await idbWrite(IDB_STORES.chunks, 'seasonHistory', seasonHistory);
   await idbWrite(IDB_STORES.chunks, 'news', news);
   await idbWrite(IDB_STORES.chunks, 'mailbox', mailbox);
-  await Promise.all(careerEntries.map((entry) => idbWrite(IDB_STORES.careerLogs, entry.key, entry.value)));
+}
+
+function normalizeRecentCareerLog(player) {
+  const source = Array.isArray(player?.recentCareerLog)
+    ? player.recentCareerLog
+    : (Array.isArray(player?.careerLog) ? player.careerLog : []);
+  return source.slice(-MAX_RECENT_CAREER_LOG_YEARS);
+}
+
+async function appendRecentCareerLogsToIndexedDb(state) {
+  const players = [];
+  (state?.teams || []).forEach((team) => {
+    ['players', 'farm'].forEach((bucket) => {
+      (team?.[bucket] || []).forEach((player) => {
+        if (player?.id) players.push(player);
+      });
+    });
+  });
+  for (const player of players) {
+    const recentCareerLog = normalizeRecentCareerLog(player);
+    if (recentCareerLog.length === 0) continue;
+    const stored = await idbRead(IDB_STORES.careerLogs, player.id);
+    const storedLog = Array.isArray(stored) ? stored : [];
+    const existingYears = new Set(storedLog.map((row) => sanitizeYear(row?.year)).filter((year) => year > 0));
+    const appendRows = recentCareerLog.filter((row) => !existingYears.has(sanitizeYear(row?.year)));
+    if (appendRows.length > 0) {
+      await idbWrite(IDB_STORES.careerLogs, player.id, [...storedLog, ...appendRows]);
+    }
+  }
 }
 
 export async function saveGame(state, options = {}) {
@@ -511,13 +533,9 @@ export async function saveGame(state, options = {}) {
     console.error('Save failed: sanitize state error', e);
     return { ok: false, quota: false, reason: 'sanitize_state_failed' };
   }
-  safeState.teams = safeState.teams.map((team) => ({
-    ...team,
-    players: Array.isArray(team.players) ? team.players.map((player) => trimCareerLogWithSummary(player, MAX_CAREER_LOG_ENTRIES)) : [],
-    farm: Array.isArray(team.farm) ? team.farm.map((player) => trimCareerLogWithSummary(player, MAX_CAREER_LOG_ENTRIES)) : [],
-  }));
   try {
     await persistLargeDataToIndexedDb(safeState);
+    await appendRecentCareerLogsToIndexedDb(safeState);
   } catch (e) {
     console.error('Save failed: IndexedDB write error', e);
     return { ok: false, quota: false, reason: 'indexeddb_write_failed' };
@@ -527,8 +545,16 @@ export async function saveGame(state, options = {}) {
   safeState.mailbox = [];
   safeState.teams = safeState.teams.map((team) => ({
     ...team,
-    players: Array.isArray(team.players) ? team.players.map((p) => ({ ...p, careerLog: [] })) : [],
-    farm: Array.isArray(team.farm) ? team.farm.map((p) => ({ ...p, careerLog: [] })) : [],
+    players: Array.isArray(team.players) ? team.players.map((p) => {
+      const recentCareerLog = normalizeRecentCareerLog(p);
+      const nextSummary = mergeCareerLogSummary(createEmptyCareerLogSummary(), p.careerLogSummary ?? buildCareerLogSummary(recentCareerLog));
+      return { ...p, careerLog: [], recentCareerLog, careerLogSummary: nextSummary, trimmedCareerLogSummary: nextSummary };
+    }) : [],
+    farm: Array.isArray(team.farm) ? team.farm.map((p) => {
+      const recentCareerLog = normalizeRecentCareerLog(p);
+      const nextSummary = mergeCareerLogSummary(createEmptyCareerLogSummary(), p.careerLogSummary ?? buildCareerLogSummary(recentCareerLog));
+      return { ...p, careerLog: [], recentCareerLog, careerLogSummary: nextSummary, trimmedCareerLogSummary: nextSummary };
+    }) : [],
   }));
   safeState.saveDataVersion = SAVE_DATA_VERSION;
 
@@ -700,17 +726,28 @@ export async function loadGame() {
           state.seasonHistory = (await idbRead(IDB_STORES.chunks, 'seasonHistory')) ?? state.seasonHistory;
           state.news = (await idbRead(IDB_STORES.chunks, 'news')) ?? state.news;
           state.mailbox = (await idbRead(IDB_STORES.chunks, 'mailbox')) ?? state.mailbox;
-          for (const team of (state.teams || [])) {
-            for (const bucket of ['players', 'farm']) {
-              for (const player of (team?.[bucket] || [])) {
-                if (!player?.id) continue;
-                const loadedLog = await idbRead(IDB_STORES.careerLogs, player.id);
-                player.careerLog = Array.isArray(loadedLog) ? loadedLog : (Array.isArray(player.careerLog) ? player.careerLog : []);
-              }
-            }
-          }
         } catch (e) {
           console.warn('IndexedDB load failed. Fallback to localStorage payload.', e);
+        }
+      }
+      for (const team of (state?.teams || [])) {
+        for (const bucket of ['players', 'farm']) {
+          for (const player of (team?.[bucket] || [])) {
+            const legacyCareerLog = Array.isArray(player?.careerLog) ? player.careerLog : [];
+            if (player?.id && legacyCareerLog.length > 0) {
+              const existing = await idbRead(IDB_STORES.careerLogs, player.id);
+              if (!Array.isArray(existing) || existing.length === 0) {
+                await idbWrite(IDB_STORES.careerLogs, player.id, legacyCareerLog);
+              }
+            }
+            const recentCareerLog = Array.isArray(player?.recentCareerLog)
+              ? player.recentCareerLog.slice(-MAX_RECENT_CAREER_LOG_YEARS)
+              : legacyCareerLog.slice(-MAX_RECENT_CAREER_LOG_YEARS);
+            player.recentCareerLog = recentCareerLog;
+            player.careerLogSummary = mergeCareerLogSummary(createEmptyCareerLogSummary(), player.careerLogSummary ?? buildCareerLogSummary(legacyCareerLog));
+            player.trimmedCareerLogSummary = mergeCareerLogSummary(createEmptyCareerLogSummary(), player.trimmedCareerLogSummary ?? player.careerLogSummary);
+            player.careerLog = [];
+          }
         }
       }
       const result = validateAndMigrateSave(state);
@@ -725,6 +762,17 @@ export async function loadGame() {
     }
   }
   return null;
+}
+
+export async function loadPlayerCareerLogById(playerId) {
+  if (typeof playerId !== 'string' || playerId.trim() === '') return [];
+  try {
+    const loaded = await idbRead(IDB_STORES.careerLogs, playerId);
+    return Array.isArray(loaded) ? loaded : [];
+  } catch (e) {
+    console.warn('Career log load failed:', e);
+    return [];
+  }
 }
 
 

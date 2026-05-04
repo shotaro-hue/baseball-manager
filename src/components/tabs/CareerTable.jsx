@@ -1,14 +1,35 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { fmtAvg, fmtIP } from '../../utils';
 import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
 import { emptyStats } from '../../engine/player';
+import { loadPlayerCareerLogById } from '../../engine/saveload';
 
 export function CareerTable({player}){
   const [mode,setMode]=useState("regular");
   const [metricKey,setMetricKey]=useState(player.isPitcher?"ERA":"HR");
+  const [log,setLog]=useState([]);
+  const [isLoading,setIsLoading]=useState(true);
 
-  const log=player.careerLog||[];
+  useEffect(()=>{
+    let alive=true;
+    const load=async()=>{
+      setIsLoading(true);
+      try{
+        const detailLog=await loadPlayerCareerLogById(String(player?.id||""));
+        if(alive) setLog(Array.isArray(detailLog)?detailLog:[]);
+      }catch(e){
+        console.warn("careerLog詳細の読み込みに失敗しました:",e);
+        if(alive) setLog([]);
+      }finally{
+        if(alive) setIsLoading(false);
+      }
+    };
+    load();
+    return()=>{alive=false;};
+  },[player?.id]);
+
+  if(isLoading) return <div style={{marginTop:8,fontSize:10,color:"#94a3b8"}}>成績を読み込み中...</div>;
   if(log.length===0) return null;
   const hasPlayoff=log.some(r=>{const ps=r.playoffStats||emptyStats();return ps.PA>0||ps.BF>0;});
   const ip=player.isPitcher;
