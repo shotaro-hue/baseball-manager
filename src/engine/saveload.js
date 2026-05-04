@@ -463,9 +463,18 @@ async function persistLargeDataToIndexedDb(state) {
   const seasonHistory = state?.seasonHistory ?? {};
   const news = Array.isArray(state?.news) ? state.news : [];
   const mailbox = Array.isArray(state?.mailbox) ? state.mailbox : [];
-  await idbWrite(IDB_STORES.chunks, 'seasonHistory', seasonHistory);
-  await idbWrite(IDB_STORES.chunks, 'news', news);
-  await idbWrite(IDB_STORES.chunks, 'mailbox', mailbox);
+  const writeTasks = [
+    idbWrite(IDB_STORES.chunks, 'seasonHistory', seasonHistory),
+    idbWrite(IDB_STORES.chunks, 'news', news),
+    idbWrite(IDB_STORES.chunks, 'mailbox', mailbox),
+  ];
+  const settled = await Promise.allSettled(writeTasks);
+  const failedCount = settled.filter((result) => result.status === 'rejected').length;
+  if (failedCount > 0) {
+    console.warn(`IndexedDB退避に失敗しました（${failedCount}/3）。localStorage保存は継続します。`);
+    return { ok: false, failedCount };
+  }
+  return { ok: true, failedCount: 0 };
 }
 
 function normalizeRecentCareerLog(player) {
@@ -474,26 +483,6 @@ function normalizeRecentCareerLog(player) {
     : (Array.isArray(player?.careerLog) ? player.careerLog : []);
   return source.slice(-MAX_RECENT_CAREER_LOG_YEARS);
 }
-
-async function appendRecentCareerLogsToIndexedDb(state) {
-  const entriesByPlayer = new Map();
-  (state?.teams || []).forEach((team) => {
-    ['players', 'farm'].forEach((bucket) => {
-      (team?.[bucket] || []).forEach((player) => {
-        const playerId = normalizePlayerId(String(player?.id || ''));
-        if (!playerId) return;
-        const recentCareerLog = normalizeRecentCareerLog(player);
-        if (recentCareerLog.length === 0) return;
-        const existing = entriesByPlayer.get(playerId) || [];
-        entriesByPlayer.set(playerId, [...existing, ...recentCareerLog]);
-      });
-    });
-  });
-  if (entriesByPlayer.size === 0) return;
-  await upsertCareerLogEntriesBatch(entriesByPlayer);
-}
-
-
 
 function normalizePlayerId(playerId) {
   return typeof playerId === 'string' ? playerId.trim() : '';
@@ -562,13 +551,7 @@ export async function saveGame(state, options = {}) {
     console.error('Save failed: sanitize state error', e);
     return { ok: false, quota: false, reason: 'sanitize_state_failed' };
   }
-  try {
-    await persistLargeDataToIndexedDb(safeState);
-    await appendRecentCareerLogsToIndexedDb(safeState);
-  } catch (e) {
-    console.error('Save failed: IndexedDB write error', e);
-    return { ok: false, quota: false, reason: 'indexeddb_write_failed' };
-  }
+  await persistLargeDataToIndexedDb(safeState);
   safeState.seasonHistory = null;
   safeState.news = [];
   safeState.mailbox = [];
