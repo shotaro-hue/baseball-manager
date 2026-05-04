@@ -1,4 +1,4 @@
-import { useState, useReducer, useMemo, useCallback, useEffect } from "react";
+import { useState, useReducer, useMemo, useCallback, useEffect, useRef } from "react";
 import { gameStateReducer, G } from './gameStateReducer';
 import { uid, clamp, rng, pname, scoutedValue, fmtSal } from '../utils';
 import { buildTeam, makePlayer, resolveTrainingFocusFromGoal, generateForeignFaPool } from '../engine/player';
@@ -15,6 +15,7 @@ import {
   FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX,
 } from '../constants';
 import { pickQuestion, calcPressDelta } from '../engine/pressConference';
+import { createPersistentDataStore } from '../state/persistentDataStore';
 
 const STATE_RECENT_CAREER_LOG_YEARS = 3;
 const STATE_MAX_SPRAY_POINTS = 40;
@@ -102,6 +103,20 @@ export function useGameState() {
   const [lastAutoSaveAt, setLastAutoSaveAt] = useState(0);
   const [saveRevision, setSaveRevision] = useState(0);
 
+  const persistentStoreRef = useRef(createPersistentDataStore());
+  const [persistentSummaries, setPersistentSummaries] = useState(() => persistentStoreRef.current.getSummaries());
+
+  const syncPersistentSummary = useCallback((key, value) => {
+    const store = persistentStoreRef.current;
+    let nextPartial = null;
+    if (key === 'news') nextPartial = { news: store.setNews(value) };
+    if (key === 'mailbox') nextPartial = { mailbox: store.setMailbox(value) };
+    if (key === 'scheduleArchive') nextPartial = { scheduleArchive: store.setScheduleArchive(value) };
+    if (key === 'gameResultsMap') nextPartial = { gameResultsMap: store.setGameResultsMap(value) };
+    if (!nextPartial) return;
+    setPersistentSummaries(prev => ({ ...prev, ...nextPartial }));
+  }, []);
+
   const markSaveDirty = useCallback(()=>{
     setSaveRevision(prev=>prev+1);
     setSaveDirty(true);
@@ -154,14 +169,22 @@ export function useGameState() {
   },[]);
 
   const pushGameResult = useCallback((gameNo, result)=>{
-    setGameResultsMap(prev=>({...prev,[gameNo]:result}));
+    setGameResultsMap(prev=>{
+      const nextMap = {...prev,[gameNo]:result};
+      syncPersistentSummary('gameResultsMap', nextMap);
+      return nextMap;
+    });
     markSaveDirty();
-  },[markSaveDirty]);
+  },[markSaveDirty, syncPersistentSummary]);
 
   const addNews = useCallback((article)=>{
-    setNews(prev=>[{id:uid(),timestamp:Date.now(),...article},...prev].slice(0,50));
+    setNews(prev=>{
+      const nextNews = [{id:uid(),timestamp:Date.now(),...article},...prev].slice(0,50);
+      syncPersistentSummary('news', nextNews);
+      return nextNews;
+    });
     markSaveDirty();
-  },[markSaveDirty]);
+  },[markSaveDirty, syncPersistentSummary]);
 
   const addToHistory = useCallback((teamId,player,exitReason)=>{
     if(!player) return;
@@ -239,6 +262,23 @@ export function useGameState() {
       return [...keptMails, ...resultMails];
     });
   },[mailbox, gameDay, myTeam, myId, upd, notify, addToHistory, setFaPool, year]);
+
+
+  useEffect(() => {
+    syncPersistentSummary('news', news);
+  }, [news, syncPersistentSummary]);
+
+  useEffect(() => {
+    syncPersistentSummary('mailbox', mailbox);
+  }, [mailbox, syncPersistentSummary]);
+
+  useEffect(() => {
+    syncPersistentSummary('scheduleArchive', scheduleArchive);
+  }, [scheduleArchive, syncPersistentSummary]);
+
+  useEffect(() => {
+    syncPersistentSummary('gameResultsMap', gameResultsMap);
+  }, [gameResultsMap, syncPersistentSummary]);
 
   // オートセーブ（hubに戻った時）
   useEffect(()=>{
@@ -597,6 +637,7 @@ export function useGameState() {
     isAutoSaveSuspended, setIsAutoSaveSuspended,
     saveDirty, setSaveDirty,
     saveRevision, setSaveRevision,
+    persistentSummaries,
     markSaveDirty,
     // derived
     myTeam,
