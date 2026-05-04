@@ -63,6 +63,7 @@ export function useGameState() {
   const [isAutoSaveSuspended, setIsAutoSaveSuspended] = useState(false);
   const [saveDirty, setSaveDirty] = useState(false);
   const [lastAutoSaveAt, setLastAutoSaveAt] = useState(0);
+  const [saveRevision, setSaveRevision] = useState(0);
 
   // gameDay が進んだとき、記者会見インターバルを超えていれば会見イベントをセット
   useEffect(()=>{
@@ -197,6 +198,7 @@ export function useGameState() {
 
   useEffect(()=>{
     if(!myId) return;
+    setSaveRevision(prev=>prev+1);
     setSaveDirty(true);
   },[teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox]);
 
@@ -206,20 +208,20 @@ export function useGameState() {
     const now = Date.now();
     const intervalMs = getAutoSaveIntervalMs();
     if (lastAutoSaveAt > 0 && now - lastAutoSaveAt < intervalMs) return;
-    saveGame({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox}).then((result)=>{
+    saveGame({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision}).then((result)=>{
       if(result.ok){setSaveExists(true);setSaveDirty(false);setLastAutoSaveAt(now);notify('💾 オートセーブ','ok');}
     }).catch((error)=>{
       console.error('Auto save failed:', error);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[screen,isAutoSaveSuspended,saveDirty,lastAutoSaveAt,teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox]);
+  },[screen,isAutoSaveSuspended,saveDirty,lastAutoSaveAt,teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision]);
 
   const handleSave = useCallback(async ()=>{
-    const result=await saveGame({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox});
+    const result=await saveGame({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision});
     if(result.ok){ setSaveExists(true); setSaveDirty(false); }
     notify(result.ok?'💾 セーブしました':result.quota?'💾 ストレージ容量が不足しています':'セーブに失敗しました',result.ok?'ok':'warn');
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,notify]);
+  },[teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision,notify]);
 
   const handleSelect = useCallback((id)=>{
     setMyId(id);
@@ -556,6 +558,7 @@ export function useGameState() {
     allStarTriggerDay, setAllStarTriggerDay,
     isAutoSaveSuspended, setIsAutoSaveSuspended,
     saveDirty, setSaveDirty,
+    saveRevision, setSaveRevision,
     // derived
     myTeam,
     tabBadges,
