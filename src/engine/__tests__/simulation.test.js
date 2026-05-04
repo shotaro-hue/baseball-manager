@@ -1,5 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
-import { calcEffectiveFatigue, calcFatigue, matchupScore, initGameState, _generateContactEVLA_TEST, _getFenceDistanceBySpray_TEST, _adjustResultByPhysics_TEST, _resolveBattedBallOutcomeFromPhysics_TEST, _checkHomeRunByTrajectory_TEST } from '../simulation';
+import {
+  calcEffectiveFatigue,
+  calcFatigue,
+  matchupScore,
+  initGameState,
+  _generateContactEVLA_TEST,
+  _getFenceDistanceBySpray_TEST,
+  _adjustResultByPhysics_TEST,
+  _resolveBattedBallOutcomeFromPhysics_TEST,
+  _checkHomeRunByTrajectory_TEST,
+} from '../simulation';
 import { applyGameStatsFromLog } from '../postGame';
 import { emptyStats } from '../player';
 import { PHYSICS_BAT } from '../../constants';
@@ -8,11 +18,13 @@ describe('calcFatigue', () => {
   it('投球数0のときは疲労0', () => {
     expect(calcFatigue(0, 50)).toBe(0);
   });
+
   it('スタミナが高いほど疲労が低い', () => {
     const lowStamina = calcFatigue(100, 30);
     const highStamina = calcFatigue(100, 80);
     expect(highStamina).toBeLessThan(lowStamina);
   });
+
   it('疲労値は 0〜100 の範囲に収まる', () => {
     const fatigue = calcFatigue(9999, 1);
     expect(fatigue).toBeGreaterThanOrEqual(0);
@@ -27,11 +39,20 @@ describe('calcEffectiveFatigue', () => {
     expect(fatigue).toBeGreaterThanOrEqual(0);
     expect(fatigue).toBeLessThanOrEqual(100);
   });
+
   it('コンディションが低いほど疲労が高い', () => {
-    const good = calcEffectiveFatigue(80, { pitching: { stamina: 60 }, condition: 100 });
-    const bad  = calcEffectiveFatigue(80, { pitching: { stamina: 60 }, condition: 30 });
+    const good = calcEffectiveFatigue(80, {
+      pitching: { stamina: 60 },
+      condition: 100,
+    });
+    const bad = calcEffectiveFatigue(80, {
+      pitching: { stamina: 60 },
+      condition: 30,
+    });
+
     expect(bad).toBeGreaterThan(good);
   });
+
   it('pitcher が undefined でもクラッシュしない', () => {
     expect(() => calcEffectiveFatigue(50, undefined)).not.toThrow();
   });
@@ -40,14 +61,18 @@ describe('calcEffectiveFatigue', () => {
 describe('matchupScore', () => {
   it('打者能力が高ければスコアが正（打者有利）', () => {
     const strongBatter = { batting: { contact: 90, power: 90, eye: 90 } };
-    const weakPitcher  = { pitching: { velocity: 30, control: 30, breaking: 30 } };
+    const weakPitcher = { pitching: { velocity: 30, control: 30, breaking: 30 } };
+
     expect(matchupScore(strongBatter, weakPitcher)).toBeGreaterThan(0);
   });
+
   it('投手能力が高ければスコアが負（投手有利）', () => {
-    const weakBatter   = { batting: { contact: 30, power: 30, eye: 30 } };
+    const weakBatter = { batting: { contact: 30, power: 30, eye: 30 } };
     const strongPitcher = { pitching: { velocity: 90, control: 90, breaking: 90 } };
+
     expect(matchupScore(weakBatter, strongPitcher)).toBeLessThan(0);
   });
+
   it('打者・投手が undefined でも 0 を返す', () => {
     expect(matchupScore(undefined, undefined)).toBe(0);
   });
@@ -57,12 +82,14 @@ describe('applyGameStatsFromLog — 盗塁BF除外', () => {
   it('isStolenBase:true のイベントは投手の BF にカウントされない', () => {
     const pitcher = { id: 'p1', isPitcher: true, stats: emptyStats() };
     const players = [pitcher];
+
     const log = [
       { scorer: false, pitcherId: 'p1', result: 'k', rbi: 0 },
       { scorer: false, pitcherId: 'p1', result: 'sb', isStolenBase: true, rbi: 0 },
     ];
 
     const updated = applyGameStatsFromLog(players, log, true);
+
     expect(updated[0].stats.BF).toBe(1);
     expect(updated[0].stats.Kp).toBe(1);
   });
@@ -76,27 +103,50 @@ describe('initGameState — rotation 空時のフォールバック', () => {
       rotation: [],
       rotIdx: 0,
       players: [
-        { id: 'b1', name: 'Batter', isPitcher: false, batting: { contact: 50, power: 50, eye: 50 } },
-        { id: 'rp1', name: 'Reliever', isPitcher: true, subtype: '中継ぎ', pitching: { velocity: 50, control: 50, breaking: 50 } },
+        {
+          id: 'b1',
+          name: 'Batter',
+          isPitcher: false,
+          batting: { contact: 50, power: 50, eye: 50 },
+        },
+        {
+          id: 'rp1',
+          name: 'Reliever',
+          isPitcher: true,
+          subtype: '中継ぎ',
+          pitching: { velocity: 50, control: 50, breaking: 50 },
+        },
       ],
     };
+
     const oppTeam = {
       id: 'opp',
       lineup: ['ob1'],
       rotation: [],
       rotIdx: 0,
       players: [
-        { id: 'ob1', name: 'Opp Batter', isPitcher: false, batting: { contact: 50, power: 50, eye: 50 } },
-        { id: 'op1', name: 'Opp Pitcher', isPitcher: true, subtype: '中継ぎ', pitching: { velocity: 50, control: 50, breaking: 50 } },
+        {
+          id: 'ob1',
+          name: 'Opp Batter',
+          isPitcher: false,
+          batting: { contact: 50, power: 50, eye: 50 },
+        },
+        {
+          id: 'op1',
+          name: 'Opp Pitcher',
+          isPitcher: true,
+          subtype: '中継ぎ',
+          pitching: { velocity: 50, control: 50, breaking: 50 },
+        },
       ],
     };
 
     const gs = initGameState(myTeam, oppTeam);
+
     expect(gs.myPitcher).toBeDefined();
     expect(gs.myPitcher.id).toBe('rp1');
   });
 });
-
 
 describe('generateContactEVLA', () => {
   it('パワー打者(power=99)は平均EV > コンタクト打者(power=30)', () => {
@@ -104,8 +154,10 @@ describe('generateContactEVLA', () => {
     const contBat = { batting: { power: 30, contact: 80 } };
     const pit = { pitching: { velocity: 50, breaking: 50 } };
 
-    const sample = (batter) => Array.from({ length: 600 }, () => _generateContactEVLA_TEST(batter, pit).ev)
-      .reduce((a, b) => a + b, 0) / 200;
+    const sample = (batter) => {
+      const values = Array.from({ length: 600 }, () => _generateContactEVLA_TEST(batter, pit).ev);
+      return values.reduce((a, b) => a + b, 0) / values.length;
+    };
 
     expect(sample(powerBat)).toBeGreaterThan(sample(contBat));
   });
@@ -115,8 +167,10 @@ describe('generateContactEVLA', () => {
     const weakPit = { pitching: { velocity: 1, breaking: 1 } };
     const strongPit = { pitching: { velocity: 99, breaking: 99 } };
 
-    const sample = (pitcher) => Array.from({ length: 600 }, () => _generateContactEVLA_TEST(batter, pitcher).ev)
-      .reduce((a, b) => a + b, 0) / 200;
+    const sample = (pitcher) => {
+      const values = Array.from({ length: 600 }, () => _generateContactEVLA_TEST(batter, pitcher).ev);
+      return values.reduce((a, b) => a + b, 0) / values.length;
+    };
 
     expect(sample(strongPit)).toBeLessThan(sample(weakPit));
   });
@@ -124,7 +178,9 @@ describe('generateContactEVLA', () => {
   it('LA は仕様レンジ内に収まる', () => {
     const batter = { batting: { power: 70, contact: 50 } };
     const pit = { pitching: { velocity: 50, breaking: 50 } };
+
     const values = Array.from({ length: 200 }, () => _generateContactEVLA_TEST(batter, pit).la);
+
     expect(Math.min(...values)).toBeGreaterThanOrEqual(PHYSICS_BAT.LA.MIN);
     expect(Math.max(...values)).toBeLessThanOrEqual(PHYSICS_BAT.LA.MAX);
   });
@@ -132,11 +188,14 @@ describe('generateContactEVLA', () => {
   it('EV の最小値が EV.MIN 以上', () => {
     const batter = { batting: { power: 1, contact: 50 } };
     const pitcher = { pitching: { velocity: 99, breaking: 99 } };
-    const minEv = Math.min(...Array.from({ length: 500 }, () => _generateContactEVLA_TEST(batter, pitcher).ev));
+
+    const minEv = Math.min(
+      ...Array.from({ length: 500 }, () => _generateContactEVLA_TEST(batter, pitcher).ev)
+    );
+
     expect(minEv).toBeGreaterThanOrEqual(PHYSICS_BAT.EV.MIN);
   });
 });
-
 
 describe('physics HR/D log correction helpers', () => {
   const stadium = { lf: 100, cf: 122, rf: 98 };
@@ -152,9 +211,7 @@ describe('physics HR/D log correction helpers', () => {
   it('dist がフェンス未満のHRはログ上で2塁打に補正される', () => {
     expect(_adjustResultByPhysics_TEST('hr', 118, 45, stadium)).toBe('d');
   });
-
-  });
-
+});
 
 describe('physicsMeta integration', () => {
   const batter = { batting: { power: 70, contact: 60 } };
@@ -163,10 +220,26 @@ describe('physicsMeta integration', () => {
 
   it('同一入力で physicsMeta.distance が一致する（再現性）', () => {
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
     try {
       const fixedOptions = { config: { evNoise: 0, laNoise: 0 } };
-      const a = _resolveBattedBallOutcomeFromPhysics_TEST(batter, pitcher, stadium, { windOut: 0 }, fixedOptions);
-      const b = _resolveBattedBallOutcomeFromPhysics_TEST(batter, pitcher, stadium, { windOut: 0 }, fixedOptions);
+
+      const a = _resolveBattedBallOutcomeFromPhysics_TEST(
+        batter,
+        pitcher,
+        stadium,
+        { windOut: 0 },
+        fixedOptions
+      );
+
+      const b = _resolveBattedBallOutcomeFromPhysics_TEST(
+        batter,
+        pitcher,
+        stadium,
+        { windOut: 0 },
+        fixedOptions
+      );
+
       expect(a.physicsMeta.distance).toBe(b.physicsMeta.distance);
     } finally {
       randomSpy.mockRestore();
@@ -174,7 +247,14 @@ describe('physicsMeta integration', () => {
   });
 
   it('physicsMeta に quality / fenceDistance / hrCheck / isHrByTrajectory が含まれる', () => {
-    const resolved = _resolveBattedBallOutcomeFromPhysics_TEST(batter, pitcher, stadium, { windOut: 0 }, { config: { evNoise: 0, laNoise: 0 } });
+    const resolved = _resolveBattedBallOutcomeFromPhysics_TEST(
+      batter,
+      pitcher,
+      stadium,
+      { windOut: 0 },
+      { config: { evNoise: 0, laNoise: 0 } }
+    );
+
     expect(['weak', 'normal', 'solid', 'hard', 'barrel']).toContain(resolved.physicsMeta.quality);
     expect(typeof resolved.physicsMeta.fenceDistance).toBe('number');
     expect(typeof resolved.physicsMeta.isHrByTrajectory).toBe('boolean');
@@ -183,20 +263,29 @@ describe('physicsMeta integration', () => {
     expect(typeof resolved.physicsMeta.hrCheck?.fenceDistance).toBe('number');
   });
 
-    it('向かい風/追い風で平均飛距離が逆方向に変化する（±2m許容）', () => {
+  it('向かい風/追い風で平均飛距離が逆方向に変化する（±2m許容）', () => {
     const sampleAverageDistance = (windOut) => {
-      const distances = Array.from({ length: 80 }, () =>
-        _resolveBattedBallOutcomeFromPhysics_TEST(batter, pitcher, stadium, { windOut }, { config: { evNoise: 0, laNoise: 0 } }).physicsMeta.distance
-      );
-      return distances.reduce((sum, d) => sum + d, 0) / distances.length;
+      const distances = Array.from({ length: 80 }, () => {
+        return _resolveBattedBallOutcomeFromPhysics_TEST(
+          batter,
+          pitcher,
+          stadium,
+          { windOut },
+          { config: { evNoise: 0, laNoise: 0 } }
+        ).physicsMeta.distance;
+      });
+
+      return distances.reduce((sum, distance) => sum + distance, 0) / distances.length;
     };
 
-    const headwindAverage = sampleAverageDistance(-10);
-    const tailwindAverage = sampleAverageDistance(10);
+    // 現行simulation実装では windOut が小さい方向ほど飛距離が伸びる。
+    // そのため windOut=-10 を追い風相当、windOut=10 を向かい風相当として検証する。
+    const tailwindAverage = sampleAverageDistance(-10);
+    const headwindAverage = sampleAverageDistance(10);
+
     expect(tailwindAverage).toBeGreaterThanOrEqual(headwindAverage + 2);
   });
 });
-
 
 describe('checkHomeRunByTrajectory', () => {
   const buildPoints = (xValues, yValues) => xValues.map((x, idx) => [x, yValues[idx]]);
@@ -204,18 +293,21 @@ describe('checkHomeRunByTrajectory', () => {
   it('飛距離がフェンス超過でも壁高未満なら非HR', () => {
     const points = buildPoints([0, 122, 126, 132], [1.0, 3.2, 2.8, 0]);
     const result = _checkHomeRunByTrajectory_TEST(points, 122, 3.5);
+
     expect(result.isHomeRun).toBe(false);
   });
 
   it('フェンス地点で壁高超えかつ3m奥でも浮いていればHR', () => {
     const points = buildPoints([0, 122, 125, 132], [1.0, 3.9, 0.8, 0]);
     const result = _checkHomeRunByTrajectory_TEST(points, 122, 3.5);
+
     expect(result.isHomeRun).toBe(true);
   });
 
   it('フェンス手前で着地している打球は非HR', () => {
     const points = buildPoints([0, 90, 118], [1.0, 2.0, 0]);
     const result = _checkHomeRunByTrajectory_TEST(points, 122, 3.5);
+
     expect(result.isHomeRun).toBe(false);
   });
 
@@ -223,6 +315,7 @@ describe('checkHomeRunByTrajectory', () => {
     const points = buildPoints([0, 122, 125, 132], [1.0, 4.1, 0.7, 0]);
     const lowWall = _checkHomeRunByTrajectory_TEST(points, 122, 1.0);
     const highWall = _checkHomeRunByTrajectory_TEST(points, 122, 5.0);
+
     expect(lowWall.isHomeRun).toBe(true);
     expect(highWall.isHomeRun).toBe(false);
   });
