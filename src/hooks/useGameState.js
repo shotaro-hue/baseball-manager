@@ -122,7 +122,12 @@ export function useGameState() {
     if(!player) return;
     setTeams(prev=>prev.map(function(t){
       if(t.id!==teamId) return t;
-      const joinYear=(player.careerLog&&player.careerLog.length>0)?player.careerLog[0].year:0;
+      const summary = player?.careerLogSummary && typeof player.careerLogSummary === 'object' ? player.careerLogSummary : {};
+      const summaryFirstYear = Number(summary.firstYear || 0) || 0;
+      const recentFirstYear = Array.isArray(player?.recentCareerLog) && player.recentCareerLog.length > 0
+        ? Number(player.recentCareerLog[0]?.year || 0) || 0
+        : 0;
+      const joinYear = summaryFirstYear > 0 ? summaryFirstYear : recentFirstYear;
       const tenure=joinYear>0?year-joinYear+1:1;
       const record=Object.assign({},player,{exitYear:year,exitReason:exitReason,tenure:tenure});
       return Object.assign({},t,{history:[...(t.history||[]),record]});

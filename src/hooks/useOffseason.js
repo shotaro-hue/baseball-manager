@@ -7,7 +7,7 @@ import { initDraftPool } from '../engine/draft';
 import { calcPostingRequestProb, calcPostingBid, POSTING_FEE_RATE } from '../engine/posting';
 import { calcOffseasonPopDelta, driftPopularity } from '../engine/fanSentiment';
 import { generateSeasonSchedule, calcAllStarTriggerDay } from '../engine/scheduleGen';
-import { appendCareerEntryToIndexedDb } from '../engine/saveload';
+import { appendCareerEntriesToIndexedDb } from '../engine/saveload';
 import { SEASON_PARAMS, getDefaultParams } from '../data/scheduleParams.js';
 import {
   TEAM_DEFS, OWNER_TRUST_BUDGET_LOW, OWNER_TRUST_BUDGET_HIGH,
@@ -86,12 +86,11 @@ export function useOffseason(gs) {
     setYear(y=>y+1);setGameDay(1);setFaPool(foreignPool);setDraftAllocation({pitcher:50,batter:50});
     setAllStarDone(false);
     setAllStarResult(null);
+    const indexedDbEntries = [];
     setTeams(prev=>prev.map(t=>{
       const nextPlayers=t.players.filter(p=>!p._retireNow).map(p=>{
         const entry = mkCareerEntry(p.stats,p.playoffStats,year,t.id,t.name);
-        appendCareerEntryToIndexedDb(String(p.id || ''), entry).catch((e) => {
-          console.warn('careerLogの追記に失敗しました:', e);
-        });
+        indexedDbEntries.push({ playerId: String(p.id || ''), careerEntry: entry });
         const compactPlayer = appendCareerEntryWithSummary(p, entry);
         return {...compactPlayer,age:p.age+1,stats:emptyStats(),playoffStats:emptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:Math.max(0,p.contractYearsLeft-1),postingRequested:false,growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlyDecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0};
       });
@@ -104,6 +103,13 @@ export function useOffseason(gs) {
       const newBudget=Math.max(Math.round(baseBudget*0.5),Math.round(rawBudget*trustFactor));
       return{...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,revenueThisSeason:0,winStreak:0,loseStreak:0,stadiumLevel:t.stadiumLevel??0,budget:newBudget,players:nextPlayers,lineup:(t.lineup||[]).filter(id=>nextIds.has(id)),lineupNoDh:(t.lineupNoDh||[]).filter(id=>nextIds.has(id)),lineupDh:(t.lineupDh||[]).filter(id=>nextIds.has(id)),rotation:(t.rotation||[]).filter(id=>nextIds.has(id)),farm:t.farm.map(p=>({...p,age:p.age+1,stats:emptyStats(),injury:null,serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}))};
     }));
+    appendCareerEntriesToIndexedDb(indexedDbEntries).then((result) => {
+      if (!result?.ok) {
+        console.warn('careerLogの一括追記に失敗しました');
+      }
+    }).catch((e) => {
+      console.warn('careerLogの一括追記に失敗しました:', e);
+    });
     // 現シーズンの日程・試合結果をアーカイブに保存
     // 詳細ボックススコアは自チーム分のみ保持して容量増加を抑える
     if(schedule){
