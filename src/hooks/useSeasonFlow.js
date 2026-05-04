@@ -638,6 +638,15 @@ export function useSeasonFlow(gs) {
   const handleModeSelect = mode => {
     setGameMode(mode);
     if(mode==="tactical"){
+      const hasCurrentGameTeams = Boolean(currentGameTeams?.my && currentGameTeams?.opp);
+      const fallbackMyTeam = teams.find(t=>t.id===myId);
+      const hasFallbackOpp = Boolean(currentOpp);
+      if (!hasCurrentGameTeams && (!fallbackMyTeam || !hasFallbackOpp)) {
+        // ⚠️ セキュリティ: 画面遷移に必要なデータが欠損している場合は強制停止し、無効な状態のまま描画しない
+        notify("試合データの読み込みに失敗しました。日程画面から再度お試しください。", "warn");
+        setScreen("hub");
+        return;
+      }
       setScreen("tactical_game");
     } else {
       const myT=(currentGameTeams?.my)||teams.find(t=>t.id===myId);
