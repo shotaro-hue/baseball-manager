@@ -16,6 +16,43 @@ import {
 } from '../constants';
 import { pickQuestion, calcPressDelta } from '../engine/pressConference';
 
+const STATE_RECENT_CAREER_LOG_YEARS = 3;
+const STATE_MAX_SPRAY_POINTS = 40;
+const STATE_MAX_BATTED_BALL_EVENTS = 80;
+
+function slimPlayerForState(player) {
+  if (!player || typeof player !== 'object') return player;
+  const stats = player.stats && typeof player.stats === 'object' ? player.stats : {};
+  const recentCareerLog = Array.isArray(player.recentCareerLog)
+    ? player.recentCareerLog.slice(-STATE_RECENT_CAREER_LOG_YEARS)
+    : [];
+  return {
+    ...player,
+    // React state軽量化: 全量履歴はIndexedDB側を参照する
+    careerLog: [],
+    recentCareerLog,
+    stats: {
+      ...stats,
+      sprayPoints: Array.isArray(stats.sprayPoints) ? stats.sprayPoints.slice(-STATE_MAX_SPRAY_POINTS) : [],
+      battedBallEvents: Array.isArray(stats.battedBallEvents) ? stats.battedBallEvents.slice(-STATE_MAX_BATTED_BALL_EVENTS) : [],
+    },
+  };
+}
+
+function slimTeamForState(team) {
+  if (!team || typeof team !== 'object') return team;
+  return {
+    ...team,
+    players: Array.isArray(team.players) ? team.players.map(slimPlayerForState) : [],
+    farm: Array.isArray(team.farm) ? team.farm.map(slimPlayerForState) : [],
+  };
+}
+
+function slimTeamsForState(teams) {
+  if (!Array.isArray(teams)) return [];
+  return teams.map(slimTeamForState);
+}
+
 const INIT_TEAMS = TEAM_DEFS.map(function(d){
   const t = NPB2025_ROSTERS[d.id] ? buildRealTeam(d, NPB2025_ROSTERS[d.id]) : buildTeam(d);
   const nonPitcherIds = (t.players || []).filter(p => !p.isPitcher).map(p => p.id);
@@ -24,7 +61,7 @@ const INIT_TEAMS = TEAM_DEFS.map(function(d){
   t.rosterDhMode = t.rosterDhMode ?? t.dhEnabled ?? false;
   t.lineup = (t.rosterDhMode ? t.lineupDh : t.lineupNoDh).slice();
   t.history = [];
-  return t;
+  return slimTeamForState(t);
 });
 
 export function useGameState() {
@@ -38,7 +75,7 @@ export function useGameState() {
   const [retireRole, setRetireRole] = useState(null);
   const [gameState, dispatch] = useReducer(gameStateReducer, { teams: INIT_TEAMS, gameDay: 1, year: 2026, myId: null });
   const { teams, gameDay, year, myId } = gameState;
-  const setTeams   = useCallback((n) => dispatch({ type: G.SET_TEAMS,    teams: n }),    []);
+  const setTeams   = useCallback((n) => dispatch({ type: G.SET_TEAMS,    teams: (prev) => slimTeamsForState(typeof n === 'function' ? n(prev) : n) }),    []);
   const setGameDay = useCallback((n) => dispatch({ type: G.SET_GAME_DAY, day:   n }),    []);
   const setYear    = useCallback((n) => dispatch({ type: G.SET_YEAR,     year:  n }),    []);
   const setMyId    = useCallback((id) => dispatch({ type: G.SET_MY_ID,   myId:  id }),   []);
@@ -105,7 +142,7 @@ export function useGameState() {
   },[myTeam,mailbox,faPool,news,gameDay]);
 
   const notify = useCallback((msg,type="ok")=>{setNotif({msg,type});setTimeout(()=>setNotif(null),3500);},[]);
-  const upd = useCallback((id, fn) => dispatch({ type: G.UPD_TEAM, id, fn }), []);
+  const upd = useCallback((id, fn) => dispatch({ type: G.UPD_TEAM, id, fn: (team) => slimTeamForState(fn(team)) }), []);
 
   const pushResult = useCallback((won,drew,oppName,myScore,oppScore,gameNo)=>{
     setRecentResults(prev=>[{won,drew,oppName,myScore,oppScore,gameNo},...prev].slice(0,5));
