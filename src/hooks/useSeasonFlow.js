@@ -319,7 +319,6 @@ export function useSeasonFlow(gs) {
   const [playoff, setPlayoff] = useState(null);
   const [currentGameTeams, setCurrentGameTeams] = useState(null);
   const [batchProgress, setBatchProgress] = useState(null);
-  const BATCH_PROGRESS_EMA_ALPHA = 0.25; // 指数移動平均【＝急な変化をなだらかにする平均】の平滑化係数
   const pendingPlayoffRef = useRef(false);
   const isBatchCancelledRef = useRef(false);
   const seasonProgressWorkerRef = useRef(null);
@@ -902,22 +901,49 @@ export function useSeasonFlow(gs) {
       return;
     }
     const startedAt = Date.now();
-    let smoothedAvgMsPerGame = 0;
+    const progressTaskId = uid();
+    seasonProgressTaskIdRef.current = progressTaskId;
+    try {
+      if (seasonProgressWorkerRef.current) seasonProgressWorkerRef.current.terminate();
+      const worker = new SeasonProgressWorker();
+      seasonProgressWorkerRef.current = worker;
+      worker.onmessage = (event) => {
+        const message = event?.data;
+        if (!message || typeof message !== "object") return;
+        if (message.type === "PROGRESS" && message.payload?.taskId === seasonProgressTaskIdRef.current) {
+          const payload = message.payload || {};
+          setBatchProgress({
+            current: Math.max(0, Number(payload.current) || 0),
+            total: Math.max(1, Number(payload.total) || 1),
+            startedAt,
+            avgMsPerGame: Math.max(0, Number(payload.avgMsPerGame) || 0),
+            etaSec: Math.max(0, Number(payload.etaSec) || 0),
+            phase: typeof payload.phase === "string" ? payload.phase : "試合計算",
+          });
+        }
+      };
+      worker.postMessage({ type: "START", payload: { taskId: progressTaskId } });
+    } catch (error) {
+      console.error("season progress worker init failed", error);
+      seasonProgressWorkerRef.current = null;
+    }
     const updateBatchProgress = (current, total, phase) => {
       const safeTotal = Math.max(1, Number.isFinite(total) ? Math.floor(total) : 1);
       const safeCurrent = Math.max(0, Math.min(Number.isFinite(current) ? Math.floor(current) : 0, safeTotal));
       const elapsedMs = Math.max(0, Date.now() - startedAt);
-      const instantAvgMsPerGame = safeCurrent > 0 ? elapsedMs / safeCurrent : 0;
-      smoothedAvgMsPerGame = smoothedAvgMsPerGame <= 0
-        ? instantAvgMsPerGame
-        : (BATCH_PROGRESS_EMA_ALPHA * instantAvgMsPerGame) + ((1 - BATCH_PROGRESS_EMA_ALPHA) * smoothedAvgMsPerGame);
-      const etaSec = safeCurrent >= safeTotal ? 0 : ((safeTotal - safeCurrent) * smoothedAvgMsPerGame) / 1000;
+      if (seasonProgressWorkerRef.current && seasonProgressTaskIdRef.current) {
+        seasonProgressWorkerRef.current.postMessage({
+          type: "TICK",
+          payload: { taskId: seasonProgressTaskIdRef.current, current: safeCurrent, total: safeTotal, elapsedMs, phase },
+        });
+        return;
+      }
       setBatchProgress({
         current: safeCurrent,
         total: safeTotal,
         startedAt,
-        avgMsPerGame: Number.isFinite(smoothedAvgMsPerGame) ? Math.max(0, smoothedAvgMsPerGame) : 0,
-        etaSec: Number.isFinite(etaSec) ? Math.max(0, etaSec) : 0,
+        avgMsPerGame: safeCurrent > 0 ? elapsedMs / safeCurrent : 0,
+        etaSec: safeCurrent >= safeTotal ? 0 : Math.max(0, safeTotal - safeCurrent),
         phase: typeof phase === "string" && phase.trim() ? phase : "試合計算",
       });
     };
@@ -1270,6 +1296,12 @@ export function useSeasonFlow(gs) {
       notify("⚠️ バッチ処理中にエラーが発生しました", "error");
     } finally {
       setBatchProgress(null);
+      if (seasonProgressWorkerRef.current) {
+        seasonProgressWorkerRef.current.postMessage({ type: "CANCEL" });
+        seasonProgressWorkerRef.current.terminate();
+        seasonProgressWorkerRef.current = null;
+      }
+      seasonProgressTaskIdRef.current = null;
       gs.setIsAutoSaveSuspended(false);
     }
     if (!completedSuccessfully) return;

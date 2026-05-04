@@ -1,7 +1,8 @@
-// 1シーズン進行用の軽量ワーカー
-// 非同期処理【＝複数の処理を同時に進める仕組み】で進捗通知のみを担当する
-let timerId = null;
-let currentTaskId = null;
+// 進捗計算専用ワーカー
+// 非同期処理【＝複数の処理を同時に進める仕組み】で ETA 計算をUIスレッドから分離する
+let activeTaskId = null;
+let smoothedAvgMsPerGame = 0;
+const EMA_ALPHA = 0.25;
 
 function sanitizeInteger(value, fallback = 0, min = 0) {
   const parsed = Number(value);
@@ -9,56 +10,64 @@ function sanitizeInteger(value, fallback = 0, min = 0) {
   return Math.max(min, Math.floor(parsed));
 }
 
-function stopTimer() {
-  if (timerId) {
-    clearInterval(timerId);
-    timerId = null;
-  }
+function sanitizePhase(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : '試合計算';
+}
+
+function resetTask(taskId) {
+  activeTaskId = taskId;
+  smoothedAvgMsPerGame = 0;
 }
 
 self.onmessage = (event) => {
   const message = event?.data;
   if (!message || typeof message !== 'object') return;
 
-  if (message.type === 'CANCEL') {
-    stopTimer();
-    if (currentTaskId) {
-      self.postMessage({ type: 'CANCELLED', payload: { taskId: currentTaskId } });
-    }
-    currentTaskId = null;
-    return;
-  }
-
-  if (message.type !== 'START') return;
-
   try {
+    if (message.type === 'START') {
+      const taskId = typeof message?.payload?.taskId === 'string' ? message.payload.taskId.trim() : '';
+      if (!taskId) throw new Error('taskId が不正です');
+      resetTask(taskId);
+      return;
+    }
+
+    if (message.type === 'CANCEL') {
+      activeTaskId = null;
+      smoothedAvgMsPerGame = 0;
+      return;
+    }
+
+    if (message.type !== 'TICK') return;
+
     const payload = message.payload && typeof message.payload === 'object' ? message.payload : {};
-    const taskId = typeof payload.taskId === 'string' && payload.taskId.trim() ? payload.taskId.trim() : '';
-    const total = sanitizeInteger(payload.totalGames, 0, 1);
-    const intervalMs = sanitizeInteger(payload.intervalMs, 120, 16);
-    if (!taskId || total <= 0) throw new Error('不正なパラメータです');
+    const taskId = typeof payload.taskId === 'string' ? payload.taskId.trim() : '';
+    if (!taskId || taskId !== activeTaskId) return;
 
-    stopTimer();
-    currentTaskId = taskId;
-    let current = 0;
-    self.postMessage({ type: 'PROGRESS', payload: { taskId, current, total, phase: '試合計算' } });
+    const total = sanitizeInteger(payload.total, 1, 1);
+    const current = Math.min(total, sanitizeInteger(payload.current, 0, 0));
+    const elapsedMs = Math.max(0, Number(payload.elapsedMs) || 0);
+    const instantAvgMsPerGame = current > 0 ? elapsedMs / current : 0;
+    smoothedAvgMsPerGame = smoothedAvgMsPerGame <= 0
+      ? instantAvgMsPerGame
+      : (EMA_ALPHA * instantAvgMsPerGame) + ((1 - EMA_ALPHA) * smoothedAvgMsPerGame);
+    const etaSec = current >= total ? 0 : ((total - current) * smoothedAvgMsPerGame) / 1000;
 
-    timerId = setInterval(() => {
-      if (currentTaskId !== taskId) {
-        stopTimer();
-        return;
-      }
-      current = Math.min(total, current + 1);
-      self.postMessage({ type: 'PROGRESS', payload: { taskId, current, total, phase: current >= total ? '集計中' : '試合計算' } });
-      if (current >= total) {
-        stopTimer();
-        self.postMessage({ type: 'DONE', payload: { taskId } });
-      }
-    }, intervalMs);
+    self.postMessage({
+      type: 'PROGRESS',
+      payload: {
+        taskId,
+        current,
+        total,
+        avgMsPerGame: Number.isFinite(smoothedAvgMsPerGame) ? Math.max(0, smoothedAvgMsPerGame) : 0,
+        etaSec: Number.isFinite(etaSec) ? Math.max(0, etaSec) : 0,
+        phase: sanitizePhase(payload.phase),
+      },
+    });
   } catch (error) {
-    stopTimer();
-    const messageText = error instanceof Error ? error.message : 'Workerエラー';
-    self.postMessage({ type: 'ERROR', payload: { message: messageText } });
-    currentTaskId = null;
+    // ⚠️ エラー詳細は機密情報を含めず最小限のみ返却する
+    self.postMessage({
+      type: 'ERROR',
+      payload: { message: error instanceof Error ? error.message : '進捗計算エラー' },
+    });
   }
 };
