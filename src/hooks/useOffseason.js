@@ -7,6 +7,7 @@ import { initDraftPool } from '../engine/draft';
 import { calcPostingRequestProb, calcPostingBid, POSTING_FEE_RATE } from '../engine/posting';
 import { calcOffseasonPopDelta, driftPopularity } from '../engine/fanSentiment';
 import { generateSeasonSchedule, calcAllStarTriggerDay } from '../engine/scheduleGen';
+import { appendCareerEntryToIndexedDb } from '../engine/saveload';
 import { SEASON_PARAMS, getDefaultParams } from '../data/scheduleParams.js';
 import {
   TEAM_DEFS, OWNER_TRUST_BUDGET_LOW, OWNER_TRUST_BUDGET_HIGH,
@@ -53,13 +54,47 @@ export function useOffseason(gs) {
     return{year:yr,teamId,teamName,stats:pick(s),playoffStats:pick(ps||emptyStats())};
   };
 
+  const appendCareerEntryWithSummary = (player, entry) => {
+    if (!player || typeof player !== 'object' || !entry) return player;
+    const isPitcher = !!player.isPitcher;
+    const stats = entry.stats || {};
+    const summaryDelta = {
+      totalGames: Number(isPitcher ? (stats.BF || 0) : (stats.PA || 0)) || 0,
+      totalHits: Number(stats.H || 0) || 0,
+      totalHomeRuns: Number(stats.HR || 0) || 0,
+      totalRbi: Number(stats.RBI || 0) || 0,
+      firstYear: Number(entry.year || 0) || 0,
+      lastYear: Number(entry.year || 0) || 0,
+      trimmedEntries: 1,
+    };
+    const baseSummary = player.careerLogSummary || {};
+    const mergedSummary = {
+      totalGames: Number(baseSummary.totalGames || 0) + summaryDelta.totalGames,
+      totalHits: Number(baseSummary.totalHits || 0) + summaryDelta.totalHits,
+      totalHomeRuns: Number(baseSummary.totalHomeRuns || 0) + summaryDelta.totalHomeRuns,
+      totalRbi: Number(baseSummary.totalRbi || 0) + summaryDelta.totalRbi,
+      firstYear: baseSummary.firstYear ? Math.min(baseSummary.firstYear, summaryDelta.firstYear) : summaryDelta.firstYear,
+      lastYear: Math.max(Number(baseSummary.lastYear || 0), summaryDelta.lastYear),
+      trimmedEntries: Number(baseSummary.trimmedEntries || 0) + 1,
+    };
+    const recent = [...(Array.isArray(player.recentCareerLog) ? player.recentCareerLog : []), entry].slice(-3);
+    return { ...player, careerLog: [], recentCareerLog: recent, careerLogSummary: mergedSummary, trimmedCareerLogSummary: mergedSummary };
+  };
+
   const handleNextYear = () => {
     const foreignPool = generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX));
     setYear(y=>y+1);setGameDay(1);setFaPool(foreignPool);setDraftAllocation({pitcher:50,batter:50});
     setAllStarDone(false);
     setAllStarResult(null);
     setTeams(prev=>prev.map(t=>{
-      const nextPlayers=t.players.filter(p=>!p._retireNow).map(p=>({...p,age:p.age+1,stats:emptyStats(),playoffStats:emptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:Math.max(0,p.contractYearsLeft-1),postingRequested:false,growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlyDecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),careerLog:[...(p.careerLog||[]),mkCareerEntry(p.stats,p.playoffStats,year,t.id,t.name)],serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}));
+      const nextPlayers=t.players.filter(p=>!p._retireNow).map(p=>{
+        const entry = mkCareerEntry(p.stats,p.playoffStats,year,t.id,t.name);
+        appendCareerEntryToIndexedDb(String(p.id || ''), entry).catch((e) => {
+          console.warn('careerLogの追記に失敗しました:', e);
+        });
+        const compactPlayer = appendCareerEntryWithSummary(p, entry);
+        return {...compactPlayer,age:p.age+1,stats:emptyStats(),playoffStats:emptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:Math.max(0,p.contractYearsLeft-1),postingRequested:false,growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlyDecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0};
+      });
       const nextIds=new Set(nextPlayers.map(p=>p.id));
       const baseBudget=TEAM_DEFS.find(d=>d.id===t.id)?.budget??t.budget;
       const seasonalPayroll=nextPlayers.reduce((s,p)=>s+(p.salary||0),0)+(t.farm||[]).reduce((s,p)=>s+(p.salary||0),0);

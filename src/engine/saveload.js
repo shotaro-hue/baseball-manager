@@ -24,7 +24,6 @@ const IDB_STORES = {
   careerLogs: 'career_logs',
 };
 
-// 将来対応予定: CareerTable / awards 側が summary 集計を参照するまでは、careerLog 詳細は 120 件保持する。
 const MAX_RECENT_CAREER_LOG_YEARS = 3;
 
 function sanitizeNumber(value, fallback = 0) {
@@ -102,38 +101,6 @@ function mergeCareerLogSummary(base, delta) {
     trimmedEntries: sanitizeNumber(safeBase.trimmedEntries, 0) + sanitizeNumber(safeDelta.trimmedEntries, 0),
   };
 }
-
-function trimCareerLogWithSummary(player, maxEntries = MAX_CAREER_LOG_ENTRIES) {
-  if (!player || typeof player !== 'object') return player;
-  const safeMaxEntries = Math.max(0, Math.trunc(sanitizeNumber(maxEntries, MAX_CAREER_LOG_ENTRIES)));
-  const careerLog = Array.isArray(player.careerLog) ? player.careerLog : [];
-  const existingSummary = player.trimmedCareerLogSummary ?? player.careerLogSummary;
-  const baseSummary = mergeCareerLogSummary(createEmptyCareerLogSummary(), existingSummary);
-  if (careerLog.length <= safeMaxEntries) {
-    return {
-      ...player,
-      careerLog,
-      trimmedCareerLogSummary: baseSummary,
-      careerLogSummary: baseSummary,
-    };
-  }
-
-  const trimCount = careerLog.length - safeMaxEntries;
-  const trimmedEntries = careerLog.slice(0, trimCount);
-  const remainedEntries = careerLog.slice(trimCount);
-  const trimmedSummary = buildCareerLogSummary(trimmedEntries);
-  const nextSummary = mergeCareerLogSummary(baseSummary, {
-    ...trimmedSummary,
-    trimmedEntries: trimCount,
-  });
-  return {
-    ...player,
-    careerLog: remainedEntries,
-    trimmedCareerLogSummary: nextSummary,
-    careerLogSummary: nextSummary,
-  };
-}
-
 
 function logPerf(label, startedAt) {
   if (!isDevEnv || !Number.isFinite(startedAt)) return;
@@ -262,9 +229,24 @@ function sanitizeSaveState(state) {
   if (!state || typeof state !== 'object' || !Array.isArray(state.teams)) {
     throw new Error('Invalid state for saving');
   }
-  // ⚠️ セキュリティ: 保存時に意図しないプロトタイプ汚染【＝Objectの継承先改ざん】を避けるため、
-  // JSONシリアライズ可能なデータのみを抽出する。
-  return JSON.parse(JSON.stringify(state));
+  const {
+    seasonHistory, news, mailbox,
+    ...rest
+  } = state;
+  const teams = state.teams.map((team) => ({
+    ...team,
+    players: Array.isArray(team?.players) ? team.players.map((p) => ({
+      ...p,
+      careerLog: [],
+      recentCareerLog: normalizeRecentCareerLog(p),
+    })) : [],
+    farm: Array.isArray(team?.farm) ? team.farm.map((p) => ({
+      ...p,
+      careerLog: [],
+      recentCareerLog: normalizeRecentCareerLog(p),
+    })) : [],
+  }));
+  return { ...rest, teams, seasonHistory, news, mailbox };
 }
 
 function formatJsonSize(byteSize) {
@@ -772,6 +754,24 @@ export async function loadPlayerCareerLogById(playerId) {
   } catch (e) {
     console.warn('Career log load failed:', e);
     return [];
+  }
+}
+
+export async function appendCareerEntryToIndexedDb(playerId, careerEntry) {
+  const normalizedPlayerId = typeof playerId === 'string' ? playerId.trim() : '';
+  if (!normalizedPlayerId || !careerEntry || typeof careerEntry !== 'object') return { ok: false };
+  try {
+    const loaded = await idbRead(IDB_STORES.careerLogs, normalizedPlayerId);
+    const existing = Array.isArray(loaded) ? loaded : [];
+    const year = sanitizeYear(careerEntry.year);
+    const deduped = existing.filter((row) => sanitizeYear(row?.year) !== year);
+    deduped.push(careerEntry);
+    deduped.sort((a, b) => sanitizeYear(a?.year) - sanitizeYear(b?.year));
+    await idbWrite(IDB_STORES.careerLogs, normalizedPlayerId, deduped);
+    return { ok: true };
+  } catch (e) {
+    console.warn('Career log append failed:', e);
+    return { ok: false };
   }
 }
 
