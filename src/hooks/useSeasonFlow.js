@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import SeasonProgressWorker from "../workers/seasonProgressWorker?worker";
 import { uid, rng, rngf, gameDayToDate } from '../utils';
 import { checkForInjuries, tickInjuries, calcRetireWill, tickPositionTraining } from '../engine/player';
 import { quickSimGame, runFarmSeason } from '../engine/simulation';
@@ -303,6 +304,7 @@ export function useSeasonFlow(gs) {
     notify, upd, addNews, addTransferLog, pushResult,
     setMailbox, setNews, setRetireModal,
     faPool, setFaPool, faYears, seasonHistory, setSeasonHistory, news, mailbox,
+    saveRevision, setSaveRevision,
     setSaveExists, cpuTradeOffers,
     allStarDone, setAllStarDone, allStarResult, setAllStarResult,
     allStarTriggerDay,
@@ -320,6 +322,8 @@ export function useSeasonFlow(gs) {
   const BATCH_PROGRESS_EMA_ALPHA = 0.25; // 指数移動平均【＝急な変化をなだらかにする平均】の平滑化係数
   const pendingPlayoffRef = useRef(false);
   const isBatchCancelledRef = useRef(false);
+  const seasonProgressWorkerRef = useRef(null);
+  const seasonProgressTaskIdRef = useRef(null);
 
   const prevMyPlayersRef = useRef(null);
   const prevMyFarmRef = useRef(null);
@@ -833,11 +837,49 @@ export function useSeasonFlow(gs) {
   };
 
   // 残り全試合まとめてオートシム
+
+
+  useEffect(()=>{
+    return () => {
+      // ⚠️ ワーカーが残るとメモリリーク【＝不要なメモリ消費】になるため明示終了
+      if (seasonProgressWorkerRef.current) {
+        seasonProgressWorkerRef.current.terminate();
+        seasonProgressWorkerRef.current = null;
+      }
+    };
+  },[]);
+
   const handleSeasonSim = (autoManageMyTeam=false) => {
     if(!myTeam) return;
     const count=SEASON_GAMES-(gameDay-1);
     if(count<=0) return;
-    runBatchGames(count, autoManageMyTeam);
+    try {
+      const taskId = uid();
+      seasonProgressTaskIdRef.current = taskId;
+      if (seasonProgressWorkerRef.current) seasonProgressWorkerRef.current.terminate();
+      const worker = new SeasonProgressWorker();
+      seasonProgressWorkerRef.current = worker;
+      worker.onmessage = (event) => {
+        const message = event?.data;
+        if (!message || typeof message !== "object") return;
+        if (message.type === "PROGRESS" && message.payload?.taskId === seasonProgressTaskIdRef.current) {
+          const safeTotal = Math.max(1, Number(message.payload.total) || 1);
+          const safeCurrent = Math.max(0, Math.min(safeTotal, Number(message.payload.current) || 0));
+          setBatchProgress((prev)=>({ ...(prev||{}), current:safeCurrent, total:safeTotal, etaSec:Math.max(0,safeTotal-safeCurrent), phase:message.payload.phase||"試合計算" }));
+        }
+      };
+      worker.postMessage({ type: "START", payload: { taskId, totalGames: count, intervalMs: 120 } });
+    } catch (error) {
+      console.error("season progress worker init failed", error);
+    }
+    runBatchGames(count, autoManageMyTeam).finally(()=>{
+      if (seasonProgressWorkerRef.current) {
+        seasonProgressWorkerRef.current.postMessage({ type: "CANCEL" });
+        seasonProgressWorkerRef.current.terminate();
+        seasonProgressWorkerRef.current = null;
+      }
+      seasonProgressTaskIdRef.current = null;
+    });
   };
 
   // リーグ内順位を計算（batchMeta用）
@@ -1161,9 +1203,11 @@ export function useSeasonFlow(gs) {
       seasonHistory:nextSeasonHistory,
       news:nextNews,
       mailbox:nextMailbox,
+      saveRevision: (Number(saveRevision) || 0) + 1,
     };
     const batchSaveResult=await saveGame(nextState,{skipBackupRotation:true,preferMainSave:true});
     if(batchSaveResult.ok){
+      setSaveRevision((prev)=>prev+1);
       setSaveExists(true);
       console.info('[BatchSave] saveGame completed once at batch end', { gameDay: newDay, teamCount: newTeams.length });
     }else{
