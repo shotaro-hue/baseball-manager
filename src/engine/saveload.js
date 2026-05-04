@@ -16,6 +16,13 @@ const BACKUP_ROTATE_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_SAVE_INTERVAL_MS = 60 * 1000;
 const LAST_BACKUP_ROTATE_KEY = 'baseball_manager_v1_last_rotate_at';
 const SAVE_SIZE_DEBUG_KEY = 'baseball_manager_debug_save_size';
+const SAVE_DATA_VERSION = 2;
+const IDB_NAME = 'baseball_manager_storage';
+const IDB_VERSION = 1;
+const IDB_STORES = {
+  chunks: 'save_chunks',
+  careerLogs: 'career_logs',
+};
 
 // 将来対応予定: CareerTable / awards 側が summary 集計を参照するまでは、careerLog 詳細は 120 件保持する。
 const MAX_CAREER_LOG_ENTRIES = 120;
@@ -430,7 +437,63 @@ function decompress(raw) {
   return parsed;
 }
 
-export function saveGame(state, options = {}) {
+function openSaveDb() {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+      reject(new Error('IndexedDB is not available'));
+      return;
+    }
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IDB_STORES.chunks)) db.createObjectStore(IDB_STORES.chunks);
+      if (!db.objectStoreNames.contains(IDB_STORES.careerLogs)) db.createObjectStore(IDB_STORES.careerLogs);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('IndexedDB open failed'));
+  });
+}
+
+async function idbWrite(storeName, key, value) {
+  const db = await openSaveDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite');
+    tx.objectStore(storeName).put(value, key);
+    tx.oncomplete = () => { db.close(); resolve(true); };
+    tx.onerror = () => { db.close(); reject(tx.error || new Error('IndexedDB write failed')); };
+  });
+}
+
+async function idbRead(storeName, key) {
+  const db = await openSaveDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readonly');
+    const req = tx.objectStore(storeName).get(key);
+    req.onsuccess = () => { db.close(); resolve(req.result); };
+    req.onerror = () => { db.close(); reject(req.error || new Error('IndexedDB read failed')); };
+  });
+}
+
+async function persistLargeDataToIndexedDb(state) {
+  const seasonHistory = state?.seasonHistory ?? {};
+  const news = Array.isArray(state?.news) ? state.news : [];
+  const mailbox = Array.isArray(state?.mailbox) ? state.mailbox : [];
+  const careerEntries = [];
+  (state?.teams || []).forEach((team) => {
+    ['players', 'farm'].forEach((bucket) => {
+      (team?.[bucket] || []).forEach((p) => {
+        if (!p?.id) return;
+        careerEntries.push({ key: p.id, value: Array.isArray(p.careerLog) ? p.careerLog : [] });
+      });
+    });
+  });
+  await idbWrite(IDB_STORES.chunks, 'seasonHistory', seasonHistory);
+  await idbWrite(IDB_STORES.chunks, 'news', news);
+  await idbWrite(IDB_STORES.chunks, 'mailbox', mailbox);
+  await Promise.all(careerEntries.map((entry) => idbWrite(IDB_STORES.careerLogs, entry.key, entry.value)));
+}
+
+export async function saveGame(state, options = {}) {
   // ⚠️ 入力値検証: 想定外の形式を保存しない（破損セーブ防止）
   if (!state || typeof state !== 'object' || !Array.isArray(state.teams)) {
     console.error('Save failed: invalid state payload');
@@ -453,6 +516,21 @@ export function saveGame(state, options = {}) {
     players: Array.isArray(team.players) ? team.players.map((player) => trimCareerLogWithSummary(player, MAX_CAREER_LOG_ENTRIES)) : [],
     farm: Array.isArray(team.farm) ? team.farm.map((player) => trimCareerLogWithSummary(player, MAX_CAREER_LOG_ENTRIES)) : [],
   }));
+  try {
+    await persistLargeDataToIndexedDb(safeState);
+  } catch (e) {
+    console.error('Save failed: IndexedDB write error', e);
+    return { ok: false, quota: false, reason: 'indexeddb_write_failed' };
+  }
+  safeState.seasonHistory = null;
+  safeState.news = [];
+  safeState.mailbox = [];
+  safeState.teams = safeState.teams.map((team) => ({
+    ...team,
+    players: Array.isArray(team.players) ? team.players.map((p) => ({ ...p, careerLog: [] })) : [],
+    farm: Array.isArray(team.farm) ? team.farm.map((p) => ({ ...p, careerLog: [] })) : [],
+  }));
+  safeState.saveDataVersion = SAVE_DATA_VERSION;
 
   const serializeStart = isDevEnv ? performance.now() : 0;
   logTopLevelSaveSize(safeState);
@@ -603,7 +681,7 @@ export function getSavePerfSummary() {
   return { count: logs.length, average, slowest };
 }
 
-export function loadGame() {
+export async function loadGame() {
   const loadGameStart = isDevEnv ? performance.now() : 0;
   const candidates = [
     { key: SAVE_KEY,     label: 'primary' },
@@ -617,6 +695,24 @@ export function loadGame() {
       logPerf('loadGame.localStorage.getItem', getItemStart);
       if (!raw) continue;
       const state = decompress(raw);
+      if (state?.saveDataVersion >= SAVE_DATA_VERSION) {
+        try {
+          state.seasonHistory = (await idbRead(IDB_STORES.chunks, 'seasonHistory')) ?? state.seasonHistory;
+          state.news = (await idbRead(IDB_STORES.chunks, 'news')) ?? state.news;
+          state.mailbox = (await idbRead(IDB_STORES.chunks, 'mailbox')) ?? state.mailbox;
+          for (const team of (state.teams || [])) {
+            for (const bucket of ['players', 'farm']) {
+              for (const player of (team?.[bucket] || [])) {
+                if (!player?.id) continue;
+                const loadedLog = await idbRead(IDB_STORES.careerLogs, player.id);
+                player.careerLog = Array.isArray(loadedLog) ? loadedLog : (Array.isArray(player.careerLog) ? player.careerLog : []);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('IndexedDB load failed. Fallback to localStorage payload.', e);
+        }
+      }
       const result = validateAndMigrateSave(state);
       if (result.ok) {
         if (key !== SAVE_KEY) console.warn(`Loaded from ${label}`);
@@ -654,4 +750,7 @@ export function deleteSave() {
   localStorage.removeItem(META_KEY);
   localStorage.removeItem(BACKUP_KEY_1);
   localStorage.removeItem(BACKUP_KEY_2);
+  if (typeof indexedDB !== 'undefined') {
+    indexedDB.deleteDatabase(IDB_NAME);
+  }
 }

@@ -1162,7 +1162,7 @@ export function useSeasonFlow(gs) {
       news:nextNews,
       mailbox:nextMailbox,
     };
-    const batchSaveResult=saveGame(nextState,{skipBackupRotation:true,preferMainSave:true});
+    const batchSaveResult=await saveGame(nextState,{skipBackupRotation:true,preferMainSave:true});
     if(batchSaveResult.ok){
       setSaveExists(true);
       console.info('[BatchSave] saveGame completed once at batch end', { gameDay: newDay, teamCount: newTeams.length });
