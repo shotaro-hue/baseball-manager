@@ -15,7 +15,9 @@ const MAX_PERF_LOGS = 30;
 const BACKUP_ROTATE_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_SAVE_INTERVAL_MS = 60 * 1000;
 const LAST_BACKUP_ROTATE_KEY = 'baseball_manager_v1_last_rotate_at';
+const SAVE_SIZE_DEBUG_KEY = 'baseball_manager_debug_save_size';
 
+// 将来対応予定: CareerTable / awards 側が summary 集計を参照するまでは、careerLog 詳細は 120 件保持する。
 const MAX_CAREER_LOG_ENTRIES = 120;
 
 function sanitizeNumber(value, fallback = 0) {
@@ -42,14 +44,24 @@ function createEmptyCareerLogSummary() {
   };
 }
 
+function isSaveSizeDebugEnabled() {
+  if (!isDevEnv) return false;
+  try {
+    return localStorage.getItem(SAVE_SIZE_DEBUG_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 function buildCareerLogSummary(entries) {
   const safeEntries = Array.isArray(entries) ? entries : [];
   return safeEntries.reduce((acc, entry) => {
     if (!entry || typeof entry !== 'object') return acc;
-    const games = sanitizeNumber(entry.games ?? entry.G ?? entry.g, 0);
-    const hits = sanitizeNumber(entry.hits ?? entry.H, 0);
-    const homeRuns = sanitizeNumber(entry.homeRuns ?? entry.HR, 0);
-    const rbi = sanitizeNumber(entry.rbi ?? entry.RBI, 0);
+    const stats = entry.stats && typeof entry.stats === 'object' ? entry.stats : {};
+    const games = sanitizeNumber(entry.games ?? entry.G ?? entry.g ?? stats.PA ?? stats.BF, 0);
+    const hits = sanitizeNumber(entry.hits ?? entry.H ?? stats.H, 0);
+    const homeRuns = sanitizeNumber(entry.homeRuns ?? entry.HR ?? stats.HR, 0);
+    const rbi = sanitizeNumber(entry.rbi ?? entry.RBI ?? stats.RBI, 0);
     const year = sanitizeYear(entry.year);
     acc.totalGames += games;
     acc.totalHits += hits;
@@ -70,12 +82,15 @@ function mergeCareerLogSummary(base, delta) {
   const baseLastYear = sanitizeYear(safeBase.lastYear);
   const deltaFirstYear = sanitizeYear(safeDelta.firstYear);
   const deltaLastYear = sanitizeYear(safeDelta.lastYear);
+  const mergedFirstYear = [baseFirstYear, deltaFirstYear]
+    .filter((year) => year > 0)
+    .reduce((min, year) => Math.min(min, year), Number.POSITIVE_INFINITY);
   return {
     totalGames: sanitizeNumber(safeBase.totalGames, 0) + sanitizeNumber(safeDelta.totalGames, 0),
     totalHits: sanitizeNumber(safeBase.totalHits, 0) + sanitizeNumber(safeDelta.totalHits, 0),
     totalHomeRuns: sanitizeNumber(safeBase.totalHomeRuns, 0) + sanitizeNumber(safeDelta.totalHomeRuns, 0),
     totalRbi: sanitizeNumber(safeBase.totalRbi, 0) + sanitizeNumber(safeDelta.totalRbi, 0),
-    firstYear: [baseFirstYear, deltaFirstYear].filter((year) => year > 0).reduce((min, year) => Math.min(min, year), 0) || 0,
+    firstYear: Number.isFinite(mergedFirstYear) ? mergedFirstYear : 0,
     lastYear: [baseLastYear, deltaLastYear].filter((year) => year > 0).reduce((max, year) => Math.max(max, year), 0),
     trimmedEntries: sanitizeNumber(safeBase.trimmedEntries, 0) + sanitizeNumber(safeDelta.trimmedEntries, 0),
   };
@@ -85,11 +100,13 @@ function trimCareerLogWithSummary(player, maxEntries = MAX_CAREER_LOG_ENTRIES) {
   if (!player || typeof player !== 'object') return player;
   const safeMaxEntries = Math.max(0, Math.trunc(sanitizeNumber(maxEntries, MAX_CAREER_LOG_ENTRIES)));
   const careerLog = Array.isArray(player.careerLog) ? player.careerLog : [];
-  const baseSummary = mergeCareerLogSummary(createEmptyCareerLogSummary(), player.careerLogSummary);
+  const existingSummary = player.trimmedCareerLogSummary ?? player.careerLogSummary;
+  const baseSummary = mergeCareerLogSummary(createEmptyCareerLogSummary(), existingSummary);
   if (careerLog.length <= safeMaxEntries) {
     return {
       ...player,
       careerLog,
+      trimmedCareerLogSummary: baseSummary,
       careerLogSummary: baseSummary,
     };
   }
@@ -105,6 +122,7 @@ function trimCareerLogWithSummary(player, maxEntries = MAX_CAREER_LOG_ENTRIES) {
   return {
     ...player,
     careerLog: remainedEntries,
+    trimmedCareerLogSummary: nextSummary,
     careerLogSummary: nextSummary,
   };
 }
@@ -175,7 +193,8 @@ function migratePlayer(p) {
     growthPhase:        p.growthPhase        ?? 'peak',
     recentPitchingDays: p.recentPitchingDays ?? [],
     careerLog:          p.careerLog          ?? [],
-    careerLogSummary:   mergeCareerLogSummary(createEmptyCareerLogSummary(), p.careerLogSummary),
+    trimmedCareerLogSummary: mergeCareerLogSummary(createEmptyCareerLogSummary(), p.trimmedCareerLogSummary ?? p.careerLogSummary),
+    careerLogSummary:   mergeCareerLogSummary(createEmptyCareerLogSummary(), p.trimmedCareerLogSummary ?? p.careerLogSummary),
     peakAbilities:      p.peakAbilities      ?? null,
     stats:              migratedStats,
     stats2:             p.stats2             ?? { PA:0, H:0, HR:0, W:0, IP:0, ER:0, K:0 },
@@ -251,7 +270,7 @@ function getJsonByteSize(value) {
     if (typeof serializedValue !== 'string') return 0;
     return new TextEncoder().encode(serializedValue).length;
   } catch (e) {
-    console.warn('[SaveSize] JSONサイズ計測に失敗しました:', e);
+    if (isSaveSizeDebugEnabled()) console.warn('[SaveSize] JSONサイズ計測に失敗しました:', e);
     return -1;
   }
 }
@@ -277,7 +296,7 @@ function summarizeTopObjectFields(target, limit = 5) {
 }
 
 function logTeamsBreakdownSize(state) {
-  if (!isDevEnv || !state || !Array.isArray(state.teams)) return;
+  if (!isSaveSizeDebugEnabled() || !state || !Array.isArray(state.teams)) return;
   const teamsTotalSize = getJsonByteSize(state.teams);
   if (teamsTotalSize >= 0) {
     console.info(`[SaveSize:teams] total: ${formatJsonSize(teamsTotalSize)}`);
@@ -365,7 +384,7 @@ function logTeamsBreakdownSize(state) {
 }
 
 function logTopLevelSaveSize(state) {
-  if (!state || typeof state !== 'object' || Array.isArray(state)) return;
+  if (!isSaveSizeDebugEnabled() || !state || typeof state !== 'object' || Array.isArray(state)) return;
   const measuredEntries = [];
   Object.keys(state).forEach((topLevelKey) => {
     const keyByteSize = getJsonByteSize(state[topLevelKey]);
