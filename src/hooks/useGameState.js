@@ -76,6 +76,10 @@ export function useGameState() {
   const [retireRole, setRetireRole] = useState(null);
   const [gameState, dispatch] = useReducer(gameStateReducer, { teams: INIT_TEAMS, gameDay: 1, year: 2026, myId: null });
   const { teams, gameDay, year, myId } = gameState;
+  const markSaveDirty = useCallback(()=>{
+    setSaveRevision(prev=>prev+1);
+    setSaveDirty(true);
+  },[]);
   const setTeams   = useCallback((n) => { dispatch({ type: G.SET_TEAMS, teams: (prev) => slimTeamsForState(typeof n === 'function' ? n(prev) : n) }); markSaveDirty(); },    [markSaveDirty]);
   const setGameDay = useCallback((n) => { dispatch({ type: G.SET_GAME_DAY, day: n }); markSaveDirty(); }, [markSaveDirty]);
   const setYear    = useCallback((n) => { dispatch({ type: G.SET_YEAR, year: n }); markSaveDirty(); }, [markSaveDirty]);
@@ -117,10 +121,6 @@ export function useGameState() {
     setPersistentSummaries(prev => ({ ...prev, ...nextPartial }));
   }, []);
 
-  const markSaveDirty = useCallback(()=>{
-    setSaveRevision(prev=>prev+1);
-    setSaveDirty(true);
-  },[]);
   const getNewsBySelector = useCallback((options = {}) => {
     return persistentStoreRef.current.selectNewsList(options);
   }, []);
