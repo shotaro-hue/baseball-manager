@@ -655,6 +655,7 @@ function initGameState(myTeam, oppTeam) {
     usedBullpen: [], usedPH: {}, usedPR: {},
     momentum: 50, stopped: false, stopReason: null, stopData: null,
     pendingStrategy: 'normal', gameOver: false,
+    liveStats: createLiveStats(),
     myInningRuns: 0, opInningRuns: 0,
     teamMorale: myTeam.morale || 60,
     stadium: stadiumKey,
@@ -817,6 +818,8 @@ function processAtBat(gs, strategy = 'normal') {
   if (isMyAtBat) newOpPC+=pitches; else newMyPC+=pitches;
 
   const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, pitcherId:pitcher?.id, result, type:inferReplayTypeFromResult(result), ev:physicsMeta.ev, la:physicsMeta.la, dist:physicsMeta.distance, sprayAngle:physicsMeta.sprayAngle, physicsMeta, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog, pitchType, zone, scorers };
+  const nextLiveStats = cloneLiveStats(gs.liveStats);
+  applyLogEntryToLiveStats(nextLiveStats, logEntry);
   const nextMyPitcherState = isMyAtBat
     ? gs.myPitcherState
     : { ...(gs.myPitcherState || makePitcherState(gs.inning, gs.isTop)), battersFaced: (gs.myPitcherState?.battersFaced || 0) + 1 };
@@ -824,9 +827,49 @@ function processAtBat(gs, strategy = 'normal') {
     ? { ...(gs.opPitcherState || makePitcherState(gs.inning, gs.isTop)), battersFaced: (gs.opPitcherState?.battersFaced || 0) + 1 }
     : gs.opPitcherState;
 
-  const nextState = { ...gs, outs, bases:newBases, score:newScore, log:[...gs.log,logEntry], myBatIdx:isMyAtBat?gs.myBatIdx+1:gs.myBatIdx, opBatIdx:!isMyAtBat?gs.opBatIdx+1:gs.opBatIdx, myPitchCount:newMyPC, opPitchCount:newOpPC, myPitcherState:nextMyPitcherState, opPitcherState:nextOpPitcherState, momentum:newMomentum, myInningRuns:!gs.isTop?gs.myInningRuns+runs:gs.myInningRuns, opInningRuns:gs.isTop?gs.opInningRuns+runs:gs.opInningRuns, stopped:false, stopReason:null, pendingStrategy:'normal' };
+  const nextState = { ...gs, outs, bases:newBases, score:newScore, log:[...gs.log,logEntry], myBatIdx:isMyAtBat?gs.myBatIdx+1:gs.myBatIdx, opBatIdx:!isMyAtBat?gs.opBatIdx+1:gs.opBatIdx, myPitchCount:newMyPC, opPitchCount:newOpPC, myPitcherState:nextMyPitcherState, opPitcherState:nextOpPitcherState, momentum:newMomentum, myInningRuns:!gs.isTop?gs.myInningRuns+runs:gs.myInningRuns, opInningRuns:gs.isTop?gs.opInningRuns+runs:gs.opInningRuns, stopped:false, stopReason:null, pendingStrategy:'normal', liveStats:nextLiveStats };
   logPerf('simulatePlateAppearance', plateAppearanceStart);
   return nextState;
+}
+
+function createLiveStats() {
+  return {
+    batting: new Map(),
+    pitching: new Map(),
+  };
+}
+
+function cloneLiveStats(liveStats) {
+  if (!liveStats || typeof liveStats !== 'object') return createLiveStats();
+  return {
+    batting: new Map(liveStats.batting || []),
+    pitching: new Map(liveStats.pitching || []),
+  };
+}
+
+function applyLogEntryToLiveStats(liveStats, entry) {
+  if (!liveStats || !entry || entry.result === 'change') return liveStats;
+  const isHitResult = ['s', 'd', 't', 'hr'].includes(entry.result);
+  if (entry.batId) {
+    const batting = liveStats.batting.get(entry.batId) || { pa: 0, ab: 0, h: 0, hr: 0, rbi: 0, bb: 0 };
+    batting.pa += 1;
+    if (!['bb', 'hbp', 'sac', 'sf'].includes(entry.result)) batting.ab += 1;
+    if (isHitResult) batting.h += 1;
+    if (entry.result === 'hr') batting.hr += 1;
+    batting.rbi += entry.rbi || 0;
+    if (entry.result === 'bb' || entry.result === 'hbp') batting.bb += 1;
+    liveStats.batting.set(entry.batId, batting);
+  }
+  if (entry.pitcherId) {
+    const pitching = liveStats.pitching.get(entry.pitcherId) || { bf: 0, k: 0, ha: 0, ra: 0, bb: 0 };
+    pitching.bf += 1;
+    if (entry.result === 'k') pitching.k += 1;
+    if (isHitResult) pitching.ha += 1;
+    pitching.ra += entry.rbi || 0;
+    if (entry.result === 'bb' || entry.result === 'hbp') pitching.bb += 1;
+    liveStats.pitching.set(entry.pitcherId, pitching);
+  }
+  return liveStats;
 }
 
 function endHalfInning(gs) {
@@ -1050,4 +1093,4 @@ export function runFarmSeason(teams) {
   });
 }
 
-export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, matchupScore, calcFatigue, calcEffectiveFatigue, PITCH_TYPES, BASELINE, BASELINE_PA, BASELINE_TARGET_RATES, ABILITY_RANGE, STADIUMS, TEAM_STADIUM, resolveBattedBallOutcomeFromPhysicsForBalance, generateContactEVLA as _generateContactEVLA_TEST, getFenceDistanceBySpray as _getFenceDistanceBySpray_TEST, adjustResultByPhysics as _adjustResultByPhysics_TEST, resolveBattedBallOutcomeFromPhysics as _resolveBattedBallOutcomeFromPhysics_TEST, estimateFielderIntercept as _estimateFielderIntercept_TEST, checkHomeRunByTrajectory as _checkHomeRunByTrajectory_TEST };
+export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, matchupScore, calcFatigue, calcEffectiveFatigue, PITCH_TYPES, BASELINE, BASELINE_PA, BASELINE_TARGET_RATES, ABILITY_RANGE, STADIUMS, TEAM_STADIUM, resolveBattedBallOutcomeFromPhysicsForBalance, generateContactEVLA as _generateContactEVLA_TEST, getFenceDistanceBySpray as _getFenceDistanceBySpray_TEST, adjustResultByPhysics as _adjustResultByPhysics_TEST, resolveBattedBallOutcomeFromPhysics as _resolveBattedBallOutcomeFromPhysics_TEST, estimateFielderIntercept as _estimateFielderIntercept_TEST, checkHomeRunByTrajectory as _checkHomeRunByTrajectory_TEST, createLiveStats as _createLiveStats_TEST, applyLogEntryToLiveStats as _applyLogEntryToLiveStats_TEST };
