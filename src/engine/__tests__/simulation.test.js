@@ -4,6 +4,8 @@ import {
   calcFatigue,
   matchupScore,
   initGameState,
+  _applyLogEntryToLiveStats_TEST,
+  _createLiveStats_TEST,
   _generateContactEVLA_TEST,
   _getFenceDistanceBySpray_TEST,
   _adjustResultByPhysics_TEST,
@@ -29,6 +31,64 @@ describe('calcFatigue', () => {
     const fatigue = calcFatigue(9999, 1);
     expect(fatigue).toBeGreaterThanOrEqual(0);
     expect(fatigue).toBeLessThanOrEqual(100);
+  });
+});
+
+describe('live stat accumulators', () => {
+  it('creates live stats on initGameState', () => {
+    const myTeam = {
+      id: 'my',
+      lineup: ['b1'],
+      rotation: ['p1'],
+      rotIdx: 0,
+      players: [
+        { id: 'b1', name: 'Batter', isPitcher: false, batting: { contact: 50, power: 50, eye: 50 } },
+        { id: 'p1', name: 'Pitcher', isPitcher: true, pitching: { velocity: 50, control: 50, breaking: 50 } },
+      ],
+    };
+    const oppTeam = {
+      id: 'opp',
+      lineup: ['ob1'],
+      rotation: ['op1'],
+      rotIdx: 0,
+      players: [
+        { id: 'ob1', name: 'Opp Batter', isPitcher: false, batting: { contact: 50, power: 50, eye: 50 } },
+        { id: 'op1', name: 'Opp Pitcher', isPitcher: true, pitching: { velocity: 50, control: 50, breaking: 50 } },
+      ],
+    };
+
+    const gs = initGameState(myTeam, oppTeam);
+
+    expect(gs.liveStats).toBeDefined();
+    expect(gs.liveStats.batting).toBeInstanceOf(Map);
+    expect(gs.liveStats.pitching).toBeInstanceOf(Map);
+  });
+
+  it('updates batting and pitching summaries from a single log entry', () => {
+    const liveStats = _createLiveStats_TEST();
+    _applyLogEntryToLiveStats_TEST(liveStats, {
+      result: 'hr',
+      batId: 'b1',
+      pitcherId: 'p1',
+      rbi: 2,
+      isTop: false,
+    });
+
+    expect(liveStats.batting.get('b1')).toEqual({
+      pa: 1,
+      ab: 1,
+      h: 1,
+      hr: 1,
+      rbi: 2,
+      bb: 0,
+    });
+    expect(liveStats.pitching.get('p1')).toEqual({
+      bf: 1,
+      k: 0,
+      ha: 1,
+      ra: 2,
+      bb: 0,
+    });
   });
 });
 
