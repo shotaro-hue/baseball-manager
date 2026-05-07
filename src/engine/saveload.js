@@ -26,6 +26,51 @@ const IDB_STORES = {
 
 const MAX_RECENT_CAREER_LOG_YEARS = 3;
 
+export function createSaveRequestQueue(saveImpl) {
+  let isSaving = false;
+  let queuedPayload = null;
+  let queuedListeners = [];
+
+  const runSave = async (payload, listeners = []) => {
+    isSaving = true;
+    try {
+      const result = await saveImpl(payload);
+      listeners.forEach(({ resolve }) => resolve(result));
+      return result;
+    } catch (error) {
+      listeners.forEach(({ reject }) => reject(error));
+      throw error;
+    } finally {
+      isSaving = false;
+      if (queuedPayload !== null) {
+        const nextPayload = queuedPayload;
+        const nextListeners = queuedListeners;
+        queuedPayload = null;
+        queuedListeners = [];
+        void runSave(nextPayload, nextListeners);
+      }
+    }
+  };
+
+  return {
+    enqueue(payload) {
+      if (!isSaving && queuedPayload === null) {
+        return runSave(payload);
+      }
+      return new Promise((resolve, reject) => {
+        queuedPayload = payload;
+        queuedListeners.push({ resolve, reject });
+      });
+    },
+    getSnapshot() {
+      return {
+        isSaving,
+        hasQueuedSave: queuedPayload !== null,
+      };
+    },
+  };
+}
+
 function sanitizeNumber(value, fallback = 0) {
   const safeFallback = Number.isFinite(Number(fallback)) ? Number(fallback) : 0;
   const normalized = Number(value);
@@ -657,6 +702,16 @@ export async function saveGame(state, options = {}) {
     console.error('Save failed:', e);
     return { ok: false, quota: false };
   }
+}
+
+const sharedSaveQueue = createSaveRequestQueue(({ state, options }) => saveGame(state, options));
+
+export function enqueueSaveGame(state, options = {}) {
+  return sharedSaveQueue.enqueue({ state, options });
+}
+
+export function getSaveQueueSnapshot() {
+  return sharedSaveQueue.getSnapshot();
 }
 
 export function getSavePerfLogs() {
