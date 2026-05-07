@@ -1,7 +1,7 @@
 import {
   simulateSeasonBatch,
   SeasonBatchCancelledError,
-} from './seasonBatchCore';
+} from './seasonBatchCore.js';
 
 let activeTaskId = null;
 let cancelRequested = false;
