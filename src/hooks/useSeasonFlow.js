@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import SeasonBatchWorker from "../workers/seasonBatchWorker?worker";
+import SeasonBatchWorker from "../workers/seasonBatchWorker.js?worker";
 import { uid, rng, rngf, gameDayToDate } from '../utils';
 import { checkForInjuries, tickInjuries, calcRetireWill, tickPositionTraining } from '../engine/player';
 import { quickSimGame, runFarmSeason } from '../engine/simulation';
