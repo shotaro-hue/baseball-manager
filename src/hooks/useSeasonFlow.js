@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import SeasonProgressWorker from "../workers/seasonProgressWorker?worker";
+import SeasonBatchWorker from "../workers/seasonBatchWorker?worker";
 import { uid, rng, rngf, gameDayToDate } from '../utils';
 import { checkForInjuries, tickInjuries, calcRetireWill, tickPositionTraining } from '../engine/player';
 import { quickSimGame, runFarmSeason } from '../engine/simulation';
@@ -10,12 +10,14 @@ import { generateCpuOffer, generateCpuCpuTrade, classifyTeam, evaluateFrontOffic
 import { initPlayoff } from '../engine/playoff';
 import { selectAllStars, runAllStarGame } from '../engine/allstar';
 import { getMyMatchup, getCpuMatchups } from '../engine/scheduleGen';
-import { saveGame } from '../engine/saveload';
+import { enqueueSaveGame } from '../engine/saveload';
 import { processCpuFaBids } from '../engine/contract';
-import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER, MAX_外国人_一軍, CPU_AUTO_MANAGE_INTERVAL, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX, FIELDING_POSITIONS, OPTIMAL_PITCHER_COUNT, MIN_ACTIVE_CATCHERS } from '../constants';
+import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER, CPU_AUTO_MANAGE_INTERVAL, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX, FIELDING_POSITIONS, OPTIMAL_PITCHER_COUNT, MIN_ACTIVE_CATCHERS } from '../constants';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 
-// 守備コーチボーナス: 怪我回復速度 UP
+const MAX_FOREIGN_ACTIVE = 4;
+
+// 螳亥ｙ繧ｳ繝ｼ繝√・繝ｼ繝翫せ: 諤ｪ謌大屓蠕ｩ騾溷ｺｦ UP
 function applyDefenseCoachRecovery(players, coaches) {
   const defBonus=(coaches||[]).filter(c=>c.type==='defense').reduce((s,c)=>s+(c.bonus||0),0);
   if(!defBonus) return players;
@@ -42,12 +44,11 @@ function applyInjuriesToPlayers(players, injuries, year) {
   });
 }
 
-// 登録クールダウンを1日デクリメント
 function tickCooldowns(players) {
   return players.map(p=>{const cd=p.registrationCooldownDays??0;if(!cd)return p;return{...p,registrationCooldownDays:Math.max(0,cd-1)};});
 }
 
-// 怪我日数 > INJURY_AUTO_DEMOTE_DAYS の一軍選手を自動二軍降格し、クールダウンをセット
+// 諤ｪ謌第律謨ｰ > INJURY_AUTO_DEMOTE_DAYS 縺ｮ荳霆埼∈謇九ｒ閾ｪ蜍穂ｺ瑚ｻ埼剄譬ｼ縺励√け繝ｼ繝ｫ繝繧ｦ繝ｳ繧偵そ繝・ヨ
 function autoInjuryDemote(team) {
   const farm=team.farm??[];
   const demoted=[];const kept=[];
@@ -61,8 +62,7 @@ function autoInjuryDemote(team) {
   return{...team,players:kept,lineup:(team.lineup??[]).filter(id=>!demotedIds.has(id)),lineupNoDh:(team.lineupNoDh??[]).filter(id=>!demotedIds.has(id)),lineupDh:(team.lineupDh??[]).filter(id=>!demotedIds.has(id)),rotation:(team.rotation??[]).filter(id=>!demotedIds.has(id)),farm:[...farm,...demoted]};
 }
 
-// ─── CPU チーム自動編成 ───────────────────────────────────────────────────────
-// スコア関数（RosterTab の rosterRecScore と同じロジック）
+// 笏笏笏 CPU 繝√・繝閾ｪ蜍慕ｷｨ謌・笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏
 function _cpuBatterScore(p) {
   const sb = saberBatter(p.stats ?? {});
   return (sb.OPS || 0) * 1000 + (p.batting?.contact ?? 50) * 1.6 + (p.batting?.eye ?? 50) * 1.1 + (p.batting?.power ?? 50) * 1.2 + (p.batting?.speed ?? 50) * 0.7;
@@ -88,11 +88,11 @@ function _cpuRosterRecScore(p) {
   return (sb.OPS || 0) * 1000 + (p.batting?.contact ?? 50) * 1.6 + (p.batting?.eye ?? 50) * 1.1 + (p.batting?.power ?? 50) * 1.2 + (p.batting?.speed ?? 50) * 0.7;
 }
 
-// CPU チームのロスター全体を自動最適化して更新したチームオブジェクトを返す
+// CPU 繝√・繝縺ｮ繝ｭ繧ｹ繧ｿ繝ｼ蜈ｨ菴薙ｒ閾ｪ蜍墓怙驕ｩ蛹悶＠縺ｦ譖ｴ譁ｰ縺励◆繝√・繝繧ｪ繝悶ず繧ｧ繧ｯ繝医ｒ霑斐☆
 function cpuAutoManageTeam(team) {
   const farm = team.farm ?? [];
   const foreignInActive = team.players.filter(p => p.isForeign).length;
-  const canPromote = (p) => !p.育成 && !p.isIkusei && (p.injuryDaysLeft ?? 0) === 0 && (p.registrationCooldownDays ?? 0) === 0 && !(p.isForeign && foreignInActive >= MAX_外国人_一軍);
+  const canPromote = (p) => !p.isIkusei && (p.injuryDaysLeft ?? 0) === 0 && (p.registrationCooldownDays ?? 0) === 0 && !(p.isForeign && foreignInActive >= MAX_FOREIGN_ACTIVE);
   let players = [...team.players];
   let newFarm = [...farm];
 
@@ -102,20 +102,18 @@ function cpuAutoManageTeam(team) {
     return base + devBonus;
   };
 
-  // ── 1. ロスター入れ替え（降格・昇格・スワップ） ──
+  // 笏笏 1. 繝ｭ繧ｹ繧ｿ繝ｼ蜈･繧梧崛縺茨ｼ磯剄譬ｼ繝ｻ譏・ｼ繝ｻ繧ｹ繝ｯ繝・・・・笏笏
   const TARGET_BATTERS = MAX_ROSTER - OPTIMAL_PITCHER_COUNT;
   const openSlots = MAX_ROSTER - players.length;
   if (openSlots < 0) {
-    // 超過分: 超過種別（投手>13 or 野手>15）から優先降格、残りは全体最下位から
-    const excess = -openSlots;
+    // 雜・℃蛻・ 雜・℃遞ｮ蛻･・域兜謇・13 or 驥取焔>15・峨°繧牙━蜈磯剄譬ｼ縲∵ｮ九ｊ縺ｯ蜈ｨ菴捺怙荳倶ｽ阪°繧・    const excess = -openSlots;
     const pitcherOver = Math.max(0, players.filter(p => p.isPitcher).length - OPTIMAL_PITCHER_COUNT);
     const batterOver = Math.max(0, players.filter(p => !p.isPitcher).length - TARGET_BATTERS);
     const demoted = new Set();
     const applyDemote = (candidates, limit) => {
-      // 捕手が MIN_ACTIVE_CATCHERS 名以下なら降格対象から除外
-      const activeCatcherCount = () => players.filter(p => !p.isPitcher && p.pos === '捕手' && !demoted.has(p.id)).length;
+      // 謐墓焔縺・MIN_ACTIVE_CATCHERS 蜷堺ｻ･荳九↑繧蛾剄譬ｼ蟇ｾ雎｡縺九ｉ髯､螟・      const activeCatcherCount = () => players.filter(p => !p.isPitcher && p.pos === '謐墓焔' && !demoted.has(p.id)).length;
       [...candidates].sort((a, b) => effScore(a, false) - effScore(b, false)).slice(0, limit).forEach(p => {
-        if (!p.isPitcher && p.pos === '捕手' && activeCatcherCount() <= MIN_ACTIVE_CATCHERS) return;
+        if (!p.isPitcher && p.pos === '謐墓焔' && activeCatcherCount() <= MIN_ACTIVE_CATCHERS) return;
         players = players.filter(q => q.id !== p.id);
         newFarm = [...newFarm, { ...p, registrationCooldownDays: REGISTRATION_COOLDOWN_DAYS }];
         demoted.add(p.id);
@@ -130,23 +128,20 @@ function cpuAutoManageTeam(team) {
     const eligibleFarm = newFarm.filter(canPromote);
     const eligP = [...eligibleFarm].filter(p => p.isPitcher).sort((a, b) => effScore(b, true) - effScore(a, true));
     const eligB = [...eligibleFarm].filter(p => !p.isPitcher).sort((a, b) => effScore(b, true) - effScore(a, true));
-    let slotsLeft = Math.min(openSlots, 3); // CPU は1回最大3人まで変更
+    let slotsLeft = Math.min(openSlots, 3); // CPU 縺ｯ1蝗樊怙螟ｧ3莠ｺ縺ｾ縺ｧ螟画峩
 
-    // 投手枠を優先昇格（目標OPTIMAL_PITCHER_COUNTまで）
     const pitcherNeed = Math.max(0, OPTIMAL_PITCHER_COUNT - players.filter(p => p.isPitcher).length);
     eligP.slice(0, Math.min(pitcherNeed, slotsLeft)).forEach(p => { players.push(p); usedFarmIds.add(p.id); slotsLeft--; });
 
-    // 野手枠を優先昇格（目標TARGET_BATTERSまで）
     const batterNeed = Math.max(0, TARGET_BATTERS - players.filter(p => !p.isPitcher).length);
     eligB.slice(0, Math.min(batterNeed, slotsLeft)).forEach(p => { players.push(p); usedFarmIds.add(p.id); slotsLeft--; });
 
-    // 残り枠は最高スコア順
     if (slotsLeft > 0) {
       eligibleFarm.filter(p => !usedFarmIds.has(p.id)).sort((a, b) => effScore(b, true) - effScore(a, true))
         .slice(0, slotsLeft).forEach(p => { players.push(p); usedFarmIds.add(p.id); });
     }
 
-    // クロス種別バランス調整: 投手不足なら最弱野手↔最強farm投手、野手不足なら最弱投手↔最強farm野手
+    // 繧ｯ繝ｭ繧ｹ遞ｮ蛻･繝舌Λ繝ｳ繧ｹ隱ｿ謨ｴ: 謚墓焔荳崎ｶｳ縺ｪ繧画怙蠑ｱ驥取焔竊疲怙蠑ｷfarm謚墓焔縲・㍽謇倶ｸ崎ｶｳ縺ｪ繧画怙蠑ｱ謚墓焔竊疲怙蠑ｷfarm驥取焔
     let curP = players.filter(p => p.isPitcher).length;
     let curB = players.filter(p => !p.isPitcher).length;
     while (curP < OPTIMAL_PITCHER_COUNT && curB > TARGET_BATTERS) {
@@ -168,8 +163,7 @@ function cpuAutoManageTeam(team) {
       curP = players.filter(p => p.isPitcher).length; curB = players.filter(p => !p.isPitcher).length;
     }
 
-    // スワップ（有力二軍 vs 一軍下位・同種別）
-    const remainFarm = newFarm.filter(fp => canPromote(fp) && !usedFarmIds.has(fp.id));
+    // 繧ｹ繝ｯ繝・・・域怏蜉帑ｺ瑚ｻ・vs 荳霆堺ｸ倶ｽ阪・蜷檎ｨｮ蛻･・・    const remainFarm = newFarm.filter(fp => canPromote(fp) && !usedFarmIds.has(fp.id));
     if (remainFarm.length > 0) {
       [...players].sort((a, b) => effScore(a, false) - effScore(b, false)).forEach(ap => {
         if (usedActiveIds.has(ap.id)) return;
@@ -186,26 +180,24 @@ function cpuAutoManageTeam(team) {
       });
     }
 
-    // 昇格実行: farm から除去（クロス種別分含む）
-    [...usedFarmIds].forEach(id => { newFarm = newFarm.filter(fp => fp.id !== id); });
+    // 譏・ｼ螳溯｡・ farm 縺九ｉ髯､蜴ｻ・医け繝ｭ繧ｹ遞ｮ蛻･蛻・性繧・・    [...usedFarmIds].forEach(id => { newFarm = newFarm.filter(fp => fp.id !== id); });
   }
 
-  // ── 1.5 先発ローテ確保: 1軍先発が6人未満なら farm 先発を優先昇格 ──
-  // 空き枠があればそのまま昇格、なければ最弱の非先発投手と入れ替え（最低5人・目標6人）
+  // 笏笏 1.5 蜈育匱繝ｭ繝ｼ繝・｢ｺ菫・ 1霆榊・逋ｺ縺・莠ｺ譛ｪ貅縺ｪ繧・farm 蜈育匱繧貞━蜈域・譬ｼ 笏笏
   {
     const TARGET_ROT = 6;
     const farmSP = newFarm
-      .filter(p => p.isPitcher && p.subtype === '先発' && canPromote(p))
+      .filter(p => p.isPitcher && p.subtype === '蜈育匱' && canPromote(p))
       .sort((a, b) => effScore(b, true) - effScore(a, true));
     for (const sp of farmSP) {
-      const curSP = players.filter(p => p.isPitcher && p.subtype === '先発' && !p.isIkusei && (p.injuryDaysLeft ?? 0) === 0).length;
+      const curSP = players.filter(p => p.isPitcher && p.subtype === '蜈育匱' && !p.isIkusei && (p.injuryDaysLeft ?? 0) === 0).length;
       if (curSP >= TARGET_ROT) break;
       if (players.length < MAX_ROSTER) {
         players = [...players, sp];
         newFarm = newFarm.filter(p => p.id !== sp.id);
       } else {
         const weakRP = players
-          .filter(p => p.isPitcher && p.subtype !== '先発' && !p.isIkusei)
+          .filter(p => p.isPitcher && p.subtype !== '蜈育匱' && !p.isIkusei)
           .sort((a, b) => effScore(a, false) - effScore(b, false))[0];
         if (!weakRP) break;
         players = [...players.filter(p => p.id !== weakRP.id), sp];
@@ -214,11 +206,10 @@ function cpuAutoManageTeam(team) {
     }
   }
 
-  // ── 1.6 捕手最低 MIN_ACTIVE_CATCHERS 名確保 ──
-  // 一軍捕手が不足していたら farm から昇格。空き枠がなければ最弱の非捕手野手と入れ替え。
+  // 笏笏 1.6 謐墓焔譛菴・MIN_ACTIVE_CATCHERS 蜷咲｢ｺ菫・笏笏
   {
-    const activeCatchers = () => players.filter(p => !p.isPitcher && p.pos === '捕手' && (p.injuryDaysLeft ?? 0) === 0);
-    const farmCatchers = () => newFarm.filter(p => !p.isPitcher && p.pos === '捕手' && canPromote(p))
+    const activeCatchers = () => players.filter(p => !p.isPitcher && p.pos === '謐墓焔' && (p.injuryDaysLeft ?? 0) === 0);
+    const farmCatchers = () => newFarm.filter(p => !p.isPitcher && p.pos === '謐墓焔' && canPromote(p))
       .sort((a, b) => effScore(b, true) - effScore(a, true));
     while (activeCatchers().length < MIN_ACTIVE_CATCHERS) {
       const fc = farmCatchers()[0];
@@ -228,7 +219,7 @@ function cpuAutoManageTeam(team) {
         newFarm = newFarm.filter(p => p.id !== fc.id);
       } else {
         const weakBatter = players
-          .filter(p => !p.isPitcher && p.pos !== '捕手')
+          .filter(p => !p.isPitcher && p.pos !== '謐墓焔')
           .sort((a, b) => effScore(a, false) - effScore(b, false))[0];
         if (!weakBatter) break;
         players = [...players.filter(p => p.id !== weakBatter.id), fc];
@@ -237,7 +228,7 @@ function cpuAutoManageTeam(team) {
     }
   }
 
-  // ── 2. 打順自動設定（MRV ヒューリスティック） ──
+  // 笏笏 2. 謇馴・・蜍戊ｨｭ螳夲ｼ・RV 繝偵Η繝ｼ繝ｪ繧ｹ繝・ぅ繝・け・・笏笏
   const batters = players.filter(p => !p.isPitcher && !p.isIkusei && (p.injuryDaysLeft ?? 0) === 0);
   const useDh = !!team.dhEnabled;
   const required = [...FIELDING_POSITIONS, ...(useDh ? ['DH'] : [])];
@@ -260,13 +251,13 @@ function cpuAutoManageTeam(team) {
     .sort((a, b) => _cpuBatterScore(b[1]) - _cpuBatterScore(a[1]))
     .map(([, player]) => player.id);
 
-  // ── 3. 投手ローテ・継投自動設定 ──
+  // 笏笏 3. 謚墓焔繝ｭ繝ｼ繝・・邯呎兜閾ｪ蜍戊ｨｭ螳・笏笏
   const pitchers = players.filter(p => p.isPitcher && !p.isIkusei && (p.injuryDaysLeft ?? 0) === 0);
-  const starters = pitchers.filter(p => p.subtype === '先発').sort((a, b) => _cpuStarterScore(b) - _cpuStarterScore(a));
-  const relievers = pitchers.filter(p => p.subtype !== '先発').sort((a, b) => _cpuRelieverScore(b) - _cpuRelieverScore(a));
+  const starters = pitchers.filter(p => p.subtype === '蜈育匱').sort((a, b) => _cpuStarterScore(b) - _cpuStarterScore(a));
+  const relievers = pitchers.filter(p => p.subtype !== '蜈育匱').sort((a, b) => _cpuRelieverScore(b) - _cpuRelieverScore(a));
   const MIN_ROT = 5;
   const newRotation = starters.slice(0, 6).map(p => p.id);
-  // 先発タイプが足りない場合は、スタミナ上位の中継ぎで最低5枠を埋める
+  // 蜈育匱繧ｿ繧､繝励′雜ｳ繧翫↑縺・ｴ蜷医・縲√せ繧ｿ繝溘リ荳贋ｽ阪・荳ｭ邯吶℃縺ｧ譛菴・譫繧貞沂繧√ｋ
   if (newRotation.length < MIN_ROT) {
     const need = MIN_ROT - newRotation.length;
     const fallbackRelievers = [...relievers]
@@ -327,7 +318,7 @@ export function useSeasonFlow(gs) {
   const prevMyPlayersRef = useRef(null);
   const prevMyFarmRef = useRef(null);
 
-  // 最終戦終了後: 全setState（対戦相手記録・CPU試合）が反映された teams でプレーオフ初期化
+  // 譛邨よ姶邨ゆｺ・ｾ・ 蜈ｨsetState・亥ｯｾ謌ｦ逶ｸ謇玖ｨ倬鹸繝ｻCPU隧ｦ蜷茨ｼ峨′蜿肴丐縺輔ｌ縺・teams 縺ｧ繝励Ξ繝ｼ繧ｪ繝募・譛溷喧
   useEffect(()=>{
     if(pendingPlayoffRef.current){
       pendingPlayoffRef.current=false;
@@ -339,28 +330,28 @@ export function useSeasonFlow(gs) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[teams]);
 
-  // アンマウント【＝画面からコンポーネントが取り除かれること】時にバッチ処理を中断
+  // 繧｢繝ｳ繝槭え繝ｳ繝医撰ｼ晉判髱｢縺九ｉ繧ｳ繝ｳ繝昴・繝阪Φ繝医′蜿悶ｊ髯､縺九ｌ繧九％縺ｨ縲第凾縺ｫ繝舌ャ繝∝・逅・ｒ荳ｭ譁ｭ
   useEffect(() => () => {
     isBatchCancelledRef.current = true;
   }, []);
 
-  // 自動降格・回復通知: myTeam の players/farm 変化を検知して通知
+  // 閾ｪ蜍暮剄譬ｼ繝ｻ蝗槫ｾｩ騾夂衍: myTeam 縺ｮ players/farm 螟牙喧繧呈､懃衍縺励※騾夂衍
   useEffect(()=>{
     if(!myTeam||!myId) return;
     const prevPlayers=prevMyPlayersRef.current;
     const prevFarm=prevMyFarmRef.current;
     if(prevPlayers!==null){
       const prevPlayerIds=new Set(prevPlayers.map(p=>p.id));
-      // 一軍から二軍に移動 かつ 怪我あり → 自動降格通知
+      // 荳霆阪°繧我ｺ瑚ｻ阪↓遘ｻ蜍・縺九▽ 諤ｪ謌代≠繧・竊・閾ｪ蜍暮剄譬ｼ騾夂衍
       const newlyDemotedInj=myTeam.farm.filter(p=>prevPlayerIds.has(p.id)&&!myTeam.players.find(x=>x.id===p.id)&&(p.injuryDaysLeft??0)>0);
       if(newlyDemotedInj.length>0){
-        const names=newlyDemotedInj.map(p=>`${p.name}（残${p.injuryDaysLeft}試合）`).join('、');
+        const names=newlyDemotedInj.map(p=>`${p.name}（${p.injuryDaysLeft}日）`).join('、');
         notify(`🤕 ${names}が怪我で自動二軍降格`,'warn');
       }
     }
     if(prevFarm!==null){
-      const prevIneligibleIds=new Set(prevFarm.filter(p=>!p.育成&&((p.injuryDaysLeft??0)>0||(p.registrationCooldownDays??0)>0)).map(p=>p.id));
-      const newlyEligible=myTeam.farm.filter(p=>!p.育成&&prevIneligibleIds.has(p.id)&&(p.injuryDaysLeft??0)===0&&(p.registrationCooldownDays??0)===0);
+      const prevIneligibleIds=new Set(prevFarm.filter(p=>!p.isIkusei&&((p.injuryDaysLeft??0)>0||(p.registrationCooldownDays??0)>0)).map(p=>p.id));
+      const newlyEligible=myTeam.farm.filter(p=>!p.isIkusei&&prevIneligibleIds.has(p.id)&&(p.injuryDaysLeft??0)===0&&(p.registrationCooldownDays??0)===0);
       if(newlyEligible.length>0){
         const names=newlyEligible.map(p=>p.name).join('、');
         notify(`✅ ${names}が回復！一軍昇格可能`,'ok');
@@ -397,21 +388,20 @@ export function useSeasonFlow(gs) {
         type:"trade",
         title:`${offer.from.name}からトレードオファー`,
         from:offer.from.name,
-        dateLabel:`${year}年 ${gameDay}日目`,
+        dateLabel:`${year}蟷ｴ ${gameDay}譌･逶ｮ`,
         timestamp:Date.now(),
         read:false,
         resolved:false,
-        body:`${offer.from.name}より交渉の申し入れがありました。\n\n■ あなたが出す: ${offer.want.map(p=>p.name).join('、')}\n■ 受け取る: ${offer.offer.length>0?offer.offer.map(p=>p.name).join('、'):'なし'}${offer.cash>0?'\n■ 金銭: +'+(offer.cash/10000).toLocaleString()+'万円':''}\n\n期限内にご検討ください。`,
+      body:`${offer.from.name}よりトレードの打診がありました。\n\n・獲得したい選手: ${offer.want.map(p=>p.name).join('、')}\n・放出候補: ${offer.offer.length>0?offer.offer.map(p=>p.name).join('、'):'なし'}${offer.cash>0?'\n・金銭: +'+(offer.cash/10000).toLocaleString()+'万円':''}\n\nメール画面から返答してください。`,
         offer
       };
       setMailbox(prev=>[...prev,mail]);
-      notify(offer.from.name+'からトレードオファーが届きました！','ok');
+      notify(`${offer.from.name}からトレードオファーが届きました`,'ok');
     }
   };
 
   /**
-   * 7月のバッチシム中にCPU vs CPU デッドライントレードを試みる。
-   * @param {object[]} teamsArr
+   * 7譛医・繝舌ャ繝√す繝荳ｭ縺ｫCPU vs CPU 繝・ャ繝峨Λ繧､繝ｳ繝医Ξ繝ｼ繝峨ｒ隧ｦ縺ｿ繧九・   * @param {object[]} teamsArr
    * @param {number} currentGameDay
    * @returns {{ headline: string, body: string } | null}
    */
@@ -433,8 +423,8 @@ export function useSeasonFlow(gs) {
     seller.players = [...seller.players.filter((p) => p.id !== buyerGets.id), sellerGets];
 
     return {
-      headline: `【移籍情報】${buyerGets.name}が${buyerName}へ`,
-      body: `${sellerName}と${buyerName}の間でトレードが成立。${buyerName}は${buyerGets.name}を獲得し、${sellerGets.name}を放出した。`,
+      headline: `移籍情報 ${buyerGets.name}が${buyerName}へ`,
+      body: `${sellerName}と${buyerName}の間でトレードが成立。${buyerName}は${buyerGets.name}を獲得し、${sellerGets.name}を放出しました。`,
       buyerName,
       sellerName,
       buyerGetsName: buyerGets.name,
@@ -477,7 +467,7 @@ export function useSeasonFlow(gs) {
       timestamp: Date.now(),
       read: false,
       resolved: false,
-      body: `${offer.from.name}より交渉の申し入れがありました。\n\n■ あなたが出す: ${offer.want.map(p => p.name).join('、')}\n■ 受け取る: ${offer.offer.length > 0 ? offer.offer.map(p => p.name).join('、') : 'なし'}${offer.cash > 0 ? '\n■ 金銭: +' + (offer.cash / 10000).toLocaleString() + '万円' : ''}\n\n期限内にご検討ください。`,
+      body: `${offer.from.name}よりトレードの打診がありました。\n\n・獲得したい選手: ${offer.want.map(p => p.name).join('、')}\n・放出候補: ${offer.offer.length > 0 ? offer.offer.map(p => p.name).join('、') : 'なし'}${offer.cash > 0 ? '\n・金銭: +' + (offer.cash / 10000).toLocaleString() + '万円' : ''}\n\nメール画面から返答してください。`,
       offer,
     };
   };
@@ -494,11 +484,10 @@ export function useSeasonFlow(gs) {
 
     const signedIdSet = new Set(foreignPool.filter((p) => !res.remainingFaPool.some((r) => r.id === p.id)).map((p) => p.id));
     const mergedPool = pool.filter((p) => !signedIdSet.has(p.id));
-    const dayNews = (res.news || []).map((item) => ({ ...item, dateLabel: `${year}年 ${currentGameDay}日目` }));
+    const dayNews = (res.news || []).map((item) => ({ ...item, dateLabel: `${year}蟷ｴ ${currentGameDay}譌･逶ｮ` }));
     return { updatedTeams: res.updatedTeams, remainingFaPool: mergedPool, news: dayNews, claimed: res.claimed || [] };
   };
 
-  // スケジュールから対戦相手を取得（フォールバック: ランダム同リーグ選択）
   const applyAllStarSelections = (baseTeams, rosters) => {
     const pickedIds = new Set([...(rosters?.ce || []), ...(rosters?.pa || [])].map(p => p.id));
     return baseTeams.map(t => ({
@@ -513,17 +502,16 @@ export function useSeasonFlow(gs) {
     if (!asResult) return [];
     return [{
       type: 'allstar',
-      headline: `【オールスター第1戦】セ${asResult.game1.score.ce} - パ${asResult.game1.score.pa}`,
+      headline: `オールスター第1戦 セ${asResult.game1.score.ce} - パ${asResult.game1.score.pa}`,
       source: 'NPB公式',
-      dateLabel: `${year}年 ${dayLabel}日目`,
-      body: `開催球場: ${asResult.venue}
-セ・リーグ選抜 ${asResult.game1.score.ce} - ${asResult.game1.score.pa} パ・リーグ選抜。MVP: ${asResult.game1.mvp?.name || '未選出'}。`,
+      dateLabel: `${year}蟷ｴ ${dayLabel}譌･逶ｮ`,
+      body: `会場: ${asResult.venue}\nセ・リーグ ${asResult.game1.score.ce} - ${asResult.game1.score.pa} パ・リーグ\nMVP: ${asResult.game1.mvp?.name || '選出なし'}`,
     },{
       type: 'allstar',
-      headline: `【オールスター第2戦】セ${asResult.game2.score.ce} - パ${asResult.game2.score.pa}`,
+      headline: `オールスター第2戦 セ${asResult.game2.score.ce} - パ${asResult.game2.score.pa}`,
       source: 'NPB公式',
-      dateLabel: `${year}年 ${dayLabel + 1}日目`,
-      body: `セ・リーグ選抜 ${asResult.game2.score.ce} - ${asResult.game2.score.pa} パ・リーグ選抜。MVP: ${asResult.game2.mvp?.name || '未選出'}。`,
+      dateLabel: `${year}蟷ｴ ${dayLabel + 1}譌･逶ｮ`,
+      body: `セ・リーグ ${asResult.game2.score.ce} - ${asResult.game2.score.pa} パ・リーグ\nMVP: ${asResult.game2.mvp?.name || '選出なし'}`,
     }];
   };
 
@@ -531,28 +519,24 @@ export function useSeasonFlow(gs) {
     buildAllStarNewsItems(asResult, dayLabel).forEach((item) => addNews(item));
   };
 
-  // ポジション優先順（不足時の自動補完に使用）
   const POSITION_FILL_ORDER = ['C','SS','2B','3B','1B','LF','CF','RF','DH'];
 
-  // CPU チーム用ラインナップ構築（自動補完・外国人枠トリム付き）
   const buildSimLineup = (team, useDh) => {
     const limit = useDh ? 9 : 8;
     const nonPitchers = (team.players || []).filter(p => !p.isPitcher && !p.isIkusei);
     const nonPitcherIds = new Set(nonPitchers.map(p => p.id));
     const source = useDh ? (team.lineupDh || team.lineup || []) : (team.lineupNoDh || team.lineup || []);
 
-    // 既存ラインナップから有効な非投手のみ
+    // 譌｢蟄倥Λ繧､繝ｳ繝翫ャ繝励°繧画怏蜉ｹ縺ｪ髱樊兜謇九・縺ｿ
     let lineup = source.filter(id => nonPitcherIds.has(id));
 
-    // 外国人選手枠トリム（4人以内）
     let foreignCount = 0;
     lineup = lineup.filter(id => {
       const p = nonPitchers.find(x => x.id === id);
-      if (p?.isForeign) { if (foreignCount < MAX_外国人_一軍) { foreignCount++; return true; } return false; }
+      if (p?.isForeign) { if (foreignCount < MAX_FOREIGN_ACTIVE) { foreignCount++; return true; } return false; }
       return true;
     });
 
-    // 不足分を自動補完（ポジション優先で並べる）
     if (lineup.length < limit) {
       const inLineup = new Set(lineup);
       const available = nonPitchers
@@ -564,7 +548,7 @@ export function useSeasonFlow(gs) {
         });
       for (const p of available) {
         if (lineup.length >= limit) break;
-        if (p.isForeign && foreignCount >= MAX_外国人_一軍) continue;
+        if (p.isForeign && foreignCount >= MAX_FOREIGN_ACTIVE) continue;
         if (p.isForeign) foreignCount++;
         lineup.push(p.id);
       }
@@ -572,7 +556,6 @@ export function useSeasonFlow(gs) {
 
     const fixedLineup = lineup.slice(0, limit);
 
-    // DHなしは9番に投手を固定し、投手にも打席を回す
     if (!useDh) {
       const starterId = team.rotation?.[team.rotIdx % Math.max(team.rotation?.length || 0, 1)];
       const starter = (team.players || []).find(p => p.id === starterId && p.isPitcher && !p.isIkusei)
@@ -602,12 +585,12 @@ export function useSeasonFlow(gs) {
     const {opp,isHome}=pickOpponentFromSchedule(gameDay);
     if(!opp) return;
 
-    // ── 試合前バリデーション ──
+    // 笏笏 隧ｦ蜷亥燕繝舌Μ繝・・繧ｷ繝ｧ繝ｳ 笏笏
     const useDh = isHome ? !!myTeam.dhEnabled : !!opp.dhEnabled;
     const neededBatters = useDh ? 9 : 8;
     const activeCount = myTeam.players.filter(p => !p.isIkusei).length;
     if (activeCount > MAX_ROSTER) {
-      setPregameError({ message: `一軍登録人数が上限（${MAX_ROSTER}人）を超えています（現在 ${activeCount} 人）。ロースターを調整してから試合を開始してください。` });
+      setPregameError({ message: `一軍登録が上限の ${MAX_ROSTER} 人を超えています。現在 ${activeCount} 人です。` });
       return;
     }
     const myNonPitchers = myTeam.players.filter(p => !p.isPitcher && !p.isIkusei);
@@ -615,12 +598,12 @@ export function useSeasonFlow(gs) {
     const lineupSrc = useDh ? (myTeam.lineupDh || myTeam.lineup || []) : (myTeam.lineupNoDh || myTeam.lineup || []);
     const myLineup = lineupSrc.filter(id => myNonPitcherIds.has(id));
     if (myLineup.length < neededBatters) {
-      setPregameError({ message: `打順の設定が不足しています（必要: ${neededBatters}人 / 現在: ${myLineup.length}人）。ロースタータブで打順を設定してください。` });
+      setPregameError({ message: `先発メンバーが不足しています。必要 ${neededBatters} 人 / 現在 ${myLineup.length} 人です。` });
       return;
     }
     const foreignInLineup = myLineup.filter(id => myNonPitchers.find(p => p.id === id)?.isForeign).length;
-    if (foreignInLineup > MAX_外国人_一軍) {
-      setPregameError({ message: `打順内の外国人選手が上限（${MAX_外国人_一軍}人）を超えています（現在 ${foreignInLineup} 人）。ロースタータブで打順を修正してください。` });
+    if (foreignInLineup > MAX_FOREIGN_ACTIVE) {
+      setPregameError({ message: `先発メンバーの外国人枠は ${MAX_FOREIGN_ACTIVE} 人までです。現在 ${foreignInLineup} 人います。` });
       return;
     }
 
@@ -634,7 +617,7 @@ export function useSeasonFlow(gs) {
     setScreen("mode_select");
   };
 
-  // Mode selected → start appropriate game type
+  // Mode selected 竊・start appropriate game type
   const handleModeSelect = mode => {
     setGameMode(mode);
     if(mode==="tactical"){
@@ -642,8 +625,7 @@ export function useSeasonFlow(gs) {
       const fallbackMyTeam = teams.find(t=>t.id===myId);
       const hasFallbackOpp = Boolean(currentOpp);
       if (!hasCurrentGameTeams && (!fallbackMyTeam || !hasFallbackOpp)) {
-        // ⚠️ セキュリティ: 画面遷移に必要なデータが欠損している場合は強制停止し、無効な状態のまま描画しない
-        notify("試合データの読み込みに失敗しました。日程画面から再度お試しください。", "warn");
+        notify("試合データの読み込みに失敗しました。日程画面から再度試してください。", "warn");
         setScreen("hub");
         return;
       }
@@ -678,14 +660,12 @@ export function useSeasonFlow(gs) {
       if(newInj.length>0){
         const injNames=newInj.reduce((acc,i)=>{const p=updated.players.find(x=>x.id===i.id);if(p)acc.push({name:p.name,...i});return acc;},[]);
         updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
-        injNames.filter(i=>i.days>=7).forEach(i=>{addNews({type:"season",headline:`🤕 【怪我】${i.name}が負傷`,source:"チーム広報",dateLabel:`${year}年 ${gameDay}日目`,body:`${i.name}が${i.type}により${i.days}試合の戦線離脱が見込まれる。チームはロスター調整を余儀なくされる。`});});
+        injNames.filter(i=>i.days>=7).forEach(i=>{addNews({type:"season",headline:`🤕 ${i.name}が負傷`,source:"チーム情報",dateLabel:`${year}年 ${gameDay}日目`,body:`${i.name}は${i.type}で${i.days}日離脱見込みです。チームはロスター調整を進めます。`});});
       }
-      // 登録クールダウンデクリメント
-      updated.players=tickCooldowns(updated.players);
-      // 二軍: 怪我回復 + クールダウンデクリメント
-      updated.farm=tickInjuries(updated.farm??[]);
+      // 逋ｻ骭ｲ繧ｯ繝ｼ繝ｫ繝繧ｦ繝ｳ繝・け繝ｪ繝｡繝ｳ繝・      updated.players=tickCooldowns(updated.players);
+      // 莠瑚ｻ・ 諤ｪ謌大屓蠕ｩ + 繧ｯ繝ｼ繝ｫ繝繧ｦ繝ｳ繝・け繝ｪ繝｡繝ｳ繝・      updated.farm=tickInjuries(updated.farm??[]);
       updated.farm=tickCooldowns(updated.farm??[]);
-      // 怪我日数 > 10日の一軍選手を自動二軍降格
+      // 諤ｪ謌第律謨ｰ > 10譌･縺ｮ荳霆埼∈謇九ｒ閾ｪ蜍穂ｺ瑚ｻ埼剄譬ｼ
       updated=autoInjuryDemote(updated);
       const popFields=applyPopularityDelta(t,won,drew);updated={...updated,...popFields};
       const rev=calcRevenue(updated);
@@ -712,7 +692,7 @@ export function useSeasonFlow(gs) {
       return updated;
     });
     // Simulate remaining CPU vs CPU games for this day (schedule-based matchups)
-    // CPU チームはまだ upd() の影響を受けていないため teams を直接参照して OK
+    // CPU 繝√・繝縺ｯ縺ｾ縺 upd() 縺ｮ蠖ｱ髻ｿ繧貞女縺代※縺・↑縺・◆繧・teams 繧堤峩謗･蜿ら・縺励※ OK
     const _oppId=currentOpp.id;
     const _cpuMatchups=getCpuMatchups(schedule,gameDay,myId,_oppId);
     const _fallbackOthers=teams.filter(t=>t.id!==myId&&t.id!==_oppId);
@@ -720,7 +700,7 @@ export function useSeasonFlow(gs) {
       ?_cpuMatchups
       :(()=>{const pairs=[];for(let i=0;i<_fallbackOthers.length-1;i+=2)pairs.push({homeId:_fallbackOthers[i].id,awayId:_fallbackOthers[i+1].id});return pairs;})();
 
-    // シム実行（setTeams 外）→ 結果をまとめてから state を更新
+    // 繧ｷ繝螳溯｡鯉ｼ・etTeams 螟厄ｼ俄・ 邨先棡繧偵∪縺ｨ繧√※縺九ｉ state 繧呈峩譁ｰ
     const cpuSimResults=[];
     for(const matchup of matchupList){
       const a=teams.find(t=>t.id===matchup.homeId);
@@ -757,7 +737,7 @@ export function useSeasonFlow(gs) {
       }
       return newTeams;
     });
-    // allTeamResultsMap に CPU ゲーム + 自チームゲームのボックススコアを一括記録
+    // allTeamResultsMap 縺ｫ CPU 繧ｲ繝ｼ繝 + 閾ｪ繝√・繝繧ｲ繝ｼ繝縺ｮ繝懊ャ繧ｯ繧ｹ繧ｹ繧ｳ繧｢繧剃ｸ諡ｬ險倬鹸
     setAllTeamResultsMap(prev=>{
       const next={...prev};
       const recordGame=(homeId,awayId,cr,hPlayers,aPlayers,oppHName,oppAName)=>{
@@ -769,8 +749,7 @@ export function useSeasonFlow(gs) {
       for(const{matchup,cr,homeTeam,awayTeam}of cpuSimResults){
         recordGame(matchup.homeId,matchup.awayId,cr,homeTeam.players,awayTeam.players,homeTeam.name,awayTeam.name);
       }
-      // 自チームの試合（myTeam が home）
-      recordGame(myId,_oppId,r,myTeam.players,currentOpp.players,myTeam.name,currentOpp.name);
+      // 閾ｪ繝√・繝縺ｮ隧ｦ蜷茨ｼ・yTeam 縺・home・・      recordGame(myId,_oppId,r,myTeam.players,currentOpp.players,myTeam.name,currentOpp.name);
       return next;
     });
     setGameResult({score:r.score,won,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:currentOpp,gameNo:gameDay});
@@ -781,12 +760,12 @@ export function useSeasonFlow(gs) {
       const newsItem = tryCpuCpuDeadlineTrade(liveTeams, gameDay);
       if (newsItem) {
         setTeams(liveTeams);
-        addNews({ type: 'trade', headline: newsItem.headline, source: 'Baseball Times', dateLabel: `${year}年 ${gameDay}日目`, body: newsItem.body });
+        addNews({ type: 'trade', headline: newsItem.headline, source: 'Baseball Times', dateLabel: `${year}蟷ｴ ${gameDay}譌･逶ｮ`, body: newsItem.body });
         addTransferLog({
           year,
           day: gameDay,
           type: "trade",
-          headline: `【CPU間トレード】${newsItem.sellerName} ↔ ${newsItem.buyerName}`,
+          headline: `縲燭PU髢薙ヨ繝ｬ繝ｼ繝峨・{newsItem.sellerName} 竊・${newsItem.buyerName}`,
           fromTeam: newsItem.sellerName,
           toTeam: newsItem.buyerName,
           playersIn: [newsItem.buyerGetsName],
@@ -795,23 +774,22 @@ export function useSeasonFlow(gs) {
         });
       }
     }
-    // 引退表明ランダム発生
     if(Math.random()<0.04&&myTeam){
       const cands=myTeam.players.filter(p=>p.age>=35&&!p._retireNow&&calcRetireWill(p)>=40);
       if(cands.length>0){
         const rp=cands[rng(0,cands.length-1)];
         setRetireModal({player:rp,type:"announce"});
-        addNews({type:"season",headline:"【引退表明】"+rp.name+"選手が今季限りでの引退を示唆",source:"スポーツ報知",dateLabel:year+"年 "+gameDay+"日目",body:rp.name+"選手（"+rp.age+"歳）が引退を示唆するコメントを発表した。チーム関係者は今後の対応を検討している。"});
+        addNews({type:"season",headline:`引退示唆 ${rp.name}`,source:"スポーツ報知",dateLabel:`${year}年 ${gameDay}日目`,body:`${rp.name}（${rp.age}歳）が引退を示唆するコメントを出しました。チームは今後、本人の意思を確認していきます。`});
       }
     }
     const _tmpl=won?NEWS_TEMPLATES_WIN:NEWS_TEMPLATES_LOSE;
     const _scoreStr=r.score.my+"-"+r.score.opp;
     const _hl=_tmpl[rng(0,_tmpl.length-1)].replace("{team}",myTeam?.name||"自チーム").replace("{opp}",currentOpp?.name||"相手").replace("{score}",_scoreStr);
-    addNews({type:"game",headline:_hl,source:"スポーツ報知",dateLabel:year+"年 "+gameDay+"日目",body:(won?myTeam?.name+"が"+currentOpp?.name+"に"+_scoreStr+"で勝利した。\n\n投打ともに噛み合い、理想的な試合運びで勝点を積み上げた。":myTeam?.name+"は"+currentOpp?.name+"に"+_scoreStr+"で敗れた。\n\n流れを引き戻せず、次戦での巻き返しが期待される。")});
+    addNews({type:"game",headline:_hl,source:"スポーツ報知",dateLabel:`${year}年 ${gameDay}日目`,body:(won?`${myTeam?.name}が${currentOpp?.name}に${_scoreStr}で勝利しました。`:`${myTeam?.name}は${currentOpp?.name}に${_scoreStr}で敗れました。`)});
     if(Math.random()<0.35){
       const _qs=won?INTERVIEW_QUESTIONS_WIN:INTERVIEW_QUESTIONS_LOSE;
       const _opts=won?INTERVIEW_OPTIONS_WIN:INTERVIEW_OPTIONS_LOSE;
-      addNews({type:"interview",headline:"【インタビュー】"+(myTeam?.name||"")+"監督に直撃！",source:"野球速報",dateLabel:year+"年 "+gameDay+"日目",body:"試合後、記者団が監督にコメントを求めた。",question:_qs[rng(0,_qs.length-1)],options:_opts});
+      addNews({type:"interview",headline:`インタビュー ${myTeam?.name||""}戦後会見`,source:"球団広報",dateLabel:`${year}年 ${gameDay}日目`,body:"試合後、監督にコメントを求められた。",question:_qs[rng(0,_qs.length-1)],options:_opts});
     }
     const _adrew=r.score.my===r.score.opp;
     pushResult(won,_adrew,currentOpp?.name||"",r.score.my,r.score.opp,gameDay);
@@ -828,13 +806,13 @@ export function useSeasonFlow(gs) {
       return;
     }
     if(gameDay>=SEASON_GAMES){
-      // 全setState反映後の teams でinitPlayoffを呼ぶためuseEffectに委譲
+      // 蜈ｨsetState蜿肴丐蠕後・ teams 縺ｧinitPlayoff繧貞他縺ｶ縺溘ａuseEffect縺ｫ蟋碑ｭｲ
       pendingPlayoffRef.current=true;
     }
     else setScreen("result");
   };
 
-  // 任意試合数まとめてオートシム
+  // 莉ｻ諢剰ｩｦ蜷域焚縺ｾ縺ｨ繧√※繧ｪ繝ｼ繝医す繝
   const handleBatchSim = (count, autoManageMyTeam=false) => {
     if(!myTeam) return;
     const requestedCount = Number.isFinite(count) ? Math.floor(count) : BATCH;
@@ -844,12 +822,11 @@ export function useSeasonFlow(gs) {
     runBatchGames(actual, autoManageMyTeam);
   };
 
-  // 残り全試合まとめてオートシム
+  // 谿九ｊ蜈ｨ隧ｦ蜷医∪縺ｨ繧√※繧ｪ繝ｼ繝医す繝
 
 
   useEffect(()=>{
     return () => {
-      // ⚠️ ワーカーが残るとメモリリーク【＝不要なメモリ消費】になるため明示終了
       if (seasonProgressWorkerRef.current) {
         seasonProgressWorkerRef.current.terminate();
         seasonProgressWorkerRef.current = null;
@@ -864,7 +841,6 @@ export function useSeasonFlow(gs) {
     runBatchGames(count, autoManageMyTeam);
   };
 
-  // リーグ内順位を計算（batchMeta用）
   const calcLeagueRank = (teamId, allTeams, league) => {
     const same = [...allTeams.filter(t => t.league === league)]
       .sort((a, b) => {
@@ -875,431 +851,206 @@ export function useSeasonFlow(gs) {
     return same.findIndex(t => t.id === teamId) + 1;
   };
 
-  // バッチ処理の共通ロジック
+  // 繝舌ャ繝∝・逅・・蜈ｱ騾壹Ο繧ｸ繝・け
   const runBatchGames = async (count, autoManageMyTeam=false) => {
     if(!myTeam) return;
     const safeCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
     if (safeCount <= 0) {
-      notify("⚠️ バッチ試合数が不正なため処理を中止しました", "warn");
+      notify("バッチ試合数が不正です", "warn");
       return;
     }
+
     const startedAt = Date.now();
-    const progressTaskId = uid();
-    seasonProgressTaskIdRef.current = progressTaskId;
-    try {
-      if (seasonProgressWorkerRef.current) seasonProgressWorkerRef.current.terminate();
-      const worker = new SeasonProgressWorker();
-      seasonProgressWorkerRef.current = worker;
-      worker.onmessage = (event) => {
-        const message = event?.data;
-        if (!message || typeof message !== "object") return;
-        if (message.type === "ERROR" && message.payload?.taskId === seasonProgressTaskIdRef.current) {
-          console.warn("season progress worker error", message.payload?.error || "unknown error");
-          if (typeof notify === "function") {
-            notify("⚠️ 進捗計算に失敗しました。処理は継続します", "warn");
+    const taskId = uid();
+    const snapshot = {
+      teams,
+      schedule,
+      faPool,
+      seasonHistory,
+      news,
+      mailbox,
+      myId,
+      gameDay,
+      year,
+      allStarDone,
+      allStarResult,
+      allStarTriggerDay,
+      saveRevision,
+    };
+
+    const mergeAllTeamResultsPatch = (patch) => {
+      if (!patch || typeof patch !== "object") return;
+      setAllTeamResultsMap((prev) => {
+        let next = prev;
+        for (const [teamId, days] of Object.entries(patch)) {
+          const currentTeamMap = prev[teamId] || {};
+          let hasDiff = false;
+          for (const [dayKey, dayValue] of Object.entries(days || {})) {
+            if (currentTeamMap[dayKey] !== dayValue) {
+              hasDiff = true;
+              break;
+            }
           }
-          return;
+          if (!hasDiff) continue;
+          next = {
+            ...next,
+            [teamId]: { ...currentTeamMap, ...days },
+          };
         }
-        if (message.type === "PROGRESS" && message.payload?.taskId === seasonProgressTaskIdRef.current) {
-          const payload = message.payload || {};
-          setBatchProgress({
-            current: Math.max(0, Number(payload.current) || 0),
-            total: Math.max(1, Number(payload.total) || 1),
-            startedAt,
-            avgMsPerGame: Math.max(0, Number(payload.avgMsPerGame) || 0),
-            etaSec: Math.max(0, Number(payload.etaSec) || 0),
-            phase: typeof payload.phase === "string" ? payload.phase : "試合計算",
-          });
-        }
-      };
-      worker.postMessage({ type: "START", payload: { taskId: progressTaskId } });
-    } catch (error) {
-      console.error("season progress worker init failed", error);
-      seasonProgressWorkerRef.current = null;
-    }
-    const updateBatchProgress = (current, total, phase) => {
-      const safeTotal = Math.max(1, Number.isFinite(total) ? Math.floor(total) : 1);
-      const safeCurrent = Math.max(0, Math.min(Number.isFinite(current) ? Math.floor(current) : 0, safeTotal));
-      const elapsedMs = Math.max(0, Date.now() - startedAt);
-      if (seasonProgressWorkerRef.current && seasonProgressTaskIdRef.current) {
-        seasonProgressWorkerRef.current.postMessage({
-          type: "TICK",
-          payload: { taskId: seasonProgressTaskIdRef.current, current: safeCurrent, total: safeTotal, elapsedMs, phase },
-        });
-        return;
-      }
-      setBatchProgress({
-        current: safeCurrent,
-        total: safeTotal,
-        startedAt,
-        avgMsPerGame: safeCurrent > 0 ? elapsedMs / safeCurrent : 0,
-        etaSec: (() => {
-          const avgMsPerGame = safeCurrent > 0 ? elapsedMs / safeCurrent : 0;
-          return safeCurrent >= safeTotal ? 0 : ((safeTotal - safeCurrent) * avgMsPerGame) / 1000;
-        })(),
-        phase: typeof phase === "string" && phase.trim() ? phase : "試合計算",
+        return next;
       });
     };
-    isBatchCancelledRef.current = false;
-    gs.setIsAutoSaveSuspended(true);
-    const CHUNK_SIZE = 3;
-    const MAX_BATCH_BOX_SCORE_KEEP = 120;
-    const makeCompactBoxScoreRecord = ({ homeId, awayId, dayNo, cr, bs, homeName, awayName }) => ({
-      homeId, awayId, dayNo, cr, homeName, awayName,
-      inningScores: bs?.inningScores,
-      homeBatting: bs?.homeBatting,
-      awayBatting: bs?.awayBatting,
-      homePitching: bs?.homePitching,
-      awayPitching: bs?.awayPitching,
-    });
 
-    updateBatchProgress(0, safeCount, "試合計算");
-    let newTeams=[...teams.map(t=>({...t,players:[...t.players.map(p=>({...p,stats:{...p.stats}}))],...(t.id===myId?{}:{})}))];
-    const results=[];
-    let newDay=gameDay;
-    let allStarDoneLocal=allStarDone;
-    let newFaPool=[...faPool];
-    const pendingTradeCountBase=mailbox.filter(m=>m.type==='trade'&&!m.resolved).length;
-    const batchTradeMails=[];
-    const batchForeignSignNews=[];
-    const batchForeignSignings=[];
-
-    // バッチ前の順位・成績スナップショット
-    const beforeRank = calcLeagueRank(myId, newTeams, myTeam.league);
-    const beforeRecord = { w: myTeam.wins, l: myTeam.losses, d: myTeam.draws ?? 0 };
-    // バッチ中に集積するメタデータ
-    const batchInjuries = [];
-    const cpuHighlights = [];
-    const batchNewsItems = []; // 試合結果ニュース
-    let batchAllStarNewsItems = [];
-    const batchBoxScores = []; // 最小フィールドのみ保持してメモリ使用量を抑制
-
-    let completedSuccessfully = false;
-    try {
-      for(let chunkStart=0; chunkStart<safeCount; chunkStart+=CHUNK_SIZE){
-        if (isBatchCancelledRef.current) break;
-        const chunkEnd = Math.min(chunkStart + CHUNK_SIZE, safeCount);
-        for(let g=chunkStart; g<chunkEnd; g++){
-          if (isBatchCancelledRef.current) break;
-      // CPU_AUTO_MANAGE_INTERVAL 日ごとに全球団のロスター・打順・ローテを最適化
-      // autoManageMyTeam=true の場合は自チームも対象に含める
-      if(newDay % CPU_AUTO_MANAGE_INTERVAL === 0){
-        newTeams=newTeams.map(t=>(t.id===myId && !autoManageMyTeam)?t:cpuAutoManageTeam(t));
-      }
-
-      const scheduleMatchup=getMyMatchup(schedule,newDay,myId);
-      const oppId=scheduleMatchup?.oppId;
-      const opp=scheduleMatchup ? newTeams.find(t=>t.id===scheduleMatchup.oppId) : null;
-      const cpuPairs=getCpuMatchups(schedule,newDay,myId,oppId);
-      for(const cpuMatchup of cpuPairs){
-        const a=newTeams.find(t=>t.id===cpuMatchup.homeId);
-        const b=newTeams.find(t=>t.id===cpuMatchup.awayId);
-        if(!a||!b) continue;
-        const useDh = !!a.dhEnabled;
-        const aPlayersSnap=[...a.players]; const bPlayersSnap=[...b.players]; // 名前解決用スナップショット
-        const cr=quickSimGame(applyDhToTeam(a, useDh),applyDhToTeam(b, useDh));
-        const bs=computeBoxScore(cr.log||[],cr.inningSummary||[],aPlayersSnap,bPlayersSnap,cr.score.my,cr.score.opp);
-        batchBoxScores.push(makeCompactBoxScoreRecord({ homeId:a.id, awayId:b.id, dayNo:newDay, cr, bs, homeName:a.name, awayName:b.name }));
-        if (batchBoxScores.length > MAX_BATCH_BOX_SCORE_KEEP) batchBoxScores.splice(0, batchBoxScores.length - MAX_BATCH_BOX_SCORE_KEEP);
-        const cdrew=cr.score.my===cr.score.opp;
-        const aWon=cr.won;
-        // 注目CPU試合を収集（大差 or 接戦）
-        {
-          const margin=Math.abs(cr.score.my-cr.score.opp);
-          if(!cdrew&&(margin>=4||margin<=1)&&cpuHighlights.length<8){
-            const label=margin>=4?"大勝":"接戦";
-            cpuHighlights.push({
-              homeTeam:{short:a.short,emoji:a.emoji,color:a.color},
-              awayTeam:{short:b.short,emoji:b.emoji,color:b.color},
-              homeScore:cr.score.my,awayScore:cr.score.opp,
-              homeWon:aWon,label
-            });
-          }
-        }
-        if(aWon){a.wins++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.losses++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
-        else if(cdrew){a.draws++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.draws++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
-        else{b.wins++;b.rf+=cr.score.opp;b.ra+=cr.score.my;a.losses++;a.rf+=cr.score.my;a.ra+=cr.score.opp;}
-        Object.assign(a,applyPopularityDelta(a,aWon,cdrew));Object.assign(b,applyPopularityDelta(b,!aWon&&!cdrew,cdrew));
-        const aRevB=calcRevenue(a);a.budget=(a.budget??0)+aRevB.ticket+aRevB.sponsor+aRevB.merch;a.revenueThisSeason=(a.revenueThisSeason??0)+aRevB.ticket+aRevB.sponsor+aRevB.merch;
-        const bRevB=calcRevenue(b);b.budget=(b.budget??0)+bRevB.ticket+bRevB.sponsor+bRevB.merch;b.revenueThisSeason=(b.revenueThisSeason??0)+bRevB.ticket+bRevB.sponsor+bRevB.merch;
-        a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon, gameDay);
-        a.players=applyPostGameCondition(a.players,cr.log||[],true,newDay);
-        a.players=tickInjuries(a.players);
-        a.players=a.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
-        const aInj=checkForInjuries(a.players, year);
-        a.players=applyInjuriesToPlayers(a.players, aInj, year);
-        b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew, gameDay);
-        b.players=applyPostGameCondition(b.players,cr.log||[],false,newDay);
-        b.players=tickInjuries(b.players);
-        b.players=b.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
-        const bInj=checkForInjuries(b.players, year);
-        b.players=applyInjuriesToPlayers(b.players, bInj, year);
-        a.rotIdx=(a.rotIdx||0)+1;
-        b.rotIdx=(b.rotIdx||0)+1;
-      }
-      const cpuCpuTradeNews = tryCpuCpuDeadlineTrade(newTeams, newDay);
-      if (cpuCpuTradeNews) {
-        results.push({ type: 'trade_news', ...cpuCpuTradeNews, day: newDay });
-      }
-      const tradeMail = tryGenerateCpuOfferInBatch(newTeams, newDay, pendingTradeCountBase + batchTradeMails.length);
-      if (tradeMail) {
-        batchTradeMails.push(tradeMail);
-      }
-      const foreignFaResult = tryCpuForeignFaInBatch(newTeams, newDay, newFaPool);
-      newTeams = foreignFaResult.updatedTeams;
-      newFaPool = foreignFaResult.remainingFaPool;
-      if (foreignFaResult.news?.length) {
-        batchForeignSignNews.push(...foreignFaResult.news);
-      }
-      if (foreignFaResult.claimed?.length) {
-        batchForeignSignings.push(...foreignFaResult.claimed);
-      }
-      const myT=newTeams.find(t=>t.id===myId);
-      if(scheduleMatchup && opp && myT){
-        const useDh = scheduleMatchup.isHome ? !!myT.dhEnabled : !!opp.dhEnabled;
-        const myTPlayersSnap=[...myT.players]; const oppPlayersSnap=[...opp.players];
-        const r=quickSimGame(applyDhToTeam(myT, useDh),applyDhToTeam(opp, useDh));
-        batchBoxScores.push(makeCompactBoxScoreRecord({ homeId:myT.id, awayId:opp.id, dayNo:newDay, cr:r, bs:null, homeName:myT.name, awayName:opp.name }));
-        if (batchBoxScores.length > MAX_BATCH_BOX_SCORE_KEEP) batchBoxScores.splice(0, batchBoxScores.length - MAX_BATCH_BOX_SCORE_KEEP);
-        const won=r.score.my>r.score.opp;
-        const drew=r.score.my===r.score.opp;
-        if(won){myT.wins++;myT.rf+=r.score.my;myT.ra+=r.score.opp;}
-        else if(drew){myT.draws++;myT.rf+=r.score.my;myT.ra+=r.score.opp;}
-        else{myT.losses++;myT.rf+=r.score.my;myT.ra+=r.score.opp;}
-        Object.assign(myT,applyPopularityDelta(myT,won,drew));
-        myT.rotIdx++;
-        myT.players=applyGameStatsFromLog(myT.players, r.log||[], true, won, newDay);
-        myT.players=applyPostGameCondition(myT.players, r.log||[], true, newDay);
-        myT.players=tickInjuries(myT.players);
-        myT.players=tickPositionTraining(myT.players);
-        myT.players=myT.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
-        myT.players=applyDefenseCoachRecovery(myT.players,myT.coaches);
-        const _inj=checkForInjuries(myT.players, year);
-        // 新規負傷選手をバッチメタに収集
-        if(_inj.length>0){
-          _inj.forEach(inj=>{
-            const p=myT.players.find(pl=>pl.id===inj.id);
-            if(p) batchInjuries.push({name:p.name,pos:p.pos,type:inj.type,days:inj.days,part:inj.part});
-          });
-        }
-        myT.players=applyInjuriesToPlayers(myT.players, _inj, year);
-        // 登録クールダウンデクリメント
-        myT.players=tickCooldowns(myT.players);
-        // 二軍: 怪我回復 + クールダウンデクリメント
-        myT.farm=tickInjuries(myT.farm??[]);
-        myT.farm=tickCooldowns(myT.farm??[]);
-        // 怪我日数 > 10日の一軍選手を自動二軍降格（インライン: myT参照を維持）
-        {const farm=myT.farm??[];const demotedB=[];const keptB=[];for(const p of myT.players){if((p.injuryDaysLeft??0)>INJURY_AUTO_DEMOTE_DAYS){demotedB.push({...p,registrationCooldownDays:REGISTRATION_COOLDOWN_DAYS});}else{keptB.push(p);}}if(demotedB.length>0){const dIds=new Set(demotedB.map(p=>p.id));myT.players=keptB;myT.farm=[...farm,...demotedB];myT.lineup=(myT.lineup??[]).filter(id=>!dIds.has(id));myT.lineupNoDh=(myT.lineupNoDh??[]).filter(id=>!dIds.has(id));myT.lineupDh=(myT.lineupDh??[]).filter(id=>!dIds.has(id));myT.rotation=(myT.rotation??[]).filter(id=>!dIds.has(id));}}
-        const oppT=newTeams.find(t=>t.id===opp.id);
-        if(oppT){
-          if(won){oppT.losses++;oppT.rf+=r.score.opp;oppT.ra+=r.score.my;}
-          else if(drew){oppT.draws++;oppT.rf+=r.score.opp;oppT.ra+=r.score.my;}
-          else{oppT.wins++;oppT.rf+=r.score.opp;oppT.ra+=r.score.my;}
-          Object.assign(oppT,applyPopularityDelta(oppT,!won&&!drew,drew));
-          oppT.players=applyGameStatsFromLog(oppT.players,r.log||[],false,!won&&!drew, newDay);
-          oppT.players=applyPostGameCondition(oppT.players,r.log||[],false,newDay);
-          oppT.players=tickInjuries(oppT.players);
-          const oppInj=checkForInjuries(oppT.players, year);
-          oppT.players=applyInjuriesToPlayers(oppT.players, oppInj, year);
-          oppT.rotIdx=(oppT.rotIdx||0)+1;
-        }
-        const rev=calcRevenue(myT);
-        const revTotal=rev.ticket+rev.sponsor+rev.merch;
-        myT.budget+=revTotal;
-        myT.revenueThisSeason=(myT.revenueThisSeason??0)+revTotal;
-        results.push({...r,won,oppTeam:opp,gameNo:newDay});
-        // バッチ試合ごとに試合結果ニュースを生成
-        {
-          const _tmpl=won?NEWS_TEMPLATES_WIN:NEWS_TEMPLATES_LOSE;
-          const _scoreStr=r.score.my+"-"+r.score.opp;
-          const myTName=newTeams.find(t=>t.id===myId)?.name||"自チーム";
-          const _hl=_tmpl[rng(0,_tmpl.length-1)].replace("{team}",myTName).replace("{opp}",opp.name||"相手").replace("{score}",_scoreStr);
-          batchNewsItems.push({type:"game",headline:_hl,source:"スポーツ報知",dateLabel:`${year}年 ${newDay}日目`,body:(won?myTName+"が"+opp.name+"に"+_scoreStr+"で勝利した。":myTName+"は"+opp.name+"に"+_scoreStr+"で敗れた。")});
-          // インタビュー（バッチ中は低確率）
-          if(rngf(0,1)<0.15){
-            const _qs=won?INTERVIEW_QUESTIONS_WIN:INTERVIEW_QUESTIONS_LOSE;
-            const _opts=won?INTERVIEW_OPTIONS_WIN:INTERVIEW_OPTIONS_LOSE;
-            batchNewsItems.push({type:"interview",headline:"【インタビュー】"+myTName+"監督に直撃！",source:"野球速報",dateLabel:`${year}年 ${newDay}日目`,body:"試合後、記者団が監督にコメントを求めた。",question:_qs[rng(0,_qs.length-1)],options:_opts});
-          }
-        }
-      }
-      if(!allStarDoneLocal && newDay===allStarTriggerDay){
-        const rosters=selectAllStars(newTeams);
-        const asResult=runAllStarGame(rosters, year);
-        newTeams=applyAllStarSelections(newTeams, rosters);
-        allStarDoneLocal=true;
-        batchAllStarNewsItems = buildAllStarNewsItems(asResult, newDay);
-        if(myId){
-          setAllStarResult({ rosters, gameResult: asResult });
-        }
-      }
-          newDay++;
-        }
-        updateBatchProgress(Math.min(chunkEnd, safeCount), safeCount, "試合計算");
-        await new Promise(requestAnimationFrame);
-      }
-
-      if (isBatchCancelledRef.current) {
-        notify("⚠️ バッチ処理を中止しました", "warn");
-        return;
-      }
-
-    // ループ後処理前にブラウザへ制御を返す（モバイルのウォッチドッグ対策）
-    updateBatchProgress(safeCount, safeCount, "集計中");
-    await new Promise(r => setTimeout(r, 0));
-    updateBatchProgress(safeCount, safeCount, "保存");
-    const tradeNewsItems = results
-      .filter(r=>r.type==='trade_news')
-      .map(r=>({
-        type:'trade',
-        headline:r.headline,
-        source:'Baseball Times',
-        dateLabel:`${year}年 ${r.day}日目`,
-        body:r.body,
-      }));
-    const transferEntries = results
-      .filter(r=>r.type==='trade_news')
-      .map(r=>({
-        id: uid(),
-        timestamp: Date.now(),
-        year,
-        day: r.day,
-        type: "trade",
-        headline: `【CPU間トレード】${r.sellerName} ↔ ${r.buyerName}`,
-        fromTeam: r.sellerName,
-        toTeam: r.buyerName,
-        playersIn: [r.buyerGetsName],
-        playersOut: [r.sellerGetsName],
-        detail: r.body,
-      }));
-    const allStarNewsItems = [...batchAllStarNewsItems];
-    // バッチ試合結果ニュース（古い順に追加 → ニュースタブは新しい順表示）
-    const gameNewsItems = [...batchNewsItems].reverse();
-    const nowTimestamp = Date.now();
-    const normalizedBatchNews = [...tradeNewsItems, ...gameNewsItems, ...batchForeignSignNews, ...allStarNewsItems]
-      .map((item, index) => ({
-        ...item,
-        id: uid(),
-        timestamp: nowTimestamp - index,
-      }));
-    const nextNews = [...normalizedBatchNews, ...news].slice(0,50);
-
-    let nextMailbox = batchTradeMails.length ? [...mailbox, ...batchTradeMails] : [...mailbox];
-    if(batchForeignSignings.length){
-      const byTeam=new Map();
-      for(const c of batchForeignSignings){
-        if(!byTeam.has(c.teamId)) byTeam.set(c.teamId,{teamId:c.teamId,teamName:c.teamName,teamEmoji:c.teamEmoji,players:[]});
-        byTeam.get(c.teamId).players.push(`${c.player.name}（${c.player.pos}）`);
-      }
-      const signings=Array.from(byTeam.values());
-      nextMailbox=[...nextMailbox,{
-        id:uid(),
-        type:'cpu_fa_summary',
-        read:false,
-        title:`【バッチ補強情報】${signings.length}球団が選手補強`,
-        subject:`【バッチ補強情報】${signings.length}球団が選手補強`,
-        from:'スカウト部',
-        dateLabel:`${year}年 ${newDay-1}日目まで`,
-        timestamp:Date.now(),
-        body:'バッチシム中に他球団で補強がありました。球団名をクリックして詳細ロスターを確認できます。',
-        signings,
-      }];
-    }
-
-    const existingSeasonHistory = seasonHistory && typeof seasonHistory === 'object' ? seasonHistory : {};
-    const existingTransfers = Array.isArray(existingSeasonHistory.transfers) ? existingSeasonHistory.transfers : [];
-    const nextSeasonHistory = {
-      ...existingSeasonHistory,
-      transfers: [...existingTransfers, ...transferEntries].slice(-400),
-    };
-    const nextState = {
-      teams:newTeams,
-      myId,
-      gameDay:newDay,
-      year,
-      faPool:newFaPool,
-      faYears,
-      seasonHistory:nextSeasonHistory,
-      news:nextNews,
-      mailbox:nextMailbox,
-      saveRevision: (Number(saveRevision) || 0) + 1,
-    };
-    const batchSaveResult=await saveGame(nextState,{skipBackupRotation:true,preferMainSave:true});
-    if(batchSaveResult.ok){
-      setSaveRevision((prev)=>prev+1);
-      setSaveExists(true);
-      console.info('[BatchSave] saveGame completed once at batch end', { gameDay: newDay, teamCount: newTeams.length });
-    }else{
-      console.warn('[BatchSave] saveGame failed at batch end', batchSaveResult);
-    }
-    updateBatchProgress(safeCount, safeCount, "結果集計");
-    if(batchTradeMails.length){
-      notify(`📨 バッチ中にトレードオファーが${batchTradeMails.length}件届きました`,'ok');
-    }
-    if(batchForeignSignings.length){
-      notify(`🗞 バッチ中に他球団の補強が${batchForeignSignings.length}件ありました`,'ok');
-    }
-    if(newFaPool.length!==faPool.length) setFaPool(newFaPool);
-    setNews(nextNews);
-    setMailbox(nextMailbox);
-    setSeasonHistory(nextSeasonHistory);
-    setTeams(newTeams);
-    setGameDay(newDay);
-    if(allStarDoneLocal) setAllStarDone(true);
-    const gameResults=results.filter(r=>r.type!=='trade_news');
-    // バッチ後の順位・成績を集計してメタデータをセット
-    const afterMyT=newTeams.find(t=>t.id===myId);
-    const afterRecord=afterMyT?{w:afterMyT.wins,l:afterMyT.losses,d:afterMyT.draws??0}:{w:0,l:0,d:0};
-    const afterRank=calcLeagueRank(myId,newTeams,myTeam.league);
-    setBatchMeta({beforeRank,afterRank,beforeRecord,afterRecord,injuries:batchInjuries,cpuHighlights});
-    setBatchResults(gameResults);
-    gs.setRecentResults(prev=>[...gameResults.map(r=>({won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp,gameNo:r.gameNo})).reverse(),...prev].slice(0,5));
-    gs.setGameResultsMap(prev=>{const next={...prev};gameResults.forEach(r=>{next[r.gameNo]={won:r.won,drew:r.score.my===r.score.opp,oppName:r.oppTeam?.name||"",myScore:r.score.my,oppScore:r.score.opp,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:r.oppTeam};});return next;});
-    // チームごとの差分を先にまとめてから1回だけ setAllTeamResultsMap を呼ぶ（O(n)）
-    // チャンク分割版は await ごとに React が再レンダリングし、モバイルで著しく遅かった
-    updateBatchProgress(safeCount, safeCount, "マップ反映");
-    await new Promise(r => setTimeout(r, 0));
-    setAllTeamResultsMap(prev=>{
-      const patches={};
-      for(const{homeId,awayId,dayNo,cr,inningScores,homeBatting,awayBatting,homePitching,awayPitching,homeName,awayName}of batchBoxScores){
-        const hWon=cr.won; const drew=cr.score.my===cr.score.opp;
-        if(!patches[homeId]) patches[homeId]={};
-        patches[homeId][dayNo]={won:hWon,drew,myScore:cr.score.my,oppScore:cr.score.opp,oppName:awayName,oppId:awayId,homeId,awayId,inningScores,myBatting:homeBatting,oppBatting:awayBatting,myPitching:homePitching,oppPitching:awayPitching};
-        if(!patches[awayId]) patches[awayId]={};
-        patches[awayId][dayNo]={won:!hWon&&!drew,drew,myScore:cr.score.opp,oppScore:cr.score.my,oppName:homeName,oppId:homeId,homeId,awayId,inningScores,myBatting:awayBatting,oppBatting:homeBatting,myPitching:awayPitching,oppPitching:homePitching};
-      }
-      let next = prev;
-      for(const[teamId,days]of Object.entries(patches)){
-        const currentTeamMap = prev[teamId] || {};
-        let hasDiff = false;
-        for (const [dayKey, dayValue] of Object.entries(days)) {
-          if (currentTeamMap[dayKey] !== dayValue) { hasDiff = true; break; }
-        }
-        if (!hasDiff) continue;
-        next = {
-          ...next,
-          [teamId]: { ...currentTeamMap, ...days },
-        };
-      }
-      return next;
-    });
-    completedSuccessfully = true;
-    } catch (error) {
-      console.error("runBatchGames failed", error);
-      notify("⚠️ バッチ処理中にエラーが発生しました", "error");
-    } finally {
-      setBatchProgress(null);
+    const cleanupWorker = () => {
       if (seasonProgressWorkerRef.current) {
-        seasonProgressWorkerRef.current.postMessage({ type: "CANCEL" });
         seasonProgressWorkerRef.current.terminate();
         seasonProgressWorkerRef.current = null;
       }
       seasonProgressTaskIdRef.current = null;
       gs.setIsAutoSaveSuspended(false);
+      setBatchProgress(null);
+    };
+
+    isBatchCancelledRef.current = false;
+    gs.setIsAutoSaveSuspended(true);
+    seasonProgressTaskIdRef.current = taskId;
+    setBatchProgress({
+      current: 0,
+      total: safeCount,
+      startedAt,
+      avgMsPerGame: 0,
+      etaSec: 0,
+      phase: "試合シム",
+    });
+
+    try {
+      if (seasonProgressWorkerRef.current) {
+        seasonProgressWorkerRef.current.terminate();
+      }
+
+      const worker = new SeasonBatchWorker();
+      seasonProgressWorkerRef.current = worker;
+
+      const result = await new Promise((resolve, reject) => {
+        worker.onerror = () => {
+          reject(new Error("Season batch worker crashed"));
+        };
+        worker.onmessage = (event) => {
+          const message = event?.data;
+          if (!message || typeof message !== "object") return;
+          const payload = message.payload || {};
+          if (payload.taskId !== seasonProgressTaskIdRef.current) return;
+
+          if (message.type === "PROGRESS") {
+            setBatchProgress({
+              current: Math.max(0, Number(payload.current ?? payload.completedGames) || 0),
+              total: Math.max(1, Number(payload.total ?? payload.totalGames) || safeCount),
+              startedAt,
+              avgMsPerGame: Math.max(0, Number(payload.avgMsPerGame) || 0),
+              etaSec: Math.max(0, Number(payload.etaSec) || 0),
+              phase: typeof payload.phase === "string" && payload.phase.trim() ? payload.phase : "試合シム",
+            });
+            return;
+          }
+
+          if (message.type === "DONE") {
+            resolve(payload.result || null);
+            return;
+          }
+
+          if (message.type === "CANCEL") {
+            resolve(null);
+            return;
+          }
+
+          if (message.type === "ERROR") {
+            reject(new Error(payload.message || "Season batch worker error"));
+          }
+        };
+
+        worker.postMessage({
+          type: "START",
+          payload: {
+            taskId,
+            snapshot,
+            count: safeCount,
+            autoManageMyTeam,
+          },
+        });
+      });
+
+      if (!result) {
+        notify("バッチ処理を中止しました", "warn");
+        return;
+      }
+
+      const {
+        nextState,
+        batchResults,
+        batchMeta,
+        recentResults: nextRecentResults,
+        gameResultsMapPatch,
+        allTeamResultsPatch,
+        nextAllStarDone,
+        allStarPayload,
+        summaryCounts,
+        shouldEnterPlayoff,
+      } = result;
+
+      setNews(nextState.news);
+      setMailbox(nextState.mailbox);
+      setSeasonHistory(nextState.seasonHistory);
+      setFaPool(nextState.faPool);
+      setTeams(nextState.teams);
+      setGameDay(nextState.gameDay);
+      setBatchMeta(batchMeta);
+      setBatchResults(batchResults);
+      gs.setRecentResults((prev) => [...nextRecentResults, ...prev].slice(0, 5));
+      gs.setGameResultsMap((prev) => ({ ...prev, ...gameResultsMapPatch }));
+      mergeAllTeamResultsPatch(allTeamResultsPatch);
+
+      if (nextAllStarDone) {
+        setAllStarDone(true);
+      }
+      if (allStarPayload) {
+        setAllStarResult(allStarPayload);
+      }
+
+      if ((summaryCounts?.tradeMailCount || 0) > 0) {
+        notify(`📨 バッチ中にトレードオファーが${summaryCounts.tradeMailCount}件届きました`, "ok");
+      }
+      if ((summaryCounts?.foreignSigningCount || 0) > 0) {
+        notify(`🗞 バッチ中に他球団の補強が${summaryCounts.foreignSigningCount}件ありました`, "ok");
+      }
+
+      if (shouldEnterPlayoff) {
+        const withFarm = runFarmSeason(nextState.teams);
+        setTeams(withFarm);
+        setPlayoff(initPlayoff(withFarm));
+        setScreen("playoff");
+      } else {
+        setScreen("batch_result");
+      }
+
+      enqueueSaveGame(nextState, { skipBackupRotation: true, preferMainSave: true })
+        .then((saveResult) => {
+          if (!saveResult?.ok) {
+            console.warn("[BatchSave] saveGame failed after batch", saveResult);
+            return;
+          }
+          setSaveRevision((prev) => Math.max(prev, Number(nextState.saveRevision) || prev));
+          setSaveExists(true);
+          gs.setSaveDirty(false);
+        })
+        .catch((error) => {
+          console.warn("[BatchSave] saveGame failed after batch", error);
+        });
+    } catch (error) {
+      console.error("runBatchGames failed", error);
+      notify("バッチ処理中にエラーが発生しました", "error");
+    } finally {
+      cleanupWorker();
     }
-    if (!completedSuccessfully) return;
-    if(newDay-1>=SEASON_GAMES){const withFarm=runFarmSeason(newTeams);setTeams(withFarm);setPlayoff(initPlayoff(withFarm));setScreen("playoff");}
-    else setScreen("batch_result");
   };
 
   // Game over callback from TacticalGameScreen
@@ -1321,12 +1072,10 @@ export function useSeasonFlow(gs) {
       updated.players=applyDefenseCoachRecovery(updated.players,t.coaches);
       const newInj=checkForInjuries(updated.players, year);
       updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
-      // 登録クールダウンデクリメント
-      updated.players=tickCooldowns(updated.players);
-      // 二軍: 怪我回復 + クールダウンデクリメント
-      updated.farm=tickInjuries(updated.farm??[]);
+      // 逋ｻ骭ｲ繧ｯ繝ｼ繝ｫ繝繧ｦ繝ｳ繝・け繝ｪ繝｡繝ｳ繝・      updated.players=tickCooldowns(updated.players);
+      // 莠瑚ｻ・ 諤ｪ謌大屓蠕ｩ + 繧ｯ繝ｼ繝ｫ繝繧ｦ繝ｳ繝・け繝ｪ繝｡繝ｳ繝・      updated.farm=tickInjuries(updated.farm??[]);
       updated.farm=tickCooldowns(updated.farm??[]);
-      // 怪我日数 > 10日の一軍選手を自動二軍降格
+      // 諤ｪ謌第律謨ｰ > 10譌･縺ｮ荳霆埼∈謇九ｒ閾ｪ蜍穂ｺ瑚ｻ埼剄譬ｼ
       updated=autoInjuryDemote(updated);
       const popFieldsT=applyPopularityDelta(t,won,drew);updated={...updated,...popFieldsT};
       const rev=calcRevenue(updated);
@@ -1408,15 +1157,14 @@ export function useSeasonFlow(gs) {
       return next;
     });
     setGameResult({...gsResult,oppTeam:currentOpp,won,gameNo:gameDay});
-    // 試合ニュース（手動試合も同様に生成）
     const _tmpl=won?NEWS_TEMPLATES_WIN:NEWS_TEMPLATES_LOSE;
     const _scoreStr=gsResult.score.my+"-"+gsResult.score.opp;
     const _hl=_tmpl[rng(0,_tmpl.length-1)].replace("{team}",myTeam?.name||"自チーム").replace("{opp}",currentOpp?.name||"相手").replace("{score}",_scoreStr);
-    addNews({type:"game",headline:_hl,source:"スポーツ報知",dateLabel:year+"年 "+gameDay+"日目",body:(won?myTeam?.name+"が"+currentOpp?.name+"に"+_scoreStr+"で勝利した。\n\n投打ともに噛み合い、理想的な試合運びで勝点を積み上げた。":myTeam?.name+"は"+currentOpp?.name+"に"+_scoreStr+"で敗れた。\n\n流れを引き戻せず、次戦での巻き返しが期待される。")});
+    addNews({type:"game",headline:_hl,source:"スポーツ報知",dateLabel:`${year}年 ${gameDay}日目`,body:(won?`${myTeam?.name}が${currentOpp?.name}に${_scoreStr}で勝利しました。`:`${myTeam?.name}は${currentOpp?.name}に${_scoreStr}で敗れました。`)});
     if(Math.random()<0.35){
       const _qs=won?INTERVIEW_QUESTIONS_WIN:INTERVIEW_QUESTIONS_LOSE;
       const _opts=won?INTERVIEW_OPTIONS_WIN:INTERVIEW_OPTIONS_LOSE;
-      addNews({type:"interview",headline:"【インタビュー】"+(myTeam?.name||"")+"監督に直撃！",source:"野球速報",dateLabel:year+"年 "+gameDay+"日目",body:"試合後、記者団が監督にコメントを求めた。",question:_qs[rng(0,_qs.length-1)],options:_opts});
+      addNews({type:"interview",headline:`インタビュー ${myTeam?.name||""}戦後会見`,source:"球団広報",dateLabel:`${year}年 ${gameDay}日目`,body:"試合後、監督にコメントを求められた。",question:_qs[rng(0,_qs.length-1)],options:_opts});
     }
     tryGenerateCpuOffer();
     const tacticalDate = gameDayToDate(gameDay, schedule);
@@ -1425,12 +1173,12 @@ export function useSeasonFlow(gs) {
       const newsItem = tryCpuCpuDeadlineTrade(liveTeams, gameDay);
       if (newsItem) {
         setTeams(liveTeams);
-        addNews({ type: 'trade', headline: newsItem.headline, source: 'Baseball Times', dateLabel: `${year}年 ${gameDay}日目`, body: newsItem.body });
+        addNews({ type: 'trade', headline: newsItem.headline, source: 'Baseball Times', dateLabel: `${year}蟷ｴ ${gameDay}譌･逶ｮ`, body: newsItem.body });
         addTransferLog({
           year,
           day: gameDay,
           type: "trade",
-          headline: `【CPU間トレード】${newsItem.sellerName} ↔ ${newsItem.buyerName}`,
+          headline: `CPUトレード ${newsItem.sellerName} -> ${newsItem.buyerName}`,
           fromTeam: newsItem.sellerName,
           toTeam: newsItem.buyerName,
           playersIn: [newsItem.buyerGetsName],
@@ -1477,3 +1225,4 @@ export function useSeasonFlow(gs) {
     tryGenerateCpuOffer,
   };
 }
+
