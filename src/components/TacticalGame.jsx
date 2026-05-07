@@ -7,40 +7,6 @@ import { OV, CondBadge, HandBadge, PitchBadge } from './ui';
 import Baseball3DModal from './Baseball3DModal';
 import PhysicsInsightPanel from './game/PhysicsInsightPanel';
 
-
-
-
-function buildBattingStatsMap(log) {
-  const map = new Map();
-  for (const e of log) {
-    if (!e || e.result === 'change' || !e.batId) continue;
-    const current = map.get(e.batId) || { pa: 0, ab: 0, h: 0, hr: 0, rbi: 0, bb: 0 };
-    current.pa += 1;
-    if (!['bb', 'hbp', 'sac', 'sf'].includes(e.result)) current.ab += 1;
-    if (IS_HIT(e.result)) current.h += 1;
-    if (e.result === 'hr') current.hr += 1;
-    current.rbi += e.rbi || 0;
-    if (e.result === 'bb' || e.result === 'hbp') current.bb += 1;
-    map.set(e.batId, current);
-  }
-  return map;
-}
-
-function buildPitchingStatsMap(log) {
-  const map = new Map();
-  for (const e of log) {
-    if (!e || e.result === 'change' || !e.pitcherId) continue;
-    const current = map.get(e.pitcherId) || { bf: 0, k: 0, ha: 0, ra: 0, bb: 0 };
-    current.bf += 1;
-    if (e.result === 'k') current.k += 1;
-    if (IS_HIT(e.result)) current.ha += 1;
-    current.ra += e.rbi || 0;
-    if (e.result === 'bb' || e.result === 'hbp') current.bb += 1;
-    map.set(e.pitcherId, current);
-  }
-  return map;
-}
-
 export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   const [gs,setGs]=useState(()=>initGameState(myTeam,oppTeam));
   const [autoRunning,setAutoRunning]=useState(false);
@@ -52,16 +18,13 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   const [modal3D,setModal3D]=useState(null);
   const [modalWarning,setModalWarning]=useState('');
   const logRef=useRef(null);
-  const [visibleLogIds, setVisibleLogIds] = useState([]);
-
-  // 表示ログIDのみを保持して、全ログの常時描画を避ける
-  useEffect(()=>{
+  const visibleLogIds = useMemo(() => {
     const safeLen = Array.isArray(gs.log) ? gs.log.length : 0;
     const start = Math.max(0, safeLen - 120);
     const ids = [];
-    for(let i=start;i<safeLen;i+=1){ ids.push(i); }
-    setVisibleLogIds(ids);
-  },[gs.log]);
+    for (let i = start; i < safeLen; i += 1) ids.push(i);
+    return ids;
+  }, [gs.log]);
 
   // Auto-scroll log
   useEffect(()=>{if(logRef.current) logRef.current.scrollTop=logRef.current.scrollHeight;},[visibleLogIds]);
@@ -205,8 +168,8 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
     return { inningScores: scores, innings: Array.from({ length: maxInn }, (_, i) => i + 1) };
   }, [gs.inningSummary, gs.inning]);
 
-  const battingStatsMap = useMemo(() => buildBattingStatsMap(gs.log), [gs.log]);
-  const pitchingStatsMap = useMemo(() => buildPitchingStatsMap(gs.log), [gs.log]);
+  const battingStatsMap = gs.liveStats?.batting || new Map();
+  const pitchingStatsMap = gs.liveStats?.pitching || new Map();
 
   const opFatigue=calcEffectiveFatigue(gs.opPitchCount,gs.opPitcher);
   const lastPlay = gs.log.length > 0 ? gs.log[gs.log.length - 1] : null;
