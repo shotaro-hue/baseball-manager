@@ -144,8 +144,9 @@ function applyDefenseCoachRecovery(players, coaches) {
 
 function applyInjuriesToPlayers(players, injuries, year) {
   if (!injuries.length) return players;
+  const injuriesById = new Map(injuries.map((injury) => [injury.id, injury]));
   return players.map((player) => {
-    const injury = injuries.find((entry) => entry.id === player.id);
+    const injury = injuriesById.get(player.id);
     if (!injury) return player;
     const history = [
       ...(player.injuryHistory ?? []),
@@ -755,6 +756,10 @@ function normalizeSnapshot(snapshot) {
   };
 }
 
+function buildTeamMap(teams) {
+  return new Map((teams || []).map((team) => [team.id, team]));
+}
+
 export function simulateSeasonBatch({
   snapshot,
   count,
@@ -818,14 +823,16 @@ export function simulateSeasonBatch({
       ));
     }
 
+    let teamMap = buildTeamMap(newTeams);
+
     const scheduleMatchup = getMyMatchup(state.schedule, newDay, state.myId);
     const oppId = scheduleMatchup?.oppId;
-    const opp = scheduleMatchup ? newTeams.find((team) => team.id === oppId) : null;
+    const opp = scheduleMatchup ? teamMap.get(oppId) : null;
     const cpuPairs = getCpuMatchups(state.schedule, newDay, state.myId, oppId);
 
     for (const cpuMatchup of cpuPairs) {
-      const homeTeam = newTeams.find((team) => team.id === cpuMatchup.homeId);
-      const awayTeam = newTeams.find((team) => team.id === cpuMatchup.awayId);
+      const homeTeam = teamMap.get(cpuMatchup.homeId);
+      const awayTeam = teamMap.get(cpuMatchup.awayId);
       if (!homeTeam || !awayTeam) continue;
       const useDh = !!homeTeam.dhEnabled;
       const homePlayersSnap = [...homeTeam.players];
@@ -921,6 +928,7 @@ export function simulateSeasonBatch({
     const foreignFaResult = tryCpuForeignFaInBatch(newTeams, newDay, newFaPool, state);
     newTeams = foreignFaResult.updatedTeams;
     newFaPool = foreignFaResult.remainingFaPool;
+    teamMap = buildTeamMap(newTeams);
     if (foreignFaResult.news?.length) {
       batchForeignSignNews.push(...foreignFaResult.news);
     }
@@ -928,7 +936,7 @@ export function simulateSeasonBatch({
       batchForeignSignings.push(...foreignFaResult.claimed);
     }
 
-    const myTeam = newTeams.find((team) => team.id === state.myId);
+    const myTeam = teamMap.get(state.myId);
     if (scheduleMatchup && opp && myTeam) {
       const useDh = scheduleMatchup.isHome ? !!myTeam.dhEnabled : !!opp.dhEnabled;
       const sim = quickSimGame(applyDhToTeam(myTeam, useDh), applyDhToTeam(opp, useDh));
@@ -989,7 +997,7 @@ export function simulateSeasonBatch({
       myTeam.farm = tickCooldowns(myTeam.farm ?? []);
       Object.assign(myTeam, autoInjuryDemote(myTeam));
 
-      const oppTeam = newTeams.find((team) => team.id === opp.id);
+      const oppTeam = teamMap.get(opp.id);
       if (oppTeam) {
         if (won) {
           oppTeam.losses += 1;
