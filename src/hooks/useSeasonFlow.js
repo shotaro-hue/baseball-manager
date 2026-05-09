@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { startTransition, useState, useRef, useEffect } from "react";
 import SeasonBatchWorker from "../workers/seasonBatchWorker.js?worker";
 import { uid, rng, rngf, gameDayToDate } from '../utils';
 import { checkForInjuries, tickInjuries, calcRetireWill, tickPositionTraining } from '../engine/player';
@@ -27,8 +27,9 @@ function applyDefenseCoachRecovery(players, coaches) {
 
 function applyInjuriesToPlayers(players, injuries, year) {
   if (!injuries.length) return players;
+  const injuriesById = new Map(injuries.map((injury) => [injury.id, injury]));
   return players.map((p) => {
-    const inj = injuries.find((i) => i.id === p.id);
+    const inj = injuriesById.get(p.id);
     if (!inj) return p;
     const history = [
       ...(p.injuryHistory ?? []),
@@ -285,6 +286,10 @@ function cpuAutoManageTeam(team) {
     rotation: newRotation,
     pitchingPattern: { ...(team.pitchingPattern ?? {}), ...newPattern },
   };
+}
+
+function buildTeamMap(teams) {
+  return new Map((teams || []).map((team) => [team.id, team]));
 }
 
 export function useSeasonFlow(gs) {
@@ -997,40 +1002,42 @@ export function useSeasonFlow(gs) {
         shouldEnterPlayoff,
       } = result;
 
-      setNews(nextState.news);
-      setMailbox(nextState.mailbox);
-      setSeasonHistory(nextState.seasonHistory);
-      setFaPool(nextState.faPool);
-      setTeams(nextState.teams);
-      setGameDay(nextState.gameDay);
-      setBatchMeta(batchMeta);
-      setBatchResults(batchResults);
-      gs.setRecentResults((prev) => [...nextRecentResults, ...prev].slice(0, 5));
-      gs.setGameResultsMap((prev) => ({ ...prev, ...gameResultsMapPatch }));
-      mergeAllTeamResultsPatch(allTeamResultsPatch);
+      startTransition(() => {
+        setNews(nextState.news);
+        setMailbox(nextState.mailbox);
+        setSeasonHistory(nextState.seasonHistory);
+        setFaPool(nextState.faPool);
+        setTeams(nextState.teams);
+        setGameDay(nextState.gameDay);
+        setBatchMeta(batchMeta);
+        setBatchResults(batchResults);
+        gs.setRecentResults((prev) => [...nextRecentResults, ...prev].slice(0, 5));
+        gs.setGameResultsMap((prev) => ({ ...prev, ...gameResultsMapPatch }));
+        mergeAllTeamResultsPatch(allTeamResultsPatch);
 
-      if (nextAllStarDone) {
-        setAllStarDone(true);
-      }
-      if (allStarPayload) {
-        setAllStarResult(allStarPayload);
-      }
+        if (nextAllStarDone) {
+          setAllStarDone(true);
+        }
+        if (allStarPayload) {
+          setAllStarResult(allStarPayload);
+        }
 
-      if ((summaryCounts?.tradeMailCount || 0) > 0) {
-        notify(`📨 バッチ中にトレードオファーが${summaryCounts.tradeMailCount}件届きました`, "ok");
-      }
-      if ((summaryCounts?.foreignSigningCount || 0) > 0) {
-        notify(`🗞 バッチ中に他球団の補強が${summaryCounts.foreignSigningCount}件ありました`, "ok");
-      }
+        if ((summaryCounts?.tradeMailCount || 0) > 0) {
+          notify(`📨 バッチ中にトレードオファーが${summaryCounts.tradeMailCount}件届きました`, "ok");
+        }
+        if ((summaryCounts?.foreignSigningCount || 0) > 0) {
+          notify(`🗞 バッチ中に他球団の補強が${summaryCounts.foreignSigningCount}件ありました`, "ok");
+        }
 
-      if (shouldEnterPlayoff) {
-        const withFarm = runFarmSeason(nextState.teams);
-        setTeams(withFarm);
-        setPlayoff(initPlayoff(withFarm));
-        setScreen("playoff");
-      } else {
-        setScreen("batch_result");
-      }
+        if (shouldEnterPlayoff) {
+          const withFarm = runFarmSeason(nextState.teams);
+          setTeams(withFarm);
+          setPlayoff(initPlayoff(withFarm));
+          setScreen("playoff");
+        } else {
+          setScreen("batch_result");
+        }
+      });
 
       enqueueSaveGame(nextState, { skipBackupRotation: true, preferMainSave: true })
         .then((saveResult) => {
@@ -1058,6 +1065,10 @@ export function useSeasonFlow(gs) {
     if(!myTeam||!currentOpp) return;
     const won=gsResult.score.my>gsResult.score.opp;
     const drew=gsResult.score.my===gsResult.score.opp;
+    setGameResult({...gsResult,oppTeam:currentOpp,won,gameNo:gameDay});
+    setScreen("result");
+
+    window.setTimeout(() => {
     upd(myId,t=>{
       let updated={...t,
         wins:t.wins+(won?1:0),losses:t.losses+(!won&&!drew?1:0),draws:t.draws+(drew?1:0),
@@ -1101,6 +1112,7 @@ export function useSeasonFlow(gs) {
       return updated;
     });
     const _tOppId=currentOpp.id;
+    const teamsById=buildTeamMap(teams);
     const _tCpuMatchups=getCpuMatchups(schedule,gameDay,myId,_tOppId);
     const _tFallbackOthers=teams.filter(t=>t.id!==myId&&t.id!==_tOppId);
     const tMatchupList=_tCpuMatchups.length>0
@@ -1108,8 +1120,8 @@ export function useSeasonFlow(gs) {
       :(()=>{const pairs=[];for(let i=0;i<_tFallbackOthers.length-1;i+=2)pairs.push({homeId:_tFallbackOthers[i].id,awayId:_tFallbackOthers[i+1].id});return pairs;})();
     const tCpuSimResults=[];
     for(const matchup of tMatchupList){
-      const a=teams.find(t=>t.id===matchup.homeId);
-      const b=teams.find(t=>t.id===matchup.awayId);
+      const a=teamsById.get(matchup.homeId);
+      const b=teamsById.get(matchup.awayId);
       if(!a||!b) continue;
       const useDh=!!a.dhEnabled;
       const cr=quickSimGame(applyDhToTeam(a,useDh),applyDhToTeam(b,useDh));
@@ -1117,9 +1129,10 @@ export function useSeasonFlow(gs) {
     }
     setTeams(prev=>{
       let newTeams=prev.map(t=>({...t,players:t.players.map(p=>({...p,stats:{...p.stats}}))}));
+      const newTeamsById=buildTeamMap(newTeams);
       for(const{matchup,cr}of tCpuSimResults){
-        const a=newTeams.find(t=>t.id===matchup.homeId);
-        const b=newTeams.find(t=>t.id===matchup.awayId);
+        const a=newTeamsById.get(matchup.homeId);
+        const b=newTeamsById.get(matchup.awayId);
         if(!a||!b) continue;
         const cdrew=cr.score.my===cr.score.opp;
         const aWon=cr.won;
@@ -1144,8 +1157,10 @@ export function useSeasonFlow(gs) {
     });
     setAllTeamResultsMap(prev=>{
       const next={...prev};
-      const recordGame=(homeId,awayId,cr,hPlayers,aPlayers,oppHName,oppAName)=>{
-        const bs=computeBoxScore(cr.log||[],cr.inningSummary||[],hPlayers,aPlayers,cr.score.my,cr.score.opp);
+      const recordGame=(homeId,awayId,cr,hPlayers,aPlayers,oppHName,oppAName,includeBoxScore=false)=>{
+        const bs=includeBoxScore
+          ? computeBoxScore(cr.log||[],cr.inningSummary||[],hPlayers,aPlayers,cr.score.my,cr.score.opp)
+          : null;
         const hWon=cr.won; const drew=cr.score.my===cr.score.opp;
         next[homeId]={...(next[homeId]||{}),[gameDay]:{won:hWon,drew,myScore:cr.score.my,oppScore:cr.score.opp,oppName:oppAName,oppId:awayId,homeId,awayId,...(bs||{})}};
         next[awayId]={...(next[awayId]||{}),[gameDay]:{won:!hWon&&!drew,drew,myScore:cr.score.opp,oppScore:cr.score.my,oppName:oppHName,oppId:homeId,homeId,awayId,inningScores:bs?.inningScores,myBatting:bs?.awayBatting,oppBatting:bs?.homeBatting,myPitching:bs?.awayPitching,oppPitching:bs?.homePitching}};
@@ -1153,10 +1168,9 @@ export function useSeasonFlow(gs) {
       for(const{matchup,cr,homeTeam,awayTeam}of tCpuSimResults){
         recordGame(matchup.homeId,matchup.awayId,cr,homeTeam.players,awayTeam.players,homeTeam.name,awayTeam.name);
       }
-      const r2=gsResult; recordGame(myId,_tOppId,r2,myTeam.players,currentOpp.players,myTeam.name,currentOpp.name);
+      const r2=gsResult; recordGame(myId,_tOppId,r2,myTeam.players,currentOpp.players,myTeam.name,currentOpp.name,true);
       return next;
     });
-    setGameResult({...gsResult,oppTeam:currentOpp,won,gameNo:gameDay});
     const _tmpl=won?NEWS_TEMPLATES_WIN:NEWS_TEMPLATES_LOSE;
     const _scoreStr=gsResult.score.my+"-"+gsResult.score.opp;
     const _hl=_tmpl[rng(0,_tmpl.length-1)].replace("{team}",myTeam?.name||"自チーム").replace("{opp}",currentOpp?.name||"相手").replace("{score}",_scoreStr);
@@ -1204,7 +1218,7 @@ export function useSeasonFlow(gs) {
     if(gameDay>=SEASON_GAMES){
       pendingPlayoffRef.current=true;
     }
-    else setScreen("result");
+    }, 0);
   };
 
   return {
@@ -1225,4 +1239,3 @@ export function useSeasonFlow(gs) {
     tryGenerateCpuOffer,
   };
 }
-
