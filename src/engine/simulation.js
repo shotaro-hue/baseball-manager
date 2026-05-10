@@ -1013,29 +1013,58 @@ function autoSwapPitcher(gs, side) {
  * @param {Object} oppTeam - 相手チームオブジェクト
  * @returns {{ score: {my:number, opp:number}, won: boolean, log: Object[], inningSummary: Object[] }}
  */
-function quickSimGame(myTeam, oppTeam) {
+function buildQuickSimHighlights(gs, log = []) {
+  const highlights = [];
+  const safeLog = Array.isArray(log) ? log : [];
+  const scoringEvents = safeLog.filter((entry) => entry && Number(entry.rbi || 0) > 0).slice(-3);
+  for (const entry of scoringEvents) {
+    highlights.push({
+      type: entry.result || 'score',
+      batter: entry.batter || '',
+      inning: entry.inning || 0,
+      rbi: Number(entry.rbi || 0),
+    });
+  }
+  if (highlights.length === 0) {
+    highlights.push({
+      type: 'final',
+      inning: gs?.inning || 0,
+      score: gs?.score || { my: 0, opp: 0 },
+    });
+  }
+  return highlights;
+}
+
+function quickSimGame(myTeam, oppTeam, options = {}) {
   const simulateGameStart = isDevEnv ? performance.now() : 0;
+  const simulationMode = options?.simulationMode || 'detailed';
+  const includeLog = options?.includeLog !== false;
+  const includePhysics = options?.includePhysics !== false;
+  const includeCrossParkAnalysis = options?.includeCrossParkAnalysis !== false;
   let gs = initGameState(myTeam, oppTeam);
   while (!gs.gameOver) {
-    // 守備側チームの自動継投（球数・終盤・ピンチを両チーム対称に処理）
-    if (gs.isTop)  gs = autoSwapPitcher(gs, 'my');
-    if (!gs.isTop) gs = autoSwapPitcher(gs, 'op');
-    let autoStrategy='normal';
-    if (gs.bases[0]&&!gs.bases[1]&&gs.outs<2) {
-      const lineup=(!gs.isTop?gs.myLineup:gs.opLineup);
-      const runner=lineup.find(p=>p.id===gs.bases[0]);
-      const sp=runner?.batting?.speed||50, sk=runner?.batting?.stealSkill||50;
-      const prob=sp>=80&&sk>=70?0.22:sp>=70&&sk>=60?0.12:sp>=60&&sk>=50?0.04:0; // 盗塁試図頻度: 全層引き下げ (旧: 0.28/0.18/0.08)
-      if (rngf(0, 1)<prob) autoStrategy='steal';
-    }
-    gs=processAtBat(gs, autoStrategy);
-    if (gs.outs>=3) gs=endHalfInning(gs);
+    if (gs.isTop) gs = autoSwapPitcher(gs, 'my');
+    else gs = autoSwapPitcher(gs, 'opp');
+    gs = processAtBat(gs, 'normal');
+    if (gs.outs >= 3) gs = endHalfInning(gs);
   }
-  const result = { score:gs.score, won:gs.score.my>gs.score.opp, log:gs.log, inningSummary:gs.inningSummary };
+  const safeLog = includeLog ? gs.log : [];
+  const result = {
+    score: { my: gs.score.my, opp: gs.score.opp },
+    won: gs.score.my > gs.score.opp,
+    log: safeLog,
+    inningSummary: Array.isArray(gs.inningSummary)
+      ? gs.inningSummary.map((entry) => ({ ...entry }))
+      : [],
+    highlights: buildQuickSimHighlights(gs, gs.log),
+    simulationMode,
+    includeLog,
+    includePhysics,
+    includeCrossParkAnalysis,
+  };
   logPerf('simulateGame', simulateGameStart);
   return result;
 }
-
 // ── 二軍簡易シミュレーション ──────────────────────────────
 // 1試合を期待値ベースで高速シム（打席単位の解決なし）
 export function farmSimGame(farmA, farmB) {
