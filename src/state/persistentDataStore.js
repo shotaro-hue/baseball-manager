@@ -8,6 +8,11 @@ function sanitizePositiveInteger(input, fallback) {
   if (Number.isInteger(value) && value > 0) return value;
   return fallback;
 }
+function sanitizeNonNegativeInteger(input, fallback = 0) {
+  const value = Number(input);
+  if (Number.isInteger(value) && value >= 0) return value;
+  return fallback;
+}
 
 function toSafeId(value) {
   if (typeof value === 'string' || typeof value === 'number') return String(value);
@@ -29,6 +34,54 @@ function buildSummary(list) {
   };
 }
 
+function selectPage(list, options = {}) {
+  const safeList = sanitizeArray(list);
+  const safeOptions = options && typeof options === 'object' ? options : {};
+  const limit = sanitizePositiveInteger(safeOptions.limit, safeList.length || 50);
+  const offset = sanitizeNonNegativeInteger(safeOptions.offset, 0);
+  return safeList.slice(offset, offset + limit);
+}
+
+function findById(list, id) {
+  const safeId = toSafeId(id);
+  if (!safeId) return null;
+  return sanitizeArray(list).find((item) => toSafeId(item?.id) === safeId) ?? null;
+}
+
+function mergeItemById(list, item) {
+  const safeList = sanitizeArray(list);
+  if (!item || typeof item !== 'object') return safeList;
+  const safeId = toSafeId(item.id);
+  if (!safeId) return safeList;
+  const index = safeList.findIndex((entry) => toSafeId(entry?.id) === safeId);
+  if (index === -1) return [item, ...safeList];
+  const next = safeList.slice();
+  next[index] = { ...next[index], ...item };
+  return next;
+}
+
+function applyDelta(list, delta) {
+  const safeList = sanitizeArray(list);
+  const safeDelta = delta && typeof delta === 'object' ? delta : {};
+  switch (safeDelta.type) {
+    case 'prepend':
+      return [...sanitizeArray(safeDelta.items), ...safeList];
+    case 'append':
+      return [...safeList, ...sanitizeArray(safeDelta.items)];
+    case 'replace':
+      return sanitizeArray(safeDelta.items);
+    case 'merge':
+      return mergeItemById(safeList, safeDelta.item);
+    case 'remove': {
+      const removeId = toSafeId(safeDelta.id);
+      if (!removeId) return safeList;
+      return safeList.filter((item) => toSafeId(item?.id) !== removeId);
+    }
+    default:
+      return safeList;
+  }
+}
+
 export function createPersistentDataStore(initialData = {}) {
   const store = {
     seasonHistory: initialData.seasonHistory && typeof initialData.seasonHistory === 'object' ? initialData.seasonHistory : {},
@@ -40,16 +93,16 @@ export function createPersistentDataStore(initialData = {}) {
 
   return {
     selectNewsList(options = {}) {
-      const safeNews = sanitizeArray(store.news);
-      const safeOptions = options && typeof options === 'object' ? options : {};
-      const limit = sanitizePositiveInteger(safeOptions.limit, safeNews.length || 50);
-      return safeNews.slice(0, limit);
+      return selectPage(store.news, options);
     },
     selectMailboxList(options = {}) {
-      const safeMailbox = sanitizeArray(store.mailbox);
-      const safeOptions = options && typeof options === 'object' ? options : {};
-      const limit = sanitizePositiveInteger(safeOptions.limit, safeMailbox.length || 50);
-      return safeMailbox.slice(0, limit);
+      return selectPage(store.mailbox, options);
+    },
+    selectNewsPage(options = {}) {
+      return selectPage(store.news, options);
+    },
+    selectMailboxPage(options = {}) {
+      return selectPage(store.mailbox, options);
     },
     selectUnreadMailboxCount(currentGameDay) {
       const safeMailbox = sanitizeArray(store.mailbox);
@@ -68,6 +121,12 @@ export function createPersistentDataStore(initialData = {}) {
       if (!latest || typeof latest !== 'object') return '';
       return toSafeId(latest.id);
     },
+    getNewsById(id) {
+      return findById(store.news, id);
+    },
+    getMailboxById(id) {
+      return findById(store.mailbox, id);
+    },
     setSeasonHistory(nextValue) {
       store.seasonHistory = nextValue && typeof nextValue === 'object' ? nextValue : {};
       return store.seasonHistory;
@@ -79,11 +138,19 @@ export function createPersistentDataStore(initialData = {}) {
       store.news = sanitizeArray(nextValue);
       return buildSummary(store.news);
     },
+    applyNewsDelta(delta) {
+      store.news = applyDelta(store.news, delta);
+      return buildSummary(store.news);
+    },
     getNews() {
       return store.news;
     },
     setMailbox(nextValue) {
       store.mailbox = sanitizeArray(nextValue);
+      return buildSummary(store.mailbox);
+    },
+    applyMailboxDelta(delta) {
+      store.mailbox = applyDelta(store.mailbox, delta);
       return buildSummary(store.mailbox);
     },
     getMailbox() {
