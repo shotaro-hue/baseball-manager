@@ -58,6 +58,12 @@ function slimTeamsForState(teams) {
   return teams.map(slimTeamForState);
 }
 
+function normalizeDirtyScopes(scopes) {
+  if (Array.isArray(scopes)) return scopes.filter((scope) => typeof scope === 'string' && scope);
+  if (typeof scopes === 'string' && scopes) return [scopes];
+  return [];
+}
+
 const INIT_TEAMS = TEAM_DEFS.map(function(d){
   const t = NPB2025_ROSTERS[d.id] ? buildRealTeam(d, NPB2025_ROSTERS[d.id]) : buildTeam(d);
   const nonPitcherIds = (t.players || []).filter(p => !p.isPitcher).map(p => p.id);
@@ -80,10 +86,17 @@ export function useGameState() {
   const [retireRole, setRetireRole] = useState(null);
   const [gameState, dispatch] = useReducer(gameStateReducer, { teams: INIT_TEAMS, gameDay: 1, year: 2026, myId: null });
   const { teams, gameDay, year, myId } = gameState;
-  const markSaveDirty = useCallback(()=>{
+  const dirtySaveScopesRef = useRef(new Set(['core', 'fa', 'seasonHistory', 'news', 'mailbox']));
+  const markSaveScopes = useCallback((scopes = []) => {
+    const normalized = normalizeDirtyScopes(scopes);
+    if (normalized.length === 0) return;
+    normalized.forEach((scope) => dirtySaveScopesRef.current.add(scope));
+  }, []);
+  const markSaveDirty = useCallback((scopes = ['core'])=>{
+    markSaveScopes(scopes);
     setSaveRevision(prev=>prev+1);
     setSaveDirty(true);
-  },[]);
+  },[markSaveScopes]);
   const setTeams   = useCallback((n) => { dispatch({ type: G.SET_TEAMS, teams: (prev) => slimTeamsForState(typeof n === 'function' ? n(prev) : n) }); markSaveDirty(); },    [markSaveDirty]);
   const setGameDay = useCallback((n) => { dispatch({ type: G.SET_GAME_DAY, day: n }); markSaveDirty(); }, [markSaveDirty]);
   const setYear    = useCallback((n) => { dispatch({ type: G.SET_YEAR, year: n }); markSaveDirty(); }, [markSaveDirty]);
@@ -95,11 +108,11 @@ export function useGameState() {
   const [seasonHistory, setSeasonHistory] = useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[],transfers:[]});
   const [saveExists, setSaveExists] = useState(()=>hasSave());
   const [schedule, setSchedule] = useState(null);
-  const [news, setNews] = useState([]);
-  const [mailbox, setMailbox] = useState([]);
+  const [news, setNewsState] = useState([]);
+  const [mailbox, setMailboxState] = useState([]);
   const [recentResults, setRecentResults] = useState([]);
-  const [gameResultsMap, setGameResultsMap] = useState({});
-  const [scheduleArchive, setScheduleArchive] = useState([]); // 過去シーズン: [{year, schedule, gameResultsMap, myTeamResultsMap}]
+  const [gameResultsMap, setGameResultsMapState] = useState({});
+  const [scheduleArchive, setScheduleArchiveState] = useState([]); // 過去シーズン: [{year, schedule, gameResultsMap, myTeamResultsMap}]
   const [cpuTradeOffers, setCpuTradeOffers] = useState([]);
   const [pressEvent, setPressEvent] = useState(null);  // 記者会見イベント
   const [lastPressDay, setLastPressDay] = useState(0); // 最後に記者会見を行ったgameDay
@@ -111,6 +124,7 @@ export function useGameState() {
   const [lastAutoSaveAt, setLastAutoSaveAt] = useState(0);
   const [saveRevision, setSaveRevision] = useState(0);
   const [saveQueueState, setSaveQueueState] = useState(() => getSaveQueueSnapshot());
+  const saveRevisionRef = useRef(0);
 
   const persistentStoreRef = useRef(createPersistentDataStore());
   const [persistentSummaries, setPersistentSummaries] = useState(() => persistentStoreRef.current.getSummaries());
@@ -126,17 +140,60 @@ export function useGameState() {
     setPersistentSummaries(prev => ({ ...prev, ...nextPartial }));
   }, []);
 
+  const setNews = useCallback((value) => {
+    setNewsState((prev) => {
+      const next = typeof value === 'function' ? value(prev) : value;
+      syncPersistentSummary('news', next);
+      markSaveScopes(['news']);
+      return Array.isArray(next) ? next : [];
+    });
+  }, [markSaveScopes, syncPersistentSummary]);
+  const setMailbox = useCallback((value) => {
+    setMailboxState((prev) => {
+      const next = typeof value === 'function' ? value(prev) : value;
+      syncPersistentSummary('mailbox', next);
+      markSaveScopes(['mailbox']);
+      return Array.isArray(next) ? next : [];
+    });
+  }, [markSaveScopes, syncPersistentSummary]);
+  const setScheduleArchive = useCallback((value) => {
+    setScheduleArchiveState((prev) => {
+      const next = typeof value === 'function' ? value(prev) : value;
+      syncPersistentSummary('scheduleArchive', next);
+      return Array.isArray(next) ? next : [];
+    });
+  }, [syncPersistentSummary]);
+  const setGameResultsMap = useCallback((value) => {
+    setGameResultsMapState((prev) => {
+      const next = typeof value === 'function' ? value(prev) : value;
+      syncPersistentSummary('gameResultsMap', next);
+      return next && typeof next === 'object' ? next : {};
+    });
+  }, [syncPersistentSummary]);
+
   const getNewsBySelector = useCallback((options = {}) => {
     return persistentStoreRef.current.selectNewsList(options);
   }, []);
   const getMailboxBySelector = useCallback((options = {}) => {
     return persistentStoreRef.current.selectMailboxList(options);
   }, []);
+  const getNewsPage = useCallback((options = {}) => {
+    return persistentStoreRef.current.selectNewsPage(options);
+  }, []);
+  const getMailboxPage = useCallback((options = {}) => {
+    return persistentStoreRef.current.selectMailboxPage(options);
+  }, []);
   const getUnreadMailboxCount = useCallback((currentGameDay) => {
     return persistentStoreRef.current.selectUnreadMailboxCount(currentGameDay);
   }, []);
   const getLatestNewsId = useCallback(() => {
     return persistentStoreRef.current.selectLatestNewsId();
+  }, []);
+  const getNewsItemById = useCallback((id) => {
+    return persistentStoreRef.current.getNewsById(id);
+  }, []);
+  const getMailboxItemById = useCallback((id) => {
+    return persistentStoreRef.current.getMailboxById(id);
   }, []);
   const refreshSaveQueueState = useCallback(() => {
     setSaveQueueState(getSaveQueueSnapshot());
@@ -148,6 +205,10 @@ export function useGameState() {
         refreshSaveQueueState();
       });
   }, [refreshSaveQueueState]);
+
+  useEffect(() => {
+    saveRevisionRef.current = saveRevision;
+  }, [saveRevision]);
 
   // gameDay が進んだとき、記者会見インターバルを超えていれば会見イベントをセット
   useEffect(()=>{
@@ -188,6 +249,27 @@ export function useGameState() {
     };
   },[myTeam,mailbox,faPool,news,gameDay]);
 
+  const getTabBadgeState = useCallback(() => tabBadges, [tabBadges]);
+  const getDashboardSlice = useCallback((options = {}) => {
+    const limit = Number.isInteger(options.limit) && options.limit > 0 ? options.limit : 5;
+    const currentGameDay = Number.isFinite(Number(options.gameDay)) ? Number(options.gameDay) : gameDay;
+    return {
+      recentResults: recentResults.slice(0, limit),
+      mailbox: persistentStoreRef.current.selectMailboxPage({ limit }),
+      unreadMailboxCount: persistentStoreRef.current.selectUnreadMailboxCount(currentGameDay),
+      latestNewsId: persistentStoreRef.current.selectLatestNewsId(),
+    };
+  }, [gameDay, recentResults]);
+  const getFaPoolByCategory = useCallback(() => {
+    const foreign = [];
+    const domestic = [];
+    for (const player of faPool) {
+      if (player?.isForeign) foreign.push(player);
+      else domestic.push(player);
+    }
+    return { foreign, domestic };
+  }, [faPool]);
+
   const notify = useCallback((msg,type="ok")=>{setNotif({msg,type});setTimeout(()=>setNotif(null),3500);},[]);
   const upd = useCallback((id, fn) => { dispatch({ type: G.UPD_TEAM, id, fn: (team) => slimTeamForState(fn(team)) }); markSaveDirty(); }, [markSaveDirty]);
 
@@ -196,13 +278,9 @@ export function useGameState() {
   },[]);
 
   const pushGameResult = useCallback((gameNo, result)=>{
-    setGameResultsMap(prev=>{
-      const nextMap = {...prev,[gameNo]:result};
-      syncPersistentSummary('gameResultsMap', nextMap);
-      return nextMap;
-    });
+    setGameResultsMap(prev=>({ ...prev, [gameNo]: result }));
     markSaveDirty();
-  },[markSaveDirty, syncPersistentSummary]);
+  },[markSaveDirty, setGameResultsMap]);
 
   const addNews = useCallback((article)=>{
     setNews(prev=>{
@@ -289,17 +367,6 @@ export function useGameState() {
   },[mailbox, gameDay, myTeam, myId, upd, notify, addToHistory, setFaPool, year]);
 
 
-  useEffect(() => {
-    syncPersistentSummary('news', news);
-  }, [news, syncPersistentSummary]);
-
-  useEffect(() => {
-    syncPersistentSummary('mailbox', mailbox);
-  }, [mailbox, syncPersistentSummary]);
-
-  useEffect(() => {
-    syncPersistentSummary('scheduleArchive', scheduleArchive);
-  }, [scheduleArchive, syncPersistentSummary]);
 
   // オートセーブ（hubに戻った時）
   useEffect(()=>{
@@ -307,8 +374,17 @@ export function useGameState() {
     const now = Date.now();
     const intervalMs = getAutoSaveIntervalMs();
     if (lastAutoSaveAt > 0 && now - lastAutoSaveAt < intervalMs) return;
-    queueSave({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision}).then((result)=>{
-      if(result.ok){setSaveExists(true);setSaveDirty(false);setLastAutoSaveAt(now);notify('💾 オートセーブ','ok');}
+    const revisionAtSave = saveRevision;
+    queueSave({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision}, { dirtyScopes: Array.from(dirtySaveScopesRef.current) }).then((result)=>{
+      if(result.ok){
+        setSaveExists(true);
+        if (saveRevisionRef.current === revisionAtSave) {
+          dirtySaveScopesRef.current.clear();
+          setSaveDirty(false);
+        }
+        setLastAutoSaveAt(now);
+        notify('Auto Save','ok');
+      }
     }).catch((error)=>{
       console.error('Auto save failed:', error);
     });
@@ -316,8 +392,15 @@ export function useGameState() {
   },[screen,isAutoSaveSuspended,saveDirty,lastAutoSaveAt,saveRevision,saveQueueState.isSaving]);
 
   const handleSave = useCallback(async ()=>{
-    const result=await queueSave({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision});
-    if(result.ok){ setSaveExists(true); setSaveDirty(false); }
+    const revisionAtSave = saveRevision;
+    const result=await queueSave({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision}, { dirtyScopes: Array.from(dirtySaveScopesRef.current) });
+    if(result.ok){
+      setSaveExists(true);
+      if (saveRevisionRef.current === revisionAtSave) {
+        dirtySaveScopesRef.current.clear();
+        setSaveDirty(false);
+      }
+    }
     notify(result.ok?'💾 セーブしました':result.quota?'💾 ストレージ容量が不足しています':'セーブに失敗しました',result.ok?'ok':'warn');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision,notify,queueSave]);
@@ -661,8 +744,15 @@ export function useGameState() {
     persistentSummaries,
     getNewsBySelector,
     getMailboxBySelector,
+    getNewsPage,
+    getMailboxPage,
     getUnreadMailboxCount,
     getLatestNewsId,
+    getNewsItemById,
+    getMailboxItemById,
+    getTabBadgeState,
+    getDashboardSlice,
+    getFaPoolByCategory,
     markSaveDirty,
     // derived
     myTeam,
