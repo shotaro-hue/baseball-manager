@@ -159,13 +159,13 @@ export function runAllStarGame(rosters, year = 2025) {
   const ceTeam = buildAllStarTeam('allstar_ce', 'セ・リーグ選抜', 'セ', rosters.ce || []);
   const paTeam = buildAllStarTeam('allstar_pa', 'パ・リーグ選抜', 'パ', rosters.pa || []);
 
-  const result1 = quickSimGame(ceTeam, paTeam);
+  const result1 = quickSimGame(ceTeam, paTeam, { simulationMode: 'fast', includeLog: false, includePhysics: false, includeCrossParkAnalysis: false });
   const pool1 = [...(rosters.ce || []), ...(rosters.pa || [])].filter(p => !p.isPitcher);
   const mvp1 = pool1.length ? pool1[rng(0, pool1.length - 1)] : (rosters.ce?.[0] || rosters.pa?.[0] || null);
 
   const ceTeam2 = buildAllStarTeam('allstar_ce', 'セ・リーグ選抜', 'セ', rosters.ce || []);
   const paTeam2 = buildAllStarTeam('allstar_pa', 'パ・リーグ選抜', 'パ', rosters.pa || []);
-  const result2 = quickSimGame(ceTeam2, paTeam2);
+  const result2 = quickSimGame(ceTeam2, paTeam2, { simulationMode: 'fast', includeLog: false, includePhysics: false, includeCrossParkAnalysis: false });
   const pool2 = [...(rosters.ce || []), ...(rosters.pa || [])].filter(p => !p.isPitcher);
   const mvp2 = pool2.length ? pool2[rng(0, pool2.length - 1)] : (rosters.ce?.[0] || rosters.pa?.[0] || null);
 
