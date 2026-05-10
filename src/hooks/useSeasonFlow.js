@@ -1,5 +1,5 @@
-import { startTransition, useState, useRef, useEffect } from "react";
-import SeasonBatchWorker from "../workers/seasonBatchWorker.js?worker";
+import { useState, useRef, useEffect } from "react";
+import SeasonBatchWorker from "../workers/seasonBatchWorker?worker";
 import { uid, rng, rngf, gameDayToDate } from '../utils';
 import { checkForInjuries, tickInjuries, calcRetireWill, tickPositionTraining } from '../engine/player';
 import { quickSimGame, runFarmSeason } from '../engine/simulation';
@@ -11,13 +11,14 @@ import { initPlayoff } from '../engine/playoff';
 import { selectAllStars, runAllStarGame } from '../engine/allstar';
 import { getMyMatchup, getCpuMatchups } from '../engine/scheduleGen';
 import { enqueueSaveGame } from '../engine/saveload';
+import { scheduleDeferredPostGameWork } from '../engine/postGameProcessing';
 import { processCpuFaBids } from '../engine/contract';
 import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER, CPU_AUTO_MANAGE_INTERVAL, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX, FIELDING_POSITIONS, OPTIMAL_PITCHER_COUNT, MIN_ACTIVE_CATCHERS } from '../constants';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 
 const MAX_FOREIGN_ACTIVE = 4;
 
-// 螳亥ｙ繧ｳ繝ｼ繝√・繝ｼ繝翫せ: 諤ｪ謌大屓蠕ｩ騾溷ｺｦ UP
+// 陞ｳ莠･・咏ｹｧ・ｳ郢晢ｽｼ郢昶・繝ｻ郢晢ｽｼ郢晉ｿｫ縺・ 隲､・ｪ隰悟､ｧ螻楢包ｽｩ鬨ｾ貅ｷ・ｺ・ｦ UP
 function applyDefenseCoachRecovery(players, coaches) {
   const defBonus=(coaches||[]).filter(c=>c.type==='defense').reduce((s,c)=>s+(c.bonus||0),0);
   if(!defBonus) return players;
@@ -27,9 +28,8 @@ function applyDefenseCoachRecovery(players, coaches) {
 
 function applyInjuriesToPlayers(players, injuries, year) {
   if (!injuries.length) return players;
-  const injuriesById = new Map(injuries.map((injury) => [injury.id, injury]));
   return players.map((p) => {
-    const inj = injuriesById.get(p.id);
+    const inj = injuries.find((i) => i.id === p.id);
     if (!inj) return p;
     const history = [
       ...(p.injuryHistory ?? []),
@@ -49,7 +49,7 @@ function tickCooldowns(players) {
   return players.map(p=>{const cd=p.registrationCooldownDays??0;if(!cd)return p;return{...p,registrationCooldownDays:Math.max(0,cd-1)};});
 }
 
-// 諤ｪ謌第律謨ｰ > INJURY_AUTO_DEMOTE_DAYS 縺ｮ荳霆埼∈謇九ｒ閾ｪ蜍穂ｺ瑚ｻ埼剄譬ｼ縺励√け繝ｼ繝ｫ繝繧ｦ繝ｳ繧偵そ繝・ヨ
+// 隲､・ｪ隰檎ｬｬ蠕玖ｬｨ・ｰ > INJURY_AUTO_DEMOTE_DAYS 邵ｺ・ｮ闕ｳﾂ髴・涵竏郁ｬ・ｹ晢ｽ帝明・ｪ陷咲ｩゑｽｺ迹夲ｽｻ蝓ｼ蜑・ｭｬ・ｼ邵ｺ蜉ｱﾂ竏壹￠郢晢ｽｼ郢晢ｽｫ郢敖郢ｧ・ｦ郢晢ｽｳ郢ｧ蛛ｵ縺晉ｹ昴・繝ｨ
 function autoInjuryDemote(team) {
   const farm=team.farm??[];
   const demoted=[];const kept=[];
@@ -63,7 +63,7 @@ function autoInjuryDemote(team) {
   return{...team,players:kept,lineup:(team.lineup??[]).filter(id=>!demotedIds.has(id)),lineupNoDh:(team.lineupNoDh??[]).filter(id=>!demotedIds.has(id)),lineupDh:(team.lineupDh??[]).filter(id=>!demotedIds.has(id)),rotation:(team.rotation??[]).filter(id=>!demotedIds.has(id)),farm:[...farm,...demoted]};
 }
 
-// 笏笏笏 CPU 繝√・繝閾ｪ蜍慕ｷｨ謌・笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏
+// 隨渉隨渉隨渉 CPU 郢昶・繝ｻ郢晢｣ｰ髢ｾ・ｪ陷肴・・ｷ・ｨ隰後・隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉隨渉
 function _cpuBatterScore(p) {
   const sb = saberBatter(p.stats ?? {});
   return (sb.OPS || 0) * 1000 + (p.batting?.contact ?? 50) * 1.6 + (p.batting?.eye ?? 50) * 1.1 + (p.batting?.power ?? 50) * 1.2 + (p.batting?.speed ?? 50) * 0.7;
@@ -89,7 +89,7 @@ function _cpuRosterRecScore(p) {
   return (sb.OPS || 0) * 1000 + (p.batting?.contact ?? 50) * 1.6 + (p.batting?.eye ?? 50) * 1.1 + (p.batting?.power ?? 50) * 1.2 + (p.batting?.speed ?? 50) * 0.7;
 }
 
-// CPU 繝√・繝縺ｮ繝ｭ繧ｹ繧ｿ繝ｼ蜈ｨ菴薙ｒ閾ｪ蜍墓怙驕ｩ蛹悶＠縺ｦ譖ｴ譁ｰ縺励◆繝√・繝繧ｪ繝悶ず繧ｧ繧ｯ繝医ｒ霑斐☆
+// CPU 郢昶・繝ｻ郢晢｣ｰ邵ｺ・ｮ郢晢ｽｭ郢ｧ・ｹ郢ｧ・ｿ郢晢ｽｼ陷茨ｽｨ闖ｴ阮呻ｽ帝明・ｪ陷榊｢捺咎ｩ包ｽｩ陋ｹ謔ｶ・邵ｺ・ｦ隴厄ｽｴ隴・ｽｰ邵ｺ蜉ｱ笳・ｹ昶・繝ｻ郢晢｣ｰ郢ｧ・ｪ郢晄じ縺夂ｹｧ・ｧ郢ｧ・ｯ郢晏現・帝恆譁絶・
 function cpuAutoManageTeam(team) {
   const farm = team.farm ?? [];
   const foreignInActive = team.players.filter(p => p.isForeign).length;
@@ -103,18 +103,18 @@ function cpuAutoManageTeam(team) {
     return base + devBonus;
   };
 
-  // 笏笏 1. 繝ｭ繧ｹ繧ｿ繝ｼ蜈･繧梧崛縺茨ｼ磯剄譬ｼ繝ｻ譏・ｼ繝ｻ繧ｹ繝ｯ繝・・・・笏笏
+  // 隨渉隨渉 1. 郢晢ｽｭ郢ｧ・ｹ郢ｧ・ｿ郢晢ｽｼ陷茨ｽ･郢ｧ譴ｧ蟠帷ｸｺ闌ｨ・ｼ逎ｯ蜑・ｭｬ・ｼ郢晢ｽｻ隴上・・ｰ・ｼ郢晢ｽｻ郢ｧ・ｹ郢晢ｽｯ郢昴・繝ｻ繝ｻ繝ｻ隨渉隨渉
   const TARGET_BATTERS = MAX_ROSTER - OPTIMAL_PITCHER_COUNT;
   const openSlots = MAX_ROSTER - players.length;
   if (openSlots < 0) {
-    // 雜・℃蛻・ 雜・℃遞ｮ蛻･・域兜謇・13 or 驥取焔>15・峨°繧牙━蜈磯剄譬ｼ縲∵ｮ九ｊ縺ｯ蜈ｨ菴捺怙荳倶ｽ阪°繧・    const excess = -openSlots;
+    // 髮懊・邃・崕繝ｻ 髮懊・邃・◇・ｮ陋ｻ・･繝ｻ蝓溷・隰・・13 or 鬩･蜿也・>15繝ｻ蟲ｨﾂｰ郢ｧ迚吮煤陷育｣ｯ蜑・ｭｬ・ｼ邵ｲ竏ｵ・ｮ荵晢ｽ顔ｸｺ・ｯ陷茨ｽｨ闖ｴ謐ｺ諤呵叉蛟ｶ・ｽ髦ｪﾂｰ郢ｧ繝ｻ    const excess = -openSlots;
     const pitcherOver = Math.max(0, players.filter(p => p.isPitcher).length - OPTIMAL_PITCHER_COUNT);
     const batterOver = Math.max(0, players.filter(p => !p.isPitcher).length - TARGET_BATTERS);
     const demoted = new Set();
     const applyDemote = (candidates, limit) => {
-      // 謐墓焔縺・MIN_ACTIVE_CATCHERS 蜷堺ｻ･荳九↑繧蛾剄譬ｼ蟇ｾ雎｡縺九ｉ髯､螟・      const activeCatcherCount = () => players.filter(p => !p.isPitcher && p.pos === '謐墓焔' && !demoted.has(p.id)).length;
+      // 隰仙｢鍋・邵ｺ繝ｻMIN_ACTIVE_CATCHERS 陷ｷ蝣ｺ・ｻ・･闕ｳ荵昶・郢ｧ陋ｾ蜑・ｭｬ・ｼ陝・ｽｾ髮趣ｽ｡邵ｺ荵晢ｽ蛾ｫｯ・､陞溘・      const activeCatcherCount = () => players.filter(p => !p.isPitcher && p.pos === '隰仙｢鍋・' && !demoted.has(p.id)).length;
       [...candidates].sort((a, b) => effScore(a, false) - effScore(b, false)).slice(0, limit).forEach(p => {
-        if (!p.isPitcher && p.pos === '謐墓焔' && activeCatcherCount() <= MIN_ACTIVE_CATCHERS) return;
+        if (!p.isPitcher && p.pos === '隰仙｢鍋・' && activeCatcherCount() <= MIN_ACTIVE_CATCHERS) return;
         players = players.filter(q => q.id !== p.id);
         newFarm = [...newFarm, { ...p, registrationCooldownDays: REGISTRATION_COOLDOWN_DAYS }];
         demoted.add(p.id);
@@ -129,7 +129,7 @@ function cpuAutoManageTeam(team) {
     const eligibleFarm = newFarm.filter(canPromote);
     const eligP = [...eligibleFarm].filter(p => p.isPitcher).sort((a, b) => effScore(b, true) - effScore(a, true));
     const eligB = [...eligibleFarm].filter(p => !p.isPitcher).sort((a, b) => effScore(b, true) - effScore(a, true));
-    let slotsLeft = Math.min(openSlots, 3); // CPU 縺ｯ1蝗樊怙螟ｧ3莠ｺ縺ｾ縺ｧ螟画峩
+    let slotsLeft = Math.min(openSlots, 3); // CPU 邵ｺ・ｯ1陜玲ｨ頑呵棔・ｧ3闔・ｺ邵ｺ・ｾ邵ｺ・ｧ陞溽判蟲ｩ
 
     const pitcherNeed = Math.max(0, OPTIMAL_PITCHER_COUNT - players.filter(p => p.isPitcher).length);
     eligP.slice(0, Math.min(pitcherNeed, slotsLeft)).forEach(p => { players.push(p); usedFarmIds.add(p.id); slotsLeft--; });
@@ -142,7 +142,7 @@ function cpuAutoManageTeam(team) {
         .slice(0, slotsLeft).forEach(p => { players.push(p); usedFarmIds.add(p.id); });
     }
 
-    // 繧ｯ繝ｭ繧ｹ遞ｮ蛻･繝舌Λ繝ｳ繧ｹ隱ｿ謨ｴ: 謚墓焔荳崎ｶｳ縺ｪ繧画怙蠑ｱ驥取焔竊疲怙蠑ｷfarm謚墓焔縲・㍽謇倶ｸ崎ｶｳ縺ｪ繧画怙蠑ｱ謚墓焔竊疲怙蠑ｷfarm驥取焔
+    // 郢ｧ・ｯ郢晢ｽｭ郢ｧ・ｹ驕橸ｽｮ陋ｻ・･郢晁・ﾎ帷ｹ晢ｽｳ郢ｧ・ｹ髫ｱ・ｿ隰ｨ・ｴ: 隰壼｢鍋・闕ｳ蟠趣ｽｶ・ｳ邵ｺ・ｪ郢ｧ逕ｻ諤呵托ｽｱ鬩･蜿也・遶顔夢諤呵托ｽｷfarm隰壼｢鍋・邵ｲ繝ｻ纃ｽ隰・ｶ・ｸ蟠趣ｽｶ・ｳ邵ｺ・ｪ郢ｧ逕ｻ諤呵托ｽｱ隰壼｢鍋・遶顔夢諤呵托ｽｷfarm鬩･蜿也・
     let curP = players.filter(p => p.isPitcher).length;
     let curB = players.filter(p => !p.isPitcher).length;
     while (curP < OPTIMAL_PITCHER_COUNT && curB > TARGET_BATTERS) {
@@ -164,7 +164,7 @@ function cpuAutoManageTeam(team) {
       curP = players.filter(p => p.isPitcher).length; curB = players.filter(p => !p.isPitcher).length;
     }
 
-    // 繧ｹ繝ｯ繝・・・域怏蜉帑ｺ瑚ｻ・vs 荳霆堺ｸ倶ｽ阪・蜷檎ｨｮ蛻･・・    const remainFarm = newFarm.filter(fp => canPromote(fp) && !usedFarmIds.has(fp.id));
+    // 郢ｧ・ｹ郢晢ｽｯ郢昴・繝ｻ繝ｻ蝓滓剰怏蟶托ｽｺ迹夲ｽｻ繝ｻvs 闕ｳﾂ髴・ｺ・ｸ蛟ｶ・ｽ髦ｪ繝ｻ陷ｷ讙趣ｽｨ・ｮ陋ｻ・･繝ｻ繝ｻ    const remainFarm = newFarm.filter(fp => canPromote(fp) && !usedFarmIds.has(fp.id));
     if (remainFarm.length > 0) {
       [...players].sort((a, b) => effScore(a, false) - effScore(b, false)).forEach(ap => {
         if (usedActiveIds.has(ap.id)) return;
@@ -181,24 +181,24 @@ function cpuAutoManageTeam(team) {
       });
     }
 
-    // 譏・ｼ螳溯｡・ farm 縺九ｉ髯､蜴ｻ・医け繝ｭ繧ｹ遞ｮ蛻･蛻・性繧・・    [...usedFarmIds].forEach(id => { newFarm = newFarm.filter(fp => fp.id !== id); });
+    // 隴上・・ｰ・ｼ陞ｳ貅ｯ・｡繝ｻ farm 邵ｺ荵晢ｽ蛾ｫｯ・､陷ｴ・ｻ繝ｻ蛹ｻ縺醍ｹ晢ｽｭ郢ｧ・ｹ驕橸ｽｮ陋ｻ・･陋ｻ繝ｻ諤ｧ郢ｧﾂ繝ｻ繝ｻ    [...usedFarmIds].forEach(id => { newFarm = newFarm.filter(fp => fp.id !== id); });
   }
 
-  // 笏笏 1.5 蜈育匱繝ｭ繝ｼ繝・｢ｺ菫・ 1霆榊・逋ｺ縺・莠ｺ譛ｪ貅縺ｪ繧・farm 蜈育匱繧貞━蜈域・譬ｼ 笏笏
+  // 隨渉隨渉 1.5 陷郁ご蛹ｱ郢晢ｽｭ郢晢ｽｼ郢昴・・｢・ｺ闖ｫ繝ｻ 1髴・ｦ翫・騾具ｽｺ邵ｺ繝ｻ闔・ｺ隴幢ｽｪ雋・邵ｺ・ｪ郢ｧ繝ｻfarm 陷郁ご蛹ｱ郢ｧ雋樞煤陷亥沺繝ｻ隴ｬ・ｼ 隨渉隨渉
   {
     const TARGET_ROT = 6;
     const farmSP = newFarm
-      .filter(p => p.isPitcher && p.subtype === '蜈育匱' && canPromote(p))
+      .filter(p => p.isPitcher && p.subtype === '陷郁ご蛹ｱ' && canPromote(p))
       .sort((a, b) => effScore(b, true) - effScore(a, true));
     for (const sp of farmSP) {
-      const curSP = players.filter(p => p.isPitcher && p.subtype === '蜈育匱' && !p.isIkusei && (p.injuryDaysLeft ?? 0) === 0).length;
+      const curSP = players.filter(p => p.isPitcher && p.subtype === '陷郁ご蛹ｱ' && !p.isIkusei && (p.injuryDaysLeft ?? 0) === 0).length;
       if (curSP >= TARGET_ROT) break;
       if (players.length < MAX_ROSTER) {
         players = [...players, sp];
         newFarm = newFarm.filter(p => p.id !== sp.id);
       } else {
         const weakRP = players
-          .filter(p => p.isPitcher && p.subtype !== '蜈育匱' && !p.isIkusei)
+          .filter(p => p.isPitcher && p.subtype !== '陷郁ご蛹ｱ' && !p.isIkusei)
           .sort((a, b) => effScore(a, false) - effScore(b, false))[0];
         if (!weakRP) break;
         players = [...players.filter(p => p.id !== weakRP.id), sp];
@@ -207,10 +207,10 @@ function cpuAutoManageTeam(team) {
     }
   }
 
-  // 笏笏 1.6 謐墓焔譛菴・MIN_ACTIVE_CATCHERS 蜷咲｢ｺ菫・笏笏
+  // 隨渉隨渉 1.6 隰仙｢鍋・隴崢闖ｴ繝ｻMIN_ACTIVE_CATCHERS 陷ｷ蜥ｲ・｢・ｺ闖ｫ繝ｻ隨渉隨渉
   {
-    const activeCatchers = () => players.filter(p => !p.isPitcher && p.pos === '謐墓焔' && (p.injuryDaysLeft ?? 0) === 0);
-    const farmCatchers = () => newFarm.filter(p => !p.isPitcher && p.pos === '謐墓焔' && canPromote(p))
+    const activeCatchers = () => players.filter(p => !p.isPitcher && p.pos === '隰仙｢鍋・' && (p.injuryDaysLeft ?? 0) === 0);
+    const farmCatchers = () => newFarm.filter(p => !p.isPitcher && p.pos === '隰仙｢鍋・' && canPromote(p))
       .sort((a, b) => effScore(b, true) - effScore(a, true));
     while (activeCatchers().length < MIN_ACTIVE_CATCHERS) {
       const fc = farmCatchers()[0];
@@ -220,7 +220,7 @@ function cpuAutoManageTeam(team) {
         newFarm = newFarm.filter(p => p.id !== fc.id);
       } else {
         const weakBatter = players
-          .filter(p => !p.isPitcher && p.pos !== '謐墓焔')
+          .filter(p => !p.isPitcher && p.pos !== '隰仙｢鍋・')
           .sort((a, b) => effScore(a, false) - effScore(b, false))[0];
         if (!weakBatter) break;
         players = [...players.filter(p => p.id !== weakBatter.id), fc];
@@ -229,7 +229,7 @@ function cpuAutoManageTeam(team) {
     }
   }
 
-  // 笏笏 2. 謇馴・・蜍戊ｨｭ螳夲ｼ・RV 繝偵Η繝ｼ繝ｪ繧ｹ繝・ぅ繝・け・・笏笏
+  // 隨渉隨渉 2. 隰・ｦｴ・ｰ繝ｻ繝ｻ陷肴・・ｨ・ｭ陞ｳ螟ｲ・ｼ繝ｻRV 郢晏・ﾎ礼ｹ晢ｽｼ郢晢ｽｪ郢ｧ・ｹ郢昴・縺・ｹ昴・縺代・繝ｻ隨渉隨渉
   const batters = players.filter(p => !p.isPitcher && !p.isIkusei && (p.injuryDaysLeft ?? 0) === 0);
   const useDh = !!team.dhEnabled;
   const required = [...FIELDING_POSITIONS, ...(useDh ? ['DH'] : [])];
@@ -252,13 +252,13 @@ function cpuAutoManageTeam(team) {
     .sort((a, b) => _cpuBatterScore(b[1]) - _cpuBatterScore(a[1]))
     .map(([, player]) => player.id);
 
-  // 笏笏 3. 謚墓焔繝ｭ繝ｼ繝・・邯呎兜閾ｪ蜍戊ｨｭ螳・笏笏
+  // 隨渉隨渉 3. 隰壼｢鍋・郢晢ｽｭ郢晢ｽｼ郢昴・繝ｻ驍ｯ蜻主・髢ｾ・ｪ陷肴・・ｨ・ｭ陞ｳ繝ｻ隨渉隨渉
   const pitchers = players.filter(p => p.isPitcher && !p.isIkusei && (p.injuryDaysLeft ?? 0) === 0);
-  const starters = pitchers.filter(p => p.subtype === '蜈育匱').sort((a, b) => _cpuStarterScore(b) - _cpuStarterScore(a));
-  const relievers = pitchers.filter(p => p.subtype !== '蜈育匱').sort((a, b) => _cpuRelieverScore(b) - _cpuRelieverScore(a));
+  const starters = pitchers.filter(p => p.subtype === '陷郁ご蛹ｱ').sort((a, b) => _cpuStarterScore(b) - _cpuStarterScore(a));
+  const relievers = pitchers.filter(p => p.subtype !== '陷郁ご蛹ｱ').sort((a, b) => _cpuRelieverScore(b) - _cpuRelieverScore(a));
   const MIN_ROT = 5;
   const newRotation = starters.slice(0, 6).map(p => p.id);
-  // 蜈育匱繧ｿ繧､繝励′雜ｳ繧翫↑縺・ｴ蜷医・縲√せ繧ｿ繝溘リ荳贋ｽ阪・荳ｭ邯吶℃縺ｧ譛菴・譫繧貞沂繧√ｋ
+  // 陷郁ご蛹ｱ郢ｧ・ｿ郢ｧ・､郢晏干窶ｲ髮懶ｽｳ郢ｧ鄙ｫ竊醍ｸｺ繝ｻ・ｰ・ｴ陷ｷ蛹ｻ繝ｻ邵ｲ竏壹○郢ｧ・ｿ郢晄ｺ倥Μ闕ｳ雍具ｽｽ髦ｪ繝ｻ闕ｳ・ｭ驍ｯ蜷ｶ邃・ｸｺ・ｧ隴崢闖ｴ繝ｻ隴ｫ・ｰ郢ｧ雋樊ｲらｹｧ竏夲ｽ・
   if (newRotation.length < MIN_ROT) {
     const need = MIN_ROT - newRotation.length;
     const fallbackRelievers = [...relievers]
@@ -286,10 +286,6 @@ function cpuAutoManageTeam(team) {
     rotation: newRotation,
     pitchingPattern: { ...(team.pitchingPattern ?? {}), ...newPattern },
   };
-}
-
-function buildTeamMap(teams) {
-  return new Map((teams || []).map((team) => [team.id, team]));
 }
 
 export function useSeasonFlow(gs) {
@@ -323,7 +319,7 @@ export function useSeasonFlow(gs) {
   const prevMyPlayersRef = useRef(null);
   const prevMyFarmRef = useRef(null);
 
-  // 譛邨よ姶邨ゆｺ・ｾ・ 蜈ｨsetState・亥ｯｾ謌ｦ逶ｸ謇玖ｨ倬鹸繝ｻCPU隧ｦ蜷茨ｼ峨′蜿肴丐縺輔ｌ縺・teams 縺ｧ繝励Ξ繝ｼ繧ｪ繝募・譛溷喧
+  // 隴崢驍ｨ繧亥ｧｶ驍ｨ繧・ｽｺ繝ｻ・ｾ繝ｻ 陷茨ｽｨsetState繝ｻ莠･・ｯ・ｾ隰鯉ｽｦ騾ｶ・ｸ隰・事・ｨ蛟ｬ鮖ｸ郢晢ｽｻCPU髫ｧ・ｦ陷ｷ闌ｨ・ｼ蟲ｨ窶ｲ陷ｿ閧ｴ荳千ｸｺ霈費ｽ檎ｸｺ繝ｻteams 邵ｺ・ｧ郢晏干ﾎ樒ｹ晢ｽｼ郢ｧ・ｪ郢晏供繝ｻ隴帶ｺｷ蝟ｧ
   useEffect(()=>{
     if(pendingPlayoffRef.current){
       pendingPlayoffRef.current=false;
@@ -335,31 +331,31 @@ export function useSeasonFlow(gs) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[teams]);
 
-  // 繧｢繝ｳ繝槭え繝ｳ繝医撰ｼ晉判髱｢縺九ｉ繧ｳ繝ｳ繝昴・繝阪Φ繝医′蜿悶ｊ髯､縺九ｌ繧九％縺ｨ縲第凾縺ｫ繝舌ャ繝∝・逅・ｒ荳ｭ譁ｭ
+  // 郢ｧ・｢郢晢ｽｳ郢晄ｧｭ縺育ｹ晢ｽｳ郢晏現ﾂ謦ｰ・ｼ譎牙愛鬮ｱ・｢邵ｺ荵晢ｽ臥ｹｧ・ｳ郢晢ｽｳ郢晄亢繝ｻ郢晞亂ﾎｦ郢晏現窶ｲ陷ｿ謔ｶ・企ｫｯ・､邵ｺ荵晢ｽ檎ｹｧ荵晢ｼ・ｸｺ・ｨ邵ｲ隨ｬ蜃ｾ邵ｺ・ｫ郢晁・繝｣郢昶・繝ｻ騾・・・定叉・ｭ隴・ｽｭ
   useEffect(() => () => {
     isBatchCancelledRef.current = true;
   }, []);
 
-  // 閾ｪ蜍暮剄譬ｼ繝ｻ蝗槫ｾｩ騾夂衍: myTeam 縺ｮ players/farm 螟牙喧繧呈､懃衍縺励※騾夂衍
+  // 髢ｾ・ｪ陷肴坩蜑・ｭｬ・ｼ郢晢ｽｻ陜玲ｧｫ・ｾ・ｩ鬨ｾ螟り｡・ myTeam 邵ｺ・ｮ players/farm 陞溽甥蝟ｧ郢ｧ蜻茨ｽ､諛・｡咲ｸｺ蜉ｱ窶ｻ鬨ｾ螟り｡・
   useEffect(()=>{
     if(!myTeam||!myId) return;
     const prevPlayers=prevMyPlayersRef.current;
     const prevFarm=prevMyFarmRef.current;
     if(prevPlayers!==null){
       const prevPlayerIds=new Set(prevPlayers.map(p=>p.id));
-      // 荳霆阪°繧我ｺ瑚ｻ阪↓遘ｻ蜍・縺九▽ 諤ｪ謌代≠繧・竊・閾ｪ蜍暮剄譬ｼ騾夂衍
+      // 闕ｳﾂ髴・亂ﾂｰ郢ｧ謌托ｽｺ迹夲ｽｻ髦ｪ竊馴§・ｻ陷阪・邵ｺ荵昶命 隲､・ｪ隰御ｻ｣竕郢ｧ繝ｻ遶翫・髢ｾ・ｪ陷肴坩蜑・ｭｬ・ｼ鬨ｾ螟り｡・
       const newlyDemotedInj=myTeam.farm.filter(p=>prevPlayerIds.has(p.id)&&!myTeam.players.find(x=>x.id===p.id)&&(p.injuryDaysLeft??0)>0);
       if(newlyDemotedInj.length>0){
-        const names=newlyDemotedInj.map(p=>`${p.name}（${p.injuryDaysLeft}日）`).join('、');
-        notify(`🤕 ${names}が怪我で自動二軍降格`,'warn');
+        const names=newlyDemotedInj.map(p=>`${p.name}・・{p.injuryDaysLeft}譌･・荏).join('縲・);
+        notify(`､・${names}縺梧ｪ謌代〒閾ｪ蜍穂ｺ瑚ｻ埼剄譬ｼ`,'warn');
       }
     }
     if(prevFarm!==null){
       const prevIneligibleIds=new Set(prevFarm.filter(p=>!p.isIkusei&&((p.injuryDaysLeft??0)>0||(p.registrationCooldownDays??0)>0)).map(p=>p.id));
       const newlyEligible=myTeam.farm.filter(p=>!p.isIkusei&&prevIneligibleIds.has(p.id)&&(p.injuryDaysLeft??0)===0&&(p.registrationCooldownDays??0)===0);
       if(newlyEligible.length>0){
-        const names=newlyEligible.map(p=>p.name).join('、');
-        notify(`✅ ${names}が回復！一軍昇格可能`,'ok');
+        const names=newlyEligible.map(p=>p.name).join('縲・);
+        notify(`笨・${names}縺悟屓蠕ｩ・∽ｸ霆肴・譬ｼ蜿ｯ閭ｽ`,'ok');
       }
     }
     prevMyPlayersRef.current=myTeam.players;
@@ -391,22 +387,22 @@ export function useSeasonFlow(gs) {
       const mail={
         id:uid(),
         type:"trade",
-        title:`${offer.from.name}からトレードオファー`,
+        title:`${offer.from.name}縺九ｉ繝医Ξ繝ｼ繝峨が繝輔ぃ繝ｼ`,
         from:offer.from.name,
-        dateLabel:`${year}蟷ｴ ${gameDay}譌･逶ｮ`,
+        dateLabel:`${year}陝ｷ・ｴ ${gameDay}隴鯉ｽ･騾ｶ・ｮ`,
         timestamp:Date.now(),
         read:false,
         resolved:false,
-      body:`${offer.from.name}よりトレードの打診がありました。\n\n・獲得したい選手: ${offer.want.map(p=>p.name).join('、')}\n・放出候補: ${offer.offer.length>0?offer.offer.map(p=>p.name).join('、'):'なし'}${offer.cash>0?'\n・金銭: +'+(offer.cash/10000).toLocaleString()+'万円':''}\n\nメール画面から返答してください。`,
+      body:`${offer.from.name}繧医ｊ繝医Ξ繝ｼ繝峨・謇楢ｨｺ縺後≠繧翫∪縺励◆縲・n\n繝ｻ迯ｲ蠕励＠縺溘＞驕ｸ謇・ ${offer.want.map(p=>p.name).join('縲・)}\n繝ｻ謾ｾ蜃ｺ蛟呵｣・ ${offer.offer.length>0?offer.offer.map(p=>p.name).join('縲・):'縺ｪ縺・}${offer.cash>0?'\n繝ｻ驥鷹姦: +'+(offer.cash/10000).toLocaleString()+'荳・・':''}\n\n繝｡繝ｼ繝ｫ逕ｻ髱｢縺九ｉ霑皮ｭ斐＠縺ｦ縺上□縺輔＞縲Ａ,
         offer
       };
       setMailbox(prev=>[...prev,mail]);
-      notify(`${offer.from.name}からトレードオファーが届きました`,'ok');
+      notify(`${offer.from.name}縺九ｉ繝医Ξ繝ｼ繝峨が繝輔ぃ繝ｼ縺悟ｱ翫″縺ｾ縺励◆`,'ok');
     }
   };
 
   /**
-   * 7譛医・繝舌ャ繝√す繝荳ｭ縺ｫCPU vs CPU 繝・ャ繝峨Λ繧､繝ｳ繝医Ξ繝ｼ繝峨ｒ隧ｦ縺ｿ繧九・   * @param {object[]} teamsArr
+   * 7隴帛現繝ｻ郢晁・繝｣郢昶・縺咏ｹ晢｣ｰ闕ｳ・ｭ邵ｺ・ｫCPU vs CPU 郢昴・繝｣郢晏ｳｨﾎ帷ｹｧ・､郢晢ｽｳ郢晏現ﾎ樒ｹ晢ｽｼ郢晏ｳｨ・帝圦・ｦ邵ｺ・ｿ郢ｧ荵敖繝ｻ   * @param {object[]} teamsArr
    * @param {number} currentGameDay
    * @returns {{ headline: string, body: string } | null}
    */
@@ -428,8 +424,8 @@ export function useSeasonFlow(gs) {
     seller.players = [...seller.players.filter((p) => p.id !== buyerGets.id), sellerGets];
 
     return {
-      headline: `移籍情報 ${buyerGets.name}が${buyerName}へ`,
-      body: `${sellerName}と${buyerName}の間でトレードが成立。${buyerName}は${buyerGets.name}を獲得し、${sellerGets.name}を放出しました。`,
+      headline: `遘ｻ邀肴ュ蝣ｱ ${buyerGets.name}縺・{buyerName}縺ｸ`,
+      body: `${sellerName}縺ｨ${buyerName}縺ｮ髢薙〒繝医Ξ繝ｼ繝峨′謌千ｫ九・{buyerName}縺ｯ${buyerGets.name}繧堤佐蠕励＠縲・{sellerGets.name}繧呈叛蜃ｺ縺励∪縺励◆縲Ａ,
       buyerName,
       sellerName,
       buyerGetsName: buyerGets.name,
@@ -466,13 +462,13 @@ export function useSeasonFlow(gs) {
     return {
       id: uid(),
       type: 'trade',
-      title: `${offer.from.name}からトレードオファー`,
+      title: `${offer.from.name}縺九ｉ繝医Ξ繝ｼ繝峨が繝輔ぃ繝ｼ`,
       from: offer.from.name,
-      dateLabel: `${year}年 ${currentGameDay}日目`,
+      dateLabel: `${year}蟷ｴ ${currentGameDay}譌･逶ｮ`,
       timestamp: Date.now(),
       read: false,
       resolved: false,
-      body: `${offer.from.name}よりトレードの打診がありました。\n\n・獲得したい選手: ${offer.want.map(p => p.name).join('、')}\n・放出候補: ${offer.offer.length > 0 ? offer.offer.map(p => p.name).join('、') : 'なし'}${offer.cash > 0 ? '\n・金銭: +' + (offer.cash / 10000).toLocaleString() + '万円' : ''}\n\nメール画面から返答してください。`,
+      body: `${offer.from.name}繧医ｊ繝医Ξ繝ｼ繝峨・謇楢ｨｺ縺後≠繧翫∪縺励◆縲・n\n繝ｻ迯ｲ蠕励＠縺溘＞驕ｸ謇・ ${offer.want.map(p => p.name).join('縲・)}\n繝ｻ謾ｾ蜃ｺ蛟呵｣・ ${offer.offer.length > 0 ? offer.offer.map(p => p.name).join('縲・) : '縺ｪ縺・}${offer.cash > 0 ? '\n繝ｻ驥鷹姦: +' + (offer.cash / 10000).toLocaleString() + '荳・・' : ''}\n\n繝｡繝ｼ繝ｫ逕ｻ髱｢縺九ｉ霑皮ｭ斐＠縺ｦ縺上□縺輔＞縲Ａ,
       offer,
     };
   };
@@ -489,7 +485,7 @@ export function useSeasonFlow(gs) {
 
     const signedIdSet = new Set(foreignPool.filter((p) => !res.remainingFaPool.some((r) => r.id === p.id)).map((p) => p.id));
     const mergedPool = pool.filter((p) => !signedIdSet.has(p.id));
-    const dayNews = (res.news || []).map((item) => ({ ...item, dateLabel: `${year}蟷ｴ ${currentGameDay}譌･逶ｮ` }));
+    const dayNews = (res.news || []).map((item) => ({ ...item, dateLabel: `${year}陝ｷ・ｴ ${currentGameDay}隴鯉ｽ･騾ｶ・ｮ` }));
     return { updatedTeams: res.updatedTeams, remainingFaPool: mergedPool, news: dayNews, claimed: res.claimed || [] };
   };
 
@@ -507,16 +503,16 @@ export function useSeasonFlow(gs) {
     if (!asResult) return [];
     return [{
       type: 'allstar',
-      headline: `オールスター第1戦 セ${asResult.game1.score.ce} - パ${asResult.game1.score.pa}`,
-      source: 'NPB公式',
-      dateLabel: `${year}蟷ｴ ${dayLabel}譌･逶ｮ`,
-      body: `会場: ${asResult.venue}\nセ・リーグ ${asResult.game1.score.ce} - ${asResult.game1.score.pa} パ・リーグ\nMVP: ${asResult.game1.mvp?.name || '選出なし'}`,
+      headline: `繧ｪ繝ｼ繝ｫ繧ｹ繧ｿ繝ｼ隨ｬ1謌ｦ 繧ｻ${asResult.game1.score.ce} - 繝・{asResult.game1.score.pa}`,
+      source: 'NPB蜈ｬ蠑・,
+      dateLabel: `${year}陝ｷ・ｴ ${dayLabel}隴鯉ｽ･騾ｶ・ｮ`,
+      body: `莨壼ｴ: ${asResult.venue}\n繧ｻ繝ｻ繝ｪ繝ｼ繧ｰ ${asResult.game1.score.ce} - ${asResult.game1.score.pa} 繝代・繝ｪ繝ｼ繧ｰ\nMVP: ${asResult.game1.mvp?.name || '驕ｸ蜃ｺ縺ｪ縺・}`,
     },{
       type: 'allstar',
-      headline: `オールスター第2戦 セ${asResult.game2.score.ce} - パ${asResult.game2.score.pa}`,
-      source: 'NPB公式',
-      dateLabel: `${year}蟷ｴ ${dayLabel + 1}譌･逶ｮ`,
-      body: `セ・リーグ ${asResult.game2.score.ce} - ${asResult.game2.score.pa} パ・リーグ\nMVP: ${asResult.game2.mvp?.name || '選出なし'}`,
+      headline: `繧ｪ繝ｼ繝ｫ繧ｹ繧ｿ繝ｼ隨ｬ2謌ｦ 繧ｻ${asResult.game2.score.ce} - 繝・{asResult.game2.score.pa}`,
+      source: 'NPB蜈ｬ蠑・,
+      dateLabel: `${year}陝ｷ・ｴ ${dayLabel + 1}隴鯉ｽ･騾ｶ・ｮ`,
+      body: `繧ｻ繝ｻ繝ｪ繝ｼ繧ｰ ${asResult.game2.score.ce} - ${asResult.game2.score.pa} 繝代・繝ｪ繝ｼ繧ｰ\nMVP: ${asResult.game2.mvp?.name || '驕ｸ蜃ｺ縺ｪ縺・}`,
     }];
   };
 
@@ -532,7 +528,7 @@ export function useSeasonFlow(gs) {
     const nonPitcherIds = new Set(nonPitchers.map(p => p.id));
     const source = useDh ? (team.lineupDh || team.lineup || []) : (team.lineupNoDh || team.lineup || []);
 
-    // 譌｢蟄倥Λ繧､繝ｳ繝翫ャ繝励°繧画怏蜉ｹ縺ｪ髱樊兜謇九・縺ｿ
+    // 隴鯉ｽ｢陝・･ﾎ帷ｹｧ・､郢晢ｽｳ郢晉ｿｫ繝｣郢晏干ﾂｰ郢ｧ逕ｻ諤剰怏・ｹ邵ｺ・ｪ鬮ｱ讓雁・隰・ｹ昴・邵ｺ・ｿ
     let lineup = source.filter(id => nonPitcherIds.has(id));
 
     let foreignCount = 0;
@@ -590,12 +586,12 @@ export function useSeasonFlow(gs) {
     const {opp,isHome}=pickOpponentFromSchedule(gameDay);
     if(!opp) return;
 
-    // 笏笏 隧ｦ蜷亥燕繝舌Μ繝・・繧ｷ繝ｧ繝ｳ 笏笏
+    // 隨渉隨渉 髫ｧ・ｦ陷ｷ莠･辯慕ｹ晁・ﾎ懃ｹ昴・繝ｻ郢ｧ・ｷ郢晢ｽｧ郢晢ｽｳ 隨渉隨渉
     const useDh = isHome ? !!myTeam.dhEnabled : !!opp.dhEnabled;
     const neededBatters = useDh ? 9 : 8;
     const activeCount = myTeam.players.filter(p => !p.isIkusei).length;
     if (activeCount > MAX_ROSTER) {
-      setPregameError({ message: `一軍登録が上限の ${MAX_ROSTER} 人を超えています。現在 ${activeCount} 人です。` });
+      setPregameError({ message: `荳霆咲匳骭ｲ縺御ｸ企剞縺ｮ ${MAX_ROSTER} 莠ｺ繧定ｶ・∴縺ｦ縺・∪縺吶ら樟蝨ｨ ${activeCount} 莠ｺ縺ｧ縺吶Ａ });
       return;
     }
     const myNonPitchers = myTeam.players.filter(p => !p.isPitcher && !p.isIkusei);
@@ -603,12 +599,12 @@ export function useSeasonFlow(gs) {
     const lineupSrc = useDh ? (myTeam.lineupDh || myTeam.lineup || []) : (myTeam.lineupNoDh || myTeam.lineup || []);
     const myLineup = lineupSrc.filter(id => myNonPitcherIds.has(id));
     if (myLineup.length < neededBatters) {
-      setPregameError({ message: `先発メンバーが不足しています。必要 ${neededBatters} 人 / 現在 ${myLineup.length} 人です。` });
+      setPregameError({ message: `蜈育匱繝｡繝ｳ繝舌・縺御ｸ崎ｶｳ縺励※縺・∪縺吶ょｿ・ｦ・${neededBatters} 莠ｺ / 迴ｾ蝨ｨ ${myLineup.length} 莠ｺ縺ｧ縺吶Ａ });
       return;
     }
     const foreignInLineup = myLineup.filter(id => myNonPitchers.find(p => p.id === id)?.isForeign).length;
     if (foreignInLineup > MAX_FOREIGN_ACTIVE) {
-      setPregameError({ message: `先発メンバーの外国人枠は ${MAX_FOREIGN_ACTIVE} 人までです。現在 ${foreignInLineup} 人います。` });
+      setPregameError({ message: `蜈育匱繝｡繝ｳ繝舌・縺ｮ螟門嵜莠ｺ譫縺ｯ ${MAX_FOREIGN_ACTIVE} 莠ｺ縺ｾ縺ｧ縺ｧ縺吶ら樟蝨ｨ ${foreignInLineup} 莠ｺ縺・∪縺吶Ａ });
       return;
     }
 
@@ -622,7 +618,7 @@ export function useSeasonFlow(gs) {
     setScreen("mode_select");
   };
 
-  // Mode selected 竊・start appropriate game type
+  // Mode selected 遶翫・start appropriate game type
   const handleModeSelect = mode => {
     setGameMode(mode);
     if(mode==="tactical"){
@@ -630,7 +626,7 @@ export function useSeasonFlow(gs) {
       const fallbackMyTeam = teams.find(t=>t.id===myId);
       const hasFallbackOpp = Boolean(currentOpp);
       if (!hasCurrentGameTeams && (!fallbackMyTeam || !hasFallbackOpp)) {
-        notify("試合データの読み込みに失敗しました。日程画面から再度試してください。", "warn");
+        notify("隧ｦ蜷医ョ繝ｼ繧ｿ縺ｮ隱ｭ縺ｿ霎ｼ縺ｿ縺ｫ螟ｱ謨励＠縺ｾ縺励◆縲よ律遞狗判髱｢縺九ｉ蜀榊ｺｦ隧ｦ縺励※縺上□縺輔＞縲・, "warn");
         setScreen("hub");
         return;
       }
@@ -665,12 +661,12 @@ export function useSeasonFlow(gs) {
       if(newInj.length>0){
         const injNames=newInj.reduce((acc,i)=>{const p=updated.players.find(x=>x.id===i.id);if(p)acc.push({name:p.name,...i});return acc;},[]);
         updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
-        injNames.filter(i=>i.days>=7).forEach(i=>{addNews({type:"season",headline:`🤕 ${i.name}が負傷`,source:"チーム情報",dateLabel:`${year}年 ${gameDay}日目`,body:`${i.name}は${i.type}で${i.days}日離脱見込みです。チームはロスター調整を進めます。`});});
+        injNames.filter(i=>i.days>=7).forEach(i=>{addNews({type:"season",headline:`､・${i.name}縺瑚ｲ蛯ｷ`,source:"繝√・繝諠・ｱ",dateLabel:`${year}蟷ｴ ${gameDay}譌･逶ｮ`,body:`${i.name}縺ｯ${i.type}縺ｧ${i.days}譌･髮｢閼ｱ隕玖ｾｼ縺ｿ縺ｧ縺吶ゅメ繝ｼ繝縺ｯ繝ｭ繧ｹ繧ｿ繝ｼ隱ｿ謨ｴ繧帝ｲ繧√∪縺吶Ａ});});
       }
-      // 逋ｻ骭ｲ繧ｯ繝ｼ繝ｫ繝繧ｦ繝ｳ繝・け繝ｪ繝｡繝ｳ繝・      updated.players=tickCooldowns(updated.players);
-      // 莠瑚ｻ・ 諤ｪ謌大屓蠕ｩ + 繧ｯ繝ｼ繝ｫ繝繧ｦ繝ｳ繝・け繝ｪ繝｡繝ｳ繝・      updated.farm=tickInjuries(updated.farm??[]);
+      // 騾具ｽｻ鬪ｭ・ｲ郢ｧ・ｯ郢晢ｽｼ郢晢ｽｫ郢敖郢ｧ・ｦ郢晢ｽｳ郢昴・縺醍ｹ晢ｽｪ郢晢ｽ｡郢晢ｽｳ郢昴・      updated.players=tickCooldowns(updated.players);
+      // 闔迹夲ｽｻ繝ｻ 隲､・ｪ隰悟､ｧ螻楢包ｽｩ + 郢ｧ・ｯ郢晢ｽｼ郢晢ｽｫ郢敖郢ｧ・ｦ郢晢ｽｳ郢昴・縺醍ｹ晢ｽｪ郢晢ｽ｡郢晢ｽｳ郢昴・      updated.farm=tickInjuries(updated.farm??[]);
       updated.farm=tickCooldowns(updated.farm??[]);
-      // 諤ｪ謌第律謨ｰ > 10譌･縺ｮ荳霆埼∈謇九ｒ閾ｪ蜍穂ｺ瑚ｻ埼剄譬ｼ
+      // 隲､・ｪ隰檎ｬｬ蠕玖ｬｨ・ｰ > 10隴鯉ｽ･邵ｺ・ｮ闕ｳﾂ髴・涵竏郁ｬ・ｹ晢ｽ帝明・ｪ陷咲ｩゑｽｺ迹夲ｽｻ蝓ｼ蜑・ｭｬ・ｼ
       updated=autoInjuryDemote(updated);
       const popFields=applyPopularityDelta(t,won,drew);updated={...updated,...popFields};
       const rev=calcRevenue(updated);
@@ -697,7 +693,7 @@ export function useSeasonFlow(gs) {
       return updated;
     });
     // Simulate remaining CPU vs CPU games for this day (schedule-based matchups)
-    // CPU 繝√・繝縺ｯ縺ｾ縺 upd() 縺ｮ蠖ｱ髻ｿ繧貞女縺代※縺・↑縺・◆繧・teams 繧堤峩謗･蜿ら・縺励※ OK
+    // CPU 郢昶・繝ｻ郢晢｣ｰ邵ｺ・ｯ邵ｺ・ｾ邵ｺ・ｰ upd() 邵ｺ・ｮ陟厄ｽｱ鬮ｻ・ｿ郢ｧ雋槫･ｳ邵ｺ莉｣窶ｻ邵ｺ繝ｻ竊醍ｸｺ繝ｻ笳・ｹｧ繝ｻteams 郢ｧ蝣､蟲ｩ隰暦ｽ･陷ｿ繧峨・邵ｺ蜉ｱ窶ｻ OK
     const _oppId=currentOpp.id;
     const _cpuMatchups=getCpuMatchups(schedule,gameDay,myId,_oppId);
     const _fallbackOthers=teams.filter(t=>t.id!==myId&&t.id!==_oppId);
@@ -705,7 +701,7 @@ export function useSeasonFlow(gs) {
       ?_cpuMatchups
       :(()=>{const pairs=[];for(let i=0;i<_fallbackOthers.length-1;i+=2)pairs.push({homeId:_fallbackOthers[i].id,awayId:_fallbackOthers[i+1].id});return pairs;})();
 
-    // 繧ｷ繝螳溯｡鯉ｼ・etTeams 螟厄ｼ俄・ 邨先棡繧偵∪縺ｨ繧√※縺九ｉ state 繧呈峩譁ｰ
+    // 郢ｧ・ｷ郢晢｣ｰ陞ｳ貅ｯ・｡魃会ｽｼ繝ｻetTeams 陞溷私・ｼ菫・・ 驍ｨ蜈域｣｡郢ｧ蛛ｵ竏ｪ邵ｺ・ｨ郢ｧ竏壺ｻ邵ｺ荵晢ｽ・state 郢ｧ蜻亥ｳｩ隴・ｽｰ
     const cpuSimResults=[];
     for(const matchup of matchupList){
       const a=teams.find(t=>t.id===matchup.homeId);
@@ -742,7 +738,7 @@ export function useSeasonFlow(gs) {
       }
       return newTeams;
     });
-    // allTeamResultsMap 縺ｫ CPU 繧ｲ繝ｼ繝 + 閾ｪ繝√・繝繧ｲ繝ｼ繝縺ｮ繝懊ャ繧ｯ繧ｹ繧ｹ繧ｳ繧｢繧剃ｸ諡ｬ險倬鹸
+    // allTeamResultsMap 邵ｺ・ｫ CPU 郢ｧ・ｲ郢晢ｽｼ郢晢｣ｰ + 髢ｾ・ｪ郢昶・繝ｻ郢晢｣ｰ郢ｧ・ｲ郢晢ｽｼ郢晢｣ｰ邵ｺ・ｮ郢晄㈱繝｣郢ｧ・ｯ郢ｧ・ｹ郢ｧ・ｹ郢ｧ・ｳ郢ｧ・｢郢ｧ蜑・ｽｸﾂ隲｡・ｬ髫ｪ蛟ｬ鮖ｸ
     setAllTeamResultsMap(prev=>{
       const next={...prev};
       const recordGame=(homeId,awayId,cr,hPlayers,aPlayers,oppHName,oppAName)=>{
@@ -754,7 +750,7 @@ export function useSeasonFlow(gs) {
       for(const{matchup,cr,homeTeam,awayTeam}of cpuSimResults){
         recordGame(matchup.homeId,matchup.awayId,cr,homeTeam.players,awayTeam.players,homeTeam.name,awayTeam.name);
       }
-      // 閾ｪ繝√・繝縺ｮ隧ｦ蜷茨ｼ・yTeam 縺・home・・      recordGame(myId,_oppId,r,myTeam.players,currentOpp.players,myTeam.name,currentOpp.name);
+      // 髢ｾ・ｪ郢昶・繝ｻ郢晢｣ｰ邵ｺ・ｮ髫ｧ・ｦ陷ｷ闌ｨ・ｼ繝ｻyTeam 邵ｺ繝ｻhome繝ｻ繝ｻ      recordGame(myId,_oppId,r,myTeam.players,currentOpp.players,myTeam.name,currentOpp.name);
       return next;
     });
     setGameResult({score:r.score,won,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:currentOpp,gameNo:gameDay});
@@ -765,12 +761,12 @@ export function useSeasonFlow(gs) {
       const newsItem = tryCpuCpuDeadlineTrade(liveTeams, gameDay);
       if (newsItem) {
         setTeams(liveTeams);
-        addNews({ type: 'trade', headline: newsItem.headline, source: 'Baseball Times', dateLabel: `${year}蟷ｴ ${gameDay}譌･逶ｮ`, body: newsItem.body });
+        addNews({ type: 'trade', headline: newsItem.headline, source: 'Baseball Times', dateLabel: `${year}陝ｷ・ｴ ${gameDay}隴鯉ｽ･騾ｶ・ｮ`, body: newsItem.body });
         addTransferLog({
           year,
           day: gameDay,
           type: "trade",
-          headline: `縲燭PU髢薙ヨ繝ｬ繝ｼ繝峨・{newsItem.sellerName} 竊・${newsItem.buyerName}`,
+          headline: `邵ｲ辯ｭPU鬮｢阮吶Κ郢晢ｽｬ郢晢ｽｼ郢晏ｳｨﾂ繝ｻ{newsItem.sellerName} 遶翫・${newsItem.buyerName}`,
           fromTeam: newsItem.sellerName,
           toTeam: newsItem.buyerName,
           playersIn: [newsItem.buyerGetsName],
@@ -784,17 +780,17 @@ export function useSeasonFlow(gs) {
       if(cands.length>0){
         const rp=cands[rng(0,cands.length-1)];
         setRetireModal({player:rp,type:"announce"});
-        addNews({type:"season",headline:`引退示唆 ${rp.name}`,source:"スポーツ報知",dateLabel:`${year}年 ${gameDay}日目`,body:`${rp.name}（${rp.age}歳）が引退を示唆するコメントを出しました。チームは今後、本人の意思を確認していきます。`});
+        addNews({type:"season",headline:`蠑暮遉ｺ蜚・${rp.name}`,source:"繧ｹ繝昴・繝・ｱ遏･",dateLabel:`${year}蟷ｴ ${gameDay}譌･逶ｮ`,body:`${rp.name}・・{rp.age}豁ｳ・峨′蠑暮繧堤､ｺ蜚・☆繧九さ繝｡繝ｳ繝医ｒ蜃ｺ縺励∪縺励◆縲ゅメ繝ｼ繝縺ｯ莉雁ｾ後∵悽莠ｺ縺ｮ諢乗昴ｒ遒ｺ隱阪＠縺ｦ縺・″縺ｾ縺吶Ａ});
       }
     }
     const _tmpl=won?NEWS_TEMPLATES_WIN:NEWS_TEMPLATES_LOSE;
     const _scoreStr=r.score.my+"-"+r.score.opp;
-    const _hl=_tmpl[rng(0,_tmpl.length-1)].replace("{team}",myTeam?.name||"自チーム").replace("{opp}",currentOpp?.name||"相手").replace("{score}",_scoreStr);
-    addNews({type:"game",headline:_hl,source:"スポーツ報知",dateLabel:`${year}年 ${gameDay}日目`,body:(won?`${myTeam?.name}が${currentOpp?.name}に${_scoreStr}で勝利しました。`:`${myTeam?.name}は${currentOpp?.name}に${_scoreStr}で敗れました。`)});
+    const _hl=_tmpl[rng(0,_tmpl.length-1)].replace("{team}",myTeam?.name||"閾ｪ繝√・繝").replace("{opp}",currentOpp?.name||"逶ｸ謇・).replace("{score}",_scoreStr);
+    addNews({type:"game",headline:_hl,source:"繧ｹ繝昴・繝・ｱ遏･",dateLabel:`${year}蟷ｴ ${gameDay}譌･逶ｮ`,body:(won?`${myTeam?.name}縺・{currentOpp?.name}縺ｫ${_scoreStr}縺ｧ蜍晏茜縺励∪縺励◆縲Ａ:`${myTeam?.name}縺ｯ${currentOpp?.name}縺ｫ${_scoreStr}縺ｧ謨励ｌ縺ｾ縺励◆縲Ａ)});
     if(Math.random()<0.35){
       const _qs=won?INTERVIEW_QUESTIONS_WIN:INTERVIEW_QUESTIONS_LOSE;
       const _opts=won?INTERVIEW_OPTIONS_WIN:INTERVIEW_OPTIONS_LOSE;
-      addNews({type:"interview",headline:`インタビュー ${myTeam?.name||""}戦後会見`,source:"球団広報",dateLabel:`${year}年 ${gameDay}日目`,body:"試合後、監督にコメントを求められた。",question:_qs[rng(0,_qs.length-1)],options:_opts});
+      addNews({type:"interview",headline:`繧､繝ｳ繧ｿ繝薙Η繝ｼ ${myTeam?.name||""}謌ｦ蠕御ｼ夊ｦ義,source:"逅・屮蠎・ｱ",dateLabel:`${year}蟷ｴ ${gameDay}譌･逶ｮ`,body:"隧ｦ蜷亥ｾ後∫屮逹｣縺ｫ繧ｳ繝｡繝ｳ繝医ｒ豎ゅａ繧峨ｌ縺溘・,question:_qs[rng(0,_qs.length-1)],options:_opts});
     }
     const _adrew=r.score.my===r.score.opp;
     pushResult(won,_adrew,currentOpp?.name||"",r.score.my,r.score.opp,gameDay);
@@ -811,13 +807,13 @@ export function useSeasonFlow(gs) {
       return;
     }
     if(gameDay>=SEASON_GAMES){
-      // 蜈ｨsetState蜿肴丐蠕後・ teams 縺ｧinitPlayoff繧貞他縺ｶ縺溘ａuseEffect縺ｫ蟋碑ｭｲ
+      // 陷茨ｽｨsetState陷ｿ閧ｴ荳占募ｾ後・ teams 邵ｺ・ｧinitPlayoff郢ｧ雋樔ｻ也ｸｺ・ｶ邵ｺ貅假ｽ「seEffect邵ｺ・ｫ陝狗｢托ｽｭ・ｲ
       pendingPlayoffRef.current=true;
     }
     else setScreen("result");
   };
 
-  // 莉ｻ諢剰ｩｦ蜷域焚縺ｾ縺ｨ繧√※繧ｪ繝ｼ繝医す繝
+  // 闔会ｽｻ隲｢蜑ｰ・ｩ・ｦ陷ｷ蝓溽・邵ｺ・ｾ邵ｺ・ｨ郢ｧ竏壺ｻ郢ｧ・ｪ郢晢ｽｼ郢晏現縺咏ｹ晢｣ｰ
   const handleBatchSim = (count, autoManageMyTeam=false) => {
     if(!myTeam) return;
     const requestedCount = Number.isFinite(count) ? Math.floor(count) : BATCH;
@@ -827,7 +823,7 @@ export function useSeasonFlow(gs) {
     runBatchGames(actual, autoManageMyTeam);
   };
 
-  // 谿九ｊ蜈ｨ隧ｦ蜷医∪縺ｨ繧√※繧ｪ繝ｼ繝医す繝
+  // 隹ｿ荵晢ｽ願怦・ｨ髫ｧ・ｦ陷ｷ蛹ｻ竏ｪ邵ｺ・ｨ郢ｧ竏壺ｻ郢ｧ・ｪ郢晢ｽｼ郢晏現縺咏ｹ晢｣ｰ
 
 
   useEffect(()=>{
@@ -856,12 +852,12 @@ export function useSeasonFlow(gs) {
     return same.findIndex(t => t.id === teamId) + 1;
   };
 
-  // 繝舌ャ繝∝・逅・・蜈ｱ騾壹Ο繧ｸ繝・け
+  // 郢晁・繝｣郢昶・繝ｻ騾・・繝ｻ陷茨ｽｱ鬨ｾ螢ｹﾎ溽ｹｧ・ｸ郢昴・縺・
   const runBatchGames = async (count, autoManageMyTeam=false) => {
     if(!myTeam) return;
     const safeCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
     if (safeCount <= 0) {
-      notify("バッチ試合数が不正です", "warn");
+      notify("繝舌ャ繝∬ｩｦ蜷域焚縺御ｸ肴ｭ｣縺ｧ縺・, "warn");
       return;
     }
 
@@ -925,7 +921,7 @@ export function useSeasonFlow(gs) {
       startedAt,
       avgMsPerGame: 0,
       etaSec: 0,
-      phase: "試合シム",
+      phase: "隧ｦ蜷医す繝",
     });
 
     try {
@@ -953,7 +949,7 @@ export function useSeasonFlow(gs) {
               startedAt,
               avgMsPerGame: Math.max(0, Number(payload.avgMsPerGame) || 0),
               etaSec: Math.max(0, Number(payload.etaSec) || 0),
-              phase: typeof payload.phase === "string" && payload.phase.trim() ? payload.phase : "試合シム",
+              phase: typeof payload.phase === "string" && payload.phase.trim() ? payload.phase : "隧ｦ蜷医す繝",
             });
             return;
           }
@@ -985,7 +981,7 @@ export function useSeasonFlow(gs) {
       });
 
       if (!result) {
-        notify("バッチ処理を中止しました", "warn");
+        notify("繝舌ャ繝∝・逅・ｒ荳ｭ豁｢縺励∪縺励◆", "warn");
         return;
       }
 
@@ -1002,42 +998,40 @@ export function useSeasonFlow(gs) {
         shouldEnterPlayoff,
       } = result;
 
-      startTransition(() => {
-        setNews(nextState.news);
-        setMailbox(nextState.mailbox);
-        setSeasonHistory(nextState.seasonHistory);
-        setFaPool(nextState.faPool);
-        setTeams(nextState.teams);
-        setGameDay(nextState.gameDay);
-        setBatchMeta(batchMeta);
-        setBatchResults(batchResults);
-        gs.setRecentResults((prev) => [...nextRecentResults, ...prev].slice(0, 5));
-        gs.setGameResultsMap((prev) => ({ ...prev, ...gameResultsMapPatch }));
-        mergeAllTeamResultsPatch(allTeamResultsPatch);
+      setNews(nextState.news);
+      setMailbox(nextState.mailbox);
+      setSeasonHistory(nextState.seasonHistory);
+      setFaPool(nextState.faPool);
+      setTeams(nextState.teams);
+      setGameDay(nextState.gameDay);
+      setBatchMeta(batchMeta);
+      setBatchResults(batchResults);
+      gs.setRecentResults((prev) => [...nextRecentResults, ...prev].slice(0, 5));
+      gs.setGameResultsMap((prev) => ({ ...prev, ...gameResultsMapPatch }));
+      mergeAllTeamResultsPatch(allTeamResultsPatch);
 
-        if (nextAllStarDone) {
-          setAllStarDone(true);
-        }
-        if (allStarPayload) {
-          setAllStarResult(allStarPayload);
-        }
+      if (nextAllStarDone) {
+        setAllStarDone(true);
+      }
+      if (allStarPayload) {
+        setAllStarResult(allStarPayload);
+      }
 
-        if ((summaryCounts?.tradeMailCount || 0) > 0) {
-          notify(`📨 バッチ中にトレードオファーが${summaryCounts.tradeMailCount}件届きました`, "ok");
-        }
-        if ((summaryCounts?.foreignSigningCount || 0) > 0) {
-          notify(`🗞 バッチ中に他球団の補強が${summaryCounts.foreignSigningCount}件ありました`, "ok");
-        }
+      if ((summaryCounts?.tradeMailCount || 0) > 0) {
+        notify(`鐙 繝舌ャ繝∽ｸｭ縺ｫ繝医Ξ繝ｼ繝峨が繝輔ぃ繝ｼ縺・{summaryCounts.tradeMailCount}莉ｶ螻翫″縺ｾ縺励◆`, "ok");
+      }
+      if ((summaryCounts?.foreignSigningCount || 0) > 0) {
+        notify(`璃 繝舌ャ繝∽ｸｭ縺ｫ莉也帥蝗｣縺ｮ陬懷ｼｷ縺・{summaryCounts.foreignSigningCount}莉ｶ縺ゅｊ縺ｾ縺励◆`, "ok");
+      }
 
-        if (shouldEnterPlayoff) {
-          const withFarm = runFarmSeason(nextState.teams);
-          setTeams(withFarm);
-          setPlayoff(initPlayoff(withFarm));
-          setScreen("playoff");
-        } else {
-          setScreen("batch_result");
-        }
-      });
+      if (shouldEnterPlayoff) {
+        const withFarm = runFarmSeason(nextState.teams);
+        setTeams(withFarm);
+        setPlayoff(initPlayoff(withFarm));
+        setScreen("playoff");
+      } else {
+        setScreen("batch_result");
+      }
 
       enqueueSaveGame(nextState, { skipBackupRotation: true, preferMainSave: true })
         .then((saveResult) => {
@@ -1054,7 +1048,7 @@ export function useSeasonFlow(gs) {
         });
     } catch (error) {
       console.error("runBatchGames failed", error);
-      notify("バッチ処理中にエラーが発生しました", "error");
+      notify("繝舌ャ繝∝・逅・ｸｭ縺ｫ繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｾ縺励◆", "error");
     } finally {
       cleanupWorker();
     }
@@ -1065,160 +1059,169 @@ export function useSeasonFlow(gs) {
     if(!myTeam||!currentOpp) return;
     const won=gsResult.score.my>gsResult.score.opp;
     const drew=gsResult.score.my===gsResult.score.opp;
-    setGameResult({...gsResult,oppTeam:currentOpp,won,gameNo:gameDay});
+    const immediateResult={
+      score:gsResult.score,
+      log:gsResult.log||[],
+      inningSummary:gsResult.inningSummary||[],
+      oppTeam:currentOpp,
+      won,
+      gameNo:gameDay,
+      _source:"tactical",
+      isPostGameProcessing:true,
+    };
+
+    setGameResult(immediateResult);
     setScreen("result");
 
-    window.setTimeout(() => {
-    upd(myId,t=>{
-      let updated={...t,
-        wins:t.wins+(won?1:0),losses:t.losses+(!won&&!drew?1:0),draws:t.draws+(drew?1:0),
-        rf:t.rf+gsResult.score.my,ra:t.ra+gsResult.score.opp,
-        rotIdx:t.rotIdx+1,
-      };
-      updated.players=applyGameStatsFromLog(updated.players, gsResult.log, true, won, gameDay);
-      updated.players=applyPostGameCondition(updated.players, gsResult.log, true, gameDay);
-      updated.players=tickInjuries(updated.players);
-      updated.players=tickPositionTraining(updated.players);
-      updated.players=updated.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
-      updated.players=applyDefenseCoachRecovery(updated.players,t.coaches);
-      const newInj=checkForInjuries(updated.players, year);
-      updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
-      // 逋ｻ骭ｲ繧ｯ繝ｼ繝ｫ繝繧ｦ繝ｳ繝・け繝ｪ繝｡繝ｳ繝・      updated.players=tickCooldowns(updated.players);
-      // 莠瑚ｻ・ 諤ｪ謌大屓蠕ｩ + 繧ｯ繝ｼ繝ｫ繝繧ｦ繝ｳ繝・け繝ｪ繝｡繝ｳ繝・      updated.farm=tickInjuries(updated.farm??[]);
-      updated.farm=tickCooldowns(updated.farm??[]);
-      // 諤ｪ謌第律謨ｰ > 10譌･縺ｮ荳霆埼∈謇九ｒ閾ｪ蜍穂ｺ瑚ｻ埼剄譬ｼ
-      updated=autoInjuryDemote(updated);
-      const popFieldsT=applyPopularityDelta(t,won,drew);updated={...updated,...popFieldsT};
-      const rev=calcRevenue(updated);
-      const revTotal=rev.ticket+rev.sponsor+rev.merch;
-      updated.budget+=revTotal;
-      updated.revenueThisSeason=(updated.revenueThisSeason??0)+revTotal;
-      return updated;
-    });
-    upd(currentOpp.id,t=>{
-      let updated={...t,
-        wins:t.wins+(!won&&!drew?1:0),
-        losses:t.losses+(won?1:0),
-        draws:t.draws+(drew?1:0),
-        rf:t.rf+gsResult.score.opp,
-        ra:t.ra+gsResult.score.my,
-      };
-      updated.players=applyGameStatsFromLog(updated.players,gsResult.log,false,!won&&!drew, gameDay);
-      updated.players=applyPostGameCondition(updated.players,gsResult.log,false,gameDay);
-      updated.players=tickInjuries(updated.players);
-      const newInj=checkForInjuries(updated.players, year);
-      updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
-      Object.assign(updated,applyPopularityDelta(t,!won&&!drew,drew));
-      return updated;
-    });
-    const _tOppId=currentOpp.id;
-    const teamsById=buildTeamMap(teams);
-    const _tCpuMatchups=getCpuMatchups(schedule,gameDay,myId,_tOppId);
-    const _tFallbackOthers=teams.filter(t=>t.id!==myId&&t.id!==_tOppId);
-    const tMatchupList=_tCpuMatchups.length>0
-      ?_tCpuMatchups
-      :(()=>{const pairs=[];for(let i=0;i<_tFallbackOthers.length-1;i+=2)pairs.push({homeId:_tFallbackOthers[i].id,awayId:_tFallbackOthers[i+1].id});return pairs;})();
-    const tCpuSimResults=[];
-    for(const matchup of tMatchupList){
-      const a=teamsById.get(matchup.homeId);
-      const b=teamsById.get(matchup.awayId);
-      if(!a||!b) continue;
-      const useDh=!!a.dhEnabled;
-      const cr=quickSimGame(applyDhToTeam(a,useDh),applyDhToTeam(b,useDh));
-      tCpuSimResults.push({matchup,cr,homeTeam:a,awayTeam:b});
-    }
-    setTeams(prev=>{
-      let newTeams=prev.map(t=>({...t,players:t.players.map(p=>({...p,stats:{...p.stats}}))}));
-      const newTeamsById=buildTeamMap(newTeams);
-      for(const{matchup,cr}of tCpuSimResults){
-        const a=newTeamsById.get(matchup.homeId);
-        const b=newTeamsById.get(matchup.awayId);
-        if(!a||!b) continue;
-        const cdrew=cr.score.my===cr.score.opp;
-        const aWon=cr.won;
-        if(aWon){a.wins++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.losses++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
-        else if(cdrew){a.draws++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.draws++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
-        else{b.wins++;b.rf+=cr.score.opp;b.ra+=cr.score.my;a.losses++;a.rf+=cr.score.my;a.ra+=cr.score.opp;}
-        Object.assign(a,applyPopularityDelta(a,aWon,cdrew));Object.assign(b,applyPopularityDelta(b,!aWon&&!cdrew,cdrew));
-        const aRevT=calcRevenue(a);a.budget=(a.budget??0)+aRevT.ticket+aRevT.sponsor+aRevT.merch;a.revenueThisSeason=(a.revenueThisSeason??0)+aRevT.ticket+aRevT.sponsor+aRevT.merch;
-        const bRevT=calcRevenue(b);b.budget=(b.budget??0)+bRevT.ticket+bRevT.sponsor+bRevT.merch;b.revenueThisSeason=(b.revenueThisSeason??0)+bRevT.ticket+bRevT.sponsor+bRevT.merch;
-        a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon, gameDay);
-        a.players=applyPostGameCondition(a.players,cr.log||[],true,gameDay);
-        a.players=tickInjuries(a.players);
-        const aInj=checkForInjuries(a.players,year);
-        a.players=applyInjuriesToPlayers(a.players,aInj,year);
-        b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew, gameDay);
-        b.players=applyPostGameCondition(b.players,cr.log||[],false,gameDay);
-        b.players=tickInjuries(b.players);
-        const bInj=checkForInjuries(b.players,year);
-        b.players=applyInjuriesToPlayers(b.players,bInj,year);
-      }
-      return newTeams;
-    });
-    setAllTeamResultsMap(prev=>{
-      const next={...prev};
-      const recordGame=(homeId,awayId,cr,hPlayers,aPlayers,oppHName,oppAName,includeBoxScore=false)=>{
-        const bs=includeBoxScore
-          ? computeBoxScore(cr.log||[],cr.inningSummary||[],hPlayers,aPlayers,cr.score.my,cr.score.opp)
-          : null;
-        const hWon=cr.won; const drew=cr.score.my===cr.score.opp;
-        next[homeId]={...(next[homeId]||{}),[gameDay]:{won:hWon,drew,myScore:cr.score.my,oppScore:cr.score.opp,oppName:oppAName,oppId:awayId,homeId,awayId,...(bs||{})}};
-        next[awayId]={...(next[awayId]||{}),[gameDay]:{won:!hWon&&!drew,drew,myScore:cr.score.opp,oppScore:cr.score.my,oppName:oppHName,oppId:homeId,homeId,awayId,inningScores:bs?.inningScores,myBatting:bs?.awayBatting,oppBatting:bs?.homeBatting,myPitching:bs?.awayPitching,oppPitching:bs?.homePitching}};
-      };
-      for(const{matchup,cr,homeTeam,awayTeam}of tCpuSimResults){
-        recordGame(matchup.homeId,matchup.awayId,cr,homeTeam.players,awayTeam.players,homeTeam.name,awayTeam.name);
-      }
-      const r2=gsResult; recordGame(myId,_tOppId,r2,myTeam.players,currentOpp.players,myTeam.name,currentOpp.name,true);
-      return next;
-    });
-    const _tmpl=won?NEWS_TEMPLATES_WIN:NEWS_TEMPLATES_LOSE;
-    const _scoreStr=gsResult.score.my+"-"+gsResult.score.opp;
-    const _hl=_tmpl[rng(0,_tmpl.length-1)].replace("{team}",myTeam?.name||"自チーム").replace("{opp}",currentOpp?.name||"相手").replace("{score}",_scoreStr);
-    addNews({type:"game",headline:_hl,source:"スポーツ報知",dateLabel:`${year}年 ${gameDay}日目`,body:(won?`${myTeam?.name}が${currentOpp?.name}に${_scoreStr}で勝利しました。`:`${myTeam?.name}は${currentOpp?.name}に${_scoreStr}で敗れました。`)});
-    if(Math.random()<0.35){
-      const _qs=won?INTERVIEW_QUESTIONS_WIN:INTERVIEW_QUESTIONS_LOSE;
-      const _opts=won?INTERVIEW_OPTIONS_WIN:INTERVIEW_OPTIONS_LOSE;
-      addNews({type:"interview",headline:`インタビュー ${myTeam?.name||""}戦後会見`,source:"球団広報",dateLabel:`${year}年 ${gameDay}日目`,body:"試合後、監督にコメントを求められた。",question:_qs[rng(0,_qs.length-1)],options:_opts});
-    }
-    tryGenerateCpuOffer();
-    const tacticalDate = gameDayToDate(gameDay, schedule);
-    if (tacticalDate && tacticalDate.month === TRADE_DEADLINE_MONTH) {
-      const liveTeams = teams.map((t) => ({ ...t, players: [...(t.players || [])] }));
-      const newsItem = tryCpuCpuDeadlineTrade(liveTeams, gameDay);
-      if (newsItem) {
-        setTeams(liveTeams);
-        addNews({ type: 'trade', headline: newsItem.headline, source: 'Baseball Times', dateLabel: `${year}蟷ｴ ${gameDay}譌･逶ｮ`, body: newsItem.body });
-        addTransferLog({
-          year,
-          day: gameDay,
-          type: "trade",
-          headline: `CPUトレード ${newsItem.sellerName} -> ${newsItem.buyerName}`,
-          fromTeam: newsItem.sellerName,
-          toTeam: newsItem.buyerName,
-          playersIn: [newsItem.buyerGetsName],
-          playersOut: [newsItem.sellerGetsName],
-          detail: newsItem.body,
+    scheduleDeferredPostGameWork(()=>{
+      try{
+        upd(myId,t=>{
+          let updated={...t,
+            wins:t.wins+(won?1:0),losses:t.losses+(!won&&!drew?1:0),draws:t.draws+(drew?1:0),
+            rf:t.rf+gsResult.score.my,ra:t.ra+gsResult.score.opp,
+            rotIdx:t.rotIdx+1,
+          };
+          updated.players=applyGameStatsFromLog(updated.players, gsResult.log, true, won, gameDay);
+          updated.players=applyPostGameCondition(updated.players, gsResult.log, true, gameDay);
+          updated.players=tickInjuries(updated.players);
+          updated.players=tickPositionTraining(updated.players);
+          updated.players=updated.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
+          updated.players=applyDefenseCoachRecovery(updated.players,t.coaches);
+          const newInj=checkForInjuries(updated.players, year);
+          updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
+          updated.players=tickCooldowns(updated.players);
+          updated.farm=tickInjuries(updated.farm??[]);
+          updated.farm=tickCooldowns(updated.farm??[]);
+          updated=autoInjuryDemote(updated);
+          const popFieldsT=applyPopularityDelta(t,won,drew);updated={...updated,...popFieldsT};
+          const rev=calcRevenue(updated);
+          const revTotal=rev.ticket+rev.sponsor+rev.merch;
+          updated.budget+=revTotal;
+          updated.revenueThisSeason=(updated.revenueThisSeason??0)+revTotal;
+          return updated;
         });
+        upd(currentOpp.id,t=>{
+          let updated={...t,
+            wins:t.wins+(!won&&!drew?1:0),
+            losses:t.losses+(won?1:0),
+            draws:t.draws+(drew?1:0),
+            rf:t.rf+gsResult.score.opp,
+            ra:t.ra+gsResult.score.my,
+          };
+          updated.players=applyGameStatsFromLog(updated.players,gsResult.log,false,!won&&!drew, gameDay);
+          updated.players=applyPostGameCondition(updated.players,gsResult.log,false,gameDay);
+          updated.players=tickInjuries(updated.players);
+          const newInj=checkForInjuries(updated.players, year);
+          updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
+          Object.assign(updated,applyPopularityDelta(t,!won&&!drew,drew));
+          return updated;
+        });
+        const _tOppId=currentOpp.id;
+        const _tCpuMatchups=getCpuMatchups(schedule,gameDay,myId,_tOppId);
+        const _tFallbackOthers=teams.filter(t=>t.id!==myId&&t.id!==_tOppId);
+        const tMatchupList=_tCpuMatchups.length>0
+          ?_tCpuMatchups
+          :(()=>{const pairs=[];for(let i=0;i<_tFallbackOthers.length-1;i+=2)pairs.push({homeId:_tFallbackOthers[i].id,awayId:_tFallbackOthers[i+1].id});return pairs;})();
+        const tCpuSimResults=[];
+        for(const matchup of tMatchupList){
+          const a=teams.find(t=>t.id===matchup.homeId);
+          const b=teams.find(t=>t.id===matchup.awayId);
+          if(!a||!b) continue;
+          const useDh=!!a.dhEnabled;
+          const cr=quickSimGame(applyDhToTeam(a,useDh),applyDhToTeam(b,useDh));
+          tCpuSimResults.push({matchup,cr,homeTeam:a,awayTeam:b});
+        }
+        setTeams(prev=>{
+          let newTeams=prev.map(t=>({...t,players:t.players.map(p=>({...p,stats:{...p.stats}}))}));
+          for(const{matchup,cr}of tCpuSimResults){
+            const a=newTeams.find(t=>t.id===matchup.homeId);
+            const b=newTeams.find(t=>t.id===matchup.awayId);
+            if(!a||!b) continue;
+            const cdrew=cr.score.my===cr.score.opp;
+            const aWon=cr.won;
+            if(aWon){a.wins++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.losses++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
+            else if(cdrew){a.draws++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.draws++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
+            else{b.wins++;b.rf+=cr.score.opp;b.ra+=cr.score.my;a.losses++;a.rf+=cr.score.my;a.ra+=cr.score.opp;}
+            Object.assign(a,applyPopularityDelta(a,aWon,cdrew));Object.assign(b,applyPopularityDelta(b,!aWon&&!cdrew,cdrew));
+            const aRevT=calcRevenue(a);a.budget=(a.budget??0)+aRevT.ticket+aRevT.sponsor+aRevT.merch;a.revenueThisSeason=(a.revenueThisSeason??0)+aRevT.ticket+aRevT.sponsor+aRevT.merch;
+            const bRevT=calcRevenue(b);b.budget=(b.budget??0)+bRevT.ticket+bRevT.sponsor+bRevT.merch;b.revenueThisSeason=(b.revenueThisSeason??0)+bRevT.ticket+bRevT.sponsor+bRevT.merch;
+            a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon, gameDay);
+            a.players=applyPostGameCondition(a.players,cr.log||[],true,gameDay);
+            a.players=tickInjuries(a.players);
+            const aInj=checkForInjuries(a.players,year);
+            a.players=applyInjuriesToPlayers(a.players,aInj,year);
+            b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew, gameDay);
+            b.players=applyPostGameCondition(b.players,cr.log||[],false,gameDay);
+            b.players=tickInjuries(b.players);
+            const bInj=checkForInjuries(b.players,year);
+            b.players=applyInjuriesToPlayers(b.players,bInj,year);
+          }
+          return newTeams;
+        });
+        setAllTeamResultsMap(prev=>{
+          const next={...prev};
+          const recordGame=(homeId,awayId,cr,hPlayers,aPlayers,oppHName,oppAName)=>{
+            const bs=computeBoxScore(cr.log||[],cr.inningSummary||[],hPlayers,aPlayers,cr.score.my,cr.score.opp);
+            const hWon=cr.won; const gameDrew=cr.score.my===cr.score.opp;
+            next[homeId]={...(next[homeId]||{}),[gameDay]:{won:hWon,drew:gameDrew,myScore:cr.score.my,oppScore:cr.score.opp,oppName:oppAName,oppId:awayId,homeId,awayId,...(bs||{})}};
+            next[awayId]={...(next[awayId]||{}),[gameDay]:{won:!hWon&&!gameDrew,drew:gameDrew,myScore:cr.score.opp,oppScore:cr.score.my,oppName:oppHName,oppId:homeId,homeId,awayId,inningScores:bs?.inningScores,myBatting:bs?.awayBatting,oppBatting:bs?.homeBatting,myPitching:bs?.awayPitching,oppPitching:bs?.homePitching}};
+          };
+          for(const{matchup,cr,homeTeam,awayTeam}of tCpuSimResults){
+            recordGame(matchup.homeId,matchup.awayId,cr,homeTeam.players,awayTeam.players,homeTeam.name,awayTeam.name);
+          }
+          recordGame(myId,_tOppId,gsResult,myTeam.players,currentOpp.players,myTeam.name,currentOpp.name);
+          return next;
+        });
+        const _tmpl=won?NEWS_TEMPLATES_WIN:NEWS_TEMPLATES_LOSE;
+        const _scoreStr=gsResult.score.my+"-"+gsResult.score.opp;
+        const _hl=_tmpl[rng(0,_tmpl.length-1)].replace("{team}",myTeam?.name||"自チーム").replace("{opp}",currentOpp?.name||"相手").replace("{score}",_scoreStr);
+        addNews({type:"game",headline:_hl,source:"スポーツ速報",dateLabel:`${year}年 ${gameDay}日目`,body:(won?`${myTeam?.name}が${currentOpp?.name}に${_scoreStr}で勝利しました。`:`${myTeam?.name}は${currentOpp?.name}に${_scoreStr}で敗れました。`)});
+        if(Math.random()<0.35){
+          const _qs=won?INTERVIEW_QUESTIONS_WIN:INTERVIEW_QUESTIONS_LOSE;
+          const _opts=won?INTERVIEW_OPTIONS_WIN:INTERVIEW_OPTIONS_LOSE;
+          addNews({type:"interview",headline:`インタビュー ${myTeam?.name||""} 試合後`,source:"記者会見",dateLabel:`${year}年 ${gameDay}日目`,body:"試合後のコメントです。",question:_qs[rng(0,_qs.length-1)],options:_opts});
+        }
+        tryGenerateCpuOffer();
+        const tacticalDate = gameDayToDate(gameDay, schedule);
+        if (tacticalDate && tacticalDate.month === TRADE_DEADLINE_MONTH) {
+          const liveTeams = teams.map((t) => ({ ...t, players: [...(t.players || [])] }));
+          const newsItem = tryCpuCpuDeadlineTrade(liveTeams, gameDay);
+          if (newsItem) {
+            setTeams(liveTeams);
+            addNews({ type: 'trade', headline: newsItem.headline, source: 'Baseball Times', dateLabel: `${year}年 ${gameDay}日目`, body: newsItem.body });
+            addTransferLog({
+              year,
+              day: gameDay,
+              type: "trade",
+              headline: `CPUトレード ${newsItem.sellerName} -> ${newsItem.buyerName}`,
+              fromTeam: newsItem.sellerName,
+              toTeam: newsItem.buyerName,
+              playersIn: [newsItem.buyerGetsName],
+              playersOut: [newsItem.sellerGetsName],
+              detail: newsItem.body,
+            });
+          }
+        }
+        pushResult(won,drew,currentOpp?.name||"",gsResult.score.my,gsResult.score.opp,gameDay);
+        gs.pushGameResult(gameDay,{won,drew,oppName:currentOpp?.name||"",myScore:gsResult.score.my,oppScore:gsResult.score.opp,log:gsResult.log||[],inningSummary:gsResult.inningSummary||[],oppTeam:currentOpp});
+        setGameDay(d=>d+1);
+        if(!allStarDone && gameDay+1===allStarTriggerDay){
+          const rosters=selectAllStars(teams);
+          const asResult=runAllStarGame(rosters, year);
+          setTeams(prev=>applyAllStarSelections(prev, rosters));
+          setAllStarDone(true);
+          setAllStarResult({ rosters, gameResult: asResult });
+          publishAllStarNews(asResult, gameDay+1);
+          setScreen("allstar");
+          return;
+        }
+        if(gameDay>=SEASON_GAMES){
+          pendingPlayoffRef.current=true;
+        }
+      } finally {
+        setGameResult(prev => prev ? { ...prev, isPostGameProcessing: false } : prev);
       }
-    }
-    const _tdrew=gsResult.score.my===gsResult.score.opp;
-    pushResult(won,_tdrew,currentOpp?.name||"",gsResult.score.my,gsResult.score.opp,gameDay);
-    gs.pushGameResult(gameDay,{won,drew:_tdrew,oppName:currentOpp?.name||"",myScore:gsResult.score.my,oppScore:gsResult.score.opp,log:gsResult.log||[],inningSummary:gsResult.inningSummary||[],oppTeam:currentOpp});
-    setGameDay(d=>d+1);
-    if(!allStarDone && gameDay+1===allStarTriggerDay){
-      const rosters=selectAllStars(teams);
-      const asResult=runAllStarGame(rosters, year);
-      setTeams(prev=>applyAllStarSelections(prev, rosters));
-      setAllStarDone(true);
-      setAllStarResult({ rosters, gameResult: asResult });
-      publishAllStarNews(asResult, gameDay+1);
-      setScreen("allstar");
-      return;
-    }
-    if(gameDay>=SEASON_GAMES){
-      pendingPlayoffRef.current=true;
-    }
-    }, 0);
+    });
   };
 
   return {
@@ -1239,3 +1242,4 @@ export function useSeasonFlow(gs) {
     tryGenerateCpuOffer,
   };
 }
+
