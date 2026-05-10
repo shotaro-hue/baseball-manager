@@ -121,6 +121,9 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
     setModal3D({ event: validation.event, stadium: currentStadium });
   }
 
+  const battingStatsMap = gs.liveStats?.batting || new Map();
+  const pitchingStatsMap = gs.liveStats?.pitching || new Map();
+
   if(gs.gameOver){
     const won=gs.score.my>gs.score.opp;
     return(
@@ -133,12 +136,12 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
             {/* Top batters */}
             <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
               {gs.myLineup.filter((p,i,arr)=>arr.indexOf(p)===i).map(p=>{
-                const hits=gs.log.filter(e=>e.batId===p?.id&&IS_HIT(e.result));
-                if(!hits.length) return null;
+                const battingLine = battingStatsMap.get(p?.id);
+                if(!battingLine?.h) return null;
                 return <div key={p?.id} className="card2" style={{textAlign:"center",minWidth:90}}>
                   <div style={{fontSize:11,fontWeight:700}}>{p?.name}</div>
-                  <div className="mono" style={{color:"#f5c842"}}>{hits.length}安打</div>
-                  <div style={{fontSize:9,color:"#374151"}}>{hits.filter(e=>e.result==="hr").length}HR {gs.log.filter(e=>e.batId===p?.id).reduce((s,e)=>s+(e.rbi||0),0)}打点</div>
+                  <div className="mono" style={{color:"#f5c842"}}>{battingLine.h} H</div>
+                  <div style={{fontSize:9,color:"#374151"}}>{battingLine.hr || 0} HR {battingLine.rbi || 0} RBI</div>
                 </div>;
               })}
             </div>
@@ -167,9 +170,6 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
     const maxInn = Math.max(9, gs.inning);
     return { inningScores: scores, innings: Array.from({ length: maxInn }, (_, i) => i + 1) };
   }, [gs.inningSummary, gs.inning]);
-
-  const battingStatsMap = gs.liveStats?.batting || new Map();
-  const pitchingStatsMap = gs.liveStats?.pitching || new Map();
 
   const opFatigue=calcEffectiveFatigue(gs.opPitchCount,gs.opPitcher);
   const lastPlay = gs.log.length > 0 ? gs.log[gs.log.length - 1] : null;
