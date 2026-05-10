@@ -6,7 +6,8 @@ import { loadGame, getSaveMeta, deleteSave } from './engine/saveload';
 import { generateSeasonSchedule, calcAllStarTriggerDay } from './engine/scheduleGen';
 import { SEASON_PARAMS, getDefaultParams } from './data/scheduleParams.js';
 import { BatchResultScreen } from './components/BatchResult';
-import { ModeSelectScreen, ResultScreen, RetirePhaseScreen, WaiverPhaseScreen, WaiverResultScreen, GrowthSummaryScreen, NewSeasonScreen, SpringTrainingScreen, ContractRenewalPhaseScreen } from './components/Screens';
+import { ModeSelectScreen, RetirePhaseScreen, WaiverPhaseScreen, WaiverResultScreen, GrowthSummaryScreen, NewSeasonScreen, SpringTrainingScreen, ContractRenewalPhaseScreen } from './components/Screens';
+import { ResultScreen } from './components/ResultScreen';
 import { DraftPreviewScreen, DraftLotteryScreen, DraftScreen, DraftReviewScreen } from './components/Draft';
 import { PlayoffScreen } from './components/PlayoffScreen';
 import { RetireModal } from './components/RetireModal';
@@ -18,7 +19,7 @@ import { DashboardTab } from './components/DashboardTab';
 import { TacticalGameScreen } from './components/TacticalGame';
 import { StatsTab, FinanceTab, ContractTab, NewsTab, MailboxTab, TradeTab, AlumniTab, RosterTab, StandingsTab, RecordsTab, ScheduleTab, BalanceTab, LeaderboardTab } from './components/Tabs';
 import {
-  SEASON_GAMES, MAX_外国人_一軍, MAX_ROSTER, TEAM_DEFS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
+  SEASON_GAMES, MAX_螟門嵜莠ｺ_荳霆・ MAX_ROSTER, TEAM_DEFS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
   POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD,
   POSITIONS, FIELDING_POSITIONS,
   FOREIGN_DEADLINE_DAY, FOREIGN_AGENT_SALARY_RATIO, FOREIGN_AGENT_ACCEPT_PROB, FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX, TRADE_DEADLINE_MONTH,
@@ -30,11 +31,11 @@ import { useSeasonFlow } from './hooks/useSeasonFlow';
 import { useOffseason } from './hooks/useOffseason';
 
 const PRIMARY_SECTIONS = [
-  { id: "home", label: "ホーム", icon: "🏠", defaultTab: "dashboard", tabs: [["dashboard", "概況"]] },
-  { id: "game", label: "日程", icon: "⚾", defaultTab: "schedule", tabs: [["schedule", "日程"]] },
-  { id: "rosterOps", label: "編成", icon: "🧩", defaultTab: "roster", tabs: [["roster", "ロースター"], ["trade", "トレード"], ["contract", "契約"], ["fa", "FA"], ["scout", "スカウト"]] },
-  { id: "analysis", label: "分析", icon: "📊", defaultTab: "stats", tabs: [["stats", "成績"], ["leaderboard", "ランキング"], ["standings", "順位"], ["records", "記録"], ["finance", "財務"], ["balance", "リーグ分析"]] },
-  { id: "inbox", label: "受信箱", icon: "📨", defaultTab: "mailbox", tabs: [["mailbox", "メール"], ["news", "ニュース"], ["alumni", "歴代"]] },
+  { id: "home", label: "繝帙・繝", icon: "匠", defaultTab: "dashboard", tabs: [["dashboard", "讎よｳ・]] },
+  { id: "game", label: "譌･遞・, icon: "笞ｾ", defaultTab: "schedule", tabs: [["schedule", "譌･遞・]] },
+  { id: "rosterOps", label: "邱ｨ謌・, icon: "ｧｩ", defaultTab: "roster", tabs: [["roster", "繝ｭ繝ｼ繧ｹ繧ｿ繝ｼ"], ["trade", "繝医Ξ繝ｼ繝・], ["contract", "螂醍ｴ・], ["fa", "FA"], ["scout", "繧ｹ繧ｫ繧ｦ繝・]] },
+  { id: "analysis", label: "蛻・梵", icon: "投", defaultTab: "stats", tabs: [["stats", "謌千ｸｾ"], ["leaderboard", "繝ｩ繝ｳ繧ｭ繝ｳ繧ｰ"], ["standings", "鬆・ｽ・], ["records", "險倬鹸"], ["finance", "雋｡蜍・], ["balance", "繝ｪ繝ｼ繧ｰ蛻・梵"]] },
+  { id: "inbox", label: "蜿嶺ｿ｡邂ｱ", icon: "鐙", defaultTab: "mailbox", tabs: [["mailbox", "繝｡繝ｼ繝ｫ"], ["news", "繝九Η繝ｼ繧ｹ"], ["alumni", "豁ｴ莉｣"]] },
 ];
 
 const TAB_TO_SECTION = PRIMARY_SECTIONS.reduce((acc, section) => {
@@ -51,7 +52,7 @@ export default function App(){
 
   const handleLoad = async () => {
     const saved = await loadGame();
-    if(!saved){ gs.notify('セーブデータがありません','warn'); return; }
+    if(!saved){ gs.notify('繧ｻ繝ｼ繝悶ョ繝ｼ繧ｿ縺後≠繧翫∪縺帙ｓ','warn'); return; }
     const normalizedTeams = (saved.teams || []).map(t => {
       const nonPitcherIds = (t.players || []).filter(p => !p.isPitcher).map(p => p.id);
       const fallback = (t.lineup || []).filter(id => nonPitcherIds.includes(id));
@@ -105,11 +106,10 @@ export default function App(){
   const [batchCount, setBatchCount] = useState(5);
   const [batchAutoManage, setBatchAutoManage] = useState(false);
   const [seasonAutoManage, setSeasonAutoManage] = useState(false);
-  const dashboardSlice = gs.getDashboardSlice({ limit: 200, gameDay });
-  const mailboxForView = gs.getMailboxPage({ limit: 200 });
-  const newsForView = gs.getNewsPage({ limit: 200 });
-  const unreadMailboxCount = dashboardSlice.unreadMailboxCount;
-  const latestNewsId = dashboardSlice.latestNewsId;
+  const mailboxForView = gs.getMailboxBySelector({ limit: 200 });
+  const newsForView = gs.getNewsBySelector({ limit: 200 });
+  const unreadMailboxCount = gs.getUnreadMailboxCount(gameDay);
+  const latestNewsId = gs.getLatestNewsId();
 
   useEffect(() => {
     const sectionId = TAB_TO_SECTION[tab];
@@ -134,8 +134,8 @@ export default function App(){
       if (lineupPlayers.length < requiredCount) {
         notify(
           rosterDhMode
-            ? "打線が 9 人揃っていません（DH含む）"
-            : "打線が 8 人揃っていません",
+            ? "謇鍋ｷ壹′ 9 莠ｺ謠・▲縺ｦ縺・∪縺帙ｓ・・H蜷ｫ繧・・
+            : "謇鍋ｷ壹′ 8 莠ｺ謠・▲縺ｦ縺・∪縺帙ｓ",
           "warn",
         );
         return;
@@ -146,11 +146,11 @@ export default function App(){
 
       for (const pos of required) {
         if (!posCount[pos]) {
-          notify(`${pos}が未割り当てです`, "warn");
+          notify(`${pos}縺梧悴蜑ｲ繧雁ｽ薙※縺ｧ縺兪, "warn");
           return;
         }
         if (posCount[pos] > 1) {
-          notify(`${pos}が重複しています`, "warn");
+          notify(`${pos}縺碁㍾隍・＠縺ｦ縺・∪縺兪, "warn");
           return;
         }
       }
@@ -174,7 +174,8 @@ export default function App(){
     return allowedOptions.includes(parsed) ? parsed : fallbackValue;
   };
 
-  const { foreign: foreignFaPool, domestic: domesticFaPool } = gs.getFaPoolByCategory();
+  const foreignFaPool = faPool.filter(p => p.isForeign);
+  const domesticFaPool = faPool.filter(p => !p.isForeign);
   const foreignActiveCount = myTeam?.players?.filter(p => p.isForeign).length || 0;
 
   const startNeg = (player) => {
@@ -185,48 +186,47 @@ export default function App(){
 
   const signForeignPlayer = (player, salary, years) => {
     const totalCost = salary * years;
-    if ((myTeam?.budget || 0) < totalCost) { notify("予算不足", "warn"); return; }
+    if ((myTeam?.budget || 0) < totalCost) { notify("莠育ｮ嶺ｸ崎ｶｳ", "warn"); return; }
     const foreignPitchers = (myTeam?.players || []).filter(p => p.isForeign && p.isPitcher).length;
     const foreignBatters = (myTeam?.players || []).filter(p => p.isForeign && !p.isPitcher).length;
-    const wouldBeAllPitchers = player.isPitcher && foreignPitchers === MAX_外国人_一軍 - 1;
-    const wouldBeAllBatters = !player.isPitcher && foreignBatters === MAX_外国人_一軍 - 1;
-    const balanceViolation = foreignActiveCount === MAX_外国人_一軍 - 1 && (wouldBeAllPitchers || wouldBeAllBatters);
+    const wouldBeAllPitchers = player.isPitcher && foreignPitchers === MAX_螟門嵜莠ｺ_荳霆・- 1;
+    const wouldBeAllBatters = !player.isPitcher && foreignBatters === MAX_螟門嵜莠ｺ_荳霆・- 1;
+    const balanceViolation = foreignActiveCount === MAX_螟門嵜莠ｺ_荳霆・- 1 && (wouldBeAllPitchers || wouldBeAllBatters);
     const rosterFull = (myTeam?.players?.length || 0) >= MAX_ROSTER;
-    const goToFarm = foreignActiveCount >= MAX_外国人_一軍 || balanceViolation || rosterFull;
+    const goToFarm = foreignActiveCount >= MAX_螟門嵜莠ｺ_荳霆・|| balanceViolation || rosterFull;
     if (goToFarm) {
       upd(myId, t => ({
         ...t,
         budget: t.budget - totalCost,
         farm: [...(t.farm || []), { ...player, isFA: false, contractYearsLeft: years, contractYears: years, salary }],
-        history: [...(t.history || []), { ...player, isFA: false, contractYearsLeft: years, contractYears: years, salary, exitYear: year, exitReason: '外国人獲得', tenure: 0 }],
+        history: [...(t.history || []), { ...player, isFA: false, contractYearsLeft: years, contractYears: years, salary, exitYear: year, exitReason: '螟門嵜莠ｺ迯ｲ蠕・, tenure: 0 }],
       }));
-      const reason = foreignActiveCount >= MAX_外国人_一軍
-        ? "外国人枠満杯"
+      const reason = foreignActiveCount >= MAX_螟門嵜莠ｺ_荳霆・        ? "螟門嵜莠ｺ譫貅譚ｯ"
         : rosterFull
-          ? "一軍枠満杯"
-          : "投手4名または野手4名は登録不可";
-      notify(`${player.name}と契約（${reason}のため二軍スタート）`, "warn");
+          ? "荳霆肴棧貅譚ｯ"
+          : "謚墓焔4蜷阪∪縺溘・驥取焔4蜷阪・逋ｻ骭ｲ荳榊庄";
+      notify(`${player.name}縺ｨ螂醍ｴ・ｼ・{reason}縺ｮ縺溘ａ莠瑚ｻ阪せ繧ｿ繝ｼ繝茨ｼ荏, "warn");
     } else {
       upd(myId, t => ({
         ...t,
         budget: t.budget - totalCost,
         players: [...t.players, { ...player, isFA: false, contractYearsLeft: years, contractYears: years, salary }],
-        history: [...(t.history || []), { ...player, isFA: false, contractYearsLeft: years, contractYears: years, salary, exitYear: year, exitReason: '外国人獲得', tenure: 0 }],
+        history: [...(t.history || []), { ...player, isFA: false, contractYearsLeft: years, contractYears: years, salary, exitYear: year, exitReason: '螟門嵜莠ｺ迯ｲ蠕・, tenure: 0 }],
       }));
-      notify(`${player.name}を一軍登録で獲得！(${years}年 計${fmtSal(totalCost)})`, "ok");
+      notify(`${player.name}繧剃ｸ霆咲匳骭ｲ縺ｧ迯ｲ蠕暦ｼ・${years}蟷ｴ 險・{fmtSal(totalCost)})`, "ok");
     }
     setFaPool(prev => prev.filter(p => p.id !== player.id));
     setFaYears(prev => { const n = { ...prev }; delete n[player.id]; return n; });
     setAgentNeg(null);
   };
 
-  // ── タイトル画面 ──
-  if(screen==="title"){const saveMeta=saveExists?getSaveMeta():null;return(<><div className="app"><div className="title"><div className="tlogo">⚾ BASEBALL<br/>MANAGER 2025</div><div className="tsub">NPB SIMULATION v2.1 — TACTICAL MODE</div>{saveMeta&&(<div style={{background:"rgba(74,222,128,.08)",border:"1px solid rgba(74,222,128,.3)",borderRadius:8,padding:"10px 14px",marginBottom:16,textAlign:"left"}}><div style={{fontSize:10,color:"#4ade80",letterSpacing:".1em",marginBottom:6}}>◈ セーブデータ</div><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}><div><div style={{fontWeight:700,fontSize:15}}>{saveMeta.teamEmoji} {saveMeta.teamName}</div><div style={{fontSize:11,color:"#94a3b8"}}>{saveMeta.year}年 第{saveMeta.gameDay}戦 {saveMeta.wins}勝{saveMeta.losses}敗</div><div style={{fontSize:9,color:"#64748b",marginTop:2}}>{saveMeta.savedAt}</div></div><div style={{display:"flex",gap:6,alignItems:"center"}}><button className="sim-btn" style={{margin:0,padding:"8px 18px",fontSize:13,background:"linear-gradient(135deg,#14532d,#166534)",borderColor:"rgba(74,222,128,.6)",color:"#4ade80"}} onClick={handleLoad}>▶ 続きから</button><button className="bsm bgr" style={{padding:"6px 10px"}} onClick={()=>{if(window.confirm('セーブデータを削除しますか？')){deleteSave();setSaveExists(false);}}}>削除</button></div></div></div>)}<div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,marginTop:saveExists?8:0,zIndex:1,position:"relative"}}>◈ 新規ゲーム — チームを選択</div><div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,zIndex:1,position:"relative"}}>◈ セントラルリーグ</div><div className="tgrid" style={{marginBottom:14}}>{TEAM_DEFS.filter(t=>t.league==="セ").map(t=><div key={t.id} className="tcard" style={{"--c":t.color}} onClick={()=>gs.handleSelect(t.id)}><span style={{fontSize:24,display:"block",marginBottom:5}}>{t.emoji}</span><div className="tcard-nm">{t.name}</div></div>)}</div><div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,zIndex:1,position:"relative"}}>◈ パシフィックリーグ</div><div className="tgrid">{TEAM_DEFS.filter(t=>t.league==="パ").map(t=><div key={t.id} className="tcard" style={{"--c":t.color}} onClick={()=>gs.handleSelect(t.id)}><span style={{fontSize:24,display:"block",marginBottom:5}}>{t.emoji}</span><div className="tcard-nm">{t.name}</div></div>)}</div><div style={{marginTop:24,paddingTop:16,borderTop:"1px solid rgba(100,116,139,.12)",textAlign:"center"}}><a href="/baseball-manager/flow-diagram.html" target="_blank" rel="noopener noreferrer" style={{fontSize:10,color:"#334155",textDecoration:"none",letterSpacing:".1em"}}>⚙ 開発者向け: システムフロー図</a></div></div></div></>);}
+  // 笏笏 繧ｿ繧､繝医Ν逕ｻ髱｢ 笏笏
+  if(screen==="title"){const saveMeta=saveExists?getSaveMeta():null;return(<><div className="app"><div className="title"><div className="tlogo">笞ｾ BASEBALL<br/>MANAGER 2025</div><div className="tsub">NPB SIMULATION v2.1 窶・TACTICAL MODE</div>{saveMeta&&(<div style={{background:"rgba(74,222,128,.08)",border:"1px solid rgba(74,222,128,.3)",borderRadius:8,padding:"10px 14px",marginBottom:16,textAlign:"left"}}><div style={{fontSize:10,color:"#4ade80",letterSpacing:".1em",marginBottom:6}}>笳・繧ｻ繝ｼ繝悶ョ繝ｼ繧ｿ</div><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}><div><div style={{fontWeight:700,fontSize:15}}>{saveMeta.teamEmoji} {saveMeta.teamName}</div><div style={{fontSize:11,color:"#94a3b8"}}>{saveMeta.year}蟷ｴ 隨ｬ{saveMeta.gameDay}謌ｦ {saveMeta.wins}蜍掉saveMeta.losses}謨・/div><div style={{fontSize:9,color:"#64748b",marginTop:2}}>{saveMeta.savedAt}</div></div><div style={{display:"flex",gap:6,alignItems:"center"}}><button className="sim-btn" style={{margin:0,padding:"8px 18px",fontSize:13,background:"linear-gradient(135deg,#14532d,#166534)",borderColor:"rgba(74,222,128,.6)",color:"#4ade80"}} onClick={handleLoad}>笆ｶ 邯壹″縺九ｉ</button><button className="bsm bgr" style={{padding:"6px 10px"}} onClick={()=>{if(window.confirm('繧ｻ繝ｼ繝悶ョ繝ｼ繧ｿ繧貞炎髯､縺励∪縺吶°・・)){deleteSave();setSaveExists(false);}}}>蜑企勁</button></div></div></div>)}<div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,marginTop:saveExists?8:0,zIndex:1,position:"relative"}}>笳・譁ｰ隕上ご繝ｼ繝 窶・繝√・繝繧帝∈謚・/div><div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,zIndex:1,position:"relative"}}>笳・繧ｻ繝ｳ繝医Λ繝ｫ繝ｪ繝ｼ繧ｰ</div><div className="tgrid" style={{marginBottom:14}}>{TEAM_DEFS.filter(t=>t.league==="繧ｻ").map(t=><div key={t.id} className="tcard" style={{"--c":t.color}} onClick={()=>gs.handleSelect(t.id)}><span style={{fontSize:24,display:"block",marginBottom:5}}>{t.emoji}</span><div className="tcard-nm">{t.name}</div></div>)}</div><div style={{fontSize:10,color:"#1e2d3d",letterSpacing:".2em",marginBottom:8,zIndex:1,position:"relative"}}>笳・繝代す繝輔ぅ繝・け繝ｪ繝ｼ繧ｰ</div><div className="tgrid">{TEAM_DEFS.filter(t=>t.league==="繝・).map(t=><div key={t.id} className="tcard" style={{"--c":t.color}} onClick={()=>gs.handleSelect(t.id)}><span style={{fontSize:24,display:"block",marginBottom:5}}>{t.emoji}</span><div className="tcard-nm">{t.name}</div></div>)}</div><div style={{marginTop:24,paddingTop:16,borderTop:"1px solid rgba(100,116,139,.12)",textAlign:"center"}}><a href="/baseball-manager/flow-diagram.html" target="_blank" rel="noopener noreferrer" style={{fontSize:10,color:"#334155",textDecoration:"none",letterSpacing:".1em"}}>笞・髢狗匱閠・髄縺・ 繧ｷ繧ｹ繝・Β繝輔Ο繝ｼ蝗ｳ</a></div></div></div></>);}
 
   if(screen==="mode_select") return(<><ModeSelectScreen myTeam={myTeam} oppTeam={currentOpp} gameDay={gameDay} onSelect={sf.handleModeSelect} onBack={()=>setScreen("hub")}/></>);
   if(screen==="batch_result") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><BatchResultScreen results={batchResults} batchMeta={batchMeta} myTeam={myTeam} onEnd={()=>setScreen("hub")} onViewDetail={r=>{sf.setGameResult({score:r.score,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:r.oppTeam,won:r.won,gameNo:r.gameNo,_source:"batch"});setScreen("result");}}/></ErrorBoundary></>);
 
-  if(screen==="result"&&gameResult){const _src=gameResult._source;const _retScreen=_src==="batch"?"batch_result":"hub";const _retLabel=_src==="batch"?"← バッチ結果に戻る":_src==="schedule"?"← 日程に戻る":"次の試合へ →";return(<><ResultScreen gsResult={gameResult} myTeam={myTeam} oppTeam={gameResult.oppTeam} gameDay={gameResult.gameNo??gameDay-1} onNext={()=>setScreen(_retScreen)} nextLabel={_retLabel}/></>);}
+  if(screen==="result"&&gameResult){const _src=gameResult._source;const _retScreen=_src==="batch"?"batch_result":"hub";const _retLabel=_src==="batch"?"← バッチ結果に戻る":_src==="schedule"?"← 日程に戻る":"ハブに戻る";return(<><ResultScreen gsResult={gameResult} myTeam={myTeam} oppTeam={gameResult.oppTeam} gameDay={gameResult.gameNo??gameDay-1} onNext={()=>setScreen(_retScreen)} nextLabel={_retLabel}/></>);}
 
 
   if(screen==="tactical_game"){
@@ -234,11 +234,10 @@ export default function App(){
       return (
         <div className="app">
           <div className="rw">
-            <div className="rtitle rlose">試合画面を開けません</div>
+            <div className="rtitle rlose">隧ｦ蜷育判髱｢繧帝幕縺代∪縺帙ｓ</div>
             <div style={{ marginBottom: 20, color: "#94a3b8", fontSize: 13 }}>
-              対戦データが不足しているため、試合を開始できませんでした。日程画面から再試行してください。
-            </div>
-            <button className="btn btn-gold" onClick={()=>setScreen("hub")}>日程画面へ戻る</button>
+              蟇ｾ謌ｦ繝・・繧ｿ縺御ｸ崎ｶｳ縺励※縺・ｋ縺溘ａ縲∬ｩｦ蜷医ｒ髢句ｧ九〒縺阪∪縺帙ｓ縺ｧ縺励◆縲よ律遞狗判髱｢縺九ｉ蜀崎ｩｦ陦後＠縺ｦ縺上□縺輔＞縲・            </div>
+            <button className="btn btn-gold" onClick={()=>setScreen("hub")}>譌･遞狗判髱｢縺ｸ謌ｻ繧・/button>
           </div>
         </div>
       );
@@ -255,7 +254,7 @@ export default function App(){
   </>);
 
   if(screen==="retire_phase") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><RetirePhaseScreen teams={teams} myId={myId} year={year} onNext={os.handleRetirePhaseNext}/></ErrorBoundary></>);
-  if(screen==="contract_renewal_phase") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><ContractRenewalPhaseScreen teams={teams} myId={myId} year={year} demands={contractRenewalDemands||{}} onSign={os.handleContractRenewalSign} onRelease={(pid)=>{const p=myTeam?.players.find(x=>x.id===pid);upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid)}));if(p){setFaPool(prev=>[...prev,{...p,isFA:true}]);addToHistory(myId,p,"戦力外");addNews({type:"season",headline:`【戦力外】${p.name}選手に戦力外通告`,source:"野球速報",dateLabel:`${year}年`,body:`${p.name}選手（${p.age}歳）が戦力外通告を受けた。`});notify(`${p.name}を戦力外通告しました`,"warn");}}} onNext={os.handleContractRenewalPhaseNext}/></ErrorBoundary></>);
+  if(screen==="contract_renewal_phase") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><ContractRenewalPhaseScreen teams={teams} myId={myId} year={year} demands={contractRenewalDemands||{}} onSign={os.handleContractRenewalSign} onRelease={(pid)=>{const p=myTeam?.players.find(x=>x.id===pid);upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid)}));if(p){setFaPool(prev=>[...prev,{...p,isFA:true}]);addToHistory(myId,p,"謌ｦ蜉帛､・);addNews({type:"season",headline:`縲先姶蜉帛､悶・{p.name}驕ｸ謇九↓謌ｦ蜉帛､夜壼相`,source:"驥守帥騾溷ｱ",dateLabel:`${year}蟷ｴ`,body:`${p.name}驕ｸ謇具ｼ・{p.age}豁ｳ・峨′謌ｦ蜉帛､夜壼相繧貞女縺代◆縲Ａ});notify(`${p.name}繧呈姶蜉帛､夜壼相縺励∪縺励◆`,"warn");}}} onNext={os.handleContractRenewalPhaseNext}/></ErrorBoundary></>);
   if(screen==="development_phase") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><GrowthSummaryScreen summary={developmentSummary} year={year} onNext={()=>setScreen("waiver_phase")}/></ErrorBoundary></>);
   if(screen==="waiver_phase") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><WaiverPhaseScreen teams={teams} myId={myId} year={year} onRelease={(pid)=>{const p=myTeam?.players.find(x=>x.id===pid);const popPenalty=(p?.salary??0)>POP_RELEASE_SALARY_THRESHOLD?POP_RELEASE_PENALTY:0;upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),popularity:Math.min(100,Math.max(0,(t.popularity??50)+popPenalty))}));if(p) setFaPool(prev=>[...prev,{...p,isFA:true}]);}} onNext={os.handleWaiverPhaseNext}/></ErrorBoundary></> );
   if(screen==="waiver_result") return(<><ErrorBoundary onReset={()=>setScreen("hub")}><WaiverResultScreen results={waiverClaimResults} year={year} onNext={()=>setScreen("draft_preview")}/></ErrorBoundary></>);
@@ -265,13 +264,13 @@ export default function App(){
       const opp=jpS?jpS.teams.find(t=>t.id!==playoff.champion.id):null;
       const seriesResult=jpS?jpS.wins[0]+"-"+jpS.wins[1]:"4-?";
       setSeasonHistory(prev=>({...prev,championships:[...(prev.championships||[]),{year,championId:playoff.champion.id,championName:playoff.champion.name,opponent:opp?.name||"?",seriesResult}]}));
-      if(playoff.champion.id===myId){setMailbox(prev=>[...prev,{id:uid(),type:"championship",read:false,title:"🏆 "+year+"年 日本一達成！",from:"NPB本部",dateLabel:year+"年",timestamp:Date.now(),body:playoff.champion.name+"が"+year+"年の日本シリーズを制覇しました（"+seriesResult+"）。球団史に残る偉業です！"}]);}
+      if(playoff.champion.id===myId){setMailbox(prev=>[...prev,{id:uid(),type:"championship",read:false,title:"醇 "+year+"蟷ｴ 譌･譛ｬ荳驕疲・・・,from:"NPB譛ｬ驛ｨ",dateLabel:year+"蟷ｴ",timestamp:Date.now(),body:playoff.champion.name+"縺・+year+"蟷ｴ縺ｮ譌･譛ｬ繧ｷ繝ｪ繝ｼ繧ｺ繧貞宛隕・＠縺ｾ縺励◆・・+seriesResult+"・峨ら帥蝗｣蜿ｲ縺ｫ谿九ｋ蛛画･ｭ縺ｧ縺呻ｼ・}]);}
     }
     const trustDelta=calcOwnerTrustDelta(myId,myTeam,playoff);
     if(trustDelta!==0){
       gs.upd(myId,t=>({...t,ownerTrust:clamp((t.ownerTrust??50)+trustDelta,0,100)}));
-      const goalLabel={champion:"日本一",pennant:"ペナント優勝",cs:"CS出場",rebuild:"再建"}[myTeam?.ownerGoal||"cs"];
-      setMailbox(prev=>[...prev,{id:uid(),type:"owner_trust",read:false,title:(trustDelta>0?"✅":"⚠️")+" オーナー評価: 目標「"+goalLabel+"」"+(trustDelta>0?"達成":"未達"),from:"球団オーナー",dateLabel:year+"年",timestamp:Date.now(),body:"今季の目標「"+goalLabel+"」に対する評価が確定しました。信頼度が"+(trustDelta>0?"+":"")+trustDelta+"変動しました（翌年予算に影響します）。"}]);
+      const goalLabel={champion:"譌･譛ｬ荳",pennant:"繝壹リ繝ｳ繝亥━蜍・,cs:"CS蜃ｺ蝣ｴ",rebuild:"蜀榊ｻｺ"}[myTeam?.ownerGoal||"cs"];
+      setMailbox(prev=>[...prev,{id:uid(),type:"owner_trust",read:false,title:(trustDelta>0?"笨・:"笞・・)+" 繧ｪ繝ｼ繝翫・隧穂ｾ｡: 逶ｮ讓吶・+goalLabel+"縲・+(trustDelta>0?"驕疲・":"譛ｪ驕・),from:"逅・屮繧ｪ繝ｼ繝翫・",dateLabel:year+"蟷ｴ",timestamp:Date.now(),body:"莉雁ｭ｣縺ｮ逶ｮ讓吶・+goalLabel+"縲阪↓蟇ｾ縺吶ｋ隧穂ｾ｡縺檎｢ｺ螳壹＠縺ｾ縺励◆縲ゆｿ｡鬆ｼ蠎ｦ縺・+(trustDelta>0?"+":"")+trustDelta+"螟牙虚縺励∪縺励◆・育ｿ悟ｹｴ莠育ｮ励↓蠖ｱ髻ｿ縺励∪縺呻ｼ峨・}]);
     }
     setScreen("retire_phase");
   }}/></ErrorBoundary></>);
@@ -280,7 +279,7 @@ export default function App(){
   if(screen==="draft"&&draftPool) return(<><DraftScreen teams={teams} myId={myId} year={year} pool={draftPool} draftAllocation={draftAllocation} autoSkip={draftAutoSkip} onDraftDone={(pl,dr)=>{setDraftAutoSkip(false);setDraftResult({pool:pl,drafted:dr});setScreen("draft_review");}}/></>);
   if(screen==="draft_review"&&draftResult) return(<><DraftReviewScreen teams={teams} myId={myId} year={year} pool={draftResult.pool} drafted={draftResult.drafted} onEnd={()=>os.handleDraftComplete(draftResult.pool,draftResult.drafted)}/></>);
   if(screen==="spring_training") return(<><SpringTrainingScreen year={year} myTeam={myTeam} springData={os.springTrainingData} onComplete={os.handleSpringTrainingComplete}/></>);
-  if(screen==="new_season") return(<><NewSeasonScreen year={year} info={newSeasonInfo} developmentSummary={developmentSummary} ownerGoal={myTeam?.ownerGoal||"cs"} onGoalSelect={(goal)=>gs.upd(myId,t=>({...t,ownerGoal:goal}))} onStart={()=>{setScreen("hub");setTab("dashboard");notify(`${year}年シーズン開幕！`,"ok");}}/></>);
+  if(screen==="new_season") return(<><NewSeasonScreen year={year} info={newSeasonInfo} developmentSummary={developmentSummary} ownerGoal={myTeam?.ownerGoal||"cs"} onGoalSelect={(goal)=>gs.upd(myId,t=>({...t,ownerGoal:goal}))} onStart={()=>{setScreen("hub");setTab("dashboard");notify(`${year}蟷ｴ繧ｷ繝ｼ繧ｺ繝ｳ髢句ｹ包ｼ～,"ok");}}/></>);
 
   if(screen==="team_detail"&&gs.viewingTeam) return(
     <TeamDetailScreen
@@ -296,13 +295,13 @@ export default function App(){
     />
   );
 
-  // ── HUB ──
+  // 笏笏 HUB 笏笏
   const g=(myTeam?.wins||0)+(myTeam?.losses||0);
   const remain=SEASON_GAMES-g;
 
   return(<><div className="app"><div className="app-layout">
-    <aside className="primary-sidebar" aria-label="メインナビゲーション">
-      <div className="primary-sidebar-title">監督メニュー</div>
+    <aside className="primary-sidebar" aria-label="繝｡繧､繝ｳ繝翫ン繧ｲ繝ｼ繧ｷ繝ｧ繝ｳ">
+      <div className="primary-sidebar-title">逶｣逹｣繝｡繝九Η繝ｼ</div>
       <div className="primary-sidebar-list">
         {PRIMARY_SECTIONS.map((section) => {
           const badgeTab = section.id === "inbox" ? "mailbox" : section.id === "rosterOps" ? "contract" : null;
@@ -323,10 +322,10 @@ export default function App(){
     </aside><div className="hub">
     <div className="topbar">
       <span style={{fontSize:26}}>{myTeam?.emoji}</span>
-      <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14,color:myTeam?.color}}>{myTeam?.name}</div><div style={{fontSize:10,color:"#374151"}}>{year}年 {(d=>d.month+"月"+d.day+"日")(gameDayToDate(gameDay,schedule))} / 第{gameDay}戦{schedule?.[gameDay]?.isInterleague?" 🔄交流戦":""} / 残り{remain}試合</div></div>
-      <div style={{display:"flex",gap:5,flexWrap:"wrap"}}><span className="chip cg">{myTeam?.wins}勝</span><span className="chip cr">{myTeam?.losses}敗</span><span className="chip cy">{fmtM(myTeam?.budget||0)}</span></div>
-      <div className="tb-record">{myTeam?.wins}勝{myTeam?.losses}敗</div>
-      <button style={{background:"rgba(74,222,128,.1)",border:"1px solid rgba(74,222,128,.4)",color:"#4ade80",borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}} onClick={gs.handleSave}>💾 保存</button>
+      <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14,color:myTeam?.color}}>{myTeam?.name}</div><div style={{fontSize:10,color:"#374151"}}>{year}蟷ｴ {(d=>d.month+"譛・+d.day+"譌･")(gameDayToDate(gameDay,schedule))} / 隨ｬ{gameDay}謌ｦ{schedule?.[gameDay]?.isInterleague?" 売莠､豬∵姶":""} / 谿九ｊ{remain}隧ｦ蜷・/div></div>
+      <div style={{display:"flex",gap:5,flexWrap:"wrap"}}><span className="chip cg">{myTeam?.wins}蜍・/span><span className="chip cr">{myTeam?.losses}謨・/span><span className="chip cy">{fmtM(myTeam?.budget||0)}</span></div>
+      <div className="tb-record">{myTeam?.wins}蜍掉myTeam?.losses}謨・/div>
+      <button style={{background:"rgba(74,222,128,.1)",border:"1px solid rgba(74,222,128,.4)",color:"#4ade80",borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}} onClick={gs.handleSave}>沈 菫晏ｭ・/button>
     </div>
 
     {notif&&<div className={`notif ${notif.type==="ok"?"nok":notif.type==="warn"?"nwarn":"nbad"}`}>{notif.msg}</div>}
@@ -334,12 +333,11 @@ export default function App(){
     {gameDay<=SEASON_GAMES&&(
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
         <button className="sim-btn" style={{margin:0,fontSize:12}} onClick={sf.handleStartGame}>
-          ⚾ 1試合<br/>
+          笞ｾ 1隧ｦ蜷・br/>
           <span style={{fontSize:9,opacity:.7}}>
-            {(d=>d?`${d.month}/${d.day} `:"") (gameDayToDate(gameDay,schedule))}采配 or オート
-          </span>
+            {(d=>d?`${d.month}/${d.day} `:"") (gameDayToDate(gameDay,schedule))}驥・・ or 繧ｪ繝ｼ繝・          </span>
         </button>
-        {/* バッチシム — 5試合刻みプルダウン */}
+        {/* 繝舌ャ繝√す繝 窶・5隧ｦ蜷亥綾縺ｿ繝励Ν繝繧ｦ繝ｳ */}
         {(()=>{
           const opts=[];
           for(let i=5;i<=remain;i+=5) opts.push(i);
@@ -350,36 +348,34 @@ export default function App(){
           return(
             <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5,background:"linear-gradient(135deg,#071a2c,#0d2840)",border:"1px solid rgba(96,165,250,.5)",borderRadius:10,padding:"8px 6px"}}>
               <select value={eff} onChange={e=>setBatchCount(parseSafeBatchCount(e.target.value, opts, eff))} style={{width:"100%",background:"rgba(15,23,42,.9)",border:"1px solid rgba(96,165,250,.4)",color:"#93c5fd",borderRadius:4,fontSize:11,fontWeight:700,padding:"3px 4px",fontFamily:"'Share Tech Mono',monospace",cursor:"pointer"}}>
-                {opts.map(n=>{const d=gameDayToDate(Math.min(gameDay+n-1,SEASON_GAMES),schedule);return<option key={n} value={n}>{n}試合{d?` (〜${d.month}/${d.day})`:""}</option>;})}
+                {opts.map(n=>{const d=gameDayToDate(Math.min(gameDay+n-1,SEASON_GAMES),schedule);return<option key={n} value={n}>{n}隧ｦ蜷・d?` (縲・{d.month}/${d.day})`:""}</option>;})}
               </select>
-              {sd&&ed&&<div style={{fontSize:9,color:"#7dd3fc"}}>{sd.month}/{sd.day} 〜 {ed.month}/{ed.day}</div>}
+              {sd&&ed&&<div style={{fontSize:9,color:"#7dd3fc"}}>{sd.month}/{sd.day} 縲・{ed.month}/{ed.day}</div>}
               <label style={{display:"flex",alignItems:"center",gap:4,fontSize:9,color:batchAutoManage?"#34d399":"#475569",cursor:"pointer",userSelect:"none"}}>
                 <input type="checkbox" checked={batchAutoManage} onChange={e=>setBatchAutoManage(e.target.checked)} style={{accentColor:"#34d399",cursor:"pointer"}}/>
-                自動編成も実行
-              </label>
-              <button style={{background:"transparent",border:"none",color:"#60a5fa",fontSize:11,cursor:sf.batchProgress?"not-allowed":"pointer",padding:"2px 4px",fontFamily:"'Bebas Neue',cursive",letterSpacing:".15em",opacity:sf.batchProgress?0.5:1}} disabled={!!sf.batchProgress} onClick={()=>sf.handleBatchSim(eff,batchAutoManage)}>⚡ まとめてシム</button>
+                閾ｪ蜍慕ｷｨ謌舌ｂ螳溯｡・              </label>
+              <button style={{background:"transparent",border:"none",color:"#60a5fa",fontSize:11,cursor:sf.batchProgress?"not-allowed":"pointer",padding:"2px 4px",fontFamily:"'Bebas Neue',cursive",letterSpacing:".15em",opacity:sf.batchProgress?0.5:1}} disabled={!!sf.batchProgress} onClick={()=>sf.handleBatchSim(eff,batchAutoManage)}>笞｡ 縺ｾ縺ｨ繧√※繧ｷ繝</button>
             </div>
           );
         })()}
         {sf.batchProgress&&(
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,background:"linear-gradient(135deg,#071a2c,#0d2840)",border:"1px solid rgba(96,165,250,.5)",borderRadius:10,padding:"8px 6px",minWidth:80}}>
-            <div style={{fontSize:9,color:"#7dd3fc",letterSpacing:".05em"}}>シミュレーション中</div>
+            <div style={{fontSize:9,color:"#7dd3fc",letterSpacing:".05em"}}>繧ｷ繝溘Η繝ｬ繝ｼ繧ｷ繝ｧ繝ｳ荳ｭ</div>
             <div style={{fontSize:13,color:"#60a5fa",fontWeight:700,fontFamily:"'Share Tech Mono',monospace"}}>{sf.batchProgress.current}/{sf.batchProgress.total}</div>
-            <div style={{fontSize:9,color:"#93c5fd"}}>残り約{Math.max(0, Math.round(sf.batchProgress.etaSec ?? 0))}秒</div>
-            <div style={{fontSize:9,color:"#7dd3fc"}}>フェーズ: {sf.batchProgress.phase ?? "試合計算"}</div>
+            <div style={{fontSize:9,color:"#93c5fd"}}>谿九ｊ邏кMath.max(0, Math.round(sf.batchProgress.etaSec ?? 0))}遘・/div>
+            <div style={{fontSize:9,color:"#7dd3fc"}}>繝輔ぉ繝ｼ繧ｺ: {sf.batchProgress.phase ?? "隧ｦ蜷郁ｨ育ｮ・}</div>
             <div style={{width:"100%",height:4,background:"rgba(96,165,250,.2)",borderRadius:2}}><div style={{height:"100%",background:"#60a5fa",borderRadius:2,width:`${Math.round(sf.batchProgress.current/sf.batchProgress.total*100)}%`,transition:"width .1s"}}/></div>
-            {sf.batchProgress.current>=sf.batchProgress.total&&<div style={{fontSize:8,color:"#bfdbfe"}}>100%後も後処理を継続中</div>}
+            {sf.batchProgress.current>=sf.batchProgress.total&&<div style={{fontSize:8,color:"#bfdbfe"}}>100%蠕後ｂ蠕悟・逅・ｒ邯咏ｶ壻ｸｭ</div>}
           </div>
         )}
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5,background:"linear-gradient(135deg,#1a0730,#2d0f50)",border:"1px solid rgba(167,139,250,.5)",borderRadius:10,padding:"8px 6px"}}>
           <label style={{display:"flex",alignItems:"center",gap:4,fontSize:9,color:seasonAutoManage?"#c4b5fd":"#6b7280",cursor:"pointer",userSelect:"none"}}>
             <input type="checkbox" checked={seasonAutoManage} onChange={e=>setSeasonAutoManage(e.target.checked)} style={{accentColor:"#a78bfa",cursor:"pointer"}}/>
-            自動編成も実行
-          </label>
+            閾ｪ蜍慕ｷｨ謌舌ｂ螳溯｡・          </label>
           <button className="sim-btn" style={{margin:0,fontSize:12,width:"100%",background:"transparent",border:"none",boxShadow:"none",color:"#a78bfa",padding:"2px 4px",opacity:sf.batchProgress?0.5:1}} disabled={!!sf.batchProgress} onClick={()=>sf.handleSeasonSim(seasonAutoManage)}>
-            🚀 残り全{remain}試合<br/>
+            噫 谿九ｊ蜈ｨ{remain}隧ｦ蜷・br/>
             <span style={{fontSize:9,opacity:.7}}>
-              {(()=>{const s=gameDayToDate(gameDay,schedule);const e=gameDayToDate(SEASON_GAMES,schedule);return s&&e?`${s.month}/${s.day}〜${e.month}/${e.day}`:"シーズン一括";})()}
+              {(()=>{const s=gameDayToDate(gameDay,schedule);const e=gameDayToDate(SEASON_GAMES,schedule);return s&&e?`${s.month}/${s.day}縲・{e.month}/${e.day}`:"繧ｷ繝ｼ繧ｺ繝ｳ荳諡ｬ";})()}
             </span>
           </button>
         </div>
@@ -400,26 +396,26 @@ export default function App(){
     </div>
 
     <ErrorBoundary key={tab}>
-    {tab==="dashboard"&&<DashboardTab myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year} recentResults={dashboardSlice.recentResults} mailbox={dashboardSlice.mailbox} faPool={faPool} onTabSwitch={handleTabChange} unreadMailboxCount={unreadMailboxCount} latestNewsId={latestNewsId}/>}
+    {tab==="dashboard"&&<DashboardTab myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year} recentResults={gs.recentResults} mailbox={mailboxForView} faPool={faPool} onTabSwitch={handleTabChange} unreadMailboxCount={unreadMailboxCount} latestNewsId={latestNewsId}/>}
     {tab==="roster"&&<RosterTab team={myTeam} onToggle={gs.toggleLineup} onReplaceLineup={gs.replaceLineup} onSetLineupOrder={gs.setLineupOrder} onSetRosterDhMode={gs.setRosterDhMode} onSetPlayerPosition={gs.setPlayerPosition} onSetStarter={gs.setStarter} onPromo={gs.promote} onDemo={gs.demote} onSetTrainingFocus={gs.setTrainingFocus} onConvertIkusei={gs.convertIkusei} onMoveRotation={gs.moveRotation} onRemoveFromRotation={gs.removeFromRotation} onSetPitchingPattern={gs.setPitchingPattern} onReplaceRotation={gs.replaceRotation} onReplaceFullRoster={gs.replaceFullRoster} onPlayerClick={gs.handlePlayerClick} onSetDevGoal={gs.setDevGoal} onPlayerTalk={gs.handlePlayerTalk} onSetConvertTarget={gs.setConvertTarget} gameDay={gameDay}/>}
     {tab==="schedule"&&<ScheduleTab schedule={schedule} gameDay={gameDay} myTeam={myTeam} teams={teams} year={year} gameResultsMap={gs.gameResultsMap} allStarDone={gs.allStarDone} allStarResult={gs.allStarResult} allStarTriggerDay={gs.allStarTriggerDay} scheduleArchive={gs.scheduleArchive||[]} onResultClick={dayNo=>{const r=gs.gameResultsMap[dayNo];if(r){sf.setGameResult({score:{my:r.myScore,opp:r.oppScore},log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:r.oppTeam,won:r.won,gameNo:dayNo,_source:"schedule"});setScreen("result");}}}/>}
     {tab==="records"&&<RecordsTab history={gs.seasonHistory}/>}
     {tab==="news"&&<NewsTab news={newsForView} onInterview={gs.handleInterview} seasonHistory={gs.seasonHistory} currentYear={year}/>}
     {tab==="mailbox"&&<MailboxTab mailbox={mailboxForView} onRead={os.handleMailRead} onAction={os.handleMailAction} teams={teams} myTeam={myTeam} onTrade={os.handleTrade} onTeamClick={gs.handleTeamClick} gameDay={gameDay}/>}
     {tab==="trade"&&(()=>{const pendingTrades=mailbox.filter(m=>m.type==="trade"&&!m.resolved);return<TradeTab myTeam={myTeam} teams={teams} onTrade={os.handleTrade} cpuOffers={pendingTrades.map(m=>m.offer)} onAcceptOffer={(idx)=>os.handleMailAction(pendingTrades[idx].id,"accept")} onDeclineOffer={(idx)=>os.handleMailAction(pendingTrades[idx].id,"decline")} deadlinePassed={(()=>{const d=gameDayToDate(gameDay,schedule);return d?d.month>TRADE_DEADLINE_MONTH:gameDay>95;})()} onPlayerClick={gs.handlePlayerClick}/>;})()}
-    {tab==="contract"&&<ContractTab team={myTeam} allTeams={teams} year={year} onOffer={os.handleContractOffer} onRelease={pid=>{const p=myTeam?.players.find(x=>x.id===pid);const popPenalty=(p?.salary??0)>POP_RELEASE_SALARY_THRESHOLD?POP_RELEASE_PENALTY:0;upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),popularity:Math.min(100,Math.max(0,(t.popularity??50)+popPenalty))}));if(p){addToHistory(myId,p,"自由契約");setFaPool(prev=>[...prev,{...p,isFA:true}]);}notify("放出しました","warn");}}/>}
+    {tab==="contract"&&<ContractTab team={myTeam} allTeams={teams} year={year} onOffer={os.handleContractOffer} onRelease={pid=>{const p=myTeam?.players.find(x=>x.id===pid);const popPenalty=(p?.salary??0)>POP_RELEASE_SALARY_THRESHOLD?POP_RELEASE_PENALTY:0;upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),popularity:Math.min(100,Math.max(0,(t.popularity??50)+popPenalty))}));if(p){addToHistory(myId,p,"閾ｪ逕ｱ螂醍ｴ・);setFaPool(prev=>[...prev,{...p,isFA:true}]);}notify("謾ｾ蜃ｺ縺励∪縺励◆","warn");}}/>}
     {tab==="alumni"&&<AlumniTab myTeam={myTeam}/>}
         {tab==="fa"&&(
       <div className="card">
-        <div className="card-h">FA市場 ({faPool.length}人)
-          <span className="chip cb" style={{marginLeft:8,fontSize:10}}>外国人一軍: {foreignActiveCount}/{MAX_外国人_一軍}</span>
+        <div className="card-h">FA蟶ょｴ ({faPool.length}莠ｺ)
+          <span className="chip cb" style={{marginLeft:8,fontSize:10}}>螟門嵜莠ｺ荳霆・ {foreignActiveCount}/{MAX_螟門嵜莠ｺ_荳霆閤</span>
         </div>
 
-        <div className="card-h" style={{marginTop:8}}>🌏 外国人FA市場 ({foreignFaPool.length}人)</div>
+        <div className="card-h" style={{marginTop:8}}>件 螟門嵜莠ｺFA蟶ょｴ ({foreignFaPool.length}莠ｺ)</div>
         {gameDay>FOREIGN_DEADLINE_DAY&&(
-          <div className="card2" style={{borderColor:"rgba(248,113,113,.4)",color:"#fca5a5"}}>交渉期限終了（7月末）</div>
+          <div className="card2" style={{borderColor:"rgba(248,113,113,.4)",color:"#fca5a5"}}>莠､貂画悄髯千ｵゆｺ・ｼ・譛域忰・・/div>
         )}
-        {foreignFaPool.length===0&&<p style={{color:"#2a3a4c",fontSize:12}}>現在、外国人FA選手はいません</p>}
+        {foreignFaPool.length===0&&<p style={{color:"#2a3a4c",fontSize:12}}>迴ｾ蝨ｨ縲∝､門嵜莠ｺFA驕ｸ謇九・縺・∪縺帙ｓ</p>}
         {foreignFaPool.map((p)=>{
           const active = agentNeg?.player?.id===p.id;
           return(
@@ -427,39 +423,37 @@ export default function App(){
               <div className="fsb" style={{flexWrap:"wrap",gap:6}}>
                 <div>
                   <span style={{fontWeight:700,fontSize:13}}>{p.name}</span>
-                  <span style={{fontSize:10,color:"#374151",marginLeft:8}}>{p.pos}/{p.age}歳 {p.hometown} 出身 · 基準{fmtSal(p.salary)}/年</span>
+                  <span style={{fontSize:10,color:"#374151",marginLeft:8}}>{p.pos}/{p.age}豁ｳ {p.hometown} 蜃ｺ霄ｫ ﾂｷ 蝓ｺ貅本fmtSal(p.salary)}/蟷ｴ</span>
                 </div>
-                <div style={{fontSize:10,color:"#374151"}}>{p.isPitcher?`投: 球速${p.pitching?.velocity||"-"} 制球${p.pitching?.control||"-"}`:`打: ミ${p.batting?.contact||"-"} パ${p.batting?.power||"-"}`}</div>
+                <div style={{fontSize:10,color:"#374151"}}>{p.isPitcher?`謚・ 逅・・{p.pitching?.velocity||"-"} 蛻ｶ逅・{p.pitching?.control||"-"}`:`謇・ 繝・{p.batting?.contact||"-"} 繝・{p.batting?.power||"-"}`}</div>
               </div>
               {!active&&(
                 <button className="bsm bga" style={{marginTop:8,opacity:gameDay>FOREIGN_DEADLINE_DAY?0.5:1}} disabled={gameDay>FOREIGN_DEADLINE_DAY} onClick={()=>startNeg(p)}>
-                  代理人交渉
-                </button>
+                  莉｣逅・ｺｺ莠､貂・                </button>
               )}
               {active&&agentNeg&&(
                 <div style={{marginTop:8,borderTop:"1px solid rgba(100,116,139,.25)",paddingTop:8,fontSize:11}}>
                   {agentNeg.round===1&&(
                     <>
-                      <div style={{marginBottom:6,color:"#cbd5e1"}}>Round 1: 年俸交渉（代理人要求: {fmtSal(agentNeg.salaryDemand)}/年）</div>
+                      <div style={{marginBottom:6,color:"#cbd5e1"}}>Round 1: 蟷ｴ菫ｸ莠､貂会ｼ井ｻ｣逅・ｺｺ隕∵ｱ・ {fmtSal(agentNeg.salaryDemand)}/蟷ｴ・・/div>
                       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                        <button className="bsm bga" onClick={()=>setAgentNeg(prev=>({...prev,round:2,salaryOffer:prev.salaryDemand}))}>要求を呑む</button>
+                        <button className="bsm bga" onClick={()=>setAgentNeg(prev=>({...prev,round:2,salaryOffer:prev.salaryDemand}))}>隕∵ｱゅｒ蜻代・</button>
                         <button className="bsm bga" onClick={()=>{
                           const accepted = rngf(0,1) < FOREIGN_AGENT_ACCEPT_PROB;
-                          if(!accepted){ notify("エージェントが交渉を打ち切りました", "warn"); setAgentNeg(null); return; }
+                          if(!accepted){ notify("繧ｨ繝ｼ繧ｸ繧ｧ繝ｳ繝医′莠､貂峨ｒ謇薙■蛻・ｊ縺ｾ縺励◆", "warn"); setAgentNeg(null); return; }
                           setAgentNeg(prev=>({...prev,round:2,salaryOffer:prev.player.salary}));
-                        }}>基準年俸で交渉</button>
-                        <button className="bsm bgr" onClick={()=>setAgentNeg(null)}>交渉打ち切り</button>
+                        }}>蝓ｺ貅門ｹｴ菫ｸ縺ｧ莠､貂・/button>
+                        <button className="bsm bgr" onClick={()=>setAgentNeg(null)}>莠､貂画遠縺｡蛻・ｊ</button>
                       </div>
                     </>
                   )}
                   {agentNeg.round===2&&(
                     <>
-                      <div style={{marginBottom:6,color:"#cbd5e1"}}>Round 2: 契約年数（最低 {agentNeg.minYears} 年）</div>
+                      <div style={{marginBottom:6,color:"#cbd5e1"}}>Round 2: 螂醍ｴ・ｹｴ謨ｰ・域怙菴・{agentNeg.minYears} 蟷ｴ・・/div>
                       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                         <button className="bsm bga" onClick={()=>signForeignPlayer(agentNeg.player, agentNeg.salaryOffer, agentNeg.minYears)}>
-                          同意する（{agentNeg.minYears}年 計{fmtSal(agentNeg.salaryOffer*agentNeg.minYears)}）
-                        </button>
-                        <button className="bsm bgr" onClick={()=>setAgentNeg(null)}>交渉打ち切り</button>
+                          蜷梧э縺吶ｋ・・agentNeg.minYears}蟷ｴ 險・fmtSal(agentNeg.salaryOffer*agentNeg.minYears)}・・                        </button>
+                        <button className="bsm bgr" onClick={()=>setAgentNeg(null)}>莠､貂画遠縺｡蛻・ｊ</button>
                       </div>
                     </>
                   )}
@@ -469,8 +463,8 @@ export default function App(){
           );
         })}
 
-        <div className="card-h" style={{marginTop:12}}>国内FA・戦力外 ({domesticFaPool.length}人)</div>
-        {domesticFaPool.length===0&&<p style={{color:"#2a3a4c",fontSize:12}}>現在FA選手はいません</p>}
+        <div className="card-h" style={{marginTop:12}}>蝗ｽ蜀・A繝ｻ謌ｦ蜉帛､・({domesticFaPool.length}莠ｺ)</div>
+        {domesticFaPool.length===0&&<p style={{color:"#2a3a4c",fontSize:12}}>迴ｾ蝨ｨFA驕ｸ謇九・縺・∪縺帙ｓ</p>}
         {domesticFaPool.map((p)=>{
           const yrs=faYears[p.id]||1;
           const totalCost=p.salary*yrs;
@@ -478,11 +472,11 @@ export default function App(){
           return(
           <div key={p.id} className="card2">
             <div className="fsb" style={{flexWrap:"wrap",gap:6}}>
-              <div><span style={{fontWeight:700,fontSize:13}}>{p.name}</span><span style={{fontSize:10,color:"#374151",marginLeft:8}}>{p.pos}/{p.age}歳 {fmtSal(p.salary)}/年</span></div>
+              <div><span style={{fontWeight:700,fontSize:13}}>{p.name}</span><span style={{fontSize:10,color:"#374151",marginLeft:8}}>{p.pos}/{p.age}豁ｳ {fmtSal(p.salary)}/蟷ｴ</span></div>
               <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
-                <span style={{fontSize:10,color:"#374151"}}>契約年数:</span>
-                {[1,2,3].map(y=><button key={y} className={"bsm "+(yrs===y?"bgb":"bga")} style={{padding:"2px 8px"}} onClick={()=>setFaYears(prev=>({...prev,[p.id]:y}))}>{y}年</button>)}
-                <button className="bsm bga" style={{marginLeft:4,opacity:canAfford?1:0.4}} onClick={()=>{if(!canAfford){notify("予算不足","warn");return;}const toFarm=(myTeam?.players?.length||0)>=MAX_ROSTER;const acquireReason=p.isWaiverReleased?'戦力外獲得':'FA獲得';upd(myId,t=>toFarm?({...t,budget:t.budget-totalCost,farm:[...t.farm,{...p,isFA:false,contractYearsLeft:yrs,contractYears:yrs}],history:[...(t.history||[]),{...p,isFA:false,contractYearsLeft:yrs,contractYears:yrs,exitYear:year,exitReason:acquireReason,tenure:0}]}):({...t,budget:t.budget-totalCost,players:[...t.players,{...p,isFA:false,contractYearsLeft:yrs,contractYears:yrs}],history:[...(t.history||[]),{...p,isFA:false,contractYearsLeft:yrs,contractYears:yrs,exitYear:year,exitReason:acquireReason,tenure:0}]}));setFaPool(prev=>prev.filter(x=>x.id!==p.id));setFaYears(prev=>{const n={...prev};delete n[p.id];return n;});notify(toFarm?`${p.name}を獲得（一軍枠満杯のため二軍スタート）`:`${p.name}を獲得！(${yrs}年 計${fmtSal(totalCost)})`,"ok");}}>獲得</button>
+                <span style={{fontSize:10,color:"#374151"}}>螂醍ｴ・ｹｴ謨ｰ:</span>
+                {[1,2,3].map(y=><button key={y} className={"bsm "+(yrs===y?"bgb":"bga")} style={{padding:"2px 8px"}} onClick={()=>setFaYears(prev=>({...prev,[p.id]:y}))}>{y}蟷ｴ</button>)}
+                <button className="bsm bga" style={{marginLeft:4,opacity:canAfford?1:0.4}} onClick={()=>{if(!canAfford){notify("莠育ｮ嶺ｸ崎ｶｳ","warn");return;}const toFarm=(myTeam?.players?.length||0)>=MAX_ROSTER;const acquireReason=p.isWaiverReleased?'謌ｦ蜉帛､也佐蠕・:'FA迯ｲ蠕・;upd(myId,t=>toFarm?({...t,budget:t.budget-totalCost,farm:[...t.farm,{...p,isFA:false,contractYearsLeft:yrs,contractYears:yrs}],history:[...(t.history||[]),{...p,isFA:false,contractYearsLeft:yrs,contractYears:yrs,exitYear:year,exitReason:acquireReason,tenure:0}]}):({...t,budget:t.budget-totalCost,players:[...t.players,{...p,isFA:false,contractYearsLeft:yrs,contractYears:yrs}],history:[...(t.history||[]),{...p,isFA:false,contractYearsLeft:yrs,contractYears:yrs,exitYear:year,exitReason:acquireReason,tenure:0}]}));setFaPool(prev=>prev.filter(x=>x.id!==p.id));setFaYears(prev=>{const n={...prev};delete n[p.id];return n;});notify(toFarm?`${p.name}繧堤佐蠕暦ｼ井ｸ霆肴棧貅譚ｯ縺ｮ縺溘ａ莠瑚ｻ阪せ繧ｿ繝ｼ繝茨ｼ荏:`${p.name}繧堤佐蠕暦ｼ・${yrs}蟷ｴ 險・{fmtSal(totalCost)})`,"ok");}}>迯ｲ蠕・/button>
               </div>
             </div>
           </div>
@@ -492,30 +486,30 @@ export default function App(){
     )}
     {tab==="scout"&&(
       <div>
-        {myTeam?.scoutResults.length>0&&<div className="card"><div className="card-h">スカウト報告</div>{myTeam.scoutResults.map((p,i)=>{
+        {myTeam?.scoutResults.length>0&&<div className="card"><div className="card-h">繧ｹ繧ｫ繧ｦ繝亥ｱ蜻・/div>{myTeam.scoutResults.map((p,i)=>{
           const bf=p._scoutBudgetFactor||1.0; const rf=p._scoutRegionFactor||1.0;
           const sv=(key,val)=>scoutedValue(val,p.id,key,15,bf,rf);
           const ScoutVal=({k,v})=>{const r=sv(k,v);return <span style={{color:r.estimated?"#f5c842":"#94a3b8"}}>{r.value}{r.estimated&&<span style={{fontSize:8,opacity:.6}}>?</span>}</span>;};
           return <div key={p.id} className="card2">
-            <div className="fsb" style={{marginBottom:6}}><span style={{fontWeight:700}}>{p.name} <span style={{fontSize:10,color:"#374151"}}>{p.pos}/{p.age}歳</span>{p.isForeign&&<span className="chip cb" style={{marginLeft:4,fontSize:8}}>外</span>}</span><div style={{display:"flex",gap:6}}><button className="bsm bga" onClick={()=>gs.signPlayer(i)}>獲得</button><button className="bsm bgr" onClick={()=>upd(myId,t=>({...t,scoutResults:t.scoutResults.filter((_,j)=>j!==i)}))}>見送り</button></div></div>
+            <div className="fsb" style={{marginBottom:6}}><span style={{fontWeight:700}}>{p.name} <span style={{fontSize:10,color:"#374151"}}>{p.pos}/{p.age}豁ｳ</span>{p.isForeign&&<span className="chip cb" style={{marginLeft:4,fontSize:8}}>螟・/span>}</span><div style={{display:"flex",gap:6}}><button className="bsm bga" onClick={()=>gs.signPlayer(i)}>迯ｲ蠕・/button><button className="bsm bgr" onClick={()=>upd(myId,t=>({...t,scoutResults:t.scoutResults.filter((_,j)=>j!==i)}))}>隕矩√ｊ</button></div></div>
             <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:10}}>
               {p.isPitcher?<>
-                <span style={{color:"#374151"}}>球速 <ScoutVal k="velocity" v={p.pitching?.velocity}/></span>
-                <span style={{color:"#374151"}}>制球 <ScoutVal k="control" v={p.pitching?.control}/></span>
-                <span style={{color:"#374151"}}>変化 <ScoutVal k="breaking" v={p.pitching?.breaking}/></span>
-                <span style={{color:"#374151"}}>スタ <ScoutVal k="stamina" v={p.pitching?.stamina}/></span>
+                <span style={{color:"#374151"}}>逅・・<ScoutVal k="velocity" v={p.pitching?.velocity}/></span>
+                <span style={{color:"#374151"}}>蛻ｶ逅・<ScoutVal k="control" v={p.pitching?.control}/></span>
+                <span style={{color:"#374151"}}>螟牙喧 <ScoutVal k="breaking" v={p.pitching?.breaking}/></span>
+                <span style={{color:"#374151"}}>繧ｹ繧ｿ <ScoutVal k="stamina" v={p.pitching?.stamina}/></span>
               </>:<>
-                <span style={{color:"#374151"}}>ミート <ScoutVal k="contact" v={p.batting?.contact}/></span>
-                <span style={{color:"#374151"}}>長打 <ScoutVal k="power" v={p.batting?.power}/></span>
-                <span style={{color:"#374151"}}>走力 <ScoutVal k="speed" v={p.batting?.speed}/></span>
-                <span style={{color:"#374151"}}>選球 <ScoutVal k="eye" v={p.batting?.eye}/></span>
+                <span style={{color:"#374151"}}>繝溘・繝・<ScoutVal k="contact" v={p.batting?.contact}/></span>
+                <span style={{color:"#374151"}}>髟ｷ謇・<ScoutVal k="power" v={p.batting?.power}/></span>
+                <span style={{color:"#374151"}}>襍ｰ蜉・<ScoutVal k="speed" v={p.batting?.speed}/></span>
+                <span style={{color:"#374151"}}>驕ｸ逅・<ScoutVal k="eye" v={p.batting?.eye}/></span>
               </>}
-              <span style={{color:"#374151"}}>潜在 <ScoutVal k="potential" v={p.potential}/></span>
+              <span style={{color:"#374151"}}>貎懷惠 <ScoutVal k="potential" v={p.potential}/></span>
             </div>
-            <div style={{fontSize:9,color:"#374151",marginTop:4}}>{fmtSal(p.salary)}/年 · <span style={{color:"#f5c842"}}>?マークは推定値</span></div>
+            <div style={{fontSize:9,color:"#374151",marginTop:4}}>{fmtSal(p.salary)}/蟷ｴ ﾂｷ <span style={{color:"#f5c842"}}>?繝槭・繧ｯ縺ｯ謗ｨ螳壼､</span></div>
           </div>;
         })}</div>}
-        <div className="card"><div className="card-h">スカウト派遣</div><div className="g2">{SCOUT_REGIONS.map(sr=><div key={sr.id} className="card2" style={{cursor:"pointer"}} onClick={()=>gs.sendScout(sr)}><div style={{fontWeight:700,fontSize:12,marginBottom:3}}>{sr.name}</div><div style={{fontSize:10,color:"#374151"}}>費用:{fmtSal(sr.cost)} / Lv{sr.qMin}〜{sr.qMax}</div></div>)}</div></div>
+        <div className="card"><div className="card-h">繧ｹ繧ｫ繧ｦ繝域ｴｾ驕｣</div><div className="g2">{SCOUT_REGIONS.map(sr=><div key={sr.id} className="card2" style={{cursor:"pointer"}} onClick={()=>gs.sendScout(sr)}><div style={{fontWeight:700,fontSize:12,marginBottom:3}}>{sr.name}</div><div style={{fontSize:10,color:"#374151"}}>雋ｻ逕ｨ:{fmtSal(sr.cost)} / Lv{sr.qMin}縲悳sr.qMax}</div></div>)}</div></div>
       </div>
     )}
     {tab==="finance"&&<FinanceTab team={myTeam} onStadiumUpgrade={gs.handleStadiumUpgrade} onTicketPriceChange={gs.handleSetTicketPrice} gameDay={gameDay} onPlayerClick={gs.handlePlayerClick}/>}
@@ -526,9 +520,9 @@ export default function App(){
 
     {tab==="roster"&&(
       <div className="card">
-        <div className="card-h">コーチ陣</div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>{myTeam?.coaches.map((c,i)=><div key={i} className="card2" style={{display:"flex",alignItems:"center",gap:8,flex:"1 1 190px"}}><span style={{fontSize:18}}>{c.emoji}</span><div style={{flex:1}}><div style={{fontSize:12,fontWeight:700}}>{c.typeName} <span style={{color:"#f5c842",fontSize:10}}>Lv{c.grade}</span></div><div style={{fontSize:10,color:"#374151"}}>{c.name}</div></div><button className="bsm bgr" onClick={()=>gs.fireCoach(i)}>解雇</button></div>)}</div>
-        <details><summary style={{fontSize:11,color:"#374151",cursor:"pointer"}}>+ コーチを雇う</summary><div className="g2" style={{marginTop:8}}>{COACH_DEFS.map(cd=>COACH_GRADES.map(cg=>{const hired=myTeam?.coaches.some(c=>c.type===cd.type&&c.grade===cg.g);return <div key={cd.type+cg.g} className="card2" style={{opacity:hired?0.5:1}}><div className="fsb"><span style={{fontSize:11}}>{cd.emoji}{cd.name} Lv{cg.g}</span><button className="bsm bga" disabled={hired} onClick={()=>gs.hireCoach(cd,cg)}>{hired?"済":"雇う"}</button></div><div style={{fontSize:10,color:"#374151",marginTop:2}}>{fmtSal(cg.salary)}/月 · +{cg.bonus}成長</div></div>;}))}</div></details>
+        <div className="card-h">繧ｳ繝ｼ繝・劵</div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>{myTeam?.coaches.map((c,i)=><div key={i} className="card2" style={{display:"flex",alignItems:"center",gap:8,flex:"1 1 190px"}}><span style={{fontSize:18}}>{c.emoji}</span><div style={{flex:1}}><div style={{fontSize:12,fontWeight:700}}>{c.typeName} <span style={{color:"#f5c842",fontSize:10}}>Lv{c.grade}</span></div><div style={{fontSize:10,color:"#374151"}}>{c.name}</div></div><button className="bsm bgr" onClick={()=>gs.fireCoach(i)}>隗｣髮・/button></div>)}</div>
+        <details><summary style={{fontSize:11,color:"#374151",cursor:"pointer"}}>+ 繧ｳ繝ｼ繝√ｒ髮・≧</summary><div className="g2" style={{marginTop:8}}>{COACH_DEFS.map(cd=>COACH_GRADES.map(cg=>{const hired=myTeam?.coaches.some(c=>c.type===cd.type&&c.grade===cg.g);return <div key={cd.type+cg.g} className="card2" style={{opacity:hired?0.5:1}}><div className="fsb"><span style={{fontSize:11}}>{cd.emoji}{cd.name} Lv{cg.g}</span><button className="bsm bga" disabled={hired} onClick={()=>gs.hireCoach(cd,cg)}>{hired?"貂・:"髮・≧"}</button></div><div style={{fontSize:10,color:"#374151",marginTop:2}}>{fmtSal(cg.salary)}/譛・ﾂｷ +{cg.bonus}謌宣聞</div></div>;}))}</div></details>
       </div>
     )}
     <RetireModal modal={retireModal} retireRole={retireRole} setRetireRole={setRetireRole} onRetain={()=>os.handleRetain(retireModal.player)} onAccept={()=>os.handleAcceptRetire(retireModal.player)} onStartRetireGame={()=>os.handleStartRetireGame(retireModal.player)} onSkipRetireGame={()=>os.handleSkipRetireGame(retireModal.player)}/>
@@ -537,17 +531,17 @@ export default function App(){
     {gs.pregameError&&(
       <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.72)',zIndex:400,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 16px'}}>
         <div style={{background:'#0d1b2a',border:'1px solid rgba(248,113,113,.4)',borderRadius:12,padding:'24px 20px',width:'100%',maxWidth:420,boxShadow:'0 8px 32px rgba(0,0,0,.6)'}}>
-          <div style={{fontSize:15,fontWeight:700,color:'#f87171',marginBottom:10}}>⚠️ 試合開始エラー</div>
+          <div style={{fontSize:15,fontWeight:700,color:'#f87171',marginBottom:10}}>笞・・隧ｦ蜷磯幕蟋九お繝ｩ繝ｼ</div>
           <div style={{fontSize:13,color:'#cbd5e1',marginBottom:18,lineHeight:1.6}}>{gs.pregameError.message}</div>
           <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
             <button
               className="bsm bga"
               onClick={()=>{gs.setPregameError(null);setTab('roster');}}
-            >ロースタータブへ</button>
+            >繝ｭ繝ｼ繧ｹ繧ｿ繝ｼ繧ｿ繝悶∈</button>
             <button
               className="bsm bgr"
               onClick={()=>gs.setPregameError(null)}
-            >閉じる</button>
+            >髢峨§繧・/button>
           </div>
         </div>
       </div>
@@ -568,7 +562,7 @@ export default function App(){
         );
       })}
       <button className="primary-nav-cta" onClick={sf.handleStartGame} disabled={gameDay>SEASON_GAMES}>
-        次へ進む
+        谺｡縺ｸ騾ｲ繧
       </button>
     </div>
   </div></div></div></>);
