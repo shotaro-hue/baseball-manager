@@ -505,13 +505,26 @@ async function idbRead(storeName, key) {
   });
 }
 
-async function persistLargeDataToIndexedDb(state) {
-  const seasonHistory = state?.seasonHistory ?? {};
-  const news = Array.isArray(state?.news) ? state.news : [];
-  const mailbox = Array.isArray(state?.mailbox) ? state.mailbox : [];
-  await idbWrite(IDB_STORES.chunks, 'seasonHistory', seasonHistory);
-  await idbWrite(IDB_STORES.chunks, 'news', news);
-  await idbWrite(IDB_STORES.chunks, 'mailbox', mailbox);
+function shouldPersistChunk(dirtyScopes, scopeName) {
+  if (!(dirtyScopes instanceof Set) || dirtyScopes.size === 0) return true;
+  return dirtyScopes.has(scopeName);
+}
+
+async function persistLargeDataToIndexedDb(state, dirtyScopes = null) {
+  const writes = [];
+  if (shouldPersistChunk(dirtyScopes, 'seasonHistory')) {
+    const seasonHistory = state?.seasonHistory ?? {};
+    writes.push(idbWrite(IDB_STORES.chunks, 'seasonHistory', seasonHistory));
+  }
+  if (shouldPersistChunk(dirtyScopes, 'news')) {
+    const news = Array.isArray(state?.news) ? state.news : [];
+    writes.push(idbWrite(IDB_STORES.chunks, 'news', news));
+  }
+  if (shouldPersistChunk(dirtyScopes, 'mailbox')) {
+    const mailbox = Array.isArray(state?.mailbox) ? state.mailbox : [];
+    writes.push(idbWrite(IDB_STORES.chunks, 'mailbox', mailbox));
+  }
+  await Promise.all(writes);
 }
 
 function normalizeRecentCareerLog(player) {
@@ -582,6 +595,7 @@ export async function saveGame(state, options = {}) {
   const skipBackupRotation = options?.skipBackupRotation === true;
   const preferMainSave = options?.preferMainSave !== false;
   const perfBreakdown = {};
+  const dirtyScopes = new Set(Array.isArray(options?.dirtyScopes) ? options.dirtyScopes.filter((scope) => typeof scope === 'string' && scope) : []);
   let safeState;
   try {
     safeState = sanitizeSaveState(state);
@@ -590,7 +604,7 @@ export async function saveGame(state, options = {}) {
     return { ok: false, quota: false, reason: 'sanitize_state_failed' };
   }
   try {
-    await persistLargeDataToIndexedDb(safeState);
+    await persistLargeDataToIndexedDb(safeState, dirtyScopes);
   } catch (e) {
     console.error('Save failed: IndexedDB write error', e);
     return { ok: false, quota: false, reason: 'indexeddb_write_failed' };
