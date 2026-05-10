@@ -105,10 +105,11 @@ export default function App(){
   const [batchCount, setBatchCount] = useState(5);
   const [batchAutoManage, setBatchAutoManage] = useState(false);
   const [seasonAutoManage, setSeasonAutoManage] = useState(false);
-  const mailboxForView = gs.getMailboxBySelector({ limit: 200 });
-  const newsForView = gs.getNewsBySelector({ limit: 200 });
-  const unreadMailboxCount = gs.getUnreadMailboxCount(gameDay);
-  const latestNewsId = gs.getLatestNewsId();
+  const dashboardSlice = gs.getDashboardSlice({ limit: 200, gameDay });
+  const mailboxForView = gs.getMailboxPage({ limit: 200 });
+  const newsForView = gs.getNewsPage({ limit: 200 });
+  const unreadMailboxCount = dashboardSlice.unreadMailboxCount;
+  const latestNewsId = dashboardSlice.latestNewsId;
 
   useEffect(() => {
     const sectionId = TAB_TO_SECTION[tab];
@@ -173,8 +174,7 @@ export default function App(){
     return allowedOptions.includes(parsed) ? parsed : fallbackValue;
   };
 
-  const foreignFaPool = faPool.filter(p => p.isForeign);
-  const domesticFaPool = faPool.filter(p => !p.isForeign);
+  const { foreign: foreignFaPool, domestic: domesticFaPool } = gs.getFaPoolByCategory();
   const foreignActiveCount = myTeam?.players?.filter(p => p.isForeign).length || 0;
 
   const startNeg = (player) => {
@@ -400,7 +400,7 @@ export default function App(){
     </div>
 
     <ErrorBoundary key={tab}>
-    {tab==="dashboard"&&<DashboardTab myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year} recentResults={gs.recentResults} mailbox={mailboxForView} faPool={faPool} onTabSwitch={handleTabChange} unreadMailboxCount={unreadMailboxCount} latestNewsId={latestNewsId}/>}
+    {tab==="dashboard"&&<DashboardTab myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year} recentResults={dashboardSlice.recentResults} mailbox={dashboardSlice.mailbox} faPool={faPool} onTabSwitch={handleTabChange} unreadMailboxCount={unreadMailboxCount} latestNewsId={latestNewsId}/>}
     {tab==="roster"&&<RosterTab team={myTeam} onToggle={gs.toggleLineup} onReplaceLineup={gs.replaceLineup} onSetLineupOrder={gs.setLineupOrder} onSetRosterDhMode={gs.setRosterDhMode} onSetPlayerPosition={gs.setPlayerPosition} onSetStarter={gs.setStarter} onPromo={gs.promote} onDemo={gs.demote} onSetTrainingFocus={gs.setTrainingFocus} onConvertIkusei={gs.convertIkusei} onMoveRotation={gs.moveRotation} onRemoveFromRotation={gs.removeFromRotation} onSetPitchingPattern={gs.setPitchingPattern} onReplaceRotation={gs.replaceRotation} onReplaceFullRoster={gs.replaceFullRoster} onPlayerClick={gs.handlePlayerClick} onSetDevGoal={gs.setDevGoal} onPlayerTalk={gs.handlePlayerTalk} onSetConvertTarget={gs.setConvertTarget} gameDay={gameDay}/>}
     {tab==="schedule"&&<ScheduleTab schedule={schedule} gameDay={gameDay} myTeam={myTeam} teams={teams} year={year} gameResultsMap={gs.gameResultsMap} allStarDone={gs.allStarDone} allStarResult={gs.allStarResult} allStarTriggerDay={gs.allStarTriggerDay} scheduleArchive={gs.scheduleArchive||[]} onResultClick={dayNo=>{const r=gs.gameResultsMap[dayNo];if(r){sf.setGameResult({score:{my:r.myScore,opp:r.oppScore},log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:r.oppTeam,won:r.won,gameNo:dayNo,_source:"schedule"});setScreen("result");}}}/>}
     {tab==="records"&&<RecordsTab history={gs.seasonHistory}/>}
