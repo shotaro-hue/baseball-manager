@@ -64,6 +64,17 @@ function normalizeDirtyScopes(scopes) {
   return [];
 }
 
+function createEmptySeasonHistory() {
+  return {
+    awards: [],
+    records: { singleSeasonHR: null, singleSeasonAVG: null, singleSeasonK: null, careerHR: {}, careerW: {} },
+    hallOfFame: [],
+    championships: [],
+    standingsHistory: [],
+    transfers: [],
+  };
+}
+
 const INIT_TEAMS = TEAM_DEFS.map(function(d){
   const t = NPB2025_ROSTERS[d.id] ? buildRealTeam(d, NPB2025_ROSTERS[d.id]) : buildTeam(d);
   const nonPitcherIds = (t.players || []).filter(p => !p.isPitcher).map(p => p.id);
@@ -86,7 +97,7 @@ export function useGameState() {
   const [retireRole, setRetireRole] = useState(null);
   const [gameState, dispatch] = useReducer(gameStateReducer, { teams: INIT_TEAMS, gameDay: 1, year: 2026, myId: null });
   const { teams, gameDay, year, myId } = gameState;
-  const dirtySaveScopesRef = useRef(new Set(['core', 'fa', 'seasonHistory', 'news', 'mailbox']));
+  const dirtySaveScopesRef = useRef(new Set(['core', 'fa', 'seasonHistory', 'news', 'mailbox', 'gameResultsMap', 'scheduleArchive']));
   const markSaveScopes = useCallback((scopes = []) => {
     const normalized = normalizeDirtyScopes(scopes);
     if (normalized.length === 0) return;
@@ -105,14 +116,9 @@ export function useGameState() {
   const [faPool, setFaPool] = useState(() => generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX)));
   const [faYears, setFaYears] = useState({});
   const [notif, setNotif] = useState(null);
-  const [seasonHistory, setSeasonHistory] = useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[],transfers:[]});
   const [saveExists, setSaveExists] = useState(()=>hasSave());
   const [schedule, setSchedule] = useState(null);
-  const [news, setNewsState] = useState([]);
-  const [mailbox, setMailboxState] = useState([]);
   const [recentResults, setRecentResults] = useState([]);
-  const [gameResultsMap, setGameResultsMapState] = useState({});
-  const [scheduleArchive, setScheduleArchiveState] = useState([]); // 過去シーズン: [{year, schedule, gameResultsMap, myTeamResultsMap}]
   const [cpuTradeOffers, setCpuTradeOffers] = useState([]);
   const [pressEvent, setPressEvent] = useState(null);  // 記者会見イベント
   const [lastPressDay, setLastPressDay] = useState(0); // 最後に記者会見を行ったgameDay
@@ -126,12 +132,20 @@ export function useGameState() {
   const [saveQueueState, setSaveQueueState] = useState(() => getSaveQueueSnapshot());
   const saveRevisionRef = useRef(0);
 
-  const persistentStoreRef = useRef(createPersistentDataStore());
+  const persistentStoreRef = useRef(createPersistentDataStore({ seasonHistory: createEmptySeasonHistory() }));
   const [persistentSummaries, setPersistentSummaries] = useState(() => persistentStoreRef.current.getSummaries());
+  const [, setPersistentVersion] = useState(0);
+
+  const seasonHistory = persistentStoreRef.current.getSeasonHistory();
+  const news = persistentStoreRef.current.getNews();
+  const mailbox = persistentStoreRef.current.getMailbox();
+  const gameResultsMap = persistentStoreRef.current.getGameResultsMap();
+  const scheduleArchive = persistentStoreRef.current.getScheduleArchive();
 
   const syncPersistentSummary = useCallback((key, value) => {
     const store = persistentStoreRef.current;
     let nextPartial = null;
+    if (key === 'seasonHistory') nextPartial = { seasonHistory: store.setSeasonHistory(value) };
     if (key === 'news') nextPartial = { news: store.setNews(value) };
     if (key === 'mailbox') nextPartial = { mailbox: store.setMailbox(value) };
     if (key === 'scheduleArchive') nextPartial = { scheduleArchive: store.setScheduleArchive(value) };
@@ -140,36 +154,54 @@ export function useGameState() {
     setPersistentSummaries(prev => ({ ...prev, ...nextPartial }));
   }, []);
 
-  const setNews = useCallback((value) => {
-    setNewsState((prev) => {
+  const updatePersistentData = useCallback((scope, updater, options = {}) => {
+    const store = persistentStoreRef.current;
+    const markDirty = options.markDirty !== false;
+    let nextValue;
+    if (scope === 'seasonHistory') nextValue = typeof updater === 'function' ? updater(store.getSeasonHistory()) : updater;
+    if (scope === 'news') nextValue = typeof updater === 'function' ? updater(store.getNews()) : updater;
+    if (scope === 'mailbox') nextValue = typeof updater === 'function' ? updater(store.getMailbox()) : updater;
+    if (scope === 'scheduleArchive') nextValue = typeof updater === 'function' ? updater(store.getScheduleArchive()) : updater;
+    if (scope === 'gameResultsMap') nextValue = typeof updater === 'function' ? updater(store.getGameResultsMap()) : updater;
+    syncPersistentSummary(scope, nextValue);
+    setPersistentVersion((prev) => prev + 1);
+    if (markDirty) {
+      const dirtyScope = scope === 'seasonHistory' ? 'seasonHistory' : scope;
+      markSaveDirty([dirtyScope]);
+    }
+    return nextValue;
+  }, [markSaveDirty, syncPersistentSummary]);
+
+  const setSeasonHistory = useCallback((value, options) => {
+    return updatePersistentData('seasonHistory', (prev) => {
       const next = typeof value === 'function' ? value(prev) : value;
-      syncPersistentSummary('news', next);
-      markSaveScopes(['news']);
+      return next && typeof next === 'object' ? next : createEmptySeasonHistory();
+    }, options);
+  }, [updatePersistentData]);
+  const setNews = useCallback((value, options) => {
+    return updatePersistentData('news', (prev) => {
+      const next = typeof value === 'function' ? value(prev) : value;
       return Array.isArray(next) ? next : [];
-    });
-  }, [markSaveScopes, syncPersistentSummary]);
-  const setMailbox = useCallback((value) => {
-    setMailboxState((prev) => {
+    }, options);
+  }, [updatePersistentData]);
+  const setMailbox = useCallback((value, options) => {
+    return updatePersistentData('mailbox', (prev) => {
       const next = typeof value === 'function' ? value(prev) : value;
-      syncPersistentSummary('mailbox', next);
-      markSaveScopes(['mailbox']);
       return Array.isArray(next) ? next : [];
-    });
-  }, [markSaveScopes, syncPersistentSummary]);
-  const setScheduleArchive = useCallback((value) => {
-    setScheduleArchiveState((prev) => {
+    }, options);
+  }, [updatePersistentData]);
+  const setScheduleArchive = useCallback((value, options) => {
+    return updatePersistentData('scheduleArchive', (prev) => {
       const next = typeof value === 'function' ? value(prev) : value;
-      syncPersistentSummary('scheduleArchive', next);
       return Array.isArray(next) ? next : [];
-    });
-  }, [syncPersistentSummary]);
-  const setGameResultsMap = useCallback((value) => {
-    setGameResultsMapState((prev) => {
+    }, options);
+  }, [updatePersistentData]);
+  const setGameResultsMap = useCallback((value, options) => {
+    return updatePersistentData('gameResultsMap', (prev) => {
       const next = typeof value === 'function' ? value(prev) : value;
-      syncPersistentSummary('gameResultsMap', next);
       return next && typeof next === 'object' ? next : {};
-    });
-  }, [syncPersistentSummary]);
+    }, options);
+  }, [updatePersistentData]);
 
   const getNewsBySelector = useCallback((options = {}) => {
     return persistentStoreRef.current.selectNewsList(options);
@@ -194,6 +226,22 @@ export function useGameState() {
   }, []);
   const getMailboxItemById = useCallback((id) => {
     return persistentStoreRef.current.getMailboxById(id);
+  }, []);
+  const getSeasonHistory = useCallback(() => {
+    return persistentStoreRef.current.getSeasonHistory();
+  }, []);
+  const getScheduleArchive = useCallback(() => {
+    return persistentStoreRef.current.getScheduleArchive();
+  }, []);
+  const getGameResultsMap = useCallback(() => {
+    return persistentStoreRef.current.getGameResultsMap();
+  }, []);
+  const resetSaveTracking = useCallback((nextRevision = null) => {
+    dirtySaveScopesRef.current.clear();
+    setSaveDirty(false);
+    if (Number.isFinite(Number(nextRevision))) {
+      setSaveRevision(Number(nextRevision));
+    }
   }, []);
   const refreshSaveQueueState = useCallback(() => {
     setSaveQueueState(getSaveQueueSnapshot());
@@ -279,15 +327,13 @@ export function useGameState() {
 
   const pushGameResult = useCallback((gameNo, result)=>{
     setGameResultsMap(prev=>({ ...prev, [gameNo]: result }));
-    markSaveDirty();
-  },[markSaveDirty, setGameResultsMap]);
+  },[setGameResultsMap]);
 
   const addNews = useCallback((article)=>{
     setNews(prev=>{
       return [{id:uid(),timestamp:Date.now(),...article},...prev].slice(0,50);
     });
-    markSaveDirty();
-  },[markSaveDirty]);
+  },[setNews]);
 
   const addToHistory = useCallback((teamId,player,exitReason)=>{
     if(!player) return;
@@ -375,7 +421,7 @@ export function useGameState() {
     const intervalMs = getAutoSaveIntervalMs();
     if (lastAutoSaveAt > 0 && now - lastAutoSaveAt < intervalMs) return;
     const revisionAtSave = saveRevision;
-    queueSave({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision}, { dirtyScopes: Array.from(dirtySaveScopesRef.current) }).then((result)=>{
+    queueSave({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,gameResultsMap,scheduleArchive,saveRevision}, { dirtyScopes: Array.from(dirtySaveScopesRef.current) }).then((result)=>{
       if(result.ok){
         setSaveExists(true);
         if (saveRevisionRef.current === revisionAtSave) {
@@ -389,11 +435,11 @@ export function useGameState() {
       console.error('Auto save failed:', error);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[screen,isAutoSaveSuspended,saveDirty,lastAutoSaveAt,saveRevision,saveQueueState.isSaving]);
+  },[screen,isAutoSaveSuspended,saveDirty,lastAutoSaveAt,saveRevision,saveQueueState.isSaving,teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,gameResultsMap,scheduleArchive,queueSave,notify]);
 
   const handleSave = useCallback(async ()=>{
     const revisionAtSave = saveRevision;
-    const result=await queueSave({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision}, { dirtyScopes: Array.from(dirtySaveScopesRef.current) });
+    const result=await queueSave({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,gameResultsMap,scheduleArchive,saveRevision}, { dirtyScopes: Array.from(dirtySaveScopesRef.current) });
     if(result.ok){
       setSaveExists(true);
       if (saveRevisionRef.current === revisionAtSave) {
@@ -403,7 +449,7 @@ export function useGameState() {
     }
     notify(result.ok?'💾 セーブしました':result.quota?'💾 ストレージ容量が不足しています':'セーブに失敗しました',result.ok?'ok':'warn');
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision,notify,queueSave]);
+  },[teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,gameResultsMap,scheduleArchive,saveRevision,notify,queueSave]);
 
   const handleSelect = useCallback((id)=>{
     setMyId(id);
@@ -750,10 +796,14 @@ export function useGameState() {
     getLatestNewsId,
     getNewsItemById,
     getMailboxItemById,
+    getSeasonHistory,
+    getScheduleArchive,
+    getGameResultsMap,
     getTabBadgeState,
     getDashboardSlice,
     getFaPoolByCategory,
     markSaveDirty,
+    resetSaveTracking,
     // derived
     myTeam,
     tabBadges,
