@@ -1,4 +1,4 @@
-import { useState, useReducer, useMemo, useCallback, useEffect, useRef } from "react";
+import { useState, useReducer, useMemo, useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { gameStateReducer, G } from './gameStateReducer';
 import { uid, clamp, rng, pname, scoutedValue, fmtSal } from '../utils';
 import { buildTeam, makePlayer, resolveTrainingFocusFromGoal, generateForeignFaPool } from '../engine/player';
@@ -75,6 +75,15 @@ function createEmptySeasonHistory() {
   };
 }
 
+function usePersistentStoreScope(store, scope, readSnapshot) {
+  useSyncExternalStore(
+    useCallback((listener) => store.subscribe(listener, scope), [store, scope]),
+    useCallback(() => store.getRevision(scope), [store, scope]),
+    useCallback(() => store.getRevision(scope), [store, scope]),
+  );
+  return readSnapshot();
+}
+
 const INIT_TEAMS = TEAM_DEFS.map(function(d){
   const t = NPB2025_ROSTERS[d.id] ? buildRealTeam(d, NPB2025_ROSTERS[d.id]) : buildTeam(d);
   const nonPitcherIds = (t.players || []).filter(p => !p.isPitcher).map(p => p.id);
@@ -133,44 +142,44 @@ export function useGameState() {
   const saveRevisionRef = useRef(0);
 
   const persistentStoreRef = useRef(createPersistentDataStore({ seasonHistory: createEmptySeasonHistory() }));
-  const [persistentSummaries, setPersistentSummaries] = useState(() => persistentStoreRef.current.getSummaries());
-  const [, setPersistentVersion] = useState(0);
-
-  const seasonHistory = persistentStoreRef.current.getSeasonHistory();
-  const news = persistentStoreRef.current.getNews();
-  const mailbox = persistentStoreRef.current.getMailbox();
-  const gameResultsMap = persistentStoreRef.current.getGameResultsMap();
-  const scheduleArchive = persistentStoreRef.current.getScheduleArchive();
-
-  const syncPersistentSummary = useCallback((key, value) => {
-    const store = persistentStoreRef.current;
-    let nextPartial = null;
-    if (key === 'seasonHistory') nextPartial = { seasonHistory: store.setSeasonHistory(value) };
-    if (key === 'news') nextPartial = { news: store.setNews(value) };
-    if (key === 'mailbox') nextPartial = { mailbox: store.setMailbox(value) };
-    if (key === 'scheduleArchive') nextPartial = { scheduleArchive: store.setScheduleArchive(value) };
-    if (key === 'gameResultsMap') nextPartial = { gameResultsMap: store.setGameResultsMap(value) };
-    if (!nextPartial) return;
-    setPersistentSummaries(prev => ({ ...prev, ...nextPartial }));
-  }, []);
+  const persistentStore = persistentStoreRef.current;
+  // Lightweight summaries are for badges/counts only. Detailed lists/history must be read via selectors/getters.
+  const persistentSummaries = usePersistentStoreScope(persistentStore, '*', () => persistentStore.getSummaries());
+  const seasonHistory = usePersistentStoreScope(persistentStore, 'seasonHistory', () => persistentStore.getSeasonHistory());
+  const news = usePersistentStoreScope(persistentStore, 'news', () => persistentStore.getNews());
+  const mailbox = usePersistentStoreScope(persistentStore, 'mailbox', () => persistentStore.getMailbox());
+  const gameResultsMap = usePersistentStoreScope(persistentStore, 'gameResultsMap', () => persistentStore.getGameResultsMap());
+  const scheduleArchive = usePersistentStoreScope(persistentStore, 'scheduleArchive', () => persistentStore.getScheduleArchive());
 
   const updatePersistentData = useCallback((scope, updater, options = {}) => {
-    const store = persistentStoreRef.current;
     const markDirty = options.markDirty !== false;
     let nextValue;
-    if (scope === 'seasonHistory') nextValue = typeof updater === 'function' ? updater(store.getSeasonHistory()) : updater;
-    if (scope === 'news') nextValue = typeof updater === 'function' ? updater(store.getNews()) : updater;
-    if (scope === 'mailbox') nextValue = typeof updater === 'function' ? updater(store.getMailbox()) : updater;
-    if (scope === 'scheduleArchive') nextValue = typeof updater === 'function' ? updater(store.getScheduleArchive()) : updater;
-    if (scope === 'gameResultsMap') nextValue = typeof updater === 'function' ? updater(store.getGameResultsMap()) : updater;
-    syncPersistentSummary(scope, nextValue);
-    setPersistentVersion((prev) => prev + 1);
+    if (scope === 'seasonHistory') {
+      nextValue = typeof updater === 'function' ? updater(persistentStore.getSeasonHistory()) : updater;
+      persistentStore.setSeasonHistory(nextValue);
+    }
+    if (scope === 'news') {
+      nextValue = typeof updater === 'function' ? updater(persistentStore.getNews()) : updater;
+      persistentStore.setNews(nextValue);
+    }
+    if (scope === 'mailbox') {
+      nextValue = typeof updater === 'function' ? updater(persistentStore.getMailbox()) : updater;
+      persistentStore.setMailbox(nextValue);
+    }
+    if (scope === 'scheduleArchive') {
+      nextValue = typeof updater === 'function' ? updater(persistentStore.getScheduleArchive()) : updater;
+      persistentStore.setScheduleArchive(nextValue);
+    }
+    if (scope === 'gameResultsMap') {
+      nextValue = typeof updater === 'function' ? updater(persistentStore.getGameResultsMap()) : updater;
+      persistentStore.setGameResultsMap(nextValue);
+    }
     if (markDirty) {
       const dirtyScope = scope === 'seasonHistory' ? 'seasonHistory' : scope;
       markSaveDirty([dirtyScope]);
     }
     return nextValue;
-  }, [markSaveDirty, syncPersistentSummary]);
+  }, [markSaveDirty, persistentStore]);
 
   const setSeasonHistory = useCallback((value, options) => {
     return updatePersistentData('seasonHistory', (prev) => {
@@ -770,14 +779,14 @@ export function useGameState() {
     faPool, setFaPool,
     faYears, setFaYears,
     notif,
-    seasonHistory, setSeasonHistory,
+    setSeasonHistory,
     saveExists, setSaveExists,
     schedule, setSchedule,
-    news, setNews,
-    mailbox, setMailbox,
+    setNews,
+    setMailbox,
     recentResults, setRecentResults,
-    gameResultsMap, setGameResultsMap,
-    scheduleArchive, setScheduleArchive,
+    setGameResultsMap,
+    setScheduleArchive,
     cpuTradeOffers, setCpuTradeOffers,
     pressEvent, setPressEvent,
     lastPressDay, setLastPressDay,
