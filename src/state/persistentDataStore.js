@@ -121,8 +121,54 @@ export function createPersistentDataStore(initialData = {}) {
     scheduleArchive: sanitizeArray(initialData.scheduleArchive),
     gameResultsMap: sanitizeObject(initialData.gameResultsMap),
   };
+  const listenersByScope = new Map();
+  const revisions = {
+    '*': 0,
+    seasonHistory: 0,
+    news: 0,
+    mailbox: 0,
+    scheduleArchive: 0,
+    gameResultsMap: 0,
+  };
+
+  function emit(scope) {
+    revisions['*'] += 1;
+    if (scope && Object.prototype.hasOwnProperty.call(revisions, scope)) {
+      revisions[scope] += 1;
+    }
+    const globalListeners = listenersByScope.get('*');
+    if (globalListeners) {
+      Array.from(globalListeners).forEach((listener) => listener());
+    }
+    if (!scope) return;
+    const scopedListeners = listenersByScope.get(scope);
+    if (scopedListeners) {
+      Array.from(scopedListeners).forEach((listener) => listener());
+    }
+  }
+
+  function subscribe(listener, scope = '*') {
+    if (typeof listener !== 'function') return () => {};
+    const safeScope = typeof scope === 'string' && scope ? scope : '*';
+    const listeners = listenersByScope.get(safeScope) ?? new Set();
+    listeners.add(listener);
+    listenersByScope.set(safeScope, listeners);
+    return () => {
+      const currentListeners = listenersByScope.get(safeScope);
+      if (!currentListeners) return;
+      currentListeners.delete(listener);
+      if (currentListeners.size === 0) {
+        listenersByScope.delete(safeScope);
+      }
+    };
+  }
 
   return {
+    subscribe,
+    getRevision(scope = '*') {
+      const safeScope = typeof scope === 'string' && scope ? scope : '*';
+      return revisions[safeScope] ?? revisions['*'];
+    },
     selectNewsList(options = {}) {
       return selectPage(store.news, options);
     },
@@ -160,6 +206,7 @@ export function createPersistentDataStore(initialData = {}) {
     },
     setSeasonHistory(nextValue) {
       store.seasonHistory = sanitizeObject(nextValue);
+      emit('seasonHistory');
       return buildSeasonHistorySummary(store.seasonHistory);
     },
     getSeasonHistory() {
@@ -167,10 +214,12 @@ export function createPersistentDataStore(initialData = {}) {
     },
     setNews(nextValue) {
       store.news = sanitizeArray(nextValue);
+      emit('news');
       return buildSummary(store.news);
     },
     applyNewsDelta(delta) {
       store.news = applyDelta(store.news, delta);
+      emit('news');
       return buildSummary(store.news);
     },
     getNews() {
@@ -178,10 +227,12 @@ export function createPersistentDataStore(initialData = {}) {
     },
     setMailbox(nextValue) {
       store.mailbox = sanitizeArray(nextValue);
+      emit('mailbox');
       return buildSummary(store.mailbox);
     },
     applyMailboxDelta(delta) {
       store.mailbox = applyDelta(store.mailbox, delta);
+      emit('mailbox');
       return buildSummary(store.mailbox);
     },
     getMailbox() {
@@ -189,6 +240,7 @@ export function createPersistentDataStore(initialData = {}) {
     },
     setScheduleArchive(nextValue) {
       store.scheduleArchive = sanitizeArray(nextValue);
+      emit('scheduleArchive');
       return { count: store.scheduleArchive.length };
     },
     getScheduleArchive() {
@@ -196,6 +248,7 @@ export function createPersistentDataStore(initialData = {}) {
     },
     setGameResultsMap(nextValue) {
       store.gameResultsMap = nextValue && typeof nextValue === 'object' ? nextValue : {};
+      emit('gameResultsMap');
       return { count: Object.keys(store.gameResultsMap).length };
     },
     getGameResultsMap() {
