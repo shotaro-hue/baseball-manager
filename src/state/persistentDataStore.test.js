@@ -62,4 +62,27 @@ describe('persistentDataStore selectors and deltas', () => {
       latestYear: 0,
     });
   });
+
+  it('supports scoped subscriptions and revisions', () => {
+    const store = createPersistentDataStore({
+      news: [{ id: 'n1' }],
+      mailbox: [{ id: 'm1', read: false, deliverOnDay: 1 }],
+    });
+    const calls = [];
+    const unsubscribeNews = store.subscribe(() => calls.push('news'), 'news');
+    const unsubscribeAll = store.subscribe(() => calls.push('all'));
+
+    store.setNews([{ id: 'n2' }]);
+    store.setMailbox([{ id: 'm2', read: true, deliverOnDay: 2 }]);
+
+    expect(calls).toEqual(['all', 'news', 'all']);
+    expect(store.getRevision('news')).toBe(1);
+    expect(store.getRevision('mailbox')).toBe(1);
+    expect(store.getRevision('*')).toBe(2);
+
+    unsubscribeNews();
+    unsubscribeAll();
+    store.setNews([{ id: 'n3' }]);
+    expect(calls).toEqual(['all', 'news', 'all']);
+  });
 });
