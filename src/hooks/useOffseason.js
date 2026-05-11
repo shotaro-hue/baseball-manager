@@ -22,7 +22,7 @@ export function useOffseason(gs) {
     teams, setTeams, myId, myTeam,
     year, setYear, gameDay, setGameDay,
     faPool, setFaPool, setFaYears,
-    seasonHistory, setSeasonHistory,
+    setSeasonHistory,
     setMailbox, setScreen,
     notify, upd, addNews, addToHistory, addTransferLog,
     setRetireModal, setRetireGamePlayer, retireRole,
@@ -30,12 +30,14 @@ export function useOffseason(gs) {
     setAllStarResult,
     setSchedule,
     schedule,
-    gameResultsMap,
     allTeamResultsMap,
     setGameResultsMap,
-    scheduleArchive, setScheduleArchive,
+    setScheduleArchive,
     setAllTeamResultsMap,
     setAllStarTriggerDay,
+    getMailboxItemById,
+    getSeasonHistory,
+    getGameResultsMap,
   } = gs;
 
   const [developmentSummary, setDevelopmentSummary] = useState(null);
@@ -82,6 +84,7 @@ export function useOffseason(gs) {
   };
 
   const handleNextYear = () => {
+    const currentGameResultsMap = getGameResultsMap();
     const foreignPool = generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX));
     setYear(y=>y+1);setGameDay(1);setFaPool(foreignPool);setDraftAllocation({pitcher:50,batter:50});
     setAllStarDone(false);
@@ -114,7 +117,7 @@ export function useOffseason(gs) {
     // 詳細ボックススコアは自チーム分のみ保持して容量増加を抑える
     if(schedule){
       const myTeamResultsMap = myId ? (allTeamResultsMap?.[myId] || {}) : {};
-      setScheduleArchive(prev=>[...prev,{year,schedule,gameResultsMap,myTeamResultsMap}].slice(-5));
+      setScheduleArchive(prev=>[...prev,{year,schedule,gameResultsMap: currentGameResultsMap,myTeamResultsMap}].slice(-5));
     }
     const nextYear=year+1;
     const newSchedule=generateSeasonSchedule(nextYear, teams);
@@ -308,7 +311,7 @@ export function useOffseason(gs) {
     setMailbox(prev=>prev.map(m=>m.id===id?{...m,read:true}:m));
   };
   const handleMailAction = (id, action) => {
-    const mail=gs.mailbox.find(m=>m.id===id);
+    const mail = getMailboxItemById(id);
     if(!mail) return;
 
     // ポスティング申請の承諾/拒否
@@ -482,11 +485,12 @@ export function useOffseason(gs) {
     setTeams(developedTeams);
     setDevelopmentSummary(mySummary);
     const awards=calcSeasonAwards(developedTeams,year);
-    const {records:newRec,broken:brokenRecs}=updateRecords(seasonHistory.records,developedTeams);
+    const currentSeasonHistory = getSeasonHistory();
+    const {records:newRec,broken:brokenRecs}=updateRecords(currentSeasonHistory.records,developedTeams);
     if(brokenRecs.length>0){const recLabel={singleSeasonHR:"シーズン本塁打",singleSeasonAVG:"シーズン打率",singleSeasonK:"シーズン奪三振"};const fmtVal=r=>r.type==="singleSeasonAVG"?`.${String(Math.round(r.value*1000)).padStart(3,"0")}`:r.type==="singleSeasonK"?`${r.value}奪三振`:`${r.value}本塁打`;const fmtOld=r=>r.type==="singleSeasonAVG"?`.${String(Math.round(r.oldValue*1000)).padStart(3,"0")}`:r.type==="singleSeasonK"?`${r.oldValue}奪三振`:`${r.oldValue}本塁打`;brokenRecs.forEach(r=>addNews({type:"record",headline:`🏅 ${r.playerName}（${r.teamName}）が${recLabel[r.type]}記録を更新！`,source:"NPB記録部",dateLabel:`${year}年`,body:`${r.playerName}（${r.teamName}）が${year}年シーズンに${fmtVal(r)}を記録し、従来の${recLabel[r.type]}記録（${fmtOld(r)}）を塗り替えた。`}));}
     const allAlumni=developedTeams.flatMap(t=>t.history||[]);
-    const newInductees=checkHallOfFame(seasonHistory.hallOfFame,allAlumni,year);
-    const newHoF=[...seasonHistory.hallOfFame,...newInductees];
+    const newInductees=checkHallOfFame(currentSeasonHistory.hallOfFame,allAlumni,year);
+    const newHoF=[...currentSeasonHistory.hallOfFame,...newInductees];
     if(newInductees.length>0){newInductees.forEach(h=>{setMailbox(prev=>[...prev,{id:uid(),type:"hof",read:false,title:"🏛 殿堂入り: "+h.playerName,from:"球団殿堂委員会",dateLabel:year+"年",timestamp:Date.now(),body:h.playerName+"選手が"+year+"年度の球団殿堂入りを果たした。"+[h.careerHR>0?"通算"+h.careerHR+"本塁打":"",h.careerW>0?"通算"+h.careerW+"勝":"",h.careerPA>0?"通算"+h.careerPA+"打席":""].filter(Boolean).join(" / ")}]);});}
     const makeRanking=(lg)=>developedTeams.filter(t=>t.league===lg).sort((a,b)=>{const pa=a.wins/Math.max(1,a.wins+a.losses);const pb=b.wins/Math.max(1,b.wins+b.losses);return pb-pa||(b.rf-b.ra)-(a.rf-a.ra);}).map(t=>({id:t.id,name:t.name,emoji:t.emoji,wins:t.wins,losses:t.losses,rf:t.rf,ra:t.ra}));
     const standingsSnap={year,central:makeRanking("セ"),pacific:makeRanking("パ"),titles:awards.titles,playerAwards:{mvpCentral:awards.mvp?.central,mvpPacific:awards.mvp?.pacific,sawamura:awards.sawamura,rookie:awards.rookie}};
@@ -558,7 +562,7 @@ export function useOffseason(gs) {
     });
     const seRanks = makeLeagueRanking("セ");
     const paRanks = makeLeagueRanking("パ");
-    const championId = seasonHistory.championships?.at(-1)?.championId ?? null;
+    const championId = getSeasonHistory().championships?.at(-1)?.championId ?? null;
     const csIds = new Set([...seRanks.slice(0, 3).map(t => t.id), ...paRanks.slice(0, 3).map(t => t.id)]);
     const teamsWithPop = postCpuTeams.map(t => {
       const leagueRanks = t.league === "セ" ? seRanks : paRanks;
