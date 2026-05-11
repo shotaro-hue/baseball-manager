@@ -34,6 +34,37 @@ function buildSummary(list) {
   };
 }
 
+function sanitizeObject(input) {
+  return input && typeof input === 'object' ? input : {};
+}
+
+function buildSeasonHistorySummary(seasonHistory) {
+  const safeHistory = sanitizeObject(seasonHistory);
+  const awards = sanitizeArray(safeHistory.awards);
+  const championships = sanitizeArray(safeHistory.championships);
+  const standingsHistory = sanitizeArray(safeHistory.standingsHistory);
+  const transfers = sanitizeArray(safeHistory.transfers);
+  const latestStandingsYear = standingsHistory.reduce((max, item) => {
+    const year = Number(item?.year || 0);
+    return year > max ? year : max;
+  }, 0);
+  const latestChampionshipYear = championships.reduce((max, item) => {
+    const year = Number(item?.year || 0);
+    return year > max ? year : max;
+  }, 0);
+  const latestTransferYear = transfers.reduce((max, item) => {
+    const year = Number(item?.year || 0);
+    return year > max ? year : max;
+  }, 0);
+  return {
+    awardCount: awards.length,
+    championshipCount: championships.length,
+    standingsYears: standingsHistory.length,
+    transferCount: transfers.length,
+    latestYear: Math.max(latestStandingsYear, latestChampionshipYear, latestTransferYear, 0),
+  };
+}
+
 function selectPage(list, options = {}) {
   const safeList = sanitizeArray(list);
   const safeOptions = options && typeof options === 'object' ? options : {};
@@ -84,11 +115,11 @@ function applyDelta(list, delta) {
 
 export function createPersistentDataStore(initialData = {}) {
   const store = {
-    seasonHistory: initialData.seasonHistory && typeof initialData.seasonHistory === 'object' ? initialData.seasonHistory : {},
+    seasonHistory: sanitizeObject(initialData.seasonHistory),
     news: sanitizeArray(initialData.news),
     mailbox: sanitizeArray(initialData.mailbox),
     scheduleArchive: sanitizeArray(initialData.scheduleArchive),
-    gameResultsMap: initialData.gameResultsMap && typeof initialData.gameResultsMap === 'object' ? initialData.gameResultsMap : {},
+    gameResultsMap: sanitizeObject(initialData.gameResultsMap),
   };
 
   return {
@@ -128,8 +159,8 @@ export function createPersistentDataStore(initialData = {}) {
       return findById(store.mailbox, id);
     },
     setSeasonHistory(nextValue) {
-      store.seasonHistory = nextValue && typeof nextValue === 'object' ? nextValue : {};
-      return store.seasonHistory;
+      store.seasonHistory = sanitizeObject(nextValue);
+      return buildSeasonHistorySummary(store.seasonHistory);
     },
     getSeasonHistory() {
       return store.seasonHistory;
@@ -172,6 +203,7 @@ export function createPersistentDataStore(initialData = {}) {
     },
     getSummaries() {
       return {
+        seasonHistory: buildSeasonHistorySummary(store.seasonHistory),
         news: buildSummary(store.news),
         mailbox: buildSummary(store.mailbox),
         scheduleArchive: { count: store.scheduleArchive.length },
