@@ -36,4 +36,30 @@ describe('persistentDataStore selectors and deltas', () => {
     expect(store.getNewsById('n2')).toMatchObject({ id: 'n2' });
     expect(store.getMailboxById('m1')).toMatchObject({ id: 'm1', read: true });
   });
+
+  it('builds seasonHistory summary metadata', () => {
+    const store = createPersistentDataStore({
+      seasonHistory: {
+        awards: [{ year: 2026 }],
+        championships: [{ year: 2027 }],
+        standingsHistory: [{ year: 2026 }, { year: 2027 }],
+        transfers: [{ year: 2028 }],
+      },
+    });
+
+    expect(store.getSummaries().seasonHistory).toEqual({
+      awardCount: 1,
+      championshipCount: 1,
+      standingsYears: 2,
+      transferCount: 1,
+      latestYear: 2028,
+    });
+    expect(store.setSeasonHistory({ awards: [], championships: [], standingsHistory: [], transfers: [] })).toEqual({
+      awardCount: 0,
+      championshipCount: 0,
+      standingsYears: 0,
+      transferCount: 0,
+      latestYear: 0,
+    });
+  });
 });
