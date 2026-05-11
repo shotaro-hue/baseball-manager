@@ -352,13 +352,17 @@ export function useSeasonFlow(gs) {
     schedule, setScreen,
     notify, upd, addNews, addTransferLog, pushResult,
     setMailbox, setNews, setRetireModal,
-    faPool, setFaPool, faYears, seasonHistory, setSeasonHistory, news, mailbox,
-    gameResultsMap, scheduleArchive,
+    faPool, setFaPool, faYears, setSeasonHistory,
     saveRevision, setSaveRevision,
     setSaveExists, cpuTradeOffers,
     allStarDone, setAllStarDone, allStarResult, setAllStarResult,
     allStarTriggerDay,
     setAllTeamResultsMap, setPregameError,
+    getSeasonHistory,
+    getNewsBySelector,
+    getMailboxBySelector,
+    getGameResultsMap,
+    getScheduleArchive,
   } = gs;
 
   const [gameResult, setGameResult] = useState(null);
@@ -905,15 +909,20 @@ export function useSeasonFlow(gs) {
 
     const startedAt = Date.now();
     const taskId = uid();
+    const currentSeasonHistory = getSeasonHistory();
+    const currentNews = getNewsBySelector({ limit: 1000 });
+    const currentMailbox = getMailboxBySelector({ limit: 1000 });
+    const currentGameResultsMap = getGameResultsMap();
+    const currentScheduleArchive = getScheduleArchive();
     const snapshot = {
       teams,
       schedule,
       faPool,
-      seasonHistory,
-      news,
-      mailbox,
-      gameResultsMap,
-      scheduleArchive,
+      seasonHistory: currentSeasonHistory,
+      news: currentNews,
+      mailbox: currentMailbox,
+      gameResultsMap: currentGameResultsMap,
+      scheduleArchive: currentScheduleArchive,
       myId,
       gameDay,
       year,
