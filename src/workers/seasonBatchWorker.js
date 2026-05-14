@@ -2,6 +2,7 @@ import {
   simulateSeasonBatch,
   SeasonBatchCancelledError,
 } from './seasonBatchCore.js';
+import { simulateSingleDay } from './singleDayCore.js';
 
 let activeTaskId = null;
 let cancelRequested = false;
@@ -20,7 +21,14 @@ self.onmessage = (event) => {
 
     if (message.type !== 'START') return;
 
-    const { taskId, snapshot, count, autoManageMyTeam } = message.payload || {};
+    const {
+      taskId,
+      mode = 'batch',
+      snapshot,
+      count,
+      autoManageMyTeam,
+      gameContext,
+    } = message.payload || {};
     if (!taskId) {
       throw new Error('taskId is required');
     }
@@ -28,10 +36,7 @@ self.onmessage = (event) => {
     activeTaskId = taskId;
     cancelRequested = false;
 
-    const result = simulateSeasonBatch({
-      snapshot,
-      count,
-      autoManageMyTeam,
+    const commonArgs = {
       isCancelled: () => cancelRequested || activeTaskId !== taskId,
       onProgress: (progress) => {
         if (cancelRequested || activeTaskId !== taskId) return;
@@ -43,7 +48,20 @@ self.onmessage = (event) => {
           },
         });
       },
-    });
+    };
+
+    const result = mode === 'singleDay'
+      ? simulateSingleDay({
+          snapshot,
+          gameContext,
+          ...commonArgs,
+        })
+      : simulateSeasonBatch({
+          snapshot,
+          count,
+          autoManageMyTeam,
+          ...commonArgs,
+        });
 
     if (cancelRequested || activeTaskId !== taskId) {
       self.postMessage({ type: 'CANCEL', payload: { taskId } });
