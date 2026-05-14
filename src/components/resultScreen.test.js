@@ -29,8 +29,8 @@ const oppTeam = {
 
 const gsResult = {
   score: { my: 3, opp: 2 },
-  log: [],
-  inningSummary: [],
+  log: [{ batId: 'b1', batter: 'Slugger', scorer: true, result: 'hr', rbi: 2, pitcherId: 'p1', inning: 3, isTop: false }],
+  inningSummary: [{ inning: 3, isTop: false, runs: 2 }],
   oppTeam,
   won: true,
   gameNo: 12,
@@ -75,7 +75,7 @@ describe('scheduleDeferredPostGameWork', () => {
 });
 
 describe('ResultScreen post-game processing state', () => {
-  it('shows processing text and disables the hub button while post-game work is running', () => {
+  it('shows processing text and keeps the hub button enabled while details are loading', () => {
     const html = renderToStaticMarkup(
       React.createElement(ResultScreen, {
         gsResult,
@@ -85,14 +85,14 @@ describe('ResultScreen post-game processing state', () => {
         onNext: () => {},
         nextLabel: 'ハブに戻る',
         isPostGameProcessing: true,
-      })
+      }),
     );
 
-    expect(html).toContain('試合後処理中');
-    expect(html).toContain('disabled=""');
+    expect(html).toContain('試合詳細を整理中');
+    expect(html).not.toContain('disabled=""');
   });
 
-  it('enables the hub button after post-game work finishes', () => {
+  it('hides the processing text after post-game work finishes', () => {
     const html = renderToStaticMarkup(
       React.createElement(ResultScreen, {
         gsResult,
@@ -102,10 +102,25 @@ describe('ResultScreen post-game processing state', () => {
         onNext: () => {},
         nextLabel: 'ハブに戻る',
         isPostGameProcessing: false,
-      })
+      }),
     );
 
-    expect(html).not.toContain('試合後処理中');
+    expect(html).not.toContain('試合詳細を整理中');
     expect(html).not.toContain('disabled=""');
+  });
+
+  it('shows a lightweight loading placeholder before deferred detail work completes', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ResultScreen, {
+        gsResult,
+        myTeam,
+        oppTeam,
+        gameDay: 12,
+        onNext: () => {},
+        nextLabel: 'ハブに戻る',
+      }),
+    );
+
+    expect(html).toContain('打者成績を読み込み中');
   });
 });
