@@ -17,6 +17,27 @@ import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 
 const MAX_FOREIGN_ACTIVE = 4;
 
+export function buildSafeGameResult(rawResult, { oppTeam = null, gameNo = null, source } = {}) {
+  const score = {
+    my: Number(rawResult?.score?.my) || 0,
+    opp: Number(rawResult?.score?.opp) || 0,
+  };
+  const won = score.my > score.opp;
+  const drew = score.my === score.opp;
+  const nextResult = {
+    ...(rawResult || {}),
+    score,
+    log: Array.isArray(rawResult?.log) ? rawResult.log : [],
+    inningSummary: Array.isArray(rawResult?.inningSummary) ? rawResult.inningSummary : [],
+    oppTeam,
+    won,
+    drew,
+    gameNo,
+  };
+  if (source) nextResult._source = source;
+  return nextResult;
+}
+
 function applyDefenseCoachRecovery(players, coaches) {
   const defBonus=(coaches||[]).filter(c=>c.type==='defense').reduce((s,c)=>s+(c.bonus||0),0);
   if(!defBonus) return players;
@@ -1304,48 +1325,63 @@ export function useSeasonFlow(gs) {
   };
 
   // Game over callback from TacticalGameScreen
-  const handleTacticalGameEnd = gsResult => {
+  const handleTacticalGameEnd = rawGameResult => {
     if(!myTeam||!currentOpp) return;
-    const won=gsResult.score.my>gsResult.score.opp;
-    const drew=gsResult.score.my===gsResult.score.opp;
+    const gsResult = buildSafeGameResult(rawGameResult, {
+      oppTeam: currentOpp,
+      gameNo: gameDay,
+      source: "tactical",
+    });
+    const won=gsResult.won;
+    const drew=gsResult.drew;
     upd(myId,t=>{
-      let updated={...t,
+      try {
+        let updated={...t,
         wins:t.wins+(won?1:0),losses:t.losses+(!won&&!drew?1:0),draws:t.draws+(drew?1:0),
         rf:t.rf+gsResult.score.my,ra:t.ra+gsResult.score.opp,
         rotIdx:t.rotIdx+1,
-      };
-      updated.players=applyGameStatsFromLog(updated.players, gsResult.log, true, won, gameDay);
-      updated.players=applyPostGameCondition(updated.players, gsResult.log, true, gameDay);
-      updated.players=tickInjuries(updated.players);
-      updated.players=tickPositionTraining(updated.players);
-      updated.players=updated.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
-      updated.players=applyDefenseCoachRecovery(updated.players,t.coaches);
-      const newInj=checkForInjuries(updated.players, year);
-      updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
-      updated.farm=tickCooldowns(updated.farm??[]);
-      updated=autoInjuryDemote(updated);
-      const popFieldsT=applyPopularityDelta(t,won,drew);updated={...updated,...popFieldsT};
-      const rev=calcRevenue(updated);
-      const revTotal=rev.ticket+rev.sponsor+rev.merch;
-      updated.budget+=revTotal;
-      updated.revenueThisSeason=(updated.revenueThisSeason??0)+revTotal;
-      return updated;
+        };
+        updated.players=applyGameStatsFromLog(updated.players, gsResult.log, true, won, gameDay);
+        updated.players=applyPostGameCondition(updated.players, gsResult.log, true, gameDay);
+        updated.players=tickInjuries(updated.players);
+        updated.players=tickPositionTraining(updated.players);
+        updated.players=updated.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
+        updated.players=applyDefenseCoachRecovery(updated.players,t.coaches);
+        const newInj=checkForInjuries(updated.players, year);
+        updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
+        updated.farm=tickCooldowns(updated.farm??[]);
+        updated=autoInjuryDemote(updated);
+        const popFieldsT=applyPopularityDelta(t,won,drew);updated={...updated,...popFieldsT};
+        const rev=calcRevenue(updated);
+        const revTotal=rev.ticket+rev.sponsor+rev.merch;
+        updated.budget+=revTotal;
+        updated.revenueThisSeason=(updated.revenueThisSeason??0)+revTotal;
+        return updated;
+      } catch (error) {
+        console.error("[TacticalPostGame] failed to update my team", error);
+        return t;
+      }
     });
     upd(currentOpp.id,t=>{
-      let updated={...t,
+      try {
+        let updated={...t,
         wins:t.wins+(!won&&!drew?1:0),
         losses:t.losses+(won?1:0),
         draws:t.draws+(drew?1:0),
         rf:t.rf+gsResult.score.opp,
         ra:t.ra+gsResult.score.my,
-      };
-      updated.players=applyGameStatsFromLog(updated.players,gsResult.log,false,!won&&!drew, gameDay);
-      updated.players=applyPostGameCondition(updated.players,gsResult.log,false,gameDay);
-      updated.players=tickInjuries(updated.players);
-      const newInj=checkForInjuries(updated.players, year);
-      updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
-      Object.assign(updated,applyPopularityDelta(t,!won&&!drew,drew));
-      return updated;
+        };
+        updated.players=applyGameStatsFromLog(updated.players,gsResult.log,false,!won&&!drew, gameDay);
+        updated.players=applyPostGameCondition(updated.players,gsResult.log,false,gameDay);
+        updated.players=tickInjuries(updated.players);
+        const newInj=checkForInjuries(updated.players, year);
+        updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
+        Object.assign(updated,applyPopularityDelta(t,!won&&!drew,drew));
+        return updated;
+      } catch (error) {
+        console.error("[TacticalPostGame] failed to update opponent team", error);
+        return t;
+      }
     });
     const _tOppId=currentOpp.id;
     const _tCpuMatchups=getCpuMatchups(schedule,gameDay,myId,_tOppId);
@@ -1359,51 +1395,65 @@ export function useSeasonFlow(gs) {
       const b=teams.find(t=>t.id===matchup.awayId);
       if(!a||!b) continue;
       const useDh=!!a.dhEnabled;
-      const cr=quickSimGame(applyDhToTeam(a,useDh),applyDhToTeam(b,useDh));
+      const cr=buildSafeGameResult(
+        quickSimGame(applyDhToTeam(a,useDh),applyDhToTeam(b,useDh)),
+        { oppTeam: b, gameNo: gameDay },
+      );
       tCpuSimResults.push({matchup,cr,homeTeam:a,awayTeam:b});
     }
     setTeams(prev=>{
-      let newTeams=prev.map(t=>({...t,players:t.players.map(p=>({...p,stats:{...p.stats}}))}));
-      for(const{matchup,cr}of tCpuSimResults){
-        const a=newTeams.find(t=>t.id===matchup.homeId);
-        const b=newTeams.find(t=>t.id===matchup.awayId);
-        if(!a||!b) continue;
-        const cdrew=cr.score.my===cr.score.opp;
-        const aWon=cr.won;
-        if(aWon){a.wins++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.losses++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
-        else if(cdrew){a.draws++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.draws++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
-        else{b.wins++;b.rf+=cr.score.opp;b.ra+=cr.score.my;a.losses++;a.rf+=cr.score.my;a.ra+=cr.score.opp;}
-        Object.assign(a,applyPopularityDelta(a,aWon,cdrew));Object.assign(b,applyPopularityDelta(b,!aWon&&!cdrew,cdrew));
-        const aRevT=calcRevenue(a);a.budget=(a.budget??0)+aRevT.ticket+aRevT.sponsor+aRevT.merch;a.revenueThisSeason=(a.revenueThisSeason??0)+aRevT.ticket+aRevT.sponsor+aRevT.merch;
-        const bRevT=calcRevenue(b);b.budget=(b.budget??0)+bRevT.ticket+bRevT.sponsor+bRevT.merch;b.revenueThisSeason=(b.revenueThisSeason??0)+bRevT.ticket+bRevT.sponsor+bRevT.merch;
-        a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon, gameDay);
-        a.players=applyPostGameCondition(a.players,cr.log||[],true,gameDay);
-        a.players=tickInjuries(a.players);
-        const aInj=checkForInjuries(a.players,year);
-        a.players=applyInjuriesToPlayers(a.players,aInj,year);
-        b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew, gameDay);
-        b.players=applyPostGameCondition(b.players,cr.log||[],false,gameDay);
-        b.players=tickInjuries(b.players);
-        const bInj=checkForInjuries(b.players,year);
-        b.players=applyInjuriesToPlayers(b.players,bInj,year);
+      try {
+        let newTeams=prev.map(t=>({...t,players:t.players.map(p=>({...p,stats:{...p.stats}}))}));
+        for(const{matchup,cr}of tCpuSimResults){
+          const a=newTeams.find(t=>t.id===matchup.homeId);
+          const b=newTeams.find(t=>t.id===matchup.awayId);
+          if(!a||!b) continue;
+          const cdrew=cr.drew;
+          const aWon=cr.won;
+          if(aWon){a.wins++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.losses++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
+          else if(cdrew){a.draws++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.draws++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
+          else{b.wins++;b.rf+=cr.score.opp;b.ra+=cr.score.my;a.losses++;a.rf+=cr.score.my;a.ra+=cr.score.opp;}
+          Object.assign(a,applyPopularityDelta(a,aWon,cdrew));Object.assign(b,applyPopularityDelta(b,!aWon&&!cdrew,cdrew));
+          const aRevT=calcRevenue(a);a.budget=(a.budget??0)+aRevT.ticket+aRevT.sponsor+aRevT.merch;a.revenueThisSeason=(a.revenueThisSeason??0)+aRevT.ticket+aRevT.sponsor+aRevT.merch;
+          const bRevT=calcRevenue(b);b.budget=(b.budget??0)+bRevT.ticket+bRevT.sponsor+bRevT.merch;b.revenueThisSeason=(b.revenueThisSeason??0)+bRevT.ticket+bRevT.sponsor+bRevT.merch;
+          a.players=applyGameStatsFromLog(a.players,cr.log,true,aWon, gameDay);
+          a.players=applyPostGameCondition(a.players,cr.log,true,gameDay);
+          a.players=tickInjuries(a.players);
+          const aInj=checkForInjuries(a.players,year);
+          a.players=applyInjuriesToPlayers(a.players,aInj,year);
+          b.players=applyGameStatsFromLog(b.players,cr.log,false,!aWon&&!cdrew, gameDay);
+          b.players=applyPostGameCondition(b.players,cr.log,false,gameDay);
+          b.players=tickInjuries(b.players);
+          const bInj=checkForInjuries(b.players,year);
+          b.players=applyInjuriesToPlayers(b.players,bInj,year);
+        }
+        return newTeams;
+      } catch (error) {
+        console.error("[TacticalPostGame] failed to update cpu matchups", error);
+        return prev;
       }
-      return newTeams;
     });
     setAllTeamResultsMap(prev=>{
-      const next={...prev};
-      const recordGame=(homeId,awayId,cr,hPlayers,aPlayers,oppHName,oppAName)=>{
-        const bs=computeBoxScore(cr.log||[],cr.inningSummary||[],hPlayers,aPlayers,cr.score.my,cr.score.opp);
-        const hWon=cr.won; const drew=cr.score.my===cr.score.opp;
-        next[homeId]={...(next[homeId]||{}),[gameDay]:{won:hWon,drew,myScore:cr.score.my,oppScore:cr.score.opp,oppName:oppAName,oppId:awayId,homeId,awayId,...(bs||{})}};
-        next[awayId]={...(next[awayId]||{}),[gameDay]:{won:!hWon&&!drew,drew,myScore:cr.score.opp,oppScore:cr.score.my,oppName:oppHName,oppId:homeId,homeId,awayId,inningScores:bs?.inningScores,myBatting:bs?.awayBatting,oppBatting:bs?.homeBatting,myPitching:bs?.awayPitching,oppPitching:bs?.homePitching}};
-      };
-      for(const{matchup,cr,homeTeam,awayTeam}of tCpuSimResults){
-        recordGame(matchup.homeId,matchup.awayId,cr,homeTeam.players,awayTeam.players,homeTeam.name,awayTeam.name);
+      try {
+        const next={...prev};
+        const recordGame=(homeId,awayId,cr,hPlayers,aPlayers,oppHName,oppAName)=>{
+          const bs=computeBoxScore(cr.log,cr.inningSummary,hPlayers,aPlayers,cr.score.my,cr.score.opp);
+          const hWon=cr.won;
+          const gameDrew=cr.drew;
+          next[homeId]={...(next[homeId]||{}),[gameDay]:{won:hWon,drew:gameDrew,myScore:cr.score.my,oppScore:cr.score.opp,oppName:oppAName,oppId:awayId,homeId,awayId,...(bs||{})}};
+          next[awayId]={...(next[awayId]||{}),[gameDay]:{won:!hWon&&!gameDrew,drew:gameDrew,myScore:cr.score.opp,oppScore:cr.score.my,oppName:oppHName,oppId:homeId,homeId,awayId,inningScores:bs?.inningScores,myBatting:bs?.awayBatting,oppBatting:bs?.homeBatting,myPitching:bs?.awayPitching,oppPitching:bs?.homePitching}};
+        };
+        for(const{matchup,cr,homeTeam,awayTeam}of tCpuSimResults){
+          recordGame(matchup.homeId,matchup.awayId,cr,homeTeam.players,awayTeam.players,homeTeam.name,awayTeam.name);
+        }
+        recordGame(myId,_tOppId,gsResult,myTeam.players,currentOpp.players,myTeam.name,currentOpp.name);
+        return next;
+      } catch (error) {
+        console.error("[TacticalPostGame] failed to build all-team results", error);
+        return prev;
       }
-      const r2=gsResult; recordGame(myId,_tOppId,r2,myTeam.players,currentOpp.players,myTeam.name,currentOpp.name);
-      return next;
     });
-    setGameResult({...gsResult,oppTeam:currentOpp,won,gameNo:gameDay});
+    setGameResult(gsResult);
     const _tmpl=won?NEWS_TEMPLATES_WIN:NEWS_TEMPLATES_LOSE;
     const _scoreStr=gsResult.score.my+"-"+gsResult.score.opp;
     const _hl=_tmpl[rng(0,_tmpl.length-1)].replace("{team}",myTeam?.name||"自チーム").replace("{opp}",currentOpp?.name||"相手").replace("{score}",_scoreStr);
@@ -1434,9 +1484,8 @@ export function useSeasonFlow(gs) {
         });
       }
     }
-    const _tdrew=gsResult.score.my===gsResult.score.opp;
-    pushResult(won,_tdrew,currentOpp?.name||"",gsResult.score.my,gsResult.score.opp,gameDay);
-    gs.pushGameResult(gameDay,{won,drew:_tdrew,oppName:currentOpp?.name||"",myScore:gsResult.score.my,oppScore:gsResult.score.opp,log:gsResult.log||[],inningSummary:gsResult.inningSummary||[],oppTeam:currentOpp});
+    pushResult(won,drew,currentOpp?.name||"",gsResult.score.my,gsResult.score.opp,gameDay);
+    gs.pushGameResult(gameDay,{won,drew,oppName:currentOpp?.name||"",myScore:gsResult.score.my,oppScore:gsResult.score.opp,log:gsResult.log,inningSummary:gsResult.inningSummary,oppTeam:currentOpp});
     setGameDay(d=>d+1);
     if(!allStarDone && gameDay+1===allStarTriggerDay){
       const rosters=selectAllStars(teams);
