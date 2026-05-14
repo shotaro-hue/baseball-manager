@@ -9,7 +9,7 @@ import { OV, CondBadge, HandBadge } from './ui';
 
 
 
-export function ModeSelectScreen({myTeam,oppTeam,gameDay,onSelect,onBack}){
+export function ModeSelectScreen({myTeam,oppTeam,gameDay,onSelect,onBack,isProcessing=false,processingPhase=""}){
   return(
     <div className="app">
       <div className="mode-wrap">
@@ -27,13 +27,15 @@ export function ModeSelectScreen({myTeam,oppTeam,gameDay,onSelect,onBack}){
           <div
             className="mode-card tactical"
             role="button"
-            tabIndex={0}
-            onClick={()=>onSelect?.("tactical")}
+            tabIndex={isProcessing ? -1 : 0}
+            onClick={()=>{ if(!isProcessing) onSelect?.("tactical"); }}
             onKeyDown={(event)=>{
+              if(isProcessing) return;
               if(event.key!=="Enter"&&event.key!==" ") return;
               event.preventDefault();
               onSelect?.("tactical");
             }}
+            style={isProcessing ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
           >
             <div style={{fontSize:42,marginBottom:10}}>🎮</div>
             <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:28,color:"#f5c842",letterSpacing:".1em",marginBottom:6}}>
@@ -48,13 +50,15 @@ export function ModeSelectScreen({myTeam,oppTeam,gameDay,onSelect,onBack}){
           <div
             className="mode-card auto"
             role="button"
-            tabIndex={0}
-            onClick={()=>onSelect?.("auto")}
+            tabIndex={isProcessing ? -1 : 0}
+            onClick={()=>{ if(!isProcessing) onSelect?.("auto"); }}
             onKeyDown={(event)=>{
+              if(isProcessing) return;
               if(event.key!=="Enter"&&event.key!==" ") return;
               event.preventDefault();
               onSelect?.("auto");
             }}
+            style={isProcessing ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
           >
             <div style={{fontSize:42,marginBottom:10}}>⚡</div>
             <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:28,color:"#34d399",letterSpacing:".1em",marginBottom:6}}>
@@ -67,7 +71,14 @@ export function ModeSelectScreen({myTeam,oppTeam,gameDay,onSelect,onBack}){
           </div>
         </div>
 
-        <button onClick={onBack} style={{background:"transparent",border:"none",color:"#374151",cursor:"pointer",fontSize:12,marginTop:4}}>
+        {isProcessing && (
+          <div style={{marginTop:8,marginBottom:8,fontSize:12,color:"#374151",textAlign:"center"}}>
+            試合を処理中です
+            {processingPhase ? ` · ${processingPhase}` : ""}
+          </div>
+        )}
+
+        <button onClick={onBack} disabled={isProcessing} style={{background:"transparent",border:"none",color:"#374151",cursor:isProcessing?"not-allowed":"pointer",fontSize:12,marginTop:4,opacity:isProcessing?0.5:1}}>
           ← ハブに戻る
         </button>
       </div>
