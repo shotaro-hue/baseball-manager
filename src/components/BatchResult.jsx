@@ -1,63 +1,142 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { cancelDeferredPostGameWork, scheduleDeferredPostGameWork } from "../engine/postGameProcessing";
 
-/* ═══════════════════════════════════════════════
-   BATCH RESULT SCREEN
-═══════════════════════════════════════════════ */
-export function BatchResultScreen({ results, batchMeta, myTeam, onEnd, onViewDetail }) {
-  const wins = results.filter(r => r.won).length;
-  const losses = results.length - wins;
+const INITIAL_VISIBLE_RESULTS = 8;
+const VISIBLE_RESULTS_STEP = 8;
 
-  // パフォーマンスハイライトを全試合ログから集計
-  const perfHighlights = useMemo(() => {
-    const hrCounts = {};
-    let biggestWin = null;
-    let biggestLoss = null;
-    for (const r of results) {
-      const margin = r.score.my - r.score.opp;
-      if (r.won && (!biggestWin || margin > biggestWin.margin)) biggestWin = { oppName: r.oppTeam?.short || "?", my: r.score.my, opp: r.score.opp, margin };
-      if (!r.won && r.score.my !== r.score.opp && (!biggestLoss || margin < biggestLoss.margin)) biggestLoss = { oppName: r.oppTeam?.short || "?", my: r.score.my, opp: r.score.opp, margin };
-      for (const e of (r.log || [])) {
-        if (e.result === "hr" && e.isTop === false) {
-          hrCounts[e.batter] = (hrCounts[e.batter] || 0) + 1;
-        }
+function buildBatchPerfHighlights(results) {
+  const hrCounts = {};
+  let biggestWin = null;
+  let biggestLoss = null;
+
+  for (const result of results || []) {
+    const margin = (result?.score?.my || 0) - (result?.score?.opp || 0);
+    if (result?.won && (!biggestWin || margin > biggestWin.margin)) {
+      biggestWin = {
+        oppName: result?.oppTeam?.short || "?",
+        my: result?.score?.my || 0,
+        opp: result?.score?.opp || 0,
+        margin,
+      };
+    }
+    if (!result?.won && (result?.score?.my !== result?.score?.opp) && (!biggestLoss || margin < biggestLoss.margin)) {
+      biggestLoss = {
+        oppName: result?.oppTeam?.short || "?",
+        my: result?.score?.my || 0,
+        opp: result?.score?.opp || 0,
+        margin,
+      };
+    }
+    for (const event of (result?.log || [])) {
+      if (event?.result === "hr" && event?.isTop === false) {
+        hrCounts[event.batter] = (hrCounts[event.batter] || 0) + 1;
       }
     }
-    const hrList = Object.entries(hrCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
-    return { hrList, biggestWin, biggestLoss };
+  }
+
+  return {
+    hrList: Object.entries(hrCounts).sort((a, b) => b[1] - a[1]).slice(0, 3),
+    biggestWin,
+    biggestLoss,
+  };
+}
+
+export function BatchResultScreen({
+  results,
+  batchMeta,
+  myTeam,
+  onEnd,
+  onViewDetail,
+  isBatchProcessing: isBatchProcessingProp,
+  initialVisibleCount,
+}) {
+  const summary = useMemo(() => {
+    const safeResults = Array.isArray(results) ? results : [];
+    const wins = safeResults.filter((result) => result?.won).length;
+    const losses = safeResults.length - wins;
+    return {
+      wins,
+      losses,
+      startGameNo: safeResults[0]?.gameNo,
+      endGameNo: safeResults[safeResults.length - 1]?.gameNo,
+      totalGames: safeResults.length,
+    };
   }, [results]);
 
-  // 順位変動の色とアイコン
+  const [detailData, setDetailData] = useState(null);
+  const [internalProcessing, setInternalProcessing] = useState(() => isBatchProcessingProp ?? !!results?.length);
+  const [visibleCount, setVisibleCount] = useState(() => {
+    const requested = Number.isFinite(initialVisibleCount) ? initialVisibleCount : INITIAL_VISIBLE_RESULTS;
+    return Math.min(Math.max(0, requested), Array.isArray(results) ? results.length : 0);
+  });
+
+  useEffect(() => {
+    const safeLength = Array.isArray(results) ? results.length : 0;
+    const requested = Number.isFinite(initialVisibleCount) ? initialVisibleCount : INITIAL_VISIBLE_RESULTS;
+    setVisibleCount(Math.min(Math.max(0, requested), safeLength));
+    setDetailData(null);
+    setInternalProcessing(true);
+
+    const handle = scheduleDeferredPostGameWork(() => {
+      setDetailData(buildBatchPerfHighlights(results || []));
+      setInternalProcessing(false);
+    });
+
+    return () => {
+      cancelDeferredPostGameWork(handle);
+    };
+  }, [results, initialVisibleCount]);
+
+  const isBatchProcessing = isBatchProcessingProp ?? internalProcessing;
+  const visibleResults = useMemo(() => (results || []).slice(0, visibleCount), [results, visibleCount]);
+  const hasMoreResults = (results?.length || 0) > visibleCount;
+
   const rankDelta = batchMeta ? batchMeta.beforeRank - batchMeta.afterRank : 0;
   const rankColor = rankDelta > 0 ? "#34d399" : rankDelta < 0 ? "#f87171" : "#94a3b8";
-  const rankArrow = rankDelta > 0 ? "▲" : rankDelta < 0 ? "▼" : "−";
+  const rankArrow = rankDelta > 0 ? "▲" : rankDelta < 0 ? "▼" : "-";
 
   return (
     <div className="app">
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "16px 12px" }}>
-
-        {/* サマリーヘッダー */}
         <div className="card" style={{ textAlign: "center", marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: 42, letterSpacing: ".1em", color: wins > losses ? "#f5c842" : wins < losses ? "#f87171" : "#94a3b8", marginBottom: 4 }}>
-            {wins}勝 {losses}敗
+          <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: 42, letterSpacing: ".1em", color: summary.wins > summary.losses ? "#f5c842" : summary.wins < summary.losses ? "#f87171" : "#94a3b8", marginBottom: 4 }}>
+            {summary.wins}勝 {summary.losses}敗
           </div>
-          <div style={{ fontSize: 12, color: "#374151", marginBottom: 10 }}>第{results[0]?.gameNo}〜{results[results.length - 1]?.gameNo}戦 / {results.length}試合</div>
+          <div style={{ fontSize: 12, color: "#374151", marginBottom: 10 }}>
+            第{summary.startGameNo ?? "-"}〜第{summary.endGameNo ?? "-"}戦 / {summary.totalGames}試合
+          </div>
+          {isBatchProcessing && (
+            <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 10 }}>
+              結果を整理中...
+            </div>
+          )}
           <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-            {results.map((r, i) => (
-              <button key={i} onClick={() => onViewDetail(r)}
-                className={`bsm ${r.won ? "bga" : "bgr"}`}
-                style={{ minWidth: 70, padding: "7px 10px", fontSize: 12 }}>
-                <span style={{ fontSize: 9, display: "block", color: "inherit", opacity: .7 }}>第{r.gameNo}戦</span>
-                {r.oppTeam?.short} {r.score.my}-{r.score.opp}
-                <span style={{ marginLeft: 4 }}>{r.won ? "✓" : "✗"}</span>
+            {visibleResults.map((result, index) => (
+              <button
+                key={`${result?.gameNo || index}-${result?.oppTeam?.short || "opp"}`}
+                onClick={() => onViewDetail(result)}
+                className={`bsm ${result?.won ? "bga" : "bgr"}`}
+                style={{ minWidth: 70, padding: "7px 10px", fontSize: 12 }}
+              >
+                <span style={{ fontSize: 9, display: "block", color: "inherit", opacity: 0.7 }}>第{result?.gameNo}戦</span>
+                {result?.oppTeam?.short} {result?.score?.my}-{result?.score?.opp}
+                <span style={{ marginLeft: 4 }}>{result?.won ? "○" : "●"}</span>
               </button>
             ))}
           </div>
+          {hasMoreResults && (
+            <button
+              className="bsm"
+              onClick={() => setVisibleCount((count) => Math.min((results?.length || 0), count + VISIBLE_RESULTS_STEP))}
+              style={{ marginTop: 10, padding: "7px 14px", fontSize: 11 }}
+            >
+              続きを表示
+            </button>
+          )}
         </div>
 
-        {/* バッチメタ: 3カラム要約 */}
         {batchMeta && (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
-            {/* 順位変動 */}
             <div className="card" style={{ padding: "12px 10px", textAlign: "center", marginBottom: 0 }}>
               <div className="card-h" style={{ marginBottom: 8 }}>順位変動</div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
@@ -72,61 +151,64 @@ export function BatchResultScreen({ results, batchMeta, myTeam, onEnd, onViewDet
               </div>
             </div>
 
-            {/* パフォーマンスハイライト */}
             <div className="card" style={{ padding: "12px 10px", marginBottom: 0 }}>
               <div className="card-h" style={{ marginBottom: 8 }}>打撃ハイライト</div>
-              {perfHighlights.hrList.length > 0
-                ? perfHighlights.hrList.map(([name, cnt], i) => (
-                  <div key={i} style={{ fontSize: 11, color: "#f5c842", marginBottom: 2 }}>
-                    ⚾ {name} <span style={{ fontWeight: 700 }}>{cnt}HR</span>
+              {!detailData ? (
+                <div style={{ fontSize: 11, color: "#374151" }}>集計中...</div>
+              ) : detailData.hrList.length > 0 ? (
+                detailData.hrList.map(([name, count], index) => (
+                  <div key={`${name}-${index}`} style={{ fontSize: 11, color: "#f5c842", marginBottom: 2 }}>
+                    ★ {name} <span style={{ fontWeight: 700 }}>{count}HR</span>
                   </div>
                 ))
-                : <div style={{ fontSize: 11, color: "#374151" }}>本塁打なし</div>
-              }
-              {perfHighlights.biggestWin && (
+              ) : (
+                <div style={{ fontSize: 11, color: "#374151" }}>本塁打なし</div>
+              )}
+              {detailData?.biggestWin && (
                 <div style={{ fontSize: 10, color: "#34d399", marginTop: 4 }}>
-                  最大勝: {perfHighlights.biggestWin.my}-{perfHighlights.biggestWin.opp} vs {perfHighlights.biggestWin.oppName}
+                  最大勝利 {detailData.biggestWin.my}-{detailData.biggestWin.opp} vs {detailData.biggestWin.oppName}
                 </div>
               )}
-              {perfHighlights.biggestLoss && (
+              {detailData?.biggestLoss && (
                 <div style={{ fontSize: 10, color: "#f87171", marginTop: 2 }}>
-                  最大敗: {perfHighlights.biggestLoss.my}-{perfHighlights.biggestLoss.opp} vs {perfHighlights.biggestLoss.oppName}
+                  最大敗戦 {detailData.biggestLoss.my}-{detailData.biggestLoss.opp} vs {detailData.biggestLoss.oppName}
                 </div>
               )}
             </div>
 
-            {/* 負傷アラート */}
             <div className="card" style={{ padding: "12px 10px", marginBottom: 0 }}>
               <div className="card-h" style={{ marginBottom: 8 }}>負傷アラート</div>
-              {batchMeta.injuries.length === 0
-                ? <div style={{ fontSize: 11, color: "#374151" }}>負傷なし</div>
-                : batchMeta.injuries.slice(0, 4).map((inj, i) => (
-                  <div key={i} style={{ fontSize: 10, color: inj.days >= 31 ? "#f87171" : inj.days >= 15 ? "#f5c842" : "#94a3b8", marginBottom: 3 }}>
-                    {inj.name}
-                    <span style={{ fontSize: 9, color: "#374151", marginLeft: 3 }}>{inj.type} {inj.days}日</span>
+              {isBatchProcessing ? (
+                <div style={{ fontSize: 11, color: "#374151" }}>整理中...</div>
+              ) : batchMeta.injuries.length === 0 ? (
+                <div style={{ fontSize: 11, color: "#374151" }}>負傷なし</div>
+              ) : (
+                batchMeta.injuries.slice(0, 4).map((injury, index) => (
+                  <div key={`${injury.name}-${index}`} style={{ fontSize: 10, color: injury.days >= 31 ? "#f87171" : injury.days >= 15 ? "#f5c842" : "#94a3b8", marginBottom: 3 }}>
+                    {injury.name}
+                    <span style={{ fontSize: 9, color: "#374151", marginLeft: 3 }}>{injury.type} {injury.days}日</span>
                   </div>
                 ))
-              }
-              {batchMeta.injuries.length > 4 && (
-                <div style={{ fontSize: 9, color: "#374151" }}>他 {batchMeta.injuries.length - 4}名</div>
+              )}
+              {!isBatchProcessing && batchMeta.injuries.length > 4 && (
+                <div style={{ fontSize: 9, color: "#374151" }}>他{batchMeta.injuries.length - 4}件</div>
               )}
             </div>
           </div>
         )}
 
-        {/* CPU試合ハイライト */}
-        {batchMeta && batchMeta.cpuHighlights.length > 0 && (
+        {batchMeta && !isBatchProcessing && batchMeta.cpuHighlights.length > 0 && (
           <div className="card" style={{ marginBottom: 12 }}>
             <div className="card-h">同日リーグ注目試合</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              {batchMeta.cpuHighlights.slice(0, 5).map((h, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 6px", background: "rgba(0,0,0,.2)", borderRadius: 5, fontSize: 11 }}>
-                  <span style={{ color: h.homeTeam.color || "#94a3b8" }}>{h.homeTeam.emoji} {h.homeTeam.short}</span>
-                  <span style={{ fontFamily: "'Share Tech Mono',monospace", fontWeight: 700, color: h.homeWon ? "#f5c842" : "#f87171" }}>{h.homeScore}</span>
-                  <span style={{ color: "#374151" }}>−</span>
-                  <span style={{ fontFamily: "'Share Tech Mono',monospace", fontWeight: 700, color: !h.homeWon ? "#f5c842" : "#f87171" }}>{h.awayScore}</span>
-                  <span style={{ color: h.awayTeam.color || "#94a3b8" }}>{h.awayTeam.emoji} {h.awayTeam.short}</span>
-                  <span className={`bsm ${h.label === "大勝" ? "bgr" : "bga"}`} style={{ marginLeft: "auto", padding: "1px 6px", fontSize: 9 }}>{h.label}</span>
+              {batchMeta.cpuHighlights.slice(0, 5).map((highlight, index) => (
+                <div key={index} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 6px", background: "rgba(0,0,0,.2)", borderRadius: 5, fontSize: 11 }}>
+                  <span style={{ color: highlight.homeTeam.color || "#94a3b8" }}>{highlight.homeTeam.emoji} {highlight.homeTeam.short}</span>
+                  <span style={{ fontFamily: "'Share Tech Mono',monospace", fontWeight: 700, color: highlight.homeWon ? "#f5c842" : "#f87171" }}>{highlight.homeScore}</span>
+                  <span style={{ color: "#374151" }}>-</span>
+                  <span style={{ fontFamily: "'Share Tech Mono',monospace", fontWeight: 700, color: !highlight.homeWon ? "#f5c842" : "#f87171" }}>{highlight.awayScore}</span>
+                  <span style={{ color: highlight.awayTeam.color || "#94a3b8" }}>{highlight.awayTeam.emoji} {highlight.awayTeam.short}</span>
+                  <span className={`bsm ${highlight.label === "大敗" ? "bgr" : "bga"}`} style={{ marginLeft: "auto", padding: "1px 6px", fontSize: 9 }}>{highlight.label}</span>
                 </div>
               ))}
             </div>
@@ -138,6 +220,3 @@ export function BatchResultScreen({ results, batchMeta, myTeam, onEnd, onViewDet
     </div>
   );
 }
-/* ═══════════════════════════════════════════════
-   MODE SELECT SCREEN
-═══════════════════════════════════════════════ */
