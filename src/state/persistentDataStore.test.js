@@ -85,4 +85,42 @@ describe('persistentDataStore selectors and deltas', () => {
     store.setNews([{ id: 'n3' }]);
     expect(calls).toEqual(['all', 'news', 'all']);
   });
+
+  it('provides lightweight selectors for visible mailbox, trades, news, and records', () => {
+    const store = createPersistentDataStore({
+      news: [
+        { id: 'n2', type: 'interview', answered: false, timestamp: 20 },
+        { id: 'n1', type: 'game', answered: false, timestamp: 10 },
+      ],
+      mailbox: [
+        { id: 'm1', type: 'trade', read: false, resolved: false, deliverOnDay: 2, timestamp: 10 },
+        { id: 'm2', type: 'info', read: false, resolved: false, deliverOnDay: 3, timestamp: 20 },
+        { id: 'm3', type: 'trade', read: true, resolved: false, deliverOnDay: 4, timestamp: 30 },
+      ],
+      seasonHistory: {
+        awards: [{ year: 2026 }],
+        records: { singleSeasonHR: { value: 50 } },
+        hallOfFame: [{ playerName: 'A' }],
+        championships: [{ year: 2027 }],
+        standingsHistory: [{ year: 2028 }],
+        transfers: [
+          { id: 't1', year: 2027, day: 10, timestamp: 100 },
+          { id: 't2', year: 2028, day: 5, timestamp: 90 },
+        ],
+      },
+    });
+
+    expect(store.selectVisibleMailboxList(3, { limit: 5 }).map((item) => item.id)).toEqual(['m2', 'm1']);
+    expect(store.selectPendingTradeCount(3)).toBe(1);
+    expect(store.selectPendingTradeOffers(5).map((item) => item.id)).toEqual(['m3', 'm1']);
+    expect(store.selectUnreadInterviewCount()).toBe(1);
+    expect(store.selectTransferLogs({ limit: 5 }).map((item) => item.id)).toEqual(['t2', 't1']);
+    expect(store.getRecordsView()).toEqual({
+      awards: [{ year: 2026 }],
+      records: { singleSeasonHR: { value: 50 } },
+      hallOfFame: [{ playerName: 'A' }],
+      championships: [{ year: 2027 }],
+      standingsHistory: [{ year: 2028 }],
+    });
+  });
 });
