@@ -1,18 +1,15 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 
-export function NewsTab({news,onInterview,seasonHistory,currentYear}){
+export function NewsTab({ news, transfers = [], onInterview, currentYear }){
   const [sel,setSel]=useState(null);
   const [answered,setAnswered]=useState({});
   const [transferYear,setTransferYear]=useState("all");
   const icon=t=>t==="game"?"⚾":t==="trade"?"🔄":t==="draft"?"📋":t==="interview"?"🎤":t==="season"?"🏆":"📰";
   const col=t=>t==="game"?"#60a5fa":t==="trade"?"#f97316":t==="draft"?"#a78bfa":t==="interview"?"#f5c842":t==="season"?"#34d399":"#94a3b8";
-  const transferLogs=(seasonHistory?.transfers||[]).slice().sort((a,b)=>{
-    if((b.year||0)!==(a.year||0)) return (b.year||0)-(a.year||0);
-    if((b.day||0)!==(a.day||0)) return (b.day||0)-(a.day||0);
-    return (b.timestamp||0)-(a.timestamp||0);
-  });
-  const transferYears=["all",...new Set(transferLogs.map(l=>l.year).filter(Boolean))];
-  const shownTransfers=transferYear==="all"?transferLogs:transferLogs.filter(l=>String(l.year)===transferYear);
+  const transferYears = useMemo(() => ["all", ...new Set((transfers || []).map(item => item?.year).filter(Boolean))], [transfers]);
+  const shownTransfers = useMemo(() => (
+    transferYear==="all" ? (transfers || []) : (transfers || []).filter(item => String(item.year) === transferYear)
+  ), [transferYear, transfers]);
   const handleAnswer=(newsId,opt)=>{
     onInterview(newsId,opt);
     setAnswered(prev=>({...prev,[newsId]:opt}));
@@ -23,7 +20,7 @@ export function NewsTab({news,onInterview,seasonHistory,currentYear}){
       <div className="card" style={{padding:"10px"}}>
         <div className="card-h">📰 スポーツニュース</div>
         {news.length===0&&<p style={{fontSize:11,color:"#374151",padding:"12px 0"}}>試合を進めるとニュースが届きます</p>}
-        {[...news].sort((a,b)=>b.timestamp-a.timestamp).map(n=>{
+        {news.map(n=>{
           const needsAnswer=n.type==="interview"&&!answered[n.id];
           return(<div key={n.id} onClick={()=>setSel(n)} style={{padding:"8px 10px",marginBottom:4,borderRadius:6,cursor:"pointer",background:sel?.id===n.id?"rgba(245,200,66,.08)":needsAnswer?"rgba(245,200,66,.03)":"rgba(255,255,255,.02)",border:sel?.id===n.id?"1px solid rgba(245,200,66,.3)":needsAnswer?"1px solid rgba(245,200,66,.15)":"1px solid rgba(255,255,255,.04)"}}>
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
@@ -44,7 +41,7 @@ export function NewsTab({news,onInterview,seasonHistory,currentYear}){
           </select>
         </div>
         {shownTransfers.length===0&&<p style={{fontSize:11,color:"#374151",padding:"8px 0"}}>この年度の移籍ログはまだありません</p>}
-        {shownTransfers.slice(0,120).map(item=>(
+        {shownTransfers.map(item=>(
           <div key={item.id} style={{padding:"8px 10px",marginBottom:5,borderRadius:6,background:"rgba(249,115,22,.06)",border:"1px solid rgba(249,115,22,.2)"}}>
             <div style={{display:"flex",justifyContent:"space-between",gap:6,alignItems:"center"}}>
               <div style={{fontSize:11,fontWeight:700,color:"#f97316"}}>{item.headline||"トレード"}</div>
