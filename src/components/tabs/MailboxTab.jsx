@@ -1,9 +1,7 @@
 import React, { useState } from "react";
 
-export function MailboxTab({mailbox, onRead, onAction, teams, myTeam, onTrade, onTeamClick, gameDay}){
+export function MailboxTab({ mailbox, unreadCount = 0, onRead, onAction, teams, myTeam, onTrade, onTeamClick, gameDay }){
   const [selected, setSelected] = useState(null);
-  const visibleMails = mailbox.filter(m=>(m.deliverOnDay??0)<=gameDay);
-  const unread = visibleMails.filter(m=>!m.read).length;
 
   const handleSelect = (m) => {
     setSelected(m);
@@ -16,14 +14,13 @@ export function MailboxTab({mailbox, onRead, onAction, teams, myTeam, onTrade, o
 
   return(
     <div style={{display:"grid", gridTemplateColumns: selected?"1fr 1fr":"1fr", gap:8}}>
-      {/* メール一覧 */}
       <div className="card" style={{padding:"10px"}}>
         <div className="card-h">
           📨 メールボックス
-          {unread>0&&<span style={{marginLeft:8,background:"#f87171",color:"#fff",borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700}}>{unread}</span>}
+          {unreadCount>0&&<span style={{marginLeft:8,background:"#f87171",color:"#fff",borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700}}>{unreadCount}</span>}
         </div>
-        {visibleMails.length===0&&<p style={{fontSize:11,color:"#374151",padding:"12px 0"}}>メールはありません</p>}
-        {[...visibleMails].sort((a,b)=>b.timestamp-a.timestamp).map(m=>(
+        {mailbox.length===0&&<p style={{fontSize:11,color:"#374151",padding:"12px 0"}}>メールはありません</p>}
+        {mailbox.map(m=>(
           <div key={m.id} onClick={()=>handleSelect(m)}
             style={{padding:"8px 10px",marginBottom:4,borderRadius:6,cursor:"pointer",
               background:selected?.id===m.id?"rgba(245,200,66,.08)":m.read?"rgba(255,255,255,.02)":"rgba(255,255,255,.05)",
@@ -38,7 +35,6 @@ export function MailboxTab({mailbox, onRead, onAction, teams, myTeam, onTrade, o
         ))}
       </div>
 
-      {/* メール詳細 */}
       {selected&&(
         <div className="card" style={{padding:"12px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
@@ -49,7 +45,6 @@ export function MailboxTab({mailbox, onRead, onAction, teams, myTeam, onTrade, o
           <div style={{fontSize:10,color:"#374151",marginBottom:10}}>差出人: {selected.from} · {selected.dateLabel}</div>
           <div style={{fontSize:12,color:"#e0d4bf",lineHeight:1.7,marginBottom:12,whiteSpace:"pre-wrap"}}>{selected.body}</div>
 
-          {/* トレードオファーの場合は承諾/拒否ボタン */}
           {selected.type==="trade"&&selected.offer&&!selected.resolved&&(
             <div>
               <div style={{marginBottom:10,padding:"8px",borderRadius:6,background:"rgba(249,115,22,.06)",border:"1px solid rgba(249,115,22,.2)"}}>
@@ -74,7 +69,6 @@ export function MailboxTab({mailbox, onRead, onAction, teams, myTeam, onTrade, o
             </div>
           )}
 
-          {/* ポスティング申請の場合は承諾/拒否ボタン */}
           {selected.type==="posting_request"&&!selected.resolved&&(
             <div>
               <div style={{marginBottom:10,padding:"10px",borderRadius:6,background:"rgba(52,211,153,.06)",border:"1px solid rgba(52,211,153,.2)"}}>
@@ -90,7 +84,6 @@ export function MailboxTab({mailbox, onRead, onAction, teams, myTeam, onTrade, o
               </div>
             </div>
           )}
-
 
           {selected.type==="cpu_fa_summary"&&selected.signings?.length>0&&(
             <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:8}}>
