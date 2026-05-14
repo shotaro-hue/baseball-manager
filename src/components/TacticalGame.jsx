@@ -7,6 +7,8 @@ import { OV, CondBadge, HandBadge, PitchBadge } from './ui';
 import Baseball3DModal from './Baseball3DModal';
 import PhysicsInsightPanel from './game/PhysicsInsightPanel';
 
+const VISIBLE_LOG_LIMIT = 80;
+
 export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   const [gs,setGs]=useState(()=>initGameState(myTeam,oppTeam));
   const [autoRunning,setAutoRunning]=useState(false);
@@ -20,7 +22,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   const logRef=useRef(null);
   const visibleLogIds = useMemo(() => {
     const safeLen = Array.isArray(gs.log) ? gs.log.length : 0;
-    const start = Math.max(0, safeLen - 120);
+    const start = Math.max(0, safeLen - VISIBLE_LOG_LIMIT);
     const ids = [];
     for (let i = start; i < safeLen; i += 1) ids.push(i);
     return ids;
@@ -172,7 +174,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   }, [gs.inningSummary, gs.inning]);
 
   const opFatigue=calcEffectiveFatigue(gs.opPitchCount,gs.opPitcher);
-  const lastPlay = gs.log.length > 0 ? gs.log[gs.log.length - 1] : null;
+  const lastPlay = useMemo(() => (gs.log.length > 0 ? gs.log[gs.log.length - 1] : null), [gs.log]);
   const safePhysicsMeta = (lastPlay && typeof lastPlay === "object" && !Array.isArray(lastPlay)) ? lastPlay.physicsMeta : null;
 
   return(
