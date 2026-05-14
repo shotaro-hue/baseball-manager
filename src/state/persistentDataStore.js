@@ -34,6 +34,14 @@ function buildSummary(list) {
   };
 }
 
+function sortByTimestampDesc(list) {
+  return sanitizeArray(list).slice().sort((a, b) => {
+    const left = Number(b?.timestamp ?? 0);
+    const right = Number(a?.timestamp ?? 0);
+    return left - right;
+  });
+}
+
 function sanitizeObject(input) {
   return input && typeof input === 'object' ? input : {};
 }
@@ -190,6 +198,62 @@ export function createPersistentDataStore(initialData = {}) {
         if (item.read === false && deliverOnDay <= safeGameDay) return count + 1;
         return count;
       }, 0);
+    },
+    selectVisibleMailboxList(currentGameDay, options = {}) {
+      const safeMailbox = sanitizeArray(store.mailbox);
+      const safeGameDay = Number.isFinite(Number(currentGameDay)) ? Number(currentGameDay) : 0;
+      const visible = safeMailbox.filter((item) => Number(item?.deliverOnDay ?? 0) <= safeGameDay);
+      return selectPage(sortByTimestampDesc(visible), options);
+    },
+    selectPendingTradeCount(currentGameDay) {
+      const safeMailbox = sanitizeArray(store.mailbox);
+      const safeGameDay = Number.isFinite(Number(currentGameDay)) ? Number(currentGameDay) : 0;
+      return safeMailbox.reduce((count, item) => {
+        if (!item || typeof item !== 'object') return count;
+        const deliverOnDay = Number(item.deliverOnDay ?? 0);
+        if (deliverOnDay > safeGameDay) return count;
+        if (item.type === 'trade' && item.resolved !== true && item.read === false) return count + 1;
+        return count;
+      }, 0);
+    },
+    selectPendingTradeOffers(currentGameDay, options = {}) {
+      const safeMailbox = sanitizeArray(store.mailbox);
+      const safeGameDay = Number.isFinite(Number(currentGameDay)) ? Number(currentGameDay) : 0;
+      const pending = safeMailbox.filter((item) => {
+        if (!item || typeof item !== 'object') return false;
+        const deliverOnDay = Number(item.deliverOnDay ?? 0);
+        return deliverOnDay <= safeGameDay && item.type === 'trade' && item.resolved !== true;
+      });
+      return selectPage(sortByTimestampDesc(pending), options);
+    },
+    selectUnreadInterviewCount() {
+      return sanitizeArray(store.news).reduce((count, item) => {
+        if (!item || typeof item !== 'object') return count;
+        return item.type === 'interview' && item.answered !== true ? count + 1 : count;
+      }, 0);
+    },
+    selectTransferLogs(options = {}) {
+      const safeHistory = sanitizeObject(store.seasonHistory);
+      const transfers = sanitizeArray(safeHistory.transfers).slice().sort((a, b) => {
+        if ((b?.year ?? 0) !== (a?.year ?? 0)) return (b?.year ?? 0) - (a?.year ?? 0);
+        if ((b?.day ?? 0) !== (a?.day ?? 0)) return (b?.day ?? 0) - (a?.day ?? 0);
+        return Number(b?.timestamp ?? 0) - Number(a?.timestamp ?? 0);
+      });
+      const yearFilter = options && typeof options === 'object' ? options.year : null;
+      const filtered = yearFilter && yearFilter !== 'all'
+        ? transfers.filter((item) => String(item?.year ?? '') === String(yearFilter))
+        : transfers;
+      return selectPage(filtered, options);
+    },
+    getRecordsView() {
+      const safeHistory = sanitizeObject(store.seasonHistory);
+      return {
+        awards: sanitizeArray(safeHistory.awards),
+        records: sanitizeObject(safeHistory.records),
+        hallOfFame: sanitizeArray(safeHistory.hallOfFame),
+        championships: sanitizeArray(safeHistory.championships),
+        standingsHistory: sanitizeArray(safeHistory.standingsHistory),
+      };
     },
     selectLatestNewsId() {
       const safeNews = sanitizeArray(store.news);
