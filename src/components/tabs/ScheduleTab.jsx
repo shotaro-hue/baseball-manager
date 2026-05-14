@@ -60,7 +60,7 @@ function getCardMarker(schedule, day, myId) {
 }
 
 // 月別週グリッドデータを構築する
-function buildMonthGrid(schedule, year, myId, month, gameResultsMap) {
+function buildMonthGrid(schedule, year, myId, month, gameResultsMap, dayIndexByDate) {
   if (!schedule || myId === null || myId === undefined) return [];
 
   // その月のすべての gameDay エントリを収集
@@ -114,7 +114,7 @@ function buildMonthGrid(schedule, year, myId, month, gameResultsMap) {
           cells.push({ type: 'game', date: { month: m, day: d }, dayNo: entry.dayNo, matchup: entry.matchup, result, isAllStar: false });
         }
       } else {
-        const dayNo = schedule.findIndex(sd => sd?.date?.month === m && sd?.date?.day === d);
+        const dayNo = dayIndexByDate.get(key) ?? -1;
         cells.push({ type: 'off', date: { month: m, day: d }, dayNo, isAllStar: false });
       }
     }
@@ -329,11 +329,22 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
   }, [gameDay, viewYear, year]);
 
   // 表示対象シーズンのデータ
-  const archived = scheduleArchive.find(a => a.year === viewYear);
+  const archived = useMemo(() => scheduleArchive.find(a => a.year === viewYear), [scheduleArchive, viewYear]);
   const isPast = viewYear !== year;
   const viewSchedule = isPast ? (archived?.schedule || null) : schedule;
   const viewResultsMap = isPast ? (archived?.gameResultsMap || {}) : gameResultsMap;
   const viewBoxResultsMap = isPast ? (archived?.myTeamResultsMap || {}) : null;
+  const dayIndexByDate = useMemo(() => {
+    const map = new Map();
+    if (!viewSchedule) return map;
+    for (let dayNo = 1; dayNo < viewSchedule.length; dayNo += 1) {
+      const day = viewSchedule[dayNo];
+      const date = day?.date;
+      if (!date) continue;
+      map.set(`${date.month}-${date.day}`, dayNo);
+    }
+    return map;
+  }, [viewSchedule]);
 
   // 過去シーズンの最終成績を gameResultsMap から集計
   const pastRecord = useMemo(() => {
@@ -373,10 +384,10 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
       .map(label => Number(label.replace('月', '')))
       .map(month => ({
         month,
-        weeks: buildMonthGrid(viewSchedule, viewYear, myTeam.id, month, viewResultsMap),
+        weeks: buildMonthGrid(viewSchedule, viewYear, myTeam.id, month, viewResultsMap, dayIndexByDate),
       }))
       .filter(m => m.weeks.length > 0);
-  }, [viewSchedule, viewYear, myTeam?.id, viewResultsMap]);
+  }, [viewSchedule, viewYear, myTeam?.id, viewResultsMap, dayIndexByDate]);
 
   if (!schedule || !myTeam) {
     return (
@@ -395,7 +406,7 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
   const boxModalDate = boxScoreModal ? gameDayToDate(boxScoreModal.dayNo, viewSchedule) : null;
 
   // 年度セレクター用リスト（過去アーカイブ + 現在）
-  const availableYears = [...scheduleArchive.map(a => a.year).sort((a,b)=>b-a), year];
+  const availableYears = useMemo(() => [...scheduleArchive.map(a => a.year).sort((a,b)=>b-a), year], [scheduleArchive, year]);
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
