@@ -638,8 +638,199 @@ export function useSeasonFlow(gs) {
     return {opp:pool[rng(0,pool.length-1)]||teams.find(t=>t.id!==myId),isHome:true,venueNote:null};
   };
 
+  const mergeAllTeamResultsPatch = (patch) => {
+    if (!patch || typeof patch !== "object") return;
+    setAllTeamResultsMap((prev) => {
+      let next = prev;
+      for (const [teamId, days] of Object.entries(patch)) {
+        const currentTeamMap = prev[teamId] || {};
+        let hasDiff = false;
+        for (const [dayKey, dayValue] of Object.entries(days || {})) {
+          if (currentTeamMap[dayKey] !== dayValue) {
+            hasDiff = true;
+            break;
+          }
+        }
+        if (!hasDiff) continue;
+        next = {
+          ...next,
+          [teamId]: { ...currentTeamMap, ...days },
+        };
+      }
+      return next;
+    });
+  };
+
+  const runSingleDaySimulation = async ({ oppId, useDh, isHome, simulationMode = "detailed" }) => {
+    if (!myTeam || !oppId) return;
+
+    const startedAt = Date.now();
+    const taskId = uid();
+    const snapshot = {
+      teams,
+      schedule,
+      faPool,
+      seasonHistory: getSeasonHistory(),
+      news: getNewsBySelector({ limit: 1000 }),
+      mailbox: getMailboxBySelector({ limit: 1000 }),
+      gameResultsMap: getGameResultsMap(),
+      scheduleArchive: getScheduleArchive(),
+      myId,
+      gameDay,
+      year,
+      allStarDone,
+      allStarResult,
+      allStarTriggerDay,
+      saveRevision,
+    };
+
+    const cleanupWorker = () => {
+      if (seasonProgressWorkerRef.current) {
+        seasonProgressWorkerRef.current.terminate();
+        seasonProgressWorkerRef.current = null;
+      }
+      seasonProgressTaskIdRef.current = null;
+      setBatchProgress(null);
+    };
+
+    isBatchCancelledRef.current = false;
+    seasonProgressTaskIdRef.current = taskId;
+    setBatchProgress({
+      current: 0,
+      total: 1,
+      startedAt,
+      avgMsPerGame: 0,
+      etaSec: 0,
+      phase: "試合シム",
+    });
+
+    try {
+      if (seasonProgressWorkerRef.current) {
+        seasonProgressWorkerRef.current.terminate();
+      }
+
+      const worker = new SeasonBatchWorker();
+      seasonProgressWorkerRef.current = worker;
+
+      const result = await new Promise((resolve, reject) => {
+        worker.onerror = () => reject(new Error("Single-day worker crashed"));
+        worker.onmessage = (event) => {
+          const message = event?.data;
+          if (!message || typeof message !== "object") return;
+          const payload = message.payload || {};
+          if (payload.taskId !== seasonProgressTaskIdRef.current) return;
+
+          if (message.type === "PROGRESS") {
+            setBatchProgress({
+              current: Math.max(0, Number(payload.current ?? 0) || 0),
+              total: Math.max(1, Number(payload.total ?? 1) || 1),
+              startedAt,
+              avgMsPerGame: Math.max(0, Number(payload.avgMsPerGame) || 0),
+              etaSec: Math.max(0, Number(payload.etaSec) || 0),
+              phase: typeof payload.phase === "string" && payload.phase.trim() ? payload.phase : "試合シム",
+            });
+            return;
+          }
+
+          if (message.type === "DONE") {
+            resolve(payload.result || null);
+            return;
+          }
+
+          if (message.type === "CANCEL") {
+            resolve(null);
+            return;
+          }
+
+          if (message.type === "ERROR") {
+            reject(new Error(payload.message || "Single-day worker error"));
+          }
+        };
+
+        worker.postMessage({
+          type: "START",
+          payload: {
+            taskId,
+            mode: "singleDay",
+            snapshot,
+            gameContext: {
+              myId,
+              gameDay,
+              selectedOpponentId: oppId,
+              useDh,
+              isHome,
+              simulationMode,
+            },
+          },
+        });
+      });
+
+      if (!result) {
+        notify("試合処理を中断しました", "warn");
+        return;
+      }
+
+      const {
+        nextState,
+        userGameResult,
+        recentResultsPatch,
+        gameResultsMapPatch,
+        allTeamResultsPatch,
+        summaryCounts,
+        screenDirective,
+        nextAllStarDone,
+        allStarPayload,
+        retireAnnouncement,
+      } = result;
+
+      setNews(nextState.news);
+      setMailbox(nextState.mailbox);
+      setSeasonHistory(nextState.seasonHistory);
+      setTeams(nextState.teams);
+      setGameDay(nextState.gameDay);
+      setGameResult(userGameResult);
+      mergeAllTeamResultsPatch(allTeamResultsPatch);
+      gs.setGameResultsMap((prev) => ({ ...prev, ...gameResultsMapPatch }));
+      (recentResultsPatch || []).slice().reverse().forEach((entry) => {
+        pushResult(entry.won, entry.drew, entry.oppName, entry.myScore, entry.oppScore, entry.gameNo);
+      });
+
+      if (retireAnnouncement) {
+        setRetireModal(retireAnnouncement);
+      }
+      if (nextAllStarDone) {
+        setAllStarDone(true);
+      }
+      if (allStarPayload) {
+        setAllStarResult(allStarPayload);
+      }
+      if ((summaryCounts?.tradeMailCount || 0) > 0) {
+        notify(`📨 トレードオファーが${summaryCounts.tradeMailCount}件届きました`, "ok");
+      }
+
+      if (screenDirective === "playoff") {
+        const withFarm = runFarmSeason(nextState.teams);
+        setTeams(withFarm);
+        setPlayoff(initPlayoff(withFarm));
+        setScreen("playoff");
+        return;
+      }
+      if (screenDirective === "allstar") {
+        setScreen("allstar");
+        return;
+      }
+      setScreen("result");
+    } catch (error) {
+      console.error("runSingleDaySimulation failed", error);
+      notify("試合進行中にエラーが発生しました", "error");
+    } finally {
+      cleanupWorker();
+    }
+  };
+
   // Pick opponent and go to mode select
   const handleStartGame = () => {
+    if(batchProgress) return;
     if(!myTeam) return;
     const {opp,isHome}=pickOpponentFromSchedule(gameDay);
     if(!opp) return;
@@ -677,6 +868,7 @@ export function useSeasonFlow(gs) {
 
   // Mode selected 竊・start appropriate game type
   const handleModeSelect = mode => {
+    if(batchProgress) return;
     setGameMode(mode);
     if(mode==="tactical"){
       const hasCurrentGameTeams = Boolean(currentGameTeams?.my && currentGameTeams?.opp);
@@ -689,10 +881,14 @@ export function useSeasonFlow(gs) {
       }
       setScreen("tactical_game");
     } else {
-      const myT=(currentGameTeams?.my)||teams.find(t=>t.id===myId);
-      const oppT=(currentGameTeams?.opp)||currentOpp;
-      const r=quickSimGame(myT,oppT);
-      handleAutoSimEnd(r);
+      const useDh = currentGameTeams?.useDh ?? !!currentOpp?.dhEnabled;
+      const isHome = currentGameTeams?.isHome ?? true;
+      runSingleDaySimulation({
+        oppId: currentOpp?.id,
+        useDh,
+        isHome,
+        simulationMode: "detailed",
+      });
     }
   };
 
