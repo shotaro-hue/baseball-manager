@@ -5,6 +5,7 @@ import { TEAM_DEFS, ACCEPT_THRESHOLD, CPU_RENEWAL_ROUNDS,
 import { fmtSal, fmtM, fmtAvg, clamp } from '../utils';
 import { calcRetireWill } from '../engine/player';
 import { evalOffer, getFaThreshold } from '../engine/contract';
+import { saberBatter } from '../engine/sabermetrics';
 import { OV, CondBadge, HandBadge } from './ui';
 
 
@@ -1250,7 +1251,7 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, onSign,
                 ) : (
                   <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12, color: '#334155' }}>
                     <span>能力: ミート {selectedPlayer.batting?.contact ?? 50} / 長打 {selectedPlayer.batting?.power ?? 50} / 選球 {selectedPlayer.batting?.eye ?? 50} / 走力 {selectedPlayer.batting?.speed ?? 50}</span>
-                    <span>成績: 打率 {(selectedPlayer.stats?.AB || 0) > 0 ? fmtAvg(selectedPlayer.stats?.H || 0, selectedPlayer.stats?.AB || 0) : '.---'} / 本塁打 {selectedPlayer.stats?.HR || 0} / 打点 {selectedPlayer.stats?.RBI || 0} / OPS {(((selectedPlayer.stats?.AB || 0) > 0) ? (((selectedPlayer.stats?.H || 0) + (selectedPlayer.stats?.BB || 0)) / ((selectedPlayer.stats?.AB || 0) + (selectedPlayer.stats?.BB || 0))) : 0).toFixed(3)}</span>
+                    <span>成績: 打率 {(selectedPlayer.stats?.AB || 0) > 0 ? fmtAvg(selectedPlayer.stats?.H || 0, selectedPlayer.stats?.AB || 0) : '.---'} / 本塁打 {selectedPlayer.stats?.HR || 0} / 打点 {selectedPlayer.stats?.RBI || 0} / OPS {(() => { const sb = saberBatter(selectedPlayer.stats || {}); return sb.OPS > 0 ? sb.OPS.toFixed(3) : '.000'; })()}</span>
                   </div>
                 )}
               </div>
