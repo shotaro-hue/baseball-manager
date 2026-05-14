@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles.css';
 import { uid, fmtM, fmtSal, gameDayToDate, scoutedValue, clamp, rng, rngf } from './utils';
@@ -108,13 +108,33 @@ export default function App(){
   const [batchCount, setBatchCount] = useState(5);
   const [batchAutoManage, setBatchAutoManage] = useState(false);
   const [seasonAutoManage, setSeasonAutoManage] = useState(false);
-  const mailboxForView = gs.getMailboxBySelector({ limit: 200 });
-  const newsForView = gs.getNewsBySelector({ limit: 200 });
-  const seasonHistoryForView = gs.getSeasonHistory();
-  const scheduleArchiveForView = gs.getScheduleArchive();
-  const gameResultsMapForView = gs.getGameResultsMap();
-  const unreadMailboxCount = gs.getUnreadMailboxCount(gameDay);
-  const latestNewsId = gs.getLatestNewsId();
+  const dashboardSlice = useMemo(() => (
+    tab === "dashboard" ? gs.getDashboardSlice({ limit: 5, gameDay }) : null
+  ), [tab, gs, gameDay]);
+  const mailboxForView = useMemo(() => (
+    tab === "mailbox" ? gs.getVisibleMailbox(gameDay, { limit: 150 }) : []
+  ), [tab, gs, gameDay]);
+  const mailboxUnreadCount = useMemo(() => (
+    tab === "mailbox" ? gs.getUnreadMailboxCount(gameDay) : 0
+  ), [tab, gs, gameDay]);
+  const newsForView = useMemo(() => (
+    tab === "news" ? gs.getNewsBySelector({ limit: 120 }) : []
+  ), [tab, gs]);
+  const transferLogsForView = useMemo(() => (
+    tab === "news" ? gs.getTransferLogs({ limit: 120 }) : []
+  ), [tab, gs]);
+  const recordsView = useMemo(() => (
+    tab === "records" ? gs.getRecordsView() : null
+  ), [tab, gs]);
+  const scheduleArchiveForView = useMemo(() => (
+    tab === "schedule" ? gs.getScheduleArchive() : []
+  ), [tab, gs]);
+  const gameResultsMapForView = useMemo(() => (
+    tab === "schedule" ? gs.getGameResultsMap() : {}
+  ), [tab, gs]);
+  const tradeOffers = useMemo(() => (
+    tab === "trade" ? gs.getPendingTradeOffers(gameDay, { limit: 50 }) : []
+  ), [tab, gs, gameDay]);
 
   useEffect(() => {
     const sectionId = TAB_TO_SECTION[tab];
@@ -406,13 +426,13 @@ export default function App(){
     </div>
 
     <ErrorBoundary key={tab}>
-    {tab==="dashboard"&&<DashboardTab myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year} recentResults={gs.recentResults} mailbox={mailboxForView} faPool={faPool} onTabSwitch={handleTabChange} unreadMailboxCount={unreadMailboxCount} latestNewsId={latestNewsId}/>}
+    {tab==="dashboard"&&<DashboardTab myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year} recentResults={gs.recentResults} pendingTradeCount={dashboardSlice?.pendingTrades||0} faPool={faPool} onTabSwitch={handleTabChange} unreadMailboxCount={dashboardSlice?.unreadMailboxCount||0} latestNewsId={dashboardSlice?.latestNewsId||""}/>}
     {tab==="roster"&&<RosterTab team={myTeam} onToggle={gs.toggleLineup} onReplaceLineup={gs.replaceLineup} onSetLineupOrder={gs.setLineupOrder} onSetRosterDhMode={gs.setRosterDhMode} onSetPlayerPosition={gs.setPlayerPosition} onSetStarter={gs.setStarter} onPromo={gs.promote} onDemo={gs.demote} onSetTrainingFocus={gs.setTrainingFocus} onConvertIkusei={gs.convertIkusei} onMoveRotation={gs.moveRotation} onRemoveFromRotation={gs.removeFromRotation} onSetPitchingPattern={gs.setPitchingPattern} onReplaceRotation={gs.replaceRotation} onReplaceFullRoster={gs.replaceFullRoster} onPlayerClick={gs.handlePlayerClick} onSetDevGoal={gs.setDevGoal} onPlayerTalk={gs.handlePlayerTalk} onSetConvertTarget={gs.setConvertTarget} gameDay={gameDay}/>}
     {tab==="schedule"&&<ScheduleTab schedule={schedule} gameDay={gameDay} myTeam={myTeam} teams={teams} year={year} gameResultsMap={gameResultsMapForView} allStarDone={gs.allStarDone} allStarResult={gs.allStarResult} allStarTriggerDay={gs.allStarTriggerDay} scheduleArchive={scheduleArchiveForView||[]} onResultClick={dayNo=>{const r=gameResultsMapForView[dayNo];if(r){sf.setGameResult({score:{my:r.myScore,opp:r.oppScore},log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:r.oppTeam,won:r.won,gameNo:dayNo,_source:"schedule"});setScreen("result");}}}/>}
-    {tab==="records"&&<RecordsTab history={seasonHistoryForView}/>}
-    {tab==="news"&&<NewsTab news={newsForView} onInterview={gs.handleInterview} seasonHistory={seasonHistoryForView} currentYear={year}/>}
-    {tab==="mailbox"&&<MailboxTab mailbox={mailboxForView} onRead={os.handleMailRead} onAction={os.handleMailAction} teams={teams} myTeam={myTeam} onTrade={os.handleTrade} onTeamClick={gs.handleTeamClick} gameDay={gameDay}/>}
-    {tab==="trade"&&(()=>{const pendingTrades=mailboxForView.filter(m=>m.type==="trade"&&!m.resolved);return<TradeTab myTeam={myTeam} teams={teams} onTrade={os.handleTrade} cpuOffers={pendingTrades.map(m=>m.offer)} onAcceptOffer={(idx)=>os.handleMailAction(pendingTrades[idx].id,"accept")} onDeclineOffer={(idx)=>os.handleMailAction(pendingTrades[idx].id,"decline")} deadlinePassed={(()=>{const d=gameDayToDate(gameDay,schedule);return d?d.month>TRADE_DEADLINE_MONTH:gameDay>95;})()} onPlayerClick={gs.handlePlayerClick}/>;})()}
+    {tab==="records"&&<RecordsTab history={recordsView}/>}
+    {tab==="news"&&<NewsTab news={newsForView} transfers={transferLogsForView} onInterview={gs.handleInterview} currentYear={year}/>}
+    {tab==="mailbox"&&<MailboxTab mailbox={mailboxForView} unreadCount={mailboxUnreadCount} onRead={os.handleMailRead} onAction={os.handleMailAction} teams={teams} myTeam={myTeam} onTrade={os.handleTrade} onTeamClick={gs.handleTeamClick} gameDay={gameDay}/>}
+    {tab==="trade"&&<TradeTab myTeam={myTeam} teams={teams} onTrade={os.handleTrade} cpuOffers={tradeOffers.map(m=>m.offer)} onAcceptOffer={(idx)=>os.handleMailAction(tradeOffers[idx].id,"accept")} onDeclineOffer={(idx)=>os.handleMailAction(tradeOffers[idx].id,"decline")} deadlinePassed={(()=>{const d=gameDayToDate(gameDay,schedule);return d?d.month>TRADE_DEADLINE_MONTH:gameDay>95;})()} onPlayerClick={gs.handlePlayerClick}/>}
     {tab==="contract"&&<ContractTab team={myTeam} allTeams={teams} year={year} onOffer={os.handleContractOffer} onRelease={pid=>{const p=myTeam?.players.find(x=>x.id===pid);const popPenalty=(p?.salary??0)>POP_RELEASE_SALARY_THRESHOLD?POP_RELEASE_PENALTY:0;upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),popularity:Math.min(100,Math.max(0,(t.popularity??50)+popPenalty))}));if(p){addToHistory(myId,p,"自由契約");setFaPool(prev=>[...prev,{...p,isFA:true}]);}notify("放出しました","warn");}}/>}
     {tab==="alumni"&&<AlumniTab myTeam={myTeam}/>}
         {tab==="fa"&&(
