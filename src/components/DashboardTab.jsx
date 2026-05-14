@@ -4,7 +4,7 @@ import { getMyMatchup } from '../engine/scheduleGen';
 import { MAX_ROSTER } from '../constants';
 import { TodayGameCard, RecommendationCard, TeamConditionCard, DashboardKpiGrid, FeaturedPlayersCard } from './dashboard/ManagerDashboardCards';
 
-export function DashboardTab({ myTeam, teams, schedule, gameDay, recentResults, mailbox, faPool, onTabSwitch }) {
+export function DashboardTab({ myTeam, teams, schedule, gameDay, recentResults, pendingTradeCount = 0, faPool, onTabSwitch }) {
   const leagueStandings = useMemo(() => {
     if (!myTeam || !teams) return { rank: 0, gb: 0, total: 0 };
     const sameLeagueTeams = [...teams.filter(t => t.league === myTeam.league)].sort((a, b) => {
@@ -36,13 +36,12 @@ export function DashboardTab({ myTeam, teams, schedule, gameDay, recentResults, 
     if (expiring > 0) items.push({ tone: 'warning', title: `契約満了予定 ${expiring}人`, reason: '契約延長の判断を先送りすると戦力低下リスクがあります。', tab: 'contract' });
     const injured = myTeam.players.filter(p => (p.injuryDaysLeft ?? 0) > 0).length;
     if (injured > 0) items.push({ tone: 'warning', title: `負傷中 ${injured}人`, reason: '起用見直しと二軍入れ替えを検討してください。', tab: 'roster' });
-    const tradeOffers = mailbox.filter(m => m.type === 'trade' && !m.resolved && !m.read).length;
-    if (tradeOffers > 0) items.push({ tone: 'danger', title: `トレードオファー ${tradeOffers}件`, reason: '期限切れ前に受諾・拒否の意思決定が必要です。', tab: 'mailbox' });
+    if (pendingTradeCount > 0) items.push({ tone: 'danger', title: `トレードオファー ${pendingTradeCount}件`, reason: '期限切れ前に受諾・拒否の意思決定が必要です。', tab: 'mailbox' });
     if (items.length === 0) {
       items.push({ tone: 'good', title: '大きな緊急課題なし', reason: '今日は試合準備と先発起用の確認を優先しましょう。', tab: 'schedule' });
     }
     return items.slice(0, 3);
-  }, [myTeam, mailbox]);
+  }, [myTeam, pendingTradeCount]);
 
   if (!myTeam) return null;
 
@@ -52,8 +51,6 @@ export function DashboardTab({ myTeam, teams, schedule, gameDay, recentResults, 
   const recentLosses = recentResults.filter(r => !r.won && !r.drew).length;
   const rpg = (myTeam.rf ?? 0) / Math.max(1, myTeam.wins + myTeam.losses);
   const rapg = (myTeam.ra ?? 0) / Math.max(1, myTeam.wins + myTeam.losses);
-
-
 
   const featuredPlayers = [...myTeam.players]
     .sort((a, b) => (b.war ?? 0) - (a.war ?? 0))
