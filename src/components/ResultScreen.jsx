@@ -16,58 +16,71 @@ function buildResultScreenData(gsResult, myTeam, oppTeam) {
     if (isTop) oppRunsByInn[inning] = runs;
     else myRunsByInn[inning] = runs;
   });
+  let myHitsTotal = 0;
+  let oppHitsTotal = 0;
+  const myPitcherIds = [];
+  const oppPitcherIds = [];
+  const myPitcherSeen = new Set();
+  const oppPitcherSeen = new Set();
+  const myPitcherStats = {};
+  const oppPitcherStats = {};
+  const myBatStatsMap = {};
+  const oppBatStatsMap = {};
+  const myBatOrder = [];
+  const oppBatOrder = [];
+  const myHREvts = [];
+  const oppHREvts = [];
 
-  const myHitsTotal = log.filter((e) => e.scorer && isHit(e.result) && !e.isStolenBase).length;
-  const oppHitsTotal = log.filter((e) => !e.scorer && isHit(e.result) && !e.isStolenBase).length;
-  const myPitchEvents = log.filter((e) => !e.scorer && !e.isStolenBase && e.pitcherId && e.result && e.result !== 'change');
-  const oppPitchEvents = log.filter((e) => !!e.scorer && !e.isStolenBase && e.pitcherId && e.result && e.result !== 'change');
-  const getUniquePitcherIds = (events) => {
-    const seen = new Set();
-    const ids = [];
-    events.forEach((e) => {
-      if (seen.has(e.pitcherId)) return;
-      seen.add(e.pitcherId);
-      ids.push(e.pitcherId);
-    });
-    return ids;
+  const getPitcherRow = (map, id) => {
+    if (!map[id]) map[id] = { outs: 0, H: 0, ER: 0, K: 0, BB: 0, PC: 0 };
+    return map[id];
   };
-  const buildPitcherStats = (events, ids) => {
-    const map = {};
-    events.forEach((e) => {
-      if (!map[e.pitcherId]) map[e.pitcherId] = { outs: 0, H: 0, ER: 0, K: 0, BB: 0, PC: 0 };
-      const row = map[e.pitcherId];
-      if (isOut(e.result)) row.outs++;
+  const getBatterRow = (map, order, event) => {
+    if (!map[event.batId]) {
+      map[event.batId] = { name: event.batter || '', AB: 0, H: 0, HR: 0, RBI: 0 };
+      order.push(event.batId);
+    }
+    return map[event.batId];
+  };
+
+  log.forEach((e) => {
+    if (!e || e.isStolenBase) return;
+    if (e.result === 'hr') {
+      if (e.scorer) myHREvts.push(e);
+      else oppHREvts.push(e);
+    }
+    if (isHit(e.result)) {
+      if (e.scorer) myHitsTotal += 1;
+      else oppHitsTotal += 1;
+    }
+    if (e.batId && e.result && e.result !== 'change') {
+      const targetMap = e.scorer ? myBatStatsMap : oppBatStatsMap;
+      const targetOrder = e.scorer ? myBatOrder : oppBatOrder;
+      const row = getBatterRow(targetMap, targetOrder, e);
+      if (!['bb', 'hbp', 'sf'].includes(e.result)) row.AB++;
       if (isHit(e.result)) row.H++;
-      if (e.result === 'k') row.K++;
-      if (e.result === 'bb') row.BB++;
-      if ((e.rbi || 0) > 0) row.ER += e.rbi;
-      row.PC += (e.pitches || 0);
-    });
-    return ids.map((id) => ({ id, ...(map[id] || { outs: 0, H: 0, ER: 0, K: 0, BB: 0, PC: 0 }) }));
-  };
-  const buildBatStats = (events) => {
-    const map = {};
-    const ordered = [];
-    events
-      .filter((e) => e.batId && e.result && e.result !== 'change' && !e.isStolenBase)
-      .forEach((e) => {
-        if (!map[e.batId]) {
-          map[e.batId] = { name: e.batter || '', AB: 0, H: 0, HR: 0, RBI: 0 };
-          ordered.push(e.batId);
-        }
-        const row = map[e.batId];
-        if (!['bb', 'hbp', 'sf'].includes(e.result)) row.AB++;
-        if (isHit(e.result)) row.H++;
-        if (e.result === 'hr') row.HR++;
-        row.RBI += (e.rbi || 0);
-      });
-    return ordered.map((id) => ({ id, ...map[id] }));
-  };
+      if (e.result === 'hr') row.HR++;
+      row.RBI += (e.rbi || 0);
+    }
+    if (!e.pitcherId || !e.result || e.result === 'change') return;
+    const pitcherIds = e.scorer ? oppPitcherIds : myPitcherIds;
+    const pitcherSeen = e.scorer ? oppPitcherSeen : myPitcherSeen;
+    const pitcherStats = e.scorer ? oppPitcherStats : myPitcherStats;
+    if (!pitcherSeen.has(e.pitcherId)) {
+      pitcherSeen.add(e.pitcherId);
+      pitcherIds.push(e.pitcherId);
+    }
+    const row = getPitcherRow(pitcherStats, e.pitcherId);
+    if (isOut(e.result)) row.outs++;
+    if (isHit(e.result)) row.H++;
+    if (e.result === 'k') row.K++;
+    if (e.result === 'bb') row.BB++;
+    if ((e.rbi || 0) > 0) row.ER += e.rbi;
+    row.PC += (e.pitches || 0);
+  });
 
-  const myPitcherIds = getUniquePitcherIds(myPitchEvents);
-  const oppPitcherIds = getUniquePitcherIds(oppPitchEvents);
-  const myPStats = buildPitcherStats(myPitchEvents, myPitcherIds);
-  const oppPStats = buildPitcherStats(oppPitchEvents, oppPitcherIds);
+  const myPStats = myPitcherIds.map((id) => ({ id, ...(myPitcherStats[id] || { outs: 0, H: 0, ER: 0, K: 0, BB: 0, PC: 0 }) }));
+  const oppPStats = oppPitcherIds.map((id) => ({ id, ...(oppPitcherStats[id] || { outs: 0, H: 0, ER: 0, K: 0, BB: 0, PC: 0 }) }));
   const myStarterOuts = myPStats[0]?.outs || 0;
   const oppStarterOuts = oppPStats[0]?.outs || 0;
   const finalLead = gsResult.score.my - gsResult.score.opp;
@@ -102,10 +115,10 @@ function buildResultScreenData(gsResult, myTeam, oppTeam) {
     oppWinnerId,
     oppLoserId,
     oppSaverId,
-    myHREvts: log.filter((e) => e.scorer && e.result === 'hr'),
-    oppHREvts: log.filter((e) => !e.scorer && e.result === 'hr'),
-    myBatStats: buildBatStats(log.filter((e) => e.scorer)),
-    oppBatStats: buildBatStats(log.filter((e) => !e.scorer)),
+    myHREvts,
+    oppHREvts,
+    myBatStats: myBatOrder.map((id) => ({ id, ...myBatStatsMap[id] })),
+    oppBatStats: oppBatOrder.map((id) => ({ id, ...oppBatStatsMap[id] })),
     myPRole: (id) => id === myWinnerId ? 'W' : id === myLoserId ? 'L' : id === mySaverId ? 'S' : '',
     oppPRole: (id) => id === oppWinnerId ? 'W' : id === oppLoserId ? 'L' : id === oppSaverId ? 'S' : '',
     resultColor: won ? 'var(--gold)' : drew ? 'var(--blue)' : 'var(--red)',
