@@ -227,6 +227,18 @@ export function useGameState() {
   const getUnreadMailboxCount = useCallback((currentGameDay) => {
     return persistentStoreRef.current.selectUnreadMailboxCount(currentGameDay);
   }, []);
+  const getVisibleMailbox = useCallback((currentGameDay, options = {}) => {
+    return persistentStoreRef.current.selectVisibleMailboxList(currentGameDay, options);
+  }, []);
+  const getPendingTradeCount = useCallback((currentGameDay) => {
+    return persistentStoreRef.current.selectPendingTradeCount(currentGameDay);
+  }, []);
+  const getPendingTradeOffers = useCallback((currentGameDay, options = {}) => {
+    return persistentStoreRef.current.selectPendingTradeOffers(currentGameDay, options);
+  }, []);
+  const getUnreadInterviewCount = useCallback(() => {
+    return persistentStoreRef.current.selectUnreadInterviewCount();
+  }, []);
   const getLatestNewsId = useCallback(() => {
     return persistentStoreRef.current.selectLatestNewsId();
   }, []);
@@ -238,6 +250,12 @@ export function useGameState() {
   }, []);
   const getSeasonHistory = useCallback(() => {
     return persistentStoreRef.current.getSeasonHistory();
+  }, []);
+  const getTransferLogs = useCallback((options = {}) => {
+    return persistentStoreRef.current.selectTransferLogs(options);
+  }, []);
+  const getRecordsView = useCallback(() => {
+    return persistentStoreRef.current.getRecordsView();
   }, []);
   const getScheduleArchive = useCallback(() => {
     return persistentStoreRef.current.getScheduleArchive();
@@ -292,19 +310,19 @@ export function useGameState() {
   const tabBadges = useMemo(()=>{
     if(!myTeam) return {};
     const expiringCount=myTeam.players.filter(p=>!p.isIkusei&&(p.contractYearsLeft??99)<=1).length;
-    const visibleMails=mailbox.filter(m=>(m.deliverOnDay??0)<=gameDay);
-    const pendingTrades=visibleMails.filter(m=>m.type==="trade"&&!m.resolved&&!m.read).length;
-    const unreadMail=visibleMails.filter(m=>!m.read).length;
-    const unreadInterviews=news.filter(n=>n.type==="interview"&&!n.answered).length;
+    const pendingTrades=getPendingTradeCount(gameDay);
+    const unreadMail=getUnreadMailboxCount(gameDay);
+    const unreadInterviews=getUnreadInterviewCount();
+    const activeRosterCount = myTeam.players.filter(p=>!p.isIkusei).length;
     return {
-      roster: myTeam.players.filter(p=>!p.isIkusei).length>MAX_ROSTER?{n:myTeam.players.filter(p=>!p.isIkusei).length-MAX_ROSTER,color:"#f87171"}:null,
+      roster: activeRosterCount>MAX_ROSTER?{n:activeRosterCount-MAX_ROSTER,color:"#f87171"}:null,
       contract: expiringCount>0?{n:expiringCount,color:"#f5c842"}:null,
       trade: pendingTrades>0?{n:pendingTrades,color:"#f97316"}:null,
       mailbox: unreadMail>0?{n:unreadMail,color:pendingTrades>0?"#f97316":"#f5c842"}:null,
       fa: faPool.length>0?{n:faPool.length,color:"#94a3b8"}:null,
       news: unreadInterviews>0?{n:unreadInterviews,color:"#f5c842"}:null,
     };
-  },[myTeam,mailbox,faPool,news,gameDay]);
+  },[myTeam,faPool,gameDay,persistentSummaries,getPendingTradeCount,getUnreadMailboxCount,getUnreadInterviewCount]);
 
   const getTabBadgeState = useCallback(() => tabBadges, [tabBadges]);
   const getDashboardSlice = useCallback((options = {}) => {
@@ -312,9 +330,10 @@ export function useGameState() {
     const currentGameDay = Number.isFinite(Number(options.gameDay)) ? Number(options.gameDay) : gameDay;
     return {
       recentResults: recentResults.slice(0, limit),
-      mailbox: persistentStoreRef.current.selectMailboxPage({ limit }),
+      mailbox: persistentStoreRef.current.selectVisibleMailboxList(currentGameDay, { limit }),
       unreadMailboxCount: persistentStoreRef.current.selectUnreadMailboxCount(currentGameDay),
       latestNewsId: persistentStoreRef.current.selectLatestNewsId(),
+      pendingTrades: persistentStoreRef.current.selectPendingTradeCount(currentGameDay),
     };
   }, [gameDay, recentResults]);
   const getFaPoolByCategory = useCallback(() => {
@@ -802,10 +821,16 @@ export function useGameState() {
     getNewsPage,
     getMailboxPage,
     getUnreadMailboxCount,
+    getVisibleMailbox,
+    getPendingTradeCount,
+    getPendingTradeOffers,
+    getUnreadInterviewCount,
     getLatestNewsId,
     getNewsItemById,
     getMailboxItemById,
     getSeasonHistory,
+    getTransferLogs,
+    getRecordsView,
     getScheduleArchive,
     getGameResultsMap,
     getTabBadgeState,
