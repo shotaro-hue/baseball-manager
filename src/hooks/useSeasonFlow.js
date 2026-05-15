@@ -12,6 +12,7 @@ import { selectAllStars, runAllStarGame } from '../engine/allstar';
 import { getMyMatchup, getCpuMatchups } from '../engine/scheduleGen';
 import { enqueueSaveGame } from '../engine/saveload';
 import { processCpuFaBids } from '../engine/contract';
+import { cancelDeferredPostGameWork, scheduleDeferredPostGameWork } from '../engine/postGameProcessing';
 import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER, CPU_AUTO_MANAGE_INTERVAL, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX, FIELDING_POSITIONS, OPTIMAL_PITCHER_COUNT, MIN_ACTIVE_CATCHERS } from '../constants';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 
@@ -378,7 +379,7 @@ export function useSeasonFlow(gs) {
     setSaveExists, cpuTradeOffers,
     allStarDone, setAllStarDone, allStarResult, setAllStarResult,
     allStarTriggerDay,
-    setAllTeamResultsMap, setPregameError,
+    setAllTeamResultsMap, setAllTeamBoxScoresMap, setPregameError,
     getSeasonHistory,
     getNewsBySelector,
     getMailboxBySelector,
@@ -398,6 +399,7 @@ export function useSeasonFlow(gs) {
   const isBatchCancelledRef = useRef(false);
   const seasonProgressWorkerRef = useRef(null);
   const seasonProgressTaskIdRef = useRef(null);
+  const deferredBatchPatchRef = useRef(null);
 
   const prevMyPlayersRef = useRef(null);
   const prevMyFarmRef = useRef(null);
@@ -415,8 +417,11 @@ export function useSeasonFlow(gs) {
 
   useEffect(() => () => {
     isBatchCancelledRef.current = true;
+    if (deferredBatchPatchRef.current) {
+      cancelDeferredPostGameWork(deferredBatchPatchRef.current);
+      deferredBatchPatchRef.current = null;
+    }
   }, []);
-
   useEffect(()=>{
     if(!myTeam||!myId) return;
     const prevPlayers=prevMyPlayersRef.current;
@@ -426,7 +431,7 @@ export function useSeasonFlow(gs) {
       const newlyDemotedInj=myTeam.farm.filter(p=>prevPlayerIds.has(p.id)&&!myTeam.players.find(x=>x.id===p.id)&&(p.injuryDaysLeft??0)>0);
       if(newlyDemotedInj.length>0){
         const names=newlyDemotedInj.map(p=>`${p.name}（${p.injuryDaysLeft}日）`).join('、');
-        notify(`🤕 ${names}が怪我で自動二軍降格`,'warn');
+        notify(`${names}が怪我で自動二軍降格`, 'warn');
       }
     }
     if(prevFarm!==null){
@@ -434,7 +439,7 @@ export function useSeasonFlow(gs) {
       const newlyEligible=myTeam.farm.filter(p=>!p.isIkusei&&prevIneligibleIds.has(p.id)&&(p.injuryDaysLeft??0)===0&&(p.registrationCooldownDays??0)===0);
       if(newlyEligible.length>0){
         const names=newlyEligible.map(p=>p.name).join('、');
-        notify(`✅ ${names}が回復！一軍昇格可能`,'ok');
+        notify(`${names}が回復し、一軍昇格可能です`, 'ok');
       }
     }
     prevMyPlayersRef.current=myTeam.players;
@@ -682,6 +687,29 @@ export function useSeasonFlow(gs) {
     });
   };
 
+  const mergeAllTeamBoxScoresPatch = (patch) => {
+    if (!patch || typeof patch !== "object") return;
+    setAllTeamBoxScoresMap((prev) => {
+      let next = prev;
+      for (const [teamId, days] of Object.entries(patch)) {
+        const currentTeamMap = prev[teamId] || {};
+        let hasDiff = false;
+        for (const [dayKey, dayValue] of Object.entries(days || {})) {
+          if (currentTeamMap[dayKey] !== dayValue) {
+            hasDiff = true;
+            break;
+          }
+        }
+        if (!hasDiff) continue;
+        next = {
+          ...next,
+          [teamId]: { ...currentTeamMap, ...days },
+        };
+      }
+      return next;
+    });
+  };
+
   const runSingleDaySimulation = async ({ oppId, useDh, isHome, simulationMode = "detailed" }) => {
     if (!myTeam || !oppId) return;
 
@@ -826,7 +854,7 @@ export function useSeasonFlow(gs) {
         setAllStarResult(allStarPayload);
       }
       if ((summaryCounts?.tradeMailCount || 0) > 0) {
-        notify(`📨 トレードオファーが${summaryCounts.tradeMailCount}件届きました`, "ok");
+        notify(`トレードオファーが${summaryCounts.tradeMailCount}件届きました`, "ok");
       }
 
       if (screenDirective === "playoff") {
@@ -935,7 +963,7 @@ export function useSeasonFlow(gs) {
       if(newInj.length>0){
         const injNames=newInj.reduce((acc,i)=>{const p=updated.players.find(x=>x.id===i.id);if(p)acc.push({name:p.name,...i});return acc;},[]);
         updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
-        injNames.filter(i=>i.days>=7).forEach(i=>{addNews({type:"season",headline:`🤕 ${i.name}が負傷`,source:"チーム情報",dateLabel:`${year}年 ${gameDay}日目`,body:`${i.name}は${i.type}で${i.days}日離脱見込みです。チームはロスター調整を進めます。`});});
+        injNames.filter(i=>i.days>=7).forEach(i=>{addNews({type:"season",headline:`${i.name} injured`,source:"Team News",dateLabel:`${year} Year Day ${gameDay}`,body:`${i.name} is expected to miss ${i.days} days due to ${i.type}. The roster will be adjusted.`});});
       }
       updated.farm=tickCooldowns(updated.farm??[]);
       updated=autoInjuryDemote(updated);
@@ -1047,12 +1075,12 @@ export function useSeasonFlow(gs) {
       if(cands.length>0){
         const rp=cands[rng(0,cands.length-1)];
         setRetireModal({player:rp,type:"announce"});
-        addNews({type:"season",headline:`引退示唆 ${rp.name}`,source:"スポーツ報知",dateLabel:`${year}年 ${gameDay}日目`,body:`${rp.name}（${rp.age}歳）が引退を示唆するコメントを出しました。チームは今後、本人の意思を確認していきます。`});
+        addNews({type:"season",headline:`Retirement hint ${rp.name}`,source:"Sports News",dateLabel:`${year} Year Day ${gameDay}`,body:`${rp.name} (${rp.age}) hinted at retirement. The team will confirm the player's plans.`});
       }
     }
     const _tmpl=won?NEWS_TEMPLATES_WIN:NEWS_TEMPLATES_LOSE;
     const _scoreStr=r.score.my+"-"+r.score.opp;
-    const _hl=_tmpl[rng(0,_tmpl.length-1)].replace("{team}",myTeam?.name||"自チーム").replace("{opp}",currentOpp?.name||"相手").replace("{score}",_scoreStr);
+    const _hl=_tmpl[rng(0,_tmpl.length-1)].replace("{team}",myTeam?.name||"My Team").replace("{opp}",currentOpp?.name||"Opponent").replace("{score}",_scoreStr);
     addNews({type:"game",headline:_hl,source:"スポーツ報知",dateLabel:`${year}年 ${gameDay}日目`,body:(won?`${myTeam?.name}が${currentOpp?.name}に${_scoreStr}で勝利しました。`:`${myTeam?.name}は${currentOpp?.name}に${_scoreStr}で敗れました。`)});
     if(Math.random()<0.35){
       const _qs=won?INTERVIEW_QUESTIONS_WIN:INTERVIEW_QUESTIONS_LOSE;
@@ -1120,7 +1148,7 @@ export function useSeasonFlow(gs) {
     if(!myTeam) return;
     const safeCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
     if (safeCount <= 0) {
-      notify("バッチ試合数が不正です", "warn");
+      notify("Failed to start batch processing", "warn");
       return;
     }
 
@@ -1251,7 +1279,7 @@ export function useSeasonFlow(gs) {
       });
 
       if (!result) {
-        notify("バッチ処理を中止しました", "warn");
+        notify("Batch processing was cancelled", "warn");
         return;
       }
 
@@ -1262,6 +1290,7 @@ export function useSeasonFlow(gs) {
         recentResults: nextRecentResults,
         gameResultsMapPatch,
         allTeamResultsPatch,
+        allTeamBoxScoresPatch,
         nextAllStarDone,
         allStarPayload,
         summaryCounts,
@@ -1276,9 +1305,16 @@ export function useSeasonFlow(gs) {
       setGameDay(nextState.gameDay);
       setBatchMeta(batchMeta);
       setBatchResults(batchResults);
+      mergeAllTeamResultsPatch(allTeamResultsPatch);
       gs.setRecentResults((prev) => [...nextRecentResults, ...prev].slice(0, 5));
       gs.setGameResultsMap((prev) => ({ ...prev, ...gameResultsMapPatch }));
-      mergeAllTeamResultsPatch(allTeamResultsPatch);
+      if (deferredBatchPatchRef.current) {
+        cancelDeferredPostGameWork(deferredBatchPatchRef.current);
+      }
+      deferredBatchPatchRef.current = scheduleDeferredPostGameWork(() => {
+        mergeAllTeamBoxScoresPatch(allTeamBoxScoresPatch);
+        deferredBatchPatchRef.current = null;
+      });
 
       if (nextAllStarDone) {
         setAllStarDone(true);
@@ -1288,10 +1324,10 @@ export function useSeasonFlow(gs) {
       }
 
       if ((summaryCounts?.tradeMailCount || 0) > 0) {
-        notify(`📨 バッチ中にトレードオファーが${summaryCounts.tradeMailCount}件届きました`, "ok");
+        notify(`Batch trade offers: ${summaryCounts.tradeMailCount}`, "ok");
       }
       if ((summaryCounts?.foreignSigningCount || 0) > 0) {
-        notify(`🗞 バッチ中に他球団の補強が${summaryCounts.foreignSigningCount}件ありました`, "ok");
+        notify(`Batch foreign signings: ${summaryCounts.foreignSigningCount}`, "ok");
       }
 
       if (shouldEnterPlayoff) {
@@ -1318,7 +1354,7 @@ export function useSeasonFlow(gs) {
         });
     } catch (error) {
       console.error("runBatchGames failed", error);
-      notify("バッチ処理中にエラーが発生しました", "error");
+      notify("An error occurred during batch processing", "error");
     } finally {
       cleanupWorker();
     }
@@ -1456,7 +1492,7 @@ export function useSeasonFlow(gs) {
     setGameResult(gsResult);
     const _tmpl=won?NEWS_TEMPLATES_WIN:NEWS_TEMPLATES_LOSE;
     const _scoreStr=gsResult.score.my+"-"+gsResult.score.opp;
-    const _hl=_tmpl[rng(0,_tmpl.length-1)].replace("{team}",myTeam?.name||"自チーム").replace("{opp}",currentOpp?.name||"相手").replace("{score}",_scoreStr);
+    const _hl=_tmpl[rng(0,_tmpl.length-1)].replace("{team}",myTeam?.name||"My Team").replace("{opp}",currentOpp?.name||"Opponent").replace("{score}",_scoreStr);
     addNews({type:"game",headline:_hl,source:"スポーツ報知",dateLabel:`${year}年 ${gameDay}日目`,body:(won?`${myTeam?.name}が${currentOpp?.name}に${_scoreStr}で勝利しました。`:`${myTeam?.name}は${currentOpp?.name}に${_scoreStr}で敗れました。`)});
     if(Math.random()<0.35){
       const _qs=won?INTERVIEW_QUESTIONS_WIN:INTERVIEW_QUESTIONS_LOSE;
@@ -1521,4 +1557,5 @@ export function useSeasonFlow(gs) {
     tryGenerateCpuOffer,
   };
 }
+
 
