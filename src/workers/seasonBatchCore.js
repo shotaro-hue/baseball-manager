@@ -51,7 +51,7 @@ import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 const MAX_FOREIGN_ACTIVE = 4;
 const MAX_BATCH_BOX_SCORE_KEEP = 120;
 const DEFAULT_PROGRESS_THROTTLE_MS = 250;
-const DEFAULT_PROGRESS_PHASE = '試合計算';
+const DEFAULT_PROGRESS_PHASE = 'Simulating games';
 
 export function createSeasonBatchProgressState(throttleMs = DEFAULT_PROGRESS_THROTTLE_MS) {
   return {
@@ -277,13 +277,13 @@ function cpuAutoManageTeam(team) {
     const demoted = new Set();
     const applyDemote = (candidates, limit) => {
       const activeCatcherCount = () => players
-        .filter((player) => !player.isPitcher && player.pos === '謐墓焔' && !demoted.has(player.id))
+        .filter((player) => !player.isPitcher && player.pos === '隰仙｢鍋・' && !demoted.has(player.id))
         .length;
       [...candidates]
         .sort((a, b) => effScore(a, false) - effScore(b, false))
         .slice(0, limit)
         .forEach((player) => {
-          if (!player.isPitcher && player.pos === '謐墓焔' && activeCatcherCount() <= MIN_ACTIVE_CATCHERS) {
+          if (!player.isPitcher && player.pos === '隰仙｢鍋・' && activeCatcherCount() <= MIN_ACTIVE_CATCHERS) {
             return;
           }
           players = players.filter((entry) => entry.id !== player.id);
@@ -419,8 +419,8 @@ function cpuAutoManageTeam(team) {
     .map(([, player]) => player.id);
 
   const pitchers = players.filter((player) => player.isPitcher && !player.isIkusei && (player.injuryDaysLeft ?? 0) === 0);
-  const starters = pitchers.filter((player) => player.subtype === '蜈育匱').sort((a, b) => cpuStarterScore(b) - cpuStarterScore(a));
-  const relievers = pitchers.filter((player) => player.subtype !== '蜈育匱').sort((a, b) => cpuRelieverScore(b) - cpuRelieverScore(a));
+  const starters = pitchers.filter((player) => player.subtype === '陷郁ご蛹ｱ').sort((a, b) => cpuStarterScore(b) - cpuStarterScore(a));
+  const relievers = pitchers.filter((player) => player.subtype !== '陷郁ご蛹ｱ').sort((a, b) => cpuRelieverScore(b) - cpuRelieverScore(a));
   const newRotation = starters.slice(0, 6).map((player) => player.id);
   const minRotation = 5;
   if (newRotation.length < minRotation) {
@@ -545,8 +545,8 @@ function tryCpuCpuDeadlineTrade(teamsArr, currentGameDay, schedule) {
   seller.players = [...seller.players.filter((player) => player.id !== buyerGets.id), sellerGets];
 
   return {
-    headline: `移籍情報 ${buyerGets.name} が ${buyerName} へ`,
-    body: `${sellerName} と ${buyerName} の間でトレードが成立。${buyerName} は ${buyerGets.name} を獲得し、${sellerGets.name} を放出した。`,
+    headline: `遘ｻ邀肴ュ蝣ｱ ${buyerGets.name} 縺・${buyerName} 縺ｸ`,
+    body: `${sellerName} 縺ｨ ${buyerName} 縺ｮ髢薙〒繝医Ξ繝ｼ繝峨′謌千ｫ九・{buyerName} 縺ｯ ${buyerGets.name} 繧堤佐蠕励＠縲・{sellerGets.name} 繧呈叛蜃ｺ縺励◆縲Ａ,
     buyerName,
     sellerName,
     buyerGetsName: buyerGets.name,
@@ -585,13 +585,13 @@ function tryGenerateCpuOfferInBatch(teamsArr, currentGameDay, existingOfferCount
   return {
     id: uid(),
     type: 'trade',
-    title: `${offer.from.name} からトレードオファー`,
+    title: `${offer.from.name} 縺九ｉ繝医Ξ繝ｼ繝峨が繝輔ぃ繝ｼ`,
     from: offer.from.name,
-    dateLabel: `${snapshot.year}年 ${currentGameDay}日目`,
+    dateLabel: `${snapshot.year}蟷ｴ ${currentGameDay}譌･逶ｮ`,
     timestamp: Date.now(),
     read: false,
     resolved: false,
-    body: `${offer.from.name} からトレードの提案が届いた。\n\n欲しい選手: ${offer.want.map((player) => player.name).join('、')}\n提示選手: ${offer.offer.length > 0 ? offer.offer.map((player) => player.name).join('、') : 'なし'}${offer.cash > 0 ? `\n金銭: +${(offer.cash / 10000).toLocaleString()}億円` : ''}\n\nメール画面で確認してください。`,
+    body: `${offer.from.name} sent a trade offer.\n\nWanted players: ${offer.want.map((player) => player.name).join(' / ')}\nOffered players: ${offer.offer.length > 0 ? offer.offer.map((player) => player.name).join(' / ') : 'None'}${offer.cash > 0 ? `\nCash: +${(offer.cash / 10000).toLocaleString()} x10k` : ''}\n\nCheck the mailbox for details.`, 
     offer,
   };
 }
@@ -616,7 +616,7 @@ function tryCpuForeignFaInBatch(teamsArr, currentGameDay, pool, snapshot) {
   const mergedPool = pool.filter((player) => !signedIdSet.has(player.id));
   const news = (result.news || []).map((item) => ({
     ...item,
-    dateLabel: `${snapshot.year}年 ${currentGameDay}日目`,
+    dateLabel: `${snapshot.year}蟷ｴ ${currentGameDay}譌･逶ｮ`,
   }));
   return {
     updatedTeams: result.updatedTeams,
@@ -643,17 +643,17 @@ function buildAllStarNewsItems(asResult, dayLabel, year) {
   return [
     {
       type: 'allstar',
-      headline: `オールスター第1戦 セ${asResult.game1.score.ce} - パ${asResult.game1.score.pa}`,
-      source: 'NPB公式',
-      dateLabel: `${year}年 ${dayLabel}日目`,
-      body: `会場: ${asResult.venue}\nセ・リーグ ${asResult.game1.score.ce} - ${asResult.game1.score.pa} パ・リーグ\nMVP: ${asResult.game1.mvp?.name || '選出なし'}`,
+      headline: `All-Star Game 1 CE ${asResult.game1.score.ce} - PA ${asResult.game1.score.pa}`,
+      source: 'NPB Official',
+      dateLabel: `${year} Day ${dayLabel}`,
+      body: `Venue: ${asResult.venue}\nCE ${asResult.game1.score.ce} - ${asResult.game1.score.pa} PA\nMVP: ${asResult.game1.mvp?.name || 'None'}`,
     },
     {
       type: 'allstar',
-      headline: `オールスター第2戦 セ${asResult.game2.score.ce} - パ${asResult.game2.score.pa}`,
-      source: 'NPB公式',
-      dateLabel: `${year}年 ${dayLabel + 1}日目`,
-      body: `セ・リーグ ${asResult.game2.score.ce} - ${asResult.game2.score.pa} パ・リーグ\nMVP: ${asResult.game2.mvp?.name || '選出なし'}`,
+      headline: `All-Star Game 2 CE ${asResult.game2.score.ce} - PA ${asResult.game2.score.pa}`,
+      source: 'NPB Official',
+      dateLabel: `${year} Day ${dayLabel + 1}`,
+      body: `CE ${asResult.game2.score.ce} - ${asResult.game2.score.pa} PA\nMVP: ${asResult.game2.mvp?.name || 'None'}`,
     },
   ];
 }
@@ -663,7 +663,13 @@ function makeCompactBoxScoreRecord({ homeId, awayId, dayNo, cr, bs, homeName, aw
     homeId,
     awayId,
     dayNo,
-    cr,
+    gameResult: {
+      won: cr.won,
+      score: {
+        my: cr.score.my,
+        opp: cr.score.opp,
+      },
+    },
     homeName,
     awayName,
     inningScores: bs?.inningScores,
@@ -671,6 +677,19 @@ function makeCompactBoxScoreRecord({ homeId, awayId, dayNo, cr, bs, homeName, aw
     awayBatting: bs?.awayBatting,
     homePitching: bs?.homePitching,
     awayPitching: bs?.awayPitching,
+  };
+}
+
+function makeTeamResultSummary({ won, drew, myScore, oppScore, oppName, oppId, homeId, awayId }) {
+  return {
+    won,
+    drew,
+    myScore,
+    oppScore,
+    oppName,
+    oppId,
+    homeId,
+    awayId,
   };
 }
 
@@ -682,6 +701,27 @@ function buildRecentResult(gameResult) {
     myScore: gameResult.score.my,
     oppScore: gameResult.score.opp,
     gameNo: gameResult.gameNo,
+  };
+}
+
+function buildBatchResultSummary(gameResult) {
+  return {
+    gameNo: gameResult.gameNo,
+    won: gameResult.won,
+    drew: gameResult.score.my === gameResult.score.opp,
+    score: {
+      my: gameResult.score.my,
+      opp: gameResult.score.opp,
+    },
+    oppTeam: gameResult.oppTeam
+      ? {
+          id: gameResult.oppTeam.id,
+          name: gameResult.oppTeam.name,
+          short: gameResult.oppTeam.short,
+          emoji: gameResult.oppTeam.emoji,
+          color: gameResult.oppTeam.color,
+        }
+      : null,
   };
 }
 
@@ -705,18 +745,45 @@ function buildGameResultsMapPatch(gameResults) {
 function buildAllTeamResultsPatch(batchBoxScores) {
   const patches = {};
   for (const box of batchBoxScores) {
-    const hWon = box.cr.won;
-    const drew = box.cr.score.my === box.cr.score.opp;
+    const hWon = box.gameResult.won;
+    const drew = box.gameResult.score.my === box.gameResult.score.opp;
     if (!patches[box.homeId]) patches[box.homeId] = {};
-    patches[box.homeId][box.dayNo] = {
+    patches[box.homeId][box.dayNo] = makeTeamResultSummary({
       won: hWon,
       drew,
-      myScore: box.cr.score.my,
-      oppScore: box.cr.score.opp,
+      myScore: box.gameResult.score.my,
+      oppScore: box.gameResult.score.opp,
       oppName: box.awayName,
       oppId: box.awayId,
       homeId: box.homeId,
       awayId: box.awayId,
+    });
+    if (!patches[box.awayId]) patches[box.awayId] = {};
+    patches[box.awayId][box.dayNo] = makeTeamResultSummary({
+      won: !hWon && !drew,
+      drew,
+      myScore: box.gameResult.score.opp,
+      oppScore: box.gameResult.score.my,
+      oppName: box.homeName,
+      oppId: box.homeId,
+      homeId: box.homeId,
+      awayId: box.awayId,
+    });
+  }
+  return patches;
+}
+
+function buildAllTeamBoxScoresPatch(batchBoxScores) {
+  const patches = {};
+  for (const box of batchBoxScores) {
+    const hasDetail = (box.inningScores && box.inningScores.length)
+      || (box.homeBatting && box.homeBatting.length)
+      || (box.awayBatting && box.awayBatting.length)
+      || (box.homePitching && box.homePitching.length)
+      || (box.awayPitching && box.awayPitching.length);
+    if (!hasDetail) continue;
+    if (!patches[box.homeId]) patches[box.homeId] = {};
+    patches[box.homeId][box.dayNo] = {
       inningScores: box.inningScores,
       myBatting: box.homeBatting,
       oppBatting: box.awayBatting,
@@ -725,14 +792,6 @@ function buildAllTeamResultsPatch(batchBoxScores) {
     };
     if (!patches[box.awayId]) patches[box.awayId] = {};
     patches[box.awayId][box.dayNo] = {
-      won: !hWon && !drew,
-      drew,
-      myScore: box.cr.score.opp,
-      oppScore: box.cr.score.my,
-      oppName: box.homeName,
-      oppId: box.homeId,
-      homeId: box.homeId,
-      awayId: box.awayId,
       inningScores: box.inningScores,
       myBatting: box.awayBatting,
       oppBatting: box.homeBatting,
@@ -862,7 +921,7 @@ export function simulateSeasonBatch({
           homeScore: sim.score.my,
           awayScore: sim.score.opp,
           homeWon,
-          label: margin >= 4 ? '大勝' : '接戦',
+          label: margin >= 4 ? 'Blowout' : 'Close game',
         });
       }
 
@@ -1029,29 +1088,29 @@ export function simulateSeasonBatch({
 
       const templates = won ? NEWS_TEMPLATES_WIN : NEWS_TEMPLATES_LOSE;
       const scoreString = `${sim.score.my}-${sim.score.opp}`;
-      const myTeamName = newTeams.find((team) => team.id === state.myId)?.name || '自チーム';
+      const myTeamName = newTeams.find((team) => team.id === state.myId)?.name || '閾ｪ繝√・繝';
       const headline = templates[rng(0, templates.length - 1)]
         .replace('{team}', myTeamName)
-        .replace('{opp}', opp.name || '相手')
+        .replace('{opp}', opp.name || 'Opponent')
         .replace('{score}', scoreString);
       batchNewsItems.push({
         type: 'game',
         headline,
-        source: 'スポーツ報知',
-        dateLabel: `${state.year}年 ${newDay}日目`,
+        source: '繧ｹ繝昴・繝・ｱ遏･',
+        dateLabel: `${state.year}蟷ｴ ${newDay}譌･逶ｮ`,
         body: won
-          ? `${myTeamName} が ${opp.name} に ${scoreString} で勝利した。`
-          : `${myTeamName} は ${opp.name} に ${scoreString} で敗れた。`,
+          ? `${myTeamName} 縺・${opp.name} 縺ｫ ${scoreString} 縺ｧ蜍晏茜縺励◆縲Ａ
+          : `${myTeamName} 縺ｯ ${opp.name} 縺ｫ ${scoreString} 縺ｧ謨励ｌ縺溘Ａ,
       });
       if (rngf(0, 1) < 0.15) {
         const questions = won ? INTERVIEW_QUESTIONS_WIN : INTERVIEW_QUESTIONS_LOSE;
         const options = won ? INTERVIEW_OPTIONS_WIN : INTERVIEW_OPTIONS_LOSE;
         batchNewsItems.push({
           type: 'interview',
-          headline: `インタビュー ${myTeamName} 監督に直撃`,
-          source: '記者会見',
-          dateLabel: `${state.year}年 ${newDay}日目`,
-          body: '試合後、記者が監督にコメントを求めた。',
+          headline: `繧､繝ｳ繧ｿ繝薙Η繝ｼ ${myTeamName} 逶｣逹｣縺ｫ逶ｴ謦チ,
+          source: 'Reporter',
+          dateLabel: `${state.year}蟷ｴ ${newDay}譌･逶ｮ`,
+          body: 'The manager was asked for a postgame comment.',
           question: questions[rng(0, questions.length - 1)],
           options,
         });
@@ -1085,7 +1144,7 @@ export function simulateSeasonBatch({
     startedAt,
     current: safeCount,
     total: safeCount,
-    phase: '集計',
+    phase: 'All-Star',
     onProgress,
     force: true,
   });
@@ -1096,7 +1155,7 @@ export function simulateSeasonBatch({
       type: 'trade',
       headline: result.headline,
       source: 'Baseball Times',
-      dateLabel: `${state.year}年 ${result.day}日目`,
+      dateLabel: `${state.year}蟷ｴ ${result.day}譌･逶ｮ`,
       body: result.body,
     }));
   const transferEntries = results
@@ -1107,7 +1166,7 @@ export function simulateSeasonBatch({
       year: state.year,
       day: result.day,
       type: 'trade',
-      headline: `CPU間トレード ${result.sellerName} -> ${result.buyerName}`,
+      headline: `CPU髢薙ヨ繝ｬ繝ｼ繝・${result.sellerName} -> ${result.buyerName}`,
       fromTeam: result.sellerName,
       toTeam: result.buyerName,
       playersIn: [result.buyerGetsName],
@@ -1145,12 +1204,12 @@ export function simulateSeasonBatch({
         id: uid(),
         type: 'cpu_fa_summary',
         read: false,
-        title: `外国人補強まとめ ${byTeam.size}件`,
-        subject: `外国人補強まとめ ${byTeam.size}件`,
-        from: 'スカウト部',
-        dateLabel: `${state.year}年 ${newDay - 1}日目まで`,
+        title: `螟門嵜莠ｺ陬懷ｼｷ縺ｾ縺ｨ繧・${byTeam.size}莉ｶ`,
+        subject: `螟門嵜莠ｺ陬懷ｼｷ縺ｾ縺ｨ繧・${byTeam.size}莉ｶ`,
+        from: '繧ｹ繧ｫ繧ｦ繝磯Κ',
+        dateLabel: `${state.year}蟷ｴ ${newDay - 1}譌･逶ｮ縺ｾ縺ｧ`,
         timestamp: Date.now(),
-        body: 'バッチシミュレーション中に成立した外国人補強の一覧です。',
+        body: 'A list of foreign signings completed during the batch simulation.',
         signings: Array.from(byTeam.values()),
       },
     ];
@@ -1188,14 +1247,14 @@ export function simulateSeasonBatch({
     startedAt,
     current: safeCount,
     total: safeCount,
-    phase: '完了',
+    phase: 'Done',
     onProgress,
     force: true,
   });
 
   return {
     nextState,
-    batchResults: gameResults,
+    batchResults: gameResults.map(buildBatchResultSummary),
     batchMeta: {
       beforeRank,
       afterRank,
@@ -1207,6 +1266,7 @@ export function simulateSeasonBatch({
     recentResults: gameResults.map(buildRecentResult).reverse().slice(0, 5),
     gameResultsMapPatch: buildGameResultsMapPatch(gameResults),
     allTeamResultsPatch: buildAllTeamResultsPatch(batchBoxScores),
+    allTeamBoxScoresPatch: buildAllTeamBoxScoresPatch(batchBoxScores),
     nextAllStarDone: allStarDoneLocal,
     allStarPayload,
     summaryCounts: {
