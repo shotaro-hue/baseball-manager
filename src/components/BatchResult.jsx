@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { cancelDeferredPostGameWork, scheduleDeferredPostGameWork } from "../engine/postGameProcessing";
 
 const INITIAL_VISIBLE_RESULTS = 8;
