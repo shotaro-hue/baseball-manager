@@ -1,25 +1,70 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { cancelDeferredPostGameWork, scheduleDeferredPostGameWork } from '../engine/postGameProcessing';
 
+const UNKNOWN_TEAM = {
+  name: '対戦相手',
+  short: 'OPP',
+  emoji: '⚾',
+  color: 'var(--text)',
+  players: [],
+  farm: [],
+  wins: 0,
+  losses: 0,
+  draws: 0,
+};
+
+function normalizeScore(score) {
+  return {
+    my: Number(score?.my) || 0,
+    opp: Number(score?.opp) || 0,
+  };
+}
+
+function normalizeResult(gsResult) {
+  const score = normalizeScore(gsResult?.score);
+  return {
+    ...(gsResult || {}),
+    score,
+    log: Array.isArray(gsResult?.log) ? gsResult.log : [],
+    inningSummary: Array.isArray(gsResult?.inningSummary) ? gsResult.inningSummary : [],
+  };
+}
+
+function normalizeTeam(team, fallback = UNKNOWN_TEAM) {
+  if (!team || typeof team !== 'object') return fallback;
+  return {
+    ...fallback,
+    ...team,
+    players: Array.isArray(team.players) ? team.players : [],
+    farm: Array.isArray(team.farm) ? team.farm : [],
+    wins: Number(team.wins) || 0,
+    losses: Number(team.losses) || 0,
+    draws: Number(team.draws) || 0,
+  };
+}
+
 function buildResultScreenSummary(gsResult) {
-  const won = gsResult.score.my > gsResult.score.opp;
-  const drew = gsResult.score.my === gsResult.score.opp;
-  const log = gsResult.log || [];
-  const inningSummary = gsResult.inningSummary || [];
-  const maxInning = Math.max(9, ...inningSummary.map((entry) => entry.inning));
+  const safeResult = normalizeResult(gsResult);
+  const won = safeResult.score.my > safeResult.score.opp;
+  const drew = safeResult.score.my === safeResult.score.opp;
+  const inningSummary = safeResult.inningSummary;
+  const maxInning = Math.max(9, ...inningSummary.map((entry) => Number(entry?.inning) || 0));
   const innings = Array.from({ length: maxInning }, (_, index) => index + 1);
   const myRunsByInn = {};
   const oppRunsByInn = {};
 
-  inningSummary.forEach(({ inning, isTop, runs }) => {
-    if (isTop) oppRunsByInn[inning] = runs;
+  inningSummary.forEach((entry) => {
+    const inning = Number(entry?.inning) || 0;
+    if (!inning) return;
+    const runs = Number(entry?.runs) || 0;
+    if (entry?.isTop) oppRunsByInn[inning] = runs;
     else myRunsByInn[inning] = runs;
   });
 
   return {
     won,
     drew,
-    log,
+    log: safeResult.log,
     maxInning,
     innings,
     myRunsByInn,
@@ -30,7 +75,10 @@ function buildResultScreenSummary(gsResult) {
 }
 
 function buildResultScreenDetails(gsResult, myTeam, oppTeam) {
-  const log = gsResult.log || [];
+  const safeResult = normalizeResult(gsResult);
+  const safeMyTeam = normalizeTeam(myTeam, { ...UNKNOWN_TEAM, name: '自チーム', short: 'MY', emoji: '🏟️', color: 'var(--gold)' });
+  const safeOppTeam = normalizeTeam(oppTeam, UNKNOWN_TEAM);
+  const log = safeResult.log;
   const isHit = (result) => ['s', 'd', 't', 'hr'].includes(result);
   const isOut = (result) => ['k', 'out', 'fo', 'go', 'sac', 'sf'].includes(result);
   let myHitsTotal = 0;
@@ -53,11 +101,12 @@ function buildResultScreenDetails(gsResult, myTeam, oppTeam) {
     return map[id];
   };
   const getBatterRow = (map, order, event) => {
-    if (!map[event.batId]) {
-      map[event.batId] = { name: event.batter || '', AB: 0, H: 0, HR: 0, RBI: 0 };
-      order.push(event.batId);
+    const id = event?.batId || event?.batter || `unknown-${order.length}`;
+    if (!map[id]) {
+      map[id] = { id, name: event?.batter || '不明', AB: 0, H: 0, HR: 0, RBI: 0 };
+      order.push(id);
     }
-    return map[event.batId];
+    return map[id];
   };
 
   log.forEach((event) => {
@@ -70,14 +119,14 @@ function buildResultScreenDetails(gsResult, myTeam, oppTeam) {
       if (event.scorer) myHitsTotal += 1;
       else oppHitsTotal += 1;
     }
-    if (event.batId && event.result && event.result !== 'change') {
+    if (event.result && event.result !== 'change') {
       const targetMap = event.scorer ? myBatStatsMap : oppBatStatsMap;
       const targetOrder = event.scorer ? myBatOrder : oppBatOrder;
       const row = getBatterRow(targetMap, targetOrder, event);
       if (!['bb', 'hbp', 'sf'].includes(event.result)) row.AB += 1;
       if (isHit(event.result)) row.H += 1;
       if (event.result === 'hr') row.HR += 1;
-      row.RBI += event.rbi || 0;
+      row.RBI += Number(event.rbi) || 0;
     }
     if (!event.pitcherId || !event.result || event.result === 'change') return;
     const pitcherIds = event.scorer ? oppPitcherIds : myPitcherIds;
@@ -92,29 +141,23 @@ function buildResultScreenDetails(gsResult, myTeam, oppTeam) {
     if (isHit(event.result)) row.H += 1;
     if (event.result === 'k') row.K += 1;
     if (event.result === 'bb') row.BB += 1;
-    if ((event.rbi || 0) > 0) row.ER += event.rbi;
-    row.PC += event.pitches || 0;
+    if ((Number(event.rbi) || 0) > 0) row.ER += Number(event.rbi) || 0;
+    row.PC += Number(event.pitches) || 0;
   });
 
   const myPStats = myPitcherIds.map((id) => ({ id, ...(myPitcherStats[id] || { outs: 0, H: 0, ER: 0, K: 0, BB: 0, PC: 0 }) }));
   const oppPStats = oppPitcherIds.map((id) => ({ id, ...(oppPitcherStats[id] || { outs: 0, H: 0, ER: 0, K: 0, BB: 0, PC: 0 }) }));
+  const won = safeResult.score.my > safeResult.score.opp;
+  const drew = safeResult.score.my === safeResult.score.opp;
+  const finalLead = safeResult.score.my - safeResult.score.opp;
   const myStarterOuts = myPStats[0]?.outs || 0;
   const oppStarterOuts = oppPStats[0]?.outs || 0;
-  const finalLead = gsResult.score.my - gsResult.score.opp;
-  const won = gsResult.score.my > gsResult.score.opp;
-  const drew = gsResult.score.my === gsResult.score.opp;
   const myWinnerId = won ? (myStarterOuts >= 15 ? myPitcherIds[0] : (myPitcherIds[1] || myPitcherIds[0])) : null;
   const myLoserId = (!won && !drew) ? myPitcherIds[0] : null;
-  const mySaveSituation = won && finalLead >= 1 && finalLead <= 3;
-  const mySaverId = (won && mySaveSituation && myPitcherIds.length >= 2 && myPitcherIds[myPitcherIds.length - 1] !== myWinnerId)
-    ? myPitcherIds[myPitcherIds.length - 1]
-    : null;
+  const mySaverId = won && finalLead >= 1 && finalLead <= 3 && myPitcherIds.length >= 2 && myPitcherIds.at(-1) !== myWinnerId ? myPitcherIds.at(-1) : null;
   const oppWinnerId = (!won && !drew) ? (oppStarterOuts >= 15 ? oppPitcherIds[0] : (oppPitcherIds[1] || oppPitcherIds[0])) : null;
   const oppLoserId = (won && !drew) ? oppPitcherIds[0] : null;
-  const oppSaveSituation = !won && !drew && Math.abs(finalLead) <= 3;
-  const oppSaverId = (!won && oppSaveSituation && oppPitcherIds.length >= 2 && oppPitcherIds[oppPitcherIds.length - 1] !== oppWinnerId)
-    ? oppPitcherIds[oppPitcherIds.length - 1]
-    : null;
+  const oppSaverId = !won && !drew && Math.abs(finalLead) <= 3 && oppPitcherIds.length >= 2 && oppPitcherIds.at(-1) !== oppWinnerId ? oppPitcherIds.at(-1) : null;
   const findPlayer = (team, id) => team?.players?.find((player) => player.id === id) ?? team?.farm?.find((player) => player.id === id);
 
   return {
@@ -130,27 +173,28 @@ function buildResultScreenDetails(gsResult, myTeam, oppTeam) {
     oppSaverId,
     myHREvts,
     oppHREvts,
-    myBatStats: myBatOrder.map((id) => ({ id, ...myBatStatsMap[id] })),
-    oppBatStats: oppBatOrder.map((id) => ({ id, ...oppBatStatsMap[id] })),
+    myBatStats: myBatOrder.map((id) => myBatStatsMap[id]),
+    oppBatStats: oppBatOrder.map((id) => oppBatStatsMap[id]),
     myPRole: (id) => (id === myWinnerId ? 'W' : id === myLoserId ? 'L' : id === mySaverId ? 'S' : ''),
     oppPRole: (id) => (id === oppWinnerId ? 'W' : id === oppLoserId ? 'L' : id === oppSaverId ? 'S' : ''),
     findPlayer,
-    myTeam,
-    oppTeam,
+    myTeam: safeMyTeam,
+    oppTeam: safeOppTeam,
   };
 }
 
 export function ResultScreen({ gsResult, myTeam, oppTeam, gameDay, onNext, nextLabel = 'ハブに戻る', isPostGameProcessing: isPostGameProcessingProp }) {
+  const safeResult = useMemo(() => normalizeResult(gsResult), [gsResult]);
+  const safeMyTeam = useMemo(() => normalizeTeam(myTeam, { ...UNKNOWN_TEAM, name: '自チーム', short: 'MY', emoji: '🏟️', color: 'var(--gold)' }), [myTeam]);
+  const safeOppTeam = useMemo(() => normalizeTeam(oppTeam || gsResult?.oppTeam, UNKNOWN_TEAM), [gsResult?.oppTeam, oppTeam]);
   const [activeTab, setActiveTab] = useState('bat');
   const [detailData, setDetailData] = useState(null);
-  const [internalProcessing, setInternalProcessing] = useState(() => (
-    isPostGameProcessingProp ?? !!gsResult
-  ));
-  const summary = useMemo(() => buildResultScreenSummary(gsResult), [gsResult]);
+  const [internalProcessing, setInternalProcessing] = useState(() => (isPostGameProcessingProp ?? !!gsResult));
+  const summary = useMemo(() => buildResultScreenSummary(safeResult), [safeResult]);
   const isPostGameProcessing = isPostGameProcessingProp ?? internalProcessing;
 
   useEffect(() => {
-    if (!gsResult) {
+    if (!gsResult?.score) {
       setDetailData(null);
       setInternalProcessing(false);
       return undefined;
@@ -163,7 +207,7 @@ export function ResultScreen({ gsResult, myTeam, oppTeam, gameDay, onNext, nextL
     let isCancelled = false;
     const handle = scheduleDeferredPostGameWork(() => {
       if (isCancelled) return;
-      const nextDetail = buildResultScreenDetails(gsResult, myTeam, oppTeam);
+      const nextDetail = buildResultScreenDetails(safeResult, safeMyTeam, safeOppTeam);
       if (isCancelled) return;
       setDetailData(nextDetail);
       setInternalProcessing(false);
@@ -173,11 +217,11 @@ export function ResultScreen({ gsResult, myTeam, oppTeam, gameDay, onNext, nextL
       isCancelled = true;
       cancelDeferredPostGameWork(handle);
     };
-  }, [gsResult, myTeam, oppTeam]);
+  }, [gsResult, safeMyTeam, safeOppTeam, safeResult]);
 
   const fmtIPlocal = (outs) => {
-    const f = Math.floor(outs / 3);
-    const r = outs % 3;
+    const f = Math.floor((Number(outs) || 0) / 3);
+    const r = (Number(outs) || 0) % 3;
     return r === 0 ? `${f}` : `${f}.${r}`;
   };
   const hrLabel = (rbi) => ({ 1: 'ソロ', 2: '2ラン', 3: '3ラン', 4: '満塁' }[rbi] || `${rbi}点本塁打`);
@@ -185,7 +229,7 @@ export function ResultScreen({ gsResult, myTeam, oppTeam, gameDay, onNext, nextL
     if (!player?.stats) return '.---';
     const ab = player.stats.AB || 0;
     const h = player.stats.H || 0;
-    return ab === 0 ? '.---' : `.${String(Math.round(h / ab * 1000)).padStart(3, '0')}`;
+    return ab === 0 ? '.---' : `.${String(Math.round((h / ab) * 1000)).padStart(3, '0')}`;
   };
 
   const cellSt = { textAlign: 'center', padding: '5px 3px', fontFamily: "'Share Tech Mono', monospace" };
@@ -197,29 +241,29 @@ export function ResultScreen({ gsResult, myTeam, oppTeam, gameDay, onNext, nextL
     <div className="app">
       <div style={{ maxWidth: 520, margin: '0 auto', paddingBottom: 60 }}>
         <div style={{ background: 'linear-gradient(180deg,rgba(4,16,28,.95) 0%,var(--card) 100%)', padding: '20px 16px 16px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontSize: 10, color: '#94a3b8', letterSpacing: '.2em', marginBottom: 10 }}>第{gameDay}戦</div>
+          <div style={{ fontSize: 10, color: '#94a3b8', letterSpacing: '.2em', marginBottom: 10 }}>第{gameDay ?? safeResult.gameNo ?? '-'}戦</div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ textAlign: 'center', flex: 1 }}>
-              <div style={{ fontSize: 30 }}>{myTeam.emoji}</div>
-              <div style={{ fontSize: 11, color: 'var(--text)', marginTop: 3, fontWeight: 700 }}>{myTeam.short}</div>
+              <div style={{ fontSize: 30 }}>{safeMyTeam.emoji}</div>
+              <div style={{ fontSize: 11, color: 'var(--text)', marginTop: 3, fontWeight: 700 }}>{safeMyTeam.short}</div>
             </div>
             <div style={{ textAlign: 'center', minWidth: 120 }}>
               <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: 52, lineHeight: 1, letterSpacing: '.05em', color: summary.resultColor }}>
-                {gsResult.score.my}<span style={{ fontSize: 32, color: 'var(--dim)', margin: '0 4px' }}>-</span>{gsResult.score.opp}
+                {safeResult.score.my}<span style={{ fontSize: 32, color: 'var(--dim)', margin: '0 4px' }}>-</span>{safeResult.score.opp}
               </div>
               <div style={{ fontSize: 9, letterSpacing: '.25em', color: summary.resultColor, marginTop: 3 }}>{summary.resultLabel}</div>
             </div>
             <div style={{ textAlign: 'center', flex: 1 }}>
-              <div style={{ fontSize: 30 }}>{oppTeam.emoji}</div>
-              <div style={{ fontSize: 11, color: 'var(--text)', marginTop: 3, fontWeight: 700 }}>{oppTeam.short}</div>
+              <div style={{ fontSize: 30 }}>{safeOppTeam.emoji}</div>
+              <div style={{ fontSize: 11, color: 'var(--text)', marginTop: 3, fontWeight: 700 }}>{safeOppTeam.short}</div>
             </div>
           </div>
           <div style={{ fontSize: 11, color: '#94a3b8' }}>
-            vs {oppTeam.name}
-            <span style={{ color: 'var(--green)', marginLeft: 5 }}>{myTeam.wins}勝</span>
+            vs {safeOppTeam.name}
+            <span style={{ color: 'var(--green)', marginLeft: 5 }}>{safeMyTeam.wins}勝</span>
             <span style={{ color: '#4b5563', margin: '0 2px' }}>/</span>
-            <span style={{ color: 'var(--red)' }}>{myTeam.losses}敗</span>
-            {(myTeam.draws || 0) > 0 && <><span style={{ color: '#4b5563', margin: '0 2px' }}>/</span><span style={{ color: 'var(--dim)' }}>{myTeam.draws}分</span></>}
+            <span style={{ color: 'var(--red)' }}>{safeMyTeam.losses}敗</span>
+            {(safeMyTeam.draws || 0) > 0 && <><span style={{ color: '#4b5563', margin: '0 2px' }}>/</span><span style={{ color: 'var(--dim)' }}>{safeMyTeam.draws}分</span></>}
           </div>
         </div>
 
@@ -237,38 +281,44 @@ export function ResultScreen({ gsResult, myTeam, oppTeam, gameDay, onNext, nextL
               </thead>
               <tbody>
                 <tr>
-                  <td style={{ padding: '5px 2px', fontSize: 11, fontWeight: 700, color: oppTeam.color || 'var(--text)', fontFamily: "'Share Tech Mono',monospace" }}>{oppTeam.short}</td>
+                  <td style={{ padding: '5px 2px', fontSize: 11, fontWeight: 700, color: safeOppTeam.color || 'var(--text)', fontFamily: "'Share Tech Mono',monospace" }}>{safeOppTeam.short}</td>
                   {summary.innings.map((inning) => {
                     const runs = summary.oppRunsByInn[inning];
                     return <td key={inning} style={{ ...cellSt, fontSize: 12, color: runs > 0 ? 'var(--text)' : 'var(--dim)', fontWeight: runs > 0 ? 700 : 400 }}>{runs !== undefined ? runs : ''}</td>;
                   })}
-                  <td style={{ ...cellSt, fontSize: 12, fontWeight: 700, color: 'var(--text)', borderLeft: '1px solid var(--border)', paddingLeft: 6 }}>{gsResult.score.opp}</td>
+                  <td style={{ ...cellSt, fontSize: 12, fontWeight: 700, color: 'var(--text)', borderLeft: '1px solid var(--border)', paddingLeft: 6 }}>{safeResult.score.opp}</td>
                   <td style={{ ...cellSt, fontSize: 11, color: 'var(--dim)' }}>{detailReady ? detailData.oppHitsTotal : '...'}</td>
                 </tr>
                 <tr>
-                  <td style={{ padding: '5px 2px', fontSize: 11, fontWeight: 700, color: myTeam.color || 'var(--gold)', fontFamily: "'Share Tech Mono',monospace" }}>{myTeam.short}</td>
+                  <td style={{ padding: '5px 2px', fontSize: 11, fontWeight: 700, color: safeMyTeam.color || 'var(--gold)', fontFamily: "'Share Tech Mono',monospace" }}>{safeMyTeam.short}</td>
                   {summary.innings.map((inning) => {
                     const runs = summary.myRunsByInn[inning];
                     const isX = runs === undefined && summary.won && inning === summary.maxInning && summary.oppRunsByInn[inning] !== undefined;
                     return <td key={inning} style={{ ...cellSt, fontSize: 12, color: runs > 0 ? 'var(--gold)' : 'var(--dim)', fontWeight: runs > 0 ? 700 : 400 }}>{runs !== undefined ? runs : isX ? 'X' : ''}</td>;
                   })}
-                  <td style={{ ...cellSt, fontSize: 12, fontWeight: 700, color: 'var(--gold)', borderLeft: '1px solid var(--border)', paddingLeft: 6 }}>{gsResult.score.my}</td>
+                  <td style={{ ...cellSt, fontSize: 12, fontWeight: 700, color: 'var(--gold)', borderLeft: '1px solid var(--border)', paddingLeft: 6 }}>{safeResult.score.my}</td>
                   <td style={{ ...cellSt, fontSize: 11, color: 'var(--dim)' }}>{detailReady ? detailData.myHitsTotal : '...'}</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
+          {!gsResult?.score && (
+            <div className="card" style={{ marginTop: 10, padding: '12px', color: 'var(--dim)', fontSize: 12 }}>
+              試合結果データが不足しています。ゲームデータは保持されています。
+            </div>
+          )}
+
           {detailReady && (detailData.myWinnerId || detailData.myLoserId || detailData.mySaverId || detailData.oppWinnerId || detailData.oppLoserId || detailData.oppSaverId) && (
             <div className="card">
               <div className="card-h">勝敗投手</div>
               {[
-                detailData.myWinnerId && { label: 'W', color: 'var(--green)', player: detailData.findPlayer(myTeam, detailData.myWinnerId), team: myTeam.short },
-                detailData.oppWinnerId && { label: 'W', color: 'var(--green)', player: detailData.findPlayer(oppTeam, detailData.oppWinnerId), team: oppTeam.short },
-                detailData.myLoserId && { label: 'L', color: 'var(--red)', player: detailData.findPlayer(myTeam, detailData.myLoserId), team: myTeam.short },
-                detailData.oppLoserId && { label: 'L', color: 'var(--red)', player: detailData.findPlayer(oppTeam, detailData.oppLoserId), team: oppTeam.short },
-                detailData.mySaverId && { label: 'S', color: 'var(--blue)', player: detailData.findPlayer(myTeam, detailData.mySaverId), team: myTeam.short },
-                detailData.oppSaverId && { label: 'S', color: 'var(--blue)', player: detailData.findPlayer(oppTeam, detailData.oppSaverId), team: oppTeam.short },
+                detailData.myWinnerId && { label: 'W', color: 'var(--green)', player: detailData.findPlayer(safeMyTeam, detailData.myWinnerId), team: safeMyTeam.short },
+                detailData.oppWinnerId && { label: 'W', color: 'var(--green)', player: detailData.findPlayer(safeOppTeam, detailData.oppWinnerId), team: safeOppTeam.short },
+                detailData.myLoserId && { label: 'L', color: 'var(--red)', player: detailData.findPlayer(safeMyTeam, detailData.myLoserId), team: safeMyTeam.short },
+                detailData.oppLoserId && { label: 'L', color: 'var(--red)', player: detailData.findPlayer(safeOppTeam, detailData.oppLoserId), team: safeOppTeam.short },
+                detailData.mySaverId && { label: 'S', color: 'var(--blue)', player: detailData.findPlayer(safeMyTeam, detailData.mySaverId), team: safeMyTeam.short },
+                detailData.oppSaverId && { label: 'S', color: 'var(--blue)', player: detailData.findPlayer(safeOppTeam, detailData.oppSaverId), team: safeOppTeam.short },
               ].filter(Boolean).map((row, index) => (
                 <div key={index} className="fsb" style={{ padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -285,9 +335,9 @@ export function ResultScreen({ gsResult, myTeam, oppTeam, gameDay, onNext, nextL
             <div className="card">
               <div className="card-h">本塁打</div>
               {[
-                ...detailData.myHREvts.map((event) => ({ ...event, teamShort: myTeam.short, teamColor: myTeam.color || 'var(--gold)' })),
-                ...detailData.oppHREvts.map((event) => ({ ...event, teamShort: oppTeam.short, teamColor: oppTeam.color || 'var(--text)' })),
-              ].sort((a, b) => a.inning - b.inning || (a.isTop ? 0 : 1) - (b.isTop ? 0 : 1)).map((event, index) => (
+                ...detailData.myHREvts.map((event) => ({ ...event, teamShort: safeMyTeam.short, teamColor: safeMyTeam.color || 'var(--gold)' })),
+                ...detailData.oppHREvts.map((event) => ({ ...event, teamShort: safeOppTeam.short, teamColor: safeOppTeam.color || 'var(--text)' })),
+              ].sort((a, b) => (Number(a.inning) || 0) - (Number(b.inning) || 0) || (a.isTop ? 0 : 1) - (b.isTop ? 0 : 1)).map((event, index) => (
                 <div key={index} className="fsb" style={{ padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontSize: 11, color: 'var(--text)', fontWeight: 700 }}>{event.batter}</span>
@@ -316,7 +366,7 @@ export function ResultScreen({ gsResult, myTeam, oppTeam, gameDay, onNext, nextL
                 )}
                 {detailReady && activeTab === 'bat' && (
                   <>
-                    {[{ team: myTeam, batters: detailData.myBatStats }, { team: oppTeam, batters: detailData.oppBatStats }].map(({ team, batters }, teamIndex) => (
+                    {[{ team: safeMyTeam, batters: detailData.myBatStats }, { team: safeOppTeam, batters: detailData.oppBatStats }].map(({ team, batters }, teamIndex) => (
                       <div key={teamIndex} style={{ marginBottom: teamIndex === 0 ? 14 : 0 }}>
                         {teamIndex > 0 && <div style={{ borderTop: '1px solid var(--border)', marginBottom: 10 }} />}
                         <div style={{ fontSize: 10, fontWeight: 700, color: team.color || 'var(--text)', marginBottom: 6 }}>{team.short}</div>
@@ -348,7 +398,7 @@ export function ResultScreen({ gsResult, myTeam, oppTeam, gameDay, onNext, nextL
                 )}
                 {detailReady && activeTab === 'pitch' && (
                   <>
-                    {[{ team: myTeam, pstats: detailData.myPStats, roleF: detailData.myPRole }, { team: oppTeam, pstats: detailData.oppPStats, roleF: detailData.oppPRole }].map(({ team, pstats, roleF }, teamIndex) => (
+                    {[{ team: safeMyTeam, pstats: detailData.myPStats, roleF: detailData.myPRole }, { team: safeOppTeam, pstats: detailData.oppPStats, roleF: detailData.oppPRole }].map(({ team, pstats, roleF }, teamIndex) => (
                       <div key={teamIndex} style={{ marginBottom: teamIndex === 0 ? 14 : 0 }}>
                         {teamIndex > 0 && <div style={{ borderTop: '1px solid var(--border)', marginBottom: 10 }} />}
                         <div style={{ fontSize: 10, fontWeight: 700, color: team.color || 'var(--text)', marginBottom: 6 }}>{team.short}</div>
