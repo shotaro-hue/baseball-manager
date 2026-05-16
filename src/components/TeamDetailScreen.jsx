@@ -197,13 +197,18 @@ function RosterStatsTab({ team, onPlayerClick, onOpenTrade }) {
 }
 
 // ── 日程・結果タブ ─────────────────────────────────────
-function TeamScheduleTab({ team, allTeams, schedule, year, allTeamResultsMap, onOpenTrade }) {
+function TeamScheduleTab({ team, allTeams, schedule, year, allTeamResultsMap, allTeamBoxScoresMap, onOpenTrade }) {
   const [selectedMonth, setSelectedMonth] = useState(null);
   const [boxScore, setBoxScore] = useState(null); // { result, dayNo }
 
   const teamResultsMap = useMemo(
     () => (allTeamResultsMap?.[team?.id] || {}),
     [allTeamResultsMap, team?.id]
+  );
+
+  const teamBoxScoresMap = useMemo(
+    () => (allTeamBoxScoresMap?.[team?.id] || {}),
+    [allTeamBoxScoresMap, team?.id]
   );
 
   const teamMap = useMemo(
@@ -222,10 +227,11 @@ function TeamScheduleTab({ team, allTeams, schedule, year, allTeamResultsMap, on
       const isHome = m.homeId === team.id;
       const oppId = isHome ? m.awayId : m.homeId;
       const result = teamResultsMap[idx] || null;
-      list.push({ dayNo: idx, date: day.date, isHome, oppId, isInterleague: m.isInterleague || false, result });
+      const boxScoreDetail = teamBoxScoresMap[idx] || null;
+      list.push({ dayNo: idx, date: day.date, isHome, oppId, isInterleague: m.isInterleague || false, result, boxScoreDetail });
     }
     return list;
-  }, [schedule, team, teamResultsMap]);
+  }, [schedule, team, teamResultsMap, teamBoxScoresMap]);
 
   const months = useMemo(() => {
     const ms = new Set(games.map(g => g.date.month));
@@ -325,7 +331,7 @@ function TeamScheduleTab({ team, allTeams, schedule, year, allTeamResultsMap, on
               </span>
               {result ? (
                 <button
-                  onClick={() => setBoxScore({ result, dayNo: g.dayNo })}
+                  onClick={() => setBoxScore({ result: { ...result, ...(g.boxScoreDetail || {}) }, dayNo: g.dayNo })}
                   style={{
                     background: 'none',
                     border: `1px solid ${resultColor}50`,
@@ -404,7 +410,7 @@ function HistoryTab({ team, onPlayerClick }) {
 }
 
 // ── メイン: TeamDetailScreen ──────────────────────────
-export function TeamDetailScreen({ team, allTeams, schedule, year, allTeamResultsMap, onBack, onPlayerClick, onOpenTrade }) {
+export function TeamDetailScreen({ team, allTeams, schedule, year, allTeamResultsMap, allTeamBoxScoresMap, onBack, onPlayerClick, onOpenTrade }) {
   const [tab, setTab] = useState('roster');
   const [showCompare, setShowCompare] = useState(true);
 
@@ -534,6 +540,7 @@ export function TeamDetailScreen({ team, allTeams, schedule, year, allTeamResult
             schedule={schedule}
             year={year}
             allTeamResultsMap={allTeamResultsMap}
+            allTeamBoxScoresMap={allTeamBoxScoresMap}
             onOpenTrade={onOpenTrade}
           />
         )}
