@@ -1,13 +1,21 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { Suspense, lazy, useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { STRATEGY_OPTS, PITCHING_POLICY_OPTS, RLABEL, IS_HIT, IS_OUT, BATCH, FATIGUE_WARNING } from '../constants';
 import { fmtAvg, fmtPct, fmtEra } from '../utils';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 import { initGameState, matchupScore, calcEffectiveFatigue, processAtBat, endHalfInning, checkStopCondition, STADIUMS, TEAM_STADIUM } from '../engine/simulation';
 import { OV, CondBadge, HandBadge, PitchBadge } from './ui';
-import Baseball3DModal from './Baseball3DModal';
-import PhysicsInsightPanel from './game/PhysicsInsightPanel';
+const Baseball3DModal = lazy(() => import('./Baseball3DModal'));
+const PhysicsInsightPanel = lazy(() => import('./game/PhysicsInsightPanel'));
 
 const VISIBLE_LOG_LIMIT = 80;
+
+function TacticalPanelFallback({ label = 'Loading...' }){
+  return (
+    <div className="card2" style={{ margin: '8px 0', fontSize: 11, color: '#94a3b8' }}>
+      {label}
+    </div>
+  );
+}
 
 export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   const [gs,setGs]=useState(()=>initGameState(myTeam,oppTeam));
@@ -340,7 +348,11 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
 
           {/* Event Log */}
           {modalWarning && <div className="notif nwarn">{modalWarning}</div>}
-          {safePhysicsMeta && <PhysicsInsightPanel physicsMeta={safePhysicsMeta} />}
+          {safePhysicsMeta && (
+            <Suspense fallback={<TacticalPanelFallback label="Loading physics..." />}>
+              <PhysicsInsightPanel physicsMeta={safePhysicsMeta} />
+            </Suspense>
+          )}
           <div className="evlog" ref={logRef}>
             {visibleLogIds.map((i)=>{ const e = gs.log[i]; if(!e) return null;
               if(e.result==="change") return <div key={i} style={{padding:"3px 8px",fontSize:10,color:"#a78bfa",borderLeft:"3px solid #a78bfa",margin:"4px 0"}}>{e.text}</div>;
@@ -502,11 +514,13 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
         )}
 
           {modal3D && (
-            <Baseball3DModal
-              event={modal3D.event}
-              stadium={modal3D.stadium}
-              onClose={() => setModal3D(null)}
-            />
+            <Suspense fallback={<TacticalPanelFallback label="Loading 3D replay..." />}>
+              <Baseball3DModal
+                event={modal3D.event}
+                stadium={modal3D.stadium}
+                onClose={() => setModal3D(null)}
+              />
+            </Suspense>
           )}
       </div>
     </div>

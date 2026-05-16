@@ -1,13 +1,10 @@
 import { useState } from "react";
 import { uid, clamp, rng, rngf, fmtM } from '../utils';
-import { emptyStats, rollRetire, developPlayers, generateForeignFaPool } from '../engine/player';
 import { calcSeasonAwards, updateRecords, checkHallOfFame } from '../engine/awards';
 import { evalOffer, cpuRenewContracts, processCpuFaBids, getFaThreshold, calcPlayerDemand } from '../engine/contract';
 import { initDraftPool } from '../engine/draft';
 import { calcPostingRequestProb, calcPostingBid, POSTING_FEE_RATE } from '../engine/posting';
 import { calcOffseasonPopDelta, driftPopularity } from '../engine/fanSentiment';
-import { generateSeasonSchedule, calcAllStarTriggerDay } from '../engine/scheduleGen';
-import { appendCareerEntriesToIndexedDb } from '../engine/saveload';
 import { SEASON_PARAMS, getDefaultParams } from '../data/scheduleParams.js';
 import {
   TEAM_DEFS, OWNER_TRUST_BUDGET_LOW, OWNER_TRUST_BUDGET_HIGH,
@@ -16,6 +13,32 @@ import {
   CAMP_COND_VARIATION, CAMP_BREAKOUT_COUNT, CAMP_BREAKOUT_COND_BOOST,
   CAMP_STRUGGLE_COUNT, CAMP_STRUGGLE_COND_HIT, CAMP_MIN_CONDITION,
 } from '../constants';
+
+let offseasonPlayerModulePromise = null;
+let offseasonScheduleModulePromise = null;
+let offseasonSaveModulePromise = null;
+
+function loadOffseasonPlayerModule() {
+  if (!offseasonPlayerModulePromise) offseasonPlayerModulePromise = import('../engine/player');
+  return offseasonPlayerModulePromise;
+}
+
+function loadOffseasonScheduleModule() {
+  if (!offseasonScheduleModulePromise) offseasonScheduleModulePromise = import('../engine/scheduleGen');
+  return offseasonScheduleModulePromise;
+}
+
+function loadOffseasonSaveModule() {
+  if (!offseasonSaveModulePromise) offseasonSaveModulePromise = import('../engine/saveload');
+  return offseasonSaveModulePromise;
+}
+
+function createEmptyStats() {
+  return {
+    PA: 0, AB: 0, H: 0, D: 0, T: 0, HR: 0, RBI: 0, BB: 0, K: 0, HBP: 0, SF: 0, SB: 0,
+    IP: 0, ER: 0, BBp: 0, HBPp: 0, Kp: 0, HRp: 0, Hp: 0, BF: 0, W: 0, L: 0, SV: 0, HLD: 0, QS: 0,
+  };
+}
 
 export function useOffseason(gs) {
   const {
@@ -53,7 +76,7 @@ export function useOffseason(gs) {
   // careerLogをコンパクト形式で保存（evSum/evN等の不要フィールドを除外）
   const mkCareerEntry = (s, ps, yr, teamId, teamName) => {
     const pick=x=>({PA:x.PA,AB:x.AB,H:x.H,D:x.D,T:x.T,HR:x.HR,RBI:x.RBI,BB:x.BB,K:x.K,HBP:x.HBP,SF:x.SF,SB:x.SB,IP:x.IP,ER:x.ER,BBp:x.BBp,HBPp:x.HBPp,Kp:x.Kp,HRp:x.HRp,Hp:x.Hp,BF:x.BF,W:x.W,L:x.L,SV:x.SV,HLD:x.HLD,QS:x.QS});
-    return{year:yr,teamId,teamName,stats:pick(s),playoffStats:pick(ps||emptyStats())};
+    return{year:yr,teamId,teamName,stats:pick(s),playoffStats:pick(ps||createEmptyStats())};
   };
 
   const appendCareerEntryWithSummary = (player, entry) => {
@@ -83,9 +106,14 @@ export function useOffseason(gs) {
     return { ...player, careerLog: [], recentCareerLog: recent, careerLogSummary: mergedSummary, trimmedCareerLogSummary: mergedSummary };
   };
 
-  const handleNextYear = () => {
+  const handleNextYear = async () => {
+    const [playerMod, scheduleMod, saveMod] = await Promise.all([
+      loadOffseasonPlayerModule(),
+      loadOffseasonScheduleModule(),
+      loadOffseasonSaveModule(),
+    ]);
     const currentGameResultsMap = getGameResultsMap();
-    const foreignPool = generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX));
+    const foreignPool = playerMod.generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX));
     setYear(y=>y+1);setGameDay(1);setFaPool(foreignPool);setDraftAllocation({pitcher:50,batter:50});
     setAllStarDone(false);
     setAllStarResult(null);
@@ -95,7 +123,7 @@ export function useOffseason(gs) {
         const entry = mkCareerEntry(p.stats,p.playoffStats,year,t.id,t.name);
         indexedDbEntries.push({ playerId: String(p.id || ''), careerEntry: entry });
         const compactPlayer = appendCareerEntryWithSummary(p, entry);
-        return {...compactPlayer,age:p.age+1,stats:emptyStats(),playoffStats:emptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:Math.max(0,p.contractYearsLeft-1),postingRequested:false,growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlyDecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0};
+        return {...compactPlayer,age:p.age+1,stats:createEmptyStats(),playoffStats:createEmptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:Math.max(0,p.contractYearsLeft-1),postingRequested:false,growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlyDecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0};
       });
       const nextIds=new Set(nextPlayers.map(p=>p.id));
       const baseBudget=TEAM_DEFS.find(d=>d.id===t.id)?.budget??t.budget;
@@ -104,9 +132,9 @@ export function useOffseason(gs) {
       const trust=t.ownerTrust??50;
       const trustFactor=t.id===myId?(trust<OWNER_TRUST_BUDGET_LOW?OWNER_TRUST_FACTOR_LOW:trust>OWNER_TRUST_BUDGET_HIGH?OWNER_TRUST_FACTOR_HIGH:1.0):1.0;
       const newBudget=Math.max(Math.round(baseBudget*0.5),Math.round(rawBudget*trustFactor));
-      return{...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,revenueThisSeason:0,winStreak:0,loseStreak:0,stadiumLevel:t.stadiumLevel??0,budget:newBudget,players:nextPlayers,lineup:(t.lineup||[]).filter(id=>nextIds.has(id)),lineupNoDh:(t.lineupNoDh||[]).filter(id=>nextIds.has(id)),lineupDh:(t.lineupDh||[]).filter(id=>nextIds.has(id)),rotation:(t.rotation||[]).filter(id=>nextIds.has(id)),farm:t.farm.map(p=>({...p,age:p.age+1,stats:emptyStats(),injury:null,serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}))};
+      return{...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,revenueThisSeason:0,winStreak:0,loseStreak:0,stadiumLevel:t.stadiumLevel??0,budget:newBudget,players:nextPlayers,lineup:(t.lineup||[]).filter(id=>nextIds.has(id)),lineupNoDh:(t.lineupNoDh||[]).filter(id=>nextIds.has(id)),lineupDh:(t.lineupDh||[]).filter(id=>nextIds.has(id)),rotation:(t.rotation||[]).filter(id=>nextIds.has(id)),farm:t.farm.map(p=>({...p,age:p.age+1,stats:createEmptyStats(),injury:null,serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}))};
     }));
-    appendCareerEntriesToIndexedDb(indexedDbEntries).then((result) => {
+    saveMod.appendCareerEntriesToIndexedDb(indexedDbEntries).then((result) => {
       if (!result?.ok) {
         console.warn('careerLogの一括追記に失敗しました');
       }
@@ -120,12 +148,12 @@ export function useOffseason(gs) {
       setScheduleArchive(prev=>[...prev,{year,schedule,gameResultsMap: currentGameResultsMap,myTeamResultsMap}].slice(-5));
     }
     const nextYear=year+1;
-    const newSchedule=generateSeasonSchedule(nextYear, teams);
+    const newSchedule=scheduleMod.generateSeasonSchedule(nextYear, teams);
     setSchedule(newSchedule);
     setGameResultsMap({});
     setAllTeamResultsMap({});
     const params=SEASON_PARAMS[nextYear]||getDefaultParams(nextYear);
-    setAllStarTriggerDay(calcAllStarTriggerDay(newSchedule, params.allStarSkipDates));
+    setAllStarTriggerDay(scheduleMod.calcAllStarTriggerDay(newSchedule, params.allStarSkipDates));
     setScreen("new_season");
   };
 
@@ -393,16 +421,17 @@ export function useOffseason(gs) {
   };
 
   // 引退フェーズ処理（退場選手確定→成長/衰退→CPU契約→表彰）
-  const handleRetirePhaseNext = (decisions) => {
+  const handleRetirePhaseNext = async (decisions) => {
+    const playerMod = await loadOffseasonPlayerModule();
     if(decisions){Object.entries(decisions).forEach(function(e){const pid=e[0];const dec=e[1];const p=myTeam?.players.find(function(x){return x.id===pid;});if(!p) return;if(dec==="accepted"||dec==="retain_failed"){upd(myId,function(t){return{...t,players:t.players.map(function(x){return x.id===pid?{...x,isRetired:true,_retireNow:true}:x;})};});addToHistory(myId,p,"引退");addNews({type:"season",headline:"【引退】"+p.name+"選手が現役引退",source:"野球速報",dateLabel:year+"年",body:p.name+"選手（"+p.age+"歳）が"+year+"年シーズンをもって現役を引退した。"});}else if(dec==="retained"){notify(p.name+"の引き留め成功！","ok");}});}
     let mySummary=null;
     const developedTeams=teams.map(t=>{
-      const cpuRetiredPlayers=t.id!==myId?t.players.filter(p=>p.age>=35&&rollRetire(p)):[];
+      const cpuRetiredPlayers=t.id!==myId?t.players.filter(p=>p.age>=35&&playerMod.rollRetire(p)):[];
       if(t.id!==myId)cpuRetiredPlayers.forEach(p=>{addNews({type:"season",headline:"【引退】"+p.name+"（"+t.name+"）が引退",source:"野球速報",dateLabel:year+"年",body:p.name+"選手（"+p.age+"歳）が引退を発表。"});});
       const retiredIds=new Set(cpuRetiredPlayers.map(p=>p.id));
       const activePlayers=t.players.filter(p=>!retiredIds.has(p.id));
-      const res=developPlayers(activePlayers, t.coaches||[]);
-      const farmRes=developPlayers(t.farm, t.coaches||[]);
+      const res=playerMod.developPlayers(activePlayers, t.coaches||[]);
+      const farmRes=playerMod.developPlayers(t.farm, t.coaches||[]);
       if(t.id===myId)mySummary=res.summary;
       let finalPlayers=res.players;
       let finalFarm=farmRes.players;

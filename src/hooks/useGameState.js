@@ -1,11 +1,7 @@
 import { useState, useReducer, useMemo, useCallback, useEffect, useRef } from "react";
 import { gameStateReducer, G } from './gameStateReducer';
 import { uid, clamp, rng, pname, scoutedValue, fmtSal } from '../utils';
-import { buildTeam, makePlayer, resolveTrainingFocusFromGoal, generateForeignFaPool } from '../engine/player';
-import { enqueueSaveGame, getSaveQueueSnapshot, hasSave, getAutoSaveIntervalMs } from '../engine/saveload';
-import { generateSeasonSchedule, calcAllStarTriggerDay } from '../engine/scheduleGen';
-import { buildRealTeam } from '../engine/realplayer';
-import { NPB2025_ROSTERS } from '../data/npb2025';
+// Player helpers are loaded lazily to keep the initial title flow lighter.
 import { SEASON_PARAMS, getDefaultParams } from '../data/scheduleParams.js';
 import {
   TEAM_DEFS, POSITIONS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
@@ -14,8 +10,6 @@ import {
   PRESS_CONFERENCE_INTERVAL,
   FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX,
 } from '../constants';
-import { pickQuestion, calcPressDelta } from '../engine/pressConference';
-import { createPersistentDataStore } from '../state/persistentDataStore';
 
 const STATE_RECENT_CAREER_LOG_YEARS = 3;
 const STATE_MAX_SPRAY_POINTS = 40;
@@ -58,16 +52,51 @@ function slimTeamsForState(teams) {
   return teams.map(slimTeamForState);
 }
 
-const INIT_TEAMS = TEAM_DEFS.map(function(d){
-  const t = NPB2025_ROSTERS[d.id] ? buildRealTeam(d, NPB2025_ROSTERS[d.id]) : buildTeam(d);
-  const nonPitcherIds = (t.players || []).filter(p => !p.isPitcher).map(p => p.id);
-  t.lineupNoDh = (t.lineupNoDh || t.lineup || nonPitcherIds).filter(id => nonPitcherIds.includes(id)).slice(0, 8);
-  t.lineupDh = (t.lineupDh || t.lineup || nonPitcherIds).filter(id => nonPitcherIds.includes(id)).slice(0, 9);
-  t.rosterDhMode = t.rosterDhMode ?? t.dhEnabled ?? false;
-  t.lineup = (t.rosterDhMode ? t.lineupDh : t.lineupNoDh).slice();
-  t.history = [];
-  return slimTeamForState(t);
-});
+const EMPTY_PERSISTENT_SUMMARIES = {
+  seasonHistory: null,
+  news: null,
+  mailbox: null,
+  scheduleArchive: null,
+  gameResultsMap: null,
+};
+
+let saveModulePromise = null;
+let scheduleModulePromise = null;
+let pressConferenceModulePromise = null;
+let playerModulePromise = null;
+let persistentDataStoreModulePromise = null;
+
+function loadSaveModule() {
+  if (!saveModulePromise) saveModulePromise = import('../engine/saveload');
+  return saveModulePromise;
+}
+
+function loadScheduleModule() {
+  if (!scheduleModulePromise) scheduleModulePromise = import('../engine/scheduleGen');
+  return scheduleModulePromise;
+}
+
+function loadPressConferenceModule() {
+  if (!pressConferenceModulePromise) pressConferenceModulePromise = import('../engine/pressConference');
+  return pressConferenceModulePromise;
+}
+
+function loadPlayerModule() {
+  if (!playerModulePromise) playerModulePromise = import('../engine/player');
+  return playerModulePromise;
+}
+
+function loadPersistentDataStoreModule() {
+  if (!persistentDataStoreModulePromise) persistentDataStoreModulePromise = import('../state/persistentDataStore');
+  return persistentDataStoreModulePromise;
+}
+
+function sliceCollection(items, options = {}) {
+  const safeItems = Array.isArray(items) ? items : [];
+  const limit = Number.isFinite(Number(options?.limit)) ? Math.max(0, Number(options.limit)) : safeItems.length;
+  const offset = Number.isFinite(Number(options?.offset)) ? Math.max(0, Number(options.offset)) : 0;
+  return safeItems.slice(offset, offset + limit);
+}
 
 export function useGameState() {
   const [screen, setScreen] = useState("title");
@@ -76,9 +105,10 @@ export function useGameState() {
   const [viewingTeam, setViewingTeam] = useState(null);  // チーム詳細画面で表示中のチーム
   const [pregameError, setPregameError] = useState(null); // 試合開始バリデーションエラー { message }
   const [allTeamResultsMap, setAllTeamResultsMap] = useState({}); // { [teamId]: { [gameDay]: boxScoreResult } }
+  const [allTeamBoxScoresMap, setAllTeamBoxScoresMap] = useState({});
   const [retireGamePlayer, setRetireGamePlayer] = useState(null);
   const [retireRole, setRetireRole] = useState(null);
-  const [gameState, dispatch] = useReducer(gameStateReducer, { teams: INIT_TEAMS, gameDay: 1, year: 2026, myId: null });
+  const [gameState, dispatch] = useReducer(gameStateReducer, { teams: [], gameDay: 1, year: 2026, myId: null });
   const { teams, gameDay, year, myId } = gameState;
   const markSaveDirty = useCallback(()=>{
     setSaveRevision(prev=>prev+1);
@@ -89,11 +119,11 @@ export function useGameState() {
   const setYear    = useCallback((n) => { dispatch({ type: G.SET_YEAR, year: n }); markSaveDirty(); }, [markSaveDirty]);
   const setMyId    = useCallback((id) => { dispatch({ type: G.SET_MY_ID, myId: id }); if(id) markSaveDirty(); }, [markSaveDirty]);
   const [tab, setTab] = useState("dashboard");
-  const [faPool, setFaPool] = useState(() => generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX)));
+  const [faPool, setFaPool] = useState([]);
   const [faYears, setFaYears] = useState({});
   const [notif, setNotif] = useState(null);
   const [seasonHistory, setSeasonHistory] = useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[],transfers:[]});
-  const [saveExists, setSaveExists] = useState(()=>hasSave());
+  const [saveExists, setSaveExists] = useState(false);
   const [schedule, setSchedule] = useState(null);
   const [news, setNews] = useState([]);
   const [mailbox, setMailbox] = useState([]);
@@ -110,40 +140,109 @@ export function useGameState() {
   const [saveDirty, setSaveDirty] = useState(false);
   const [lastAutoSaveAt, setLastAutoSaveAt] = useState(0);
   const [saveRevision, setSaveRevision] = useState(0);
-  const [saveQueueState, setSaveQueueState] = useState(() => getSaveQueueSnapshot());
+  const [saveQueueState, setSaveQueueState] = useState({ isSaving: false });
+  const [persistentEnabled, setPersistentEnabled] = useState(false);
 
-  const persistentStoreRef = useRef(createPersistentDataStore());
-  const [persistentSummaries, setPersistentSummaries] = useState(() => persistentStoreRef.current.getSummaries());
+  const persistentStoreRef = useRef(null);
+  const [persistentSummaries, setPersistentSummaries] = useState(EMPTY_PERSISTENT_SUMMARIES);
+
+  useEffect(() => {
+    let alive = true;
+    loadSaveModule()
+      .then((mod) => {
+        if (!alive) return;
+        setSaveExists(mod.hasSave());
+        setSaveQueueState(mod.getSaveQueueSnapshot());
+      })
+      .catch((error) => {
+        console.error('Failed to load save module:', error);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const getPersistentStore = useCallback(() => {
+    return persistentStoreRef.current;
+  }, []);
+
+  const ensurePersistentStore = useCallback(async () => {
+    if (persistentStoreRef.current) return persistentStoreRef.current;
+    const mod = await loadPersistentDataStoreModule();
+    persistentStoreRef.current = mod.createPersistentDataStore();
+    return persistentStoreRef.current;
+  }, []);
+
+  const enablePersistentStore = useCallback(() => {
+    if (persistentEnabled) return;
+    ensurePersistentStore()
+      .then((store) => {
+        setPersistentSummaries(store.getSummaries());
+        setPersistentEnabled(true);
+      })
+      .catch((error) => {
+        console.error('Failed to enable persistent store:', error);
+      });
+  }, [ensurePersistentStore, persistentEnabled]);
 
   const syncPersistentSummary = useCallback((key, value) => {
-    const store = persistentStoreRef.current;
+    const store = getPersistentStore();
+    if (!store) return;
     let nextPartial = null;
+    if (key === 'seasonHistory') nextPartial = { seasonHistory: store.setSeasonHistory(value) };
     if (key === 'news') nextPartial = { news: store.setNews(value) };
     if (key === 'mailbox') nextPartial = { mailbox: store.setMailbox(value) };
     if (key === 'scheduleArchive') nextPartial = { scheduleArchive: store.setScheduleArchive(value) };
     if (key === 'gameResultsMap') nextPartial = { gameResultsMap: store.setGameResultsMap(value) };
     if (!nextPartial) return;
     setPersistentSummaries(prev => ({ ...prev, ...nextPartial }));
-  }, []);
+  }, [getPersistentStore]);
 
   const getNewsBySelector = useCallback((options = {}) => {
-    return persistentStoreRef.current.selectNewsList(options);
-  }, []);
+    const store = getPersistentStore();
+    return store ? store.selectNewsList(options) : sliceCollection(news, options);
+  }, [getPersistentStore, news]);
   const getMailboxBySelector = useCallback((options = {}) => {
-    return persistentStoreRef.current.selectMailboxList(options);
-  }, []);
+    const store = getPersistentStore();
+    return store ? store.selectMailboxList(options) : sliceCollection(mailbox, options);
+  }, [getPersistentStore, mailbox]);
+  const getSeasonHistory = useCallback(() => {
+    const store = getPersistentStore();
+    return store ? store.getSeasonHistory() : seasonHistory;
+  }, [getPersistentStore, seasonHistory]);
+  const getGameResultsMap = useCallback(() => {
+    const store = getPersistentStore();
+    return store ? store.getGameResultsMap() : gameResultsMap;
+  }, [getPersistentStore, gameResultsMap]);
+  const getScheduleArchive = useCallback(() => {
+    const store = getPersistentStore();
+    return store ? store.getScheduleArchive() : scheduleArchive;
+  }, [getPersistentStore, scheduleArchive]);
   const getUnreadMailboxCount = useCallback((currentGameDay) => {
-    return persistentStoreRef.current.selectUnreadMailboxCount(currentGameDay);
-  }, []);
+    const store = getPersistentStore();
+    if (store) return store.selectUnreadMailboxCount(currentGameDay);
+    return mailbox.reduce((count, item) => {
+      const deliverOnDay = Number(item?.deliverOnDay ?? 0);
+      return item?.read === false && deliverOnDay <= currentGameDay ? count + 1 : count;
+    }, 0);
+  }, [getPersistentStore, mailbox]);
   const getLatestNewsId = useCallback(() => {
-    return persistentStoreRef.current.selectLatestNewsId();
-  }, []);
+    const store = getPersistentStore();
+    return store ? store.selectLatestNewsId() : (news[0]?.id ?? null);
+  }, [getPersistentStore, news]);
   const refreshSaveQueueState = useCallback(() => {
-    setSaveQueueState(getSaveQueueSnapshot());
+    loadSaveModule()
+      .then((mod) => {
+        setSaveQueueState(mod.getSaveQueueSnapshot());
+      })
+      .catch((error) => {
+        console.error('Failed to refresh save queue state:', error);
+      });
   }, []);
   const queueSave = useCallback((state, options = {}) => {
     refreshSaveQueueState();
-    return enqueueSaveGame(state, options)
+    return loadSaveModule()
+      .then((mod) => mod.enqueueSaveGame(state, options))
       .finally(() => {
         refreshSaveQueueState();
       });
@@ -154,7 +253,13 @@ export function useGameState() {
     if(!myId || gameDay <= 1 || gameDay > 143) return;
     if(pressEvent) return; // 既にイベント表示中
     if(gameDay - lastPressDay >= PRESS_CONFERENCE_INTERVAL){
-      setPressEvent(pickQuestion(gameDay));
+      loadPressConferenceModule()
+        .then((mod) => {
+          setPressEvent(mod.pickQuestion(gameDay));
+        })
+        .catch((error) => {
+          console.error('Failed to load press conference module:', error);
+        });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[gameDay, myId]);
@@ -162,10 +267,16 @@ export function useGameState() {
   // シーズン日程をyear変更時に再生成（チームID・リーグ構成は不変なのでteams.lengthで十分）
   useEffect(()=>{
     if(teams.length===12){
-      const newSchedule = generateSeasonSchedule(year,teams);
-      setSchedule(newSchedule);
-      const params = SEASON_PARAMS[year] || getDefaultParams(year);
-      setAllStarTriggerDay(calcAllStarTriggerDay(newSchedule, params.allStarSkipDates));
+      loadScheduleModule()
+        .then((mod) => {
+          const newSchedule = mod.generateSeasonSchedule(year,teams);
+          setSchedule(newSchedule);
+          const params = SEASON_PARAMS[year] || getDefaultParams(year);
+          setAllStarTriggerDay(mod.calcAllStarTriggerDay(newSchedule, params.allStarSkipDates));
+        })
+        .catch((error) => {
+          console.error('Failed to load schedule module:', error);
+        });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[year,teams.length]);
@@ -290,24 +401,40 @@ export function useGameState() {
 
 
   useEffect(() => {
+    if (!persistentEnabled) return;
+    syncPersistentSummary('seasonHistory', seasonHistory);
+  }, [persistentEnabled, seasonHistory, syncPersistentSummary]);
+
+  useEffect(() => {
+    if (!persistentEnabled) return;
     syncPersistentSummary('news', news);
-  }, [news, syncPersistentSummary]);
+  }, [news, persistentEnabled, syncPersistentSummary]);
 
   useEffect(() => {
+    if (!persistentEnabled) return;
     syncPersistentSummary('mailbox', mailbox);
-  }, [mailbox, syncPersistentSummary]);
+  }, [mailbox, persistentEnabled, syncPersistentSummary]);
 
   useEffect(() => {
+    if (!persistentEnabled) return;
     syncPersistentSummary('scheduleArchive', scheduleArchive);
-  }, [scheduleArchive, syncPersistentSummary]);
+  }, [persistentEnabled, scheduleArchive, syncPersistentSummary]);
+
+  useEffect(() => {
+    if (screen === 'hub' && myId != null) {
+      enablePersistentStore();
+    }
+  }, [enablePersistentStore, myId, screen]);
 
   // オートセーブ（hubに戻った時）
   useEffect(()=>{
     if(screen!=='hub' || isAutoSaveSuspended || !saveDirty || saveQueueState.isSaving) return;
     const now = Date.now();
-    const intervalMs = getAutoSaveIntervalMs();
-    if (lastAutoSaveAt > 0 && now - lastAutoSaveAt < intervalMs) return;
-    queueSave({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision}).then((result)=>{
+    loadSaveModule().then((mod)=>{
+      const intervalMs = mod.getAutoSaveIntervalMs();
+      if (lastAutoSaveAt > 0 && now - lastAutoSaveAt < intervalMs) return { ok: false, skipped: true };
+      return queueSave({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision});
+    }).then((result)=>{
       if(result.ok){setSaveExists(true);setSaveDirty(false);setLastAutoSaveAt(now);notify('💾 オートセーブ','ok');}
     }).catch((error)=>{
       console.error('Auto save failed:', error);
@@ -322,16 +449,28 @@ export function useGameState() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision,notify,queueSave]);
 
-  const handleSelect = useCallback((id)=>{
+  const ensureInitialTeams = useCallback(async () => {
+    if (teams.length === TEAM_DEFS.length) return teams;
+    const { createInitialTeams } = await import('../engine/bootstrapTeams');
+    const initialTeams = createInitialTeams();
+    setTeams(initialTeams);
+    return initialTeams;
+  }, [setTeams, teams]);
+
+  const handleSelect = useCallback(async (id)=>{
+    const nextTeams = await ensureInitialTeams();
+    const playerMod = await loadPlayerModule();
+    setFaPool(playerMod.generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX)));
     setMyId(id);
     setScreen("hub");
     setTab("dashboard");
-    const newSchedule = generateSeasonSchedule(year,teams);
+    const scheduleMod = await loadScheduleModule();
+    const newSchedule = scheduleMod.generateSeasonSchedule(year,nextTeams);
     setSchedule(newSchedule);
     const params = SEASON_PARAMS[year] || getDefaultParams(year);
-    setAllStarTriggerDay(calcAllStarTriggerDay(newSchedule, params.allStarSkipDates));
+    setAllStarTriggerDay(scheduleMod.calcAllStarTriggerDay(newSchedule, params.allStarSkipDates));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[year,teams]);
+  },[ensureInitialTeams, year]);
 
   const handlePlayerClick = useCallback((player,teamName)=>setPlayerModal({player,teamName}),[]);
   const handleTeamClick = useCallback((team)=>{setViewingTeam(team);setScreen("team_detail");},[]);
@@ -339,15 +478,21 @@ export function useGameState() {
   const setTrainingFocus = useCallback((pid,focus)=>upd(myId,t=>({...t,players:t.players.map(p=>p.id===pid?{...p,trainingFocus:focus}:p)})),[upd,myId]);
 
   const setDevGoal = useCallback((pid, goal) => {
-    upd(myId, t => {
-      const updateP = p => {
-        if (p.id !== pid) return p;
-        const updated = { ...p, devGoal: goal || null };
-        updated.trainingFocus = resolveTrainingFocusFromGoal(updated);
-        return updated;
-      };
-      return { ...t, players: t.players.map(updateP), farm: t.farm.map(updateP) };
-    });
+    loadPlayerModule()
+      .then((mod) => {
+        upd(myId, t => {
+          const updateP = p => {
+            if (p.id !== pid) return p;
+            const updated = { ...p, devGoal: goal || null };
+            updated.trainingFocus = mod.resolveTrainingFocusFromGoal(updated);
+            return updated;
+          };
+          return { ...t, players: t.players.map(updateP), farm: t.farm.map(updateP) };
+        });
+      })
+      .catch((error) => {
+        console.error('Failed to load player module for dev goal update:', error);
+      });
   }, [upd, myId]);
 
   const handlePlayerTalk = useCallback((pid, talkType) => {
@@ -568,7 +713,7 @@ export function useGameState() {
     upd(myId,t=>({...t,budget:t.budget-region.cost,scoutMissions:[...t.scoutMissions,{id:uid(),name:region.name,weeksLeft:region.weeks,qMin:region.qMin,qMax:region.qMax,cost:region.cost,foreign:region.foreign,regionFactor:region.regionFactor||1.0}]}));
     notify(`${region.name}へスカウト派遣！`,"ok");
     setTimeout(()=>{
-      upd(myId,t=>{const mis=t.scoutMissions.find(m=>m.name===region.name);if(!mis) return t;const np=makePlayer(Math.random()<0.4?"先発":POSITIONS[rng(0,7)],rng(mis.qMin,mis.qMax),Math.random()<0.4,undefined,mis.foreign&&Math.random()<0.7);return{...t,scoutMissions:t.scoutMissions.filter(m=>m!==mis),scoutResults:[...t.scoutResults,{...np,_scoutRegionFactor:mis.regionFactor||1.0,_scoutBudgetFactor:t.budget>300000?0.7:t.budget>150000?0.85:1.0}]};});
+      loadPlayerModule().then((playerMod)=>{upd(myId,t=>{const mis=t.scoutMissions.find(m=>m.name===region.name);if(!mis) return t;const np=playerMod.makePlayer(Math.random()<0.4?"先発":POSITIONS[rng(0,7)],rng(mis.qMin,mis.qMax),Math.random()<0.4,undefined,mis.foreign&&Math.random()<0.7);return{...t,scoutMissions:t.scoutMissions.filter(m=>m!==mis),scoutResults:[...t.scoutResults,{...np,_scoutRegionFactor:mis.regionFactor||1.0,_scoutBudgetFactor:t.budget>300000?0.7:t.budget>150000?0.85:1.0}]};});}).catch((error)=>{console.error('Failed to resolve scout result:', error);notify("スカウト結果の生成に失敗しました","error");});
       notify("スカウト報告が届きました！","ok");
     },3000);
   },[myTeam,upd,myId,notify]);
@@ -586,7 +731,8 @@ export function useGameState() {
   const handlePressAnswer = useCallback((choiceIdx) => {
     if (!pressEvent) return;
     const choice = pressEvent.choices[choiceIdx];
-    const { popDelta, moraleDelta } = calcPressDelta(choice);
+    loadPressConferenceModule().then((mod) => {
+      const { popDelta, moraleDelta } = mod.calcPressDelta(choice);
     upd(myId, t => ({
       ...t,
       popularity: Math.min(100, Math.max(0, (t.popularity ?? 50) + popDelta)),
@@ -601,6 +747,9 @@ export function useGameState() {
     );
     setPressEvent(null);
     setLastPressDay(gameDay);
+    }).catch((error) => {
+      console.error('Failed to resolve press conference choice:', error);
+    });
   }, [pressEvent, upd, myId, notify, gameDay]);
 
   const handleStadiumUpgrade = useCallback(()=>{
@@ -631,6 +780,7 @@ export function useGameState() {
     viewingTeam, setViewingTeam,
     pregameError, setPregameError,
     allTeamResultsMap, setAllTeamResultsMap,
+    allTeamBoxScoresMap, setAllTeamBoxScoresMap,
     retireGamePlayer, setRetireGamePlayer,
     retireRole, setRetireRole,
     teams, setTeams,
@@ -659,8 +809,11 @@ export function useGameState() {
     saveDirty, setSaveDirty,
     saveRevision, setSaveRevision,
     persistentSummaries,
+    getSeasonHistory,
     getNewsBySelector,
     getMailboxBySelector,
+    getGameResultsMap,
+    getScheduleArchive,
     getUnreadMailboxCount,
     getLatestNewsId,
     markSaveDirty,
