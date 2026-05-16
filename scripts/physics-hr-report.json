@@ -1,0 +1,53 @@
+{
+  "generatedAt": "2026-05-16T14:21:39.355Z",
+  "results": [
+    {
+      "profile": "power70",
+      "hrPerBip": 0.02485,
+      "hrPerPa": 0.02485,
+      "teamHrPerGame": 0.9443,
+      "avgEv": 113.76463499999987,
+      "avgLa": 14.354900000000058,
+      "avgDistance": 46.5928,
+      "qualityRate": {
+        "weak": 0.3582,
+        "normal": 0.25025,
+        "solid": 0.23335,
+        "hard": 0.1287,
+        "barrel": 0.0295
+      }
+    },
+    {
+      "profile": "power80",
+      "hrPerBip": 0.02975,
+      "hrPerPa": 0.02975,
+      "teamHrPerGame": 1.1305,
+      "avgEv": 115.44489000000068,
+      "avgLa": 14.722970000000034,
+      "avgDistance": 48.6017,
+      "qualityRate": {
+        "weak": 0.3514,
+        "normal": 0.2227,
+        "solid": 0.2384,
+        "hard": 0.1498,
+        "barrel": 0.0377
+      }
+    },
+    {
+      "profile": "power90",
+      "hrPerBip": 0.03585,
+      "hrPerPa": 0.03585,
+      "teamHrPerGame": 1.3623,
+      "avgEv": 116.56223499999969,
+      "avgLa": 14.856065000000017,
+      "avgDistance": 49.82905,
+      "qualityRate": {
+        "weak": 0.34795,
+        "normal": 0.20145,
+        "solid": 0.24765,
+        "hard": 0.16145,
+        "barrel": 0.0415
+      }
+    }
+  ]
+}
