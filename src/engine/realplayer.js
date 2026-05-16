@@ -1,6 +1,6 @@
 import { clamp, rng, uid } from '../utils';
 import { POSITIONS } from '../constants';
-import { emptyStats, makePlayer, applyPositionFields } from './player';
+import { emptyStats, makePlayer, applyPositionFields } from './playerCore';
 import { DEFAULT_CONTRACT_END_YEAR } from '../data/npb2025';
 
 /* ═══════════════════════════════════════════════

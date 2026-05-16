@@ -1,6 +1,6 @@
 import { r2, clamp } from '../utils';
 import { IS_HIT, IS_OUT } from '../constants';
-import { emptyStats } from './player';
+import { emptyStats } from './playerCore';
 
 const getBattedBallType = (e) => {
   if (!e || !['out', 'sf'].includes(e.result)) return null;

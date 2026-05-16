@@ -1,22 +1,42 @@
 import { useState, useRef, useEffect } from "react";
 import SeasonBatchWorker from "../workers/seasonBatchWorker?worker";
 import { uid, rng, rngf, gameDayToDate } from '../utils';
-import { checkForInjuries, tickInjuries, calcRetireWill, tickPositionTraining } from '../engine/player';
 import { quickSimGame, runFarmSeason } from '../engine/simulation';
 import { applyGameStatsFromLog, applyPostGameCondition, computeBoxScore } from '../engine/postGame';
 import { calcRevenue } from '../engine/finance';
 import { applyPopularityDelta } from '../engine/fanSentiment';
 import { generateCpuOffer, generateCpuCpuTrade, classifyTeam, evaluateFrontOfficePlan } from '../engine/trade';
 import { initPlayoff } from '../engine/playoff';
-import { selectAllStars, runAllStarGame } from '../engine/allstar';
-import { getMyMatchup, getCpuMatchups } from '../engine/scheduleGen';
-import { enqueueSaveGame } from '../engine/saveload';
 import { processCpuFaBids } from '../engine/contract';
 import { cancelDeferredPostGameWork, scheduleDeferredPostGameWork } from '../engine/postGameProcessing';
 import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER, CPU_AUTO_MANAGE_INTERVAL, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX, FIELDING_POSITIONS, OPTIMAL_PITCHER_COUNT, MIN_ACTIVE_CATCHERS } from '../constants';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 
 const MAX_FOREIGN_ACTIVE = 4;
+let seasonPlayerModulePromise = null;
+let seasonScheduleModulePromise = null;
+let seasonSaveModulePromise = null;
+let seasonAllStarModulePromise = null;
+
+function loadSeasonPlayerModule() {
+  if (!seasonPlayerModulePromise) seasonPlayerModulePromise = import('../engine/player');
+  return seasonPlayerModulePromise;
+}
+
+function loadSeasonScheduleModule() {
+  if (!seasonScheduleModulePromise) seasonScheduleModulePromise = import('../engine/scheduleGen');
+  return seasonScheduleModulePromise;
+}
+
+function loadSeasonSaveModule() {
+  if (!seasonSaveModulePromise) seasonSaveModulePromise = import('../engine/saveload');
+  return seasonSaveModulePromise;
+}
+
+function loadSeasonAllStarModule() {
+  if (!seasonAllStarModulePromise) seasonAllStarModulePromise = import('../engine/allstar');
+  return seasonAllStarModulePromise;
+}
 
 export function buildSafeGameResult(rawResult, { oppTeam = null, gameNo = null, source } = {}) {
   const score = {
@@ -654,8 +674,9 @@ export function useSeasonFlow(gs) {
 
   const applyDhToTeam = (team, useDh) => ({ ...team, lineup: buildSimLineup(team, useDh) });
 
-  const pickOpponentFromSchedule = (day) => {
-    const matchup=getMyMatchup(schedule,day,myId);
+  const pickOpponentFromSchedule = async (day) => {
+    const scheduleMod = await loadSeasonScheduleModule();
+    const matchup=scheduleMod.getMyMatchup(schedule,day,myId);
     if(matchup){
       return {opp:teams.find(t=>t.id===matchup.oppId)||null, isHome:matchup.isHome, venueNote:matchup.venueNote};
     }
@@ -878,10 +899,10 @@ export function useSeasonFlow(gs) {
   };
 
   // Pick opponent and go to mode select
-  const handleStartGame = () => {
+  const handleStartGame = async () => {
     if(batchProgress) return;
     if(!myTeam) return;
-    const {opp,isHome}=pickOpponentFromSchedule(gameDay);
+    const {opp,isHome}=await pickOpponentFromSchedule(gameDay);
     if(!opp) return;
 
     const useDh = isHome ? !!myTeam.dhEnabled : !!opp.dhEnabled;
@@ -942,9 +963,14 @@ export function useSeasonFlow(gs) {
   };
 
   // Auto sim result handler
-  const handleAutoSimEnd = r => {
+  const handleAutoSimEnd = async (r) => {
     const myT=teams.find(t=>t.id===myId);
     if(!myT) return;
+    const [playerMod, scheduleMod, allStarMod] = await Promise.all([
+      loadSeasonPlayerModule(),
+      loadSeasonScheduleModule(),
+      loadSeasonAllStarModule(),
+    ]);
     const won=r.score.my>r.score.opp;
     const drew=r.score.my===r.score.opp;
     upd(myId,t=>{
@@ -955,11 +981,11 @@ export function useSeasonFlow(gs) {
       };
       updated.players=applyGameStatsFromLog(updated.players, r.log||[], true, won, gameDay);
       updated.players=applyPostGameCondition(updated.players, r.log||[], true, gameDay);
-      updated.players=tickInjuries(updated.players);
-      updated.players=tickPositionTraining(updated.players);
+      updated.players=playerMod.tickInjuries(updated.players);
+      updated.players=playerMod.tickPositionTraining(updated.players);
       updated.players=updated.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
       updated.players=applyDefenseCoachRecovery(updated.players,t.coaches);
-      const newInj=checkForInjuries(updated.players, year);
+      const newInj=playerMod.checkForInjuries(updated.players, year);
       if(newInj.length>0){
         const injNames=newInj.reduce((acc,i)=>{const p=updated.players.find(x=>x.id===i.id);if(p)acc.push({name:p.name,...i});return acc;},[]);
         updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
@@ -985,15 +1011,15 @@ export function useSeasonFlow(gs) {
       };
       updated.players=applyGameStatsFromLog(updated.players,r.log||[],false,!won&&!drew, gameDay);
       updated.players=applyPostGameCondition(updated.players,r.log||[],false,gameDay);
-      updated.players=tickInjuries(updated.players);
-      const newInj=checkForInjuries(updated.players, year);
+      updated.players=playerMod.tickInjuries(updated.players);
+      const newInj=playerMod.checkForInjuries(updated.players, year);
       updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
       Object.assign(updated,applyPopularityDelta(t,!won&&!drew,drew));
       return updated;
     });
     // Simulate remaining CPU vs CPU games for this day (schedule-based matchups)
     const _oppId=currentOpp.id;
-    const _cpuMatchups=getCpuMatchups(schedule,gameDay,myId,_oppId);
+    const _cpuMatchups=scheduleMod.getCpuMatchups(schedule,gameDay,myId,_oppId);
     const _fallbackOthers=teams.filter(t=>t.id!==myId&&t.id!==_oppId);
     const matchupList=_cpuMatchups.length>0
       ?_cpuMatchups
@@ -1024,13 +1050,13 @@ export function useSeasonFlow(gs) {
         const bRev=calcRevenue(b);b.budget=(b.budget??0)+bRev.ticket+bRev.sponsor+bRev.merch;b.revenueThisSeason=(b.revenueThisSeason??0)+bRev.ticket+bRev.sponsor+bRev.merch;
         a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon, gameDay);
         a.players=applyPostGameCondition(a.players,cr.log||[],true,gameDay);
-        a.players=tickInjuries(a.players);
-        const aInj=checkForInjuries(a.players,year);
+        a.players=playerMod.tickInjuries(a.players);
+        const aInj=playerMod.checkForInjuries(a.players,year);
         a.players=applyInjuriesToPlayers(a.players,aInj,year);
         b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew, gameDay);
         b.players=applyPostGameCondition(b.players,cr.log||[],false,gameDay);
-        b.players=tickInjuries(b.players);
-        const bInj=checkForInjuries(b.players,year);
+        b.players=playerMod.tickInjuries(b.players);
+        const bInj=playerMod.checkForInjuries(b.players,year);
         b.players=applyInjuriesToPlayers(b.players,bInj,year);
       }
       return newTeams;
@@ -1071,7 +1097,7 @@ export function useSeasonFlow(gs) {
       }
     }
     if(Math.random()<0.04&&myTeam){
-      const cands=myTeam.players.filter(p=>p.age>=35&&!p._retireNow&&calcRetireWill(p)>=40);
+      const cands=myTeam.players.filter(p=>p.age>=35&&!p._retireNow&&playerMod.calcRetireWill(p)>=40);
       if(cands.length>0){
         const rp=cands[rng(0,cands.length-1)];
         setRetireModal({player:rp,type:"announce"});
@@ -1092,8 +1118,8 @@ export function useSeasonFlow(gs) {
     gs.pushGameResult(gameDay,{won,drew:_adrew,oppName:currentOpp?.name||"",myScore:r.score.my,oppScore:r.score.opp,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:currentOpp});
     setGameDay(d=>d+1);
     if(!allStarDone && gameDay+1===allStarTriggerDay){
-      const rosters=selectAllStars(teams);
-      const asResult=runAllStarGame(rosters, year);
+      const rosters=allStarMod.selectAllStars(teams);
+      const asResult=allStarMod.runAllStarGame(rosters, year);
       setTeams(prev=>applyAllStarSelections(prev, rosters));
       setAllStarDone(true);
       setAllStarResult({ rosters, gameResult: asResult });
@@ -1339,7 +1365,8 @@ export function useSeasonFlow(gs) {
         setScreen("batch_result");
       }
 
-      enqueueSaveGame(nextState, { skipBackupRotation: true, preferMainSave: true })
+      loadSeasonSaveModule()
+        .then((saveMod) => saveMod.enqueueSaveGame(nextState, { skipBackupRotation: true, preferMainSave: true }))
         .then((saveResult) => {
           if (!saveResult?.ok) {
             console.warn("[BatchSave] saveGame failed after batch", saveResult);
@@ -1361,8 +1388,13 @@ export function useSeasonFlow(gs) {
   };
 
   // Game over callback from TacticalGameScreen
-  const handleTacticalGameEnd = rawGameResult => {
+  const handleTacticalGameEnd = async rawGameResult => {
     if(!myTeam||!currentOpp) return;
+    const [playerMod, scheduleMod, allStarMod] = await Promise.all([
+      loadSeasonPlayerModule(),
+      loadSeasonScheduleModule(),
+      loadSeasonAllStarModule(),
+    ]);
     const gsResult = buildSafeGameResult(rawGameResult, {
       oppTeam: currentOpp,
       gameNo: gameDay,
@@ -1379,11 +1411,11 @@ export function useSeasonFlow(gs) {
         };
         updated.players=applyGameStatsFromLog(updated.players, gsResult.log, true, won, gameDay);
         updated.players=applyPostGameCondition(updated.players, gsResult.log, true, gameDay);
-        updated.players=tickInjuries(updated.players);
-        updated.players=tickPositionTraining(updated.players);
+        updated.players=playerMod.tickInjuries(updated.players);
+        updated.players=playerMod.tickPositionTraining(updated.players);
         updated.players=updated.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
         updated.players=applyDefenseCoachRecovery(updated.players,t.coaches);
-        const newInj=checkForInjuries(updated.players, year);
+        const newInj=playerMod.checkForInjuries(updated.players, year);
         updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
         updated.farm=tickCooldowns(updated.farm??[]);
         updated=autoInjuryDemote(updated);
@@ -1409,8 +1441,8 @@ export function useSeasonFlow(gs) {
         };
         updated.players=applyGameStatsFromLog(updated.players,gsResult.log,false,!won&&!drew, gameDay);
         updated.players=applyPostGameCondition(updated.players,gsResult.log,false,gameDay);
-        updated.players=tickInjuries(updated.players);
-        const newInj=checkForInjuries(updated.players, year);
+        updated.players=playerMod.tickInjuries(updated.players);
+        const newInj=playerMod.checkForInjuries(updated.players, year);
         updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
         Object.assign(updated,applyPopularityDelta(t,!won&&!drew,drew));
         return updated;
@@ -1420,7 +1452,7 @@ export function useSeasonFlow(gs) {
       }
     });
     const _tOppId=currentOpp.id;
-    const _tCpuMatchups=getCpuMatchups(schedule,gameDay,myId,_tOppId);
+    const _tCpuMatchups=scheduleMod.getCpuMatchups(schedule,gameDay,myId,_tOppId);
     const _tFallbackOthers=teams.filter(t=>t.id!==myId&&t.id!==_tOppId);
     const tMatchupList=_tCpuMatchups.length>0
       ?_tCpuMatchups
@@ -1454,13 +1486,13 @@ export function useSeasonFlow(gs) {
           const bRevT=calcRevenue(b);b.budget=(b.budget??0)+bRevT.ticket+bRevT.sponsor+bRevT.merch;b.revenueThisSeason=(b.revenueThisSeason??0)+bRevT.ticket+bRevT.sponsor+bRevT.merch;
           a.players=applyGameStatsFromLog(a.players,cr.log,true,aWon, gameDay);
           a.players=applyPostGameCondition(a.players,cr.log,true,gameDay);
-          a.players=tickInjuries(a.players);
-          const aInj=checkForInjuries(a.players,year);
+          a.players=playerMod.tickInjuries(a.players);
+          const aInj=playerMod.checkForInjuries(a.players,year);
           a.players=applyInjuriesToPlayers(a.players,aInj,year);
           b.players=applyGameStatsFromLog(b.players,cr.log,false,!aWon&&!cdrew, gameDay);
           b.players=applyPostGameCondition(b.players,cr.log,false,gameDay);
-          b.players=tickInjuries(b.players);
-          const bInj=checkForInjuries(b.players,year);
+          b.players=playerMod.tickInjuries(b.players);
+          const bInj=playerMod.checkForInjuries(b.players,year);
           b.players=applyInjuriesToPlayers(b.players,bInj,year);
         }
         return newTeams;
@@ -1524,8 +1556,8 @@ export function useSeasonFlow(gs) {
     gs.pushGameResult(gameDay,{won,drew,oppName:currentOpp?.name||"",myScore:gsResult.score.my,oppScore:gsResult.score.opp,log:gsResult.log,inningSummary:gsResult.inningSummary,oppTeam:currentOpp});
     setGameDay(d=>d+1);
     if(!allStarDone && gameDay+1===allStarTriggerDay){
-      const rosters=selectAllStars(teams);
-      const asResult=runAllStarGame(rosters, year);
+      const rosters=allStarMod.selectAllStars(teams);
+      const asResult=allStarMod.runAllStarGame(rosters, year);
       setTeams(prev=>applyAllStarSelections(prev, rosters));
       setAllStarDone(true);
       setAllStarResult({ rosters, gameResult: asResult });
