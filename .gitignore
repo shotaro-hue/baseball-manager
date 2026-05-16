@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Local Claude Code settings（個人設定・コミット対象外）
+.claude/settings.local.json
+
+# Environment
+.env
+.env.local
+.env.*.local
+test-results/
+playwright-report/
+
+scripts/mc-results.json

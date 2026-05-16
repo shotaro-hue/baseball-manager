@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Baseball Manager 2025 — 処理フロー図</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 32px;
+  }
+  h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: #f8fafc;
+  }
+  .subtitle {
+    font-size: 0.9rem;
+    color: #94a3b8;
+    margin-bottom: 32px;
+  }
+
+  /* ─── Legend ─── */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 36px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 6px 14px;
+  }
+  .dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .dot-screen   { background: #3b82f6; }
+  .dot-hook     { background: #a855f7; }
+  .dot-engine   { background: #10b981; }
+  .dot-component{ background: #f59e0b; }
+
+  /* ─── Section wrappers ─── */
+  .section {
+    margin-bottom: 48px;
+  }
+  .section-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #93c5fd;
+    border-left: 4px solid #3b82f6;
+    padding-left: 12px;
+    margin-bottom: 20px;
+  }
+
+  /* ─── Mermaid container ─── */
+  .diagram-box {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 24px;
+    overflow-x: auto;
+  }
+  .mermaid {
+    min-width: 700px;
+  }
+
+  /* ─── File reference table ─── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  th {
+    text-align: left;
+    background: #1e293b;
+    color: #93c5fd;
+    padding: 10px 14px;
+    border-bottom: 2px solid #334155;
+  }
+  td {
+    padding: 9px 14px;
+    border-bottom: 1px solid #1e293b;
+    vertical-align: top;
+  }
+  tr:nth-child(odd) td { background: #0f172a; }
+  tr:nth-child(even) td { background: #162032; }
+  .tag {
+    display: inline-block;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin: 2px 2px;
+  }
+  .tag-screen   { background: #1d4ed8; color: #bfdbfe; }
+  .tag-hook     { background: #6b21a8; color: #e9d5ff; }
+  .tag-engine   { background: #065f46; color: #a7f3d0; }
+  .tag-component{ background: #78350f; color: #fde68a; }
+
+  code {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 0.82rem;
+    color: #86efac;
+    font-family: "Fira Code", "Courier New", monospace;
+  }
+</style>
+</head>
+<body>
+
+<h1>⚾ Baseball Manager 2025 — 処理フロー図</h1>
+<p class="subtitle">どの画面でどのファイルが動くかを示す全体マップ</p>
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-item"><div class="dot dot-screen"></div>画面 (Screen)</div>
+  <div class="legend-item"><div class="dot dot-hook"></div>状態管理 (Hook)</div>
+  <div class="legend-item"><div class="dot dot-engine"></div>エンジン (Engine)</div>
+  <div class="legend-item"><div class="dot dot-component"></div>UI コンポーネント</div>
+</div>
+
+<!-- ===== 1. ゲーム全体フロー ===== -->
+<div class="section">
+  <div class="section-title">① ゲーム全体の流れ（シーズン〜オフシーズンのループ）</div>
+  <div class="diagram-box">
+    <div class="mermaid">
+flowchart TD
+  A([🏠 タイトル画面\nScreens.jsx]) -->|チーム選択| B
+
+  subgraph HUB["🏟️ ハブ画面 (シーズン中)  —  App.jsx"]
+    B([ダッシュボード\n各種タブ])
+  end
+
+  B -->|試合開始ボタン| C([⚙️ モード選択\nScreens.jsx])
+  C -->|手動プレイ| D([🎮 戦術試合画面\nTacticalGame.jsx])
+  C -->|自動シム| E([⚡ 自動シム\nsimulation.js])
+  D --> F
+  E --> F([📊 試合結果画面\nScreens.jsx])
+  F -->|次の試合へ| B
+
+  B -->|まとめてシム| G([📅 バッチシム\n5試合 or 全試合])
+  G --> H([📋 バッチ結果画面\nScreens.jsx])
+  H --> B
+
+  B -->|143試合完了| I([🏆 プレーオフ画面\nScreens.jsx])
+  I --> J
+
+  subgraph OFF["🍂 オフシーズン  —  useOffseason.js"]
+    J([引退・育成フェーズ]) --> K([戦力外通告フェーズ])
+    K --> L([ドラフトフェーズ])
+    L --> M([新シーズン準備])
+  end
+
+  M -->|年が変わってシーズン開幕| B
+
+  style HUB fill:#1e3a5f,stroke:#3b82f6,color:#e2e8f0
+  style OFF fill:#1a2e1a,stroke:#10b981,color:#e2e8f0
+    </div>
+  </div>
+</div>
+
+<!-- ===== 2. 試合1試合の処理フロー ===== -->
+<div class="section">
+  <div class="section-title">② 試合1試合の内部処理（どのファイルが何をするか）</div>
+  <div class="diagram-box">
+    <div class="mermaid">
+flowchart TD
+  A([試合開始\nuseSeasonFlow.js]) --> B
+
+  B["📋 対戦相手の決定\nscheduleGen.js\n→ getMyMatchup()"] --> C
+
+  C["✅ ロスター検証\n・打者8〜9人揃っているか\n・外国人枠チェック"] --> D
+
+  D{手動 or 自動?}
+
+  D -->|手動プレイ| E["🎮 TacticalGame.jsx\n（ユーザーが各イニング操作）\n・投手交代\n・打者送り出し"]
+  D -->|自動| F["⚡ simulation.js\nquickSimGame()\n打席を1つずつ解決"]
+
+  E --> G
+  F --> G
+
+  G["📊 postGame.js\n試合後の集計\n・勝敗・得失点\n・個人成績（打率・防御率等）\n・ボックススコア生成"]
+
+  G --> H["💰 finance.js\ncalcRevenue()\n観客収入・グッズ売上計算"]
+  G --> I["❤️ fanSentiment.js\n人気度の増減"]
+  G --> J["🤕 player.js\ncheckForInjuries()\n怪我チェック"]
+  G --> K["📰 ニュース・インタビュー記事生成\nApp.jsx 内ロジック"]
+
+  H --> L
+  I --> L
+  J --> L
+  K --> L
+
+  L["🤝 CPU同士の試合も同時に処理\ntrade.js → generateCpuCpuTrade()\n全12球団の順位表更新"]
+
+  L --> M([結果画面へ])
+    </div>
+  </div>
+</div>
+
+<!-- ===== 3. オフシーズンの処理フロー ===== -->
+<div class="section">
+  <div class="section-title">③ オフシーズンの処理（引退〜ドラフト〜新シーズン開幕）</div>
+  <div class="diagram-box">
+    <div class="mermaid">
+flowchart TD
+  START([プレーオフ終了]) --> A
+
+  subgraph RETIRE["🌸 引退・育成フェーズ  —  useOffseason.js: handleRetirePhaseNext()"]
+    A["👴 引退処理\nplayer.js → rollRetire()\n年齢・体力で引退判定"] --> B
+    B["📈 選手育成・成長\nplayer.js → developPlayers()\n能力値が上下する"] --> C
+    C["🏆 個人賞の決定\nawards.js → calcSeasonAwards()\nMVP・沢村賞・新人王"] --> D
+    D["🌏 海外移籍・メジャー申請\nposting.js → calcPostingRequestProb()"]
+  end
+
+  D --> E
+
+  subgraph WAIVER["⚡ 戦力外通告フェーズ  —  useOffseason.js: handleWaiverPhaseNext()"]
+    E["❌ 戦力外選手の決定\n（ユーザーが選ぶ）"] --> F
+    F["📋 FAプールへ放出\nCPU球団が自動獲得入札\ncontract.js → processCpuFaBids()"]
+  end
+
+  F --> G
+
+  subgraph DRAFT["🎯 ドラフトフェーズ  —  Draft.jsx + useOffseason.js"]
+    G["🎲 ドラフト会議\ndraft.js → initDraftPool()\n高校生・大学生候補生成"] --> H
+    H["抽選 → 指名\nユーザーが選手を指名\nCPU球団も自動指名"]
+  end
+
+  H --> I
+
+  subgraph NEXT["🌅 新シーズン準備  —  useOffseason.js: handleNextYear()"]
+    I["📅 新スケジュール生成\nscheduleGen.js → generateSchedule()\n143試合の日程"] --> J
+    J["💰 新年度予算計算\n収入 × 60% − 年俸総額"] --> K
+    K["📊 全選手の年齢+1\nステータスリセット"]
+  end
+
+  K --> END([🏟️ 新シーズン開幕！])
+
+  style RETIRE fill:#1e2a3a,stroke:#3b82f6,color:#e2e8f0
+  style WAIVER fill:#2a1e1e,stroke:#ef4444,color:#e2e8f0
+  style DRAFT fill:#1e2a1e,stroke:#10b981,color:#e2e8f0
+  style NEXT fill:#2a2a1e,stroke:#f59e0b,color:#e2e8f0
+    </div>
+  </div>
+</div>
+
+<!-- ===== 4. ファイル早見表 ===== -->
+<div class="section">
+  <div class="section-title">④ ファイル別・役割早見表</div>
+  <div class="diagram-box" style="padding:0; overflow:hidden; border-radius:12px;">
+    <table>
+      <thead>
+        <tr>
+          <th>ファイル</th>
+          <th>種類</th>
+          <th>担当する処理</th>
+          <th>呼び出しタイミング</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>App.jsx</code></td>
+          <td><span class="tag tag-component">コンポーネント</span></td>
+          <td>全画面のルーティング（どの画面を表示するか決める司令塔）</td>
+          <td>常時</td>
+        </tr>
+        <tr>
+          <td><code>useGameState.js</code></td>
+          <td><span class="tag tag-hook">Hook</span></td>
+          <td>選手・チーム・お金・日付などゲーム全体の状態を保持・更新</td>
+          <td>常時</td>
+        </tr>
+        <tr>
+          <td><code>useSeasonFlow.js</code></td>
+          <td><span class="tag tag-hook">Hook</span></td>
+          <td>試合の開始→シム→結果反映のループを管理</td>
+          <td>試合ごと・バッチシムごと</td>
+        </tr>
+        <tr>
+          <td><code>useOffseason.js</code></td>
+          <td><span class="tag tag-hook">Hook</span></td>
+          <td>シーズン終了後の引退・育成・ドラフト・新年度準備を管理</td>
+          <td>オフシーズン中</td>
+        </tr>
+        <tr>
+          <td><code>simulation.js</code></td>
+          <td><span class="tag tag-engine">エンジン</span></td>
+          <td>打席を1球ずつ解決（三振/安打/本塁打の確率計算・乱数で結果決定）</td>
+          <td>自動シム・バッチシム時</td>
+        </tr>
+        <tr>
+          <td><code>postGame.js</code></td>
+          <td><span class="tag tag-engine">エンジン</span></td>
+          <td>試合終了後の成績集計（打率・防御率・勝利投手などの更新）</td>
+          <td>試合終了後</td>
+        </tr>
+        <tr>
+          <td><code>player.js</code></td>
+          <td><span class="tag tag-engine">エンジン</span></td>
+          <td>選手の生成・老化・成長・引退・怪我判定</td>
+          <td>試合後（怪我）・オフシーズン（育成・引退）</td>
+        </tr>
+        <tr>
+          <td><code>contract.js</code></td>
+          <td><span class="tag tag-engine">エンジン</span></td>
+          <td>契約オファーの評価・CPU球団の自動FA獲得</td>
+          <td>FA期間・オフシーズン</td>
+        </tr>
+        <tr>
+          <td><code>trade.js</code></td>
+          <td><span class="tag tag-engine">エンジン</span></td>
+          <td>トレード価値計算・CPU球団間の自動トレード生成</td>
+          <td>シーズン中（7月トレード期限）</td>
+        </tr>
+        <tr>
+          <td><code>scheduleGen.js</code></td>
+          <td><span class="tag tag-engine">エンジン</span></td>
+          <td>143試合の年間日程を生成・今日の対戦相手を返す</td>
+          <td>新シーズン開幕時・試合開始時</td>
+        </tr>
+        <tr>
+          <td><code>finance.js</code></td>
+          <td><span class="tag tag-engine">エンジン</span></td>
+          <td>観客収入・グッズ売上・放映権収入の計算</td>
+          <td>試合終了後</td>
+        </tr>
+        <tr>
+          <td><code>fanSentiment.js</code></td>
+          <td><span class="tag tag-engine">エンジン</span></td>
+          <td>勝敗・順位に応じたファン人気度の増減</td>
+          <td>試合後・オフシーズン</td>
+        </tr>
+        <tr>
+          <td><code>awards.js</code></td>
+          <td><span class="tag tag-engine">エンジン</span></td>
+          <td>MVP・沢村賞・新人王・殿堂入りの選出</td>
+          <td>オフシーズン（引退フェーズ）</td>
+        </tr>
+        <tr>
+          <td><code>draft.js</code></td>
+          <td><span class="tag tag-engine">エンジン</span></td>
+          <td>ドラフト候補選手の生成・CPU球団の自動指名</td>
+          <td>ドラフトフェーズ</td>
+        </tr>
+        <tr>
+          <td><code>posting.js</code></td>
+          <td><span class="tag tag-engine">エンジン</span></td>
+          <td>メジャー挑戦・海外移籍の申請確率計算</td>
+          <td>オフシーズン（引退フェーズ）</td>
+        </tr>
+        <tr>
+          <td><code>saveload.js</code></td>
+          <td><span class="tag tag-engine">エンジン</span></td>
+          <td>ゲームデータのセーブ・ロード（ブラウザのlocalStorageを使用）</td>
+          <td>手動セーブ時・ゲーム起動時</td>
+        </tr>
+        <tr>
+          <td><code>TacticalGame.jsx</code></td>
+          <td><span class="tag tag-component">コンポーネント</span></td>
+          <td>手動プレイ時の試合操作UI（投手交代・打者確認など）</td>
+          <td>手動試合プレイ中</td>
+        </tr>
+        <tr>
+          <td><code>Draft.jsx</code></td>
+          <td><span class="tag tag-component">コンポーネント</span></td>
+          <td>ドラフト抽選・指名の操作UI</td>
+          <td>ドラフトフェーズ</td>
+        </tr>
+        <tr>
+          <td><code>Screens.jsx</code></td>
+          <td><span class="tag tag-component">コンポーネント</span></td>
+          <td>モード選択・試合結果・プレーオフなどの各種画面</td>
+          <td>各フェーズの遷移画面</td>
+        </tr>
+        <tr>
+          <td><code>constants.js</code></td>
+          <td><span class="tag tag-component">設定</span></td>
+          <td>球団定義・能力値テーブル・ゲームバランスの数値（全エンジンから参照）</td>
+          <td>常時（全エンジンが参照）</td>
+        </tr>
+        <tr>
+          <td><code>utils.js</code></td>
+          <td><span class="tag tag-component">設定</span></td>
+          <td>乱数生成・数値フォーマッター・ID生成（全エンジンから参照）</td>
+          <td>常時（全エンジンが参照）</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== 5. データの流れ ===== -->
+<div class="section">
+  <div class="section-title">⑤ データの保存と読み込みの流れ</div>
+  <div class="diagram-box">
+    <div class="mermaid">
+flowchart LR
+  A["🎮 ゲームプレイ中\n（メモリ上のデータ）"] -->|手動セーブ or 自動セーブ| B
+  B["💾 saveload.js\n→ localStorage への書き込み"] --> C
+  C["🌐 ブラウザの保存領域\n（タブを閉じても残る）"]
+  C -->|ゲーム起動時・ロード時| D
+  D["💾 saveload.js\n→ localStorage からの読み込み"] --> A
+
+  E["📊 NPB 2025 実選手データ\nnpb2025.js"] -->|ゲーム開始時の初期化| A
+  F["⚙️ 定数・バランス値\nconstants.js"] -->|全処理から参照| A
+    </div>
+  </div>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      primaryColor: '#1e40af',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#3b82f6',
+      lineColor: '#64748b',
+      secondaryColor: '#1e293b',
+      tertiaryColor: '#0f172a',
+      background: '#0f172a',
+      mainBkg: '#1e293b',
+      nodeBorder: '#475569',
+      clusterBkg: '#1e293b',
+      titleColor: '#e2e8f0',
+      edgeLabelBackground: '#1e293b',
+      fontSize: '15px',
+    },
+    flowchart: {
+      curve: 'basis',
+      padding: 20,
+    },
+  });
+</script>
+</body>
+</html>
