@@ -123,4 +123,31 @@ describe('ResultScreen post-game processing state', () => {
 
     expect(html).toContain('打者成績を読み込み中');
   });
+
+  it('異常な inningSummary 値（Infinity/負数）でもクラッシュせず表示できる', () => {
+    const unstableResult = {
+      ...gsResult,
+      inningSummary: [
+        { inning: Infinity, isTop: true, runs: 1 },
+        { inning: -99, isTop: false, runs: 999 },
+        { inning: 'abc', isTop: false, runs: NaN },
+      ],
+    };
+
+    const html = renderToStaticMarkup(
+      React.createElement(ResultScreen, {
+        gsResult: unstableResult,
+        myTeam,
+        oppTeam,
+        gameDay: 12,
+        onNext: () => {},
+        nextLabel: 'ハブに戻る',
+        isPostGameProcessing: false,
+      }),
+    );
+
+    expect(html).toContain('ハブに戻る');
+    expect(html).toContain('3');
+    expect(html).toContain('2');
+  });
 });

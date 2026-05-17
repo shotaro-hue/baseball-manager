@@ -14,9 +14,11 @@ const UNKNOWN_TEAM = {
 };
 
 function normalizeScore(score) {
+  const safeMyScore = Number(score?.my);
+  const safeOppScore = Number(score?.opp);
   return {
-    my: Number(score?.my) || 0,
-    opp: Number(score?.opp) || 0,
+    my: Number.isFinite(safeMyScore) ? safeMyScore : 0,
+    opp: Number.isFinite(safeOppScore) ? safeOppScore : 0,
   };
 }
 
@@ -48,15 +50,21 @@ function buildResultScreenSummary(gsResult) {
   const won = safeResult.score.my > safeResult.score.opp;
   const drew = safeResult.score.my === safeResult.score.opp;
   const inningSummary = safeResult.inningSummary;
-  const maxInning = Math.max(9, ...inningSummary.map((entry) => Number(entry?.inning) || 0));
-  const innings = Array.from({ length: maxInning }, (_, index) => index + 1);
+  const normalizedInnings = inningSummary
+    .map((entry) => Number(entry?.inning))
+    .filter((inning) => Number.isFinite(inning) && inning > 0)
+    .map((inning) => Math.floor(inning));
+  // ⚠️ セキュリティ: 異常値で配列生成が破綻しないよう、最大イニング数を明示的に制限する
+  const boundedMaxInning = Math.min(30, Math.max(9, ...normalizedInnings, 9));
+  const innings = Array.from({ length: boundedMaxInning }, (_, index) => index + 1);
   const myRunsByInn = {};
   const oppRunsByInn = {};
 
   inningSummary.forEach((entry) => {
-    const inning = Number(entry?.inning) || 0;
-    if (!inning) return;
-    const runs = Number(entry?.runs) || 0;
+    const inning = Math.floor(Number(entry?.inning));
+    if (!Number.isFinite(inning) || inning <= 0 || inning > boundedMaxInning) return;
+    const runsRaw = Number(entry?.runs);
+    const runs = Number.isFinite(runsRaw) ? Math.max(0, runsRaw) : 0;
     if (entry?.isTop) oppRunsByInn[inning] = runs;
     else myRunsByInn[inning] = runs;
   });
@@ -65,7 +73,7 @@ function buildResultScreenSummary(gsResult) {
     won,
     drew,
     log: safeResult.log,
-    maxInning,
+    maxInning: boundedMaxInning,
     innings,
     myRunsByInn,
     oppRunsByInn,
