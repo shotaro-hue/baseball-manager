@@ -1394,12 +1394,13 @@ export function useSeasonFlow(gs) {
       setScreen("hub");
       return;
     }
-    const gsResult = buildSafeGameResult(rawGameResult, {
-      oppTeam: currentOpp,
-      gameNo: gameDay,
-      source: "tactical",
-    });
+    let gsResult = null;
     try {
+      gsResult = buildSafeGameResult(rawGameResult, {
+        oppTeam: currentOpp,
+        gameNo: gameDay,
+        source: "tactical",
+      });
       const [playerMod, scheduleMod, allStarMod] = await Promise.all([
         loadSeasonPlayerModule(),
         loadSeasonScheduleModule(),
@@ -1577,6 +1578,13 @@ export function useSeasonFlow(gs) {
     } catch (error) {
       console.error("[TacticalPostGame] failed to finalize tactical game", error);
       // ⚠️ セキュリティ: 画面表示用にエラーメッセージをそのまま表示せず、固定文言で通知する
+      if (!gsResult) {
+        gsResult = buildSafeGameResult(rawGameResult, {
+          oppTeam: currentOpp,
+          gameNo: gameDay,
+          source: "tactical_fallback",
+        });
+      }
       setGameResult(gsResult);
       setScreen("result");
       notify("試合後処理でエラーが発生したため、一部の集計をスキップして結果画面へ遷移しました。", "warn");
@@ -1601,4 +1609,3 @@ export function useSeasonFlow(gs) {
     tryGenerateCpuOffer,
   };
 }
-
