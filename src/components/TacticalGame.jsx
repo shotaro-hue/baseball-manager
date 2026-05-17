@@ -149,6 +149,12 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   const safeBases = Array.isArray(gs.bases) ? gs.bases : [null, null, null];
   const safeInningSummary = Array.isArray(gs.inningSummary) ? gs.inningSummary : [];
   const safeLog = Array.isArray(gs.log) ? gs.log : [];
+  const safeScore = {
+    my: Number(gs?.score?.my) || 0,
+    opp: Number(gs?.score?.opp) || 0,
+  };
+  const safeMyTeam = (myTeam && typeof myTeam === "object") ? myTeam : { name: "自チーム", short: "MY" };
+  const safeOppTeam = (oppTeam && typeof oppTeam === "object") ? oppTeam : { name: "対戦相手", short: "OPP" };
 
   const handleGameEndSafely = useCallback(async () => {
     if (isEndingGame) return;
@@ -173,13 +179,13 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   }, [gs, isEndingGame, onGameEnd, safeBases, safeInningSummary, safeLog, safeMyLineup, safeOppLineup]);
 
   if(gs.gameOver){
-    const won=gs.score.my>gs.score.opp;
+    const won=safeScore.my>safeScore.opp;
     return(
       <div className="app">
         <div className="rw">
-          <div style={{color:"#1e2d3d",letterSpacing:".2em",fontSize:11,marginBottom:8}}>vs {oppTeam.name}</div>
+          <div style={{color:"#1e2d3d",letterSpacing:".2em",fontSize:11,marginBottom:8}}>vs {safeOppTeam.name || "対戦相手"}</div>
           <div className={`rtitle ${won?"rwin":"rlose"}`}>{won?"勝利！！":"敗北..."}</div>
-          <div className="rscore" style={{color:won?"#f5c842":"#374151"}}>{myTeam.short} {gs.score.my} – {gs.score.opp} {oppTeam.short}</div>
+          <div className="rscore" style={{color:won?"#f5c842":"#374151"}}>{safeMyTeam.short || "MY"} {safeScore.my} – {safeScore.opp} {safeOppTeam.short || "OPP"}</div>
           <div style={{marginBottom:24}}>
             {/* Top batters */}
             <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>

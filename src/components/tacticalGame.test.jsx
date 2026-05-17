@@ -64,4 +64,18 @@ describe('TacticalGameScreen', () => {
     expect(replayButtons.length).toBe(0);
     root.unmount();
   });
+
+  it('myTeam / oppTeam が不足していても試合終了画面がクラッシュしない', async () => {
+    const container = document.createElement('div');
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<TacticalGameScreen myTeam={null} oppTeam={undefined} onGameEnd={() => Promise.resolve()} />);
+    });
+
+    expect(container.textContent).toContain('対戦相手');
+    expect(container.textContent).toContain('MY');
+    expect(container.textContent).toContain('OPP');
+    root.unmount();
+  });
 });
