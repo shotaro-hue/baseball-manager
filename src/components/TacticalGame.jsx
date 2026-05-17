@@ -19,6 +19,7 @@ function TacticalPanelFallback({ label = 'Loading...' }){
 
 export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   const [gs,setGs]=useState(()=>initGameState(myTeam,oppTeam));
+  const [isEndingGame, setIsEndingGame] = useState(false);
   const [autoRunning,setAutoRunning]=useState(false);
   const [selectedPH,setSelectedPH]=useState(null);
   const [selectedRP,setSelectedRP]=useState(null);
@@ -131,8 +132,45 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
     setModal3D({ event: validation.event, stadium: currentStadium });
   }
 
-  const battingStatsMap = gs.liveStats?.batting || new Map();
-  const pitchingStatsMap = gs.liveStats?.pitching || new Map();
+  const battingStatsStore = gs.liveStats?.batting ?? null;
+  const pitchingStatsStore = gs.liveStats?.pitching ?? null;
+  const getSafeStatLine = useCallback((store, playerId) => {
+    // ⚠️ セキュリティ: playerId はUI入力由来の可能性があるため文字列/数値のみ受け付ける
+    if (!(typeof playerId === "string" || typeof playerId === "number")) return null;
+    if (!store) return null;
+    if (store instanceof Map) return store.get(playerId) ?? null;
+    if (typeof store === "object" && !Array.isArray(store)) {
+      return Object.prototype.hasOwnProperty.call(store, playerId) ? store[playerId] : null;
+    }
+    return null;
+  }, []);
+  const safeMyLineup = Array.isArray(gs.myLineup) ? gs.myLineup : [];
+  const safeOppLineup = Array.isArray(gs.opLineup) ? gs.opLineup : [];
+  const safeBases = Array.isArray(gs.bases) ? gs.bases : [null, null, null];
+  const safeInningSummary = Array.isArray(gs.inningSummary) ? gs.inningSummary : [];
+  const safeLog = Array.isArray(gs.log) ? gs.log : [];
+
+  const handleGameEndSafely = useCallback(async () => {
+    if (isEndingGame) return;
+    setIsEndingGame(true);
+    try {
+      // ⚠️ セキュリティ: UI由来データをそのまま渡さないよう、最小限の構造に正規化して渡す
+      const normalizedResult = {
+        ...gs,
+        myLineup: safeMyLineup,
+        opLineup: safeOppLineup,
+        bases: safeBases,
+        inningSummary: safeInningSummary,
+        log: safeLog,
+      };
+      await Promise.resolve(onGameEnd(normalizedResult));
+    } catch (error) {
+      console.error("[TacticalGameScreen] onGameEnd failed", error);
+      setModalWarning("⚠️ 試合終了処理に失敗しました。再度お試しください。");
+    } finally {
+      setIsEndingGame(false);
+    }
+  }, [gs, isEndingGame, onGameEnd, safeBases, safeInningSummary, safeLog, safeMyLineup, safeOppLineup]);
 
   if(gs.gameOver){
     const won=gs.score.my>gs.score.opp;
@@ -145,8 +183,8 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
           <div style={{marginBottom:24}}>
             {/* Top batters */}
             <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
-              {gs.myLineup.filter((p,i,arr)=>arr.indexOf(p)===i).map(p=>{
-                const battingLine = battingStatsMap.get(p?.id);
+              {safeMyLineup.filter((p,i,arr)=>arr.indexOf(p)===i).map(p=>{
+                const battingLine = getSafeStatLine(battingStatsStore, p?.id);
                 if(!battingLine?.h) return null;
                 return <div key={p?.id} className="card2" style={{textAlign:"center",minWidth:90}}>
                   <div style={{fontSize:11,fontWeight:700}}>{p?.name}</div>
@@ -156,7 +194,9 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
               })}
             </div>
           </div>
-          <button className="btn btn-gold" onClick={()=>onGameEnd(gs)}>試合終了 → 結果へ</button>
+          <button className="btn btn-gold" disabled={isEndingGame} onClick={handleGameEndSafely}>
+            {isEndingGame ? "処理中..." : "試合終了 → 結果へ"}
+          </button>
         </div>
       </div>
     );
@@ -165,24 +205,24 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   const curPitcher=gs.myPitcher;
   const fatigue=calcEffectiveFatigue(gs.myPitchCount,curPitcher);
   const fatigueColor=fatigue<40?"#34d399":fatigue<70?"#f5c842":"#f87171";
-  const nextBatter=!gs.isTop?gs.myLineup[gs.myBatIdx%Math.max(gs.myLineup.length,1)]:gs.opLineup[gs.opBatIdx%Math.max(gs.opLineup.length,1)];
+  const nextBatter=!gs.isTop?safeMyLineup[gs.myBatIdx%Math.max(safeMyLineup.length,1)]:safeOppLineup[gs.opBatIdx%Math.max(safeOppLineup.length,1)];
   const mu=matchupScore(!gs.isTop?nextBatter:null,gs.isTop?curPitcher:gs.opPitcher);
   const muLabel=mu>15?"⚡ 有利":mu>-15?"⚖️ 互角":"💀 不利";
   const muClass=mu>15?"mu-adv":mu>-15?"mu-even":"mu-dis";
 
   const { inningScores, innings } = useMemo(() => {
     const scores = {};
-    gs.inningSummary.forEach(s => {
+    safeInningSummary.forEach(s => {
       if (!scores[s.inning]) scores[s.inning] = { top: "-", bot: "-" };
       if (s.isTop) scores[s.inning].top = s.runs;
       else scores[s.inning].bot = s.runs;
     });
     const maxInn = Math.max(9, gs.inning);
     return { inningScores: scores, innings: Array.from({ length: maxInn }, (_, i) => i + 1) };
-  }, [gs.inningSummary, gs.inning]);
+  }, [safeInningSummary, gs.inning]);
 
   const opFatigue=calcEffectiveFatigue(gs.opPitchCount,gs.opPitcher);
-  const lastPlay = useMemo(() => (gs.log.length > 0 ? gs.log[gs.log.length - 1] : null), [gs.log]);
+  const lastPlay = useMemo(() => (safeLog.length > 0 ? safeLog[safeLog.length - 1] : null), [safeLog]);
   const safePhysicsMeta = (lastPlay && typeof lastPlay === "object" && !Array.isArray(lastPlay)) ? lastPlay.physicsMeta : null;
 
   return(
@@ -254,14 +294,14 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
             <div style={{flex:1}}>
               <div className="side-banner-main">{gs.isTop?"守備中":"攻撃中"}</div>
               <div className="side-banner-sub">
-                {gs.bases.filter(Boolean).length>0?`${gs.bases.filter(Boolean).length}人の走者`:"走者なし"} ・ {gs.outs}アウト
-                {(gs.bases[1]||gs.bases[2])&&<span style={{color:"#f5c842",marginLeft:6}}>🔥 得点圏</span>}
+                {safeBases.filter(Boolean).length>0?`${safeBases.filter(Boolean).length}人の走者`:"走者なし"} ・ {gs.outs}アウト
+                {(safeBases[1]||safeBases[2])&&<span style={{color:"#f5c842",marginLeft:6}}>🔥 得点圏</span>}
               </div>
             </div>
             <div style={{textAlign:"center"}}>
               <div className="diamond" style={{margin:"0 auto"}}>
-                <div className="base bH"/><div className={`base b1 ${gs.bases[0]?"on":""}`}/>
-                <div className={`base b2 ${gs.bases[1]?"on":""}`}/><div className={`base b3 ${gs.bases[2]?"on":""}`}/>
+                <div className="base bH"/><div className={`base b1 ${safeBases[0]?"on":""}`}/>
+                <div className={`base b2 ${safeBases[1]?"on":""}`}/><div className={`base b3 ${safeBases[2]?"on":""}`}/>
               </div>
               <div className="odots" style={{marginTop:4}}>{[0,1,2].map(i=><div key={i} className={`odot ${i<gs.outs?"on":""}`}/>)}</div>
             </div>
@@ -282,7 +322,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
               </div>
               <span style={{fontFamily:"monospace",fontSize:11,color:fatigueColor,width:36,textAlign:"right"}}>{fatigue}%</span>
             </div>
-            {(()=>{const ps=pitchingStatsMap.get(curPitcher?.id);if(!ps)return null;return<div className="gstat" style={{marginBottom:8}}>{ps.bf}打者 <span style={{color:"#a78bfa"}}>{ps.k}K</span> <span style={{color:"#f87171"}}>{ps.ha}被安打</span> <span style={{color:"#fbbf24"}}>{ps.ra}失点</span></div>;})()}
+            {(()=>{const ps=getSafeStatLine(pitchingStatsStore, curPitcher?.id);if(!ps)return null;return<div className="gstat" style={{marginBottom:8}}>{ps.bf}打者 <span style={{color:"#a78bfa"}}>{ps.k}K</span> <span style={{color:"#f87171"}}>{ps.ha}被安打</span> <span style={{color:"#fbbf24"}}>{ps.ra}失点</span></div>;})()}
             <div style={{display:"flex",gap:10,marginBottom:8,flexWrap:"wrap"}}>
               <span style={{fontSize:11}}>球速<OV v={curPitcher?.pitching?.velocity||0}/></span>
               <span style={{fontSize:11}}>制球<OV v={curPitcher?.pitching?.control||0}/></span>
@@ -336,7 +376,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
                   <span style={{fontSize:10}}>ミート<OV v={nextBatter.batting.contact}/></span>
                   <span style={{fontSize:10}}>長打<OV v={nextBatter.batting.power}/></span>
                 </div>}
-                {(()=>{const bs=battingStatsMap.get(nextBatter?.id);if(!bs)return<div style={{fontSize:9,color:"var(--dim)",marginTop:4}}>本日初打席</div>;return<div className="gstat" style={{marginTop:4}}>{bs.ab}打{bs.h}安打{bs.hr>0?` ${bs.hr}HR`:""}</div>;})()}
+                {(()=>{const bs=getSafeStatLine(battingStatsStore, nextBatter?.id);if(!bs)return<div style={{fontSize:9,color:"var(--dim)",marginTop:4}}>本日初打席</div>;return<div className="gstat" style={{marginTop:4}}>{bs.ab}打{bs.h}安打{bs.hr>0?` ${bs.hr}HR`:""}</div>;})()}
               </div>
             </div>
           </div>
@@ -354,7 +394,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
             </Suspense>
           )}
           <div className="evlog" ref={logRef}>
-            {visibleLogIds.map((i)=>{ const e = gs.log[i]; if(!e) return null;
+            {visibleLogIds.map((i)=>{ const e = safeLog[i]; if(!e) return null;
               if(e.result==="change") return <div key={i} style={{padding:"3px 8px",fontSize:10,color:"#a78bfa",borderLeft:"3px solid #a78bfa",margin:"4px 0"}}>{e.text}</div>;
               const cls=e.result==="hr"?"evi-hr":IS_HIT(e.result)?"evi-hit":IS_OUT(e.result)?"evi-out":"";
               return(
@@ -460,7 +500,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
                       <span style={{fontSize:11}}>長打<OV v={p.batting.power}/></span>
                       <span style={{fontSize:11}}>選球<OV v={p.batting.eye}/></span>
                       <span style={{fontSize:10,color:"#374151"}}>打率:{fmtAvg(p.stats.H,p.stats.AB)}</span>
-                      {(()=>{const bs=battingStatsMap.get(p.id);if(!bs)return null;return<span className="gstat" style={{marginLeft:4}}>{bs.ab}打{bs.h}安</span>;})()}
+                      {(()=>{const bs=getSafeStatLine(battingStatsStore, p.id);if(!bs)return null;return<span className="gstat" style={{marginLeft:4}}>{bs.ab}打{bs.h}安</span>;})()}
                     </div>
                   </div>
                 );
@@ -510,7 +550,9 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
           </>
         )}
         {gs.gameOver&&(
-          <button className="btn btn-gold" style={{width:"100%"}} onClick={()=>onGameEnd(gs)}>試合終了 → 結果へ ✓</button>
+          <button className="btn btn-gold" style={{width:"100%"}} disabled={isEndingGame} onClick={handleGameEndSafely}>
+            {isEndingGame ? "処理中..." : "試合終了 → 結果へ ✓"}
+          </button>
         )}
 
           {modal3D && (
