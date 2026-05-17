@@ -132,8 +132,18 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
     setModal3D({ event: validation.event, stadium: currentStadium });
   }
 
-  const battingStatsMap = gs.liveStats?.batting || new Map();
-  const pitchingStatsMap = gs.liveStats?.pitching || new Map();
+  const battingStatsStore = gs.liveStats?.batting ?? null;
+  const pitchingStatsStore = gs.liveStats?.pitching ?? null;
+  const getSafeStatLine = useCallback((store, playerId) => {
+    // ⚠️ セキュリティ: playerId はUI入力由来の可能性があるため文字列/数値のみ受け付ける
+    if (!(typeof playerId === "string" || typeof playerId === "number")) return null;
+    if (!store) return null;
+    if (store instanceof Map) return store.get(playerId) ?? null;
+    if (typeof store === "object" && !Array.isArray(store)) {
+      return Object.prototype.hasOwnProperty.call(store, playerId) ? store[playerId] : null;
+    }
+    return null;
+  }, []);
   const safeMyLineup = Array.isArray(gs.myLineup) ? gs.myLineup : [];
   const safeOppLineup = Array.isArray(gs.opLineup) ? gs.opLineup : [];
   const safeBases = Array.isArray(gs.bases) ? gs.bases : [null, null, null];
@@ -174,7 +184,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
             {/* Top batters */}
             <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
               {safeMyLineup.filter((p,i,arr)=>arr.indexOf(p)===i).map(p=>{
-                const battingLine = battingStatsMap.get(p?.id);
+                const battingLine = getSafeStatLine(battingStatsStore, p?.id);
                 if(!battingLine?.h) return null;
                 return <div key={p?.id} className="card2" style={{textAlign:"center",minWidth:90}}>
                   <div style={{fontSize:11,fontWeight:700}}>{p?.name}</div>
@@ -312,7 +322,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
               </div>
               <span style={{fontFamily:"monospace",fontSize:11,color:fatigueColor,width:36,textAlign:"right"}}>{fatigue}%</span>
             </div>
-            {(()=>{const ps=pitchingStatsMap.get(curPitcher?.id);if(!ps)return null;return<div className="gstat" style={{marginBottom:8}}>{ps.bf}打者 <span style={{color:"#a78bfa"}}>{ps.k}K</span> <span style={{color:"#f87171"}}>{ps.ha}被安打</span> <span style={{color:"#fbbf24"}}>{ps.ra}失点</span></div>;})()}
+            {(()=>{const ps=getSafeStatLine(pitchingStatsStore, curPitcher?.id);if(!ps)return null;return<div className="gstat" style={{marginBottom:8}}>{ps.bf}打者 <span style={{color:"#a78bfa"}}>{ps.k}K</span> <span style={{color:"#f87171"}}>{ps.ha}被安打</span> <span style={{color:"#fbbf24"}}>{ps.ra}失点</span></div>;})()}
             <div style={{display:"flex",gap:10,marginBottom:8,flexWrap:"wrap"}}>
               <span style={{fontSize:11}}>球速<OV v={curPitcher?.pitching?.velocity||0}/></span>
               <span style={{fontSize:11}}>制球<OV v={curPitcher?.pitching?.control||0}/></span>
@@ -366,7 +376,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
                   <span style={{fontSize:10}}>ミート<OV v={nextBatter.batting.contact}/></span>
                   <span style={{fontSize:10}}>長打<OV v={nextBatter.batting.power}/></span>
                 </div>}
-                {(()=>{const bs=battingStatsMap.get(nextBatter?.id);if(!bs)return<div style={{fontSize:9,color:"var(--dim)",marginTop:4}}>本日初打席</div>;return<div className="gstat" style={{marginTop:4}}>{bs.ab}打{bs.h}安打{bs.hr>0?` ${bs.hr}HR`:""}</div>;})()}
+                {(()=>{const bs=getSafeStatLine(battingStatsStore, nextBatter?.id);if(!bs)return<div style={{fontSize:9,color:"var(--dim)",marginTop:4}}>本日初打席</div>;return<div className="gstat" style={{marginTop:4}}>{bs.ab}打{bs.h}安打{bs.hr>0?` ${bs.hr}HR`:""}</div>;})()}
               </div>
             </div>
           </div>
@@ -490,7 +500,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
                       <span style={{fontSize:11}}>長打<OV v={p.batting.power}/></span>
                       <span style={{fontSize:11}}>選球<OV v={p.batting.eye}/></span>
                       <span style={{fontSize:10,color:"#374151"}}>打率:{fmtAvg(p.stats.H,p.stats.AB)}</span>
-                      {(()=>{const bs=battingStatsMap.get(p.id);if(!bs)return null;return<span className="gstat" style={{marginLeft:4}}>{bs.ab}打{bs.h}安</span>;})()}
+                      {(()=>{const bs=getSafeStatLine(battingStatsStore, p.id);if(!bs)return null;return<span className="gstat" style={{marginLeft:4}}>{bs.ab}打{bs.h}安</span>;})()}
                     </div>
                   </div>
                 );
