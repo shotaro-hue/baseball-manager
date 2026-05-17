@@ -189,6 +189,7 @@ export function ResultScreen({ gsResult, myTeam, oppTeam, gameDay, onNext, nextL
   const safeOppTeam = useMemo(() => normalizeTeam(oppTeam || gsResult?.oppTeam, UNKNOWN_TEAM), [gsResult?.oppTeam, oppTeam]);
   const [activeTab, setActiveTab] = useState('bat');
   const [detailData, setDetailData] = useState(null);
+  const [detailError, setDetailError] = useState('');
   const [internalProcessing, setInternalProcessing] = useState(() => (isPostGameProcessingProp ?? !!gsResult));
   const summary = useMemo(() => buildResultScreenSummary(safeResult), [safeResult]);
   const isPostGameProcessing = isPostGameProcessingProp ?? internalProcessing;
@@ -196,20 +197,29 @@ export function ResultScreen({ gsResult, myTeam, oppTeam, gameDay, onNext, nextL
   useEffect(() => {
     if (!gsResult?.score) {
       setDetailData(null);
+      setDetailError('');
       setInternalProcessing(false);
       return undefined;
     }
 
     setActiveTab('bat');
     setDetailData(null);
+    setDetailError('');
     setInternalProcessing(true);
 
     let isCancelled = false;
     const handle = scheduleDeferredPostGameWork(() => {
       if (isCancelled) return;
-      const nextDetail = buildResultScreenDetails(safeResult, safeMyTeam, safeOppTeam);
-      if (isCancelled) return;
-      setDetailData(nextDetail);
+      try {
+        const nextDetail = buildResultScreenDetails(safeResult, safeMyTeam, safeOppTeam);
+        if (isCancelled) return;
+        setDetailData(nextDetail);
+      } catch (error) {
+        console.error('[ResultScreen] detail aggregation failed', error);
+        if (isCancelled) return;
+        setDetailData(null);
+        setDetailError('⚠️ 詳細成績の集計に失敗しました。スコア表示とハブ復帰は利用できます。');
+      }
       setInternalProcessing(false);
     });
 
@@ -306,6 +316,11 @@ export function ResultScreen({ gsResult, myTeam, oppTeam, gameDay, onNext, nextL
           {!gsResult?.score && (
             <div className="card" style={{ marginTop: 10, padding: '12px', color: 'var(--dim)', fontSize: 12 }}>
               試合結果データが不足しています。ゲームデータは保持されています。
+            </div>
+          )}
+          {detailError && (
+            <div className="card" style={{ marginTop: 10, padding: '12px', color: 'var(--red)', fontSize: 12 }}>
+              {detailError}
             </div>
           )}
 
