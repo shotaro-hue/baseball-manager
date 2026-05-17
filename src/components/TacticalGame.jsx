@@ -197,6 +197,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
           <button className="btn btn-gold" disabled={isEndingGame} onClick={handleGameEndSafely}>
             {isEndingGame ? "処理中..." : "試合終了 → 結果へ"}
           </button>
+          {modalWarning && <div className="notif nwarn" style={{ marginTop: 10 }}>{modalWarning}</div>}
         </div>
       </div>
     );
@@ -406,7 +407,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
                   <PitchBadge pitchType={e.pitchType} zone={e.zone} />
                   {e.strategy&&<span style={{fontSize:9,color:"#a78bfa",marginLeft:4}}>[{e.strategy}]</span>}
                   {e.ev>0&&<span style={{fontFamily:"monospace",fontSize:9,color:"#1e2d3d",marginLeft:4}}>EV:{Math.round((Number(e.ev)||0)*10)/10}km/h LA:{e.la}° {e.dist>0&&`${e.dist}m`}</span>}
-                  {Number.isFinite(Number(e.ev)) && Number(e.ev) > 0 && <button onClick={()=>open3DReplaySafely(e)} style={{fontSize:9,marginLeft:4,padding:'1px 4px',cursor:'pointer'}}>3D再生</button>}
+                  {Number.isFinite(Number(e.ev)) && Number(e.ev) > 0 && Number.isFinite(Number(e.la)) && <button onClick={()=>open3DReplaySafely(e)} style={{fontSize:9,marginLeft:4,padding:'1px 4px',cursor:'pointer'}}>3D再生</button>}
                   {e.rbi>0&&<span style={{color:"#f5c842",marginLeft:5,fontSize:11}}>+{e.rbi}点！</span>}
                 </div>
               );
