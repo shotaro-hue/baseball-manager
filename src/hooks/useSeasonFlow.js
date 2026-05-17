@@ -1389,17 +1389,22 @@ export function useSeasonFlow(gs) {
 
   // Game over callback from TacticalGameScreen
   const handleTacticalGameEnd = async rawGameResult => {
-    if(!myTeam||!currentOpp) return;
-    const [playerMod, scheduleMod, allStarMod] = await Promise.all([
-      loadSeasonPlayerModule(),
-      loadSeasonScheduleModule(),
-      loadSeasonAllStarModule(),
-    ]);
+    if (!myTeam || !currentOpp) {
+      notify("試合結果を保存できませんでした。対戦データを再読み込みしてください。", "error");
+      setScreen("hub");
+      return;
+    }
     const gsResult = buildSafeGameResult(rawGameResult, {
       oppTeam: currentOpp,
       gameNo: gameDay,
       source: "tactical",
     });
+    try {
+      const [playerMod, scheduleMod, allStarMod] = await Promise.all([
+        loadSeasonPlayerModule(),
+        loadSeasonScheduleModule(),
+        loadSeasonAllStarModule(),
+      ]);
     const won=gsResult.won;
     const drew=gsResult.drew;
     upd(myId,t=>{
@@ -1565,10 +1570,17 @@ export function useSeasonFlow(gs) {
       setScreen("allstar");
       return;
     }
-    if(gameDay>=SEASON_GAMES){
-      pendingPlayoffRef.current=true;
+      if(gameDay>=SEASON_GAMES){
+        pendingPlayoffRef.current=true;
+      }
+      else setScreen("result");
+    } catch (error) {
+      console.error("[TacticalPostGame] failed to finalize tactical game", error);
+      // ⚠️ セキュリティ: 画面表示用にエラーメッセージをそのまま表示せず、固定文言で通知する
+      setGameResult(gsResult);
+      setScreen("result");
+      notify("試合後処理でエラーが発生したため、一部の集計をスキップして結果画面へ遷移しました。", "warn");
     }
-    else setScreen("result");
   };
 
   return {
@@ -1589,5 +1601,4 @@ export function useSeasonFlow(gs) {
     tryGenerateCpuOffer,
   };
 }
-
 
