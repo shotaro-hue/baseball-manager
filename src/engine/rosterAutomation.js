@@ -1,7 +1,6 @@
 import {
   FIELDING_POSITIONS,
   MAX_ROSTER,
-  MAX_陞滄摩蠏懆滋・ｺ_闕ｳﾂ髴・・,
   MIN_ACTIVE_CATCHERS,
   OPTIMAL_PITCHER_COUNT,
   ROSTER_DEVREC_BONUS,
@@ -11,7 +10,15 @@ import {
 } from '../constants';
 import { saberBatter, saberPitcher } from './sabermetrics';
 
-const getRosterDhMode = (team, rosterDhMode) => rosterDhMode ?? team.rosterDhMode ?? team.dhEnabled ?? false;
+const MAX_FOREIGN_ACTIVE = 4;
+const SUBTYPE_STARTER = '\u5148\u767a';
+const POS_CATCHER = '\u6355\u624b';
+const IKUSEI_KEY = '\u80b2\u6210';
+
+const getRosterDhMode = (team, rosterDhMode) =>
+  rosterDhMode ?? team.rosterDhMode ?? team.dhEnabled ?? false;
+
+const isIkuseiPlayer = (player) => !!player?.[IKUSEI_KEY];
 
 export const starterScore = (player) => {
   const stats = saberPitcher(player.stats ?? {});
@@ -57,14 +64,19 @@ export const rosterRecScore = (player) => {
   return batterScore(player);
 };
 
-const proficiencyAt = (player, pos) => (pos === 'DH' ? 50 : player.pos === pos ? 100 : (player.positions?.[pos] ?? 0));
+const proficiencyAt = (player, pos) =>
+  pos === 'DH' ? 50 : player.pos === pos ? 100 : (player.positions?.[pos] ?? 0);
 
 export function buildAutoLineupEntries(team, options = {}) {
   const rosterDhMode = getRosterDhMode(team, options.rosterDhMode);
   const required = [...FIELDING_POSITIONS, ...(rosterDhMode ? ['DH'] : [])];
-  const eligibleBatters = (team.players || []).filter((player) => !player.isPitcher && (player.injuryDaysLeft ?? 0) === 0);
+  const eligibleBatters = (team.players || []).filter(
+    (player) => !player.isPitcher && !isIkuseiPlayer(player) && (player.injuryDaysLeft ?? 0) === 0,
+  );
   const sortedBatters = [...eligibleBatters].sort((a, b) => batterScore(b) - batterScore(a));
-  const posEligible = Object.fromEntries(required.map((pos) => [pos, sortedBatters.filter((player) => proficiencyAt(player, pos) > 0)]));
+  const posEligible = Object.fromEntries(
+    required.map((pos) => [pos, sortedBatters.filter((player) => proficiencyAt(player, pos) > 0)]),
+  );
   const posOrder = [...required].sort((a, b) => posEligible[a].length - posEligible[b].length);
   const assignment = new Map();
   const usedPlayers = new Set();
@@ -91,12 +103,14 @@ export function buildAutoLineupEntries(team, options = {}) {
 }
 
 export function buildAutoPitchingStaff(team) {
-  const eligiblePitchers = (team.players || []).filter((player) => player.isPitcher && (player.injuryDaysLeft ?? 0) === 0);
+  const eligiblePitchers = (team.players || []).filter(
+    (player) => player.isPitcher && !isIkuseiPlayer(player) && (player.injuryDaysLeft ?? 0) === 0,
+  );
   const starters = eligiblePitchers
-    .filter((player) => player.subtype === '陷郁ご蛹ｱ')
+    .filter((player) => player.subtype === SUBTYPE_STARTER)
     .sort((a, b) => starterScore(b) - starterScore(a));
   const relievers = eligiblePitchers
-    .filter((player) => player.subtype !== '陷郁ご蛹ｱ')
+    .filter((player) => player.subtype !== SUBTYPE_STARTER)
     .sort((a, b) => relieverScore(b) - relieverScore(a));
   const rotation = [
     ...starters.slice(0, 6),
@@ -127,8 +141,12 @@ export function buildAutoManagedRoster(team, options = {}) {
     const entry = lineupEntries.find((lineupEntry) => lineupEntry.id === player.id);
     return entry && entry.pos !== player.pos ? { ...player, pos: entry.pos } : player;
   });
-  const lineupNoDh = buildAutoLineupEntries({ ...team, players }, { rosterDhMode: false }).map((entry) => entry.id).slice(0, 8);
-  const lineupDh = buildAutoLineupEntries({ ...team, players }, { rosterDhMode: true }).map((entry) => entry.id).slice(0, 9);
+  const lineupNoDh = buildAutoLineupEntries({ ...team, players }, { rosterDhMode: false })
+    .map((entry) => entry.id)
+    .slice(0, 8);
+  const lineupDh = buildAutoLineupEntries({ ...team, players }, { rosterDhMode: true })
+    .map((entry) => entry.id)
+    .slice(0, 9);
 
   return {
     ...team,
@@ -146,10 +164,12 @@ export function buildAutoManagedRoster(team, options = {}) {
 export function buildRosterRecs(team) {
   const recs = [];
   const foreignInActive = (team.players || []).filter((player) => player.isForeign).length;
-  const canPromote = (player) => !player.髢ｧ・ｲ隰後・
+  const canPromote = (player) =>
+    !isIkuseiPlayer(player)
     && (player.injuryDaysLeft ?? 0) === 0
     && (player.registrationCooldownDays ?? 0) === 0
-    && !(player.isForeign && foreignInActive >= MAX_陞滄摩蠏懆滋・ｺ_闕ｳﾂ髴・・);
+    && !(player.isForeign && foreignInActive >= MAX_FOREIGN_ACTIVE);
+
   const effectiveScore = (player, isFarm) => {
     const base = rosterRecScore(player);
     const devBonus = isFarm
@@ -159,6 +179,7 @@ export function buildRosterRecs(team) {
       : 0;
     return base + devBonus;
   };
+
   const targetBatters = MAX_ROSTER - OPTIMAL_PITCHER_COUNT;
   let projectedPlayers = [...(team.players || [])];
   let projectedFarm = [...(team.farm || [])];
@@ -168,8 +189,14 @@ export function buildRosterRecs(team) {
   const openSlots = MAX_ROSTER - projectedPlayers.length;
   if (openSlots < 0) {
     const excess = -openSlots;
-    const pitcherOver = Math.max(0, projectedPlayers.filter((player) => player.isPitcher).length - OPTIMAL_PITCHER_COUNT);
-    const batterOver = Math.max(0, projectedPlayers.filter((player) => !player.isPitcher).length - targetBatters);
+    const pitcherOver = Math.max(
+      0,
+      projectedPlayers.filter((player) => player.isPitcher).length - OPTIMAL_PITCHER_COUNT,
+    );
+    const batterOver = Math.max(
+      0,
+      projectedPlayers.filter((player) => !player.isPitcher).length - targetBatters,
+    );
     const addDemotes = (candidates, limit) => {
       [...candidates]
         .sort((a, b) => effectiveScore(a, false) - effectiveScore(b, false))
@@ -182,9 +209,15 @@ export function buildRosterRecs(team) {
         });
     };
     addDemotes(projectedPlayers.filter((player) => player.isPitcher), Math.min(pitcherOver, excess));
-    addDemotes(projectedPlayers.filter((player) => !player.isPitcher), Math.min(batterOver, excess - usedActiveIds.size));
+    addDemotes(
+      projectedPlayers.filter((player) => !player.isPitcher),
+      Math.min(batterOver, excess - usedActiveIds.size),
+    );
     if (usedActiveIds.size < excess) {
-      addDemotes(projectedPlayers.filter((player) => !usedActiveIds.has(player.id)), excess - usedActiveIds.size);
+      addDemotes(
+        projectedPlayers.filter((player) => !usedActiveIds.has(player.id)),
+        excess - usedActiveIds.size,
+      );
     }
     return recs;
   }
@@ -196,10 +229,16 @@ export function buildRosterRecs(team) {
   const eligibleBatters = projectedFarm
     .filter((player) => !player.isPitcher && canPromote(player))
     .sort((a, b) => effectiveScore(b, true) - effectiveScore(a, true));
+
   const addPromotes = (candidates, limit) => {
     candidates.slice(0, limit).forEach((player) => {
       if (usedFarmIds.has(player.id) || slotsLeft <= 0) return;
-      recs.push({ type: 'promote', upPlayer: player, downPlayer: null, scoreDiff: Math.round(effectiveScore(player, true)) });
+      recs.push({
+        type: 'promote',
+        upPlayer: player,
+        downPlayer: null,
+        scoreDiff: Math.round(effectiveScore(player, true)),
+      });
       usedFarmIds.add(player.id);
       projectedPlayers.push(player);
       projectedFarm = projectedFarm.filter((candidate) => candidate.id !== player.id);
@@ -207,10 +246,18 @@ export function buildRosterRecs(team) {
     });
   };
 
-  const pitcherNeed = Math.max(0, OPTIMAL_PITCHER_COUNT - projectedPlayers.filter((player) => player.isPitcher).length);
+  const pitcherNeed = Math.max(
+    0,
+    OPTIMAL_PITCHER_COUNT - projectedPlayers.filter((player) => player.isPitcher).length,
+  );
   addPromotes(eligiblePitchers, pitcherNeed);
-  const batterNeed = Math.max(0, targetBatters - projectedPlayers.filter((player) => !player.isPitcher).length);
+
+  const batterNeed = Math.max(
+    0,
+    targetBatters - projectedPlayers.filter((player) => !player.isPitcher).length,
+  );
   addPromotes(eligibleBatters.filter((player) => !usedFarmIds.has(player.id)), batterNeed);
+
   if (slotsLeft > 0) {
     addPromotes(
       [...projectedFarm]
@@ -222,6 +269,7 @@ export function buildRosterRecs(team) {
 
   let currentPitchers = projectedPlayers.filter((player) => player.isPitcher).length;
   let currentBatters = projectedPlayers.filter((player) => !player.isPitcher).length;
+
   while (currentPitchers < OPTIMAL_PITCHER_COUNT && currentBatters > targetBatters) {
     const farmPitcher = projectedFarm
       .filter((player) => player.isPitcher && canPromote(player) && !usedFarmIds.has(player.id))
@@ -230,14 +278,23 @@ export function buildRosterRecs(team) {
       .filter((player) => !player.isPitcher && !usedActiveIds.has(player.id))
       .sort((a, b) => effectiveScore(a, false) - effectiveScore(b, false))[0];
     if (!farmPitcher || !activeBatter) break;
-    recs.push({ type: 'swap', upPlayer: farmPitcher, downPlayer: activeBatter, scoreDiff: Math.round(effectiveScore(farmPitcher, true) - effectiveScore(activeBatter, false)) });
+    recs.push({
+      type: 'swap',
+      upPlayer: farmPitcher,
+      downPlayer: activeBatter,
+      scoreDiff: Math.round(effectiveScore(farmPitcher, true) - effectiveScore(activeBatter, false)),
+    });
     usedFarmIds.add(farmPitcher.id);
     usedActiveIds.add(activeBatter.id);
-    projectedPlayers = [...projectedPlayers.filter((player) => player.id !== activeBatter.id), farmPitcher];
+    projectedPlayers = [
+      ...projectedPlayers.filter((player) => player.id !== activeBatter.id),
+      farmPitcher,
+    ];
     projectedFarm = projectedFarm.filter((player) => player.id !== farmPitcher.id);
     currentPitchers = projectedPlayers.filter((player) => player.isPitcher).length;
     currentBatters = projectedPlayers.filter((player) => !player.isPitcher).length;
   }
+
   while (currentBatters < targetBatters && currentPitchers > OPTIMAL_PITCHER_COUNT) {
     const farmBatter = projectedFarm
       .filter((player) => !player.isPitcher && canPromote(player) && !usedFarmIds.has(player.id))
@@ -246,10 +303,18 @@ export function buildRosterRecs(team) {
       .filter((player) => player.isPitcher && !usedActiveIds.has(player.id))
       .sort((a, b) => effectiveScore(a, false) - effectiveScore(b, false))[0];
     if (!farmBatter || !activePitcher) break;
-    recs.push({ type: 'swap', upPlayer: farmBatter, downPlayer: activePitcher, scoreDiff: Math.round(effectiveScore(farmBatter, true) - effectiveScore(activePitcher, false)) });
+    recs.push({
+      type: 'swap',
+      upPlayer: farmBatter,
+      downPlayer: activePitcher,
+      scoreDiff: Math.round(effectiveScore(farmBatter, true) - effectiveScore(activePitcher, false)),
+    });
     usedFarmIds.add(farmBatter.id);
     usedActiveIds.add(activePitcher.id);
-    projectedPlayers = [...projectedPlayers.filter((player) => player.id !== activePitcher.id), farmBatter];
+    projectedPlayers = [
+      ...projectedPlayers.filter((player) => player.id !== activePitcher.id),
+      farmBatter,
+    ];
     projectedFarm = projectedFarm.filter((player) => player.id !== farmBatter.id);
     currentPitchers = projectedPlayers.filter((player) => player.isPitcher).length;
     currentBatters = projectedPlayers.filter((player) => !player.isPitcher).length;
@@ -258,16 +323,25 @@ export function buildRosterRecs(team) {
   const remainingFarm = projectedFarm
     .filter((player) => canPromote(player) && !usedFarmIds.has(player.id))
     .sort((a, b) => effectiveScore(b, true) - effectiveScore(a, true));
+
   if (remainingFarm.length > 0) {
     [...projectedPlayers]
       .sort((a, b) => effectiveScore(a, false) - effectiveScore(b, false))
       .forEach((activePlayer) => {
         if (usedActiveIds.has(activePlayer.id)) return;
-        const best = remainingFarm.find((farmPlayer) => !usedFarmIds.has(farmPlayer.id) && farmPlayer.isPitcher === activePlayer.isPitcher);
+        const best = remainingFarm.find(
+          (farmPlayer) =>
+            !usedFarmIds.has(farmPlayer.id) && farmPlayer.isPitcher === activePlayer.isPitcher,
+        );
         if (!best) return;
         const diff = effectiveScore(best, true) - effectiveScore(activePlayer, false);
         if (diff < ROSTER_SWAP_SCORE_THRESHOLD) return;
-        recs.push({ type: 'swap', upPlayer: best, downPlayer: activePlayer, scoreDiff: Math.round(diff) });
+        recs.push({
+          type: 'swap',
+          upPlayer: best,
+          downPlayer: activePlayer,
+          scoreDiff: Math.round(diff),
+        });
         usedFarmIds.add(best.id);
         usedActiveIds.add(activePlayer.id);
       });
@@ -285,7 +359,7 @@ export function applyRosterRecs(team, recs) {
       const player = playersById.get(rec.downPlayer.id);
       if (player) {
         playersById.delete(player.id);
-        farmById.set(player.id, player);
+        farmById.set(player.id, { ...player, registrationCooldownDays: 10 });
       }
     }
     if ((rec.type === 'promote' || rec.type === 'swap') && rec.upPlayer) {
@@ -305,32 +379,48 @@ export function applyRosterRecs(team, recs) {
 }
 
 function ensureMinimumCatcherCount(team) {
-  const activeCatchers = (team.players || []).filter((player) => !player.isPitcher && player.pos === '隰仙｢鍋・');
+  const activeCatchers = (team.players || []).filter(
+    (player) => !player.isPitcher && player.pos === POS_CATCHER && (player.injuryDaysLeft ?? 0) === 0,
+  );
   if (activeCatchers.length >= MIN_ACTIVE_CATCHERS) return team;
 
   let nextTeam = team;
   const catcherFarm = (team.farm || [])
-    .filter((player) => !player.isPitcher && player.pos === '隰仙｢鍋・' && !player.髢ｧ・ｲ隰後・ && (player.injuryDaysLeft ?? 0) === 0 && (player.registrationCooldownDays ?? 0) === 0)
+    .filter(
+      (player) =>
+        !player.isPitcher
+        && player.pos === POS_CATCHER
+        && !isIkuseiPlayer(player)
+        && (player.injuryDaysLeft ?? 0) === 0
+        && (player.registrationCooldownDays ?? 0) === 0,
+    )
     .sort((a, b) => rosterRecScore(b) - rosterRecScore(a));
   const demoteCandidates = (team.players || [])
-    .filter((player) => player.pos !== '隰仙｢鍋・')
+    .filter((player) => !player.isPitcher && player.pos !== POS_CATCHER)
     .sort((a, b) => rosterRecScore(a) - rosterRecScore(b));
 
   let catcherIndex = 0;
   let demoteIndex = 0;
-  while ((nextTeam.players || []).filter((player) => !player.isPitcher && player.pos === '隰仙｢鍋・').length < MIN_ACTIVE_CATCHERS) {
+  while (
+    (nextTeam.players || []).filter(
+      (player) => !player.isPitcher && player.pos === POS_CATCHER && (player.injuryDaysLeft ?? 0) === 0,
+    ).length < MIN_ACTIVE_CATCHERS
+  ) {
     const promoteTarget = catcherFarm[catcherIndex];
     const demoteTarget = demoteCandidates[demoteIndex];
     if (!promoteTarget || !demoteTarget) break;
-    nextTeam = applyRosterRecs(nextTeam, [{
-      type: 'swap',
-      upPlayer: promoteTarget,
-      downPlayer: demoteTarget,
-      scoreDiff: 0,
-    }]);
+    nextTeam = applyRosterRecs(nextTeam, [
+      {
+        type: 'swap',
+        upPlayer: promoteTarget,
+        downPlayer: demoteTarget,
+        scoreDiff: 0,
+      },
+    ]);
     catcherIndex += 1;
     demoteIndex += 1;
   }
+
   return nextTeam;
 }
 
@@ -342,6 +432,8 @@ export function optimizeTeamForGameStart(team, options = {}) {
   nextTeam = buildAutoManagedRoster(nextTeam, options);
   return {
     ...nextTeam,
-    lineup: (getRosterDhMode(nextTeam, options.rosterDhMode) ? nextTeam.lineupDh : nextTeam.lineupNoDh).slice(),
+    lineup: (
+      getRosterDhMode(nextTeam, options.rosterDhMode) ? nextTeam.lineupDh : nextTeam.lineupNoDh
+    ).slice(),
   };
 }
