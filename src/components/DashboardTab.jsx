@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { fmtM, gameDayToDate } from '../utils';
-import { getMyMatchup } from '../engine/scheduleGen';
+import { getMyMatchup } from '../engine/scheduleLookup';
 import { MAX_ROSTER } from '../constants';
 import { TodayGameCard, RecommendationCard, TeamConditionCard, DashboardKpiGrid, FeaturedPlayersCard } from './dashboard/ManagerDashboardCards';
 
@@ -24,6 +24,7 @@ export function DashboardTab({ myTeam, teams, schedule, gameDay, recentResults, 
     if (!matchup) return null;
     const opponent = teams.find(t => t.id === matchup.oppId);
     const date = gameDayToDate(gameDay + 1, schedule);
+    if (!opponent || !date) return null;
     return { opponent, isHome: matchup.isHome, date, isInterleague: matchup.isInterleague };
   }, [schedule, gameDay, myTeam, teams]);
 
@@ -49,10 +50,11 @@ export function DashboardTab({ myTeam, teams, schedule, gameDay, recentResults, 
   const runDiff = (myTeam.rf ?? 0) - (myTeam.ra ?? 0);
   const recentWins = recentResults.filter(r => r.won).length;
   const recentLosses = recentResults.filter(r => !r.won && !r.drew).length;
-  const rpg = (myTeam.rf ?? 0) / Math.max(1, myTeam.wins + myTeam.losses);
-  const rapg = (myTeam.ra ?? 0) / Math.max(1, myTeam.wins + myTeam.losses);
+  const rpg = Number((myTeam.rf ?? 0) / Math.max(1, myTeam.wins + myTeam.losses)) || 0;
+  const rapg = Number((myTeam.ra ?? 0) / Math.max(1, myTeam.wins + myTeam.losses)) || 0;
 
-  const featuredPlayers = [...myTeam.players]
+  const featuredPlayers = [...(myTeam.players || [])]
+    .filter(Boolean)
     .sort((a, b) => (b.war ?? 0) - (a.war ?? 0))
     .slice(0, 3);
 

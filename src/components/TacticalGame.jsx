@@ -162,19 +162,16 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   const muLabel=mu>15?"⚡ 有利":mu>-15?"⚖️ 互角":"💀 不利";
   const muClass=mu>15?"mu-adv":mu>-15?"mu-even":"mu-dis";
 
-  const { inningScores, innings } = useMemo(() => {
-    const scores = {};
-    gs.inningSummary.forEach(s => {
-      if (!scores[s.inning]) scores[s.inning] = { top: "-", bot: "-" };
-      if (s.isTop) scores[s.inning].top = s.runs;
-      else scores[s.inning].bot = s.runs;
-    });
-    const maxInn = Math.max(9, gs.inning);
-    return { inningScores: scores, innings: Array.from({ length: maxInn }, (_, i) => i + 1) };
-  }, [gs.inningSummary, gs.inning]);
+  const inningScores = {};
+  gs.inningSummary.forEach(s => {
+    if (!inningScores[s.inning]) inningScores[s.inning] = { top: "-", bot: "-" };
+    if (s.isTop) inningScores[s.inning].top = s.runs;
+    else inningScores[s.inning].bot = s.runs;
+  });
+  const innings = Array.from({ length: Math.max(9, gs.inning) }, (_, i) => i + 1);
 
   const opFatigue=calcEffectiveFatigue(gs.opPitchCount,gs.opPitcher);
-  const lastPlay = useMemo(() => (gs.log.length > 0 ? gs.log[gs.log.length - 1] : null), [gs.log]);
+  const lastPlay = gs.log.length > 0 ? gs.log[gs.log.length - 1] : null;
   const safePhysicsMeta = (lastPlay && typeof lastPlay === "object" && !Array.isArray(lastPlay)) ? lastPlay.physicsMeta : null;
 
   return(

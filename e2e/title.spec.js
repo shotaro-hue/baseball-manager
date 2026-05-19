@@ -26,9 +26,9 @@ test.describe('タイトル画面', () => {
 
   test('チームを選択するとHUB画面に遷移する', async ({ page }) => {
     // 読売ジャイアンツを選択
-    await page.getByText('読売ジャイアンツ').click();
+    await page.getByRole('button', { name: '読売ジャイアンツ' }).click();
 
     // HUB画面のタブが表示されることを確認
-    await expect(page.getByText('🏠 概況')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('button', { name: '概況' })).toBeVisible({ timeout: 5000 });
   });
 });
