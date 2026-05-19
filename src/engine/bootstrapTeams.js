@@ -1,5 +1,6 @@
 import { buildTeam } from './playerCore';
 import { buildRealTeam } from './realplayer';
+import { optimizeTeamForGameStart } from './rosterAutomation';
 import { NPB2025_ROSTERS } from '../data/npb2025';
 import { TEAM_DEFS } from '../constants';
 
@@ -42,9 +43,10 @@ function slimTeamForState(team) {
 
 export function createInitialTeams() {
   return TEAM_DEFS.map((def) => {
-    const team = NPB2025_ROSTERS[def.id]
+    const rawTeam = NPB2025_ROSTERS[def.id]
       ? buildRealTeam(def, NPB2025_ROSTERS[def.id])
       : buildTeam(def);
+    const team = optimizeTeamForGameStart(rawTeam);
     const nonPitcherIds = (team.players || [])
       .filter((player) => !player.isPitcher)
       .map((player) => player.id);
