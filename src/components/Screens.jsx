@@ -3,7 +3,7 @@ import { TEAM_DEFS, ACCEPT_THRESHOLD, CPU_RENEWAL_ROUNDS,
   NEGOTIATION_MORALE_ACCEPT_BONUS, NEGOTIATION_MORALE_CUT_PENALTY,
   NEGOTIATION_MORALE_ROUND_HIT, NEGOTIATION_TRUST_HAPPY, NEGOTIATION_TRUST_HOLDOUT } from '../constants';
 import { fmtSal, fmtM, fmtAvg, clamp } from '../utils';
-import { calcRetireWill } from '../engine/player';
+import { calcRetireWill } from '../engine/playerCore';
 import { evalOffer, getFaThreshold } from '../engine/contract';
 import { saberBatter } from '../engine/sabermetrics';
 import { OV, CondBadge, HandBadge } from './ui';

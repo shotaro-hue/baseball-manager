@@ -1,6 +1,6 @@
 import { rng, clamp } from '../utils';
 import { POSITIONS, DRAFT_POOL_SIZE, PROSPECT_TYPE_WEIGHTS, PROSPECT_ENTRY_AGE, PROSPECT_READINESS_RANGE } from '../constants';
-import { makePlayer } from './player';
+import { makePlayer } from './playerCore';
 import { analyzeTeamNeeds } from './trade';
 
 /* ═══════════════════════════════════════════════

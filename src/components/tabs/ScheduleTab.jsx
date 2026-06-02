@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { gameDayToDate } from '../../utils';
-import { getMyMatchup } from '../../engine/scheduleGen';
+import { getMyMatchup } from '../../engine/scheduleLookup';
 import { SEASON_GAMES } from '../../constants';
 import { BoxScoreModal } from '../BoxScoreModal';
 
