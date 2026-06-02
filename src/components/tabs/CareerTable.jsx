@@ -2,8 +2,14 @@ import React, { useEffect, useState } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { fmtAvg, fmtIP } from '../../utils';
 import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
-import { emptyStats } from '../../engine/player';
-import { loadPlayerCareerLogById } from '../../engine/saveload';
+import { emptyStats } from '../../engine/playerCore';
+
+let careerSaveModulePromise = null;
+
+function loadCareerSaveModule() {
+  if (!careerSaveModulePromise) careerSaveModulePromise = import('../../engine/saveload');
+  return careerSaveModulePromise;
+}
 
 export function CareerTable({player}){
   const [mode,setMode]=useState("regular");
@@ -16,7 +22,8 @@ export function CareerTable({player}){
     const load=async()=>{
       setIsLoading(true);
       try{
-        const detailLog=await loadPlayerCareerLogById(String(player?.id||""));
+        const mod = await loadCareerSaveModule();
+        const detailLog=await mod.loadPlayerCareerLogById(String(player?.id||""));
         const fallbackRecentLog = Array.isArray(player?.recentCareerLog) ? player.recentCareerLog : [];
         const nextLog = Array.isArray(detailLog) && detailLog.length > 0 ? detailLog : fallbackRecentLog;
         if(alive) setLog(nextLog);
