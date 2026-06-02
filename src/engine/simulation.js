@@ -569,6 +569,20 @@ function makePitcherState(inning, isTop) {
   return { enteredInning: inning, enteredIsTop: isTop, enteredOuts: 0, battersFaced: 0 };
 }
 
+function isMyTeamBatting(gs) {
+  return gs?.isMyHome ? !gs.isTop : gs.isTop;
+}
+
+function isMyTeamDefending(gs) {
+  return !isMyTeamBatting(gs);
+}
+
+function getHomeAwayScores(gs) {
+  return gs?.isMyHome
+    ? { home: gs.score.my, away: gs.score.opp }
+    : { home: gs.score.opp, away: gs.score.my };
+}
+
 function scoreBullpenArm(pitcher, targetRole) {
   const stuff = ((pitcher?.pitching?.velocity ?? 50) + (pitcher?.pitching?.control ?? 50) * 1.2 + (pitcher?.pitching?.breaking ?? 50)) / 3.2;
   const stamina = pitcher?.pitching?.stamina ?? 50;
@@ -633,22 +647,24 @@ function pickBullpenArm(bullpen, targetRole, pattern = {}) {
  * @param {Object} oppTeam - 相手チームオブジェクト
  * @returns {Object} 初期ゲーム状態（inning / score / outs / bases / lineup / bullpen 等）
  */
-function initGameState(myTeam, oppTeam) {
+function initGameState(myTeam, oppTeam, options = {}) {
   const myL = myTeam.lineup.map(id => myTeam.players.find(p => p.id === id)).filter(Boolean);
   const opL = oppTeam.lineup.map(id => oppTeam.players.find(p => p.id === id)).filter(Boolean);
   const myStarter = myTeam.players.find(p => p.id === myTeam.rotation[myTeam.rotIdx % Math.max(myTeam.rotation.length,1)]) || myTeam.players.find(p => p.isPitcher);
   const opStarter = oppTeam.players.find(p => p.id === oppTeam.rotation[oppTeam.rotIdx % Math.max(oppTeam.rotation.length,1)]) || oppTeam.players.find(p => p.isPitcher);
-  const stadiumKey = TEAM_STADIUM[oppTeam.id] || 'tokyo_dome';
+  const isMyHome = options?.isMyHome !== false;
+  const stadiumKey = TEAM_STADIUM[(isMyHome ? myTeam.id : oppTeam.id)] || 'tokyo_dome';
 
   return {
+    isMyHome,
     inning: 1, isTop: true, score: { my: 0, opp: 0 },
     outs: 0, bases: [null,null,null], log: [], inningSummary: [],
     myLineup: [...myL], opLineup: [...opL],
     myBatIdx: 0, opBatIdx: 0,
     myPitcher: myStarter, opPitcher: opStarter,
     myPitchCount: 0, opPitchCount: 0,
-    myPitcherState: makePitcherState(1, true),
-    opPitcherState: makePitcherState(1, false),
+    myPitcherState: makePitcherState(1, !isMyHome),
+    opPitcherState: makePitcherState(1, isMyHome),
     myBullpen: sortBullpen(myTeam.players.filter(p => p.isPitcher && p.id !== myStarter?.id && !(new Set(myTeam.rotation || [])).has(p.id))),
     opBullpen: sortBullpen(oppTeam.players.filter(p => p.isPitcher && p.id !== opStarter?.id && !(new Set(oppTeam.rotation || [])).has(p.id))),
     myBench:   myTeam.players.filter(p => !p.isPitcher && !myTeam.lineup.includes(p.id)),
@@ -677,7 +693,7 @@ function initGameState(myTeam, oppTeam) {
 function processAtBat(gs, strategy = 'normal') {
   const plateAppearanceStart = isDevEnv ? performance.now() : 0;
   if (!gs.myLineup.length || !gs.opLineup.length) return gs; // STEP2安全弁: 空lineup guard
-  const isMyAtBat  = !gs.isTop;
+  const isMyAtBat  = isMyTeamBatting(gs);
   const batter     = isMyAtBat ? gs.myLineup[gs.myBatIdx % gs.myLineup.length] : gs.opLineup[gs.opBatIdx % gs.opLineup.length];
   const pitcher    = isMyAtBat ? gs.opPitcher : gs.myPitcher;
   const pitchCount = isMyAtBat ? gs.opPitchCount : gs.myPitchCount;
@@ -827,7 +843,7 @@ function processAtBat(gs, strategy = 'normal') {
     ? { ...(gs.opPitcherState || makePitcherState(gs.inning, gs.isTop)), battersFaced: (gs.opPitcherState?.battersFaced || 0) + 1 }
     : gs.opPitcherState;
 
-  const nextState = { ...gs, outs, bases:newBases, score:newScore, log:[...gs.log,logEntry], myBatIdx:isMyAtBat?gs.myBatIdx+1:gs.myBatIdx, opBatIdx:!isMyAtBat?gs.opBatIdx+1:gs.opBatIdx, myPitchCount:newMyPC, opPitchCount:newOpPC, myPitcherState:nextMyPitcherState, opPitcherState:nextOpPitcherState, momentum:newMomentum, myInningRuns:!gs.isTop?gs.myInningRuns+runs:gs.myInningRuns, opInningRuns:gs.isTop?gs.opInningRuns+runs:gs.opInningRuns, stopped:false, stopReason:null, pendingStrategy:'normal', liveStats:nextLiveStats };
+  const nextState = { ...gs, outs, bases:newBases, score:newScore, log:[...gs.log,logEntry], myBatIdx:isMyAtBat?gs.myBatIdx+1:gs.myBatIdx, opBatIdx:!isMyAtBat?gs.opBatIdx+1:gs.opBatIdx, myPitchCount:newMyPC, opPitchCount:newOpPC, myPitcherState:nextMyPitcherState, opPitcherState:nextOpPitcherState, momentum:newMomentum, myInningRuns:isMyAtBat?gs.myInningRuns+runs:gs.myInningRuns, opInningRuns:!isMyAtBat?gs.opInningRuns+runs:gs.opInningRuns, stopped:false, stopReason:null, pendingStrategy:'normal', liveStats:nextLiveStats };
   logPerf('simulatePlateAppearance', plateAppearanceStart);
   return nextState;
 }
@@ -876,29 +892,32 @@ function endHalfInning(gs) {
   const isTop      = gs.isTop;
   const newInn     = isTop ? gs.inning : gs.inning+1;
   const newSummary = [...gs.inningSummary, { inning:gs.inning, isTop, runs:isTop?gs.opInningRuns:gs.myInningRuns }];
-  if (!isTop && gs.inning===9 && gs.score.my>gs.score.opp) return { ...gs, inningSummary:newSummary, gameOver:true, outs:0, bases:[null,null,null] };
-  if (newInn>9  && gs.score.my!==gs.score.opp)             return { ...gs, inningSummary:newSummary, gameOver:true, outs:0, bases:[null,null,null] };
+  const { home: homeScore, away: awayScore } = getHomeAwayScores(gs);
+  if (isTop && gs.inning >= 9 && homeScore > awayScore)    return { ...gs, inningSummary:newSummary, gameOver:true, outs:0, bases:[null,null,null] };
+  if (!isTop && newInn>9  && homeScore!==awayScore)        return { ...gs, inningSummary:newSummary, gameOver:true, outs:0, bases:[null,null,null] };
   if (newInn>12)                                            return { ...gs, inningSummary:newSummary, gameOver:true, outs:0, bases:[null,null,null] };
   return { ...gs, inning:newInn, isTop:!isTop, outs:0, bases:[null,null,null], inningSummary:newSummary, myInningRuns:0, opInningRuns:0 };
 }
 
 function checkStopCondition(gs) {
+  const isMyDefending = isMyTeamDefending(gs);
+  const isMyBatting = !isMyDefending;
   const myEffFatigue = calcEffectiveFatigue(gs.myPitchCount, gs.myPitcher);
-  if (gs.isTop && (myEffFatigue >= FATIGUE_LIMIT || gs.myPitchCount >= PITCH_HARD_CAP))
+  if (isMyDefending && (myEffFatigue >= FATIGUE_LIMIT || gs.myPitchCount >= PITCH_HARD_CAP))
     return { reason:'pitcher_limit',           label:'🚨 投手交代必須',             priority:5, data:{ pitchCount:gs.myPitchCount, fatigue:myEffFatigue, pitcher:gs.myPitcher } };
-  if (gs.isTop && myEffFatigue >= FATIGUE_WARNING && gs.myBullpen.length>0)
+  if (isMyDefending && myEffFatigue >= FATIGUE_WARNING && gs.myBullpen.length>0)
     return { reason:'pitcher_tired',           label:'⚠️ 投手疲労警告',           priority:2, data:{ pitchCount:gs.myPitchCount, fatigue:myEffFatigue, pitcher:gs.myPitcher } };
-  if (gs.isTop && gs.outs===2 && (gs.bases[1]||gs.bases[2]) && gs.myBullpen.length>0)
+  if (isMyDefending && gs.outs===2 && (gs.bases[1]||gs.bases[2]) && gs.myBullpen.length>0)
     return { reason:'scoring_position_crisis', label:'🔴 得点圏ピンチ！',           priority:3, data:null };
   const myBehind = gs.score.opp-gs.score.my;
-  if (!gs.isTop && myBehind>=0 && myBehind<=2 && gs.bases.some(Boolean))
+  if (isMyBatting && myBehind>=0 && myBehind<=2 && gs.bases.some(Boolean))
     return { reason:'scoring_chance',          label:'🟡 チャンス！采配を指示',     priority:2, data:{ gap:myBehind } };
-  if (!gs.isTop && gs.inning>=7) {
+  if (isMyBatting && gs.inning>=7) {
     const nextBatter = gs.myLineup.length > 0 ? gs.myLineup[gs.myBatIdx % gs.myLineup.length] : null; // STEP2安全弁
     if (nextBatter?.batting?.contact<60 && gs.myBench.length>0)
       return { reason:'pinch_hit_chance',      label:'💡 代打のチャンス',           priority:1, data:{ batter:nextBatter } };
   }
-  if (gs.isTop && gs.inning>=8) {
+  if (isMyDefending && gs.inning>=8) {
     const diff=gs.score.my-gs.score.opp;
     // 本物の抑えがいる場合のみクローザー投入タイミングを通知する
     const closers=gs.myBullpen.filter(p=>p.subtype==='抑え');
@@ -1041,10 +1060,9 @@ function quickSimGame(myTeam, oppTeam, options = {}) {
   const includeLog = options?.includeLog !== false;
   const includePhysics = options?.includePhysics !== false;
   const includeCrossParkAnalysis = options?.includeCrossParkAnalysis !== false;
-  let gs = initGameState(myTeam, oppTeam);
+  let gs = initGameState(myTeam, oppTeam, { isMyHome: options?.isMyHome !== false });
   while (!gs.gameOver) {
-    if (gs.isTop) gs = autoSwapPitcher(gs, 'my');
-    else gs = autoSwapPitcher(gs, 'opp');
+    gs = autoSwapPitcher(gs, isMyTeamDefending(gs) ? 'my' : 'opp');
     gs = processAtBat(gs, 'normal');
     if (gs.outs >= 3) gs = endHalfInning(gs);
   }

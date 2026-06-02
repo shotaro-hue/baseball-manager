@@ -9,8 +9,8 @@ import PhysicsInsightPanel from './game/PhysicsInsightPanel';
 
 const VISIBLE_LOG_LIMIT = 80;
 
-export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
-  const [gs,setGs]=useState(()=>initGameState(myTeam,oppTeam));
+export function TacticalGameScreen({myTeam,oppTeam,isHome=true,onGameEnd}){
+  const [gs,setGs]=useState(()=>initGameState(myTeam,oppTeam,{ isMyHome:isHome }));
   const [autoRunning,setAutoRunning]=useState(false);
   const [selectedPH,setSelectedPH]=useState(null);
   const [selectedRP,setSelectedRP]=useState(null);
@@ -27,6 +27,8 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
     for (let i = start; i < safeLen; i += 1) ids.push(i);
     return ids;
   }, [gs.log]);
+  const isMyBatting = gs.isMyHome ? !gs.isTop : gs.isTop;
+  const isMyDefending = !isMyBatting;
 
   // Auto-scroll log
   useEffect(()=>{if(logRef.current) logRef.current.scrollTop=logRef.current.scrollHeight;},[visibleLogIds]);
@@ -80,7 +82,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   // 代打
   const sendPinchHitter=phId=>{
     const ph=gs.myBench.find(p=>p.id===phId);
-    if(!ph||gs.isTop) return;
+    if(!ph||!isMyBatting) return;
     const nextIdx=gs.myBatIdx%gs.myLineup.length;
     setGs(prev=>{
       const newLineup=[...prev.myLineup];
@@ -157,8 +159,8 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
   const curPitcher=gs.myPitcher;
   const fatigue=calcEffectiveFatigue(gs.myPitchCount,curPitcher);
   const fatigueColor=fatigue<40?"#34d399":fatigue<70?"#f5c842":"#f87171";
-  const nextBatter=!gs.isTop?gs.myLineup[gs.myBatIdx%Math.max(gs.myLineup.length,1)]:gs.opLineup[gs.opBatIdx%Math.max(gs.opLineup.length,1)];
-  const mu=matchupScore(!gs.isTop?nextBatter:null,gs.isTop?curPitcher:gs.opPitcher);
+  const nextBatter=isMyBatting?gs.myLineup[gs.myBatIdx%Math.max(gs.myLineup.length,1)]:gs.opLineup[gs.opBatIdx%Math.max(gs.opLineup.length,1)];
+  const mu=matchupScore(isMyBatting?nextBatter:null,isMyDefending?curPitcher:gs.opPitcher);
   const muLabel=mu>15?"⚡ 有利":mu>-15?"⚖️ 互角":"💀 不利";
   const muClass=mu>15?"mu-adv":mu>-15?"mu-even":"mu-dis";
 
@@ -238,10 +240,10 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
           )}
 
           {/* 攻守 + ダイヤモンド + アウト */}
-          <div className={`side-banner ${gs.isTop?"defending":"attacking"}`}>
-            <div style={{fontSize:32}}>{gs.isTop?"🛡️":"⚔️"}</div>
+          <div className={`side-banner ${isMyDefending?"defending":"attacking"}`}>
+            <div style={{fontSize:32}}>{isMyDefending?"🛡️":"⚔️"}</div>
             <div style={{flex:1}}>
-              <div className="side-banner-main">{gs.isTop?"守備中":"攻撃中"}</div>
+              <div className="side-banner-main">{isMyDefending?"守備中":"攻撃中"}</div>
               <div className="side-banner-sub">
                 {gs.bases.filter(Boolean).length>0?`${gs.bases.filter(Boolean).length}人の走者`:"走者なし"} ・ {gs.outs}アウト
                 {(gs.bases[1]||gs.bases[2])&&<span style={{color:"#f5c842",marginLeft:6}}>🔥 得点圏</span>}
@@ -295,7 +297,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
           {/* Matchup card — pitcher vs batter side-by-side */}
           <div className="card2" style={{margin:0}}>
             <div className="fsb" style={{marginBottom:8}}>
-              <span style={{fontSize:9,color:"var(--dim)",letterSpacing:".2em",textTransform:"uppercase"}}>{gs.isTop?"自投手 vs 相手打者":"相手投手 vs 自打者"}</span>
+              <span style={{fontSize:9,color:"var(--dim)",letterSpacing:".2em",textTransform:"uppercase"}}>{isMyDefending?"自投手 vs 相手打者":"相手投手 vs 自打者"}</span>
               <span className={`matchup-badge ${muClass}`}>{muLabel} ({mu>0?"+":""}{mu})</span>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:"var(--sp-1)",alignItems:"center"}}>
@@ -303,15 +305,15 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
               <div>
                 <div style={{fontSize:9,color:"var(--dim)",letterSpacing:".15em",marginBottom:3,textTransform:"uppercase"}}>投手</div>
                 <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>
-                  {gs.isTop?(curPitcher?.name||"—"):(gs.opPitcher?.name||"—")}
-                  <HandBadge p={gs.isTop?curPitcher:gs.opPitcher}/>
+                  {isMyDefending?(curPitcher?.name||"—"):(gs.opPitcher?.name||"—")}
+                  <HandBadge p={isMyDefending?curPitcher:gs.opPitcher}/>
                 </div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                  <span style={{fontSize:10}}>球速<OV v={(gs.isTop?curPitcher:gs.opPitcher)?.pitching?.velocity||0}/></span>
-                  <span style={{fontSize:10}}>制球<OV v={(gs.isTop?curPitcher:gs.opPitcher)?.pitching?.control||0}/></span>
+                  <span style={{fontSize:10}}>球速<OV v={(isMyDefending?curPitcher:gs.opPitcher)?.pitching?.velocity||0}/></span>
+                  <span style={{fontSize:10}}>制球<OV v={(isMyDefending?curPitcher:gs.opPitcher)?.pitching?.control||0}/></span>
                 </div>
                 <div style={{fontSize:9,color:"var(--dim)",marginTop:4}}>
-                  疲労 {gs.isTop?fatigue:opFatigue}%
+                  疲労 {isMyDefending?fatigue:opFatigue}%
                 </div>
               </div>
 
@@ -427,7 +429,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
               <div style={{fontSize:10,color:"#374151",marginBottom:8}}>次打者: <span style={{color:"#f5c842"}}>{nextBatter?.name}</span>（ミート:{nextBatter?.batting?.contact}）と交代</div>
               {gs.myBench.length===0&&<p style={{color:"#374151",fontSize:12}}>ベンチに選手がいません</p>}
               {gs.myBench.map(p=>{
-                const mu2=matchupScore(p,gs.isTop?curPitcher:gs.opPitcher);
+                const mu2=matchupScore(p,isMyDefending?curPitcher:gs.opPitcher);
                 return(
                   <div key={p.id} className="card2" style={{cursor:"pointer"}} onClick={()=>setSelectedPH(p.id)}>
                     <div className="fsb">
@@ -490,7 +492,7 @@ export function TacticalGameScreen({myTeam,oppTeam,onGameEnd}){
           <>
             <button className="btn btn-green" onClick={resume}>▶ 続行</button>
             <button className="btn btn-gold" onClick={()=>setShowMenu(m=>m==="pitcher"?null:"pitcher")} disabled={gs.myBullpen.length===0} style={{opacity:gs.myBullpen.length===0?0.4:1}}>🔄 投手交代</button>
-            <button className="btn" style={{background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.2)",color:"#60a5fa",opacity:gs.isTop||gs.myBench.length===0?0.4:1}} onClick={()=>setShowMenu(m=>m==="pinch"?null:"pinch")} disabled={gs.isTop||gs.myBench.length===0}>👤 代打</button>
+            <button className="btn" style={{background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.2)",color:"#60a5fa",opacity:!isMyBatting||gs.myBench.length===0?0.4:1}} onClick={()=>setShowMenu(m=>m==="pinch"?null:"pinch")} disabled={!isMyBatting||gs.myBench.length===0}>👤 代打</button>
             <button className="btn" style={{background:"rgba(167,139,250,.1)",border:"1px solid rgba(167,139,250,.2)",color:"#a78bfa"}} onClick={()=>setShowMenu(m=>m==="strategy"?null:"strategy")}>🎯 作戦</button>
           </>
         )}

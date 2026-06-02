@@ -341,7 +341,7 @@ function tryCpuCpuDeadlineTradeSingleDay(teams, snapshot) {
   };
 }
 
-function updateTeamAfterGame(team, result, isMyPerspective, won, drew, gameDay, year) {
+function updateTeamAfterGame(team, result, isMyPerspective, won, drew, gameDay, year, isHomeTeam = isMyPerspective) {
   let updated = {
     ...team,
     wins: team.wins + (won ? 1 : 0),
@@ -352,7 +352,7 @@ function updateTeamAfterGame(team, result, isMyPerspective, won, drew, gameDay, 
     rotIdx: isMyPerspective ? team.rotIdx + 1 : team.rotIdx,
   };
   updated.players = applyGameStatsFromLog(updated.players, result.log || [], isMyPerspective, won, gameDay);
-  updated.players = applyPostGameCondition(updated.players, result.log || [], isMyPerspective, gameDay);
+  updated.players = applyPostGameCondition(updated.players, result.log || [], isMyPerspective, gameDay, isHomeTeam);
   updated.players = tickInjuries(updated.players);
   if (isMyPerspective) {
     updated.players = tickPositionTraining(updated.players);
@@ -409,10 +409,11 @@ export function simulateSingleDay({ snapshot, gameContext, isCancelled, onProgre
   ensureNotCancelled(isCancelled);
 
   const useDh = !!gameContext?.useDh;
+  const isHome = gameContext?.isHome !== false;
   const userGameResult = quickSimGame(
     applyDhToTeam(myTeam, useDh),
     applyDhToTeam(currentOpp, useDh),
-    { simulationMode: gameContext?.simulationMode || 'detailed' },
+    { simulationMode: gameContext?.simulationMode || 'detailed', isMyHome: isHome },
   );
   const won = userGameResult.score.my > userGameResult.score.opp;
   const drew = userGameResult.score.my === userGameResult.score.opp;
@@ -424,8 +425,8 @@ export function simulateSingleDay({ snapshot, gameContext, isCancelled, onProgre
   }));
   const myTeamIndex = nextTeams.findIndex((team) => team.id === safeSnapshot.myId);
   const oppTeamIndex = nextTeams.findIndex((team) => team.id === currentOpp.id);
-  const myUpdate = updateTeamAfterGame(nextTeams[myTeamIndex], userGameResult, true, won, drew, safeSnapshot.gameDay, safeSnapshot.year);
-  const oppUpdate = updateTeamAfterGame(nextTeams[oppTeamIndex], userGameResult, false, !won && !drew, drew, safeSnapshot.gameDay, safeSnapshot.year);
+  const myUpdate = updateTeamAfterGame(nextTeams[myTeamIndex], userGameResult, true, won, drew, safeSnapshot.gameDay, safeSnapshot.year, isHome);
+  const oppUpdate = updateTeamAfterGame(nextTeams[oppTeamIndex], userGameResult, false, !won && !drew, drew, safeSnapshot.gameDay, safeSnapshot.year, !isHome);
   nextTeams[myTeamIndex] = myUpdate.team;
   nextTeams[oppTeamIndex] = oppUpdate.team;
 
@@ -449,14 +450,21 @@ export function simulateSingleDay({ snapshot, gameContext, isCancelled, onProgre
   const myBoxScore = computeBoxScore(
     userGameResult.log || [],
     userGameResult.inningSummary || [],
-    myTeam.players,
-    currentOpp.players,
-    userGameResult.score.my,
-    userGameResult.score.opp,
+    isHome ? myTeam.players : currentOpp.players,
+    isHome ? currentOpp.players : myTeam.players,
+    isHome ? userGameResult.score.my : userGameResult.score.opp,
+    isHome ? userGameResult.score.opp : userGameResult.score.my,
   );
+  const homePerspectiveUserResult = isHome
+    ? userGameResult
+    : {
+        ...userGameResult,
+        won: userGameResult.score.opp > userGameResult.score.my,
+        score: { my: userGameResult.score.opp, opp: userGameResult.score.my },
+      };
   mergeAllTeamResultPatches(
     allTeamResultsPatch,
-    buildAllTeamResultEntry(safeSnapshot.myId, currentOpp.id, userGameResult, myBoxScore, myTeam.name, currentOpp.name, safeSnapshot.gameDay),
+    buildAllTeamResultEntry(isHome ? safeSnapshot.myId : currentOpp.id, isHome ? currentOpp.id : safeSnapshot.myId, homePerspectiveUserResult, myBoxScore, isHome ? myTeam.name : currentOpp.name, isHome ? currentOpp.name : myTeam.name, safeSnapshot.gameDay),
   );
 
   for (const matchup of matchupList) {

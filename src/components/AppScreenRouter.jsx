@@ -209,6 +209,7 @@ export default function AppScreenRouter({ app }) {
             <TacticalGameScreen
               myTeam={myTeam}
               oppTeam={sf.currentOpp}
+              isHome={sf.currentGameTeams?.isHome ?? true}
               onGameEnd={sf.handleTacticalGameEnd}
             />
           </ErrorBoundary>
