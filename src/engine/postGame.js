@@ -1,6 +1,6 @@
 import { r2, clamp } from '../utils';
 import { IS_HIT, IS_OUT } from '../constants';
-import { emptyStats } from './player';
+import { emptyStats } from './playerCore';
 
 const getBattedBallType = (e) => {
   if (!e || !['out', 'sf'].includes(e.result)) return null;
@@ -242,6 +242,27 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0) 
   const sprayChartGenerationStart = isDevEnv ? performance.now() : 0;
   const myAtBats = log.filter((e) => e.scorer === isMyTeam && e.batId && e.result && e.result !== "change");
   const myPitchABs = log.filter((e) => e.scorer === !isMyTeam && e.pitcherId && e.result && e.result !== "change" && !e.isStolenBase);
+  const batterEventsById = new Map();
+  const runsByPlayerId = new Map();
+  let myRuns = 0;
+  let oppRuns = 0;
+
+  myAtBats.forEach((e) => {
+    if (!batterEventsById.has(e.batId)) batterEventsById.set(e.batId, []);
+    batterEventsById.get(e.batId).push(e);
+  });
+
+  log.forEach((e) => {
+    if (!e?.isStolenBase) {
+      if (e.scorer === isMyTeam) myRuns += e.rbi || 0;
+      else oppRuns += e.rbi || 0;
+    }
+    if (e.scorer !== isMyTeam || !Array.isArray(e.scorers)) return;
+    e.scorers.forEach((playerId) => {
+      if (!playerId) return;
+      runsByPlayerId.set(playerId, (runsByPlayerId.get(playerId) || 0) + 1);
+    });
+  });
 
   const pitcherMap = {};
   myPitchABs.forEach((e) => {
@@ -270,7 +291,7 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0) 
 
   const updated = players.map((p) => {
     const pm = pitcherMap[p.id];
-    const allMyEvents = log.filter((e) => e.scorer === isMyTeam && e.batId === p.id && e.result && e.result !== "change");
+    const allMyEvents = batterEventsById.get(p.id) || [];
     if (!allMyEvents.length && !pm) return p;
     const s = { ...emptyStats(), ...p.stats }; // STEP3安全弁: stats未初期化対策
     const baseSprayPoints = Array.isArray(s.sprayPoints) ? s.sprayPoints : [];
@@ -433,11 +454,11 @@ function countConsecutiveGames(days, currentDay) {
 }
 
 // 試合後コンディション更新（③ 連投疲労を含む）
-export function applyPostGameCondition(players, log, isMyTeam, gameDay) {
+export function applyPostGameCondition(players, log, isMyTeam, gameDay, isHomeTeam = isMyTeam) {
   const pitchCountMap = {};
   log.forEach((e) => {
     if (!e.pitcherId || e.isStolenBase) return;
-    const isPitcherOfMyTeam = isMyTeam ? (e.isTop === true) : (e.isTop === false);
+    const isPitcherOfMyTeam = isHomeTeam ? (e.isTop === true) : (e.isTop === false);
     if (!isPitcherOfMyTeam) return;
     pitchCountMap[e.pitcherId] = (pitchCountMap[e.pitcherId] || 0) + (e.pitches || 0);
   });

@@ -4,6 +4,7 @@ import {
   calcFatigue,
   matchupScore,
   initGameState,
+  endHalfInning,
   _applyLogEntryToLiveStats_TEST,
   _createLiveStats_TEST,
   _generateContactEVLA_TEST,
@@ -205,6 +206,51 @@ describe('initGameState — rotation 空時のフォールバック', () => {
 
     expect(gs.myPitcher).toBeDefined();
     expect(gs.myPitcher.id).toBe('rp1');
+  });
+});
+
+describe('home and away handling', () => {
+  it('stores away-team context when isMyHome is false', () => {
+    const team = {
+      id: 'my',
+      lineup: ['b1'],
+      rotation: ['p1'],
+      rotIdx: 0,
+      players: [
+        { id: 'b1', name: 'Batter', isPitcher: false, batting: { contact: 50, power: 50, eye: 50 } },
+        { id: 'p1', name: 'Pitcher', isPitcher: true, pitching: { velocity: 50, control: 50, breaking: 50 } },
+      ],
+    };
+    const opp = {
+      id: 'opp',
+      lineup: ['ob1'],
+      rotation: ['op1'],
+      rotIdx: 0,
+      players: [
+        { id: 'ob1', name: 'Opp Batter', isPitcher: false, batting: { contact: 50, power: 50, eye: 50 } },
+        { id: 'op1', name: 'Opp Pitcher', isPitcher: true, pitching: { velocity: 50, control: 50, breaking: 50 } },
+      ],
+    };
+
+    const gs = initGameState(team, opp, { isMyHome: false });
+
+    expect(gs.isMyHome).toBe(false);
+  });
+
+  it('ends after the top of the 9th when the home team leads', () => {
+    const next = endHalfInning({
+      isMyHome: false,
+      inning: 9,
+      isTop: true,
+      score: { my: 2, opp: 4 },
+      outs: 3,
+      bases: [null, null, null],
+      inningSummary: [],
+      myInningRuns: 0,
+      opInningRuns: 0,
+    });
+
+    expect(next.gameOver).toBe(true);
   });
 });
 
