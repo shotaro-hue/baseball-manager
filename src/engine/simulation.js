@@ -891,7 +891,10 @@ function applyLogEntryToLiveStats(liveStats, entry) {
 function endHalfInning(gs) {
   const isTop      = gs.isTop;
   const newInn     = isTop ? gs.inning : gs.inning+1;
-  const newSummary = [...gs.inningSummary, { inning:gs.inning, isTop, runs:isTop?gs.opInningRuns:gs.myInningRuns }];
+  const halfInningRuns = isTop
+    ? (gs.isMyHome ? gs.opInningRuns : gs.myInningRuns)
+    : (gs.isMyHome ? gs.myInningRuns : gs.opInningRuns);
+  const newSummary = [...gs.inningSummary, { inning:gs.inning, isTop, runs:halfInningRuns }];
   const { home: homeScore, away: awayScore } = getHomeAwayScores(gs);
   if (isTop && gs.inning >= 9 && homeScore > awayScore)    return { ...gs, inningSummary:newSummary, gameOver:true, outs:0, bases:[null,null,null] };
   if (!isTop && newInn>9  && homeScore!==awayScore)        return { ...gs, inningSummary:newSummary, gameOver:true, outs:0, bases:[null,null,null] };

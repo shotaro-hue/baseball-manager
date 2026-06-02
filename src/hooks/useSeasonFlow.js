@@ -1522,7 +1522,22 @@ export function useSeasonFlow(gs) {
         for(const{matchup,cr,homeTeam,awayTeam}of tCpuSimResults){
           recordGame(matchup.homeId,matchup.awayId,cr,homeTeam.players,awayTeam.players,homeTeam.name,awayTeam.name);
         }
-        recordGame(myId,_tOppId,gsResult,myTeam.players,currentOpp.players,myTeam.name,currentOpp.name);
+        const homePerspectiveGameResult = isHome
+          ? gsResult
+          : {
+              ...gsResult,
+              won: gsResult.score.opp > gsResult.score.my,
+              score: { my: gsResult.score.opp, opp: gsResult.score.my },
+            };
+        recordGame(
+          isHome ? myId : _tOppId,
+          isHome ? _tOppId : myId,
+          homePerspectiveGameResult,
+          isHome ? myTeam.players : currentOpp.players,
+          isHome ? currentOpp.players : myTeam.players,
+          isHome ? myTeam.name : currentOpp.name,
+          isHome ? currentOpp.name : myTeam.name,
+        );
         return next;
       } catch (error) {
         console.error("[TacticalPostGame] failed to build all-team results", error);

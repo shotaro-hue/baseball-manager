@@ -252,6 +252,22 @@ describe('home and away handling', () => {
 
     expect(next.gameOver).toBe(true);
   });
+
+  it('records top-half runs from the away team when my team is the visitor', () => {
+    const next = endHalfInning({
+      isMyHome: false,
+      inning: 3,
+      isTop: true,
+      score: { my: 2, opp: 1 },
+      outs: 3,
+      bases: [null, null, null],
+      inningSummary: [],
+      myInningRuns: 2,
+      opInningRuns: 0,
+    });
+
+    expect(next.inningSummary).toEqual([{ inning: 3, isTop: true, runs: 2 }]);
+  });
 });
 
 describe('generateContactEVLA', () => {

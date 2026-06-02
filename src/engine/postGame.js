@@ -356,10 +356,7 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0) 
       if (e.ev > 0 && e.la !== undefined) { s.laSum += e.la; s.laN++; }
     });
 
-    // 得点（R）: scorersに自分のIDが含まれるイベントをカウント
-    log.forEach((e) => {
-      if (e.scorer === isMyTeam && e.scorers?.includes(p.id)) s.R++;
-    });
+    s.R += runsByPlayerId.get(p.id) || 0;
 
     if (pm) {
       const ip = pm.outs / 3;
@@ -380,9 +377,6 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0) 
     const closerId  = pitcherOrder[pitcherOrder.length - 1];
     const isMulti   = pitcherOrder.length >= 2;
 
-    // 総得点を集計してセーブ状況を判定
-    const myRuns  = log.filter(e => !e.isStolenBase && e.scorer === isMyTeam).reduce((s,e) => s+(e.rbi||0), 0);
-    const oppRuns = log.filter(e => !e.isStolenBase && e.scorer !== isMyTeam).reduce((s,e) => s+(e.rbi||0), 0);
     const finalLead = myRuns - oppRuns; // 正: 自チームがリード
     const saveSit   = won && finalLead >= 1 && finalLead <= 3; // セーブ状況
 
