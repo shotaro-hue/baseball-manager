@@ -998,15 +998,22 @@ export function simulateSeasonBatch({
     const myTeam = teamMap.get(state.myId);
     if (scheduleMatchup && opp && myTeam) {
       const useDh = scheduleMatchup.isHome ? !!myTeam.dhEnabled : !!opp.dhEnabled;
-      const sim = quickSimGame(applyDhToTeam(myTeam, useDh), applyDhToTeam(opp, useDh));
+      const sim = quickSimGame(applyDhToTeam(myTeam, useDh), applyDhToTeam(opp, useDh), { isMyHome: scheduleMatchup.isHome });
+      const homePerspectiveSim = scheduleMatchup.isHome
+        ? sim
+        : {
+            ...sim,
+            won: sim.score.opp > sim.score.my,
+            score: { my: sim.score.opp, opp: sim.score.my },
+          };
       batchBoxScores.push(makeCompactBoxScoreRecord({
-        homeId: myTeam.id,
-        awayId: opp.id,
+        homeId: scheduleMatchup.isHome ? myTeam.id : opp.id,
+        awayId: scheduleMatchup.isHome ? opp.id : myTeam.id,
         dayNo: newDay,
-        cr: sim,
+        cr: homePerspectiveSim,
         bs: null,
-        homeName: myTeam.name,
-        awayName: opp.name,
+        homeName: scheduleMatchup.isHome ? myTeam.name : opp.name,
+        awayName: scheduleMatchup.isHome ? opp.name : myTeam.name,
       }));
       if (batchBoxScores.length > MAX_BATCH_BOX_SCORE_KEEP) {
         batchBoxScores.splice(0, batchBoxScores.length - MAX_BATCH_BOX_SCORE_KEEP);
@@ -1030,7 +1037,7 @@ export function simulateSeasonBatch({
       Object.assign(myTeam, applyPopularityDelta(myTeam, won, drew));
       myTeam.rotIdx = (myTeam.rotIdx || 0) + 1;
       myTeam.players = applyGameStatsFromLog(myTeam.players, sim.log || [], true, won, newDay);
-      myTeam.players = applyPostGameCondition(myTeam.players, sim.log || [], true, newDay);
+      myTeam.players = applyPostGameCondition(myTeam.players, sim.log || [], true, newDay, scheduleMatchup.isHome);
       myTeam.players = tickInjuries(myTeam.players);
       myTeam.players = tickPositionTraining(myTeam.players);
       myTeam.players = myTeam.players.map((player) => ({ ...player, daysOnActiveRoster: (player.daysOnActiveRoster ?? 0) + 1 }));
@@ -1073,7 +1080,7 @@ export function simulateSeasonBatch({
         }
         Object.assign(oppTeam, applyPopularityDelta(oppTeam, !won && !drew, drew));
         oppTeam.players = applyGameStatsFromLog(oppTeam.players, sim.log || [], false, !won && !drew, newDay);
-        oppTeam.players = applyPostGameCondition(oppTeam.players, sim.log || [], false, newDay);
+        oppTeam.players = applyPostGameCondition(oppTeam.players, sim.log || [], false, newDay, !scheduleMatchup.isHome);
         oppTeam.players = tickInjuries(oppTeam.players);
         oppTeam.players = applyInjuriesToPlayers(oppTeam.players, checkForInjuries(oppTeam.players, state.year), state.year);
         oppTeam.rotIdx = (oppTeam.rotIdx || 0) + 1;
