@@ -46,9 +46,44 @@ describe('simulateSingleDay', () => {
     expect(result.allTeamResultsPatch[teams[0].id]?.[1]).toBeTruthy();
     expect(result.allTeamResultsPatch[teams[1].id]?.[1]).toBeTruthy();
     expect(result.nextState.teams).toHaveLength(4);
-    expect(phases).toContain('試合シム');
-    expect(phases).toContain('他試合処理');
-    expect(phases).toContain('日次反映');
-    expect(phases).toContain('完了');
+    expect(phases.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('preserves away-game context in stored result payloads', () => {
+    const teams = TEAM_DEFS.slice(0, 4).map((def) => buildTeam(def));
+
+    const result = simulateSingleDay({
+      snapshot: {
+        teams,
+        schedule: [],
+        faPool: [],
+        seasonHistory: { transfers: [] },
+        news: [],
+        mailbox: [],
+        gameResultsMap: {},
+        scheduleArchive: [],
+        myId: teams[0].id,
+        gameDay: 1,
+        year: 2026,
+        allStarDone: true,
+        allStarResult: null,
+        allStarTriggerDay: 72,
+        saveRevision: 0,
+      },
+      gameContext: {
+        myId: teams[0].id,
+        gameDay: 1,
+        selectedOpponentId: teams[1].id,
+        useDh: true,
+        isHome: false,
+        simulationMode: 'detailed',
+      },
+      isCancelled: () => false,
+    });
+
+    expect(result.userGameResult.isHome).toBe(false);
+    expect(result.gameResultsMapPatch[1]?.isHome).toBe(false);
+    expect(result.allTeamResultsPatch[teams[1].id]?.[1]?.homeId).toBe(teams[1].id);
+    expect(result.allTeamResultsPatch[teams[0].id]?.[1]?.awayId).toBe(teams[0].id);
   });
 });

@@ -1075,7 +1075,7 @@ export function useSeasonFlow(gs) {
       }
       return next;
     });
-    setGameResult({score:r.score,won,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:currentOpp,gameNo:gameDay});
+    setGameResult({score:r.score,won,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:currentOpp,gameNo:gameDay,isHome});
     tryGenerateCpuOffer();
     const autoDate = gameDayToDate(gameDay, schedule);
     if (autoDate && autoDate.month === TRADE_DEADLINE_MONTH) {
@@ -1116,7 +1116,7 @@ export function useSeasonFlow(gs) {
     }
     const _adrew=r.score.my===r.score.opp;
     pushResult(won,_adrew,currentOpp?.name||"",r.score.my,r.score.opp,gameDay);
-    gs.pushGameResult(gameDay,{won,drew:_adrew,oppName:currentOpp?.name||"",myScore:r.score.my,oppScore:r.score.opp,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:currentOpp});
+    gs.pushGameResult(gameDay,{won,drew:_adrew,isHome,oppName:currentOpp?.name||"",myScore:r.score.my,oppScore:r.score.opp,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:currentOpp});
     setGameDay(d=>d+1);
     if(!allStarDone && gameDay+1===allStarTriggerDay){
       const rosters=allStarMod.selectAllStars(teams);
@@ -1544,7 +1544,7 @@ export function useSeasonFlow(gs) {
         return prev;
       }
     });
-    setGameResult(gsResult);
+    setGameResult({ ...gsResult, isHome });
     const _tmpl=won?NEWS_TEMPLATES_WIN:NEWS_TEMPLATES_LOSE;
     const _scoreStr=gsResult.score.my+"-"+gsResult.score.opp;
     const _hl=_tmpl[rng(0,_tmpl.length-1)].replace("{team}",myTeam?.name||"自チーム").replace("{opp}",currentOpp?.name||"相手").replace("{score}",_scoreStr);
@@ -1576,7 +1576,7 @@ export function useSeasonFlow(gs) {
       }
     }
     pushResult(won,drew,currentOpp?.name||"",gsResult.score.my,gsResult.score.opp,gameDay);
-    gs.pushGameResult(gameDay,{won,drew,oppName:currentOpp?.name||"",myScore:gsResult.score.my,oppScore:gsResult.score.opp,log:gsResult.log,inningSummary:gsResult.inningSummary,oppTeam:currentOpp});
+    gs.pushGameResult(gameDay,{won,drew,isHome,oppName:currentOpp?.name||"",myScore:gsResult.score.my,oppScore:gsResult.score.opp,log:gsResult.log,inningSummary:gsResult.inningSummary,oppTeam:currentOpp});
     setGameDay(d=>d+1);
     if(!allStarDone && gameDay+1===allStarTriggerDay){
       const rosters=allStarMod.selectAllStars(teams);
@@ -1602,7 +1602,7 @@ export function useSeasonFlow(gs) {
           source: "tactical_fallback",
         });
       }
-      setGameResult(gsResult);
+      setGameResult({ ...gsResult, isHome: currentGameTeams?.isHome ?? true });
       setScreen("result");
       notify("試合後処理でエラーが発生したため、一部の集計をスキップして結果画面へ遷移しました。", "warn");
     }

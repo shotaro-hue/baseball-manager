@@ -28,7 +28,7 @@ function buildBatchPerfHighlights(results) {
       };
     }
     for (const event of (result?.log || [])) {
-      if (event?.result === "hr" && event?.isTop === false) {
+      if (event?.result === "hr" && event?.scorer) {
         hrCounts[event.batter] = (hrCounts[event.batter] || 0) + 1;
       }
     }

@@ -167,11 +167,12 @@ function applyDhToTeam(team, useDh) {
   return { ...team, lineup: buildSimLineup(team, useDh) };
 }
 
-function buildGameResultsMapPatch(gameNo, result, oppTeam) {
+function buildGameResultsMapPatch(gameNo, result, oppTeam, isHome = true) {
   return {
     [gameNo]: {
       won: result.won,
       drew: result.score.my === result.score.opp,
+      isHome,
       oppName: oppTeam?.name || '',
       myScore: result.score.my,
       oppScore: result.score.opp,
@@ -446,7 +447,7 @@ export function simulateSingleDay({ snapshot, gameContext, isCancelled, onProgre
       })();
 
   const allTeamResultsPatch = {};
-  const gameResultsMapPatch = buildGameResultsMapPatch(safeSnapshot.gameDay, userGameResult, currentOpp);
+  const gameResultsMapPatch = buildGameResultsMapPatch(safeSnapshot.gameDay, userGameResult, currentOpp, isHome);
   const myBoxScore = computeBoxScore(
     userGameResult.log || [],
     userGameResult.inningSummary || [],
@@ -595,6 +596,7 @@ export function simulateSingleDay({ snapshot, gameContext, isCancelled, onProgre
       oppTeam: currentOpp,
       won,
       gameNo: safeSnapshot.gameDay,
+      isHome,
     },
     recentResultsPatch: [{
       won,

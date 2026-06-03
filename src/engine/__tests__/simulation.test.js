@@ -13,7 +13,7 @@ import {
   _resolveBattedBallOutcomeFromPhysics_TEST,
   _checkHomeRunByTrajectory_TEST,
 } from '../simulation';
-import { applyGameStatsFromLog } from '../postGame';
+import { applyGameStatsFromLog, computeBoxScore } from '../postGame';
 import { emptyStats } from '../player';
 import { PHYSICS_BAT } from '../../constants';
 
@@ -267,6 +267,32 @@ describe('home and away handling', () => {
     });
 
     expect(next.inningSummary).toEqual([{ inning: 3, isTop: true, runs: 2 }]);
+  });
+
+  it('builds home and away box scores from inning side rather than my/opp scorer flags', () => {
+    const homePlayers = [
+      { id: 'hb1', name: 'Home Batter', pos: 'CF' },
+      { id: 'hp1', name: 'Home Pitcher', pos: 'P' },
+    ];
+    const awayPlayers = [
+      { id: 'ab1', name: 'Away Batter', pos: 'LF' },
+      { id: 'ap1', name: 'Away Pitcher', pos: 'P' },
+    ];
+    const log = [
+      { inning: 1, isTop: true, scorer: true, batId: 'ab1', batter: 'Away Batter', pitcherId: 'hp1', result: 's', rbi: 1, outs: 0, bases: ['ab1', null, null] },
+      { inning: 1, isTop: false, scorer: false, batId: 'hb1', batter: 'Home Batter', pitcherId: 'ap1', result: 'k', rbi: 0, outs: 1, bases: [null, null, null] },
+    ];
+    const inningSummary = [
+      { inning: 1, isTop: true, runs: 1 },
+      { inning: 1, isTop: false, runs: 0 },
+    ];
+
+    const box = computeBoxScore(log, inningSummary, homePlayers, awayPlayers, 0, 1);
+
+    expect(box.homeBatting[0]).toMatchObject({ id: 'hb1', AB: 1, H: 0, K: 1 });
+    expect(box.awayBatting[0]).toMatchObject({ id: 'ab1', AB: 1, H: 1, RBI: 1 });
+    expect(box.homePitching[0]).toMatchObject({ id: 'hp1', H: 1, ER: 1 });
+    expect(box.awayPitching[0]).toMatchObject({ id: 'ap1', H: 0, K: 1 });
   });
 });
 

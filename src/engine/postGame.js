@@ -122,14 +122,12 @@ function buildBattedBallEvent(e, gameDay) {
 export function computeBoxScore(log, inningSummary, homeTeamPlayers, awayTeamPlayers, homeScore, awayScore) {
   if (!log || !log.length) return null;
 
-  // scorer=true → home team at bat (bottom of inning in sim)
-  // scorer=false → away team at bat (top of inning in sim)
   function computeBatting(players, isHomeBatting) {
-    const scorer = isHomeBatting; // home bats → scorer=true
+    const battingIsTop = !isHomeBatting;
     const map = {};
     const order = [];
     log.forEach(e => {
-      if (e.scorer !== scorer || !e.batId || e.isStolenBase || !e.result || e.result === 'change') return;
+      if (e.isTop !== battingIsTop || !e.batId || e.isStolenBase || !e.result || e.result === 'change') return;
       if (!map[e.batId]) { map[e.batId] = { AB: 0, H: 0, HR: 0, RBI: 0, BB: 0, K: 0, FO_LF: 0, FO_CF: 0, FO_RF: 0, GO: 0, LO: 0 }; order.push(e.batId); }
       const m = map[e.batId];
       const isBB  = e.result === 'bb';
@@ -153,10 +151,9 @@ export function computeBoxScore(log, inningSummary, homeTeamPlayers, awayTeamPla
   }
 
   function computePitching(players, isHomePitching, homeWon, drew) {
-    // home pitcher faces away batters → away bats → scorer=false
-    const batterScorer = !isHomePitching;
+    const batterIsTop = isHomePitching;
     const events = log.filter(e =>
-      e.scorer === batterScorer && e.pitcherId && !e.isStolenBase && e.result && e.result !== 'change'
+      e.isTop === batterIsTop && e.pitcherId && !e.isStolenBase && e.result && e.result !== 'change'
     );
     const map = {};
     const order = [];
@@ -180,18 +177,18 @@ export function computeBoxScore(log, inningSummary, homeTeamPlayers, awayTeamPla
     // 敗戦投手: 相手チームが最終的にリードを奪ったプレイの投手
     const losingPitcherId = (() => {
       if (teamWon || drew) return null;
-      let myScore = 0, oppScore = 0, losingId = null;
+      let teamScore = 0, oppScore = 0, losingId = null;
       for (const e of log) {
         if (!e.rbi || e.rbi <= 0 || e.isStolenBase) continue;
-        if (e.scorer !== batterScorer) {
+        if (e.isTop !== batterIsTop) {
           // 自チーム得点 → リード回復でリセット
-          myScore += e.rbi;
-          if (myScore >= oppScore) losingId = null;
+          teamScore += e.rbi;
+          if (teamScore >= oppScore) losingId = null;
         } else {
           // 相手得点 → 勝ち越しなら記録
           const prev = oppScore;
           oppScore += e.rbi;
-          if (oppScore > myScore && prev <= myScore) losingId = e.pitcherId ?? null;
+          if (oppScore > teamScore && prev <= teamScore) losingId = e.pitcherId ?? null;
         }
       }
       return losingId ?? starterId;

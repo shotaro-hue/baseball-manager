@@ -216,6 +216,7 @@ export default function HubContentRouter({ app, tab, onTabChange }) {
             inningSummary: result.inningSummary || [],
             oppTeam: result.oppTeam,
             won: result.won,
+            isHome: result.isHome,
             gameNo: dayNo,
             _source: 'schedule',
           });
