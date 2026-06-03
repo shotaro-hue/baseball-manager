@@ -22,6 +22,7 @@ export default function BatchResultRoute({
           inningSummary: detail.inningSummary || [],
           oppTeam: detail.oppTeam || result.oppTeam,
           won: detail.won,
+          isHome: detail.isHome,
           gameNo: result.gameNo,
           _source: 'batch',
         });

@@ -49,6 +49,7 @@ function buildResultScreenSummary(gsResult) {
   const safeResult = normalizeResult(gsResult);
   const won = safeResult.score.my > safeResult.score.opp;
   const drew = safeResult.score.my === safeResult.score.opp;
+  const isHome = safeResult.isHome !== false;
   const inningSummary = safeResult.inningSummary;
   const normalizedInnings = inningSummary
     .map((entry) => Number(entry?.inning))
@@ -65,8 +66,9 @@ function buildResultScreenSummary(gsResult) {
     if (!Number.isFinite(inning) || inning <= 0 || inning > boundedMaxInning) return;
     const runsRaw = Number(entry?.runs);
     const runs = Number.isFinite(runsRaw) ? Math.max(0, runsRaw) : 0;
-    if (entry?.isTop) oppRunsByInn[inning] = runs;
-    else myRunsByInn[inning] = runs;
+    const myIsBatting = isHome ? !entry?.isTop : !!entry?.isTop;
+    if (myIsBatting) myRunsByInn[inning] = runs;
+    else oppRunsByInn[inning] = runs;
   });
 
   return {

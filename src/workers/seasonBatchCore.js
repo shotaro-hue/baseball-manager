@@ -731,6 +731,7 @@ function buildGameResultsMapPatch(gameResults) {
     patch[result.gameNo] = {
       won: result.won,
       drew: result.score.my === result.score.opp,
+      isHome: result.isHome !== false,
       oppName: result.oppTeam?.name || '',
       myScore: result.score.my,
       oppScore: result.score.opp,
@@ -1091,7 +1092,7 @@ export function simulateSeasonBatch({
       myTeam.budget = (myTeam.budget ?? 0) + revenueTotal;
       myTeam.revenueThisSeason = (myTeam.revenueThisSeason ?? 0) + revenueTotal;
 
-      results.push({ ...sim, won, oppTeam: opp, gameNo: newDay });
+      results.push({ ...sim, won, oppTeam: opp, gameNo: newDay, isHome: scheduleMatchup.isHome });
 
       const templates = won ? NEWS_TEMPLATES_WIN : NEWS_TEMPLATES_LOSE;
       const scoreString = `${sim.score.my}-${sim.score.opp}`;
