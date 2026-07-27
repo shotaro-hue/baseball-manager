@@ -43,10 +43,11 @@ describe('optimizeTeamForGameStart', () => {
     });
   });
 
-  it('builds a UI-friendly full roster payload from the same shared logic', () => {
-    const optimized = buildAutoManagedRoster(makeOverfullTeam());
+  it('builds a UI-friendly payload without changing roster membership', () => {
+    const team = makeOverfullTeam();
+    const optimized = buildAutoManagedRoster(team);
 
-    expect(optimized.players).toHaveLength(MAX_ROSTER);
+    expect(optimized.players).toHaveLength(team.players.length);
     expect(optimized.lineupEntries).toHaveLength(optimized.rosterDhMode ? 9 : 8);
     expect(optimized.rotation.length).toBeGreaterThan(0);
     expect(optimized.rotation.length).toBeLessThanOrEqual(6);

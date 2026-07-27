@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('タイトル画面', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
   });
 
   test('ゲームタイトルが表示される', async ({ page }) => {
@@ -29,6 +29,6 @@ test.describe('タイトル画面', () => {
     await page.getByRole('button', { name: '読売ジャイアンツ' }).click();
 
     // HUB画面のタブが表示されることを確認
-    await expect(page.getByRole('button', { name: '概況' })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('button', { name: /ホーム/ })).toBeVisible({ timeout: 8000 });
   });
 });

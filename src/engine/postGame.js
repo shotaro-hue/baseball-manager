@@ -17,7 +17,9 @@ const getFieldZone = (e) => {
   return 'CF';
 };
 
-const MAX_BATTED_BALL_EVENTS = 500;
+// React state / save payload と同じ上限に揃える。
+// 500件の詳細物理データを全選手分保持すると、100試合バッチで数百MBまで膨らむ。
+const MAX_BATTED_BALL_EVENTS = 80;
 const SPRAY_CHART_MAX_DISTANCE = 150;
 const isDevEnv = import.meta.env.DEV;
 
@@ -38,8 +40,36 @@ function normalizeBattedBallCoordinate(rawValue, fallbackValue = 0) {
 }
 
 
-function sanitizeMetaObject(value) {
-  return value && typeof value === 'object' ? value : {};
+export function compactBattedBallEvent(event) {
+  if (!event || typeof event !== 'object') return null;
+  const warningReasons = Array.isArray(event.warningReasons)
+    ? event.warningReasons.filter((warning) => typeof warning === 'string').slice(0, 4)
+    : [];
+  const displayWarnings = Array.isArray(event.displayWarnings)
+    ? event.displayWarnings.filter((warning) => typeof warning === 'string').slice(0, 4)
+    : warningReasons;
+  return {
+    playerId: event.playerId,
+    gameDay: Number.isFinite(Number(event.gameDay)) ? Number(event.gameDay) : 0,
+    x: Number.isFinite(Number(event.x)) ? Number(event.x) : 0.5,
+    y: Number.isFinite(Number(event.y)) ? Number(event.y) : 0,
+    hitType: typeof event.hitType === 'string' ? event.hitType : 'out',
+    exitVelo: Number.isFinite(Number(event.exitVelo)) ? Number(event.exitVelo) : 0,
+    launchAngle: Number.isFinite(Number(event.launchAngle)) ? Number(event.launchAngle) : 0,
+    distance: Number.isFinite(Number(event.distance)) ? Number(event.distance) : 0,
+    sprayAngle: Number.isFinite(Number(event.sprayAngle)) ? Number(event.sprayAngle) : 45,
+    fenceDistance: Number.isFinite(Number(event.fenceDistance)) ? Number(event.fenceDistance) : 100,
+    fenceRatio: Number.isFinite(Number(event.fenceRatio))
+      ? Number(event.fenceRatio)
+      : (100 / SPRAY_CHART_MAX_DISTANCE),
+    isHrByTrajectory: Boolean(event.isHrByTrajectory),
+    hrClearance: event.hrClearance != null && Number.isFinite(Number(event.hrClearance))
+      ? Number(event.hrClearance)
+      : null,
+    isDisplayInconsistent: Boolean(event.isDisplayInconsistent) || warningReasons.length > 0,
+    warningReasons,
+    displayWarnings,
+  };
 }
 
 function mapHitTypeFromResult(result) {
@@ -81,7 +111,7 @@ function buildBattedBallEvent(e, gameDay) {
   if (isHomeRun && y + 0.02 < fenceRatio) warningReasons.push("HR打球がフェンス内側に表示されています");
   if (!isHomeRun && y - 0.02 > fenceRatio) warningReasons.push("非HR打球がフェンス外側に表示されています");
 
-  return {
+  return compactBattedBallEvent({
     playerId: e.batId,
     gameDay: Number.isFinite(gameDay) ? Number(gameDay) : 0,
     x,
@@ -97,14 +127,8 @@ function buildBattedBallEvent(e, gameDay) {
     hrClearance: safeHrClearance,
     isDisplayInconsistent: warningReasons.length > 0,
     warningReasons,
-    physics: sanitizeMetaObject(e?.physicsMeta?.physics),
-    park: sanitizeMetaObject(e?.physicsMeta?.park),
-    environment: sanitizeMetaObject(e?.physicsMeta?.environment),
-    crossPark: sanitizeMetaObject(e?.physicsMeta?.crossPark),
-    evaluation: sanitizeMetaObject(e?.physicsMeta?.evaluation),
-    commentary: sanitizeMetaObject(e?.physicsMeta?.commentary),
     displayWarnings: warningReasons,
-  };
+  });
 }
 
 /**
@@ -292,7 +316,12 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0) 
     if (!allMyEvents.length && !pm) return p;
     const s = { ...emptyStats(), ...p.stats }; // STEP3安全弁: stats未初期化対策
     const baseSprayPoints = Array.isArray(s.sprayPoints) ? s.sprayPoints : [];
-    const baseBattedBallEvents = Array.isArray(s.battedBallEvents) ? s.battedBallEvents : [];
+    const baseBattedBallEvents = Array.isArray(s.battedBallEvents)
+      ? s.battedBallEvents
+        .slice(-MAX_BATTED_BALL_EVENTS)
+        .map(compactBattedBallEvent)
+        .filter(Boolean)
+      : [];
     const newSprayPoints = [];
     const newBattedBallEvents = [];
 

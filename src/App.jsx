@@ -87,8 +87,8 @@ export default function App() {
       (saved.faPool?.length ?? 0) === 0 && saved.gameDay === 1;
     gs.setFaPool(shouldBackfillForeignFa ? openingForeignPool : saved.faPool || []);
     gs.setFaYears(saved.faYears || {});
-    gs.setSeasonHistory(
-      saved.seasonHistory || {
+    gs.hydrateLargeSaveData({
+      seasonHistory: saved.seasonHistory || {
         awards: [],
         records: {
           singleSeasonHR: null,
@@ -102,10 +102,11 @@ export default function App() {
         standingsHistory: [],
         transfers: [],
       },
-    );
-    gs.setNews(saved.news || []);
-    gs.setMailbox(saved.mailbox || []);
+      news: saved.news || [],
+      mailbox: saved.mailbox || [],
+    });
     gs.setSaveRevision(Number(saved.saveRevision) || 0);
+    gs.resetSaveTracking();
     gs.setCpuTradeOffers([]);
 
     sf.setPlayoff(null);

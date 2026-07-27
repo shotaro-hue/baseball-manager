@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
 
 async function selectTeamAndGoToHub(page, teamName = '読売ジャイアンツ') {
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.evaluate(() => localStorage.clear());
-  await page.reload();
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: teamName }).click();
-  await expect(page.getByRole('button', { name: '概況' })).toBeVisible({ timeout: 8000 });
+  await expect(page.getByRole('button', { name: /ホーム/ })).toBeVisible({ timeout: 8000 });
 }
 
 test.describe('HUB画面', () => {
@@ -22,9 +22,9 @@ test.describe('HUB画面', () => {
     await expect(page.getByText('打者成績')).toBeVisible({ timeout: 5000 });
   });
 
-  test('ロースタータブに選手テーブルが表示される', async ({ page }) => {
-    await page.getByRole('button', { name: '🧩 編成' }).click();
-    await page.getByRole('button', { name: 'ロースター' }).click();
+  test('ロスタータブに選手テーブルが表示される', async ({ page }) => {
+    await page.getByRole('button', { name: /編成/ }).click();
+    await page.getByRole('button', { name: 'ロスター' }).click();
 
     await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 5000 });
   });

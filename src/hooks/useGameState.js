@@ -1,5 +1,6 @@
 import { useState, useReducer, useMemo, useCallback, useEffect, useRef } from "react";
 import { gameStateReducer, G } from './gameStateReducer';
+import { createSaveDirtyTracker } from '../state/saveDirtyTracker';
 import { uid, clamp, rng, pname, scoutedValue, fmtSal } from '../utils';
 // Player helpers are loaded lazily to keep the initial title flow lighter.
 import { SEASON_PARAMS, getDefaultParams } from '../data/scheduleParams.js';
@@ -10,6 +11,7 @@ import {
   PRESS_CONFERENCE_INTERVAL,
   FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX,
 } from '../constants';
+import { compactBattedBallEvent } from '../engine/postGame';
 
 const STATE_RECENT_CAREER_LOG_YEARS = 3;
 const STATE_MAX_SPRAY_POINTS = 40;
@@ -29,7 +31,12 @@ function slimPlayerForState(player) {
     stats: {
       ...stats,
       sprayPoints: Array.isArray(stats.sprayPoints) ? stats.sprayPoints.slice(-STATE_MAX_SPRAY_POINTS) : [],
-      battedBallEvents: Array.isArray(stats.battedBallEvents) ? stats.battedBallEvents.slice(-STATE_MAX_BATTED_BALL_EVENTS) : [],
+      battedBallEvents: Array.isArray(stats.battedBallEvents)
+        ? stats.battedBallEvents
+          .slice(-STATE_MAX_BATTED_BALL_EVENTS)
+          .map(compactBattedBallEvent)
+          .filter(Boolean)
+        : [],
     },
   };
 }
@@ -110,7 +117,15 @@ export function useGameState() {
   const [retireRole, setRetireRole] = useState(null);
   const [gameState, dispatch] = useReducer(gameStateReducer, { teams: [], gameDay: 1, year: 2026, myId: null });
   const { teams, gameDay, year, myId } = gameState;
-  const markSaveDirty = useCallback(()=>{
+  const [saveDirty, setSaveDirty] = useState(false);
+  const [lastAutoSaveAt, setLastAutoSaveAt] = useState(0);
+  const [saveRevision, setSaveRevision] = useState(0);
+  const saveDirtyTrackerRef = useRef(null);
+  if (saveDirtyTrackerRef.current === null) {
+    saveDirtyTrackerRef.current = createSaveDirtyTracker();
+  }
+  const markSaveDirty = useCallback((scopes = [])=>{
+    saveDirtyTrackerRef.current.mark(scopes);
     setSaveRevision(prev=>prev+1);
     setSaveDirty(true);
   },[]);
@@ -122,11 +137,11 @@ export function useGameState() {
   const [faPool, setFaPool] = useState([]);
   const [faYears, setFaYears] = useState({});
   const [notif, setNotif] = useState(null);
-  const [seasonHistory, setSeasonHistory] = useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[],transfers:[]});
+  const [seasonHistory, setSeasonHistoryState] = useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[],transfers:[]});
   const [saveExists, setSaveExists] = useState(false);
   const [schedule, setSchedule] = useState(null);
-  const [news, setNews] = useState([]);
-  const [mailbox, setMailbox] = useState([]);
+  const [news, setNewsState] = useState([]);
+  const [mailbox, setMailboxState] = useState([]);
   const [recentResults, setRecentResults] = useState([]);
   const [gameResultsMap, setGameResultsMap] = useState({});
   const [scheduleArchive, setScheduleArchive] = useState([]); // 過去シーズン: [{year, schedule, gameResultsMap, myTeamResultsMap}]
@@ -137,14 +152,32 @@ export function useGameState() {
   const [allStarResult, setAllStarResult] = useState(null);
   const [allStarTriggerDay, setAllStarTriggerDay] = useState(72);
   const [isAutoSaveSuspended, setIsAutoSaveSuspended] = useState(false);
-  const [saveDirty, setSaveDirty] = useState(false);
-  const [lastAutoSaveAt, setLastAutoSaveAt] = useState(0);
-  const [saveRevision, setSaveRevision] = useState(0);
   const [saveQueueState, setSaveQueueState] = useState({ isSaving: false });
   const [persistentEnabled, setPersistentEnabled] = useState(false);
 
   const persistentStoreRef = useRef(null);
   const [persistentSummaries, setPersistentSummaries] = useState(EMPTY_PERSISTENT_SUMMARIES);
+  const setSeasonHistory = useCallback((nextValue) => {
+    setSeasonHistoryState(nextValue);
+    markSaveDirty(['seasonHistory']);
+  }, [markSaveDirty]);
+  const setNews = useCallback((nextValue) => {
+    setNewsState(nextValue);
+    markSaveDirty(['news']);
+  }, [markSaveDirty]);
+  const setMailbox = useCallback((nextValue) => {
+    setMailboxState(nextValue);
+    markSaveDirty(['mailbox']);
+  }, [markSaveDirty]);
+  const hydrateLargeSaveData = useCallback((nextValue = {}) => {
+    setSeasonHistoryState(nextValue.seasonHistory ?? {});
+    setNewsState(Array.isArray(nextValue.news) ? nextValue.news : []);
+    setMailboxState(Array.isArray(nextValue.mailbox) ? nextValue.mailbox : []);
+  }, []);
+  const resetSaveTracking = useCallback(() => {
+    saveDirtyTrackerRef.current.reset();
+    setSaveDirty(false);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -247,6 +280,19 @@ export function useGameState() {
         refreshSaveQueueState();
       });
   }, [refreshSaveQueueState]);
+  const beginTrackedSave = useCallback((extraOptions = {}) => {
+    const snapshot = saveDirtyTrackerRef.current.snapshot({ persistAll: !saveExists });
+    const options = { ...extraOptions };
+    if (Array.isArray(snapshot.dirtyScopes)) {
+      options.dirtyScopes = snapshot.dirtyScopes;
+    }
+    return { snapshot, options };
+  }, [saveExists]);
+  const completeTrackedSave = useCallback((snapshot) => {
+    const result = saveDirtyTrackerRef.current.complete(snapshot);
+    if (result.isCurrent) setSaveDirty(false);
+    return result;
+  }, []);
 
   // gameDay が進んだとき、記者会見インターバルを超えていれば会見イベントをセット
   useEffect(()=>{
@@ -319,8 +365,7 @@ export function useGameState() {
     setNews(prev=>{
       return [{id:uid(),timestamp:Date.now(),...article},...prev].slice(0,50);
     });
-    markSaveDirty();
-  },[markSaveDirty]);
+  },[setNews]);
 
   const addToHistory = useCallback((teamId,player,exitReason)=>{
     if(!player) return;
@@ -432,10 +477,21 @@ export function useGameState() {
     const now = Date.now();
     loadSaveModule().then((mod)=>{
       const intervalMs = mod.getAutoSaveIntervalMs();
-      if (lastAutoSaveAt > 0 && now - lastAutoSaveAt < intervalMs) return { ok: false, skipped: true };
-      return queueSave({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision});
-    }).then((result)=>{
-      if(result.ok){setSaveExists(true);setSaveDirty(false);setLastAutoSaveAt(now);notify('💾 オートセーブ','ok');}
+      if (lastAutoSaveAt > 0 && now - lastAutoSaveAt < intervalMs) {
+        return { result: { ok: false, skipped: true }, snapshot: null };
+      }
+      const request = beginTrackedSave();
+      return queueSave(
+        {teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision},
+        request.options,
+      ).then((result) => ({ result, snapshot: request.snapshot }));
+    }).then(({ result, snapshot })=>{
+      if(result.ok){
+        setSaveExists(true);
+        completeTrackedSave(snapshot);
+        setLastAutoSaveAt(now);
+        notify('💾 オートセーブ','ok');
+      }
     }).catch((error)=>{
       console.error('Auto save failed:', error);
     });
@@ -443,11 +499,18 @@ export function useGameState() {
   },[screen,isAutoSaveSuspended,saveDirty,lastAutoSaveAt,saveRevision,saveQueueState.isSaving]);
 
   const handleSave = useCallback(async ()=>{
-    const result=await queueSave({teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision});
-    if(result.ok){ setSaveExists(true); setSaveDirty(false); }
+    const request = beginTrackedSave();
+    const result=await queueSave(
+      {teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision},
+      request.options,
+    );
+    if(result.ok){
+      setSaveExists(true);
+      completeTrackedSave(request.snapshot);
+    }
     notify(result.ok?'💾 セーブしました':result.quota?'💾 ストレージ容量が不足しています':'セーブに失敗しました',result.ok?'ok':'warn');
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision,notify,queueSave]);
+  },[teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision,notify,queueSave,beginTrackedSave,completeTrackedSave]);
 
   const ensureInitialTeams = useCallback(async () => {
     if (teams.length === TEAM_DEFS.length) return teams;
@@ -817,6 +880,8 @@ export function useGameState() {
     getUnreadMailboxCount,
     getLatestNewsId,
     markSaveDirty,
+    hydrateLargeSaveData,
+    resetSaveTracking,
     // derived
     myTeam,
     tabBadges,
