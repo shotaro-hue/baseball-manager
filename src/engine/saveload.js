@@ -23,6 +23,7 @@ const IDB_STORES = {
   chunks: 'save_chunks',
   careerLogs: 'career_logs',
 };
+const INDEXED_DB_CHUNK_SCOPES = ['seasonHistory', 'news', 'mailbox'];
 
 const MAX_RECENT_CAREER_LOG_YEARS = 3;
 
@@ -505,26 +506,29 @@ async function idbRead(storeName, key) {
   });
 }
 
-function shouldPersistChunk(dirtyScopes, scopeName) {
-  if (!(dirtyScopes instanceof Set) || dirtyScopes.size === 0) return true;
-  return dirtyScopes.has(scopeName);
+export function resolveIndexedDbChunkScopes(dirtyScopes) {
+  if (!Array.isArray(dirtyScopes)) return [...INDEXED_DB_CHUNK_SCOPES];
+  const requested = new Set(dirtyScopes.filter((scope) => typeof scope === 'string' && scope));
+  return INDEXED_DB_CHUNK_SCOPES.filter((scope) => requested.has(scope));
 }
 
-async function persistLargeDataToIndexedDb(state, dirtyScopes = null) {
+async function persistLargeDataToIndexedDb(state, dirtyScopes) {
+  const scopes = resolveIndexedDbChunkScopes(dirtyScopes);
   const writes = [];
-  if (shouldPersistChunk(dirtyScopes, 'seasonHistory')) {
+  if (scopes.includes('seasonHistory')) {
     const seasonHistory = state?.seasonHistory ?? {};
     writes.push(idbWrite(IDB_STORES.chunks, 'seasonHistory', seasonHistory));
   }
-  if (shouldPersistChunk(dirtyScopes, 'news')) {
+  if (scopes.includes('news')) {
     const news = Array.isArray(state?.news) ? state.news : [];
     writes.push(idbWrite(IDB_STORES.chunks, 'news', news));
   }
-  if (shouldPersistChunk(dirtyScopes, 'mailbox')) {
+  if (scopes.includes('mailbox')) {
     const mailbox = Array.isArray(state?.mailbox) ? state.mailbox : [];
     writes.push(idbWrite(IDB_STORES.chunks, 'mailbox', mailbox));
   }
   await Promise.all(writes);
+  return scopes;
 }
 
 function normalizeRecentCareerLog(player) {
@@ -595,7 +599,6 @@ export async function saveGame(state, options = {}) {
   const skipBackupRotation = options?.skipBackupRotation === true;
   const preferMainSave = options?.preferMainSave !== false;
   const perfBreakdown = {};
-  const dirtyScopes = new Set(Array.isArray(options?.dirtyScopes) ? options.dirtyScopes.filter((scope) => typeof scope === 'string' && scope) : []);
   let safeState;
   try {
     safeState = sanitizeSaveState(state);
@@ -604,7 +607,10 @@ export async function saveGame(state, options = {}) {
     return { ok: false, quota: false, reason: 'sanitize_state_failed' };
   }
   try {
-    await persistLargeDataToIndexedDb(safeState, dirtyScopes);
+    const indexedDbStart = isDevEnv ? performance.now() : 0;
+    const persistedScopes = await persistLargeDataToIndexedDb(safeState, options?.dirtyScopes);
+    perfBreakdown.indexedDbMs = safeElapsedMs(indexedDbStart);
+    perfBreakdown.indexedDbWriteCount = persistedScopes.length;
   } catch (e) {
     console.error('Save failed: IndexedDB write error', e);
     return { ok: false, quota: false, reason: 'indexeddb_write_failed' };

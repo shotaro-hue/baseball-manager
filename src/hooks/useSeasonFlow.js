@@ -405,6 +405,7 @@ export function useSeasonFlow(gs) {
     getMailboxBySelector,
     getGameResultsMap,
     getScheduleArchive,
+    resetSaveTracking,
   } = gs;
 
   const [gameResult, setGameResult] = useState(null);
@@ -1375,7 +1376,7 @@ export function useSeasonFlow(gs) {
           }
           setSaveRevision((prev) => Math.max(prev, Number(nextState.saveRevision) || prev));
           setSaveExists(true);
-          gs.setSaveDirty(false);
+          resetSaveTracking();
         })
         .catch((error) => {
           console.warn("[BatchSave] saveGame failed after batch", error);

@@ -678,6 +678,7 @@ function initGameState(myTeam, oppTeam, options = {}) {
     leagueEnv: myTeam.leagueEnv || DEFAULT_LEAGUE_ENV,
     coachBonuses: (()=>{ const c=myTeam.coaches||[]; return { running:c.filter(x=>x.type==='running').reduce((s,x)=>s+(x.bonus||0),0), pitching:c.filter(x=>x.type==='pitching').reduce((s,x)=>s+(x.bonus||0),0) }; })(),
     pitchingPolicy: myTeam.pitchingPolicy || 'normal',
+    compactLogs: Boolean(options?.compactLogs),
     myPitchingPattern: myTeam.pitchingPattern ?? { closerId: null, setupId: null, seventhId: null, middleOrder: [] },
     opPitchingPattern: { closerId: null, setupId: null, seventhId: null, middleOrder: [] },
   };
@@ -833,7 +834,17 @@ function processAtBat(gs, strategy = 'normal') {
   let newMyPC=gs.myPitchCount, newOpPC=gs.opPitchCount;
   if (isMyAtBat) newOpPC+=pitches; else newMyPC+=pitches;
 
-  const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, pitcherId:pitcher?.id, result, type:inferReplayTypeFromResult(result), ev:physicsMeta.ev, la:physicsMeta.la, dist:physicsMeta.distance, sprayAngle:physicsMeta.sprayAngle, physicsMeta, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog, pitchType, zone, scorers };
+  const logPhysicsMeta = gs.compactLogs
+    ? {
+        fenceDistance: physicsMeta.fenceDistance,
+        isHrByTrajectory: Boolean(physicsMeta.isHrByTrajectory),
+        hrCheck: {
+          fenceDistance: physicsMeta.hrCheck?.fenceDistance,
+          clearance: physicsMeta.hrCheck?.clearance,
+        },
+      }
+    : physicsMeta;
+  const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, pitcherId:pitcher?.id, result, type:inferReplayTypeFromResult(result), ev:physicsMeta.ev, la:physicsMeta.la, dist:physicsMeta.distance, sprayAngle:physicsMeta.sprayAngle, physicsMeta:logPhysicsMeta, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog:gs.compactLogs?undefined:pitchLog, pitchType, zone, scorers };
   const nextLiveStats = cloneLiveStats(gs.liveStats);
   applyLogEntryToLiveStats(nextLiveStats, logEntry);
   const nextMyPitcherState = isMyAtBat
@@ -1063,7 +1074,10 @@ function quickSimGame(myTeam, oppTeam, options = {}) {
   const includeLog = options?.includeLog !== false;
   const includePhysics = options?.includePhysics !== false;
   const includeCrossParkAnalysis = options?.includeCrossParkAnalysis !== false;
-  let gs = initGameState(myTeam, oppTeam, { isMyHome: options?.isMyHome !== false });
+  let gs = initGameState(myTeam, oppTeam, {
+    isMyHome: options?.isMyHome !== false,
+    compactLogs: Boolean(options?.compactLogs),
+  });
   while (!gs.gameOver) {
     gs = autoSwapPitcher(gs, isMyTeamDefending(gs) ? 'my' : 'opp');
     gs = processAtBat(gs, 'normal');

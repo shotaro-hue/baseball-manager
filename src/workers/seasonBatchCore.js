@@ -725,6 +725,78 @@ function buildBatchResultSummary(gameResult) {
   };
 }
 
+function compactBatchLogEntry(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  return {
+    inning: Number(entry.inning) || 0,
+    isTop: Boolean(entry.isTop),
+    batter: typeof entry.batter === 'string' ? entry.batter : '?',
+    batId: entry.batId ?? null,
+    pitcherId: entry.pitcherId ?? null,
+    result: typeof entry.result === 'string' ? entry.result : '',
+    type: typeof entry.type === 'string' ? entry.type : undefined,
+    rbi: Number(entry.rbi) || 0,
+    outs: Number(entry.outs) || 0,
+    bases: Array.isArray(entry.bases) ? entry.bases.slice(0, 3) : [],
+    pitches: Number(entry.pitches) || 0,
+    isIntentional: Boolean(entry.isIntentional),
+    strategy: typeof entry.strategy === 'string' ? entry.strategy : undefined,
+    scorer: Boolean(entry.scorer),
+    isStolenBase: Boolean(entry.isStolenBase),
+    pitchType: typeof entry.pitchType === 'string' ? entry.pitchType : undefined,
+    zone: typeof entry.zone === 'string' ? entry.zone : undefined,
+    scorers: Array.isArray(entry.scorers) ? entry.scorers.slice(0, 4) : [],
+  };
+}
+
+function buildBatchOpponentSnapshot(team, log) {
+  const participantIds = new Set();
+  for (const entry of log || []) {
+    if (entry?.scorer === false && entry.batId != null) participantIds.add(entry.batId);
+    if (entry?.scorer === true && entry.pitcherId != null) participantIds.add(entry.pitcherId);
+  }
+  const sourcePlayers = [...(team?.players || []), ...(team?.farm || [])];
+  const players = sourcePlayers
+    .filter((player) => participantIds.has(player.id))
+    .map((player) => ({
+      id: player.id,
+      name: player.name,
+      stats: {
+        AB: Number(player?.stats?.AB) || 0,
+        H: Number(player?.stats?.H) || 0,
+      },
+    }));
+  return {
+    id: team?.id,
+    name: team?.name || '',
+    short: team?.short || '',
+    emoji: team?.emoji || '',
+    color: team?.color || '',
+    players,
+    farm: [],
+  };
+}
+
+function buildBatchGameResult(sim, won, oppTeam, gameNo, isHome) {
+  const compactLog = (sim?.log || []).map(compactBatchLogEntry).filter(Boolean);
+  return {
+    score: {
+      my: Number(sim?.score?.my) || 0,
+      opp: Number(sim?.score?.opp) || 0,
+    },
+    won: Boolean(won),
+    log: compactLog,
+    inningSummary: (sim?.inningSummary || []).map((inning) => ({
+      inning: Number(inning?.inning) || 0,
+      isTop: Boolean(inning?.isTop),
+      runs: Number(inning?.runs) || 0,
+    })),
+    oppTeam: buildBatchOpponentSnapshot(oppTeam, compactLog),
+    gameNo,
+    isHome: isHome !== false,
+  };
+}
+
 function buildGameResultsMapPatch(gameResults) {
   const patch = {};
   gameResults.forEach((result) => {
@@ -897,7 +969,11 @@ export function simulateSeasonBatch({
       const useDh = !!homeTeam.dhEnabled;
       const homePlayersSnap = [...homeTeam.players];
       const awayPlayersSnap = [...awayTeam.players];
-      const sim = quickSimGame(applyDhToTeam(homeTeam, useDh), applyDhToTeam(awayTeam, useDh));
+      const sim = quickSimGame(
+        applyDhToTeam(homeTeam, useDh),
+        applyDhToTeam(awayTeam, useDh),
+        { compactLogs: true },
+      );
       const box = computeBoxScore(sim.log || [], sim.inningSummary || [], homePlayersSnap, awayPlayersSnap, sim.score.my, sim.score.opp);
       batchBoxScores.push(makeCompactBoxScoreRecord({
         homeId: homeTeam.id,
@@ -999,7 +1075,11 @@ export function simulateSeasonBatch({
     const myTeam = teamMap.get(state.myId);
     if (scheduleMatchup && opp && myTeam) {
       const useDh = scheduleMatchup.isHome ? !!myTeam.dhEnabled : !!opp.dhEnabled;
-      const sim = quickSimGame(applyDhToTeam(myTeam, useDh), applyDhToTeam(opp, useDh), { isMyHome: scheduleMatchup.isHome });
+      const sim = quickSimGame(
+        applyDhToTeam(myTeam, useDh),
+        applyDhToTeam(opp, useDh),
+        { isMyHome: scheduleMatchup.isHome, compactLogs: true },
+      );
       const homePerspectiveSim = scheduleMatchup.isHome
         ? sim
         : {
@@ -1092,7 +1172,7 @@ export function simulateSeasonBatch({
       myTeam.budget = (myTeam.budget ?? 0) + revenueTotal;
       myTeam.revenueThisSeason = (myTeam.revenueThisSeason ?? 0) + revenueTotal;
 
-      results.push({ ...sim, won, oppTeam: opp, gameNo: newDay, isHome: scheduleMatchup.isHome });
+      results.push(buildBatchGameResult(sim, won, opp, newDay, scheduleMatchup.isHome));
 
       const templates = won ? NEWS_TEMPLATES_WIN : NEWS_TEMPLATES_LOSE;
       const scoreString = `${sim.score.my}-${sim.score.opp}`;
