@@ -8,7 +8,11 @@ import {
   ROSTER_DEVREC_POTENTIAL_MIN,
   ROSTER_SWAP_SCORE_THRESHOLD,
 } from '../constants';
-import { saberBatter, saberPitcher } from './sabermetrics';
+import { saberPitcher } from './sabermetrics';
+import {
+  calcCpuBatterEvaluation,
+  createBattedBallLeagueContext,
+} from './cpuBatterEvaluation';
 
 const MAX_FOREIGN_ACTIVE = 4;
 const SUBTYPE_STARTER = '\u5148\u767a';
@@ -40,14 +44,8 @@ export const relieverScore = (player) => {
     + eraBonus;
 };
 
-export const batterScore = (player) => {
-  const stats = saberBatter(player.stats ?? {});
-  return (stats.OPS || 0) * 1000
-    + (player.batting?.contact ?? 50) * 1.6
-    + (player.batting?.eye ?? 50) * 1.1
-    + (player.batting?.power ?? 50) * 1.2
-    + (player.batting?.speed ?? 50) * 0.7;
-};
+export const batterScore = (player, leagueContext = {}) =>
+  calcCpuBatterEvaluation(player, leagueContext).total;
 
 export const rosterRecScore = (player) => {
   if (player.isPitcher) {
@@ -73,7 +71,13 @@ export function buildAutoLineupEntries(team, options = {}) {
   const eligibleBatters = (team.players || []).filter(
     (player) => !player.isPitcher && !isIkuseiPlayer(player) && (player.injuryDaysLeft ?? 0) === 0,
   );
-  const sortedBatters = [...eligibleBatters].sort((a, b) => batterScore(b) - batterScore(a));
+  const leagueContext = options.leagueContext || createBattedBallLeagueContext([
+    ...(team.players || []),
+    ...(team.farm || []),
+  ]);
+  const sortedBatters = [...eligibleBatters].sort(
+    (a, b) => batterScore(b, leagueContext) - batterScore(a, leagueContext),
+  );
   const posEligible = Object.fromEntries(
     required.map((pos) => [pos, sortedBatters.filter((player) => proficiencyAt(player, pos) > 0)]),
   );
@@ -98,7 +102,7 @@ export function buildAutoLineupEntries(team, options = {}) {
   }
 
   return [...assignment.entries()]
-    .sort((a, b) => batterScore(b[1]) - batterScore(a[1]))
+    .sort((a, b) => batterScore(b[1], leagueContext) - batterScore(a[1], leagueContext))
     .map(([pos, player]) => ({ id: player.id, pos }));
 }
 

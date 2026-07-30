@@ -1,25 +1,33 @@
 import { r2, clamp } from '../utils';
-import { IS_HIT, IS_OUT } from '../constants';
+import {
+  HARD_HIT_THRESHOLD_KMH,
+  IS_HIT,
+  IS_OUT,
+  MAX_BATTED_BALL_EVENTS,
+  MAX_SPRAY_POINTS,
+} from '../constants';
 import { emptyStats } from './playerCore';
+import {
+  classifyBattedBallType,
+  createEmptyBattedBallProfile,
+  createRecentBattedBallProfile,
+  normalizeBattedBallEvent,
+  resolveFieldDirection,
+  updateBattedBallProfile,
+} from './battedBallProfile';
 
 const getBattedBallType = (e) => {
-  if (!e || !['out', 'sf'].includes(e.result)) return null;
-  const la = e.la ?? 0;
-  if (la >= 18) return 'fly';
-  if (la >= 8) return 'line';
-  return 'ground';
+  if (!e || !['s', 'd', 't', 'hr', 'out', 'sf', 'go', 'fo'].includes(e.result)) return null;
+  return classifyBattedBallType(e.la ?? e.laDeg);
 };
 
 const getFieldZone = (e) => {
-  const spray = e?.sprayAngle ?? 45;
-  if (spray < 35) return 'LF';
-  if (spray > 55) return 'RF';
+  const direction = resolveFieldDirection(e?.sprayAngle ?? e?.sprayAngleDeg ?? 45);
+  if (direction === 'left') return 'LF';
+  if (direction === 'right') return 'RF';
   return 'CF';
 };
 
-// React state / save payload と同じ上限に揃える。
-// 500件の詳細物理データを全選手分保持すると、100試合バッチで数百MBまで膨らむ。
-const MAX_BATTED_BALL_EVENTS = 80;
 const SPRAY_CHART_MAX_DISTANCE = 150;
 const isDevEnv = import.meta.env.DEV;
 
@@ -69,6 +77,12 @@ export function compactBattedBallEvent(event) {
     isDisplayInconsistent: Boolean(event.isDisplayInconsistent) || warningReasons.length > 0,
     warningReasons,
     displayWarnings,
+    batterSide: event.batterSide === 'left' ? 'left' : 'right',
+    pitcherHand: event.pitcherHand === 'left' ? 'left' : 'right',
+    result: typeof event.result === 'string' ? event.result : 'out',
+    contactQuality: ['weak', 'normal', 'solid', 'hard', 'barrel'].includes(event.contactQuality)
+      ? event.contactQuality
+      : null,
   };
 }
 
@@ -111,7 +125,9 @@ function buildBattedBallEvent(e, gameDay) {
   if (isHomeRun && y + 0.02 < fenceRatio) warningReasons.push("HR打球がフェンス内側に表示されています");
   if (!isHomeRun && y - 0.02 > fenceRatio) warningReasons.push("非HR打球がフェンス外側に表示されています");
 
+  const normalized = normalizeBattedBallEvent(e);
   return compactBattedBallEvent({
+    ...(normalized || {}),
     playerId: e.batId,
     gameDay: Number.isFinite(gameDay) ? Number(gameDay) : 0,
     x,
@@ -324,6 +340,10 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0) 
       : [];
     const newSprayPoints = [];
     const newBattedBallEvents = [];
+    let battedBallProfile = {
+      ...createEmptyBattedBallProfile(),
+      ...(s.battedBallProfile || {}),
+    };
 
     allMyEvents.forEach((e) => {
       if (e.isStolenBase) {
@@ -349,15 +369,16 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0) 
       else if (battedType === 'ground') s.GO++;
       else if (battedType === 'line') s.LO++;
       if (e.ev > 0) {
-        const sprayAngle = Number.isFinite(e.sprayAngle) ? e.sprayAngle : 45;
-        if (sprayAngle < 30) s.pullBatted++;
-        else if (sprayAngle > 60) s.oppositeBatted++;
-        else s.centerBatted++;
+        const normalizedEvent = normalizeBattedBallEvent(e, { batHand: p.batHand });
+        if (normalizedEvent?.relativeDirection === 'pull') s.pullBatted++;
+        else if (normalizedEvent?.relativeDirection === 'opposite') s.oppositeBatted++;
+        else if (normalizedEvent?.relativeDirection === 'center') s.centerBatted++;
 
-        if (e.ev >= 145) s.hardHit++;
+        if (e.ev >= HARD_HIT_THRESHOLD_KMH) s.hardHit++;
         if (battedType === 'ground') s.groundBatted++;
         else if (battedType === 'line') s.lineBatted++;
         else if (battedType === 'fly') s.flyBatted++;
+        if (normalizedEvent) battedBallProfile = updateBattedBallProfile(battedBallProfile, normalizedEvent);
         // ⚠️ セキュリティ: ログ由来値は有限数に検証し、安全な範囲へ丸めて保持する
         const safeDist = Number.isFinite(e.dist) ? Math.max(0, Math.min(220, Number(e.dist))) : 0;
         const safeSpray = Number.isFinite(e.sprayAngle) ? Math.max(0, Math.min(90, Number(e.sprayAngle))) : 45;
@@ -391,9 +412,10 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0) 
       s.HBPp += pm.HBPp; s.HRp += pm.HRp; s.Hp += pm.Hp;
       s.ER += Math.round(pm.ER);
     }
-    const MAX_SPRAY_POINTS = 120;
     s.sprayPoints = [...baseSprayPoints, ...newSprayPoints].slice(-MAX_SPRAY_POINTS);
     s.battedBallEvents = [...baseBattedBallEvents, ...newBattedBallEvents].slice(-MAX_BATTED_BALL_EVENTS);
+    battedBallProfile.recent = createRecentBattedBallProfile(s.battedBallEvents);
+    s.battedBallProfile = battedBallProfile;
     return { ...p, stats: s };
   });
 

@@ -10,12 +10,12 @@ import {
   MAX_SHIHAKA_TOTAL, REGISTRATION_COOLDOWN_DAYS, TALK_COOLDOWN_DAYS,
   PRESS_CONFERENCE_INTERVAL,
   FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX,
+  MAX_BATTED_BALL_EVENTS, MAX_SPRAY_POINTS,
 } from '../constants';
 import { compactBattedBallEvent } from '../engine/postGame';
+import { createSaveId, ensureSaveId } from '../engine/saveIdentity';
 
 const STATE_RECENT_CAREER_LOG_YEARS = 3;
-const STATE_MAX_SPRAY_POINTS = 40;
-const STATE_MAX_BATTED_BALL_EVENTS = 80;
 
 function slimPlayerForState(player) {
   if (!player || typeof player !== 'object') return player;
@@ -30,10 +30,10 @@ function slimPlayerForState(player) {
     recentCareerLog,
     stats: {
       ...stats,
-      sprayPoints: Array.isArray(stats.sprayPoints) ? stats.sprayPoints.slice(-STATE_MAX_SPRAY_POINTS) : [],
+      sprayPoints: Array.isArray(stats.sprayPoints) ? stats.sprayPoints.slice(-MAX_SPRAY_POINTS) : [],
       battedBallEvents: Array.isArray(stats.battedBallEvents)
         ? stats.battedBallEvents
-          .slice(-STATE_MAX_BATTED_BALL_EVENTS)
+          .slice(-MAX_BATTED_BALL_EVENTS)
           .map(compactBattedBallEvent)
           .filter(Boolean)
         : [],
@@ -115,8 +115,12 @@ export function useGameState() {
   const [allTeamBoxScoresMap, setAllTeamBoxScoresMap] = useState({});
   const [retireGamePlayer, setRetireGamePlayer] = useState(null);
   const [retireRole, setRetireRole] = useState(null);
-  const [gameState, dispatch] = useReducer(gameStateReducer, { teams: [], gameDay: 1, year: 2026, myId: null });
-  const { teams, gameDay, year, myId } = gameState;
+  const [gameState, dispatch] = useReducer(
+    gameStateReducer,
+    undefined,
+    () => ({ teams: [], gameDay: 1, year: 2026, myId: null, saveId: createSaveId() }),
+  );
+  const { teams, gameDay, year, myId, saveId } = gameState;
   const [saveDirty, setSaveDirty] = useState(false);
   const [lastAutoSaveAt, setLastAutoSaveAt] = useState(0);
   const [saveRevision, setSaveRevision] = useState(0);
@@ -133,6 +137,7 @@ export function useGameState() {
   const setGameDay = useCallback((n) => { dispatch({ type: G.SET_GAME_DAY, day: n }); markSaveDirty(); }, [markSaveDirty]);
   const setYear    = useCallback((n) => { dispatch({ type: G.SET_YEAR, year: n }); markSaveDirty(); }, [markSaveDirty]);
   const setMyId    = useCallback((id) => { dispatch({ type: G.SET_MY_ID, myId: id }); if(id) markSaveDirty(); }, [markSaveDirty]);
+  const setSaveId  = useCallback((id) => { dispatch({ type: G.SET_SAVE_ID, saveId: ensureSaveId(id) }); }, []);
   const [tab, setTab] = useState("dashboard");
   const [faPool, setFaPool] = useState([]);
   const [faYears, setFaYears] = useState({});
@@ -276,6 +281,20 @@ export function useGameState() {
     refreshSaveQueueState();
     return loadSaveModule()
       .then((mod) => mod.enqueueSaveGame(state, options))
+      .then(async (result) => {
+        if (!result?.ok) return result;
+        try {
+          const archive = await import('../engine/battedBallArchive');
+          const status = archive.getBattedBallQueueStatus();
+          const archiveResult = status.failedRecords > 0
+            ? await archive.retryFailedBattedBallWrites()
+            : await archive.flushBattedBallQueue();
+          return { ...result, archive: archiveResult };
+        } catch (error) {
+          console.warn('打球アーカイブのフラッシュに失敗しました。試合セーブは完了しています。', error);
+          return { ...result, archive: { ok: false } };
+        }
+      })
       .finally(() => {
         refreshSaveQueueState();
       });
@@ -482,7 +501,7 @@ export function useGameState() {
       }
       const request = beginTrackedSave();
       return queueSave(
-        {teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision},
+        {teams,myId,gameDay,year,saveId,faPool,faYears,seasonHistory,news,mailbox,saveRevision},
         request.options,
       ).then((result) => ({ result, snapshot: request.snapshot }));
     }).then(({ result, snapshot })=>{
@@ -501,7 +520,7 @@ export function useGameState() {
   const handleSave = useCallback(async ()=>{
     const request = beginTrackedSave();
     const result=await queueSave(
-      {teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision},
+      {teams,myId,gameDay,year,saveId,faPool,faYears,seasonHistory,news,mailbox,saveRevision},
       request.options,
     );
     if(result.ok){
@@ -524,6 +543,7 @@ export function useGameState() {
     const nextTeams = await ensureInitialTeams();
     const playerMod = await loadPlayerModule();
     setFaPool(playerMod.generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX)));
+    setSaveId(createSaveId());
     setMyId(id);
     setScreen("hub");
     setTab("dashboard");
@@ -533,7 +553,7 @@ export function useGameState() {
     const params = SEASON_PARAMS[year] || getDefaultParams(year);
     setAllStarTriggerDay(scheduleMod.calcAllStarTriggerDay(newSchedule, params.allStarSkipDates));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[ensureInitialTeams, year]);
+  },[ensureInitialTeams, setSaveId, year]);
 
   const handlePlayerClick = useCallback((player,teamName)=>setPlayerModal({player,teamName}),[]);
   const handleTeamClick = useCallback((team)=>{setViewingTeam(team);setScreen("team_detail");},[]);
@@ -848,6 +868,7 @@ export function useGameState() {
     retireRole, setRetireRole,
     teams, setTeams,
     myId, setMyId,
+    saveId, setSaveId,
     tab, setTab,
     gameDay, setGameDay,
     year, setYear,

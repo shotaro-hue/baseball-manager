@@ -1,5 +1,16 @@
 import LZString from 'lz-string';
 import { resolveInitialContractYears } from './realplayer';
+import {
+  BASEBALL_MANAGER_DB_STORES,
+  openBaseballManagerDb,
+} from './baseballManagerDb';
+import { ensureSaveId } from './saveIdentity';
+import { MAX_BATTED_BALL_EVENTS, MAX_SPRAY_POINTS } from '../constants';
+import {
+  createEmptyBattedBallProfile,
+  createRecentBattedBallProfile,
+  updateBattedBallProfile,
+} from './battedBallProfile';
 
 /* ═══════════════════════════════════════════════
    SAVE / LOAD — localStorage
@@ -16,12 +27,11 @@ const BACKUP_ROTATE_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_SAVE_INTERVAL_MS = 60 * 1000;
 const LAST_BACKUP_ROTATE_KEY = 'baseball_manager_v1_last_rotate_at';
 const SAVE_SIZE_DEBUG_KEY = 'baseball_manager_debug_save_size';
-const SAVE_DATA_VERSION = 3;
-const IDB_NAME = 'baseball_manager_storage';
-const IDB_VERSION = 1;
+const SAVE_DATA_VERSION = 4;
+const INDEXED_DB_LARGE_DATA_VERSION = 3;
 const IDB_STORES = {
-  chunks: 'save_chunks',
-  careerLogs: 'career_logs',
+  chunks: BASEBALL_MANAGER_DB_STORES.chunks,
+  careerLogs: BASEBALL_MANAGER_DB_STORES.careerLogs,
 };
 const INDEXED_DB_CHUNK_SCOPES = ['seasonHistory', 'news', 'mailbox'];
 
@@ -198,10 +208,23 @@ function shouldRotateBackupNow() {
 function migratePlayer(p) {
   const legacyCareerLog = Array.isArray(p.careerLog) ? p.careerLog : [];
   const recentCareerLog = Array.isArray(p.recentCareerLog) ? p.recentCareerLog : legacyCareerLog.slice(-MAX_RECENT_CAREER_LOG_YEARS);
+  const legacyBattedBallEvents = Array.isArray(p?.stats?.battedBallEvents)
+    ? p.stats.battedBallEvents.slice(-MAX_BATTED_BALL_EVENTS)
+    : [];
+  const migratedProfile = p?.stats?.battedBallProfile && typeof p.stats.battedBallProfile === 'object'
+    ? { ...createEmptyBattedBallProfile(), ...p.stats.battedBallProfile }
+    : legacyBattedBallEvents.reduce(
+      (profile, event) => updateBattedBallProfile(profile, event),
+      createEmptyBattedBallProfile(),
+    );
+  migratedProfile.recent = createRecentBattedBallProfile(legacyBattedBallEvents);
   const migratedStats = {
     ...(p.stats ?? {}),
-    sprayPoints: Array.isArray(p?.stats?.sprayPoints) ? p.stats.sprayPoints : [],
-    battedBallEvents: Array.isArray(p?.stats?.battedBallEvents) ? p.stats.battedBallEvents : [],
+    sprayPoints: Array.isArray(p?.stats?.sprayPoints)
+      ? p.stats.sprayPoints.slice(-MAX_SPRAY_POINTS)
+      : [],
+    battedBallEvents: legacyBattedBallEvents,
+    battedBallProfile: migratedProfile,
   };
   return {
     ...p,
@@ -268,7 +291,7 @@ function validateAndMigrateSave(state) {
     revenueThisSeason:  t.revenueThisSeason  ?? 0,
     players: Array.isArray(t.players) ? t.players.map(migratePlayer).map(p => migrateInitialContractYears(p, t.name, state)) : [],
   }));
-  return { ok: true, state: { ...state, teams } };
+  return { ok: true, state: { ...state, saveId: ensureSaveId(state.saveId), teams } };
 }
 
 function sanitizeSaveState(state) {
@@ -286,11 +309,29 @@ function sanitizeSaveState(state) {
       ...p,
       careerLog: [],
       recentCareerLog: normalizeRecentCareerLog(p),
+      stats: {
+        ...(p.stats || {}),
+        sprayPoints: Array.isArray(p?.stats?.sprayPoints)
+          ? p.stats.sprayPoints.slice(-MAX_SPRAY_POINTS)
+          : [],
+        battedBallEvents: Array.isArray(p?.stats?.battedBallEvents)
+          ? p.stats.battedBallEvents.slice(-MAX_BATTED_BALL_EVENTS)
+          : [],
+      },
     })) : [],
     farm: Array.isArray(team?.farm) ? team.farm.map((p) => ({
       ...p,
       careerLog: [],
       recentCareerLog: normalizeRecentCareerLog(p),
+      stats: {
+        ...(p.stats || {}),
+        sprayPoints: Array.isArray(p?.stats?.sprayPoints)
+          ? p.stats.sprayPoints.slice(-MAX_SPRAY_POINTS)
+          : [],
+        battedBallEvents: Array.isArray(p?.stats?.battedBallEvents)
+          ? p.stats.battedBallEvents.slice(-MAX_BATTED_BALL_EVENTS)
+          : [],
+      },
     })) : [],
   }));
   return { ...rest, teams, seasonHistory, news, mailbox, saveRevision: sanitizeNumber(saveRevision, 0) };
@@ -470,20 +511,7 @@ function decompress(raw) {
 }
 
 function openSaveDb() {
-  return new Promise((resolve, reject) => {
-    if (typeof indexedDB === 'undefined') {
-      reject(new Error('IndexedDB is not available'));
-      return;
-    }
-    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(IDB_STORES.chunks)) db.createObjectStore(IDB_STORES.chunks);
-      if (!db.objectStoreNames.contains(IDB_STORES.careerLogs)) db.createObjectStore(IDB_STORES.careerLogs);
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error || new Error('IndexedDB open failed'));
-  });
+  return openBaseballManagerDb();
 }
 
 async function idbWrite(storeName, key, value) {
@@ -806,7 +834,7 @@ export async function loadGame() {
       logPerf('loadGame.localStorage.getItem', getItemStart);
       if (!raw) continue;
       const state = decompress(raw);
-      if (state?.saveDataVersion >= SAVE_DATA_VERSION) {
+      if (state?.saveDataVersion >= INDEXED_DB_LARGE_DATA_VERSION) {
         try {
           state.seasonHistory = (await idbRead(IDB_STORES.chunks, 'seasonHistory')) ?? state.seasonHistory;
           state.news = (await idbRead(IDB_STORES.chunks, 'news')) ?? state.news;
@@ -919,11 +947,20 @@ export function getSaveMeta() {
 }
 
 export function deleteSave() {
+  let saveId = null;
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) saveId = decompress(raw)?.saveId ?? null;
+  } catch {
+    saveId = null;
+  }
   localStorage.removeItem(SAVE_KEY);
   localStorage.removeItem(META_KEY);
   localStorage.removeItem(BACKUP_KEY_1);
   localStorage.removeItem(BACKUP_KEY_2);
-  if (typeof indexedDB !== 'undefined') {
-    indexedDB.deleteDatabase(IDB_NAME);
+  if (saveId) {
+    import('./battedBallArchive')
+      .then((mod) => mod.deleteBattedBallArchiveBySaveId(saveId))
+      .catch((error) => console.warn('打球アーカイブ削除に失敗しました', error));
   }
 }

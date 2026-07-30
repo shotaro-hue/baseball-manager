@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis } from "recharts";
 import { fmtAvg, fmtPct, fmtIP } from '../../utils';
 import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
@@ -9,6 +9,7 @@ import { SprayChart } from './SprayChart';
 const RANGE_FILTERS = {
   LAST30: 'last30',
   SEASON: 'season',
+  YEAR: 'year',
   CAREER: 'career',
 };
 
@@ -85,19 +86,148 @@ function filterBattedBallEvents(events, rangeFilter, resultFilter) {
   });
 }
 
-export function StatsTab({teams,myId,onPlayerClick}){
+function archiveEventToChartEvent(event, index) {
+  if (Number.isFinite(Number(event?.x)) && Number.isFinite(Number(event?.y))) return event;
+  const result = event?.result;
+  const hitType = result === 's' ? 'single'
+    : result === 'd' ? 'double'
+      : result === 't' ? 'triple'
+        : result === 'hr' ? 'homeRun'
+          : 'out';
+  return {
+    ...event,
+    id: `${event?.gameId || 'archive'}:${event?.seq ?? index}`,
+    x: Math.max(0, Math.min(1, Number(event?.sprayAngleDeg ?? 45) / 90)),
+    y: Math.max(0, Math.min(1, Number(event?.distanceM ?? 0) / 150)),
+    hitType,
+    gameDay: Number(event?.gameDay) || 0,
+    exitVelo: Number(event?.evKmh) || 0,
+    launchAngle: Number(event?.laDeg) || 0,
+  };
+}
+
+function ProfileMetric({ label, value }) {
+  return <div className="fsb" style={{fontSize:10,padding:"3px 0"}}><span style={{color:"#64748b"}}>{label}</span><span className="mono">{value}</span></div>;
+}
+
+function BattedBallProfileSummary({ profile }) {
+  if (!profile || Number(profile.bip) <= 0) {
+    return <div style={{fontSize:10,color:"#64748b"}}>打球データはまだありません</div>;
+  }
+  const bip = Number(profile.bip) || 0;
+  const pct = (value) => `${((Number(value || 0) / bip) * 100).toFixed(1)}%`;
+  const avg = (sum, n, unit = '') => Number(n) > 0 ? `${(Number(sum) / Number(n)).toFixed(1)}${unit}` : '---';
+  const reliability = bip < 30 ? `低（${bip}打球）` : bip < 120 ? `蓄積中（${bip}/120）` : `十分（${bip}打球）`;
+  return (
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"0 14px"}}>
+      <ProfileMetric label="平均打球速度" value={avg(profile.evSum,profile.evN,' km/h')}/>
+      <ProfileMetric label="平均打球角度" value={avg(profile.laSum,profile.laN,'°')}/>
+      <ProfileMetric label="強打球率" value={pct(profile.hardHit)}/>
+      <ProfileMetric label="バレル率" value={pct(profile.barrel)}/>
+      <ProfileMetric label="GB / LD / FB" value={`${pct(profile.ground)} / ${pct(profile.line)} / ${pct(profile.fly)}`}/>
+      <ProfileMetric label="物理方向 左 / 中 / 右" value={`${pct(profile.left)} / ${pct(profile.center)} / ${pct(profile.right)}`}/>
+      <ProfileMetric label="打者基準 引張 / 中 / 逆" value={`${pct(profile.pull)} / ${pct(profile.centerRelative)} / ${pct(profile.opposite)}`}/>
+      <ProfileMetric label="信頼度" value={reliability}/>
+    </div>
+  );
+}
+
+export function StatsTab({teams,myId,onPlayerClick,saveId,year}){
   const [view,setView]=useState("batter");
   const [selId,setSelId]=useState(null);
   const [openTip,setOpenTip]=useState(null);
   const [rangeFilter,setRangeFilter]=useState(RANGE_FILTERS.SEASON);
   const [resultFilter,setResultFilter]=useState(RESULT_FILTERS.ALL);
+  const [archiveYears,setArchiveYears]=useState([]);
+  const [selectedYear,setSelectedYear]=useState(year);
+  const [archiveMeta,setArchiveMeta]=useState(null);
+  const [archiveView,setArchiveView]=useState({status:"memory",events:null,profile:null,totalEvents:0,sampled:false});
   const myTeam=teams.find(t=>t.id===myId);
   const batters=myTeam.players.filter(p=>!p.isPitcher);
   const pitchers=myTeam.players.filter(p=>p.isPitcher);
   const sel=myTeam.players.find(p=>p.id===selId);
+  const memoryEvents = useMemo(
+    () => Array.isArray(sel?.stats?.battedBallEvents) ? sel.stats.battedBallEvents : [],
+    [sel],
+  );
+  const sourceEvents = archiveView.events ?? memoryEvents;
   const filteredSprayEvents = !sel || sel.isPitcher
     ? []
-    : filterBattedBallEvents(sel.stats?.battedBallEvents, rangeFilter, resultFilter);
+    : filterBattedBallEvents(sourceEvents, rangeFilter, resultFilter).map(archiveEventToChartEvent);
+  const selectedProfile = archiveView.profile || sel?.stats?.battedBallProfile || null;
+
+  useEffect(() => {
+    setSelectedYear(year);
+  }, [year]);
+
+  useEffect(() => {
+    let alive = true;
+    if (!sel?.id || sel.isPitcher || !saveId) {
+      setArchiveYears([]);
+      setArchiveMeta(null);
+      return () => { alive = false; };
+    }
+    import('../../engine/battedBallArchive').then(async (archive) => {
+      const [years, meta] = await Promise.all([
+        archive.loadPlayerBattedBallYears(saveId, sel.id),
+        archive.loadBattedBallArchiveMeta(saveId),
+      ]);
+      if (!alive) return;
+      setArchiveYears(years);
+      setArchiveMeta(meta);
+    });
+    return () => { alive = false; };
+  }, [saveId, sel?.id, sel?.isPitcher]);
+
+  useEffect(() => {
+    let alive = true;
+    if (!sel?.id || sel.isPitcher) return () => { alive = false; };
+    if (rangeFilter === RANGE_FILTERS.LAST30 || !saveId) {
+      setArchiveView({
+        status: "memory",
+        events: memoryEvents.slice(-30),
+        profile: sel?.stats?.battedBallProfile?.recent || null,
+        totalEvents: Math.min(30, memoryEvents.length),
+        sampled: false,
+      });
+      return () => { alive = false; };
+    }
+    setArchiveView({
+      status:"loading",
+      events:memoryEvents,
+      profile:sel?.stats?.battedBallProfile || null,
+      totalEvents:memoryEvents.length,
+      sampled:false,
+    });
+    import('../../engine/battedBallArchive').then((archive) => archive.loadPlayerBattedBalls({
+      saveId,
+      playerId: sel.id,
+      year: rangeFilter === RANGE_FILTERS.YEAR ? selectedYear : year,
+      period: rangeFilter === RANGE_FILTERS.CAREER ? 'career' : 'season',
+    })).then((loaded) => {
+      if (!alive) return;
+      if (loaded.status !== 'ready' || loaded.totalEvents === 0) {
+        setArchiveView({
+          status: loaded.status === 'ready' ? 'fallback' : loaded.status,
+          events: memoryEvents,
+          profile: sel?.stats?.battedBallProfile || null,
+          totalEvents: memoryEvents.length,
+          sampled: false,
+        });
+        return;
+      }
+      setArchiveView(loaded);
+    }).catch(() => {
+      if (alive) setArchiveView({
+        status:"error",
+        events:memoryEvents,
+        profile:sel?.stats?.battedBallProfile || null,
+        totalEvents:memoryEvents.length,
+        sampled:false,
+      });
+    });
+    return () => { alive = false; };
+  }, [memoryEvents, rangeFilter, saveId, sel?.id, sel?.isPitcher, selectedYear, year]);
   const radar=sel?(sel.isPitcher?[
     {s:"球速",v:sel.pitching.velocity},
     {s:"制球",v:sel.pitching.control},
@@ -142,10 +272,19 @@ export function StatsTab({teams,myId,onPlayerClick}){
                   style={{fontSize:12,padding:"2px 6px"}}
                 >
                   <option value={RANGE_FILTERS.LAST30}>直近30打球</option>
-                  <option value={RANGE_FILTERS.SEASON}>シーズン</option>
+                  <option value={RANGE_FILTERS.SEASON}>今季</option>
+                  <option value={RANGE_FILTERS.YEAR}>年度指定</option>
                   <option value={RANGE_FILTERS.CAREER}>通算</option>
                 </select>
               </label>
+              {rangeFilter===RANGE_FILTERS.YEAR&&(
+                <label style={{fontSize:12,color:"#374151",display:"inline-flex",alignItems:"center",gap:6}}>
+                  年度
+                  <select value={selectedYear} onChange={(e)=>setSelectedYear(Number(e.target.value))} style={{fontSize:12,padding:"2px 6px"}}>
+                    {(archiveYears.length?archiveYears:[year]).map((archiveYear)=><option key={archiveYear} value={archiveYear}>{archiveYear}</option>)}
+                  </select>
+                </label>
+              )}
               <label style={{fontSize:12,color:"#374151",display:"inline-flex",alignItems:"center",gap:6}}>
                 結果
                 <select
@@ -159,6 +298,18 @@ export function StatsTab({teams,myId,onPlayerClick}){
                   <option value={RESULT_FILTERS.OUT}>アウト</option>
                 </select>
               </label>
+            </div>
+          )}
+          {!sel.isPitcher&&(
+            <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"9px 11px",margin:"6px 0"}}>
+              <BattedBallProfileSummary profile={selectedProfile}/>
+              <div style={{fontSize:9,color:"#64748b",marginTop:5}}>
+                {archiveView.status==="loading"?"アーカイブを読込中…":
+                  archiveView.status==="error"||archiveView.status==="unavailable"?"アーカイブを利用できないため直近80打球を表示":
+                  archiveView.status==="fallback"?"アーカイブ開始前のため直近80打球を表示":
+                  `${archiveView.totalEvents || 0}打球${archiveView.sampled?"（グラフは1,000件を決定的抽出）":""}`}
+                {archiveMeta?.archiveStartYear?` / アーカイブ開始 ${archiveMeta.archiveStartYear}年`:""}
+              </div>
             </div>
           )}
           <CareerTable player={sel}/>

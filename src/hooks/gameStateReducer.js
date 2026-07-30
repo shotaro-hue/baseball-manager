@@ -4,6 +4,7 @@ export const G = {
   SET_GAME_DAY: 'SET_GAME_DAY',
   SET_YEAR:     'SET_YEAR',
   SET_MY_ID:    'SET_MY_ID',
+  SET_SAVE_ID:  'SET_SAVE_ID',
 };
 
 /**
@@ -22,6 +23,8 @@ export function gameStateReducer(state, action) {
       return { ...state, year: typeof action.year === 'function' ? action.year(state.year) : action.year };
     case G.SET_MY_ID:
       return { ...state, myId: action.myId };
+    case G.SET_SAVE_ID:
+      return { ...state, saveId: action.saveId };
     default:
       return state;
   }

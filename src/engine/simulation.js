@@ -844,7 +844,10 @@ function processAtBat(gs, strategy = 'normal') {
         },
       }
     : physicsMeta;
-  const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, pitcherId:pitcher?.id, result, type:inferReplayTypeFromResult(result), ev:physicsMeta.ev, la:physicsMeta.la, dist:physicsMeta.distance, sprayAngle:physicsMeta.sprayAngle, physicsMeta:logPhysicsMeta, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog:gs.compactLogs?undefined:pitchLog, pitchType, zone, scorers };
+  const actualBatterSide = batter?.batHand === 'switch'
+    ? (pitcher?.hand === 'left' ? 'right' : 'left')
+    : (batter?.batHand === 'left' ? 'left' : 'right');
+  const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, batterSide:actualBatterSide, pitcherId:pitcher?.id, pitcherHand:pitcher?.hand === 'left' ? 'left' : 'right', result, type:inferReplayTypeFromResult(result), ev:physicsMeta.ev, la:physicsMeta.la, dist:physicsMeta.distance, sprayAngle:physicsMeta.sprayAngle, physicsMeta:logPhysicsMeta, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog:gs.compactLogs?undefined:pitchLog, pitchType, zone, scorers };
   const nextLiveStats = cloneLiveStats(gs.liveStats);
   applyLogEntryToLiveStats(nextLiveStats, logEntry);
   const nextMyPitcherState = isMyAtBat

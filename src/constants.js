@@ -329,6 +329,17 @@ export const RLABEL = {
 export const IS_HIT = (r) => ["hr", "t", "d", "s"].includes(r);
 export const IS_OUT = (r) => ["k", "go", "fo", "sac", "out", "sf"].includes(r);
 
+// ── 打球データ保持・アーカイブ ─────────────────────
+// 通常試合・Worker・React state・セーブで必ず同じ上限を参照する。
+export const MAX_BATTED_BALL_EVENTS = 80;
+export const MAX_SPRAY_POINTS = 40;
+export const BATTED_BALL_RECENT_WINDOW = 60;
+export const MAX_BATTED_BALL_CHART_POINTS = 1000;
+export const BATTED_BALL_ARCHIVE_GAMES_PER_CHUNK = 5;
+export const BATTED_BALL_ARCHIVE_EVENTS_PER_CHUNK = 2000;
+export const BATTED_BALL_ARCHIVE_BYTES_PER_CHUNK = 2 * 1024 * 1024;
+export const HARD_HIT_THRESHOLD_KMH = 145;
+
 // 育成目標 (development goals) — devGoal フィールドの選択肢
 export const DEV_GOALS_BATTER = [
   { key: "", label: "設定なし" },

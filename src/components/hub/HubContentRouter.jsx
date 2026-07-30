@@ -391,6 +391,8 @@ export default function HubContentRouter({ app, tab, onTabChange }) {
         <StatsTab
           teams={teams}
           myId={myId}
+          saveId={gs.saveId}
+          year={year}
           onPlayerClick={gs.handlePlayerClick}
         />
       </DeferredHubTab>

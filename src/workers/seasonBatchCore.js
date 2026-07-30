@@ -11,6 +11,10 @@ import {
   computeBoxScore,
 } from '../engine/postGame';
 import { calcRevenue } from '../engine/finance';
+import {
+  createBattedBallArchiveChunker,
+  createBattedBallBatchRecords,
+} from '../engine/battedBallProfile';
 import { applyPopularityDelta } from '../engine/fanSentiment';
 import {
   generateCpuOffer,
@@ -897,6 +901,7 @@ export function simulateSeasonBatch({
   count,
   autoManageMyTeam = false,
   onProgress,
+  onArchiveChunk,
   isCancelled,
 }) {
   const state = normalizeSnapshot(snapshot);
@@ -912,6 +917,18 @@ export function simulateSeasonBatch({
 
   const startedAt = Date.now();
   const progressState = createSeasonBatchProgressState();
+  const archiveChunker = createBattedBallArchiveChunker(onArchiveChunk);
+  const archiveGame = (log, gameDay, firstTeam, secondTeam) => {
+    const gameId = `${gameDay}:${firstTeam?.id || 'team1'}:${secondTeam?.id || 'team2'}`;
+    archiveChunker.add(createBattedBallBatchRecords(log, {
+      saveId: state.saveId,
+      year: state.year,
+      gameDay,
+      gameId,
+      teams: [firstTeam, secondTeam],
+      source: 'worker',
+    }));
+  };
   emitProgress({
     progressState,
     startedAt,
@@ -974,6 +991,7 @@ export function simulateSeasonBatch({
         applyDhToTeam(awayTeam, useDh),
         { compactLogs: true },
       );
+      archiveGame(sim.log, newDay, homeTeam, awayTeam);
       const box = computeBoxScore(sim.log || [], sim.inningSummary || [], homePlayersSnap, awayPlayersSnap, sim.score.my, sim.score.opp);
       batchBoxScores.push(makeCompactBoxScoreRecord({
         homeId: homeTeam.id,
@@ -1080,6 +1098,7 @@ export function simulateSeasonBatch({
         applyDhToTeam(opp, useDh),
         { isMyHome: scheduleMatchup.isHome, compactLogs: true },
       );
+      archiveGame(sim.log, newDay, myTeam, opp);
       const homePerspectiveSim = scheduleMatchup.isHome
         ? sim
         : {
@@ -1227,6 +1246,7 @@ export function simulateSeasonBatch({
   }
 
   ensureNotCancelled(isCancelled);
+  archiveChunker.flush();
   emitProgress({
     progressState,
     startedAt,
