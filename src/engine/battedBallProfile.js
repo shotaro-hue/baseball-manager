@@ -4,7 +4,8 @@ import {
   BATTED_BALL_ARCHIVE_GAMES_PER_CHUNK,
   BATTED_BALL_RECENT_WINDOW,
   HARD_HIT_THRESHOLD_KMH,
-} from '../constants';
+} from '../constants.js';
+import { isBarreledBattedBall } from './barrelClassification.js';
 
 export const BATTED_BALL_SCHEMA_VERSION = 1;
 const IN_PLAY_RESULTS = new Set(['s', 'd', 't', 'hr', 'out', 'sf', 'go', 'fo']);
@@ -198,7 +199,10 @@ function accumulateProfile(profile, event) {
   next.laSum += event.laDeg;
   next.laN += 1;
   if (event.evKmh >= HARD_HIT_THRESHOLD_KMH) next.hardHit += 1;
-  if (event.contactQuality === 'barrel') next.barrel += 1;
+  // バレルは保存形式やシミュレーション種別に依存させず、
+  // 全打球で保持しているEV×打球角度から決定的に判定する。
+  // これにより、旧compactログのquality欠落分も読込時に復元できる。
+  if (isBarreledBattedBall(event.evKmh, event.laDeg)) next.barrel += 1;
   if (event.battedBallType) next[event.battedBallType] += 1;
   if (event.fieldDirection) next[event.fieldDirection] += 1;
   if (event.relativeDirection === 'center') next.centerRelative += 1;

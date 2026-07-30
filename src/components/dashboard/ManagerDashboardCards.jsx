@@ -1,5 +1,3 @@
-import { mockDashboard } from '../../data/mockDashboard';
-
 const toneClassByName = {
   good: 'cg',
   warning: 'cy',
@@ -11,7 +9,7 @@ export function TodayGameCard({ todayGame, gameDay, onGoGame }) {
   if (!todayGame || !todayGame.date || !todayGame.opponent) {
     return (
       <div className="card">
-        <div className="card-h">Today's Game</div>
+        <div className="card-h">Today&apos;s Game</div>
         <div style={{ color: '#94a3b8' }}>No scheduled game is available.</div>
       </div>
     );
@@ -19,7 +17,7 @@ export function TodayGameCard({ todayGame, gameDay, onGoGame }) {
 
   return (
     <div className="card dashboard-order-game">
-      <div className="card-h">Today's Game</div>
+      <div className="card-h">Today&apos;s Game</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <span style={{ fontSize: 30 }}>{todayGame.opponent.emoji || 'VS'}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -37,7 +35,7 @@ export function TodayGameCard({ todayGame, gameDay, onGoGame }) {
   );
 }
 
-export function RecommendationCard({ items, onTabSwitch }) {
+export function RecommendationCard({ items, onTabSwitch, onPlayerClick }) {
   return (
     <div className="card dashboard-order-recommendation">
       <div className="card-h">Recommendations</div>
@@ -45,7 +43,13 @@ export function RecommendationCard({ items, onTabSwitch }) {
         {items.map((item, idx) => (
           <button
             key={`${item.title}-${idx}`}
-            onClick={() => onTabSwitch(item.tab)}
+            onClick={() => item.player
+              ? onPlayerClick?.(
+                item.player,
+                item.teamName,
+                item.initialSection || (item.player.isPitcher ? 'stats' : 'battedBall'),
+              )
+              : onTabSwitch(item.tab)}
             className="action-item"
             style={{ borderLeftColor: item.tone === 'danger' ? '#f87171' : item.tone === 'warning' ? '#f5c842' : '#34d399' }}
           >
@@ -60,7 +64,14 @@ export function RecommendationCard({ items, onTabSwitch }) {
   );
 }
 
-export function TeamConditionCard({ runDiff, recentWins, recentLosses, winPct, budgetLabel }) {
+export function TeamConditionCard({
+  runDiff,
+  recentWins,
+  recentLosses,
+  winPct,
+  budgetLabel,
+  conditions,
+}) {
   return (
     <div className="card dashboard-order-condition">
       <div className="card-h">Team Status</div>
@@ -69,7 +80,7 @@ export function TeamConditionCard({ runDiff, recentWins, recentLosses, winPct, b
         <span className={`chip ${recentWins >= recentLosses ? 'cg' : 'cr'}`}>Recent {recentWins}-{recentLosses}</span>
         <span className={`chip ${winPct >= '.550' ? 'cg' : winPct < '.450' ? 'cr' : 'cb'}`}>Win% {winPct}</span>
         <span className="chip cb">Budget {budgetLabel}</span>
-        {mockDashboard.teamConditions.map((condition) => (
+        {(conditions || []).map((condition) => (
           <span key={condition.label} className={`chip ${toneClassByName[condition.tone] || 'cb'}`} title={condition.description || ''}>
             {condition.label}
           </span>
@@ -93,7 +104,7 @@ export function DashboardKpiGrid({ rank, wins, losses, rpg, rapg }) {
   );
 }
 
-export function FeaturedPlayersCard({ players }) {
+export function FeaturedPlayersCard({ players, onPlayerClick, teamName }) {
   const safePlayers = Array.isArray(players) ? players.filter(Boolean) : [];
 
   return (
@@ -101,10 +112,15 @@ export function FeaturedPlayersCard({ players }) {
       <div className="card-h">Featured Players</div>
       <div style={{ display: 'grid', gap: 8 }}>
         {safePlayers.map((p) => (
-          <div key={p.id} className="card2" style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+          <button
+            type="button"
+            key={p.id}
+            className="card2 dashboard-player-button"
+            onClick={() => onPlayerClick?.(p, teamName, p.isPitcher ? 'stats' : 'battedBall')}
+          >
             <span style={{ overflowWrap: 'anywhere' }}>{p.name} ({p.pos})</span>
             <span className="mono">WAR {Number(p.war ?? 0).toFixed(1)}</span>
-          </div>
+          </button>
         ))}
       </div>
     </div>

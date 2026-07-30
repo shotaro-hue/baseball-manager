@@ -837,6 +837,8 @@ function processAtBat(gs, strategy = 'normal') {
 
   const logPhysicsMeta = gs.compactLogs
     ? {
+        // 集計・アーカイブで打球品質を失わない最小フィールド。
+        quality: physicsMeta.quality || 'normal',
         fenceDistance: physicsMeta.fenceDistance,
         isHrByTrajectory: Boolean(physicsMeta.isHrByTrajectory),
         hrCheck: {

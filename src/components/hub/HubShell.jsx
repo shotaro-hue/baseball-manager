@@ -9,6 +9,10 @@ import HubSimPanel from './HubSimPanel';
 import HubTabsNav from './HubTabsNav';
 import HubContentRouter from './HubContentRouter';
 import HubBottomNav from './HubBottomNav';
+import {
+  PlayerComparisonDialog,
+  PlayerComparisonTray,
+} from '../PlayerComparisonTray';
 
 const PRIMARY_SECTIONS = [
   {
@@ -36,6 +40,7 @@ const PRIMARY_SECTIONS = [
       ['contract', '契約'],
       ['fa', 'FA'],
       ['scout', 'スカウト'],
+      ['finance', '球団運営'],
     ],
   },
   {
@@ -48,9 +53,14 @@ const PRIMARY_SECTIONS = [
       ['leaderboard', 'ランキング'],
       ['standings', '順位表'],
       ['records', '記録'],
-      ['finance', '財務'],
-      ['balance', 'リーグ分析'],
     ],
+  },
+  {
+    id: 'developer',
+    label: '開発',
+    icon: '🧪',
+    defaultTab: 'balance',
+    tabs: [['balance', 'バランス検証']],
   },
   {
     id: 'inbox',
@@ -96,6 +106,9 @@ export default function HubShell({ state, flows, app }) {
     ),
   );
   const [currentPrimarySection, setCurrentPrimarySection] = useState('home');
+  const [comparePlayers, setComparePlayers] = useState([]);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [decisionTarget, setDecisionTarget] = useState(null);
 
   useEffect(() => {
     const sectionId = TAB_TO_SECTION[tab];
@@ -169,6 +182,33 @@ export default function HubShell({ state, flows, app }) {
 
   const totalGames = (myTeam?.wins || 0) + (myTeam?.losses || 0);
   const remain = SEASON_GAMES - totalGames;
+  const toggleCompare = useCallback((player, teamName) => {
+    if (!player?.id) return;
+    if (comparePlayers.some((entry) => entry.id === player.id)) {
+      setComparePlayers((current) =>
+        current.filter((entry) => entry.id !== player.id),
+      );
+      setCompareOpen(false);
+      return;
+    }
+    if (comparePlayers.length >= 2) {
+      gs.notify('比較できるのは2人までです。どちらかを外してください。', 'warn');
+      return;
+    }
+    setComparePlayers((current) => [
+      ...current,
+      { ...player, _teamName: teamName || player._teamName || '' },
+    ]);
+  }, [comparePlayers, gs]);
+  const removeComparePlayer = useCallback((playerId) => {
+    setComparePlayers((current) => current.filter((entry) => entry.id !== playerId));
+    setCompareOpen(false);
+  }, []);
+  const navigateWithPlayer = useCallback((targetTab, player, teamName) => {
+    setDecisionTarget({ tab: targetTab, player, teamName });
+    gs.setPlayerModal(null);
+    handleTabChange(targetTab);
+  }, [gs, handleTabChange]);
 
   return (
     <div className="app">
@@ -252,7 +292,36 @@ export default function HubShell({ state, flows, app }) {
           />
 
           <ErrorBoundary key={tab}>
-            <HubContentRouter app={app} tab={tab} onTabChange={handleTabChange} />
+            {decisionTarget?.tab === tab && (
+              <div className="decision-context-banner" role="status">
+                <div>
+                  <strong>{decisionTarget.player?.name}</strong>
+                  <span>を判断対象として保持中</span>
+                </div>
+                <button
+                  type="button"
+                  className="bsm bga"
+                  onClick={() => gs.handlePlayerClick(
+                    decisionTarget.player,
+                    decisionTarget.teamName,
+                    decisionTarget.player?.isPitcher ? 'stats' : 'battedBall',
+                  )}
+                >
+                  選手詳細
+                </button>
+                <button type="button" className="bsm" onClick={() => setDecisionTarget(null)}>解除</button>
+              </div>
+            )}
+
+            <HubContentRouter
+              app={app}
+              tab={tab}
+              onTabChange={handleTabChange}
+              comparison={{
+                players: comparePlayers,
+                onToggle: toggleCompare,
+              }}
+            />
 
             <RetireModal
               modal={gs.retireModal}
@@ -270,9 +339,17 @@ export default function HubShell({ state, flows, app }) {
 
             {gs.playerModal && (
               <PlayerModal
+                key={`${gs.playerModal.player?.id}:${gs.playerModal.initialSection || 'profile'}`}
                 player={gs.playerModal.player}
                 teamName={gs.playerModal.teamName}
                 isMyTeam={gs.playerModal.teamName === myTeam?.name}
+                initialSection={gs.playerModal.initialSection}
+                saveId={gs.saveId}
+                year={year}
+                teams={gs.teams}
+                isCompared={comparePlayers.some((entry) => entry.id === gs.playerModal.player?.id)}
+                onToggleCompare={toggleCompare}
+                onNavigate={navigateWithPlayer}
                 onSetConvertTarget={gs.setConvertTarget}
                 onClose={() => gs.setPlayerModal(null)}
               />
@@ -365,6 +442,23 @@ export default function HubShell({ state, flows, app }) {
             onStartGame={sf.handleStartGame}
             disableStart={gameDay > SEASON_GAMES}
           />
+
+          <PlayerComparisonTray
+            players={comparePlayers}
+            onRemove={removeComparePlayer}
+            onClear={() => {
+              setComparePlayers([]);
+              setCompareOpen(false);
+            }}
+            onOpen={() => setCompareOpen(true)}
+          />
+          {compareOpen && comparePlayers.length === 2 && (
+            <PlayerComparisonDialog
+              players={comparePlayers}
+              onRemove={removeComparePlayer}
+              onClose={() => setCompareOpen(false)}
+            />
+          )}
         </div>
       </div>
     </div>

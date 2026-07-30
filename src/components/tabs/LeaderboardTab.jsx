@@ -52,7 +52,14 @@ function calcQualified(gameDay) {
   };
 }
 
-export function LeaderboardTab({ teams, myId, gameDay = 1 }) {
+export function LeaderboardTab({
+  teams,
+  myId,
+  gameDay = 1,
+  onPlayerClick,
+  onToggleCompare,
+  comparePlayerIds = [],
+}) {
   const [view, setView]           = useState("batter");
   const [league, setLeague]       = useState("全体");
   const [sortKey, setSortKey]     = useState("OPS");
@@ -124,6 +131,13 @@ export function LeaderboardTab({ teams, myId, gameDay = 1 }) {
   const qualThreshLabel = view === "batter"
     ? `規定打席: ${qualified.pa}`
     : `規定投球回: ${fmtIP(qualified.ip)}`;
+  const openPlayer = (player) => {
+    onPlayerClick?.(
+      player,
+      player._teamName,
+      player.isPitcher ? "stats" : "battedBall",
+    );
+  };
 
   return (
     <div>
@@ -189,13 +203,22 @@ export function LeaderboardTab({ teams, myId, gameDay = 1 }) {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
             {top3.map((p, i) => (
-              <div key={p.id} style={{
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => openPlayer(p)}
+                aria-label={`${p.name}の詳細を開く`}
+                style={{
                 background: i === 0 ? "linear-gradient(135deg,rgba(245,200,66,.12),rgba(245,200,66,.04))"
                   : i === 1 ? "linear-gradient(135deg,rgba(148,163,184,.12),rgba(148,163,184,.04))"
                   : "linear-gradient(135deg,rgba(180,120,60,.12),rgba(180,120,60,.04))",
                 border: `1px solid ${i===0?"rgba(245,200,66,.4)":i===1?"rgba(148,163,184,.4)":"rgba(180,120,60,.4)"}`,
                 borderRadius: 8,
                 padding: "8px 10px",
+                color: "inherit",
+                cursor: "pointer",
+                textAlign: "left",
+                width: "100%",
               }}>
                 <div style={{ fontSize: 18, lineHeight: 1 }}>{MEDAL[i]}</div>
                 <div style={{ fontWeight: 700, fontSize: 13, marginTop: 4, color: p._isMyTeam ? "#60a5fa" : "#e2e8f0" }}>
@@ -212,7 +235,7 @@ export function LeaderboardTab({ teams, myId, gameDay = 1 }) {
                 <div style={{ fontSize: 9, color: "#475569", marginTop: 2 }}>
                   {view === "batter" ? `打席: ${p.stats?.PA ?? 0}` : `投球回: ${p.stats?.IP > 0 ? fmtIP(p.stats.IP) : "0"}`}
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -237,6 +260,7 @@ export function LeaderboardTab({ teams, myId, gameDay = 1 }) {
               <tr>
                 <th style={{ width: 30, textAlign: "center" }}>#</th>
                 <th>選手</th>
+                {onToggleCompare && <th>比較</th>}
                 <th>球団</th>
                 {league === "全体" && <th style={{ fontSize: 9, color: "#475569" }}>L</th>}
                 {view === "pitcher" && <th style={{ fontSize: 10 }}>役割</th>}
@@ -268,7 +292,20 @@ export function LeaderboardTab({ teams, myId, gameDay = 1 }) {
                   ? idx === 0 ? "rgba(245,200,66,.06)" : idx === 1 ? "rgba(148,163,184,.04)" : "rgba(180,120,60,.04)"
                   : undefined;
                 return (
-                  <tr key={p.id} style={{ background: rowBg }}>
+                  <tr
+                    key={p.id}
+                    className="interactive-player-row"
+                    tabIndex={0}
+                    aria-label={`${p.name}の詳細を開く`}
+                    onClick={() => openPlayer(p)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openPlayer(p);
+                      }
+                    }}
+                    style={{ background: rowBg }}
+                  >
                     <td style={{ textAlign: "center", fontWeight: isTop3 ? 700 : 400, color: isTop3 ? "#f5c842" : "#475569", fontSize: 11 }}>
                       {isTop3 ? MEDAL[idx] : idx + 1}
                     </td>
@@ -276,6 +313,20 @@ export function LeaderboardTab({ teams, myId, gameDay = 1 }) {
                       {p.name}
                       {p._isMyTeam && <span style={{ fontSize: 8, color: "#60a5fa", marginLeft: 4, background: "rgba(96,165,250,.15)", padding: "1px 3px", borderRadius: 3 }}>自</span>}
                     </td>
+                    {onToggleCompare && (
+                      <td>
+                        <button
+                          type="button"
+                          className={comparePlayerIds.includes(p.id) ? "compare-add-button on" : "compare-add-button"}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onToggleCompare(p, p._teamName);
+                          }}
+                        >
+                          {comparePlayerIds.includes(p.id) ? "比較中" : "＋比較"}
+                        </button>
+                      </td>
+                    )}
                     <td style={{ fontSize: 10, whiteSpace: "nowrap" }}>
                       <span style={{ color: p._teamColor || "#94a3b8" }}>{p._teamEmoji}</span>
                       <span style={{ color: "#94a3b8", marginLeft: 3 }}>{p._teamShort}</span>

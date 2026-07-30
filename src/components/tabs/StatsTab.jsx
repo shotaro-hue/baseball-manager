@@ -1,417 +1,333 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis } from "recharts";
+import { useMemo, useState } from 'react';
 import { fmtAvg, fmtPct, fmtIP } from '../../utils';
 import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
-import { ThCell, HandBadge } from '../ui';
-import { CareerTable } from './CareerTable';
-import { SprayChart } from './SprayChart';
+import { inningsToOuts, stableSort } from '../../engine/analysisComparison';
+import { HandBadge, ThCell } from '../ui';
 
-const RANGE_FILTERS = {
-  LAST30: 'last30',
-  SEASON: 'season',
-  YEAR: 'year',
-  CAREER: 'career',
-};
+const BATTER_COLUMNS = [
+  { key: 'PA', label: '打席', value: (p) => Number(p.stats?.PA) || 0, render: (p) => p.stats.PA },
+  { key: 'AVG', label: '打率', value: (p) => p.stats?.AB > 0 ? p.stats.H / p.stats.AB : null, render: (p) => p.stats.AB > 0 ? fmtAvg(p.stats.H, p.stats.AB) : '---' },
+  {
+    key: 'OPS',
+    label: 'OPS',
+    value: (p, sb) => p.stats?.PA > 0 ? sb.OPS : null,
+    render: (p, sb) => sb.OPS > 0 ? sb.OPS.toFixed(3) : '---',
+    color: (p, sb) => sb.OPS >= .850 ? '#34d399' : sb.OPS >= .700 ? '#f5c842' : undefined,
+  },
+  { key: 'HR', label: '本塁打', value: (p) => Number(p.stats?.HR) || 0, render: (p) => p.stats.HR },
+  { key: 'RBI', label: '打点', value: (p) => Number(p.stats?.RBI) || 0, render: (p) => p.stats.RBI },
+  {
+    key: 'WAR',
+    label: 'WAR',
+    value: (p, sb) => sb.WAR,
+    render: (p, sb) => sb.WAR ?? '---',
+    color: (p, sb) => sb.WAR >= 4 ? '#34d399' : sb.WAR >= 2 ? '#f5c842' : sb.WAR < 0 ? '#f87171' : undefined,
+  },
+  { key: 'wOBA', label: 'wOBA', advanced: true, value: (p, sb) => p.stats?.PA > 0 ? sb.wOBA : null, render: (p, sb) => sb.wOBA > 0 ? sb.wOBA.toFixed(3) : '---' },
+  {
+    key: 'wRCp',
+    label: 'wRC+',
+    advanced: true,
+    value: (p, sb) => p.stats?.PA > 0 ? sb.wRCp : null,
+    render: (p, sb) => p.stats?.PA > 0 ? sb.wRCp : '---',
+    color: (p, sb) => sb.wRCp >= 130 ? '#34d399' : sb.wRCp >= 100 ? '#f5c842' : p.stats?.PA > 0 ? '#f87171' : undefined,
+  },
+  { key: 'ISO', label: 'ISO', advanced: true, value: (p, sb) => p.stats?.AB > 0 ? sb.ISO : null, render: (p, sb) => p.stats?.AB > 0 ? sb.ISO.toFixed(3) : '---' },
+  { key: 'BABIP', label: 'BABIP', advanced: true, value: (p, sb) => p.stats?.AB > 0 ? sb.BABIP : null, render: (p, sb) => p.stats?.AB > 0 ? sb.BABIP.toFixed(3) : '---' },
+  { key: 'BBpct', label: '四球率', advanced: true, value: (p, sb) => p.stats?.PA > 0 ? sb.BBpct : null, render: (p, sb) => p.stats?.PA > 0 ? fmtPct(sb.BBpct) : '---' },
+  {
+    key: 'Kpct',
+    label: '三振率',
+    advanced: true,
+    value: (p, sb) => p.stats?.PA > 0 ? sb.Kpct : null,
+    render: (p, sb) => p.stats?.PA > 0 ? fmtPct(sb.Kpct) : '---',
+    color: (p, sb) => sb.Kpct > .25 ? '#f87171' : sb.Kpct > 0 && sb.Kpct < .15 ? '#34d399' : undefined,
+  },
+  {
+    key: 'EVavg',
+    label: '打球速度',
+    advanced: true,
+    value: (p, sb) => sb.EVavg > 0 ? sb.EVavg : null,
+    render: (p, sb) => sb.EVavg > 0 ? sb.EVavg.toFixed(1) : '---',
+    color: (p, sb) => sb.EVavg >= 145 ? '#34d399' : sb.EVavg >= 130 ? '#f5c842' : undefined,
+  },
+  { key: 'LAavg', label: '打球角度', advanced: true, value: (p, sb) => p.stats?.laN > 0 ? sb.LAavg : null, render: (p, sb) => p.stats?.laN > 0 ? sb.LAavg.toFixed(1) : '---' },
+  { key: 'SB', label: '盗塁', advanced: true, value: (p) => Number(p.stats?.SB) || 0, render: (p) => p.stats.SB },
+];
 
-const RESULT_FILTERS = {
-  ALL: 'all',
-  HIT: 'hit',
-  HR: 'hr',
-  OUT: 'out',
-};
+const ROLE_ORDER = ['先発', '中継ぎ', 'セットアッパー', '抑え'];
 
-const HIT_TYPES = {
-  single: 'single',
-  double: 'double',
-  triple: 'triple',
-  homeRun: 'homeRun',
-  out: 'out',
-};
+const PITCHER_COLUMNS = [
+  {
+    key: 'role',
+    label: '役割',
+    value: (p) => {
+      const index = ROLE_ORDER.findIndex((role) => String(p.subtype || '').includes(role));
+      return index >= 0 ? index : ROLE_ORDER.length;
+    },
+    render: (p) => p.subtype,
+    className: 'text-cell',
+  },
+  { key: 'W', label: '勝', value: (p) => Number(p.stats?.W) || 0, render: (p) => p.stats.W, color: () => '#34d399' },
+  { key: 'L', label: '敗', value: (p) => Number(p.stats?.L) || 0, render: (p) => p.stats.L },
+  { key: 'ERA', label: '防御率', value: (p, sp) => p.stats?.IP > 0 ? sp.ERA : null, render: (p, sp) => p.stats?.IP > 0 ? sp.ERA.toFixed(2) : '---', color: (p, sp) => sp.ERA > 0 && sp.ERA < 3 ? '#34d399' : sp.ERA < 4 ? '#f5c842' : p.stats?.IP > 0 ? '#f87171' : undefined },
+  { key: 'IP', label: '投球回', value: (p) => p.stats?.IP > 0 ? inningsToOuts(p.stats.IP) : null, render: (p) => p.stats?.IP > 0 ? fmtIP(p.stats.IP) : '---' },
+  { key: 'Kp', label: '奪三振', value: (p) => Number(p.stats?.Kp) || 0, render: (p) => p.stats.Kp },
+  { key: 'WHIP', label: 'WHIP', value: (p, sp) => p.stats?.IP > 0 ? sp.WHIP : null, render: (p, sp) => p.stats?.IP > 0 ? sp.WHIP.toFixed(2) : '---' },
+  { key: 'WAR', label: 'WAR', value: (p, sp) => p.stats?.IP > 0 ? sp.WAR : null, render: (p, sp) => p.stats?.IP > 0 ? sp.WAR : '---' },
+  { key: 'SV', label: 'S', advanced: true, value: (p) => Number(p.stats?.SV) || 0, render: (p) => p.stats.SV },
+  { key: 'HLD', label: 'H', advanced: true, value: (p) => Number(p.stats?.HLD) || 0, render: (p) => p.stats.HLD },
+  { key: 'QS', label: 'QS', advanced: true, value: (p) => Number(p.stats?.QS) || 0, render: (p) => p.stats.QS },
+  { key: 'FIP', label: 'FIP', advanced: true, value: (p, sp) => p.stats?.IP > 0 ? sp.FIP : null, render: (p, sp) => p.stats?.IP > 0 ? sp.FIP : '---' },
+  { key: 'xFIP', label: 'xFIP', advanced: true, value: (p, sp) => p.stats?.IP > 0 ? sp.xFIP : null, render: (p, sp) => p.stats?.IP > 0 ? sp.xFIP : '---' },
+  { key: 'Kpct', label: '三振率', advanced: true, value: (p, sp) => p.stats?.BF > 0 ? sp.Kpct : null, render: (p, sp) => p.stats?.BF > 0 ? fmtPct(sp.Kpct) : '---' },
+  { key: 'BBpct', label: '四球率', advanced: true, value: (p, sp) => p.stats?.BF > 0 ? sp.BBpct : null, render: (p, sp) => p.stats?.BF > 0 ? fmtPct(sp.BBpct) : '---' },
+];
 
-function sanitizeRangeFilter(value) {
-  const validValues = Object.values(RANGE_FILTERS);
-  return validValues.includes(value) ? value : RANGE_FILTERS.SEASON;
+function metricsFor(player, isPitcher) {
+  return isPitcher ? saberPitcher(player.stats || {}) : saberBatter(player.stats || {});
 }
 
-function sanitizeResultFilter(value) {
-  const validValues = Object.values(RESULT_FILTERS);
-  return validValues.includes(value) ? value : RESULT_FILTERS.ALL;
-}
-
-function normalizeGameDayValue(rawGameDay, fallbackIndex) {
-  const num = Number(rawGameDay);
-  if (Number.isFinite(num)) return num;
-
-  const parsed = Date.parse(rawGameDay);
-  if (Number.isFinite(parsed)) return parsed;
-
-  return fallbackIndex;
-}
-
-function filterBattedBallEvents(events, rangeFilter, resultFilter) {
-  if (!Array.isArray(events)) return [];
-
-  const normalizedRangeFilter = sanitizeRangeFilter(rangeFilter);
-  const normalizedResultFilter = sanitizeResultFilter(resultFilter);
-
-  const sortedEvents = events
-    .map((event, index) => ({
-      ...event,
-      __originIndex: index,
-      __gameDayValue: normalizeGameDayValue(event?.gameDay, index),
-    }))
-    .sort((a, b) => {
-      if (b.__gameDayValue !== a.__gameDayValue) {
-        return b.__gameDayValue - a.__gameDayValue;
-      }
-      return b.__originIndex - a.__originIndex;
-    });
-
-  const rangeFilteredEvents = (() => {
-    if (normalizedRangeFilter === RANGE_FILTERS.CAREER) return sortedEvents;
-    if (normalizedRangeFilter === RANGE_FILTERS.LAST30) return sortedEvents.slice(0, 30);
-    return sortedEvents;
-  })();
-
-  return rangeFilteredEvents.filter((event) => {
-    const hitType = typeof event?.hitType === 'string' ? event.hitType : null;
-    const isHit = hitType === HIT_TYPES.single || hitType === HIT_TYPES.double || hitType === HIT_TYPES.triple || hitType === HIT_TYPES.homeRun;
-
-    if (normalizedResultFilter === RESULT_FILTERS.HIT) return isHit;
-    if (normalizedResultFilter === RESULT_FILTERS.HR) return hitType === HIT_TYPES.homeRun;
-    if (normalizedResultFilter === RESULT_FILTERS.OUT) return hitType === HIT_TYPES.out;
-
-    // ⚠️ 未知の hitType は「all」扱いで除外せず、安全側にフォールバックする
-    return true;
-  });
-}
-
-function archiveEventToChartEvent(event, index) {
-  if (Number.isFinite(Number(event?.x)) && Number.isFinite(Number(event?.y))) return event;
-  const result = event?.result;
-  const hitType = result === 's' ? 'single'
-    : result === 'd' ? 'double'
-      : result === 't' ? 'triple'
-        : result === 'hr' ? 'homeRun'
-          : 'out';
-  return {
-    ...event,
-    id: `${event?.gameId || 'archive'}:${event?.seq ?? index}`,
-    x: Math.max(0, Math.min(1, Number(event?.sprayAngleDeg ?? 45) / 90)),
-    y: Math.max(0, Math.min(1, Number(event?.distanceM ?? 0) / 150)),
-    hitType,
-    gameDay: Number(event?.gameDay) || 0,
-    exitVelo: Number(event?.evKmh) || 0,
-    launchAngle: Number(event?.laDeg) || 0,
-  };
-}
-
-function ProfileMetric({ label, value }) {
-  return <div className="fsb" style={{fontSize:10,padding:"3px 0"}}><span style={{color:"#64748b"}}>{label}</span><span className="mono">{value}</span></div>;
-}
-
-function BattedBallProfileSummary({ profile }) {
-  if (!profile || Number(profile.bip) <= 0) {
-    return <div style={{fontSize:10,color:"#64748b"}}>打球データはまだありません</div>;
-  }
-  const bip = Number(profile.bip) || 0;
-  const pct = (value) => `${((Number(value || 0) / bip) * 100).toFixed(1)}%`;
-  const avg = (sum, n, unit = '') => Number(n) > 0 ? `${(Number(sum) / Number(n)).toFixed(1)}${unit}` : '---';
-  const reliability = bip < 30 ? `低（${bip}打球）` : bip < 120 ? `蓄積中（${bip}/120）` : `十分（${bip}打球）`;
+function InteractivePlayerRow({
+  player,
+  teamName,
+  isPitcher,
+  columns,
+  onOpen,
+  onToggleCompare,
+  isCompared,
+}) {
+  const metrics = metricsFor(player, isPitcher);
+  const open = () => onOpen?.(player, teamName, isPitcher ? 'stats' : 'battedBall');
   return (
-    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"0 14px"}}>
-      <ProfileMetric label="平均打球速度" value={avg(profile.evSum,profile.evN,' km/h')}/>
-      <ProfileMetric label="平均打球角度" value={avg(profile.laSum,profile.laN,'°')}/>
-      <ProfileMetric label="強打球率" value={pct(profile.hardHit)}/>
-      <ProfileMetric label="バレル率" value={pct(profile.barrel)}/>
-      <ProfileMetric label="GB / LD / FB" value={`${pct(profile.ground)} / ${pct(profile.line)} / ${pct(profile.fly)}`}/>
-      <ProfileMetric label="物理方向 左 / 中 / 右" value={`${pct(profile.left)} / ${pct(profile.center)} / ${pct(profile.right)}`}/>
-      <ProfileMetric label="打者基準 引張 / 中 / 逆" value={`${pct(profile.pull)} / ${pct(profile.centerRelative)} / ${pct(profile.opposite)}`}/>
-      <ProfileMetric label="信頼度" value={reliability}/>
+    <tr
+      className="interactive-player-row"
+      tabIndex={0}
+      onClick={open}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          open();
+        }
+      }}
+      aria-label={`${player.name}の${isPitcher ? '成績' : '打球分析'}を開く`}
+    >
+      <td className="stats-player-cell">
+        <span>{player.name}</span>
+        {isPitcher && <HandBadge p={player}/>}
+      </td>
+      {onToggleCompare && (
+        <td className="stats-compare-cell">
+          <button
+            type="button"
+            className={isCompared ? 'compare-add-button on' : 'compare-add-button'}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleCompare(player, teamName);
+            }}
+            aria-label={`${player.name}を比較${isCompared ? 'から外す' : 'へ追加'}`}
+          >
+            {isCompared ? '比較中' : '＋比較'}
+          </button>
+        </td>
+      )}
+      {columns.map((column) => (
+        <td
+          key={column.key}
+          className={column.className || 'mono'}
+          style={{ color: column.color?.(player, metrics) }}
+        >
+          {column.render(player, metrics)}
+        </td>
+      ))}
+    </tr>
+  );
+}
+
+function StatsTable({
+  title,
+  defaultSortLabel,
+  players,
+  teamName,
+  isPitcher,
+  showAdvanced,
+  openTip,
+  onOpenTip,
+  onPlayerClick,
+  sortState,
+  onSort,
+  onToggleCompare,
+  comparePlayerIds,
+}) {
+  const allColumns = isPitcher ? PITCHER_COLUMNS : BATTER_COLUMNS;
+  const columns = showAdvanced ? allColumns : allColumns.filter((column) => !column.advanced);
+  const sortedPlayers = useMemo(() => {
+    if (!sortState?.key || !sortState?.direction) return players;
+    if (sortState.key === 'name') return stableSort(players, (player) => player.name, sortState.direction);
+    const column = allColumns.find((item) => item.key === sortState.key);
+    if (!column) return players;
+    return stableSort(
+      players,
+      (player) => column.value(player, metricsFor(player, isPitcher)),
+      sortState.direction,
+    );
+  }, [allColumns, isPitcher, players, sortState]);
+  const sortLabel = sortState?.key
+    ? `${sortState.key === 'name' ? '選手名' : allColumns.find((column) => column.key === sortState.key)?.label} ${sortState.direction === 'asc' ? '昇順' : '降順'}`
+    : `初期順（${defaultSortLabel}）`;
+
+  return (
+    <div className="card">
+      <div className="stats-table-heading">
+        <div>
+          <div className="card-h">{title}</div>
+          <div className="stats-sort-label">{sortLabel} · 見出しを押すと降順→昇順→初期順</div>
+        </div>
+      </div>
+      <div className="stats-table-wrap">
+        <table className="tbl stats-table">
+          <thead>
+            <tr>
+              <ThCell
+                label="選手"
+                sortDirection={sortState?.key === 'name' ? sortState.direction : null}
+                onSort={() => onSort('name')}
+              />
+              {onToggleCompare && <th className="stats-compare-cell">比較</th>}
+              {columns.map((column) => (
+                <ThCell
+                  key={column.key}
+                  label={column.label}
+                  openLabel={openTip}
+                  onOpen={onOpenTip}
+                  sortDirection={sortState?.key === column.key ? sortState.direction : null}
+                  onSort={() => onSort(column.key)}
+                />
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {sortedPlayers.map((player) => (
+              <InteractivePlayerRow
+                key={player.id}
+                player={player}
+                teamName={teamName}
+                isPitcher={isPitcher}
+                columns={columns}
+                onOpen={onPlayerClick}
+                onToggleCompare={onToggleCompare}
+                isCompared={comparePlayerIds?.includes(player.id)}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
 
-export function StatsTab({teams,myId,onPlayerClick,saveId,year}){
-  const [view,setView]=useState("batter");
-  const [selId,setSelId]=useState(null);
-  const [openTip,setOpenTip]=useState(null);
-  const [rangeFilter,setRangeFilter]=useState(RANGE_FILTERS.SEASON);
-  const [resultFilter,setResultFilter]=useState(RESULT_FILTERS.ALL);
-  const [archiveYears,setArchiveYears]=useState([]);
-  const [selectedYear,setSelectedYear]=useState(year);
-  const [archiveMeta,setArchiveMeta]=useState(null);
-  const [archiveView,setArchiveView]=useState({status:"memory",events:null,profile:null,totalEvents:0,sampled:false});
-  const myTeam=teams.find(t=>t.id===myId);
-  const batters=myTeam.players.filter(p=>!p.isPitcher);
-  const pitchers=myTeam.players.filter(p=>p.isPitcher);
-  const sel=myTeam.players.find(p=>p.id===selId);
-  const memoryEvents = useMemo(
-    () => Array.isArray(sel?.stats?.battedBallEvents) ? sel.stats.battedBallEvents : [],
-    [sel],
+function nextSortState(current, key) {
+  if (current?.key !== key || !current?.direction) return { key, direction: 'desc' };
+  if (current.direction === 'desc') return { key, direction: 'asc' };
+  return { key: null, direction: null };
+}
+
+export function StatsTab({
+  teams,
+  myId,
+  onPlayerClick,
+  onToggleCompare,
+  comparePlayerIds = [],
+}) {
+  const [view, setView] = useState('batter');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [openTip, setOpenTip] = useState(null);
+  const [sortByView, setSortByView] = useState({
+    batter: { key: null, direction: null },
+    pitcher: { key: null, direction: null },
+  });
+  const myTeam = teams.find((team) => team.id === myId);
+
+  const batters = useMemo(
+    () => [...(myTeam?.players || [])]
+      .filter((player) => !player.isPitcher)
+      .sort((a, b) => saberBatter(b.stats).OPS - saberBatter(a.stats).OPS),
+    [myTeam?.players],
   );
-  const sourceEvents = archiveView.events ?? memoryEvents;
-  const filteredSprayEvents = !sel || sel.isPitcher
-    ? []
-    : filterBattedBallEvents(sourceEvents, rangeFilter, resultFilter).map(archiveEventToChartEvent);
-  const selectedProfile = archiveView.profile || sel?.stats?.battedBallProfile || null;
+  const pitchers = useMemo(
+    () => [...(myTeam?.players || [])]
+      .filter((player) => player.isPitcher)
+      .sort((a, b) => {
+        const aEra = a.stats?.IP > 0 ? saberPitcher(a.stats).ERA : Number.POSITIVE_INFINITY;
+        const bEra = b.stats?.IP > 0 ? saberPitcher(b.stats).ERA : Number.POSITIVE_INFINITY;
+        return aEra - bEra;
+      }),
+    [myTeam?.players],
+  );
 
-  useEffect(() => {
-    setSelectedYear(year);
-  }, [year]);
+  if (!myTeam) return <div className="card">球団データを読み込めません。</div>;
 
-  useEffect(() => {
-    let alive = true;
-    if (!sel?.id || sel.isPitcher || !saveId) {
-      setArchiveYears([]);
-      setArchiveMeta(null);
-      return () => { alive = false; };
-    }
-    import('../../engine/battedBallArchive').then(async (archive) => {
-      const [years, meta] = await Promise.all([
-        archive.loadPlayerBattedBallYears(saveId, sel.id),
-        archive.loadBattedBallArchiveMeta(saveId),
-      ]);
-      if (!alive) return;
-      setArchiveYears(years);
-      setArchiveMeta(meta);
-    });
-    return () => { alive = false; };
-  }, [saveId, sel?.id, sel?.isPitcher]);
+  const handleSort = (key) => {
+    setSortByView((current) => ({
+      ...current,
+      [view]: nextSortState(current[view], key),
+    }));
+  };
 
-  useEffect(() => {
-    let alive = true;
-    if (!sel?.id || sel.isPitcher) return () => { alive = false; };
-    if (rangeFilter === RANGE_FILTERS.LAST30 || !saveId) {
-      setArchiveView({
-        status: "memory",
-        events: memoryEvents.slice(-30),
-        profile: sel?.stats?.battedBallProfile?.recent || null,
-        totalEvents: Math.min(30, memoryEvents.length),
-        sampled: false,
-      });
-      return () => { alive = false; };
-    }
-    setArchiveView({
-      status:"loading",
-      events:memoryEvents,
-      profile:sel?.stats?.battedBallProfile || null,
-      totalEvents:memoryEvents.length,
-      sampled:false,
-    });
-    import('../../engine/battedBallArchive').then((archive) => archive.loadPlayerBattedBalls({
-      saveId,
-      playerId: sel.id,
-      year: rangeFilter === RANGE_FILTERS.YEAR ? selectedYear : year,
-      period: rangeFilter === RANGE_FILTERS.CAREER ? 'career' : 'season',
-    })).then((loaded) => {
-      if (!alive) return;
-      if (loaded.status !== 'ready' || loaded.totalEvents === 0) {
-        setArchiveView({
-          status: loaded.status === 'ready' ? 'fallback' : loaded.status,
-          events: memoryEvents,
-          profile: sel?.stats?.battedBallProfile || null,
-          totalEvents: memoryEvents.length,
-          sampled: false,
-        });
-        return;
-      }
-      setArchiveView(loaded);
-    }).catch(() => {
-      if (alive) setArchiveView({
-        status:"error",
-        events:memoryEvents,
-        profile:sel?.stats?.battedBallProfile || null,
-        totalEvents:memoryEvents.length,
-        sampled:false,
-      });
-    });
-    return () => { alive = false; };
-  }, [memoryEvents, rangeFilter, saveId, sel?.id, sel?.isPitcher, selectedYear, year]);
-  const radar=sel?(sel.isPitcher?[
-    {s:"球速",v:sel.pitching.velocity},
-    {s:"制球",v:sel.pitching.control},
-    {s:"変化球",v:sel.pitching.breaking},
-    {s:"球種",v:sel.pitching.variety},
-    {s:"ピンチ",v:sel.pitching.clutchP},
-    {s:"スタミナ",v:sel.pitching.stamina},
-  ]:[
-    {s:"ミート",v:sel.batting.contact},
-    {s:"長打",v:sel.batting.power},
-    {s:"走力",v:sel.batting.speed},
-    {s:"選球",v:sel.batting.eye},
-    {s:"クラッチ",v:sel.batting.clutch},
-    {s:"変化球",v:sel.batting.breakingBall},
-  ]):[];
-  return(
+  return (
     <div>
-      <div className="tabs">
-        {[["batter","🏏 打者"],["pitcher","⚾ 投手"]].map(([k,l])=>(
-          <button key={k} onClick={()=>{setSelId(null);setView(k);}} className={`tab ${view===k?"on":""}`}>{l}</button>
-        ))}
+      <div className="stats-toolbar">
+        <div className="tabs" role="tablist" aria-label="成績種別">
+          {[['batter', '🏏 打者'], ['pitcher', '⚾ 投手']].map(([key, label]) => (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={view === key}
+              onClick={() => setView(key)}
+              className={`tab ${view === key ? 'on' : ''}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="stats-column-toggle" aria-label="表示する指標">
+          <button className={!showAdvanced ? 'on' : ''} onClick={() => setShowAdvanced(false)}>主要指標</button>
+          <button className={showAdvanced ? 'on' : ''} onClick={() => setShowAdvanced(true)}>詳細指標</button>
+        </div>
       </div>
-      {sel&&(
-        <div className="card" style={{marginBottom:10}}>
-          <div className="fsb" style={{marginBottom:8}}>
-            <div><span style={{fontWeight:700,fontSize:15}}>{sel.name}</span><span style={{fontSize:11,color:"#374151",marginLeft:8}}>{sel.pos}/{sel.age}歳</span></div>
-            <button className="bsm bgr" onClick={()=>setSelId(null)}>✕</button>
-          </div>
-          <div className="g2">
-            <ResponsiveContainer width="100%" height={170}><RadarChart data={radar}><PolarGrid stroke="rgba(255,255,255,.07)"/><PolarAngleAxis dataKey="s" tick={{fill:"#374151",fontSize:10}}/><Radar dataKey="v" stroke="#f5c842" fill="#f5c842" fillOpacity={0.13}/></RadarChart></ResponsiveContainer>
-            <div style={{fontSize:11}}>
-              {sel.isPitcher?(()=>{const sp=saberPitcher(sel.stats);return[["防御率",sp.ERA],["奪三振",sel.stats.Kp],["WHIP",sp.WHIP],["FIP",sp.FIP],["xFIP",sp.xFIP],["三振率",fmtPct(sp.Kpct)],["四球率",fmtPct(sp.BBpct)],["WAR",sp.WAR]].map(([l,v])=><div key={l} className="fsb" style={{padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.03)"}}><span style={{color:"#374151"}}>{l}</span><span className="mono" style={{color:"#94a3b8"}}>{v}</span></div>);})():(()=>{const sb=saberBatter(sel.stats);return[["打率",fmtAvg(sel.stats.H,sel.stats.AB)],["OPS",sb.OPS.toFixed(3)],["wOBA",sb.wOBA.toFixed(3)],["wRC+",sb.wRCp],["ISO",sb.ISO.toFixed(3)],["四球率",fmtPct(sb.BBpct)],["三振率",fmtPct(sb.Kpct)],["打球速度",sb.EVavg>0?sb.EVavg+"km/h":"---"],["WAR",sb.WAR]].map(([l,v])=><div key={l} className="fsb" style={{padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.03)"}}><span style={{color:"#374151"}}>{l}</span><span className="mono" style={{color:"#94a3b8"}}>{v}</span></div>);})()}
-            </div>
-          </div>
-          {!sel.isPitcher && (
-            <div style={{display:"flex",gap:10,flexWrap:"wrap",margin:"8px 0 4px"}}>
-              <label style={{fontSize:12,color:"#374151",display:"inline-flex",alignItems:"center",gap:6}}>
-                期間
-                <select
-                  value={rangeFilter}
-                  onChange={(e)=>setRangeFilter(sanitizeRangeFilter(e.target.value))}
-                  style={{fontSize:12,padding:"2px 6px"}}
-                >
-                  <option value={RANGE_FILTERS.LAST30}>直近30打球</option>
-                  <option value={RANGE_FILTERS.SEASON}>今季</option>
-                  <option value={RANGE_FILTERS.YEAR}>年度指定</option>
-                  <option value={RANGE_FILTERS.CAREER}>通算</option>
-                </select>
-              </label>
-              {rangeFilter===RANGE_FILTERS.YEAR&&(
-                <label style={{fontSize:12,color:"#374151",display:"inline-flex",alignItems:"center",gap:6}}>
-                  年度
-                  <select value={selectedYear} onChange={(e)=>setSelectedYear(Number(e.target.value))} style={{fontSize:12,padding:"2px 6px"}}>
-                    {(archiveYears.length?archiveYears:[year]).map((archiveYear)=><option key={archiveYear} value={archiveYear}>{archiveYear}</option>)}
-                  </select>
-                </label>
-              )}
-              <label style={{fontSize:12,color:"#374151",display:"inline-flex",alignItems:"center",gap:6}}>
-                結果
-                <select
-                  value={resultFilter}
-                  onChange={(e)=>setResultFilter(sanitizeResultFilter(e.target.value))}
-                  style={{fontSize:12,padding:"2px 6px"}}
-                >
-                  <option value={RESULT_FILTERS.ALL}>すべて</option>
-                  <option value={RESULT_FILTERS.HIT}>ヒット</option>
-                  <option value={RESULT_FILTERS.HR}>本塁打</option>
-                  <option value={RESULT_FILTERS.OUT}>アウト</option>
-                </select>
-              </label>
-            </div>
-          )}
-          {!sel.isPitcher&&(
-            <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"9px 11px",margin:"6px 0"}}>
-              <BattedBallProfileSummary profile={selectedProfile}/>
-              <div style={{fontSize:9,color:"#64748b",marginTop:5}}>
-                {archiveView.status==="loading"?"アーカイブを読込中…":
-                  archiveView.status==="error"||archiveView.status==="unavailable"?"アーカイブを利用できないため直近80打球を表示":
-                  archiveView.status==="fallback"?"アーカイブ開始前のため直近80打球を表示":
-                  `${archiveView.totalEvents || 0}打球${archiveView.sampled?"（グラフは1,000件を決定的抽出）":""}`}
-                {archiveMeta?.archiveStartYear?` / アーカイブ開始 ${archiveMeta.archiveStartYear}年`:""}
-              </div>
-            </div>
-          )}
-          <CareerTable player={sel}/>
-          {sel && !sel.isPitcher && <SprayChart events={filteredSprayEvents} />}
-        </div>
-      )}
-      {view==="batter"&&(
-        <div className="card">
-          <div className="card-h">打者成績 — クリックで詳細</div>
-          <div style={{overflowX:"auto"}}>
-            <table className="tbl">
-              <thead><tr>
-  <th>選手</th>
-  <ThCell label="打席"   openLabel={openTip} onOpen={setOpenTip}/>
-  <ThCell label="打率"   openLabel={openTip} onOpen={setOpenTip}/>
-  <ThCell label="OPS"   openLabel={openTip} onOpen={setOpenTip}/>
-  <ThCell label="wOBA"  openLabel={openTip} onOpen={setOpenTip}/>
-  <ThCell label="wRC+"  openLabel={openTip} onOpen={setOpenTip}/>
-  <ThCell label="ISO"   openLabel={openTip} onOpen={setOpenTip}/>
-  <ThCell label="BABIP" openLabel={openTip} onOpen={setOpenTip}/>
-  <ThCell label="四球率" openLabel={openTip} onOpen={setOpenTip}/>
-  <ThCell label="三振率" openLabel={openTip} onOpen={setOpenTip}/>
-  <ThCell label="打球速度" openLabel={openTip} onOpen={setOpenTip}/>
-  <ThCell label="打球角度" openLabel={openTip} onOpen={setOpenTip}/>
-  <ThCell label="WAR"   openLabel={openTip} onOpen={setOpenTip}/>
-  <th>本塁打</th>
-  <th>打点</th>
-  <th>盗塁</th>
-</tr></thead>
-              <tbody>
-                {batters.sort((a,b)=>saberBatter(b.stats).OPS-saberBatter(a.stats).OPS).map(p=>{const sb=saberBatter(p.stats);return(
-                  <tr key={p.id} style={{cursor:"pointer"}} onClick={()=>setSelId(p.id)}>
-                    <td style={{fontWeight:700,fontSize:12,color:selId===p.id?"#f5c842":undefined}}><span style={{cursor:"pointer",color:"#60a5fa"}} onClick={(e)=>{e.stopPropagation();onPlayerClick?.(p,myTeam?.name);}}>{p.name}</span></td>
-                    <td className="mono">{p.stats.PA}</td>
-                    <td className="mono">{fmtAvg(p.stats.H,p.stats.AB)}</td>
-                    <td className="mono" style={{color:sb.OPS>=.850?"#34d399":sb.OPS>=.700?"#f5c842":undefined}}>{sb.OPS>0?sb.OPS.toFixed(3):"---"}</td>
-                    <td className="mono">{sb.wOBA>0?sb.wOBA.toFixed(3):"---"}</td>
-                    <td className="mono" style={{color:sb.wRCp>=130?"#34d399":sb.wRCp>=100?"#f5c842":sb.wRCp>0?"#f87171":undefined}}>{sb.wRCp!=null?sb.wRCp:"---"}</td>
-                    <td className="mono">{sb.ISO>0?sb.ISO.toFixed(3):"---"}</td>
-                    <td className="mono">{sb.BABIP>0?sb.BABIP.toFixed(3):"---"}</td>
-                    <td className="mono">{sb.BBpct>0?fmtPct(sb.BBpct):"---"}</td>
-                    <td className="mono" style={{color:sb.Kpct>0.25?"#f87171":sb.Kpct<0.15?"#34d399":undefined}}>{sb.Kpct>0?fmtPct(sb.Kpct):"---"}</td>
-                    <td className="mono" style={{color:sb.EVavg>=145?"#34d399":sb.EVavg>=130?"#f5c842":undefined}}>{sb.EVavg>0?sb.EVavg.toFixed(1):"---"}</td>
-                    <td className="mono">{sb.LAavg!=null?sb.LAavg.toFixed(1):"---"}</td>
-                    <td className="mono" style={{color:sb.WAR>=4?"#34d399":sb.WAR>=2?"#f5c842":sb.WAR<0?"#f87171":undefined}}>{sb.WAR!=null?sb.WAR:"---"}</td>
-                    <td className="mono" style={{color:p.stats.HR>=20?"#f5c842":undefined}}>{p.stats.HR}</td>
-                    <td className="mono">{p.stats.RBI}</td>
-                    <td className="mono" style={{color:p.stats.SB>=20?"#34d399":undefined}}>{p.stats.SB}{p.stats.CS>0&&<span style={{fontSize:9,color:"#f87171",marginLeft:2}}>({p.stats.CS})</span>}</td>
-                  </tr>
-                );})}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-      {view==="pitcher"&&(
-        <div className="card">
-          <div className="card-h">投手成績</div>
-          <div style={{overflowX:"auto"}}>
-            <table className="tbl">
-              <thead><tr>
-  <th>選手</th>
-  <th>役割</th>
-  <th>勝</th>
-  <th>敗</th>
-  <th title="セーブ">S</th>
-  <th title="ホールド">H</th>
-  <th title="クオリティスタート">QS</th>
-  <ThCell label="投球回"  openLabel={openTip} onOpen={setOpenTip}/>
-  <ThCell label="防御率"  openLabel={openTip} onOpen={setOpenTip}/>
-  <th title="奪三振">K</th>
-  <ThCell label="WHIP"   openLabel={openTip} onOpen={setOpenTip}/>
-  <ThCell label="FIP"    openLabel={openTip} onOpen={setOpenTip}/>
-  <ThCell label="xFIP"   openLabel={openTip} onOpen={setOpenTip}/>
-  <ThCell label="三振率"  openLabel={openTip} onOpen={setOpenTip}/>
-  <ThCell label="四球率"  openLabel={openTip} onOpen={setOpenTip}/>
-  <ThCell label="WAR"    openLabel={openTip} onOpen={setOpenTip}/>
-</tr></thead>
-              <tbody>
-                {pitchers.sort((a,b)=>saberPitcher(a.stats).ERA-saberPitcher(b.stats).ERA).map(p=>{const sp=saberPitcher(p.stats);return(
-                  <tr key={p.id} style={{cursor:"pointer"}} onClick={()=>setSelId(p.id)}>
-                    <td style={{fontWeight:700,fontSize:12,color:selId===p.id?"#f5c842":undefined}}><span style={{cursor:"pointer",color:"#60a5fa"}} onClick={(e)=>{e.stopPropagation();onPlayerClick?.(p,myTeam?.name);}}>{p.name}</span><HandBadge p={p}/></td>
-                    <td style={{fontSize:10,color:"#374151"}}>{p.subtype}</td>
-                    <td className="mono" style={{color:"#34d399"}}>{p.stats.W}</td><td className="mono" style={{color:"#f87171"}}>{p.stats.L}</td>
-                    <td className="mono" style={{color:p.stats.SV>0?"#34d399":undefined}}>{p.stats.SV||"-"}</td>
-                    <td className="mono" style={{color:p.stats.HLD>0?"#60a5fa":undefined}}>{p.stats.HLD||"-"}</td>
-                    <td className="mono" style={{color:p.stats.QS>0?"#f5c842":undefined}}>{p.stats.QS||"-"}</td>
-                    <td className="mono">{p.stats.IP>0?fmtIP(p.stats.IP):"---"}</td>
-                    <td className="mono" style={{color:sp.ERA>0&&sp.ERA<2.5?"#34d399":sp.ERA<3.5?"#f5c842":sp.ERA>0?"#f87171":undefined}}>{sp.ERA>0?sp.ERA:"---"}</td>
-                    <td className="mono" style={{color:p.stats.Kp>=150?"#34d399":p.stats.Kp>=100?"#f5c842":undefined}}>{p.stats.Kp||"-"}</td>
-                    <td className="mono" style={{color:sp.WHIP>0&&sp.WHIP<1.0?"#34d399":sp.WHIP<1.3?"#f5c842":sp.WHIP<1.5?"#94a3b8":"#f87171"}}>{sp.WHIP>0?sp.WHIP:"---"}</td>
-                    <td className="mono" style={{color:sp.FIP<3?"#34d399":sp.FIP<4?"#f5c842":sp.FIP>0?"#f87171":undefined}}>{sp.FIP>0?sp.FIP:"---"}</td>
-                    <td className="mono">{sp.xFIP>0?sp.xFIP:"---"}</td>
-                    <td className="mono" style={{color:sp.Kpct>=0.30?"#34d399":undefined}}>{sp.Kpct>0?fmtPct(sp.Kpct):"---"}</td>
-                    <td className="mono" style={{color:sp.BBpct<=0.05?"#34d399":sp.BBpct>=0.12?"#f87171":undefined}}>{sp.BBpct>0?fmtPct(sp.BBpct):"---"}</td>
-                    <td className="mono" style={{color:sp.WAR>=3?"#34d399":sp.WAR>=1?"#f5c842":sp.WAR<0?"#f87171":undefined}}>{sp.WAR!==0?sp.WAR:"---"}</td>
-                  </tr>
-                );})}
-              </tbody>
-            </table>
-          </div>
-        </div>
+
+      {view === 'batter' ? (
+        <StatsTable
+          title="打者成績"
+          defaultSortLabel="OPS降順"
+          players={batters}
+          teamName={myTeam.name}
+          isPitcher={false}
+          showAdvanced={showAdvanced}
+          openTip={openTip}
+          onOpenTip={setOpenTip}
+          onPlayerClick={onPlayerClick}
+          sortState={sortByView.batter}
+          onSort={handleSort}
+          onToggleCompare={onToggleCompare}
+          comparePlayerIds={comparePlayerIds}
+        />
+      ) : (
+        <StatsTable
+          title="投手成績"
+          defaultSortLabel="防御率昇順"
+          players={pitchers}
+          teamName={myTeam.name}
+          isPitcher
+          showAdvanced={showAdvanced}
+          openTip={openTip}
+          onOpenTip={setOpenTip}
+          onPlayerClick={onPlayerClick}
+          sortState={sortByView.pitcher}
+          onSort={handleSort}
+          onToggleCompare={onToggleCompare}
+          comparePlayerIds={comparePlayerIds}
+        />
       )}
     </div>
   );

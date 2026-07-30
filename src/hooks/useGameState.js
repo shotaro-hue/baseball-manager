@@ -556,7 +556,14 @@ export function useGameState() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[ensureInitialTeams, setSaveId, year]);
 
-  const handlePlayerClick = useCallback((player,teamName)=>setPlayerModal({player,teamName}),[]);
+  const handlePlayerClick = useCallback(
+    (player, teamName, initialSection = 'profile') => setPlayerModal({
+      player,
+      teamName,
+      initialSection,
+    }),
+    [],
+  );
   const handleTeamClick = useCallback((team)=>{setViewingTeam(team);setScreen("team_detail");},[]);
 
   const setTrainingFocus = useCallback((pid,focus)=>upd(myId,t=>({...t,players:t.players.map(p=>p.id===pid?{...p,trainingFocus:focus}:p)})),[upd,myId]);

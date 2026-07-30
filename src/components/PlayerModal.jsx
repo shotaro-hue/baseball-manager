@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { fmtSal, fmtAvg, fmtIP } from '../utils';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 import { CareerTable } from './tabs/CareerTable';
-import { SprayChart } from './tabs/SprayChart';
+import { BattedBallAnalysisPanel } from './BattedBallAnalysisPanel';
 
 /* ═══════════════════════════════════════════════
    PLAYER DETAIL MODAL
@@ -37,79 +37,6 @@ function AbilityBar({label, value, color="#60a5fa"}){
 }
 
 
-function clampNormalized(value, min, max) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return null;
-  if (max <= min) return null;
-  const normalized = (numeric - min) / (max - min);
-  return Math.min(1, Math.max(0, normalized));
-}
-
-function mapResultToHitType(result, point = {}) {
-  const normalizedResult = typeof result === "string" ? result.trim().toLowerCase() : "";
-  const dist = Number(point?.dist);
-  const fenceDistance = Number(point?.fenceDistance);
-  const isHrByTrajectory = point?.isHrByTrajectory === true;
-
-  const looksLikeValidHr =
-    isHrByTrajectory ||
-    (normalizedResult === "hr" &&
-      Number.isFinite(dist) &&
-      Number.isFinite(fenceDistance) &&
-      dist >= fenceDistance);
-
-  if (["s", "1b", "single"].includes(normalizedResult)) return "single";
-  if (["d", "2b", "double"].includes(normalizedResult)) return "double";
-  if (["t", "3b", "triple"].includes(normalizedResult)) return "triple";
-  if (["hr", "homerun"].includes(normalizedResult) && looksLikeValidHr) return "homeRun";
-
-  // HR表記なのにフェンス未達なら、可視化上はHR扱いしない
-  if (["hr", "homerun"].includes(normalizedResult)) return "out";
-
-  return "out";
-}
-
-function toSprayChartEvents(sprayPoints) {
-  if (!Array.isArray(sprayPoints)) return [];
-
-  return sprayPoints
-    .map((point, index) => {
-      const safeDist = Number.isFinite(Number(point?.dist))
-        ? Math.max(0, Math.min(220, Number(point.dist)))
-        : null;
-
-      const safeSpray = Number.isFinite(Number(point?.sprayAngle))
-        ? Math.max(0, Math.min(90, Number(point.sprayAngle)))
-        : null;
-
-      const safeFenceDistance = Number.isFinite(Number(point?.fenceDistance))
-        ? Math.max(85, Math.min(140, Number(point.fenceDistance)))
-        : 100;
-
-      const maxDisplayDistance = Math.max(110, safeFenceDistance * 1.18);
-
-      const normalizedDistance = clampNormalized(safeDist, 0, maxDisplayDistance);
-      const normalizedAngle = clampNormalized(safeSpray, 0, 90);
-      const fenceRatio = clampNormalized(safeFenceDistance, 0, maxDisplayDistance);
-
-      if (!Number.isFinite(normalizedDistance) || !Number.isFinite(normalizedAngle)) {
-        return null;
-      }
-
-      return {
-        id: point?.id ?? `spray-point-${index}`,
-        x: normalizedAngle,
-        y: normalizedDistance,
-        fenceRatio,
-        hitType: mapResultToHitType(point?.result, point),
-        hrClearance: Number.isFinite(Number(point?.hrClearance)) ? Number(point.hrClearance) : null,
-        fenceDistance: Number.isFinite(Number(point?.fenceDistance)) ? Number(point.fenceDistance) : null,
-        isHrByTrajectory: point?.isHrByTrajectory === true,
-      };
-    })
-    .filter(Boolean);
-}
-
 // 守備適正ダイヤモンド
 const FIELD_POSITIONS = [
   { key:"捕手",   x:150, y:165, label:"C"  },
@@ -140,7 +67,7 @@ function PositionDiamond({player, convertTarget, onSetConvertTarget}){
   return(
     <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-        <span style={{fontSize:10,color:"#374151",fontWeight:700,letterSpacing:".05em"}}>守備適正</span>
+        <span style={{fontSize:10,color:"#94a3b8",fontWeight:700,letterSpacing:".05em"}}>守備適正</span>
         {onSetConvertTarget&&<span style={{fontSize:8,color:"#818cf8"}}>ポジションをクリックでコンバート指示</span>}
       </div>
 
@@ -219,19 +146,38 @@ function PositionDiamond({player, convertTarget, onSetConvertTarget}){
   );
 }
 
-export function PlayerModal({player:p, teamName, isMyTeam, onSetConvertTarget, onClose}){
+const VALID_SECTIONS = new Set(["profile", "stats", "battedBall", "career"]);
+
+function resolveInitialSection(player, requestedSection) {
+  if (!VALID_SECTIONS.has(requestedSection)) return "profile";
+  if (requestedSection === "battedBall" && player?.isPitcher) return "stats";
+  return requestedSection;
+}
+
+export function PlayerModal({
+  player:p,
+  teamName,
+  isMyTeam,
+  initialSection = "profile",
+  saveId,
+  year,
+  teams,
+  isCompared = false,
+  onToggleCompare,
+  onNavigate,
+  onSetConvertTarget,
+  onClose,
+}){
   const [localConvertTarget, setLocalConvertTarget] = useState(p?.convertTarget ?? null);
-  const [activeSection, setActiveSection] = useState("profile");
+  const [activeSection, setActiveSection] = useState(
+    () => resolveInitialSection(p, initialSection),
+  );
 
   useEffect(()=>{
     const handler=(e)=>{if(e.key==="Escape")onClose();};
     window.addEventListener("keydown",handler);
     return()=>window.removeEventListener("keydown",handler);
   },[onClose]);
-
-  useEffect(() => {
-    setActiveSection("profile");
-  }, [p?.id]);
 
   if(!p) return null;
 
@@ -264,30 +210,45 @@ export function PlayerModal({player:p, teamName, isMyTeam, onSetConvertTarget, o
 
   return(
     <div
-      style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.78)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 16px"}}
+      className="player-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={`player-modal-title-${p.id}`}
       onClick={e=>{if(e.target===e.currentTarget)onClose();}}
     >
-      <div style={{background:"#0d1b2a",border:"1px solid #1e3a5f",borderRadius:12,padding:20,width:"100%",maxWidth:480,boxShadow:"0 8px 32px rgba(0,0,0,.6)",maxHeight:"90vh",overflowY:"auto"}}>
+      <div className={`player-modal-card ${activeSection === "battedBall" ? "wide" : ""}`}>
 
         {/* ヘッダー */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
           <div>
-            <div style={{fontSize:16,fontWeight:700,color:"#e0d4bf",marginBottom:2}}>
+            <div id={`player-modal-title-${p.id}`} style={{fontSize:16,fontWeight:700,color:"#e0d4bf",marginBottom:2}}>
               {safePlayerName}
               {p.isForeign&&<span style={{fontSize:9,background:"rgba(96,165,250,.15)",color:"#60a5fa",border:"1px solid rgba(96,165,250,.3)",borderRadius:3,padding:"1px 5px",marginLeft:6}}>外国人</span>}
               {p.育成&&<span style={{fontSize:9,background:"rgba(167,139,250,.15)",color:"#a78bfa",border:"1px solid rgba(167,139,250,.3)",borderRadius:3,padding:"1px 5px",marginLeft:4}}>育成</span>}
             </div>
-            <div style={{fontSize:11,color:"#374151"}}>
+            <div style={{fontSize:11,color:"#94a3b8"}}>
               {p.age}歳 / {p.pos}
-              {p.isPitcher&&safeSubtype&&safeSubtype!==p.pos&&<span style={{marginLeft:6,color:"#374151"}}>（{safeSubtype}）</span>}
+              {p.isPitcher&&safeSubtype&&safeSubtype!==p.pos&&<span style={{marginLeft:6,color:"#94a3b8"}}>（{safeSubtype}）</span>}
               {p.isPitcher&&<span style={{marginLeft:6,color:p.hand==="left"?"#a78bfa":"#94a3b8"}}>{p.hand==="left"?"左投":"右投"}</span>}
             </div>
             {safeTeamName&&<div style={{fontSize:10,color:"#60a5fa",marginTop:2}}>{safeTeamName}</div>}
           </div>
-          <button
-            onClick={onClose}
-            style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",color:"#94a3b8",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontSize:12}}
-          >✕</button>
+          <div className="player-modal-header-actions">
+            {onToggleCompare&&(
+              <button
+                type="button"
+                className={isCompared?"compare-add-button on":"compare-add-button"}
+                onClick={()=>onToggleCompare(p,teamName)}
+              >
+                {isCompared?"比較から外す":"＋ 比較"}
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              aria-label="選手詳細を閉じる"
+              style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",color:"#94a3b8",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontSize:12}}
+            >✕</button>
+          </div>
         </div>
 
         {/* 状態バッジ行 */}
@@ -300,24 +261,78 @@ export function PlayerModal({player:p, teamName, isMyTeam, onSetConvertTarget, o
         </div>
 
         {/* セクション切替 */}
-        <div style={{display:"flex",gap:8,marginBottom:12}}>
-          <button onClick={()=>setActiveSection("profile")} style={{flex:1,borderRadius:8,padding:"8px 10px",cursor:"pointer",border:activeSection==="profile"?"1px solid #60a5fa":"1px solid rgba(255,255,255,.12)",background:activeSection==="profile"?"rgba(96,165,250,.15)":"rgba(255,255,255,.04)",color:activeSection==="profile"?"#93c5fd":"#94a3b8",fontSize:11,fontWeight:700}}>能力・プロフィール</button>
-          <button onClick={()=>setActiveSection("stats")} style={{flex:1,borderRadius:8,padding:"8px 10px",cursor:"pointer",border:activeSection==="stats"?"1px solid #34d399":"1px solid rgba(255,255,255,.12)",background:activeSection==="stats"?"rgba(52,211,153,.14)":"rgba(255,255,255,.04)",color:activeSection==="stats"?"#6ee7b7":"#94a3b8",fontSize:11,fontWeight:700}}>成績</button>
+        <div className="player-detail-tabs" role="tablist" aria-label="選手詳細">
+          {[
+            ["profile", "概要"],
+            ["stats", "今季成績"],
+            ...(!p.isPitcher ? [["battedBall", "打球分析"]] : []),
+            ["career", "年度別・通算"],
+          ].map(([sectionId, label]) => (
+            <button
+              key={sectionId}
+              type="button"
+              role="tab"
+              aria-selected={activeSection === sectionId}
+              className={activeSection === sectionId ? "on" : ""}
+              onClick={() => setActiveSection(sectionId)}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         {activeSection==="profile"&&(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12,minWidth:0}}>
           <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}>
-            <div style={{fontSize:10,color:"#374151",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>能力値</div>
+            <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>能力値</div>
             {p.isPitcher?(<><AbilityBar label="球速" value={p.pitching.velocity}/><AbilityBar label="制球" value={p.pitching.control}/><AbilityBar label="スタミナ" value={p.pitching.stamina}/><AbilityBar label="変化球" value={p.pitching.breaking}/><AbilityBar label="球種" value={p.pitching.variety}/><AbilityBar label="ピンチ" value={p.pitching.clutchP}/></>):(<><AbilityBar label="ミート" value={p.batting.contact}/><AbilityBar label="長打" value={p.batting.power}/><AbilityBar label="走力" value={p.batting.speed}/><AbilityBar label="守備" value={p.batting.defense}/><AbilityBar label="選球眼" value={p.batting.eye}/><AbilityBar label="クラッチ" value={p.batting.clutch}/></>)}
-            <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",justifyContent:"space-between"}}><span style={{fontSize:9,color:"#374151"}}>潜在能力</span><span style={{fontSize:10,color:"#a78bfa",fontFamily:"monospace",fontWeight:700}}>{p.potential}</span></div>
+            <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",justifyContent:"space-between"}}><span style={{fontSize:9,color:"#94a3b8"}}>潜在能力</span><span style={{fontSize:10,color:"#a78bfa",fontFamily:"monospace",fontWeight:700}}>{p.potential}</span></div>
           </div>
-          <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#374151",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>契約</div><StatRow label="年俸" value={fmtSal(p.salary)} color="#f5c842"/><StatRow label="残年数" value={`${p.contractYearsLeft}年`} color={p.contractYearsLeft===0?"#f87171":undefined}/><div style={{marginTop:6,paddingTop:6,borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",justifyContent:"space-between"}}><span style={{fontSize:9,color:"#374151"}}>モラル</span><span style={{fontSize:10,fontFamily:"monospace",color:(p.morale??70)>=80?"#34d399":(p.morale??70)>=60?"#f5c842":"#f87171"}}>{p.morale??70}</span></div><div style={{marginTop:4,display:"flex",justifyContent:"space-between"}}><span style={{fontSize:9,color:"#374151"}}>コンディション</span><span style={{fontSize:10,fontFamily:"monospace",color:(p.condition??70)>=80?"#34d399":(p.condition??70)>=60?"#f5c842":"#f87171"}}>{p.condition??70}</span></div></div>
+          <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>契約</div><StatRow label="年俸" value={fmtSal(p.salary)} color="#f5c842"/><StatRow label="残年数" value={`${p.contractYearsLeft}年`} color={p.contractYearsLeft===0?"#f87171":undefined}/><div style={{marginTop:6,paddingTop:6,borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",justifyContent:"space-between"}}><span style={{fontSize:9,color:"#94a3b8"}}>モラル</span><span style={{fontSize:10,fontFamily:"monospace",color:(p.morale??70)>=80?"#34d399":(p.morale??70)>=60?"#f5c842":"#f87171"}}>{p.morale??70}</span></div><div style={{marginTop:4,display:"flex",justifyContent:"space-between"}}><span style={{fontSize:9,color:"#94a3b8"}}>コンディション</span><span style={{fontSize:10,fontFamily:"monospace",color:(p.condition??70)>=80?"#34d399":(p.condition??70)>=60?"#f5c842":"#f87171"}}>{p.condition??70}</span></div></div>
         </div>)}
 
-        {activeSection==="stats"&&(<div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12,minWidth:0}}><div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#374151",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>今季成績</div>{p.isPitcher?(<><StatRow label="防御率" value={sp.ERA>0?sp.ERA:"---"} color={sp.ERA>0&&sp.ERA<3?"#34d399":sp.ERA<4?"#f5c842":sp.ERA>0?"#f87171":undefined}/><StatRow label="勝-敗" value={`${p.stats.W}-${p.stats.L}`}/><StatRow label="投球回" value={p.stats.IP>0?fmtIP(p.stats.IP):"---"}/><StatRow label="奪三振" value={p.stats.Kp||0}/><StatRow label="WHIP" value={sp.WHIP>0?sp.WHIP:"---"} color={sp.WHIP>0&&sp.WHIP<1.0?"#34d399":sp.WHIP<1.3?"#f5c842":undefined}/><StatRow label="セーブ" value={p.stats.SV||0}/><StatRow label="H" value={p.stats.HLD||0}/></>):(<><StatRow label="打率" value={fmtAvg(p.stats.H,p.stats.AB)} color={p.stats.AB>0&&(p.stats.H/p.stats.AB)>=.300?"#34d399":(p.stats.H/p.stats.AB)>=.250?"#f5c842":undefined}/><StatRow label="本塁打" value={p.stats.HR} color={p.stats.HR>=20?"#f5c842":undefined}/><StatRow label="打点" value={p.stats.RBI}/><StatRow label="OPS" value={sb.OPS>0?sb.OPS.toFixed(3):"---"} color={sb.OPS>=.850?"#34d399":sb.OPS>=.700?"#f5c842":undefined}/><StatRow label="盗塁" value={p.stats.SB||0}/><StatRow label="出塁率" value={sb.OBP>0?sb.OBP.toFixed(3):"---"}/><StatRow label="強打球率" value={sb.hardHitPct>0?`${(sb.hardHitPct*100).toFixed(1)}%`:"---"} color={sb.hardHitPct>=0.4?"#34d399":undefined}/></>)}</div>{!p.isPitcher&&(<div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#374151",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>打球傾向分析</div><StatRow label="打者基準・引っ張り" value={sb.pullPct>0?`${(sb.pullPct*100).toFixed(1)}%`:"---"}/><StatRow label="打者基準・中方向" value={sb.centerPct>0?`${(sb.centerPct*100).toFixed(1)}%`:"---"}/><StatRow label="打者基準・逆方向" value={sb.oppositePct>0?`${(sb.oppositePct*100).toFixed(1)}%`:"---"}/>{(()=>{const profile=p?.stats?.battedBallProfile;const bip=Number(profile?.bip)||0;const pct=(value)=>bip>0?`${((Number(value||0)/bip)*100).toFixed(1)}%`:"---";return <><StatRow label="物理方向・左翼" value={pct(profile?.left)}/><StatRow label="物理方向・中堅" value={pct(profile?.center)}/><StatRow label="物理方向・右翼" value={pct(profile?.right)}/></>;})()}<StatRow label="ゴロ率" value={sb.gbPct>0?`${(sb.gbPct*100).toFixed(1)}%`:"---"}/><StatRow label="ライナー率" value={sb.ldPct>0?`${(sb.ldPct*100).toFixed(1)}%`:"---"}/><StatRow label="フライ率" value={sb.fbPct>0?`${(sb.fbPct*100).toFixed(1)}%`:"---"}/><SprayChart events={toSprayChartEvents(Array.isArray(p?.stats?.sprayPoints) ? p.stats.sprayPoints : [])} /></div>)}</div>)}
+        {activeSection==="stats"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12,minWidth:0}}>
+            <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}>
+              <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>今季成績</div>
+              {p.isPitcher ? (
+                <>
+                  <StatRow label="防御率" value={sp.ERA>0?sp.ERA:"---"} color={sp.ERA>0&&sp.ERA<3?"#34d399":sp.ERA<4?"#f5c842":sp.ERA>0?"#f87171":undefined}/>
+                  <StatRow label="勝-敗" value={`${p.stats.W}-${p.stats.L}`}/>
+                  <StatRow label="投球回" value={p.stats.IP>0?fmtIP(p.stats.IP):"---"}/>
+                  <StatRow label="奪三振" value={p.stats.Kp||0}/>
+                  <StatRow label="WHIP" value={sp.WHIP>0?sp.WHIP:"---"} color={sp.WHIP>0&&sp.WHIP<1.0?"#34d399":sp.WHIP<1.3?"#f5c842":undefined}/>
+                  <StatRow label="セーブ" value={p.stats.SV||0}/>
+                  <StatRow label="ホールド" value={p.stats.HLD||0}/>
+                </>
+              ) : (
+                <>
+                  <StatRow label="打率" value={fmtAvg(p.stats.H,p.stats.AB)} color={p.stats.AB>0&&(p.stats.H/p.stats.AB)>=.300?"#34d399":(p.stats.H/p.stats.AB)>=.250?"#f5c842":undefined}/>
+                  <StatRow label="本塁打" value={p.stats.HR} color={p.stats.HR>=20?"#f5c842":undefined}/>
+                  <StatRow label="打点" value={p.stats.RBI}/>
+                  <StatRow label="OPS" value={sb.OPS>0?sb.OPS.toFixed(3):"---"} color={sb.OPS>=.850?"#34d399":sb.OPS>=.700?"#f5c842":undefined}/>
+                  <StatRow label="盗塁" value={p.stats.SB||0}/>
+                  <StatRow label="出塁率" value={sb.OBP>0?sb.OBP.toFixed(3):"---"}/>
+                  <StatRow label="強打球率" value={sb.hardHitPct>0?`${(sb.hardHitPct*100).toFixed(1)}%`:"---"} color={sb.hardHitPct>=0.4?"#34d399":undefined}/>
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
-        {/* 年度別・通算成績 */}
-        <CareerTable player={p}/>
+        {activeSection === "battedBall" && !p.isPitcher && (
+          <BattedBallAnalysisPanel player={p} saveId={saveId} year={year} teams={teams} teamName={teamName}/>
+        )}
+
+        {activeSection === "career" && <CareerTable player={p}/>}
+
+        {onNavigate&&(
+          <div className="player-decision-actions" aria-label="この選手について判断する">
+            <span>この選手について判断</span>
+            {isMyTeam&&<button type="button" className="bsm bga" onClick={()=>onNavigate("roster",p,teamName)}>起用へ</button>}
+            {isMyTeam&&<button type="button" className="bsm bga" onClick={()=>onNavigate("contract",p,teamName)}>契約へ</button>}
+            <button type="button" className="bsm bgb" onClick={()=>onNavigate("trade",p,teamName)}>トレードへ</button>
+          </div>
+        )}
 
       </div>
     </div>
@@ -327,7 +342,7 @@ export function PlayerModal({player:p, teamName, isMyTeam, onSetConvertTarget, o
 function StatRow({label,value,color}){
   return(
     <div style={{display:"flex",justifyContent:"space-between",padding:"2px 0"}}>
-      <span style={{fontSize:10,color:"#374151"}}>{label}</span>
+      <span style={{fontSize:10,color:"#94a3b8"}}>{label}</span>
       <span style={{fontSize:10,fontFamily:"monospace",color:color||"#e0d4bf",fontWeight:color?700:400}}>{value}</span>
     </div>
   );

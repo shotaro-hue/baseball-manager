@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { fmtAvg, fmtOBP, fmtIP, gameDayToDate } from '../utils';
 import { BoxScoreModal } from './BoxScoreModal';
 import { getManagementPolicy, getManagementTrait } from '../engine/managementPolicy';
+import { TeamComparisonPanel } from './TeamComparisonPanel';
 
 const MONTH_LABELS = [3, 4, 5, 6, 7, 8, 9, 10];
 
@@ -411,7 +412,7 @@ function HistoryTab({ team, onPlayerClick }) {
 }
 
 // ── メイン: TeamDetailScreen ──────────────────────────
-export function TeamDetailScreen({ team, allTeams, schedule, year, allTeamResultsMap, allTeamBoxScoresMap, onBack, onPlayerClick, onOpenTrade }) {
+export function TeamDetailScreen({ team, myTeam, allTeams, schedule, year, allTeamResultsMap, allTeamBoxScoresMap, onBack, onPlayerClick, onOpenTrade }) {
   const [tab, setTab] = useState('roster');
   const [showCompare, setShowCompare] = useState(true);
 
@@ -507,6 +508,10 @@ export function TeamDetailScreen({ team, allTeams, schedule, year, allTeamResult
             <span className="chip" style={{ background: 'rgba(167,139,250,.12)', color: '#c4b5fd' }}>チーム傾向: {archetype}</span>
           </div>
         </div>
+
+        {showCompare && myTeam && team.id !== myTeam.id && (
+          <TeamComparisonPanel myTeam={myTeam} opponent={team} allTeams={allTeams} />
+        )}
 
         <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>
           {insightCards.map((c, idx) => (
