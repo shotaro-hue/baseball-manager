@@ -16,6 +16,10 @@ import {
   getManagementPolicy,
   getManagementTrait,
 } from '../../engine/managementPolicy';
+import {
+  MIN_OFFICIAL_BATTED_BALLS,
+  stableSort,
+} from '../../engine/analysisComparison';
 
 const TALK_OPTIONS = [
   { type: "praise",       label: "💪 激励する",      desc: "モラル +5〜+15（確実）" },
@@ -195,6 +199,28 @@ export function RosterTab({team,allTeams,onToggle,onReplaceLineup,onSetLineupOrd
       evaluateBatterForPolicy(player, team, { teams: allTeams, leagueContext }),
     ]),
   );
+  const leagueEvRows = stableSort(
+    (allTeams || [])
+      .filter((entry) => entry.league === team.league)
+      .flatMap((entry) => (entry.players || []).filter((player) => !player.isPitcher))
+      .map((player) => {
+        const profile = player.stats?.battedBallProfile || {};
+        return {
+          playerId: player.id,
+          count: Number(profile.bip) || 0,
+          value: Number(profile.evN) > 0 ? Number(profile.evSum) / Number(profile.evN) : null,
+        };
+      })
+      .filter((row) => row.count >= MIN_OFFICIAL_BATTED_BALLS && row.value != null),
+    (row) => row.value,
+    'desc',
+  );
+  const leagueEvTopPercent = Object.fromEntries(
+    leagueEvRows.map((row, index) => [
+      row.playerId,
+      Math.max(1, Math.ceil(((index + 1) / leagueEvRows.length) * 100)),
+    ]),
+  );
   const lineupLimit = rosterDhMode ? 9 : 8;
   const lineupSlots = Array.from({ length: lineupLimit }, (_, i) => i + 1);
   const autoSetLineup=()=>{
@@ -314,7 +340,7 @@ export function RosterTab({team,allTeams,onToggle,onReplaceLineup,onSetLineupOrd
           </div>
           <div style={{overflowX:"auto"}}>
             <table className="tbl">
-              <thead><tr><th>#</th><th>選手名</th><th>守備</th><th>適正</th><th>年齢</th><th>方針評価</th><th>ミート</th><th>長打</th><th>走力</th><th>選球</th><th>クラッチ</th><th>変化球</th><th>状態</th><th>調子</th><th>モラル</th><th>打率</th><th>HR</th><th>OPS</th><th>強化</th><th>コンバート</th><th></th></tr></thead>
+              <thead><tr><th>#</th><th>選手名</th><th>守備</th><th>適正</th><th>年齢</th><th>方針評価</th><th>リーグ打球</th><th>ミート</th><th>長打</th><th>走力</th><th>選球</th><th>クラッチ</th><th>変化球</th><th>状態</th><th>調子</th><th>モラル</th><th>打率</th><th>HR</th><th>OPS</th><th>強化</th><th>コンバート</th><th></th></tr></thead>
               <tbody>
                 {orderedBatters.map(p=>{const inL=team.lineup.includes(p.id);const sb=saberBatter(p.stats);const isInj=(p.injuryDaysLeft??0)>0;return(
                   <tr key={p.id} style={isInj?{opacity:.55}:undefined}>
@@ -388,6 +414,9 @@ export function RosterTab({team,allTeams,onToggle,onReplaceLineup,onSetLineupOrd
                     <td className="mono" style={{color:"#374151"}}>{p.age}</td>
                     <td title={policyEvaluations[p.id]?.reasons?.join(" / ")} style={{color:(policyEvaluations[p.id]?.total??50)>=60?"#4ade80":(policyEvaluations[p.id]?.total??50)<45?"#f87171":"#f5c842",fontWeight:700}}>
                       {Math.round(policyEvaluations[p.id]?.total??50)}
+                    </td>
+                    <td style={{color:(leagueEvTopPercent[p.id]??101)<=25?"#34d399":"#94a3b8",fontSize:9,whiteSpace:"nowrap"}}>
+                      {leagueEvTopPercent[p.id]?`上位${leagueEvTopPercent[p.id]}%`:"N不足"}
                     </td>
                     <td><OV v={p.batting.contact}/></td><td><OV v={p.batting.power}/></td><td><OV v={p.batting.speed}/></td><td><OV v={p.batting.eye}/></td>
                     <td><OV v={p.batting.clutch}/></td><td><OV v={p.batting.breakingBall}/></td>

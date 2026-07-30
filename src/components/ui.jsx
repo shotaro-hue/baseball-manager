@@ -96,16 +96,41 @@ const STAT_TIPS = {
   "xFIP":  { en: "xFIP", desc: "被本塁打をリーグ平均に補正したFIP" },
 };
 
-export function ThCell({ label, openLabel, onOpen }) {
+export function ThCell({
+  label,
+  openLabel,
+  onOpen,
+  sortDirection,
+  onSort,
+}) {
   const tip = STAT_TIPS[label];
   const isOpen = openLabel === label;
   return (
     <th
-      style={{ position: "relative", cursor: tip ? "pointer" : "default" }}
-      onClick={() => { if (tip) onOpen(isOpen ? null : label); }}
+      style={{ position: "relative", whiteSpace: "nowrap" }}
     >
-      {label}
-      {tip && <span style={{ fontSize: 8, color: "#60a5fa", marginLeft: 2 }}>ⓘ</span>}
+      <button
+        type="button"
+        className="table-sort-button"
+        onClick={() => onSort?.()}
+        disabled={!onSort}
+        aria-label={onSort ? `${label}でソート` : undefined}
+      >
+        {label}
+        {sortDirection && (
+          <span className="table-sort-direction">{sortDirection === "asc" ? "▲" : "▼"}</span>
+        )}
+      </button>
+      {tip && (
+        <button
+          type="button"
+          className="table-tip-button"
+          aria-label={`${label}の説明`}
+          onClick={() => onOpen?.(isOpen ? null : label)}
+        >
+          ⓘ
+        </button>
+      )}
       {isOpen && tip && (
         <div style={{
           position: "absolute", top: "100%", left: 0,

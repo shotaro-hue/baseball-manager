@@ -4,7 +4,7 @@
 :root{
   --bg:#04101c;--card:#0b1c30;--border:rgba(255,255,255,.07);
   --gold:#f5c842;--green:#34d399;--red:#f87171;--blue:#60a5fa;--purple:#a78bfa;
-  --text:#c0cfe0;--dim:#2e4055;
+  --text:#c0cfe0;--dim:#71849a;
   /* 3-tier spacing scale: tight / comfortable / section */
   --sp-1:8px; --sp-2:14px; --sp-3:18px;
   /* 3-tier type scale for hierarchy (rank / stat / meta) */
@@ -47,7 +47,7 @@ body{background:var(--bg);}
   background:rgba(4,16,28,.96);backdrop-filter:blur(8px);
   border-top:1px solid rgba(255,255,255,.08);
   padding:8px 10px max(8px, env(safe-area-inset-bottom));
-  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;
+  display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;
 }
 .primary-nav-btn{
   border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);color:#90a4b8;
@@ -337,4 +337,255 @@ body{background:var(--bg);}
     backdrop-filter:none;
     -webkit-backdrop-filter:none;
   }
+}
+
+/* Player detail and batted-ball analysis */
+.player-modal-overlay{
+  position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;
+  padding:16px;background:rgba(0,0,0,.78);
+}
+.player-modal-card{
+  width:100%;max-width:620px;max-height:92vh;overflow-y:auto;padding:20px;
+  background:#0d1b2a;border:1px solid #1e3a5f;border-radius:12px;
+  box-shadow:0 8px 32px rgba(0,0,0,.6);
+}
+.player-modal-card.wide{max-width:860px;}
+.player-detail-tabs{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:14px;
+}
+.player-detail-tabs button{
+  min-height:42px;padding:8px;border-radius:8px;cursor:pointer;
+  border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);
+  color:#94a3b8;font-family:inherit;font-size:11px;font-weight:700;
+}
+.player-detail-tabs button.on{
+  color:#f5c842;border-color:rgba(245,200,66,.55);background:rgba(245,200,66,.12);
+}
+.player-detail-tabs button:focus-visible,
+.interactive-player-row:focus-visible,
+.stats-column-toggle button:focus-visible{
+  outline:2px solid #f5c842;outline-offset:2px;
+}
+.batted-ball-analysis{display:grid;gap:12px;}
+.batted-ball-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+.batted-ball-heading h3{margin:0;color:#f8fafc;font-size:17px;}
+.batted-ball-heading p{margin-top:3px;color:#94a3b8;font-size:11px;line-height:1.5;}
+.batted-ball-reliability{
+  flex-shrink:0;padding:5px 9px;border-radius:999px;font-size:10px;font-weight:700;
+  border:1px solid rgba(148,163,184,.3);background:rgba(148,163,184,.08);color:#cbd5e1;
+}
+.batted-ball-reliability.reliability-low{border-color:rgba(248,113,113,.35);color:#fca5a5;background:rgba(248,113,113,.08);}
+.batted-ball-reliability.reliability-mid{border-color:rgba(245,200,66,.35);color:#f5c842;background:rgba(245,200,66,.08);}
+.batted-ball-reliability.reliability-high{border-color:rgba(52,211,153,.35);color:#6ee7b7;background:rgba(52,211,153,.08);}
+.batted-ball-controls{
+  display:flex;align-items:end;gap:10px;flex-wrap:wrap;padding:10px;
+  border:1px solid rgba(148,163,184,.16);border-radius:10px;background:rgba(255,255,255,.025);
+}
+.batted-ball-controls label{display:grid;gap:4px;min-width:130px;color:#94a3b8;font-size:10px;}
+.batted-ball-controls select{
+  min-height:40px;padding:7px 30px 7px 10px;border-radius:8px;
+  border:1px solid rgba(148,163,184,.35);background:#0b1828;color:#e2e8f0;
+  font:inherit;font-size:12px;
+}
+.batted-ball-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+.batted-ball-metric{
+  min-height:84px;padding:10px;border-radius:10px;
+  background:rgba(255,255,255,.03);border:1px solid rgba(148,163,184,.13);
+}
+.batted-ball-metric-label{color:#94a3b8;font-size:10px;}
+.batted-ball-metric-value{margin-top:4px;color:#f8fafc;font-size:20px;font-weight:700;}
+.batted-ball-metric-note{margin-top:3px;color:#71849a;font-size:9px;}
+.batted-ball-warning,.batted-ball-coverage{
+  padding:9px 11px;border-radius:8px;font-size:11px;line-height:1.55;
+}
+.batted-ball-warning{color:#fcd34d;border:1px solid rgba(245,158,11,.35);background:rgba(245,158,11,.09);}
+.batted-ball-coverage{color:#93c5fd;border:1px solid rgba(96,165,250,.3);background:rgba(96,165,250,.08);}
+.batted-ball-breakdown{display:flex;gap:6px;flex-wrap:wrap;}
+.batted-ball-breakdown span{
+  padding:4px 8px;border-radius:999px;background:rgba(148,163,184,.09);
+  color:#cbd5e1;border:1px solid rgba(148,163,184,.18);font-size:10px;
+}
+.batted-ball-loading,.batted-ball-empty{
+  min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:5px;text-align:center;padding:18px;border:1px dashed rgba(148,163,184,.24);
+  border-radius:10px;color:#94a3b8;font-size:11px;
+}
+.batted-ball-empty strong{color:#e2e8f0;font-size:13px;}
+.batted-ball-sample-note{color:#71849a;font-size:9px;text-align:right;}
+
+/* Statistics tables */
+.stats-toolbar{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;
+}
+.stats-toolbar .tabs{min-width:220px;}
+.stats-column-toggle{
+  display:flex;padding:3px;border-radius:8px;background:rgba(0,0,0,.3);
+}
+.stats-column-toggle button{
+  min-height:34px;padding:6px 10px;border:0;border-radius:6px;
+  color:#94a3b8;background:transparent;font:inherit;font-size:10px;cursor:pointer;
+}
+.stats-column-toggle button.on{color:#f5c842;background:rgba(245,200,66,.12);}
+.stats-table-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+.stats-table-heading .card-h{margin-bottom:4px;color:#94a3b8;}
+.stats-sort-label{margin-bottom:10px;color:#71849a;font-size:10px;}
+.stats-table-wrap{overflow-x:auto;border-radius:8px;}
+.stats-table th:first-child,.stats-table td:first-child{
+  position:sticky;left:0;z-index:2;background:#0b1c30;
+}
+.stats-table thead th:first-child{z-index:3;}
+.stats-player-cell{min-width:128px;color:#93c5fd;font-size:12px;font-weight:700;}
+.interactive-player-row{cursor:pointer;}
+.interactive-player-row:hover td{background:rgba(96,165,250,.06);}
+.interactive-player-row:hover td:first-child{background:#10243a;}
+.interactive-player-row:focus-visible td{background:rgba(245,200,66,.06);}
+.stats-table .text-cell{color:#94a3b8;font-size:10px;}
+.table-sort-button{
+  appearance:none;border:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;
+  padding:6px 2px;cursor:pointer;white-space:nowrap;
+}
+.table-sort-button:disabled{cursor:default;}
+.table-sort-direction{margin-left:4px;color:#f5c842;font-size:9px;}
+.table-tip-button{
+  appearance:none;border:0;background:transparent;color:#60a5fa;padding:4px 2px;
+  font-size:9px;cursor:pointer;
+}
+.stats-compare-cell{min-width:62px;text-align:center;}
+.compare-add-button{
+  min-height:30px;padding:4px 7px;border-radius:7px;white-space:nowrap;cursor:pointer;
+  border:1px solid rgba(96,165,250,.28);background:rgba(96,165,250,.07);
+  color:#93c5fd;font:inherit;font-size:9px;font-weight:700;
+}
+.compare-add-button.on{
+  color:#f5c842;border-color:rgba(245,200,66,.4);background:rgba(245,200,66,.1);
+}
+.player-modal-header-actions{display:flex;align-items:center;gap:6px;}
+.player-decision-actions{
+  position:sticky;bottom:-20px;display:flex;align-items:center;justify-content:flex-end;gap:6px;
+  margin:14px -20px -20px;padding:10px 20px;background:rgba(7,18,31,.96);
+  border-top:1px solid rgba(148,163,184,.16);z-index:4;
+}
+.player-decision-actions>span{margin-right:auto;color:#94a3b8;font-size:10px;font-weight:700;}
+.decision-context-banner{
+  display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:9px 11px;
+  border:1px solid rgba(245,200,66,.32);border-radius:9px;background:rgba(245,200,66,.07);
+}
+.decision-context-banner>div{display:flex;gap:5px;flex:1;min-width:0;}
+.decision-context-banner strong{color:#f5c842;}
+.decision-context-banner span{color:#94a3b8;font-size:11px;}
+.player-compare-tray{
+  position:fixed;right:18px;bottom:18px;z-index:240;display:flex;align-items:center;gap:8px;
+  max-width:min(720px,calc(100vw - 36px));padding:9px 10px;border-radius:12px;
+  background:rgba(7,18,31,.97);border:1px solid rgba(96,165,250,.36);
+  box-shadow:0 12px 34px rgba(0,0,0,.48);
+}
+.player-compare-tray-title{color:#93c5fd;font-size:10px;font-weight:800;white-space:nowrap;}
+.player-compare-tray-list{display:flex;gap:5px;min-width:0;}
+.player-compare-tray-list>span{
+  display:inline-flex;align-items:center;gap:4px;max-width:150px;padding:4px 7px;border-radius:999px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:rgba(96,165,250,.1);color:#dbeafe;font-size:10px;
+}
+.player-compare-tray-list button{
+  border:0;background:transparent;color:#93c5fd;cursor:pointer;padding:0;
+}
+.player-compare-overlay{
+  position:fixed;inset:0;z-index:360;display:flex;align-items:center;justify-content:center;
+  padding:16px;background:rgba(0,0,0,.8);
+}
+.player-compare-dialog{
+  width:min(760px,100%);max-height:92vh;overflow:auto;padding:18px;border-radius:14px;
+  background:#0d1b2a;border:1px solid #1e3a5f;box-shadow:0 16px 50px rgba(0,0,0,.58);
+}
+.player-compare-header{display:flex;justify-content:space-between;gap:12px;margin-bottom:12px;}
+.player-compare-header h2{margin:0;color:#f8fafc;font-size:18px;}
+.player-compare-header p{margin:3px 0 0;color:#94a3b8;font-size:10px;}
+.player-compare-header>button{
+  width:36px;height:36px;border-radius:8px;cursor:pointer;border:1px solid rgba(148,163,184,.2);
+  background:rgba(255,255,255,.04);color:#94a3b8;
+}
+.player-compare-names{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-left:34%;margin-bottom:8px;}
+.player-compare-names>div{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.player-compare-names strong{color:#f8fafc;font-size:13px;}
+.player-compare-names span{color:#71849a;font-size:9px;}
+.player-compare-names button{
+  margin-left:auto;border:0;background:transparent;color:#fca5a5;font:inherit;font-size:9px;cursor:pointer;
+}
+.player-compare-table-wrap,.team-comparison-table-wrap{overflow-x:auto;}
+.player-compare-table td:first-child,.team-comparison-table td:first-child{color:#94a3b8;}
+.dashboard-player-button{
+  width:100%;display:flex;justify-content:space-between;gap:8px;color:inherit;
+  font:inherit;text-align:left;cursor:pointer;
+}
+.team-comparison-panel{
+  margin-bottom:10px;padding:12px;border:1px solid rgba(96,165,250,.25);
+  border-radius:10px;background:rgba(30,64,175,.06);
+}
+.team-comparison-heading,.league-comparison-heading{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;
+}
+.team-comparison-heading h3{margin:0;color:#f8fafc;font-size:14px;}
+.team-comparison-heading p{margin:3px 0 0;color:#94a3b8;font-size:10px;}
+.team-comparison-heading>span{color:#93c5fd;font-size:9px;}
+.team-comparison-table strong{display:block;color:#e2e8f0;}
+.team-comparison-table td span{display:block;color:#71849a;font-size:8px;}
+.team-comparison-table .comparison-better strong{color:#34d399;}
+.league-comparison-block{
+  padding:11px;border:1px solid rgba(96,165,250,.22);border-radius:10px;
+  background:rgba(30,64,175,.05);
+}
+.league-comparison-heading strong{display:block;color:#e2e8f0;font-size:12px;}
+.league-comparison-heading span{display:block;margin-top:2px;color:#71849a;font-size:9px;}
+.league-comparison-heading em{color:#fcd34d;font-size:9px;font-style:normal;}
+.league-comparison-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;}
+.league-comparison-card{
+  min-width:0;padding:9px;border-radius:9px;background:rgba(255,255,255,.03);
+  border:1px solid rgba(148,163,184,.13);
+}
+.league-comparison-card>span{display:block;color:#94a3b8;font-size:9px;}
+.league-comparison-card>strong{display:block;margin-top:3px;color:#f8fafc;font-size:15px;}
+.league-comparison-card>b{display:block;margin-top:4px;color:#f5c842;font-size:9px;}
+.league-comparison-card>small{display:block;margin-top:2px;color:#71849a;font-size:8px;}
+.percentile-track{
+  position:relative;height:3px;margin-top:7px;border-radius:999px;
+  background:linear-gradient(90deg,#f87171,#f5c842,#34d399);
+}
+.percentile-track i{
+  position:absolute;top:50%;width:7px;height:7px;border-radius:50%;transform:translate(-50%,-50%);
+  background:#fff;border:1px solid #0d1b2a;box-shadow:0 0 0 1px rgba(255,255,255,.2);
+}
+.league-comparison-summary{
+  margin-top:8px;padding-top:8px;border-top:1px solid rgba(148,163,184,.12);
+  color:#cbd5e1;font-size:10px;line-height:1.5;
+}
+
+@media(max-width:600px){
+  .primary-bottom-nav{gap:3px;padding-left:4px;padding-right:4px;}
+  .primary-nav-btn{min-height:54px;font-size:9px;border-radius:8px;}
+  .player-modal-overlay{align-items:flex-end;padding:0;}
+  .player-modal-card,.player-modal-card.wide{
+    max-width:none;max-height:95vh;border-radius:16px 16px 0 0;padding:16px 12px;
+  }
+  .player-detail-tabs{display:flex;overflow-x:auto;padding-bottom:3px;}
+  .player-detail-tabs button{flex:0 0 auto;min-width:92px;}
+  .batted-ball-heading{align-items:flex-start;flex-direction:column;}
+  .batted-ball-controls{display:grid;grid-template-columns:1fr 1fr;}
+  .batted-ball-controls label{min-width:0;}
+  .batted-ball-controls label:last-child{grid-column:1 / -1;}
+  .batted-ball-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .league-comparison-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .stats-toolbar{align-items:stretch;}
+  .stats-toolbar .tabs,.stats-column-toggle{width:100%;}
+  .stats-column-toggle button{flex:1;}
+  .player-decision-actions{bottom:-16px;margin:14px -12px -16px;padding:9px 12px;flex-wrap:wrap;}
+  .player-decision-actions>span{width:100%;flex-basis:100%;}
+  .decision-context-banner{flex-wrap:wrap;}
+  .player-compare-tray{
+    left:8px;right:8px;bottom:68px;max-width:none;gap:5px;padding:7px;
+  }
+  .player-compare-tray-title{display:none;}
+  .player-compare-tray-list{flex:1;overflow:hidden;}
+  .player-compare-tray-list>span{max-width:110px;}
+  .player-compare-overlay{align-items:flex-end;padding:0;}
+  .player-compare-dialog{max-height:94vh;border-radius:16px 16px 0 0;padding:14px 10px;}
+  .player-compare-names{margin-left:0;}
 }

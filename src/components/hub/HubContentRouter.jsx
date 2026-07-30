@@ -55,7 +55,7 @@ function DeferredHubTab({ label, children }) {
   );
 }
 
-export default function HubContentRouter({ app, tab, onTabChange }) {
+export default function HubContentRouter({ app, tab, onTabChange, comparison }) {
   const { gs, sf, os } = app;
   const { myTeam, myId, teams, year, gameDay, schedule, faPool, mailbox } = gs;
 
@@ -78,6 +78,7 @@ export default function HubContentRouter({ app, tab, onTabChange }) {
         mailbox={mailboxForView}
         faPool={faPool}
         onTabSwitch={onTabChange}
+        onPlayerClick={gs.handlePlayerClick}
         unreadMailboxCount={unreadMailboxCount}
         latestNewsId={latestNewsId}
       />
@@ -396,6 +397,8 @@ export default function HubContentRouter({ app, tab, onTabChange }) {
           saveId={gs.saveId}
           year={year}
           onPlayerClick={gs.handlePlayerClick}
+          onToggleCompare={comparison?.onToggle}
+          comparePlayerIds={comparison?.players?.map((player) => player.id) || []}
         />
       </DeferredHubTab>
     );
@@ -404,7 +407,14 @@ export default function HubContentRouter({ app, tab, onTabChange }) {
   if (tab === 'leaderboard') {
     return (
       <DeferredHubTab label="Loading leaderboard...">
-        <LeaderboardTab teams={teams} myId={myId} gameDay={gameDay} />
+        <LeaderboardTab
+          teams={teams}
+          myId={myId}
+          gameDay={gameDay}
+          onPlayerClick={gs.handlePlayerClick}
+          onToggleCompare={comparison?.onToggle}
+          comparePlayerIds={comparison?.players?.map((player) => player.id) || []}
+        />
       </DeferredHubTab>
     );
   }

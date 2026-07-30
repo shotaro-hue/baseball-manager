@@ -3,8 +3,22 @@ import { fmtM, gameDayToDate } from '../utils';
 import { getMyMatchup } from '../engine/scheduleLookup';
 import { MAX_ROSTER } from '../constants';
 import { TodayGameCard, RecommendationCard, TeamConditionCard, DashboardKpiGrid, FeaturedPlayersCard } from './dashboard/ManagerDashboardCards';
+import {
+  buildDecisionInsights,
+  buildTeamConditions,
+} from '../engine/analysisComparison';
 
-export function DashboardTab({ myTeam, teams, schedule, gameDay, recentResults, pendingTradeCount = 0, faPool, onTabSwitch }) {
+export function DashboardTab({
+  myTeam,
+  teams,
+  schedule,
+  gameDay,
+  recentResults,
+  pendingTradeCount = 0,
+  faPool,
+  onTabSwitch,
+  onPlayerClick,
+}) {
   const leagueStandings = useMemo(() => {
     if (!myTeam || !teams) return { rank: 0, gb: 0, total: 0 };
     const sameLeagueTeams = [...teams.filter(t => t.league === myTeam.league)].sort((a, b) => {
@@ -38,11 +52,15 @@ export function DashboardTab({ myTeam, teams, schedule, gameDay, recentResults, 
     const injured = myTeam.players.filter(p => (p.injuryDaysLeft ?? 0) > 0).length;
     if (injured > 0) items.push({ tone: 'warning', title: `負傷中 ${injured}人`, reason: '起用見直しと二軍入れ替えを検討してください。', tab: 'roster' });
     if (pendingTradeCount > 0) items.push({ tone: 'danger', title: `トレードオファー ${pendingTradeCount}件`, reason: '期限切れ前に受諾・拒否の意思決定が必要です。', tab: 'mailbox' });
+    const playerInsights = buildDecisionInsights({ myTeam, teams })
+      .map((item) => ({ ...item, teamName: myTeam.name }));
+    items.push(...playerInsights);
     if (items.length === 0) {
       items.push({ tone: 'good', title: '大きな緊急課題なし', reason: '今日は試合準備と先発起用の確認を優先しましょう。', tab: 'schedule' });
     }
     return items.slice(0, 3);
-  }, [myTeam, pendingTradeCount]);
+  }, [myTeam, pendingTradeCount, teams]);
+  const teamConditions = useMemo(() => buildTeamConditions(myTeam), [myTeam]);
 
   if (!myTeam) return null;
 
@@ -61,16 +79,21 @@ export function DashboardTab({ myTeam, teams, schedule, gameDay, recentResults, 
   return (
     <div className="manager-dashboard-grid">
       <TodayGameCard todayGame={todayGame} gameDay={gameDay} onGoGame={() => onTabSwitch('game_action')} />
-      <RecommendationCard items={recommendationItems} onTabSwitch={onTabSwitch} />
+      <RecommendationCard
+        items={recommendationItems}
+        onTabSwitch={onTabSwitch}
+        onPlayerClick={onPlayerClick}
+      />
       <TeamConditionCard
         runDiff={runDiff}
         recentWins={recentWins}
         recentLosses={recentLosses}
         winPct={winPct}
         budgetLabel={fmtM(myTeam.budget ?? 0)}
+        conditions={teamConditions}
       />
       <DashboardKpiGrid rank={leagueStandings.rank} wins={myTeam.wins} losses={myTeam.losses} rpg={rpg} rapg={rapg} />
-      <FeaturedPlayersCard players={featuredPlayers} />
+      <FeaturedPlayersCard players={featuredPlayers} onPlayerClick={onPlayerClick} teamName={myTeam.name} />
     </div>
   );
 }

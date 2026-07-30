@@ -1,7 +1,6 @@
 import { MAX_BATTED_BALL_CHART_POINTS } from '../constants';
 import {
   BATTED_BALL_SCHEMA_VERSION,
-  mergeBattedBallProfiles,
   normalizeBattedBallEvent,
   sampleBattedBallEvents,
   updateBattedBallProfile,
@@ -14,6 +13,7 @@ import {
 const pendingById = new Map();
 const failedById = new Map();
 const perfSamples = [];
+const comparisonCache = new Map();
 let activeFlush = null;
 let lastError = null;
 let retryCount = 0;
@@ -112,6 +112,7 @@ async function writeRecords(records) {
       });
     }
     await completeTransaction(transaction);
+    comparisonCache.clear();
   } finally {
     db.close();
   }
@@ -205,9 +206,13 @@ function aggregateRecords(records) {
     || (Number(a.gameDay) - Number(b.gameDay))
     || String(a.gameId).localeCompare(String(b.gameId)));
   const events = [];
-  const profiles = [];
+  const profilesByResult = {
+    all: null,
+    hit: null,
+    hr: null,
+    out: null,
+  };
   for (const record of sortedRecords) {
-    let profile = null;
     for (const rawEvent of Array.isArray(record.events) ? record.events : []) {
       const event = normalizeBattedBallEvent(rawEvent);
       if (!event) continue;
@@ -217,13 +222,21 @@ function aggregateRecords(records) {
         gameDay: record.gameDay,
         gameId: record.gameId,
       });
-      profile = updateBattedBallProfile(profile, event);
+      const isHit = ['s', 'd', 't', 'hr'].includes(event.result);
+      profilesByResult.all = updateBattedBallProfile(profilesByResult.all, event);
+      profilesByResult[isHit ? 'hit' : 'out'] = updateBattedBallProfile(
+        profilesByResult[isHit ? 'hit' : 'out'],
+        event,
+      );
+      if (event.result === 'hr') {
+        profilesByResult.hr = updateBattedBallProfile(profilesByResult.hr, event);
+      }
     }
-    if (profile) profiles.push(profile);
   }
   return {
     events,
-    profile: mergeBattedBallProfiles(profiles),
+    profile: profilesByResult.all,
+    profilesByResult,
   };
 }
 
@@ -261,6 +274,7 @@ export async function loadPlayerBattedBalls({
       status: 'ready',
       events,
       profile: aggregate.profile,
+      profilesByResult: aggregate.profilesByResult,
       totalEvents: aggregate.events.length,
       sampled: aggregate.events.length > events.length,
     };
@@ -284,6 +298,63 @@ export async function loadPlayerBattedBallYears(saveId, playerId) {
       .sort((a, b) => b - a);
   } catch {
     return [];
+  }
+}
+
+export async function loadBattedBallComparisonProfiles({
+  saveId,
+  year,
+  period = 'season',
+  playerIds,
+}) {
+  if (!isValidId(saveId)) {
+    return { status: 'unavailable', peers: [], source: 'archive' };
+  }
+  const ids = [...new Set((Array.isArray(playerIds) ? playerIds : []).filter(isValidId))].sort();
+  if (ids.length === 0) return { status: 'ready', peers: [], source: 'archive' };
+  const cacheKey = `${saveId}:${period}:${Math.trunc(Number(year) || 0)}:${ids.join(',')}`;
+  const cached = comparisonCache.get(cacheKey);
+  if (cached) return cached;
+  try {
+    const query = period === 'career'
+      ? IDBKeyRange.bound([saveId, ''], [saveId, '\uffff'])
+      : IDBKeyRange.only([saveId, Math.trunc(Number(year))]);
+    const records = await readAllFromIndex(
+      period === 'career' ? 'byPlayer' : 'bySaveYear',
+      query,
+    );
+    const allowed = new Set(ids);
+    const byPlayer = new Map();
+    for (const record of records) {
+      if (!allowed.has(record?.playerId)) continue;
+      const list = byPlayer.get(record.playerId) || [];
+      list.push(record);
+      byPlayer.set(record.playerId, list);
+    }
+    const result = {
+      status: 'ready',
+      source: 'archive',
+      peers: ids.map((playerId) => {
+        const aggregate = aggregateRecords(byPlayer.get(playerId) || []);
+        return {
+          playerId,
+          profilesByResult: aggregate.profilesByResult,
+          totalEvents: aggregate.events.length,
+        };
+      }),
+    };
+    comparisonCache.set(cacheKey, result);
+    if (comparisonCache.size > 8) {
+      comparisonCache.delete(comparisonCache.keys().next().value);
+    }
+    return result;
+  } catch (error) {
+    return {
+      status: typeof indexedDB === 'undefined' ? 'unavailable' : 'error',
+      source: 'archive',
+      peers: [],
+      error: error instanceof Error ? error.message : 'comparison_load_failed',
+    };
   }
 }
 
