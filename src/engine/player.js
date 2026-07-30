@@ -4,6 +4,7 @@ import {
   FOREIGN_PLAYER_NAMES, FOREIGN_NATIONALITIES, INJURY_BODY_PARTS, INJURY_RECURRENCE_MULTIPLIER,
   INJURY_RECURRENCE_WINDOW_YEARS, SECONDARY_POSITION_RULES, POS_TRAINING_PER_DAY,
 } from '../constants';
+import { createEmptyBattedBallProfile } from './battedBallProfile';
 
 
 /* ═══════════════════════════════════════════════
@@ -18,6 +19,7 @@ export const emptyStats = () => ({
   groundBatted: 0, lineBatted: 0, flyBatted: 0,
   sprayPoints: [], // 打球着弾点の簡易ログ（最新N件）
   battedBallEvents: [], // 打球イベントの詳細ログ（最新N件）
+  battedBallProfile: createEmptyBattedBallProfile(),
   FO_LF: 0, FO_CF: 0, FO_RF: 0, GO: 0, LO: 0,
   IP: 0, ER: 0, BBp: 0, HBPp: 0, Kp: 0, HRp: 0, Hp: 0, BF: 0, W: 0, L: 0, SV: 0, HLD: 0, QS: 0, BS: 0,
 });
@@ -47,7 +49,7 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
     id: uid(), name: pname(), pos, age, potential: rng(55, 99),
     isPitcher: isPitch, isForeign, salary: 0,
     contractYears: rng(1, 3), contractYearsLeft: rng(1, 3),
-    育成: false, isFA: false, condition: rng(80, 100),
+    育成: false, isFA: false, condition: rng(80, 100), form: 50,
     injury: null, injuryDaysLeft: 0, injuryPart: null, injuryHistory: [],
     trainingFocus: null,
     devGoal: null,
@@ -78,6 +80,7 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
     const ov = (p.pitching.velocity + p.pitching.control * 1.2 + p.pitching.stamina + p.pitching.breaking + p.pitching.clutchP * 0.3) / 4.5;
     p.salary = Math.max(MIN_SALARY_IKUSEI, clamp(Math.round((ov * 60 - 2800) / 500) * 500, 0, 50000));
   } else {
+    p.batHand = Math.random() < 0.3 ? 'left' : (Math.random() < 0.06 ? 'switch' : 'right');
     p.batting = {
       contact: s(), power: s(), eye: s(-5), speed: s(), arm: s(-5),
       defense: s(-5), catching: s(-3), stealSkill: s(-8), baseRunning: s(-5),

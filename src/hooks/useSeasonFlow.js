@@ -11,12 +11,15 @@ import { processCpuFaBids } from '../engine/contract';
 import { cancelDeferredPostGameWork, scheduleDeferredPostGameWork } from '../engine/postGameProcessing';
 import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER, CPU_AUTO_MANAGE_INTERVAL, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX, FIELDING_POSITIONS, OPTIMAL_PITCHER_COUNT, MIN_ACTIVE_CATCHERS } from '../constants';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
+import { createBattedBallBatchRecords } from '../engine/battedBallProfile';
+import { applyManagementPolicy } from '../engine/rosterAutomation';
 
 const MAX_FOREIGN_ACTIVE = 4;
 let seasonPlayerModulePromise = null;
 let seasonScheduleModulePromise = null;
 let seasonSaveModulePromise = null;
 let seasonAllStarModulePromise = null;
+let seasonBattedBallArchiveModulePromise = null;
 
 function loadSeasonPlayerModule() {
   if (!seasonPlayerModulePromise) seasonPlayerModulePromise = import('../engine/player');
@@ -36,6 +39,13 @@ function loadSeasonSaveModule() {
 function loadSeasonAllStarModule() {
   if (!seasonAllStarModulePromise) seasonAllStarModulePromise = import('../engine/allstar');
   return seasonAllStarModulePromise;
+}
+
+function loadSeasonBattedBallArchiveModule() {
+  if (!seasonBattedBallArchiveModulePromise) {
+    seasonBattedBallArchiveModulePromise = import('../engine/battedBallArchive');
+  }
+  return seasonBattedBallArchiveModulePromise;
 }
 
 export function buildSafeGameResult(rawResult, { oppTeam = null, gameNo = null, source } = {}) {
@@ -100,6 +110,18 @@ function autoInjuryDemote(team) {
   if(demoted.length===0)return team;
   const demotedIds=new Set(demoted.map(p=>p.id));
   return{...team,players:kept,lineup:(team.lineup??[]).filter(id=>!demotedIds.has(id)),lineupNoDh:(team.lineupNoDh??[]).filter(id=>!demotedIds.has(id)),lineupDh:(team.lineupDh??[]).filter(id=>!demotedIds.has(id)),rotation:(team.rotation??[]).filter(id=>!demotedIds.has(id)),farm:[...farm,...demoted]};
+}
+
+function applyScheduledCpuManagement(teams, gameDay, myId) {
+  return teams.map((team) => (
+    team.id === myId
+      ? team
+      : applyManagementPolicy(team, {
+          teams,
+          gameDay: gameDay + 1,
+          includeRosterChanges: true,
+        })
+  ));
 }
 
 function _cpuBatterScore(p) {
@@ -389,7 +411,7 @@ function cpuAutoManageTeam(team) {
 
 export function useSeasonFlow(gs) {
   const {
-    teams, setTeams, myId, myTeam,
+    teams, setTeams, myId, myTeam, saveId,
     gameDay, setGameDay, year,
     schedule, setScreen,
     notify, upd, addNews, addTransferLog, pushResult,
@@ -421,6 +443,20 @@ export function useSeasonFlow(gs) {
   const seasonProgressWorkerRef = useRef(null);
   const seasonProgressTaskIdRef = useRef(null);
   const deferredBatchPatchRef = useRef(null);
+  const archiveNormalGame = (log, firstTeam, secondTeam, archiveGameDay = gameDay) => {
+    const records = createBattedBallBatchRecords(log, {
+      saveId,
+      year,
+      gameDay: archiveGameDay,
+      gameId: `${archiveGameDay}:${firstTeam?.id || 'team1'}:${secondTeam?.id || 'team2'}`,
+      teams: [firstTeam, secondTeam],
+      source: 'normal',
+    });
+    if (records.length === 0) return;
+    loadSeasonBattedBallArchiveModule()
+      .then((mod) => mod.enqueueBattedBallBatches(records))
+      .catch((error) => console.warn("打球アーカイブのキュー投入に失敗しました", error));
+  };
 
   const prevMyPlayersRef = useRef(null);
   const prevMyFarmRef = useRef(null);
@@ -739,6 +775,7 @@ export function useSeasonFlow(gs) {
     const taskId = uid();
     const snapshot = {
       teams,
+      saveId,
       schedule,
       faPool,
       seasonHistory: getSeasonHistory(),
@@ -790,6 +827,13 @@ export function useSeasonFlow(gs) {
           if (!message || typeof message !== "object") return;
           const payload = message.payload || {};
           if (payload.taskId !== seasonProgressTaskIdRef.current) return;
+
+          if (message.type === "ARCHIVE_CHUNK") {
+            loadSeasonBattedBallArchiveModule()
+              .then((mod) => mod.enqueueBattedBallBatches(payload.chunk?.records))
+              .catch((error) => console.warn("打球アーカイブのキュー投入に失敗しました", error));
+            return;
+          }
 
           if (message.type === "PROGRESS") {
             setBatchProgress({
@@ -975,6 +1019,7 @@ export function useSeasonFlow(gs) {
     ]);
     const won=r.score.my>r.score.opp;
     const drew=r.score.my===r.score.opp;
+    archiveNormalGame(r.log || [], myT, currentOpp);
     upd(myId,t=>{
       let updated={...t,
         wins:t.wins+(won?1:0),losses:t.losses+(!won&&!drew?1:0),draws:t.draws+(drew?1:0),
@@ -1034,6 +1079,7 @@ export function useSeasonFlow(gs) {
       if(!a||!b) continue;
       const useDh=!!a.dhEnabled;
       const cr=quickSimGame(applyDhToTeam(a,useDh),applyDhToTeam(b,useDh));
+      archiveNormalGame(cr.log || [], a, b);
       cpuSimResults.push({matchup,cr,homeTeam:a,awayTeam:b,useDh});
     }
     setTeams(prev=>{
@@ -1061,7 +1107,7 @@ export function useSeasonFlow(gs) {
         const bInj=playerMod.checkForInjuries(b.players,year);
         b.players=applyInjuriesToPlayers(b.players,bInj,year);
       }
-      return newTeams;
+      return applyScheduledCpuManagement(newTeams, gameDay, myId);
     });
     setAllTeamResultsMap(prev=>{
       const next={...prev};
@@ -1189,6 +1235,7 @@ export function useSeasonFlow(gs) {
     const currentScheduleArchive = getScheduleArchive();
     const snapshot = {
       teams,
+      saveId,
       schedule,
       faPool,
       seasonHistory: currentSeasonHistory,
@@ -1267,6 +1314,13 @@ export function useSeasonFlow(gs) {
           if (!message || typeof message !== "object") return;
           const payload = message.payload || {};
           if (payload.taskId !== seasonProgressTaskIdRef.current) return;
+
+          if (message.type === "ARCHIVE_CHUNK") {
+            loadSeasonBattedBallArchiveModule()
+              .then((mod) => mod.enqueueBattedBallBatches(payload.chunk?.records))
+              .catch((error) => console.warn("打球アーカイブのキュー投入に失敗しました", error));
+            return;
+          }
 
           if (message.type === "PROGRESS") {
             setBatchProgress({
@@ -1411,6 +1465,7 @@ export function useSeasonFlow(gs) {
     const won=gsResult.won;
     const drew=gsResult.drew;
     const isHome = currentGameTeams?.isHome ?? true;
+    archiveNormalGame(gsResult.log || [], myTeam, currentOpp);
     upd(myId,t=>{
       try {
         let updated={...t,
@@ -1476,6 +1531,7 @@ export function useSeasonFlow(gs) {
         quickSimGame(applyDhToTeam(a,useDh),applyDhToTeam(b,useDh)),
         { oppTeam: b, gameNo: gameDay },
       );
+      archiveNormalGame(cr.log || [], a, b);
       tCpuSimResults.push({matchup,cr,homeTeam:a,awayTeam:b});
     }
     setTeams(prev=>{
@@ -1504,7 +1560,7 @@ export function useSeasonFlow(gs) {
           const bInj=playerMod.checkForInjuries(b.players,year);
           b.players=applyInjuriesToPlayers(b.players,bInj,year);
         }
-        return newTeams;
+        return applyScheduledCpuManagement(newTeams, gameDay, myId);
       } catch (error) {
         console.error("[TacticalPostGame] failed to update cpu matchups", error);
         return prev;

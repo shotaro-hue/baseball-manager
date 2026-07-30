@@ -69,6 +69,7 @@ export default function App() {
 
     gs.setTeams(normalizedTeams);
     gs.setMyId(saved.myId);
+    gs.setSaveId(saved.saveId);
     gs.setGameDay(saved.gameDay);
     gs.setYear(saved.year);
 

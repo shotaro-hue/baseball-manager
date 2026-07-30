@@ -48,6 +48,16 @@ self.onmessage = (event) => {
           },
         });
       },
+      onArchiveChunk: (chunk) => {
+        if (cancelRequested || activeTaskId !== taskId) return;
+        self.postMessage({
+          type: 'ARCHIVE_CHUNK',
+          payload: {
+            taskId,
+            chunk,
+          },
+        });
+      },
     };
 
     const result = mode === 'singleDay'

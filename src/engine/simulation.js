@@ -272,6 +272,7 @@ function applyFatigue(pit, fatigue, pitchingBonus = 0) {
 function applyBatterSituation(bat, situation) {
   const clutch    = bat?.batting?.clutch || 50;
   const condition = (bat?.condition || 100) / 100;
+  const formMod   = 1 + ((clamp(Number(bat?.form ?? 50), 0, 100) - 50) / 50) * 0.03;
   const morale    = bat?.morale || 70; // 個人モラルを使用
   const isClutch  = situation.runnersInScoring && situation.closeGame;
   const clutchMod = isClutch ? (clutch - 50) / 200 : 0;
@@ -280,9 +281,9 @@ function applyBatterSituation(bat, situation) {
   const vsLeft    = bat?.batting?.vsLeft || 50;
   const vsLeftMod = (situation.pitcherHand === 'left') ? (vsLeft - 50) / 300 : 0;
   return { ...bat, batting: { ...bat?.batting,
-    contact: clamp((bat?.batting?.contact||50) * condition + clutchMod * 50 + moraleMod * 50 + vsLeftMod * 50, 1, 99),
-    power:   clamp((bat?.batting?.power  ||50) * condition + clutchMod * 30 + moraleMod * 30 + vsLeftMod * 30, 1, 99),
-    eye:     clamp((bat?.batting?.eye    ||50) * condition + moraleMod * 20, 1, 99),
+    contact: clamp((bat?.batting?.contact||50) * condition * formMod + clutchMod * 50 + moraleMod * 50 + vsLeftMod * 50, 1, 99),
+    power:   clamp((bat?.batting?.power  ||50) * condition * formMod + clutchMod * 30 + moraleMod * 30 + vsLeftMod * 30, 1, 99),
+    eye:     clamp((bat?.batting?.eye    ||50) * condition * formMod + moraleMod * 20, 1, 99),
   }};
 }
 
@@ -844,7 +845,10 @@ function processAtBat(gs, strategy = 'normal') {
         },
       }
     : physicsMeta;
-  const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, pitcherId:pitcher?.id, result, type:inferReplayTypeFromResult(result), ev:physicsMeta.ev, la:physicsMeta.la, dist:physicsMeta.distance, sprayAngle:physicsMeta.sprayAngle, physicsMeta:logPhysicsMeta, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog:gs.compactLogs?undefined:pitchLog, pitchType, zone, scorers };
+  const actualBatterSide = batter?.batHand === 'switch'
+    ? (pitcher?.hand === 'left' ? 'right' : 'left')
+    : (batter?.batHand === 'left' ? 'left' : 'right');
+  const logEntry = { inning:gs.inning, isTop:gs.isTop, batter:batter?.name||'?', batId:batter?.id, batterSide:actualBatterSide, pitcherId:pitcher?.id, pitcherHand:pitcher?.hand === 'left' ? 'left' : 'right', result, type:inferReplayTypeFromResult(result), ev:physicsMeta.ev, la:physicsMeta.la, dist:physicsMeta.distance, sprayAngle:physicsMeta.sprayAngle, physicsMeta:logPhysicsMeta, rbi, outs:isOut?outs:gs.outs, bases:[...newBases], pitches, isIntentional, strategy:strategy!=='normal'?strategy:undefined, scorer:isMyAtBat, pitchLog:gs.compactLogs?undefined:pitchLog, pitchType, zone, scorers };
   const nextLiveStats = cloneLiveStats(gs.liveStats);
   applyLogEntryToLiveStats(nextLiveStats, logEntry);
   const nextMyPitcherState = isMyAtBat

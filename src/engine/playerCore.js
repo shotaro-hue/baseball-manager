@@ -3,6 +3,7 @@ import {
   FIELDING_POSITIONS, PLAYER_TYPES_B, PLAYER_TYPES_P, PLAYER_COMMENTS_B, PLAYER_COMMENTS_P, MIN_SALARY_IKUSEI,
   SECONDARY_POSITION_RULES,
 } from '../constants';
+import { createEmptyBattedBallProfile } from './battedBallProfile';
 
 export const emptyStats = () => ({
   PA: 0, AB: 0, H: 0, D: 0, T: 0, HR: 0, RBI: 0, BB: 0, K: 0, HBP: 0,
@@ -11,6 +12,7 @@ export const emptyStats = () => ({
   groundBatted: 0, lineBatted: 0, flyBatted: 0,
   sprayPoints: [],
   battedBallEvents: [],
+  battedBallProfile: createEmptyBattedBallProfile(),
   FO_LF: 0, FO_CF: 0, FO_RF: 0, GO: 0, LO: 0,
   IP: 0, ER: 0, BBp: 0, HBPp: 0, Kp: 0, HRp: 0, Hp: 0, BF: 0, W: 0, L: 0, SV: 0, HLD: 0, QS: 0, BS: 0,
 });
@@ -40,7 +42,7 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
     id: uid(), name: pname(), pos, age, potential: rng(55, 99),
     isPitcher: isPitch, isForeign, salary: 0,
     contractYears: rng(1, 3), contractYearsLeft: rng(1, 3),
-    育成: false, isFA: false, condition: rng(80, 100),
+    育成: false, isFA: false, condition: rng(80, 100), form: 50,
     injury: null, injuryDaysLeft: 0, injuryPart: null, injuryHistory: [],
     trainingFocus: null,
     devGoal: null,
@@ -71,6 +73,7 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
     const ov = (player.pitching.velocity + player.pitching.control * 1.2 + player.pitching.stamina + player.pitching.breaking + player.pitching.clutchP * 0.3) / 4.5;
     player.salary = Math.max(MIN_SALARY_IKUSEI, clamp(Math.round((ov * 60 - 2800) / 500) * 500, 0, 50000));
   } else {
+    player.batHand = Math.random() < 0.3 ? 'left' : (Math.random() < 0.06 ? 'switch' : 'right');
     player.batting = {
       contact: s(), power: s(), eye: s(-5), speed: s(), arm: s(-5),
       defense: s(-5), catching: s(-3), stealSkill: s(-8), baseRunning: s(-5),

@@ -3,6 +3,10 @@ import { checkForInjuries, tickInjuries, tickPositionTraining, calcRetireWill } 
 import { quickSimGame } from '../engine/simulation';
 import { applyGameStatsFromLog, applyPostGameCondition, computeBoxScore } from '../engine/postGame';
 import { calcRevenue } from '../engine/finance';
+import {
+  createBattedBallArchiveChunker,
+  createBattedBallBatchRecords,
+} from '../engine/battedBallProfile';
 import { applyPopularityDelta } from '../engine/fanSentiment';
 import { generateCpuOffer, generateCpuCpuTrade, classifyTeam, evaluateFrontOfficePlan } from '../engine/trade';
 import { selectAllStars, runAllStarGame } from '../engine/allstar';
@@ -397,7 +401,13 @@ function maybeBuildRetireAnnouncement(team, year, gameDay) {
   };
 }
 
-export function simulateSingleDay({ snapshot, gameContext, isCancelled, onProgress }) {
+export function simulateSingleDay({
+  snapshot,
+  gameContext,
+  isCancelled,
+  onProgress,
+  onArchiveChunk,
+}) {
   const safeSnapshot = cloneValue(snapshot || {});
   const teams = safeSnapshot.teams || [];
   const myTeam = teams.find((team) => team.id === safeSnapshot.myId);
@@ -408,6 +418,17 @@ export function simulateSingleDay({ snapshot, gameContext, isCancelled, onProgre
 
   emitProgress(onProgress, '試合シム');
   ensureNotCancelled(isCancelled);
+  const archiveChunker = createBattedBallArchiveChunker(onArchiveChunk);
+  const archiveGame = (log, firstTeam, secondTeam) => {
+    archiveChunker.add(createBattedBallBatchRecords(log, {
+      saveId: safeSnapshot.saveId,
+      year: safeSnapshot.year,
+      gameDay: safeSnapshot.gameDay,
+      gameId: `${safeSnapshot.gameDay}:${firstTeam?.id || 'team1'}:${secondTeam?.id || 'team2'}`,
+      teams: [firstTeam, secondTeam],
+      source: 'worker',
+    }));
+  };
 
   const useDh = !!gameContext?.useDh;
   const isHome = gameContext?.isHome !== false;
@@ -416,6 +437,7 @@ export function simulateSingleDay({ snapshot, gameContext, isCancelled, onProgre
     applyDhToTeam(currentOpp, useDh),
     { simulationMode: gameContext?.simulationMode || 'detailed', isMyHome: isHome },
   );
+  archiveGame(userGameResult.log, myTeam, currentOpp);
   const won = userGameResult.score.my > userGameResult.score.opp;
   const drew = userGameResult.score.my === userGameResult.score.opp;
 
@@ -480,6 +502,7 @@ export function simulateSingleDay({ snapshot, gameContext, isCancelled, onProgre
       applyDhToTeam(awayTeam, !!homeTeam.dhEnabled),
       { simulationMode: gameContext?.simulationMode || 'detailed' },
     );
+    archiveGame(cpuResult.log, homeTeam, awayTeam);
     const homeWon = cpuResult.won;
     const cpuDrew = cpuResult.score.my === cpuResult.score.opp;
     nextTeams[homeIndex] = updateTeamAfterGame(homeTeam, cpuResult, true, homeWon, cpuDrew, safeSnapshot.gameDay, safeSnapshot.year).team;
@@ -588,6 +611,7 @@ export function simulateSingleDay({ snapshot, gameContext, isCancelled, onProgre
   };
 
   emitProgress(onProgress, '完了', true);
+  archiveChunker.flush();
 
   return {
     nextState,

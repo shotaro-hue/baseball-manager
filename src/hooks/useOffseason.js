@@ -13,6 +13,7 @@ import {
   CAMP_COND_VARIATION, CAMP_BREAKOUT_COUNT, CAMP_BREAKOUT_COND_BOOST,
   CAMP_STRUGGLE_COUNT, CAMP_STRUGGLE_COND_HIT, CAMP_MIN_CONDITION,
 } from '../constants';
+import { createEmptyBattedBallProfile } from '../engine/battedBallProfile';
 
 let offseasonPlayerModulePromise = null;
 let offseasonScheduleModulePromise = null;
@@ -36,6 +37,10 @@ function loadOffseasonSaveModule() {
 function createEmptyStats() {
   return {
     PA: 0, AB: 0, H: 0, D: 0, T: 0, HR: 0, RBI: 0, BB: 0, K: 0, HBP: 0, SF: 0, SB: 0,
+    evSum: 0, evN: 0, laSum: 0, laN: 0,
+    pullBatted: 0, centerBatted: 0, oppositeBatted: 0, hardHit: 0,
+    groundBatted: 0, lineBatted: 0, flyBatted: 0,
+    sprayPoints: [], battedBallEvents: [], battedBallProfile: createEmptyBattedBallProfile(),
     IP: 0, ER: 0, BBp: 0, HBPp: 0, Kp: 0, HRp: 0, Hp: 0, BF: 0, W: 0, L: 0, SV: 0, HLD: 0, QS: 0,
   };
 }
@@ -76,7 +81,14 @@ export function useOffseason(gs) {
   // careerLogをコンパクト形式で保存（evSum/evN等の不要フィールドを除外）
   const mkCareerEntry = (s, ps, yr, teamId, teamName) => {
     const pick=x=>({PA:x.PA,AB:x.AB,H:x.H,D:x.D,T:x.T,HR:x.HR,RBI:x.RBI,BB:x.BB,K:x.K,HBP:x.HBP,SF:x.SF,SB:x.SB,IP:x.IP,ER:x.ER,BBp:x.BBp,HBPp:x.HBPp,Kp:x.Kp,HRp:x.HRp,Hp:x.Hp,BF:x.BF,W:x.W,L:x.L,SV:x.SV,HLD:x.HLD,QS:x.QS});
-    return{year:yr,teamId,teamName,stats:pick(s),playoffStats:pick(ps||createEmptyStats())};
+    return{
+      year:yr,
+      teamId,
+      teamName,
+      stats:pick(s),
+      playoffStats:pick(ps||createEmptyStats()),
+      battedBallProfile:s?.battedBallProfile || null,
+    };
   };
 
   const appendCareerEntryWithSummary = (player, entry) => {

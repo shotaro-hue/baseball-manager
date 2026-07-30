@@ -2,11 +2,9 @@ import { buildTeam } from './playerCore';
 import { buildRealTeam } from './realplayer';
 import { optimizeTeamForGameStart } from './rosterAutomation';
 import { NPB2025_ROSTERS } from '../data/npb2025';
-import { TEAM_DEFS } from '../constants';
+import { MAX_BATTED_BALL_EVENTS, MAX_SPRAY_POINTS, TEAM_DEFS } from '../constants';
 
 const STATE_RECENT_CAREER_LOG_YEARS = 3;
-const STATE_MAX_SPRAY_POINTS = 40;
-const STATE_MAX_BATTED_BALL_EVENTS = 80;
 
 function slimPlayerForState(player) {
   if (!player || typeof player !== 'object') return player;
@@ -21,10 +19,10 @@ function slimPlayerForState(player) {
     stats: {
       ...stats,
       sprayPoints: Array.isArray(stats.sprayPoints)
-        ? stats.sprayPoints.slice(-STATE_MAX_SPRAY_POINTS)
+        ? stats.sprayPoints.slice(-MAX_SPRAY_POINTS)
         : [],
       battedBallEvents: Array.isArray(stats.battedBallEvents)
-        ? stats.battedBallEvents.slice(-STATE_MAX_BATTED_BALL_EVENTS)
+        ? stats.battedBallEvents.slice(-MAX_BATTED_BALL_EVENTS)
         : [],
     },
   };

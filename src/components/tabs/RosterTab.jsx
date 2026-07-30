@@ -3,6 +3,19 @@ import { MAX_ROSTER, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL, DEV_GOALS_BATTER, 
 import { fmtAvg, fmtSal, fmtEra } from '../../utils';
 import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
 import { OV, CondBadge, HandBadge } from '../ui';
+import {
+  buildAutoLineupEntries as buildPolicyLineupEntries,
+  buildAutoPitchingStaff,
+  buildRosterRecs as buildPolicyRosterRecs,
+} from '../../engine/rosterAutomation';
+import {
+  MANAGEMENT_POLICIES,
+  MANAGEMENT_POLICY_ORDER,
+  createManagementLeagueContext,
+  evaluateBatterForPolicy,
+  getManagementPolicy,
+  getManagementTrait,
+} from '../../engine/managementPolicy';
 
 const TALK_OPTIONS = [
   { type: "praise",       label: "💪 激励する",      desc: "モラル +5〜+15（確実）" },
@@ -152,7 +165,7 @@ const buildRosterRecs=(team)=>{
   return recs;
 };
 
-export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetRosterDhMode,onSetPlayerPosition,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onReplaceRotation,onReplaceFullRoster,onPlayerClick,onSetDevGoal,onPlayerTalk,onSetConvertTarget,gameDay}){
+export function RosterTab({team,allTeams,onToggle,onReplaceLineup,onSetLineupOrder,onSetRosterDhMode,onSetPlayerPosition,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onReplaceRotation,onReplaceFullRoster,onPlayerClick,onSetDevGoal,onPlayerTalk,onSetConvertTarget,onSetManagementPolicy,gameDay}){
   const [view,setView]=useState("batters");
   const [justConverted,setJustConverted]=useState(new Set());
   const [talkingPid,setTalkingPid]=useState(null);
@@ -173,81 +186,32 @@ export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetR
   const posCountInLineup=lineupPlayers.reduce((acc,p)=>{acc[p.pos]=(acc[p.pos]??0)+1;return acc;},{});
   const injured=team.players.filter(p=>(p.injuryDaysLeft??0)>0);
   const rosterDhMode = team.rosterDhMode ?? team.dhEnabled;
+  const policy = getManagementPolicy(team);
+  const trait = getManagementTrait(team);
+  const leagueContext = createManagementLeagueContext(allTeams, team);
+  const policyEvaluations = Object.fromEntries(
+    batters.map((player) => [
+      player.id,
+      evaluateBatterForPolicy(player, team, { teams: allTeams, leagueContext }),
+    ]),
+  );
   const lineupLimit = rosterDhMode ? 9 : 8;
   const lineupSlots = Array.from({ length: lineupLimit }, (_, i) => i + 1);
   const autoSetLineup=()=>{
-    const eligible=batters.filter(p=>(p.injuryDaysLeft??0)===0);
-    if(!eligible.length)return;
-    const scoreOf=p=>{const s=saberBatter(p.stats);return(s.OPS||0)*1000+p.batting.contact*1.6+p.batting.eye*1.1+p.batting.power*1.2+p.batting.speed*0.7;};
-    const profAt=(p,pos)=>pos==='DH'?50:p.pos===pos?100:(p.positions?.[pos]??0);
-    const required=[...FIELDING_POSITIONS,...(rosterDhMode?['DH']:[])];
-    const sorted=[...eligible].sort((a,b)=>scoreOf(b)-scoreOf(a));
-    const posEligible=Object.fromEntries(required.map(pos=>[pos,sorted.filter(p=>profAt(p,pos)>0)]));
-    // 最も候補が少ないポジションから埋める（MRV ヒューリスティック）
-    const posOrder=[...required].sort((a,b)=>posEligible[a].length-posEligible[b].length);
-    const assignment=new Map();
-    const playerUsed=new Set();
-    for(const pos of posOrder){
-      const best=posEligible[pos].find(p=>!playerUsed.has(p.id));
-      if(best){assignment.set(pos,best);playerUsed.add(best.id);}
-    }
-    // 全守備位置を埋めることを最優先: 適性なしでも残った選手を強制割り当て
-    for(const pos of posOrder){
-      if(assignment.has(pos))continue;
-      const fallback=sorted.find(p=>!playerUsed.has(p.id));
-      if(fallback){assignment.set(pos,fallback);playerUsed.add(fallback.id);}
-    }
-    // ラインアップを一括置換（重複なし・アトミック更新）
-    const entries=[...assignment.entries()]
-      .sort((a,b)=>scoreOf(b[1])-scoreOf(a[1]))
-      .map(([pos,player])=>({id:player.id,pos}));
+    const entries=buildPolicyLineupEntries(team,{rosterDhMode,teams:allTeams,leagueContext});
     onReplaceLineup&&onReplaceLineup(entries);
-    setRosterRecs(buildRosterRecs(team));
+    setRosterRecs(buildPolicyRosterRecs(team,{teams:allTeams,leagueContext}));
   };
   const autoSetPitcherLineup=()=>{
-    const eligible=pitchers.filter(p=>(p.injuryDaysLeft??0)===0);
-    if(!eligible.length)return;
-    // 先発 subtype を先発スコアでソート、不足分は中継ぎ系をスタミナ順で補充
-    const starters=[...eligible].filter(p=>p.subtype==="先発").sort((a,b)=>starterScore(b)-starterScore(a));
-    const relievers=[...eligible].filter(p=>p.subtype!=="先発").sort((a,b)=>relieverScore(b)-relieverScore(a));
-    const newRotation=[
-      ...starters.slice(0,6),
-      ...relievers.slice(0,Math.max(0,6-starters.length)),
-    ].map(p=>p.id);
-    const rotSet=new Set(newRotation);
-    const remaining=[...eligible].filter(p=>!rotSet.has(p.id)).sort((a,b)=>relieverScore(b)-relieverScore(a));
-    const newPattern={
-      closerId:remaining[0]?.id??null,
-      setupId:remaining[1]?.id??null,
-      seventhId:remaining[2]?.id??null,
-      middleOrder:remaining.slice(3).map(p=>p.id),
-    };
-    onReplaceRotation&&onReplaceRotation(newRotation,newPattern);
-    setRosterRecs(buildRosterRecs(team));
+    const {rotation,pitchingPattern}=buildAutoPitchingStaff(team);
+    onReplaceRotation&&onReplaceRotation(rotation,pitchingPattern);
+    setRosterRecs(buildPolicyRosterRecs(team,{teams:allTeams,leagueContext}));
   };
   const autoSetFullRoster=()=>{
-    // 野手打線
-    const eligibleB=batters.filter(p=>(p.injuryDaysLeft??0)===0);
-    const scoreOf=p=>{const s=saberBatter(p.stats);return(s.OPS||0)*1000+p.batting.contact*1.6+p.batting.eye*1.1+p.batting.power*1.2+p.batting.speed*0.7;};
-    const profAt=(p,pos)=>pos==='DH'?50:p.pos===pos?100:(p.positions?.[pos]??0);
-    const required=[...FIELDING_POSITIONS,...(rosterDhMode?['DH']:[])];
-    const sortedB=[...eligibleB].sort((a,b)=>scoreOf(b)-scoreOf(a));
-    const posEligible=Object.fromEntries(required.map(pos=>[pos,sortedB.filter(p=>profAt(p,pos)>0)]));
-    const posOrder=[...required].sort((a,b)=>posEligible[a].length-posEligible[b].length);
-    const assignment=new Map();const playerUsed=new Set();
-    for(const pos of posOrder){const best=posEligible[pos].find(p=>!playerUsed.has(p.id));if(best){assignment.set(pos,best);playerUsed.add(best.id);}}
-    for(const pos of posOrder){if(assignment.has(pos))continue;const fallback=sortedB.find(p=>!playerUsed.has(p.id));if(fallback){assignment.set(pos,fallback);playerUsed.add(fallback.id);}}
-    const lineupEntries=[...assignment.entries()].sort((a,b)=>scoreOf(b[1])-scoreOf(a[1])).map(([pos,player])=>({id:player.id,pos}));
-    // 投手ローテ・継投
-    const eligibleP=pitchers.filter(p=>(p.injuryDaysLeft??0)===0);
-    const sp2=[...eligibleP].filter(p=>p.subtype==="先発").sort((a,b)=>starterScore(b)-starterScore(a));
-    const rp2=[...eligibleP].filter(p=>p.subtype!=="先発").sort((a,b)=>relieverScore(b)-relieverScore(a));
-    const newRotation=[...sp2.slice(0,6),...rp2.slice(0,Math.max(0,6-sp2.length))].map(p=>p.id);
-    const rotSet=new Set(newRotation);
-    const remaining=[...eligibleP].filter(p=>!rotSet.has(p.id)).sort((a,b)=>relieverScore(b)-relieverScore(a));
-    const newPattern={closerId:remaining[0]?.id??null,setupId:remaining[1]?.id??null,seventhId:remaining[2]?.id??null,middleOrder:remaining.slice(3).map(p=>p.id)};
-    onReplaceFullRoster&&onReplaceFullRoster(lineupEntries,newRotation,newPattern);
-    setRosterRecs(buildRosterRecs(team));
+    const lineupEntries=buildPolicyLineupEntries(team,{rosterDhMode,teams:allTeams,leagueContext});
+    const {rotation,pitchingPattern}=buildAutoPitchingStaff(team);
+    onReplaceFullRoster&&onReplaceFullRoster(lineupEntries,rotation,pitchingPattern);
+    setRosterRecs(buildPolicyRosterRecs(team,{teams:allTeams,leagueContext}));
   };
   const executeRec=(rec,idx)=>{
     if(rec.type==='demote'||rec.type==='swap')onDemo&&onDemo(rec.downPlayer.id);
@@ -262,6 +226,32 @@ export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetR
   };
   return(
     <div>
+      <div className="card" style={{marginBottom:10,borderColor:"rgba(96,165,250,.28)",background:"rgba(30,64,175,.06)"}}>
+        <div className="card-h" style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+          <span>🧭 起用方針</span>
+          <span className="chip cb">{policy.label}</span>
+          <span className="chip" style={{color:"#c4b5fd",background:"rgba(139,92,246,.1)"}}>特徴: {trait.label}</span>
+          <span style={{marginLeft:"auto",fontSize:10,color:"#94a3b8"}}>見切り目安 {policy.patiencePa}打席</span>
+        </div>
+        <input
+          type="range"
+          min="0"
+          max={MANAGEMENT_POLICY_ORDER.length-1}
+          step="1"
+          value={MANAGEMENT_POLICY_ORDER.indexOf(policy.id)}
+          onChange={(event)=>onSetManagementPolicy?.(MANAGEMENT_POLICY_ORDER[Number(event.target.value)])}
+          aria-label="起用方針"
+          style={{width:"100%",accentColor:"#60a5fa"}}
+        />
+        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:3,fontSize:9,color:"#64748b",textAlign:"center"}}>
+          {MANAGEMENT_POLICY_ORDER.map((id)=><span key={id} style={{color:id===policy.id?"#93c5fd":"#64748b"}}>{MANAGEMENT_POLICIES[id].label}</span>)}
+        </div>
+        <div style={{marginTop:8,fontSize:11,color:"#cbd5e1"}}>{policy.short}</div>
+        <div style={{marginTop:5,fontSize:9,color:"#64748b"}}>
+          成績 {policy.weights.season}% / 直近 {policy.weights.recent}% / 打球 {policy.weights.battedBall}% / 能力 {policy.weights.ability}% / 守備 {policy.weights.defense}% / 将来性 {policy.weights.future}%
+        </div>
+        {team.managementMeta?.lastDecision&&<div style={{marginTop:5,fontSize:10,color:"#a5b4fc"}}>前回判断: {team.managementMeta.lastDecision}</div>}
+      </div>
       {injured.length>0&&(
         <div className="card" style={{marginBottom:8,background:"rgba(248,113,113,.06)",border:"1px solid rgba(248,113,113,.2)"}}>
           <div className="card-h" style={{color:"#f87171"}}>🤕 負傷者リスト ({injured.length}人)</div>
@@ -280,7 +270,7 @@ export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetR
         <span className="chip cy" style={{marginLeft:"auto",alignSelf:"center"}}>一軍 {team.players.length}/{MAX_ROSTER}</span>
         <span className="chip cb" style={{alignSelf:"center"}}>外国人 {team.players.filter(p=>p.isForeign).length}/{MAX_外国人_一軍}</span>
         {(()=>{const s=team.players.filter(p=>!p.育成).length+team.farm.filter(p=>!p.育成).length;const over=s>=MAX_SHIHAKA_TOTAL;return <span className="chip" style={{alignSelf:"center",background:over?"rgba(248,113,113,.15)":"rgba(52,211,153,.08)",border:`1px solid ${over?"rgba(248,113,113,.4)":"rgba(52,211,153,.25)"}`,color:over?"#f87171":"#94a3b8",fontSize:10}}>支配下 {s}/{MAX_SHIHAKA_TOTAL}</span>;})()}
-        <button className="bsm bgb" style={{alignSelf:"center",fontSize:11,padding:"5px 10px"}} onClick={autoSetFullRoster}>🔄 一括自動編成</button>
+        <button className="bsm bgb" style={{alignSelf:"center",fontSize:11,padding:"5px 10px"}} onClick={autoSetFullRoster}>🔄 方針で一括自動編成</button>
       </div>
       {rosterRecs!==null&&(
         <div className="card" style={{marginBottom:10,borderColor:"rgba(99,102,241,.35)",background:"rgba(99,102,241,.04)"}}>
@@ -301,6 +291,7 @@ export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetR
                 {rec.type==='swap'&&<span style={{color:"#374151",fontSize:10}}>⇄</span>}
                 {rec.downPlayer&&<span style={{color:"#f87171"}}>↓ <span style={{fontWeight:600,cursor:"pointer"}} onClick={()=>onPlayerClick?.(rec.downPlayer,team.name)}>{rec.downPlayer.name}</span><span style={{fontSize:9,color:"#6b7280",marginLeft:2}}>{rec.downPlayer.pos}</span></span>}
                 {rec.scoreDiff>0&&<span style={{fontSize:9,color:"#f5c842",marginLeft:2}}>+{rec.scoreDiff}pt</span>}
+                {rec.reasons?.length>0&&<span style={{fontSize:9,color:"#94a3b8"}}>{rec.reasons.join(" / ")}</span>}
                 <button className="bsm bga" style={{marginLeft:"auto",fontSize:9}} onClick={()=>executeRec(rec,i)}>▶ 実行</button>
               </div>
             );
@@ -323,7 +314,7 @@ export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetR
           </div>
           <div style={{overflowX:"auto"}}>
             <table className="tbl">
-              <thead><tr><th>#</th><th>選手名</th><th>守備</th><th>適正</th><th>年齢</th><th>ミート</th><th>長打</th><th>走力</th><th>選球</th><th>クラッチ</th><th>変化球</th><th>状態</th><th>モラル</th><th>打率</th><th>HR</th><th>OPS</th><th>強化</th><th>コンバート</th><th></th></tr></thead>
+              <thead><tr><th>#</th><th>選手名</th><th>守備</th><th>適正</th><th>年齢</th><th>方針評価</th><th>ミート</th><th>長打</th><th>走力</th><th>選球</th><th>クラッチ</th><th>変化球</th><th>状態</th><th>調子</th><th>モラル</th><th>打率</th><th>HR</th><th>OPS</th><th>強化</th><th>コンバート</th><th></th></tr></thead>
               <tbody>
                 {orderedBatters.map(p=>{const inL=team.lineup.includes(p.id);const sb=saberBatter(p.stats);const isInj=(p.injuryDaysLeft??0)>0;return(
                   <tr key={p.id} style={isInj?{opacity:.55}:undefined}>
@@ -395,9 +386,13 @@ export function RosterTab({team,onToggle,onReplaceLineup,onSetLineupOrder,onSetR
                       )}
                     </td>
                     <td className="mono" style={{color:"#374151"}}>{p.age}</td>
+                    <td title={policyEvaluations[p.id]?.reasons?.join(" / ")} style={{color:(policyEvaluations[p.id]?.total??50)>=60?"#4ade80":(policyEvaluations[p.id]?.total??50)<45?"#f87171":"#f5c842",fontWeight:700}}>
+                      {Math.round(policyEvaluations[p.id]?.total??50)}
+                    </td>
                     <td><OV v={p.batting.contact}/></td><td><OV v={p.batting.power}/></td><td><OV v={p.batting.speed}/></td><td><OV v={p.batting.eye}/></td>
                     <td><OV v={p.batting.clutch}/></td><td><OV v={p.batting.breakingBall}/></td>
                     <td><CondBadge p={p}/></td>
+                    <td className="mono" style={{color:(p.form??50)>=58?"#4ade80":(p.form??50)<=42?"#f87171":"#94a3b8"}}>{Math.round(p.form??50)}</td>
                     <td><MoralBadge v={p.morale}/></td>
                     <td className="mono">{fmtAvg(p.stats.H,p.stats.AB)}</td>
                     <td className="mono" style={{color:p.stats.HR>=20?"#f5c842":undefined}}>{p.stats.HR}</td>
