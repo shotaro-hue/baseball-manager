@@ -10,9 +10,16 @@ import {
 } from '../constants';
 import { saberPitcher } from './sabermetrics';
 import {
-  calcCpuBatterEvaluation,
   createBattedBallLeagueContext,
 } from './cpuBatterEvaluation';
+import {
+  ensureManagementIdentity,
+  evaluateBatterForPolicy,
+  getManagementPolicy,
+  getManagementTrait,
+  shouldRunLineupManagement,
+  shouldRunRosterManagement,
+} from './managementPolicy';
 
 const MAX_FOREIGN_ACTIVE = 4;
 const SUBTYPE_STARTER = '\u5148\u767a';
@@ -44,10 +51,10 @@ export const relieverScore = (player) => {
     + eraBonus;
 };
 
-export const batterScore = (player, leagueContext = {}) =>
-  calcCpuBatterEvaluation(player, leagueContext).total;
+export const batterScore = (player, leagueContext = {}, team = {}, options = {}) =>
+  evaluateBatterForPolicy(player, team, { ...options, leagueContext }).total;
 
-export const rosterRecScore = (player) => {
+export const rosterRecScore = (player, team = {}, options = {}) => {
   if (player.isPitcher) {
     const stats = saberPitcher(player.stats ?? {});
     const ability = (player.pitching?.velocity ?? 50) * 1.2
@@ -59,7 +66,7 @@ export const rosterRecScore = (player) => {
     const whipScore = stats.WHIP > 0 ? Math.max(0, (1.5 - stats.WHIP) * 50) : 0;
     return ability * 0.55 + eraScore + whipScore;
   }
-  return batterScore(player);
+  return batterScore(player, options.leagueContext, team, options);
 };
 
 const proficiencyAt = (player, pos) =>
@@ -76,7 +83,7 @@ export function buildAutoLineupEntries(team, options = {}) {
     ...(team.farm || []),
   ]);
   const sortedBatters = [...eligibleBatters].sort(
-    (a, b) => batterScore(b, leagueContext) - batterScore(a, leagueContext),
+    (a, b) => batterScore(b, leagueContext, team, options) - batterScore(a, leagueContext, team, options),
   );
   const posEligible = Object.fromEntries(
     required.map((pos) => [pos, sortedBatters.filter((player) => proficiencyAt(player, pos) > 0)]),
@@ -101,9 +108,32 @@ export function buildAutoLineupEntries(team, options = {}) {
     }
   }
 
-  return [...assignment.entries()]
-    .sort((a, b) => batterScore(b[1], leagueContext) - batterScore(a[1], leagueContext))
-    .map(([pos, player]) => ({ id: player.id, pos }));
+  const entries = [...assignment.entries()].map(([pos, player]) => ({ id: player.id, pos, player }));
+  const evaluation = (entry) =>
+    evaluateBatterForPolicy(entry.player, team, { ...options, leagueContext });
+  const onBase = (entry) => {
+    const stats = entry.player?.stats || {};
+    const pa = Math.max(1, Number(stats.PA) || 0);
+    return evaluation(entry).total
+      + (Number(entry.player?.batting?.eye ?? 50) - 50) * 0.25
+      + (Number(entry.player?.batting?.speed ?? 50) - 50) * 0.18
+      + ((Number(stats.BB) || 0) / pa) * 20;
+  };
+  const power = (entry) => evaluation(entry).total
+    + (Number(entry.player?.batting?.power ?? 50) - 50) * 0.35;
+  const remaining = [...entries];
+  const take = (sorter) => {
+    remaining.sort(sorter);
+    return remaining.shift();
+  };
+  const battingOrder = [];
+  if (remaining.length) battingOrder.push(take((a, b) => onBase(b) - onBase(a)));
+  if (remaining.length) battingOrder.push(take((a, b) => onBase(b) - onBase(a)));
+  if (remaining.length) battingOrder.push(take((a, b) => evaluation(b).total - evaluation(a).total));
+  if (remaining.length) battingOrder.push(take((a, b) => power(b) - power(a)));
+  if (remaining.length) battingOrder.push(take((a, b) => power(b) - power(a)));
+  remaining.sort((a, b) => evaluation(b).total - evaluation(a).total);
+  return [...battingOrder, ...remaining].filter(Boolean).map(({ id, pos }) => ({ id, pos }));
 }
 
 export function buildAutoPitchingStaff(team) {
@@ -138,17 +168,17 @@ export function buildAutoPitchingStaff(team) {
 
 export function buildAutoManagedRoster(team, options = {}) {
   const rosterDhMode = getRosterDhMode(team, options.rosterDhMode);
-  const lineupEntries = buildAutoLineupEntries(team, { rosterDhMode });
+  const lineupEntries = buildAutoLineupEntries(team, { ...options, rosterDhMode });
   const lineupIds = lineupEntries.map((entry) => entry.id);
   const { rotation, pitchingPattern } = buildAutoPitchingStaff(team);
   const players = (team.players || []).map((player) => {
     const entry = lineupEntries.find((lineupEntry) => lineupEntry.id === player.id);
     return entry && entry.pos !== player.pos ? { ...player, pos: entry.pos } : player;
   });
-  const lineupNoDh = buildAutoLineupEntries({ ...team, players }, { rosterDhMode: false })
+  const lineupNoDh = buildAutoLineupEntries({ ...team, players }, { ...options, rosterDhMode: false })
     .map((entry) => entry.id)
     .slice(0, 8);
-  const lineupDh = buildAutoLineupEntries({ ...team, players }, { rosterDhMode: true })
+  const lineupDh = buildAutoLineupEntries({ ...team, players }, { ...options, rosterDhMode: true })
     .map((entry) => entry.id)
     .slice(0, 9);
 
@@ -165,7 +195,7 @@ export function buildAutoManagedRoster(team, options = {}) {
   };
 }
 
-export function buildRosterRecs(team) {
+export function buildRosterRecs(team, options = {}) {
   const recs = [];
   const foreignInActive = (team.players || []).filter((player) => player.isForeign).length;
   const canPromote = (player) =>
@@ -175,7 +205,7 @@ export function buildRosterRecs(team) {
     && !(player.isForeign && foreignInActive >= MAX_FOREIGN_ACTIVE);
 
   const effectiveScore = (player, isFarm) => {
-    const base = rosterRecScore(player);
+    const base = rosterRecScore(player, team, options);
     const devBonus = isFarm
       && (player.potential ?? 0) >= ROSTER_DEVREC_POTENTIAL_MIN
       && (player.daysOnActiveRoster ?? 0) < ROSTER_DEVREC_DAYS_MAX
@@ -207,7 +237,13 @@ export function buildRosterRecs(team) {
         .slice(0, limit)
         .forEach((player) => {
           if (usedActiveIds.has(player.id)) return;
-          recs.push({ type: 'demote', downPlayer: player, upPlayer: null, scoreDiff: 0 });
+          recs.push({
+            type: 'demote',
+            downPlayer: player,
+            upPlayer: null,
+            scoreDiff: 0,
+            reasons: ['一軍枠超過', '方針評価下位'],
+          });
           usedActiveIds.add(player.id);
           projectedPlayers = projectedPlayers.filter((candidate) => candidate.id !== player.id);
         });
@@ -242,6 +278,7 @@ export function buildRosterRecs(team) {
         upPlayer: player,
         downPlayer: null,
         scoreDiff: Math.round(effectiveScore(player, true)),
+        reasons: ['方針評価上位', '一軍枠を充足'],
       });
       usedFarmIds.add(player.id);
       projectedPlayers.push(player);
@@ -287,6 +324,7 @@ export function buildRosterRecs(team) {
       upPlayer: farmPitcher,
       downPlayer: activeBatter,
       scoreDiff: Math.round(effectiveScore(farmPitcher, true) - effectiveScore(activeBatter, false)),
+      reasons: ['投手人数を調整'],
     });
     usedFarmIds.add(farmPitcher.id);
     usedActiveIds.add(activeBatter.id);
@@ -312,6 +350,7 @@ export function buildRosterRecs(team) {
       upPlayer: farmBatter,
       downPlayer: activePitcher,
       scoreDiff: Math.round(effectiveScore(farmBatter, true) - effectiveScore(activePitcher, false)),
+      reasons: ['野手人数を調整'],
     });
     usedFarmIds.add(farmBatter.id);
     usedActiveIds.add(activePitcher.id);
@@ -339,12 +378,17 @@ export function buildRosterRecs(team) {
         );
         if (!best) return;
         const diff = effectiveScore(best, true) - effectiveScore(activePlayer, false);
-        if (diff < ROSTER_SWAP_SCORE_THRESHOLD) return;
+        const policyThreshold = getManagementPolicy(team).swapThreshold ?? ROSTER_SWAP_SCORE_THRESHOLD;
+        if (diff < policyThreshold) return;
         recs.push({
           type: 'swap',
           upPlayer: best,
           downPlayer: activePlayer,
           scoreDiff: Math.round(diff),
+          reasons: [
+            `${getManagementPolicy(team).label}の評価差`,
+            best.isPitcher ? '投手成績・能力' : evaluateBatterForPolicy(best, team, options).reasons.join('・'),
+          ],
         });
         usedFarmIds.add(best.id);
         usedActiveIds.add(activePlayer.id);
@@ -429,8 +473,8 @@ function ensureMinimumCatcherCount(team) {
 }
 
 export function optimizeTeamForGameStart(team, options = {}) {
-  let nextTeam = { ...team };
-  const recs = buildRosterRecs(nextTeam);
+  let nextTeam = ensureManagementIdentity({ ...team });
+  const recs = buildRosterRecs(nextTeam, options);
   if (recs.length > 0) nextTeam = applyRosterRecs(nextTeam, recs);
   nextTeam = ensureMinimumCatcherCount(nextTeam);
   nextTeam = buildAutoManagedRoster(nextTeam, options);
@@ -439,5 +483,36 @@ export function optimizeTeamForGameStart(team, options = {}) {
     lineup: (
       getRosterDhMode(nextTeam, options.rosterDhMode) ? nextTeam.lineupDh : nextTeam.lineupNoDh
     ).slice(),
+  };
+}
+
+export function applyManagementPolicy(team, options = {}) {
+  const gameDay = Number(options.gameDay || 0);
+  const force = options.force === true;
+  let nextTeam = ensureManagementIdentity(team);
+  const runRoster = options.includeRosterChanges !== false
+    && (force || shouldRunRosterManagement(nextTeam, gameDay));
+  const runLineup = force || shouldRunLineupManagement(nextTeam, gameDay);
+  const recs = runRoster ? buildRosterRecs(nextTeam, options) : [];
+  if (recs.length > 0) nextTeam = applyRosterRecs(nextTeam, recs);
+  if (runRoster) nextTeam = ensureMinimumCatcherCount(nextTeam);
+  if (runLineup) nextTeam = buildAutoManagedRoster(nextTeam, options);
+  if (!runRoster && !runLineup) return nextTeam;
+
+  const policy = getManagementPolicy(nextTeam);
+  const trait = getManagementTrait(nextTeam);
+  const lineupNames = (nextTeam.lineup || [])
+    .slice(0, 3)
+    .map((id) => nextTeam.players?.find((player) => player.id === id)?.name)
+    .filter(Boolean);
+  return {
+    ...nextTeam,
+    managementMeta: {
+      ...(nextTeam.managementMeta || {}),
+      ...(runLineup ? { lastLineupDay: gameDay } : {}),
+      ...(runRoster ? { lastRosterDay: gameDay } : {}),
+      lastDecision: `${policy.label}・${trait.label}: ${lineupNames.join('、')}を上位起用`,
+      lastRosterChanges: recs.length,
+    },
   };
 }

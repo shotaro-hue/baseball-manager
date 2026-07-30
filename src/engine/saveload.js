@@ -232,6 +232,7 @@ function migratePlayer(p) {
     serviceYears:       p.serviceYears       ?? 0,
     ikuseiYears:        p.ikuseiYears        ?? 0,
     condition:          p.condition          ?? 100,
+    form:               p.form               ?? 50,
     morale:             p.morale             ?? 60,
     trust:              p.trust              ?? 50,
     injuryDaysLeft:     p.injuryDaysLeft     ?? 0,

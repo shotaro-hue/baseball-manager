@@ -506,6 +506,7 @@ export function applyPostGameCondition(players, log, isMyTeam, gameDay, isHomeTe
   });
 
   return players.map((p) => {
+    const previousForm = Number(p.form ?? 50);
     if (p.isPitcher) {
       const thrown = pitchCountMap[p.id] || 0;
       // 直近7試合の記録を保持
@@ -514,7 +515,12 @@ export function applyPostGameCondition(players, log, isMyTeam, gameDay, isHomeTe
         // 登板なし: 日次コンディション回復（休養効果）
         const recoveryRate = (p.pitching?.recovery ?? 50);
         const dailyRecovery = Math.round(8 + (recoveryRate - 50) / 10);
-        return { ...p, condition: Math.min((p.condition ?? 100) + dailyRecovery, 100), recentPitchingDays: recentBase };
+        return {
+          ...p,
+          condition: Math.min((p.condition ?? 100) + dailyRecovery, 100),
+          form: clamp(previousForm + (50 - previousForm) * 0.08, 25, 75),
+          recentPitchingDays: recentBase,
+        };
       }
       const recoveryBonus = ((p.pitching?.recovery || 50) - 50) / 200;
       const fatigueDrop   = clamp(Math.round(thrown / 3 - recoveryBonus * 15), 5, 40);
@@ -523,14 +529,44 @@ export function applyPostGameCondition(players, log, isMyTeam, gameDay, isHomeTe
       const consec        = countConsecutiveGames(newRecentDays, gameDay);
       const consecPenalty = consec >= 3 ? 15 : consec >= 2 ? 5 : 0;
       const newCond = clamp(p.condition - fatigueDrop - consecPenalty, 20, 100);
-      return { ...p, condition: newCond, lastPitched: true, recentPitchingDays: newRecentDays };
+      return {
+        ...p,
+        condition: newCond,
+        form: clamp(previousForm + (50 - previousForm) * 0.04, 25, 75),
+        lastPitched: true,
+        recentPitchingDays: newRecentDays,
+      };
     } else {
-      const played = log.some((e) => e.batId === p.id && !e.isStolenBase);
-      if (!played) return p;
+      const plateAppearances = log.filter(
+        (e) => e.batId === p.id && !e.isStolenBase && e.result && e.result !== 'change',
+      );
+      const played = plateAppearances.length > 0;
+      if (!played) {
+        const recoveryRate = Number(p.batting?.recovery ?? 50);
+        const dailyRecovery = Math.round(4 + (recoveryRate - 50) / 20);
+        return {
+          ...p,
+          condition: clamp((p.condition ?? 100) + dailyRecovery, 60, 100),
+          form: clamp(previousForm + (50 - previousForm) * 0.08, 25, 75),
+        };
+      }
       const recoveryBonus = ((p.batting?.recovery || 50) - 50) / 300;
       const delta = clamp(Math.round(-3 + recoveryBonus * 5), -5, 2);
       const newCond = clamp(p.condition + delta, 60, 100);
-      return { ...p, condition: newCond };
+      const hits = plateAppearances.filter((e) => IS_HIT(e.result)).length;
+      const onBase = plateAppearances.filter(
+        (e) => IS_HIT(e.result) || e.result === 'bb' || e.result === 'hbp',
+      ).length;
+      const homers = plateAppearances.filter((e) => e.result === 'hr').length;
+      const strikeouts = plateAppearances.filter((e) => e.result === 'k').length;
+      const pa = plateAppearances.length;
+      const gameForm = clamp(
+        40 + (hits / pa) * 50 + (onBase / pa) * 15 + homers * 6 - (strikeouts / pa) * 10,
+        25,
+        75,
+      );
+      const nextForm = clamp(previousForm * 0.8 + gameForm * 0.2, 25, 75);
+      return { ...p, condition: newCond, form: nextForm };
     }
   });
 }

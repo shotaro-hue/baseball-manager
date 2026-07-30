@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fmtAvg, fmtOBP, fmtIP, gameDayToDate } from '../utils';
 import { BoxScoreModal } from './BoxScoreModal';
+import { getManagementPolicy, getManagementTrait } from '../engine/managementPolicy';
 
 const MONTH_LABELS = [3, 4, 5, 6, 7, 8, 9, 10];
 
@@ -440,6 +441,8 @@ export function TeamDetailScreen({ team, allTeams, schedule, year, allTeamResult
       : '連勝連敗なし';
   const injuredCount = (team.players || []).filter(p => (p.injuryDaysLeft || 0) > 0).length;
   const archetype = buildTeamArchetype(team);
+  const managementPolicy = getManagementPolicy(team);
+  const managementTrait = getManagementTrait(team);
   const teamEraData = (team.players || [])
     .filter(p => p.isPitcher)
     .reduce((acc, p) => ({ ip: acc.ip + (p.stats?.IP || 0), er: acc.er + (p.stats?.ER || 0) }), { ip: 0, er: 0 });
@@ -498,6 +501,9 @@ export function TeamDetailScreen({ team, allTeams, schedule, year, allTeamResult
             <span className="chip" style={{ background: 'rgba(96,165,250,.13)', color: '#93c5fd' }}>直近10: {recentSummary.wins}-{recentSummary.losses}{recentSummary.draws > 0 ? `-${recentSummary.draws}` : ''}</span>
             <span className="chip" style={{ background: 'rgba(245,158,11,.12)', color: '#fbbf24' }}>{streak}</span>
             <span className="chip" style={{ background: injuredCount > 0 ? 'rgba(248,113,113,.12)' : 'rgba(74,222,128,.12)', color: injuredCount > 0 ? '#f87171' : '#4ade80' }}>離脱者 {injuredCount}人</span>
+            <span className="chip" style={{ background: 'rgba(96,165,250,.13)', color: '#93c5fd' }}>起用方針: {managementPolicy.label}</span>
+            <span className="chip" style={{ background: 'rgba(139,92,246,.1)', color: '#c4b5fd' }}>特徴: {managementTrait.label}</span>
+            {team.managementMeta?.lastDecision&&<span style={{fontSize:10,color:'#94a3b8'}}>前回判断: {team.managementMeta.lastDecision}</span>}
             <span className="chip" style={{ background: 'rgba(167,139,250,.12)', color: '#c4b5fd' }}>チーム傾向: {archetype}</span>
           </div>
         </div>

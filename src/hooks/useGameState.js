@@ -14,6 +14,7 @@ import {
 } from '../constants';
 import { compactBattedBallEvent } from '../engine/postGame';
 import { createSaveId, ensureSaveId } from '../engine/saveIdentity';
+import { MANAGEMENT_POLICIES } from '../engine/managementPolicy';
 
 const STATE_RECENT_CAREER_LOG_YEARS = 3;
 
@@ -715,6 +716,19 @@ export function useGameState() {
     });
   }, [upd, myId]);
 
+  const setManagementPolicy = useCallback((policyId) => {
+    if (!MANAGEMENT_POLICIES[policyId]) return;
+    upd(myId, t => ({
+      ...t,
+      managementPolicyId: policyId,
+      managementMeta: {
+        ...(t.managementMeta || {}),
+        lastDecision: `起用方針を${MANAGEMENT_POLICIES[policyId].label}へ変更`,
+      },
+    }));
+    notify(`起用方針を「${MANAGEMENT_POLICIES[policyId].label}」に変更`, 'ok');
+  }, [myId, notify, upd]);
+
   const setStarter = useCallback((pid)=>{upd(myId,t=>({...t,rotation:t.rotation.includes(pid)?t.rotation:[...t.rotation,pid]}));notify("先発ローテに追加","ok");},[upd,myId,notify]);
   const moveRotation = useCallback((pid,dir)=>upd(myId,t=>{const r=[...t.rotation];const i=r.indexOf(pid);if(i<0)return t;const j=i+dir;if(j<0||j>=r.length)return t;[r[i],r[j]]=[r[j],r[i]];return{...t,rotation:r};}),[upd,myId]);
   const removeFromRotation = useCallback((pid)=>upd(myId,t=>({...t,rotation:t.rotation.filter(id=>id!==pid)})),[upd,myId]);
@@ -926,6 +940,7 @@ export function useGameState() {
     replaceLineup,
     setLineupOrder,
     setRosterDhMode,
+    setManagementPolicy,
     setPlayerPosition,
     setConvertTarget,
     setStarter,

@@ -71,13 +71,37 @@ function qualityIndex(profile, leagueRates) {
 }
 
 function currentReliability(bip) {
-  if (bip < 30) return { reliability: clamp(bip / 30, 0, 1), maxRate: 0.02 };
-  const reliability = clamp((bip - 30) / 90, 0, 1);
-  return { reliability, maxRate: 0.02 + reliability * 0.13 };
+  const reliability = clamp(bip / 120, 0, 1);
+  return { reliability, maxRate: reliability * 0.08 };
 }
 
 /**
- * CPUの打者評価。打球補正は現在プロフィール±15%、直近±5%以内。
+ * 方針評価でも使う打球品質。50をリーグ平均とする0〜100スコア。
+ */
+export function calcBattedBallQuality(player, leagueContext = {}) {
+  const profile = player?.stats?.battedBallProfile;
+  const recent = profile?.recent;
+  const leagueRates = resolveLeagueRates(leagueContext);
+  const bip = Math.max(0, Number(profile?.bip) || 0);
+  const recentBip = Math.max(0, Number(recent?.bip) || 0);
+  const reliability = clamp(bip / 120, 0, 1);
+  const recentReliability = clamp(recentBip / 30, 0, 1);
+  const currentIndex = qualityIndex(profile, leagueRates);
+  const recentIndex = qualityIndex(recent, leagueRates);
+  return {
+    score: clamp(50 + currentIndex * reliability * 35, 0, 100),
+    recentScore: clamp(50 + recentIndex * recentReliability * 30, 0, 100),
+    reliability,
+    recentReliability,
+    currentIndex,
+    recentIndex,
+    bip,
+    recentBip,
+  };
+}
+
+/**
+ * 互換CPU打者評価。打球補正は今季±8%、直近±3%、合計±10%以内。
  */
 export function calcCpuBatterEvaluation(player, leagueContext = {}, options = {}) {
   const stats = saberBatter(player?.stats ?? {});
@@ -88,7 +112,6 @@ export function calcCpuBatterEvaluation(player, leagueContext = {}, options = {}
     + (player?.batting?.speed ?? 50) * 0.7;
   const base = resultScore + abilityScore;
   const profile = player?.stats?.battedBallProfile;
-  const recent = profile?.recent;
   const leagueRates = resolveLeagueRates(leagueContext);
   const bip = Math.max(0, Number(profile?.bip) || 0);
   const current = currentReliability(bip);
@@ -96,11 +119,15 @@ export function calcCpuBatterEvaluation(player, leagueContext = {}, options = {}
   const currentRate = clamp(currentQuality * current.maxRate, -current.maxRate, current.maxRate);
   const battedBallAdjustment = base * currentRate;
 
+  const recent = profile?.recent;
   const recentBip = Math.max(0, Number(recent?.bip) || 0);
   const recentReliability = clamp(recentBip / 30, 0, 1);
   const recentQuality = qualityIndex(recent, leagueRates);
-  const recentRate = clamp(recentQuality * recentReliability * 0.05, -0.05, 0.05);
-  const recentAdjustment = options.includeRecent === false ? 0 : base * recentRate;
+  const rawRecentRate = clamp(recentQuality * recentReliability * 0.03, -0.03, 0.03);
+  const recentRate = options.includeRecent === false
+    ? 0
+    : clamp(rawRecentRate, -0.1 - currentRate, 0.1 - currentRate);
+  const recentAdjustment = base * recentRate;
   const total = base + battedBallAdjustment + recentAdjustment;
   const reasons = [];
   if (bip < 30) reasons.push({ code: 'BIP_SMALL_SAMPLE', bip });

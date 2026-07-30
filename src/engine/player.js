@@ -49,7 +49,7 @@ export function makePlayer(pos, q, isPitch, ageOverride, isForeign = false) {
     id: uid(), name: pname(), pos, age, potential: rng(55, 99),
     isPitcher: isPitch, isForeign, salary: 0,
     contractYears: rng(1, 3), contractYearsLeft: rng(1, 3),
-    育成: false, isFA: false, condition: rng(80, 100),
+    育成: false, isFA: false, condition: rng(80, 100), form: 50,
     injury: null, injuryDaysLeft: 0, injuryPart: null, injuryHistory: [],
     trainingFocus: null,
     devGoal: null,

@@ -12,6 +12,7 @@ import { cancelDeferredPostGameWork, scheduleDeferredPostGameWork } from '../eng
 import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, INJURY_AUTO_DEMOTE_DAYS, REGISTRATION_COOLDOWN_DAYS, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER, CPU_AUTO_MANAGE_INTERVAL, ROSTER_SWAP_SCORE_THRESHOLD, ROSTER_DEVREC_BONUS, ROSTER_DEVREC_POTENTIAL_MIN, ROSTER_DEVREC_DAYS_MAX, FIELDING_POSITIONS, OPTIMAL_PITCHER_COUNT, MIN_ACTIVE_CATCHERS } from '../constants';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 import { createBattedBallBatchRecords } from '../engine/battedBallProfile';
+import { applyManagementPolicy } from '../engine/rosterAutomation';
 
 const MAX_FOREIGN_ACTIVE = 4;
 let seasonPlayerModulePromise = null;
@@ -109,6 +110,18 @@ function autoInjuryDemote(team) {
   if(demoted.length===0)return team;
   const demotedIds=new Set(demoted.map(p=>p.id));
   return{...team,players:kept,lineup:(team.lineup??[]).filter(id=>!demotedIds.has(id)),lineupNoDh:(team.lineupNoDh??[]).filter(id=>!demotedIds.has(id)),lineupDh:(team.lineupDh??[]).filter(id=>!demotedIds.has(id)),rotation:(team.rotation??[]).filter(id=>!demotedIds.has(id)),farm:[...farm,...demoted]};
+}
+
+function applyScheduledCpuManagement(teams, gameDay, myId) {
+  return teams.map((team) => (
+    team.id === myId
+      ? team
+      : applyManagementPolicy(team, {
+          teams,
+          gameDay: gameDay + 1,
+          includeRosterChanges: true,
+        })
+  ));
 }
 
 function _cpuBatterScore(p) {
@@ -1094,7 +1107,7 @@ export function useSeasonFlow(gs) {
         const bInj=playerMod.checkForInjuries(b.players,year);
         b.players=applyInjuriesToPlayers(b.players,bInj,year);
       }
-      return newTeams;
+      return applyScheduledCpuManagement(newTeams, gameDay, myId);
     });
     setAllTeamResultsMap(prev=>{
       const next={...prev};
@@ -1547,7 +1560,7 @@ export function useSeasonFlow(gs) {
           const bInj=playerMod.checkForInjuries(b.players,year);
           b.players=applyInjuriesToPlayers(b.players,bInj,year);
         }
-        return newTeams;
+        return applyScheduledCpuManagement(newTeams, gameDay, myId);
       } catch (error) {
         console.error("[TacticalPostGame] failed to update cpu matchups", error);
         return prev;

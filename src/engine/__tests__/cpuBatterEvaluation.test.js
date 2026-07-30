@@ -76,4 +76,29 @@ describe('CPU batted-ball evaluation', () => {
     expect(weak.total).toBeLessThan(weak.base);
     expect(strong.total).toBeGreaterThan(weak.total);
   });
+
+  it('shrinks a one-ball sample to a negligible adjustment', () => {
+    const evaluation = calcCpuBatterEvaluation(makePlayer({
+      bip: 1,
+      hardHit: 1,
+      barrel: 1,
+      line: 1,
+      ground: 0,
+      fly: 0,
+      laN: 1,
+      laSum: 15,
+      recent: {
+        bip: 1,
+        hardHit: 1,
+        barrel: 1,
+        line: 1,
+        ground: 0,
+        fly: 0,
+        laN: 1,
+        laSum: 15,
+      },
+    }), {}, { includeRecent: false });
+
+    expect(evaluation.battedBallAdjustment / evaluation.base).toBeLessThan(0.001);
+  });
 });

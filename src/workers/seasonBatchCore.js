@@ -51,6 +51,7 @@ import {
   MIN_ACTIVE_CATCHERS,
 } from '../constants';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
+import { applyManagementPolicy } from '../engine/rosterAutomation';
 
 const MAX_FOREIGN_ACTIVE = 4;
 const MAX_BATCH_BOX_SCORE_KEEP = 120;
@@ -966,11 +967,15 @@ export function simulateSeasonBatch({
   for (let index = 0; index < safeCount; index += 1) {
     ensureNotCancelled(isCancelled);
 
-    if (newDay % CPU_AUTO_MANAGE_INTERVAL === 0) {
-      newTeams = newTeams.map((team) => (
-        team.id === state.myId && !autoManageMyTeam ? team : cpuAutoManageTeam(team)
-      ));
-    }
+    newTeams = newTeams.map((team) => (
+      team.id === state.myId && !autoManageMyTeam
+        ? team
+        : applyManagementPolicy(team, {
+            teams: newTeams,
+            gameDay: newDay,
+            includeRosterChanges: true,
+          })
+    ));
 
     let teamMap = buildTeamMap(newTeams);
 

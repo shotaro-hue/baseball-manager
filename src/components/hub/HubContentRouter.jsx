@@ -89,6 +89,7 @@ export default function HubContentRouter({ app, tab, onTabChange }) {
       <>
         <RosterTab
           team={myTeam}
+          allTeams={teams}
           onToggle={gs.toggleLineup}
           onReplaceLineup={gs.replaceLineup}
           onSetLineupOrder={gs.setLineupOrder}
@@ -108,6 +109,7 @@ export default function HubContentRouter({ app, tab, onTabChange }) {
           onSetDevGoal={gs.setDevGoal}
           onPlayerTalk={gs.handlePlayerTalk}
           onSetConvertTarget={gs.setConvertTarget}
+          onSetManagementPolicy={gs.setManagementPolicy}
           gameDay={gameDay}
         />
 
