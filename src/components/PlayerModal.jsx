@@ -181,7 +181,7 @@ export function PlayerModal({
 
   if(!p) return null;
 
-  const sb=!p.isPitcher?saberBatter(p.stats):null;
+  const sb=saberBatter(p.stats || {});
   const sp=p.isPitcher?saberPitcher(p.stats):null;
 
   const phase=p.growthPhase==="growth"?"成長期":p.growthPhase==="peak"?"全盛期":p.growthPhase==="earlyDecline"?"衰退初期":"衰退期";
@@ -303,6 +303,12 @@ export function PlayerModal({
                   <StatRow label="WHIP" value={sp.WHIP>0?sp.WHIP:"---"} color={sp.WHIP>0&&sp.WHIP<1.0?"#34d399":sp.WHIP<1.3?"#f5c842":undefined}/>
                   <StatRow label="セーブ" value={p.stats.SV||0}/>
                   <StatRow label="ホールド" value={p.stats.HLD||0}/>
+                  <div style={{margin:"7px 0 5px",paddingTop:7,borderTop:"1px solid rgba(255,255,255,.06)",fontSize:10,color:"#94a3b8",fontWeight:700,letterSpacing:".05em"}}>打撃成績</div>
+                  <StatRow label="打席" value={p.stats.PA||0}/>
+                  <StatRow label="打率" value={p.stats.AB>0?fmtAvg(p.stats.H,p.stats.AB):"---"}/>
+                  <StatRow label="安打" value={p.stats.H||0}/>
+                  <StatRow label="打点" value={p.stats.RBI||0}/>
+                  <StatRow label="OPS" value={sb.OPS>0?sb.OPS.toFixed(3):"---"}/>
                 </>
               ) : (
                 <>
