@@ -23,7 +23,10 @@ export function saberBatter(s) {
   const BABIP_d = s.AB - s.K - s.HR + s.SF;
   const BABIP = BABIP_d > 0 ? (s.H - s.HR) / BABIP_d : 0;
   const wOBA_n = WW.BB * s.BB + WW.HBP * s.HBP + WW.s1b * singles + WW.d2b * s.D + WW.t3b * s.T + WW.HR * s.HR;
-  const wOBA_d = s.AB - s.H + s.BB + s.HBP + s.SF + s.K;
+  // wOBA の分母は（敬遠を別管理しないこのゲームでは）打数 + 四死球 + 犠飛。
+  // 三振はすでに AB に含まれるため、ここで加算すると二重計上になる。また、安打を
+  // 差し引くと打者ごとに分母が縮み、wOBA / wRC+ / WAR が大きく水増しされてしまう。
+  const wOBA_d = s.AB + s.BB + s.HBP + s.SF;
   const wOBA = wOBA_d > 0 ? wOBA_n / wOBA_d : 0;
   const wRCp = Math.round(((wOBA - LG_WOBA) / WOBA_SCALE + 1) * 100);
   const WAR = r2(((wOBA - LG_WOBA) / WOBA_SCALE) * s.PA / 10);
