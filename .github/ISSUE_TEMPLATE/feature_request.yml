@@ -1,0 +1,42 @@
+name: Feature request
+description: Propose a change that improves player decisions, simulation quality, or maintainability
+title: "[Feature] "
+labels: []
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem should this solve?
+      description: Describe the player or maintainer problem before proposing the implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Explain the smallest useful change.
+    validations:
+      required: true
+  - type: dropdown
+    id: value
+    attributes:
+      label: Primary value
+      options:
+        - Simulation correctness
+        - Decision quality / explainability
+        - Multi-season franchise depth
+        - Performance / reliability
+        - Accessibility / UX
+        - Developer tooling / maintainability
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional. Mention simpler approaches or tradeoffs you considered.
+  - type: textarea
+    id: validation
+    attributes:
+      label: How could we validate success?
+      description: Tests, measurable outcomes, or concrete player scenarios that would show the feature works.
