@@ -10,6 +10,7 @@ function loadTitleSaveModule() {
 
 export default function TitleScreen({
   saveExists,
+  initializationError,
   onLoad,
   onSelectTeam,
   onSaveDeleted,
@@ -163,6 +164,12 @@ export default function TitleScreen({
         >
           NEW GAME - チームを選択
         </div>
+
+        {initializationError && (
+          <div role="alert" style={{background:'rgba(248,113,113,.1)',border:'1px solid rgba(248,113,113,.45)',borderRadius:7,padding:'8px 10px',marginBottom:10,color:'#f87171',fontSize:11,textAlign:'left'}}>
+            {initializationError}
+          </div>
+        )}
 
         <div
           style={{

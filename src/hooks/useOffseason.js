@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { uid, clamp, rng, rngf, fmtM } from '../utils';
 import { calcSeasonAwards, updateRecords, checkHallOfFame } from '../engine/awards';
 import { evalOffer, cpuRenewContracts, processCpuFaBids, getFaThreshold, calcPlayerDemand } from '../engine/contract';
@@ -14,6 +14,8 @@ import {
   CAMP_STRUGGLE_COUNT, CAMP_STRUGGLE_COND_HIT, CAMP_MIN_CONDITION,
 } from '../constants';
 import { createEmptyBattedBallProfile } from '../engine/battedBallProfile';
+import { isTeamIdSet } from '../engine/teamId';
+import { appendCareerEntryToPlayer, makeCareerEntry } from '../engine/careerStats';
 
 let offseasonPlayerModulePromise = null;
 let offseasonScheduleModulePromise = null;
@@ -36,12 +38,12 @@ function loadOffseasonSaveModule() {
 
 function createEmptyStats() {
   return {
-    PA: 0, AB: 0, H: 0, D: 0, T: 0, HR: 0, RBI: 0, BB: 0, K: 0, HBP: 0, SF: 0, SB: 0,
+    PA: 0, AB: 0, H: 0, D: 0, T: 0, HR: 0, RBI: 0, BB: 0, K: 0, HBP: 0, SF: 0, SH: 0, SB: 0, CS: 0, R: 0,
     evSum: 0, evN: 0, laSum: 0, laN: 0,
     pullBatted: 0, centerBatted: 0, oppositeBatted: 0, hardHit: 0,
     groundBatted: 0, lineBatted: 0, flyBatted: 0,
     sprayPoints: [], battedBallEvents: [], battedBallProfile: createEmptyBattedBallProfile(),
-    IP: 0, ER: 0, BBp: 0, HBPp: 0, Kp: 0, HRp: 0, Hp: 0, BF: 0, W: 0, L: 0, SV: 0, HLD: 0, QS: 0,
+    IP: 0, ER: 0, BBp: 0, HBPp: 0, Kp: 0, HRp: 0, Hp: 0, BF: 0, W: 0, L: 0, SV: 0, HLD: 0, QS: 0, BS: 0,
   };
 }
 
@@ -76,49 +78,27 @@ export function useOffseason(gs) {
   const [draftAllocation, setDraftAllocation] = useState({pitcher:50,batter:50});
   const [waiverClaimResults, setWaiverClaimResults] = useState(null);
   const [contractRenewalDemands, setContractRenewalDemands] = useState(null);
+  const [careerPersistenceError, setCareerPersistenceError] = useState(null);
+  const nextYearTransitionRef = useRef(false);
+  const retireTransitionRef = useRef(false);
   // { [playerId]: { demandSalary, minAcceptSalary, resistanceFactor } }
 
-  // careerLogをコンパクト形式で保存（evSum/evN等の不要フィールドを除外）
-  const mkCareerEntry = (s, ps, yr, teamId, teamName) => {
-    const pick=x=>({PA:x.PA,AB:x.AB,H:x.H,D:x.D,T:x.T,HR:x.HR,RBI:x.RBI,BB:x.BB,K:x.K,HBP:x.HBP,SF:x.SF,SB:x.SB,IP:x.IP,ER:x.ER,BBp:x.BBp,HBPp:x.HBPp,Kp:x.Kp,HRp:x.HRp,Hp:x.Hp,BF:x.BF,W:x.W,L:x.L,SV:x.SV,HLD:x.HLD,QS:x.QS});
-    return{
-      year:yr,
-      teamId,
-      teamName,
-      stats:pick(s),
-      playoffStats:pick(ps||createEmptyStats()),
-      battedBallProfile:s?.battedBallProfile || null,
-    };
-  };
+  // careerLogをコンパクト形式で保存（打球詳細などの不要フィールドを除外）
+  const mkCareerEntry = (s, ps, yr, teamId, teamName) => makeCareerEntry(
+    s,
+    ps || createEmptyStats(),
+    yr,
+    teamId,
+    teamName,
+  );
 
-  const appendCareerEntryWithSummary = (player, entry) => {
-    if (!player || typeof player !== 'object' || !entry) return player;
-    const isPitcher = !!player.isPitcher;
-    const stats = entry.stats || {};
-    const summaryDelta = {
-      totalGames: Number(isPitcher ? (stats.BF || 0) : (stats.PA || 0)) || 0,
-      totalHits: Number(stats.H || 0) || 0,
-      totalHomeRuns: Number(stats.HR || 0) || 0,
-      totalRbi: Number(stats.RBI || 0) || 0,
-      firstYear: Number(entry.year || 0) || 0,
-      lastYear: Number(entry.year || 0) || 0,
-      trimmedEntries: 1,
-    };
-    const baseSummary = player.careerLogSummary || {};
-    const mergedSummary = {
-      totalGames: Number(baseSummary.totalGames || 0) + summaryDelta.totalGames,
-      totalHits: Number(baseSummary.totalHits || 0) + summaryDelta.totalHits,
-      totalHomeRuns: Number(baseSummary.totalHomeRuns || 0) + summaryDelta.totalHomeRuns,
-      totalRbi: Number(baseSummary.totalRbi || 0) + summaryDelta.totalRbi,
-      firstYear: baseSummary.firstYear ? Math.min(baseSummary.firstYear, summaryDelta.firstYear) : summaryDelta.firstYear,
-      lastYear: Math.max(Number(baseSummary.lastYear || 0), summaryDelta.lastYear),
-      trimmedEntries: Number(baseSummary.trimmedEntries || 0) + 1,
-    };
-    const recent = [...(Array.isArray(player.recentCareerLog) ? player.recentCareerLog : []), entry].slice(-3);
-    return { ...player, careerLog: [], recentCareerLog: recent, careerLogSummary: mergedSummary, trimmedCareerLogSummary: mergedSummary };
-  };
+  const appendCareerEntryWithSummary = (player, entry) => appendCareerEntryToPlayer(player, entry);
 
-  const handleNextYear = async () => {
+  const handleNextYear = async (sourceTeams = teams) => {
+    if (nextYearTransitionRef.current) return false;
+    nextYearTransitionRef.current = true;
+    setCareerPersistenceError(null);
+    try {
     const [playerMod, scheduleMod, saveMod] = await Promise.all([
       loadOffseasonPlayerModule(),
       loadOffseasonScheduleModule(),
@@ -126,11 +106,8 @@ export function useOffseason(gs) {
     ]);
     const currentGameResultsMap = getGameResultsMap();
     const foreignPool = playerMod.generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX));
-    setYear(y=>y+1);setGameDay(1);setFaPool(foreignPool);setDraftAllocation({pitcher:50,batter:50});
-    setAllStarDone(false);
-    setAllStarResult(null);
     const indexedDbEntries = [];
-    setTeams(prev=>prev.map(t=>{
+    const nextTeams = (Array.isArray(sourceTeams) ? sourceTeams : teams).map(t=>{
       const nextPlayers=t.players.filter(p=>!p._retireNow).map(p=>{
         const entry = mkCareerEntry(p.stats,p.playoffStats,year,t.id,t.name);
         indexedDbEntries.push({ playerId: String(p.id || ''), careerEntry: entry });
@@ -145,28 +122,43 @@ export function useOffseason(gs) {
       const trustFactor=t.id===myId?(trust<OWNER_TRUST_BUDGET_LOW?OWNER_TRUST_FACTOR_LOW:trust>OWNER_TRUST_BUDGET_HIGH?OWNER_TRUST_FACTOR_HIGH:1.0):1.0;
       const newBudget=Math.max(Math.round(baseBudget*0.5),Math.round(rawBudget*trustFactor));
       return{...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,revenueThisSeason:0,winStreak:0,loseStreak:0,stadiumLevel:t.stadiumLevel??0,budget:newBudget,players:nextPlayers,lineup:(t.lineup||[]).filter(id=>nextIds.has(id)),lineupNoDh:(t.lineupNoDh||[]).filter(id=>nextIds.has(id)),lineupDh:(t.lineupDh||[]).filter(id=>nextIds.has(id)),rotation:(t.rotation||[]).filter(id=>nextIds.has(id)),farm:t.farm.map(p=>({...p,age:p.age+1,stats:createEmptyStats(),injury:null,serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}))};
-    }));
-    saveMod.appendCareerEntriesToIndexedDb(indexedDbEntries).then((result) => {
-      if (!result?.ok) {
-        console.warn('careerLogの一括追記に失敗しました');
-      }
-    }).catch((e) => {
-      console.warn('careerLogの一括追記に失敗しました:', e);
     });
+    const persisted = await saveMod.appendCareerEntriesToIndexedDb(indexedDbEntries);
+    if (!persisted?.ok) {
+      const message = '年度成績の保存に失敗しました。次年度へは進んでいません。再試行してください。';
+      setCareerPersistenceError(message);
+      notify(message,'warn');
+      return false;
+    }
+
+    const nextYear=year+1;
+    setTeams(nextTeams);
+    setYear(nextYear);setGameDay(1);setFaPool(foreignPool);setDraftAllocation({pitcher:50,batter:50});
+    setAllStarDone(false);
+    setAllStarResult(null);
     // 現シーズンの日程・試合結果をアーカイブに保存
     // 詳細ボックススコアは自チーム分のみ保持して容量増加を抑える
     if(schedule){
-      const myTeamResultsMap = myId ? (allTeamResultsMap?.[myId] || {}) : {};
+      const myTeamResultsMap = isTeamIdSet(myId) ? (allTeamResultsMap?.[myId] || {}) : {};
       setScheduleArchive(prev=>[...prev,{year,schedule,gameResultsMap: currentGameResultsMap,myTeamResultsMap}].slice(-5));
     }
-    const nextYear=year+1;
-    const newSchedule=scheduleMod.generateSeasonSchedule(nextYear, teams);
+    const newSchedule=scheduleMod.generateSeasonSchedule(nextYear, nextTeams);
     setSchedule(newSchedule);
     setGameResultsMap({});
     setAllTeamResultsMap({});
     const params=SEASON_PARAMS[nextYear]||getDefaultParams(nextYear);
     setAllStarTriggerDay(scheduleMod.calcAllStarTriggerDay(newSchedule, params.allStarSkipDates));
     setScreen("new_season");
+    return true;
+    } catch (error) {
+      console.error('年度更新処理に失敗しました:', error);
+      const message = '年度成績の保存に失敗しました。次年度へは進んでいません。再試行してください。';
+      setCareerPersistenceError(message);
+      notify(message,'warn');
+      return false;
+    } finally {
+      nextYearTransitionRef.current = false;
+    }
   };
 
   const generateSpringTraining = (currentTeams) => {
@@ -252,10 +244,11 @@ export function useOffseason(gs) {
     setScreen("spring_training");
   };
 
-  const handleSpringTrainingComplete = () => {
+  const handleSpringTrainingComplete = async () => {
+    let preparedTeams = teams;
     if (springTrainingData?.conditionDeltas) {
       const deltas = springTrainingData.conditionDeltas;
-      setTeams(prev => prev.map(t => ({
+      preparedTeams = teams.map(t => ({
         ...t,
         players: t.players.map(p => ({
           ...p,
@@ -265,10 +258,10 @@ export function useOffseason(gs) {
           ...p,
           condition: p.育成 ? (p.condition || 100) : clamp((p.condition || 100) + (deltas[p.id] || 0), CAMP_MIN_CONDITION, 100),
         })),
-      })));
+      }));
     }
-    setSpringTrainingData(null);
-    handleNextYear();
+    const completed = await handleNextYear(preparedTeams);
+    if (completed) setSpringTrainingData(null);
   };
 
   const handleContractOffer = (pid, sal, yrs, meta = {}) => {
@@ -434,13 +427,74 @@ export function useOffseason(gs) {
 
   // 引退フェーズ処理（退場選手確定→成長/衰退→CPU契約→表彰）
   const handleRetirePhaseNext = async (decisions) => {
-    const playerMod = await loadOffseasonPlayerModule();
-    if(decisions){Object.entries(decisions).forEach(function(e){const pid=e[0];const dec=e[1];const p=myTeam?.players.find(function(x){return x.id===pid;});if(!p) return;if(dec==="accepted"||dec==="retain_failed"){upd(myId,function(t){return{...t,players:t.players.map(function(x){return x.id===pid?{...x,isRetired:true,_retireNow:true}:x;})};});addToHistory(myId,p,"引退");addNews({type:"season",headline:"【引退】"+p.name+"選手が現役引退",source:"野球速報",dateLabel:year+"年",body:p.name+"選手（"+p.age+"歳）が"+year+"年シーズンをもって現役を引退した。"});}else if(dec==="retained"){notify(p.name+"の引き留め成功！","ok");}});}
+    if (retireTransitionRef.current) return false;
+    retireTransitionRef.current = true;
+    setCareerPersistenceError(null);
+    try {
+    const [playerMod, saveMod] = await Promise.all([
+      loadOffseasonPlayerModule(),
+      loadOffseasonSaveModule(),
+    ]);
+    const safeDecisions = decisions && typeof decisions === 'object' ? decisions : {};
+    const userRetiredIds = new Set(
+      Object.entries(safeDecisions)
+        .filter(([, decision]) => decision === 'accepted' || decision === 'retain_failed')
+        .map(([playerId]) => playerId),
+    );
+    Object.entries(safeDecisions).forEach(([playerId, decision]) => {
+      if (decision !== 'retained') return;
+      const player = myTeam?.players.find((candidate) => candidate.id === playerId);
+      if (player) notify(player.name+"の引き留め成功！","ok");
+    });
+
+    const retirementByTeam = new Map();
+    const retirementCareerEntries = [];
+    for (const team of teams) {
+      const retiringPlayers = team.id === myId
+        ? team.players.filter((player) => userRetiredIds.has(player.id) || player._retireNow)
+        : team.players.filter((player) => player.age >= 35 && playerMod.rollRetire(player));
+      const alumni = retiringPlayers.map((player) => {
+        const careerEntry = mkCareerEntry(player.stats, player.playoffStats, year, team.id, team.name);
+        retirementCareerEntries.push({ playerId: String(player.id || ''), careerEntry });
+        const archivedPlayer = appendCareerEntryWithSummary(player, careerEntry);
+        return {
+          ...archivedPlayer,
+          isRetired: true,
+          _retireNow: true,
+          exitYear: year,
+          exitReason: '引退',
+          tenure: player.serviceYears || 1,
+        };
+      });
+      retirementByTeam.set(team.id, {
+        ids: new Set(retiringPlayers.map((player) => player.id)),
+        alumni,
+      });
+    }
+
+    const persisted = await saveMod.appendCareerEntriesToIndexedDb(retirementCareerEntries);
+    if (!persisted?.ok) {
+      const message = '引退選手の最終年成績を保存できませんでした。処理を中断しました。再試行してください。';
+      setCareerPersistenceError(message);
+      notify(message,'warn');
+      return false;
+    }
+
+    for (const team of teams) {
+      for (const player of retirementByTeam.get(team.id)?.alumni || []) {
+        addNews({
+          type:"season",
+          headline: team.id === myId ? "【引退】"+player.name+"選手が現役引退" : "【引退】"+player.name+"（"+team.name+"）が引退",
+          source:"野球速報",
+          dateLabel:year+"年",
+          body:player.name+"選手（"+player.age+"歳）が"+year+"年シーズンをもって現役を引退した。",
+        });
+      }
+    }
     let mySummary=null;
     const developedTeams=teams.map(t=>{
-      const cpuRetiredPlayers=t.id!==myId?t.players.filter(p=>p.age>=35&&playerMod.rollRetire(p)):[];
-      if(t.id!==myId)cpuRetiredPlayers.forEach(p=>{addNews({type:"season",headline:"【引退】"+p.name+"（"+t.name+"）が引退",source:"野球速報",dateLabel:year+"年",body:p.name+"選手（"+p.age+"歳）が引退を発表。"});});
-      const retiredIds=new Set(cpuRetiredPlayers.map(p=>p.id));
+      const retirement = retirementByTeam.get(t.id) || { ids: new Set(), alumni: [] };
+      const retiredIds=retirement.ids;
       const activePlayers=t.players.filter(p=>!retiredIds.has(p.id));
       const res=playerMod.developPlayers(activePlayers, t.coaches||[]);
       const farmRes=playerMod.developPlayers(t.farm, t.coaches||[]);
@@ -513,8 +567,7 @@ export function useOffseason(gs) {
         });
       }
 
-      const cpuAlumni=cpuRetiredPlayers.map(p=>({...p,exitYear:year,exitReason:"引退",tenure:p.serviceYears||1}));
-      return{...t,players:postingPlayers,farm:farmAfterIkusei,history:[...(t.history||[]),...cpuAlumni]};
+      return{...t,players:postingPlayers,farm:farmAfterIkusei,history:[...(t.history||[]),...retirement.alumni]};
     });
     // CPU契約更改は contract_renewal_phase 完了後に実行（フェーズ分離）
     // 自チーム満了選手の要求額を事前計算して state に保持
@@ -536,9 +589,19 @@ export function useOffseason(gs) {
     const makeRanking=(lg)=>developedTeams.filter(t=>t.league===lg).sort((a,b)=>{const pa=a.wins/Math.max(1,a.wins+a.losses);const pb=b.wins/Math.max(1,b.wins+b.losses);return pb-pa||(b.rf-b.ra)-(a.rf-a.ra);}).map(t=>({id:t.id,name:t.name,emoji:t.emoji,wins:t.wins,losses:t.losses,rf:t.rf,ra:t.ra}));
     const standingsSnap={year,central:makeRanking("セ"),pacific:makeRanking("パ"),titles:awards.titles,playerAwards:{mvpCentral:awards.mvp?.central,mvpPacific:awards.mvp?.pacific,sawamura:awards.sawamura,rookie:awards.rookie}};
     setSeasonHistory(prev=>({...prev,awards:[...prev.awards,awards],records:newRec,hallOfFame:newHoF,standingsHistory:[...(prev.standingsHistory||[]),standingsSnap]}));
-    const retiredMyNames=decisions?Object.entries(decisions).filter(([,d])=>d==="accepted"||d==="retain_failed").map(([pid])=>myTeam?.players.find(x=>x.id===pid)?.name).filter(Boolean):[];
+    const retiredMyNames=Object.entries(safeDecisions).filter(([,d])=>d==="accepted"||d==="retain_failed").map(([pid])=>myTeam?.players.find(x=>x.id===pid)?.name).filter(Boolean);
     setNewSeasonInfo({retiredNames:retiredMyNames,year:year+1,draftCount:0,draftNames:[]});
     setScreen("contract_renewal_phase");
+    return true;
+    } catch (error) {
+      console.error('引退フェーズ処理に失敗しました:', error);
+      const message = '引退選手の最終年成績を保存できませんでした。処理を中断しました。再試行してください。';
+      setCareerPersistenceError(message);
+      notify(message,'warn');
+      return false;
+    } finally {
+      retireTransitionRef.current = false;
+    }
   };
 
   // 契約更改フェーズ: 合意確定（ダイアログUI側から呼ばれる）
@@ -669,6 +732,7 @@ export function useOffseason(gs) {
     draftAllocation, setDraftAllocation,
     waiverClaimResults,
     contractRenewalDemands,
+    careerPersistenceError,
     handleNextYear,
     handleDraftComplete,
     handleSpringTrainingComplete,

@@ -11,6 +11,14 @@ import {
   createRecentBattedBallProfile,
   updateBattedBallProfile,
 } from './battedBallProfile';
+import { hasSelectedTeam } from './teamId';
+import { emptyStats } from './playerCore';
+import {
+  buildCareerLogSummary,
+  getCareerEntryKey,
+  getRecentCareerLog,
+  normalizeCareerLogSummary,
+} from './careerStats';
 
 /* ═══════════════════════════════════════════════
    SAVE / LOAD — localStorage
@@ -20,7 +28,7 @@ const SAVE_KEY     = 'baseball_manager_v1';
 const META_KEY     = 'baseball_manager_v1_meta';
 const BACKUP_KEY_1 = 'baseball_manager_v1_bk1';
 const BACKUP_KEY_2 = 'baseball_manager_v1_bk2';
-const isDevEnv = import.meta.env.DEV;
+const isDevEnv = import.meta.env?.DEV ?? false;
 const PERF_LOG_KEY = 'baseball_manager_save_perf_logs';
 const MAX_PERF_LOGS = 30;
 const BACKUP_ROTATE_INTERVAL_MS = 5 * 60 * 1000;
@@ -94,18 +102,6 @@ function sanitizeYear(value) {
   return normalized;
 }
 
-function createEmptyCareerLogSummary() {
-  return {
-    totalGames: 0,
-    totalHits: 0,
-    totalHomeRuns: 0,
-    totalRbi: 0,
-    firstYear: 0,
-    lastYear: 0,
-    trimmedEntries: 0,
-  };
-}
-
 function isSaveSizeDebugEnabled() {
   if (!isDevEnv) return false;
   try {
@@ -113,49 +109,6 @@ function isSaveSizeDebugEnabled() {
   } catch {
     return false;
   }
-}
-
-function buildCareerLogSummary(entries) {
-  const safeEntries = Array.isArray(entries) ? entries : [];
-  return safeEntries.reduce((acc, entry) => {
-    if (!entry || typeof entry !== 'object') return acc;
-    const stats = entry.stats && typeof entry.stats === 'object' ? entry.stats : {};
-    const games = sanitizeNumber(entry.games ?? entry.G ?? entry.g ?? stats.PA ?? stats.BF, 0);
-    const hits = sanitizeNumber(entry.hits ?? entry.H ?? stats.H, 0);
-    const homeRuns = sanitizeNumber(entry.homeRuns ?? entry.HR ?? stats.HR, 0);
-    const rbi = sanitizeNumber(entry.rbi ?? entry.RBI ?? stats.RBI, 0);
-    const year = sanitizeYear(entry.year);
-    acc.totalGames += games;
-    acc.totalHits += hits;
-    acc.totalHomeRuns += homeRuns;
-    acc.totalRbi += rbi;
-    if (year > 0) {
-      if (acc.firstYear === 0 || year < acc.firstYear) acc.firstYear = year;
-      if (acc.lastYear === 0 || year > acc.lastYear) acc.lastYear = year;
-    }
-    return acc;
-  }, createEmptyCareerLogSummary());
-}
-
-function mergeCareerLogSummary(base, delta) {
-  const safeBase = base && typeof base === 'object' ? base : createEmptyCareerLogSummary();
-  const safeDelta = delta && typeof delta === 'object' ? delta : createEmptyCareerLogSummary();
-  const baseFirstYear = sanitizeYear(safeBase.firstYear);
-  const baseLastYear = sanitizeYear(safeBase.lastYear);
-  const deltaFirstYear = sanitizeYear(safeDelta.firstYear);
-  const deltaLastYear = sanitizeYear(safeDelta.lastYear);
-  const mergedFirstYear = [baseFirstYear, deltaFirstYear]
-    .filter((year) => year > 0)
-    .reduce((min, year) => Math.min(min, year), Number.POSITIVE_INFINITY);
-  return {
-    totalGames: sanitizeNumber(safeBase.totalGames, 0) + sanitizeNumber(safeDelta.totalGames, 0),
-    totalHits: sanitizeNumber(safeBase.totalHits, 0) + sanitizeNumber(safeDelta.totalHits, 0),
-    totalHomeRuns: sanitizeNumber(safeBase.totalHomeRuns, 0) + sanitizeNumber(safeDelta.totalHomeRuns, 0),
-    totalRbi: sanitizeNumber(safeBase.totalRbi, 0) + sanitizeNumber(safeDelta.totalRbi, 0),
-    firstYear: Number.isFinite(mergedFirstYear) ? mergedFirstYear : 0,
-    lastYear: [baseLastYear, deltaLastYear].filter((year) => year > 0).reduce((max, year) => Math.max(max, year), 0),
-    trimmedEntries: sanitizeNumber(safeBase.trimmedEntries, 0) + sanitizeNumber(safeDelta.trimmedEntries, 0),
-  };
 }
 
 function logPerf(label, startedAt) {
@@ -207,7 +160,10 @@ function shouldRotateBackupNow() {
 // ── 選手フィールドのマイグレーション ──────────────
 function migratePlayer(p) {
   const legacyCareerLog = Array.isArray(p.careerLog) ? p.careerLog : [];
-  const recentCareerLog = Array.isArray(p.recentCareerLog) ? p.recentCareerLog : legacyCareerLog.slice(-MAX_RECENT_CAREER_LOG_YEARS);
+  const recentCareerLog = getRecentCareerLog(
+    Array.isArray(p.recentCareerLog) ? p.recentCareerLog : legacyCareerLog,
+    MAX_RECENT_CAREER_LOG_YEARS,
+  );
   const legacyBattedBallEvents = Array.isArray(p?.stats?.battedBallEvents)
     ? p.stats.battedBallEvents.slice(-MAX_BATTED_BALL_EVENTS)
     : [];
@@ -219,6 +175,7 @@ function migratePlayer(p) {
     );
   migratedProfile.recent = createRecentBattedBallProfile(legacyBattedBallEvents);
   const migratedStats = {
+    ...emptyStats(),
     ...(p.stats ?? {}),
     sprayPoints: Array.isArray(p?.stats?.sprayPoints)
       ? p.stats.sprayPoints.slice(-MAX_SPRAY_POINTS)
@@ -239,11 +196,12 @@ function migratePlayer(p) {
     growthPhase:        p.growthPhase        ?? 'peak',
     recentPitchingDays: p.recentPitchingDays ?? [],
     careerLog:          [],
-    recentCareerLog:    recentCareerLog.slice(-MAX_RECENT_CAREER_LOG_YEARS),
-    trimmedCareerLogSummary: mergeCareerLogSummary(createEmptyCareerLogSummary(), p.trimmedCareerLogSummary ?? p.careerLogSummary ?? buildCareerLogSummary(legacyCareerLog)),
-    careerLogSummary:   mergeCareerLogSummary(createEmptyCareerLogSummary(), p.trimmedCareerLogSummary ?? p.careerLogSummary ?? buildCareerLogSummary(legacyCareerLog)),
+    recentCareerLog,
+    trimmedCareerLogSummary: normalizeCareerLogSummary(p.trimmedCareerLogSummary ?? p.careerLogSummary ?? buildCareerLogSummary(legacyCareerLog)),
+    careerLogSummary:   normalizeCareerLogSummary(p.trimmedCareerLogSummary ?? p.careerLogSummary ?? buildCareerLogSummary(legacyCareerLog)),
     peakAbilities:      p.peakAbilities      ?? null,
     stats:              migratedStats,
+    playoffStats:       { ...emptyStats(), ...(p.playoffStats ?? {}) },
     stats2:             p.stats2             ?? { PA:0, H:0, HR:0, W:0, IP:0, ER:0, K:0 },
     entryType:          p.entryType          ?? (p.isForeign ? '外国人' : (p.entryAge??p.age) <= 19 ? '高卒' : (p.entryAge??p.age) <= 22 ? '大卒' : '社会人'),
     daysOnActiveRoster: p.daysOnActiveRoster ?? (p.serviceYears ?? 0) * 120,
@@ -279,7 +237,7 @@ function migrateInitialContractYears(player, teamName, state) {
 }
 
 function validateAndMigrateSave(state) {
-  if (!state || !Array.isArray(state.teams) || !state.myId || !state.year) {
+  if (!state || !hasSelectedTeam(state.teams, state.myId) || !state.year) {
     return { ok: false };
   }
   const teams = state.teams.map(t => ({
@@ -564,7 +522,7 @@ function normalizeRecentCareerLog(player) {
   const source = Array.isArray(player?.recentCareerLog)
     ? player.recentCareerLog
     : (Array.isArray(player?.careerLog) ? player.careerLog : []);
-  return source.slice(-MAX_RECENT_CAREER_LOG_YEARS);
+  return getRecentCareerLog(source, MAX_RECENT_CAREER_LOG_YEARS);
 }
 
 
@@ -596,17 +554,17 @@ async function upsertCareerLogEntriesBatch(entriesByPlayer) {
         const playerId = normalizePlayerId(playerIdRaw);
         if (!playerId || !Array.isArray(rows) || rows.length === 0) continue;
         const existing = await readCurrent(playerId);
-        const byYear = new Map();
+        const byEntryKey = new Map();
         for (const row of existing) {
           const year = sanitizeYear(row?.year);
-          if (year > 0) byYear.set(year, row);
+          if (year > 0) byEntryKey.set(getCareerEntryKey(row), row);
         }
         for (const row of rows) {
           const year = sanitizeYear(row?.year);
           if (year <= 0) continue;
-          byYear.set(year, row);
+          byEntryKey.set(getCareerEntryKey(row), row);
         }
-        const merged = Array.from(byYear.values()).sort((a, b) => sanitizeYear(a?.year) - sanitizeYear(b?.year));
+        const merged = Array.from(byEntryKey.values()).sort((a, b) => sanitizeYear(a?.year) - sanitizeYear(b?.year));
         await writeNext(playerId, merged);
       }
     })().catch((error) => reject(error));
@@ -614,6 +572,27 @@ async function upsertCareerLogEntriesBatch(entriesByPlayer) {
     tx.oncomplete = () => { db.close(); resolve({ ok: true }); };
     tx.onerror = () => { db.close(); reject(tx.error || new Error('IndexedDB batch upsert failed')); };
     tx.onabort = () => { db.close(); reject(tx.error || new Error('IndexedDB batch upsert aborted')); };
+  });
+}
+
+async function replaceCareerLogEntriesBatch(entriesByPlayer) {
+  const db = await openSaveDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORES.careerLogs, 'readwrite');
+    const store = tx.objectStore(IDB_STORES.careerLogs);
+    for (const [playerIdRaw, rows] of entriesByPlayer instanceof Map ? entriesByPlayer.entries() : []) {
+      const playerId = normalizePlayerId(playerIdRaw);
+      if (!playerId || !Array.isArray(rows)) continue;
+      store.put(
+        rows
+          .filter((row) => sanitizeYear(row?.year) > 0)
+          .sort((a, b) => sanitizeYear(a?.year) - sanitizeYear(b?.year)),
+        playerId,
+      );
+    }
+    tx.oncomplete = () => { db.close(); resolve({ ok: true }); };
+    tx.onerror = () => { db.close(); reject(tx.error || new Error('IndexedDB career log initialization failed')); };
+    tx.onabort = () => { db.close(); reject(tx.error || new Error('IndexedDB career log initialization aborted')); };
   });
 }
 
@@ -651,12 +630,12 @@ export async function saveGame(state, options = {}) {
     ...team,
     players: Array.isArray(team.players) ? team.players.map((p) => {
       const recentCareerLog = normalizeRecentCareerLog(p);
-      const nextSummary = mergeCareerLogSummary(createEmptyCareerLogSummary(), p.careerLogSummary ?? buildCareerLogSummary(recentCareerLog));
+      const nextSummary = normalizeCareerLogSummary(p.careerLogSummary ?? buildCareerLogSummary(recentCareerLog));
       return { ...p, careerLog: [], recentCareerLog, careerLogSummary: nextSummary, trimmedCareerLogSummary: nextSummary };
     }) : [],
     farm: Array.isArray(team.farm) ? team.farm.map((p) => {
       const recentCareerLog = normalizeRecentCareerLog(p);
-      const nextSummary = mergeCareerLogSummary(createEmptyCareerLogSummary(), p.careerLogSummary ?? buildCareerLogSummary(recentCareerLog));
+      const nextSummary = normalizeCareerLogSummary(p.careerLogSummary ?? buildCareerLogSummary(recentCareerLog));
       return { ...p, careerLog: [], recentCareerLog, careerLogSummary: nextSummary, trimmedCareerLogSummary: nextSummary };
     }) : [],
   }));
@@ -856,11 +835,11 @@ export async function loadGame() {
               }
             }
             const recentCareerLog = Array.isArray(player?.recentCareerLog)
-              ? player.recentCareerLog.slice(-MAX_RECENT_CAREER_LOG_YEARS)
-              : legacyCareerLog.slice(-MAX_RECENT_CAREER_LOG_YEARS);
+              ? getRecentCareerLog(player.recentCareerLog, MAX_RECENT_CAREER_LOG_YEARS)
+              : getRecentCareerLog(legacyCareerLog, MAX_RECENT_CAREER_LOG_YEARS);
             player.recentCareerLog = recentCareerLog;
-            player.careerLogSummary = mergeCareerLogSummary(createEmptyCareerLogSummary(), player.careerLogSummary ?? buildCareerLogSummary(legacyCareerLog));
-            player.trimmedCareerLogSummary = mergeCareerLogSummary(createEmptyCareerLogSummary(), player.trimmedCareerLogSummary ?? player.careerLogSummary);
+            player.careerLogSummary = normalizeCareerLogSummary(player.careerLogSummary ?? buildCareerLogSummary(legacyCareerLog));
+            player.trimmedCareerLogSummary = normalizeCareerLogSummary(player.trimmedCareerLogSummary ?? player.careerLogSummary);
             player.careerLog = [];
           }
         }
@@ -920,6 +899,25 @@ export async function appendCareerEntriesToIndexedDb(entries) {
   } catch (e) {
     console.warn('Career log batch append failed:', e);
     return { ok: false, appendedPlayers: 0 };
+  }
+}
+
+export async function initializeCareerLogsInIndexedDb(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) return { ok: true, initializedPlayers: 0 };
+  const entriesByPlayer = new Map();
+  for (const item of entries) {
+    const playerId = normalizePlayerId(item?.playerId);
+    const careerEntries = Array.isArray(item?.careerEntries) ? item.careerEntries : [];
+    if (!playerId || careerEntries.length === 0) continue;
+    entriesByPlayer.set(playerId, careerEntries);
+  }
+  if (entriesByPlayer.size === 0) return { ok: false, initializedPlayers: 0 };
+  try {
+    await replaceCareerLogEntriesBatch(entriesByPlayer);
+    return { ok: true, initializedPlayers: entriesByPlayer.size };
+  } catch (e) {
+    console.error('Career log initialization failed:', e);
+    return { ok: false, initializedPlayers: 0, reason: 'indexeddb_write_failed' };
   }
 }
 

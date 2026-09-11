@@ -1,8 +1,8 @@
-import { saberBatter } from './sabermetrics';
+import { saberBatter } from './sabermetrics.js';
 import {
   calcBattedBallQuality,
   createBattedBallLeagueContext,
-} from './cpuBatterEvaluation';
+} from './cpuBatterEvaluation.js';
 
 const clamp = (value, min = 0, max = 100) => Math.max(min, Math.min(max, value));
 
@@ -73,20 +73,20 @@ export const MANAGEMENT_TRAITS = {
 const TRAIT_ORDER = Object.keys(MANAGEMENT_TRAITS);
 
 function stableHash(value) {
-  return String(value || '').split('').reduce((total, char) => ((total * 31) + char.charCodeAt(0)) >>> 0, 7);
+  return String(value ?? '').split('').reduce((total, char) => ((total * 31) + char.charCodeAt(0)) >>> 0, 7);
 }
 
 export function getManagementPolicy(team) {
   const id = MANAGEMENT_POLICIES[team?.managementPolicyId]
     ? team.managementPolicyId
-    : MANAGEMENT_POLICY_ORDER[stableHash(team?.id || team?.name) % MANAGEMENT_POLICY_ORDER.length];
+    : MANAGEMENT_POLICY_ORDER[stableHash(team?.id ?? team?.name) % MANAGEMENT_POLICY_ORDER.length];
   return MANAGEMENT_POLICIES[id];
 }
 
 export function getManagementTrait(team) {
   const id = MANAGEMENT_TRAITS[team?.managementTraitId]
     ? team.managementTraitId
-    : TRAIT_ORDER[stableHash(`${team?.id || team?.name}-trait`) % TRAIT_ORDER.length];
+    : TRAIT_ORDER[stableHash(`${team?.id ?? team?.name}-trait`) % TRAIT_ORDER.length];
   return MANAGEMENT_TRAITS[id];
 }
 

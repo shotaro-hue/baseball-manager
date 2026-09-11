@@ -3,7 +3,8 @@ import { ErrorBoundary } from '../ErrorBoundary';
 import { RetireModal } from '../RetireModal';
 import { PlayerModal } from '../PlayerModal';
 import { PressConferenceModal } from '../PressConferenceModal';
-import { POSITIONS, FIELDING_POSITIONS, SEASON_GAMES } from '../../constants';
+import { SEASON_GAMES } from '../../constants';
+import { validateLineup } from '../../engine/rosterAutomation';
 import HubHeader from './HubHeader';
 import HubSimPanel from './HubSimPanel';
 import HubTabsNav from './HubTabsNav';
@@ -122,37 +123,11 @@ export default function HubShell({ state, flows, app }) {
   const handleTabChange = useCallback(
     (newTab) => {
       if (tab === 'roster' && newTab !== 'roster' && myTeam) {
-        const lineupPlayers = myTeam.lineup
-          .map((id) => myTeam.players.find((player) => player.id === id))
-          .filter(Boolean);
         const rosterDhMode = myTeam.rosterDhMode ?? myTeam.dhEnabled;
-        const required = rosterDhMode ? POSITIONS : FIELDING_POSITIONS;
-        const requiredCount = required.length;
-
-        if (lineupPlayers.length < requiredCount) {
-          gs.notify(
-            rosterDhMode
-              ? 'DHありの先発9人が揃っていません'
-              : '先発8人が揃っていません',
-            'warn',
-          );
+        const lineupValidation = validateLineup(myTeam, rosterDhMode);
+        if (lineupValidation.errors.length > 0) {
+          gs.notify(lineupValidation.errors[0], 'warn');
           return;
-        }
-
-        const posCount = {};
-        lineupPlayers.forEach((player) => {
-          posCount[player.pos] = (posCount[player.pos] ?? 0) + 1;
-        });
-
-        for (const pos of required) {
-          if (!posCount[pos]) {
-            gs.notify(`${pos} が未設定です`, 'warn');
-            return;
-          }
-          if (posCount[pos] > 1) {
-            gs.notify(`${pos} が重複しています`, 'warn');
-            return;
-          }
         }
       }
 

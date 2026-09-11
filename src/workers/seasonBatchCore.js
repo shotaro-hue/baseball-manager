@@ -33,27 +33,19 @@ import {
   INTERVIEW_QUESTIONS_LOSE,
   INTERVIEW_OPTIONS_WIN,
   INTERVIEW_OPTIONS_LOSE,
-  INJURY_AUTO_DEMOTE_DAYS,
-  REGISTRATION_COOLDOWN_DAYS,
   TRADE_DEADLINE_MONTH,
   TRADE_DEADLINE_PROB_EARLY,
   TRADE_DEADLINE_PROB_PEAK,
   TRADE_DEADLINE_CPU_CPU_PROB,
   INJURY_HISTORY_MAX,
-  MAX_ROSTER,
-  CPU_AUTO_MANAGE_INTERVAL,
-  ROSTER_SWAP_SCORE_THRESHOLD,
-  ROSTER_DEVREC_BONUS,
-  ROSTER_DEVREC_POTENTIAL_MIN,
-  ROSTER_DEVREC_DAYS_MAX,
-  FIELDING_POSITIONS,
-  OPTIMAL_PITCHER_COUNT,
-  MIN_ACTIVE_CATCHERS,
 } from '../constants';
-import { saberBatter, saberPitcher } from '../engine/sabermetrics';
-import { applyManagementPolicy } from '../engine/rosterAutomation';
+import {
+  applyEmergencyRosterMaintenance,
+  applyManagementPolicy,
+  prepareTeamForGame,
+  ROSTER_AUTOMATION_MODES,
+} from '../engine/rosterAutomation';
 
-const MAX_FOREIGN_ACTIVE = 4;
 const MAX_BATCH_BOX_SCORE_KEEP = 120;
 const DEFAULT_PROGRESS_THROTTLE_MS = 250;
 const DEFAULT_PROGRESS_PHASE = 'Simulating games';
@@ -178,339 +170,8 @@ function tickCooldowns(players) {
   });
 }
 
-function autoInjuryDemote(team) {
-  const farm = team.farm ?? [];
-  const demoted = [];
-  const kept = [];
-  for (const player of team.players || []) {
-    if ((player.injuryDaysLeft ?? 0) > INJURY_AUTO_DEMOTE_DAYS) {
-      demoted.push({ ...player, registrationCooldownDays: REGISTRATION_COOLDOWN_DAYS });
-    } else {
-      kept.push(player);
-    }
-  }
-  if (demoted.length === 0) return team;
-  const demotedIds = new Set(demoted.map((player) => player.id));
-  return {
-    ...team,
-    players: kept,
-    lineup: (team.lineup ?? []).filter((id) => !demotedIds.has(id)),
-    lineupNoDh: (team.lineupNoDh ?? []).filter((id) => !demotedIds.has(id)),
-    lineupDh: (team.lineupDh ?? []).filter((id) => !demotedIds.has(id)),
-    rotation: (team.rotation ?? []).filter((id) => !demotedIds.has(id)),
-    farm: [...farm, ...demoted],
-  };
-}
-
-function cpuBatterScore(player) {
-  const sb = saberBatter(player.stats ?? {});
-  return (sb.OPS || 0) * 1000
-    + (player.batting?.contact ?? 50) * 1.6
-    + (player.batting?.eye ?? 50) * 1.1
-    + (player.batting?.power ?? 50) * 1.2
-    + (player.batting?.speed ?? 50) * 0.7;
-}
-
-function cpuStarterScore(player) {
-  const sp = saberPitcher(player.stats ?? {});
-  const eraBonus = sp.ERA > 0 ? Math.max(0, (4 - sp.ERA) * 15) : 0;
-  return (player.pitching?.velocity ?? 50) * 1.2
-    + (player.pitching?.control ?? 50) * 1.5
-    + (player.pitching?.breaking ?? 50) * 1.0
-    + (player.pitching?.stamina ?? 50) * 2.0
-    + eraBonus;
-}
-
-function cpuRelieverScore(player) {
-  const sp = saberPitcher(player.stats ?? {});
-  const eraBonus = sp.ERA > 0 ? Math.max(0, (4 - sp.ERA) * 15) : 0;
-  return (player.pitching?.velocity ?? 50) * 2.0
-    + (player.pitching?.control ?? 50) * 1.5
-    + (player.pitching?.breaking ?? 50) * 1.2
-    + (player.pitching?.stamina ?? 50) * 0.5
-    + eraBonus;
-}
-
-function cpuRosterRecScore(player) {
-  if (player.isPitcher) {
-    const sp = saberPitcher(player.stats ?? {});
-    const ability = (player.pitching?.velocity ?? 50) * 1.2
-      + (player.pitching?.control ?? 50) * 1.5
-      + (player.pitching?.breaking ?? 50) * 1.0
-      + (player.pitching?.stamina ?? 50) * 0.8;
-    if (!sp.ERA && !sp.WHIP) return ability;
-    return ability * 0.55
-      + Math.max(0, (5.0 - sp.ERA) * 35)
-      + Math.max(0, (1.5 - sp.WHIP) * 50);
-  }
-  const sb = saberBatter(player.stats ?? {});
-  return (sb.OPS || 0) * 1000
-    + (player.batting?.contact ?? 50) * 1.6
-    + (player.batting?.eye ?? 50) * 1.1
-    + (player.batting?.power ?? 50) * 1.2
-    + (player.batting?.speed ?? 50) * 0.7;
-}
-
-function cpuAutoManageTeam(team) {
-  const farm = team.farm ?? [];
-  const foreignInActive = (team.players || []).filter((player) => player.isForeign).length;
-  const canPromote = (player) => !player.isIkusei
-    && (player.injuryDaysLeft ?? 0) === 0
-    && (player.registrationCooldownDays ?? 0) === 0
-    && !(player.isForeign && foreignInActive >= MAX_FOREIGN_ACTIVE);
-
-  let players = [...(team.players || [])];
-  let newFarm = [...farm];
-
-  const effScore = (player, isFarm) => {
-    const base = cpuRosterRecScore(player);
-    const devBonus = isFarm
-      && (player.potential ?? 0) >= ROSTER_DEVREC_POTENTIAL_MIN
-      && (player.daysOnActiveRoster ?? 0) < ROSTER_DEVREC_DAYS_MAX
-      ? ROSTER_DEVREC_BONUS
-      : 0;
-    return base + devBonus;
-  };
-
-  const targetBatters = MAX_ROSTER - OPTIMAL_PITCHER_COUNT;
-  const openSlots = MAX_ROSTER - players.length;
-
-  if (openSlots < 0) {
-    const excess = -openSlots;
-    const pitcherOver = Math.max(0, players.filter((player) => player.isPitcher).length - OPTIMAL_PITCHER_COUNT);
-    const batterOver = Math.max(0, players.filter((player) => !player.isPitcher).length - targetBatters);
-    const demoted = new Set();
-    const applyDemote = (candidates, limit) => {
-      const activeCatcherCount = () => players
-        .filter((player) => !player.isPitcher && player.pos === '捕手' && !demoted.has(player.id))
-        .length;
-      [...candidates]
-        .sort((a, b) => effScore(a, false) - effScore(b, false))
-        .slice(0, limit)
-        .forEach((player) => {
-          if (!player.isPitcher && player.pos === '捕手' && activeCatcherCount() <= MIN_ACTIVE_CATCHERS) {
-            return;
-          }
-          players = players.filter((entry) => entry.id !== player.id);
-          newFarm = [...newFarm, { ...player, registrationCooldownDays: REGISTRATION_COOLDOWN_DAYS }];
-          demoted.add(player.id);
-        });
-    };
-    applyDemote(players.filter((player) => player.isPitcher), Math.min(pitcherOver, excess));
-    applyDemote(players.filter((player) => !player.isPitcher), Math.min(batterOver, excess - demoted.size));
-    if (demoted.size < excess) {
-      applyDemote(players.filter((player) => !demoted.has(player.id)), excess - demoted.size);
-    }
-  } else {
-    const usedFarmIds = new Set();
-    const usedActiveIds = new Set();
-    const eligibleFarm = newFarm.filter(canPromote);
-    const eligiblePitchers = [...eligibleFarm]
-      .filter((player) => player.isPitcher)
-      .sort((a, b) => effScore(b, true) - effScore(a, true));
-    const eligibleBatters = [...eligibleFarm]
-      .filter((player) => !player.isPitcher)
-      .sort((a, b) => effScore(b, true) - effScore(a, true));
-    let slotsLeft = Math.min(openSlots, 3);
-
-    const pitcherNeed = Math.max(0, OPTIMAL_PITCHER_COUNT - players.filter((player) => player.isPitcher).length);
-    eligiblePitchers.slice(0, Math.min(pitcherNeed, slotsLeft)).forEach((player) => {
-      players.push(player);
-      usedFarmIds.add(player.id);
-      slotsLeft -= 1;
-    });
-
-    const batterNeed = Math.max(0, targetBatters - players.filter((player) => !player.isPitcher).length);
-    eligibleBatters.slice(0, Math.min(batterNeed, slotsLeft)).forEach((player) => {
-      players.push(player);
-      usedFarmIds.add(player.id);
-      slotsLeft -= 1;
-    });
-
-    if (slotsLeft > 0) {
-      eligibleFarm
-        .filter((player) => !usedFarmIds.has(player.id))
-        .sort((a, b) => effScore(b, true) - effScore(a, true))
-        .slice(0, slotsLeft)
-        .forEach((player) => {
-          players.push(player);
-          usedFarmIds.add(player.id);
-        });
-    }
-
-    let curPitchers = players.filter((player) => player.isPitcher).length;
-    let curBatters = players.filter((player) => !player.isPitcher).length;
-    while (curPitchers < OPTIMAL_PITCHER_COUNT && curBatters > targetBatters) {
-      const farmPitcher = newFarm
-        .filter((player) => player.isPitcher && canPromote(player) && !usedFarmIds.has(player.id))
-        .sort((a, b) => effScore(b, true) - effScore(a, true))[0];
-      const activeBatter = players
-        .filter((player) => !player.isPitcher && !usedActiveIds.has(player.id))
-        .sort((a, b) => effScore(a, false) - effScore(b, false))[0];
-      if (!farmPitcher || !activeBatter) break;
-      players = [...players.filter((player) => player.id !== activeBatter.id), farmPitcher];
-      newFarm = [...newFarm.filter((player) => player.id !== farmPitcher.id), { ...activeBatter, registrationCooldownDays: REGISTRATION_COOLDOWN_DAYS }];
-      usedFarmIds.add(farmPitcher.id);
-      usedActiveIds.add(activeBatter.id);
-      curPitchers = players.filter((player) => player.isPitcher).length;
-      curBatters = players.filter((player) => !player.isPitcher).length;
-    }
-    while (curBatters < targetBatters && curPitchers > OPTIMAL_PITCHER_COUNT) {
-      const farmBatter = newFarm
-        .filter((player) => !player.isPitcher && canPromote(player) && !usedFarmIds.has(player.id))
-        .sort((a, b) => effScore(b, true) - effScore(a, true))[0];
-      const activePitcher = players
-        .filter((player) => player.isPitcher && !usedActiveIds.has(player.id))
-        .sort((a, b) => effScore(a, false) - effScore(b, false))[0];
-      if (!farmBatter || !activePitcher) break;
-      players = [...players.filter((player) => player.id !== activePitcher.id), farmBatter];
-      newFarm = [...newFarm.filter((player) => player.id !== farmBatter.id), { ...activePitcher, registrationCooldownDays: REGISTRATION_COOLDOWN_DAYS }];
-      usedFarmIds.add(farmBatter.id);
-      usedActiveIds.add(activePitcher.id);
-      curPitchers = players.filter((player) => player.isPitcher).length;
-      curBatters = players.filter((player) => !player.isPitcher).length;
-    }
-
-    const remainFarm = newFarm.filter((player) => canPromote(player) && !usedFarmIds.has(player.id));
-    if (remainFarm.length > 0) {
-      [...players]
-        .sort((a, b) => effScore(a, false) - effScore(b, false))
-        .forEach((activePlayer) => {
-          if (usedActiveIds.has(activePlayer.id)) return;
-          const best = remainFarm.find((farmPlayer) => !usedFarmIds.has(farmPlayer.id) && farmPlayer.isPitcher === activePlayer.isPitcher);
-          if (!best) return;
-          if (effScore(best, true) - effScore(activePlayer, false) >= ROSTER_SWAP_SCORE_THRESHOLD) {
-            players = players.filter((player) => player.id !== activePlayer.id);
-            players.push(best);
-            newFarm = newFarm.filter((player) => player.id !== best.id);
-            newFarm.push({ ...activePlayer, registrationCooldownDays: REGISTRATION_COOLDOWN_DAYS });
-            usedFarmIds.add(best.id);
-            usedActiveIds.add(activePlayer.id);
-          }
-        });
-    }
-
-    [...usedFarmIds].forEach((id) => {
-      newFarm = newFarm.filter((player) => player.id !== id);
-    });
-  }
-
-  const batters = players.filter((player) => !player.isPitcher && !player.isIkusei && (player.injuryDaysLeft ?? 0) === 0);
-  const useDh = !!team.dhEnabled;
-  const required = [...FIELDING_POSITIONS, ...(useDh ? ['DH'] : [])];
-  const profAt = (player, pos) => (pos === 'DH' ? 50 : (player.pos === pos ? 100 : (player.positions?.[pos] ?? 0)));
-  const sortedBatters = [...batters].sort((a, b) => cpuBatterScore(b) - cpuBatterScore(a));
-  const posEligible = Object.fromEntries(required.map((pos) => [pos, sortedBatters.filter((player) => profAt(player, pos) > 0)]));
-  const posOrder = [...required].sort((a, b) => posEligible[a].length - posEligible[b].length);
-  const assignment = new Map();
-  const playerUsed = new Set();
-  for (const pos of posOrder) {
-    const best = posEligible[pos].find((player) => !playerUsed.has(player.id));
-    if (best) {
-      assignment.set(pos, best);
-      playerUsed.add(best.id);
-    }
-  }
-  for (const pos of posOrder) {
-    if (assignment.has(pos)) continue;
-    const fallback = sortedBatters.find((player) => !playerUsed.has(player.id));
-    if (fallback) {
-      assignment.set(pos, fallback);
-      playerUsed.add(fallback.id);
-    }
-  }
-  const newLineup = [...assignment.entries()]
-    .sort((a, b) => cpuBatterScore(b[1]) - cpuBatterScore(a[1]))
-    .map(([, player]) => player.id);
-
-  const pitchers = players.filter((player) => player.isPitcher && !player.isIkusei && (player.injuryDaysLeft ?? 0) === 0);
-  const starters = pitchers.filter((player) => player.subtype === '先発').sort((a, b) => cpuStarterScore(b) - cpuStarterScore(a));
-  const relievers = pitchers.filter((player) => player.subtype !== '先発').sort((a, b) => cpuRelieverScore(b) - cpuRelieverScore(a));
-  const newRotation = starters.slice(0, 6).map((player) => player.id);
-  const minRotation = 5;
-  if (newRotation.length < minRotation) {
-    const need = minRotation - newRotation.length;
-    const fallbackRelievers = [...relievers]
-      .sort((a, b) => (b.pitching?.stamina ?? 50) - (a.pitching?.stamina ?? 50))
-      .slice(0, need)
-      .map((player) => player.id);
-    newRotation.push(...fallbackRelievers);
-  }
-  const rotationSet = new Set(newRotation);
-  const remaining = pitchers
-    .filter((player) => !rotationSet.has(player.id))
-    .sort((a, b) => cpuRelieverScore(b) - cpuRelieverScore(a));
-  const newPattern = {
-    closerId: remaining[0]?.id ?? null,
-    setupId: remaining[1]?.id ?? null,
-    seventhId: remaining[2]?.id ?? null,
-    middleOrder: remaining.slice(3).map((player) => player.id),
-  };
-
-  return {
-    ...team,
-    players,
-    farm: newFarm,
-    lineup: newLineup,
-    lineupDh: newLineup,
-    lineupNoDh: newLineup,
-    rotation: newRotation,
-    pitchingPattern: { ...(team.pitchingPattern ?? {}), ...newPattern },
-  };
-}
-
-const POSITION_FILL_ORDER = ['C', 'SS', '2B', '3B', '1B', 'LF', 'CF', 'RF', 'DH'];
-
-function buildSimLineup(team, useDh) {
-  const limit = useDh ? 9 : 8;
-  const nonPitchers = (team.players || []).filter((player) => !player.isPitcher && !player.isIkusei);
-  const nonPitcherIds = new Set(nonPitchers.map((player) => player.id));
-  const source = useDh ? (team.lineupDh || team.lineup || []) : (team.lineupNoDh || team.lineup || []);
-  let lineup = source.filter((id) => nonPitcherIds.has(id));
-  let foreignCount = 0;
-  lineup = lineup.filter((id) => {
-    const player = nonPitchers.find((entry) => entry.id === id);
-    if (player?.isForeign) {
-      if (foreignCount < MAX_FOREIGN_ACTIVE) {
-        foreignCount += 1;
-        return true;
-      }
-      return false;
-    }
-    return true;
-  });
-  if (lineup.length < limit) {
-    const inLineup = new Set(lineup);
-    const available = nonPitchers
-      .filter((player) => !inLineup.has(player.id))
-      .sort((a, b) => {
-        const ai = POSITION_FILL_ORDER.indexOf(a.pos);
-        const bi = POSITION_FILL_ORDER.indexOf(b.pos);
-        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-      });
-    for (const player of available) {
-      if (lineup.length >= limit) break;
-      if (player.isForeign && foreignCount >= MAX_FOREIGN_ACTIVE) continue;
-      if (player.isForeign) foreignCount += 1;
-      lineup.push(player.id);
-    }
-  }
-  const fixedLineup = lineup.slice(0, limit);
-  if (!useDh) {
-    const starterId = team.rotation?.[team.rotIdx % Math.max(team.rotation?.length || 0, 1)];
-    const starter = (team.players || []).find((player) => player.id === starterId && player.isPitcher && !player.isIkusei)
-      || (team.players || []).find((player) => player.isPitcher && !player.isIkusei)
-      || null;
-    if (starter) return [...fixedLineup, starter.id];
-  }
-  return fixedLineup;
-}
-
 function applyDhToTeam(team, useDh) {
-  return {
-    ...team,
-    lineup: buildSimLineup(team, useDh),
-  };
+  return prepareTeamForGame(team, useDh);
 }
 
 function calcLeagueRank(teamId, allTeams, league) {
@@ -523,7 +184,7 @@ function calcLeagueRank(teamId, allTeams, league) {
   return sameLeague.findIndex((team) => team.id === teamId) + 1;
 }
 
-function tryCpuCpuDeadlineTrade(teamsArr, currentGameDay, schedule) {
+function tryCpuCpuDeadlineTrade(teamsArr, currentGameDay, schedule, myId) {
   const currentDate = gameDayToDate(currentGameDay, schedule);
   if (!currentDate || currentDate.month !== TRADE_DEADLINE_MONTH) return null;
   if (rngf(0, 1) > TRADE_DEADLINE_CPU_CPU_PROB) return null;
@@ -531,7 +192,7 @@ function tryCpuCpuDeadlineTrade(teamsArr, currentGameDay, schedule) {
   teamsArr.forEach((team) => {
     team.frontOfficePlan = evaluateFrontOfficePlan(team, teamsArr, currentGameDay);
   });
-  const result = generateCpuCpuTrade(teamsArr);
+  const result = generateCpuCpuTrade(teamsArr.filter((team) => team.id !== myId));
   if (!result) return null;
 
   const {
@@ -920,7 +581,7 @@ export function simulateSeasonBatch({
   const progressState = createSeasonBatchProgressState();
   const archiveChunker = createBattedBallArchiveChunker(onArchiveChunk);
   const archiveGame = (log, gameDay, firstTeam, secondTeam) => {
-    const gameId = `${gameDay}:${firstTeam?.id || 'team1'}:${secondTeam?.id || 'team2'}`;
+    const gameId = `${gameDay}:${firstTeam?.id ?? 'team1'}:${secondTeam?.id ?? 'team2'}`;
     archiveChunker.add(createBattedBallBatchRecords(log, {
       saveId: state.saveId,
       year: state.year,
@@ -967,15 +628,17 @@ export function simulateSeasonBatch({
   for (let index = 0; index < safeCount; index += 1) {
     ensureNotCancelled(isCancelled);
 
-    newTeams = newTeams.map((team) => (
-      team.id === state.myId && !autoManageMyTeam
-        ? team
-        : applyManagementPolicy(team, {
-            teams: newTeams,
-            gameDay: newDay,
-            includeRosterChanges: true,
-          })
-    ));
+    newTeams = newTeams.map((team) => {
+      if (team.id === state.myId && !autoManageMyTeam) {
+        return applyEmergencyRosterMaintenance(team);
+      }
+      return applyManagementPolicy(team, {
+        teams: newTeams,
+        gameDay: newDay,
+        includeRosterChanges: true,
+        automationMode: ROSTER_AUTOMATION_MODES.FULL,
+      });
+    });
 
     let teamMap = buildTeamMap(newTeams);
 
@@ -1063,18 +726,20 @@ export function simulateSeasonBatch({
       homeTeam.players = tickInjuries(homeTeam.players);
       homeTeam.players = homeTeam.players.map((player) => ({ ...player, daysOnActiveRoster: (player.daysOnActiveRoster ?? 0) + 1 }));
       homeTeam.players = applyInjuriesToPlayers(homeTeam.players, checkForInjuries(homeTeam.players, state.year), state.year);
+      homeTeam.farm = tickCooldowns(tickInjuries(homeTeam.farm ?? []));
 
       awayTeam.players = applyGameStatsFromLog(awayTeam.players, sim.log || [], false, !homeWon && !drew, newDay);
       awayTeam.players = applyPostGameCondition(awayTeam.players, sim.log || [], false, newDay);
       awayTeam.players = tickInjuries(awayTeam.players);
       awayTeam.players = awayTeam.players.map((player) => ({ ...player, daysOnActiveRoster: (player.daysOnActiveRoster ?? 0) + 1 }));
       awayTeam.players = applyInjuriesToPlayers(awayTeam.players, checkForInjuries(awayTeam.players, state.year), state.year);
+      awayTeam.farm = tickCooldowns(tickInjuries(awayTeam.farm ?? []));
 
       homeTeam.rotIdx = (homeTeam.rotIdx || 0) + 1;
       awayTeam.rotIdx = (awayTeam.rotIdx || 0) + 1;
     }
 
-    const cpuCpuTradeNews = tryCpuCpuDeadlineTrade(newTeams, newDay, state.schedule);
+    const cpuCpuTradeNews = tryCpuCpuDeadlineTrade(newTeams, newDay, state.schedule, state.myId);
     if (cpuCpuTradeNews) {
       results.push({ type: 'trade_news', ...cpuCpuTradeNews, day: newDay });
     }
@@ -1166,7 +831,7 @@ export function simulateSeasonBatch({
       myTeam.players = tickCooldowns(myTeam.players);
       myTeam.farm = tickInjuries(myTeam.farm ?? []);
       myTeam.farm = tickCooldowns(myTeam.farm ?? []);
-      Object.assign(myTeam, autoInjuryDemote(myTeam));
+      Object.assign(myTeam, applyEmergencyRosterMaintenance(myTeam));
 
       const oppTeam = teamMap.get(opp.id);
       if (oppTeam) {
@@ -1188,6 +853,7 @@ export function simulateSeasonBatch({
         oppTeam.players = applyPostGameCondition(oppTeam.players, sim.log || [], false, newDay, !scheduleMatchup.isHome);
         oppTeam.players = tickInjuries(oppTeam.players);
         oppTeam.players = applyInjuriesToPlayers(oppTeam.players, checkForInjuries(oppTeam.players, state.year), state.year);
+        oppTeam.farm = tickCooldowns(tickInjuries(oppTeam.farm ?? []));
         oppTeam.rotIdx = (oppTeam.rotIdx || 0) + 1;
       }
 

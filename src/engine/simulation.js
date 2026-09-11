@@ -4,8 +4,9 @@ import { calcSprayAngle, classifyBattedBallType, resolveFieldSideBySprayAngle, s
 import { STADIUMS, TEAM_STADIUM } from './stadiums';
 import { getFenceDistanceBySpray, evaluateTrajectoryAgainstPark, evaluateAcrossParks } from './parkEffects';
 import { analyzeEnvironmentEffect } from './battedBallAnalysis';
+import { PITCHER_BATTING_DEFAULTS, withEffectiveBatting } from './battingProfile';
 
-const isDevEnv = import.meta.env.DEV;
+const isDevEnv = import.meta.env?.DEV ?? false;
 function logPerf(label, startedAt) {
   if (!isDevEnv || !Number.isFinite(startedAt)) return;
   const elapsedMs = performance.now() - startedAt;
@@ -43,8 +44,6 @@ const BASELINE_TARGET_RATES = {
 };
 
 const BASELINE = { ...BASELINE_PA, ...BASELINE_TARGET_RATES }; // deprecated: 既存UI互換
-
-
 
 // ═══════════════════════════════════════════════════════════════
 //  SECTION 2: 能力値→確率の変換（Step B）
@@ -231,23 +230,24 @@ function simAtBat(bat, pit, strategy = 'normal', pitchCount = 0, situation = {},
     return { result: 'bb', pitches: 1, isIntentional: true, pitchType: null, zone: null, pitchLog: [] };
   }
 
+  const effectiveBat  = withEffectiveBatting(bat);
   const pitchingBonus = situation.coachBonuses?.pitching || 0;
   const fatigue       = calcEffectiveFatigue(pitchCount, pit);
   const fatiguedPit   = applyFatigue(pit, fatigue, pitchingBonus);
-  const situatedBat   = applyBatterSituation(bat, situation);
+  const situatedBat   = applyBatterSituation(effectiveBat, situation);
   let   probs         = calcPAProbs(situatedBat, fatiguedPit, leagueEnv);
   probs               = applyPitchingPolicy(probs, situation.pitchingPolicy);
   const stadium       = situation.stadium ? STADIUMS[situation.stadium] : null;
 
   let result = sampleResult(probs);
 
-  if (strategy === 'bunt' && (result === 's' || result === 'out')) {
+  if (strategy === 'bunt' && result === 'inplay') {
     result = rngf(0, 1) < 0.65 ? 'sac' : 'out';
   }
 
   // 注記: pitchType/zone は演出用で、確定した結果から逆算して割り当てている。
   const pitchType = selectPitchForResult(result, pit);
-  const zone      = selectZoneForResult(result, bat);
+  const zone      = selectZoneForResult(result, effectiveBat);
   const pitches   = estimatePitchCount(result);
 
   return { result, pitches, pitchType, zone, pitchLog: [{ pitchType, zone, result }], ev: 0, la: 0, dist: 0, isIntentional: false };
@@ -415,8 +415,10 @@ function checkHomeRunByTrajectory(points, fenceDistance, wallHeight = PHYSICS_BA
 
 function resolveBattedBallOutcomeFromPhysicsForBalance(batter, pitcher, stadium, environment = {}, options = {}) {
   const totalStart = isDevEnv ? performance.now() : 0;
+  const effectiveBatter = withEffectiveBatting(batter);
+  const rngProvider = typeof options?.rngProvider === 'function' ? options.rngProvider : rngf;
   const safeLeagueEnv = { ...DEFAULT_LEAGUE_ENV, ...(options?.leagueEnv || {}) };
-  const { ev: generatedEv, la: generatedLa, quality } = generateContactEVLA(batter, pitcher, { ...options, leagueEnv: safeLeagueEnv });
+  const { ev: generatedEv, la: generatedLa, quality } = generateContactEVLA(effectiveBatter, pitcher, { ...options, leagueEnv: safeLeagueEnv });
   const ev = Number.isFinite(generatedEv) ? generatedEv : SAFE_EV;
   const la = Number.isFinite(generatedLa) ? generatedLa : SAFE_LA;
   const safeEnvironment = sanitizeEnvironment(environment);
@@ -451,7 +453,6 @@ function resolveBattedBallOutcomeFromPhysicsForBalance(batter, pitcher, stadium,
   if (hrCheck.isHomeRun) {
     result = 'hr';
   } else {
-    const rngProvider = typeof options?.rngProvider === 'function' ? options.rngProvider : rngf;
     const intercept = estimateFielderIntercept(distance, ballType, side.key, rngProvider);
     const catchAdjusted = rngProvider(0, 1) < clamp(intercept.interceptRate * safeLeagueEnv.catchMod, 0.05, 0.98);
     if (intercept.caught) {
@@ -475,6 +476,14 @@ function resolveBattedBallOutcomeFromPhysicsForBalance(batter, pitcher, stadium,
     // 打高是正: アウト→単打変換を廃止。物理演算+捕球率でBABIPを決定する。
     if (result === 's' && reroll > 1 - doubleBoost * 0.24) result = 'd';
     if (result === 'd' && reroll > 1 - tripleBoost * 0.12) result = 't';
+  }
+
+  if (
+    effectiveBatter?.isPitcher
+    && ['s', 'd', 't'].includes(result)
+    && rngProvider(0, 1) > PITCHER_BATTING_DEFAULTS.nonHomeRunHitRetention
+  ) {
+    result = 'out';
   }
 
   const park = evaluateTrajectoryAgainstPark({ trajectory: points, sprayAngleDeg: sprayAngle, stadium: { ...stadium, id: stadium?.id, name: stadium?.name }, wallHeightM: effectiveWallHeight });
@@ -544,8 +553,9 @@ function weightedRandom(weights) {
 }
 
 function matchupScore(bat, pit) {
-  if (!bat?.batting || !pit?.pitching) return 0;
-  const off = (bat.batting.contact * 2 + bat.batting.power + bat.batting.eye) / 4;
+  const effectiveBat = withEffectiveBatting(bat);
+  if (!effectiveBat?.batting || !pit?.pitching) return 0;
+  const off = (effectiveBat.batting.contact * 2 + effectiveBat.batting.power + effectiveBat.batting.eye) / 4;
   const def = (pit.pitching.velocity + pit.pitching.control * 2 + pit.pitching.breaking) / 4;
   return Math.round((off - def) / 100 * 100);
 }
@@ -649,8 +659,19 @@ function pickBullpenArm(bullpen, targetRole, pattern = {}) {
  * @returns {Object} 初期ゲーム状態（inning / score / outs / bases / lineup / bullpen 等）
  */
 function initGameState(myTeam, oppTeam, options = {}) {
-  const myL = myTeam.lineup.map(id => myTeam.players.find(p => p.id === id)).filter(Boolean);
-  const opL = oppTeam.lineup.map(id => oppTeam.players.find(p => p.id === id)).filter(Boolean);
+  const buildLineup = (team) => team.lineup
+    .map((id) => {
+      const player = team.players.find((candidate) => candidate.id === id);
+      if (!player) return player;
+      if (player.isPitcher) return withEffectiveBatting(player);
+      const assignedPos = team.activeFielding?.[id];
+      return assignedPos && assignedPos !== player.pos
+        ? { ...player, pos: assignedPos }
+        : player;
+    })
+    .filter(Boolean);
+  const myL = buildLineup(myTeam);
+  const opL = buildLineup(oppTeam);
   const myStarter = myTeam.players.find(p => p.id === myTeam.rotation[myTeam.rotIdx % Math.max(myTeam.rotation.length,1)]) || myTeam.players.find(p => p.isPitcher);
   const opStarter = oppTeam.players.find(p => p.id === oppTeam.rotation[oppTeam.rotIdx % Math.max(oppTeam.rotation.length,1)]) || oppTeam.players.find(p => p.isPitcher);
   const isMyHome = options?.isMyHome !== false;
@@ -661,6 +682,9 @@ function initGameState(myTeam, oppTeam, options = {}) {
     inning: 1, isTop: true, score: { my: 0, opp: 0 },
     outs: 0, bases: [null,null,null], log: [], inningSummary: [],
     myLineup: [...myL], opLineup: [...opL],
+    myPitcherBattingSlotIndex: myL.findIndex((player) => player?.isPitcher),
+    opPitcherBattingSlotIndex: opL.findIndex((player) => player?.isPitcher),
+    myPitcherMustBeReplaced: false,
     myBatIdx: 0, opBatIdx: 0,
     myPitcher: myStarter, opPitcher: opStarter,
     myPitchCount: 0, opPitchCount: 0,
@@ -764,7 +788,15 @@ function processAtBat(gs, strategy = 'normal') {
 
   if (isOut) {
     outs++; momentumDelta = isMyAtBat ? -3 : 3;
-    if (result === 'sac' && newBases[0]) newBases = [null, newBases[0], null];
+    if (result === 'sac' && newBases[0]) {
+      const [runnerOnFirst, runnerOnSecond, runnerOnThird] = newBases;
+      if (runnerOnThird) {
+        scorers.push(runnerOnThird);
+        runs += 1;
+        rbi += 1;
+      }
+      newBases = [null, runnerOnFirst, runnerOnSecond];
+    }
     // 犠牲フライ: 2アウト未満でランナー3塁あり、フライアウト確率
     if (result === 'out' && gs.outs < 2 && newBases[2]) {
       const sfRate = clamp(0.25 + ((runnerOf(2)?.batting?.speed || 50) - 50) / 400, 0.15, 0.40);
@@ -916,12 +948,23 @@ function endHalfInning(gs) {
   if (isTop && gs.inning >= 9 && homeScore > awayScore)    return { ...gs, inningSummary:newSummary, gameOver:true, outs:0, bases:[null,null,null] };
   if (!isTop && newInn>9  && homeScore!==awayScore)        return { ...gs, inningSummary:newSummary, gameOver:true, outs:0, bases:[null,null,null] };
   if (newInn>12)                                            return { ...gs, inningSummary:newSummary, gameOver:true, outs:0, bases:[null,null,null] };
-  return { ...gs, inning:newInn, isTop:!isTop, outs:0, bases:[null,null,null], inningSummary:newSummary, myInningRuns:0, opInningRuns:0 };
+  const nextState = { ...gs, inning:newInn, isTop:!isTop, outs:0, bases:[null,null,null], inningSummary:newSummary, myInningRuns:0, opInningRuns:0 };
+  if (isMyTeamDefending(nextState) && nextState.myPitcherMustBeReplaced) {
+    return {
+      ...nextState,
+      stopped: true,
+      stopReason: 'pitcher_reentry_required',
+      stopData: { reason: 'pitcher_reentry_required', label: '🚨 投手交代が必要です', priority: 5 },
+    };
+  }
+  return nextState;
 }
 
 function checkStopCondition(gs) {
   const isMyDefending = isMyTeamDefending(gs);
   const isMyBatting = !isMyDefending;
+  if (isMyDefending && gs.myPitcherMustBeReplaced)
+    return { reason:'pitcher_reentry_required', label:'🚨 投手交代が必要です', priority:5, data:null };
   const myEffFatigue = calcEffectiveFatigue(gs.myPitchCount, gs.myPitcher);
   if (isMyDefending && (myEffFatigue >= FATIGUE_LIMIT || gs.myPitchCount >= PITCH_HARD_CAP))
     return { reason:'pitcher_limit',           label:'🚨 投手交代必須',             priority:5, data:{ pitchCount:gs.myPitchCount, fatigue:myEffFatigue, pitcher:gs.myPitcher } };
@@ -948,13 +991,17 @@ function checkStopCondition(gs) {
 }
 
 
-function replacePitcherInBattingOrder(lineup, currentPitcherId, nextPitcher) {
+function replacePitcherInBattingOrder(lineup, currentPitcherId, nextPitcher, fixedSlotIndex = -1) {
   // 入力値検証【＝想定外の値を弾いて安全に処理する】
   if (!Array.isArray(lineup) || !nextPitcher?.id) return lineup;
-  const pitcherSlotIndex = lineup.findIndex(p => p?.id === currentPitcherId && p?.isPitcher);
+  const pitcherSlotIndex = Number.isInteger(fixedSlotIndex)
+    && fixedSlotIndex >= 0
+    && fixedSlotIndex < lineup.length
+    ? fixedSlotIndex
+    : lineup.findIndex(p => p?.id === currentPitcherId && p?.isPitcher);
   if (pitcherSlotIndex === -1) return lineup;
   const nextLineup = [...lineup];
-  nextLineup[pitcherSlotIndex] = nextPitcher;
+  nextLineup[pitcherSlotIndex] = withEffectiveBatting(nextPitcher);
   return nextLineup;
 }
 
@@ -1024,7 +1071,7 @@ function autoSwapPitcher(gs, side) {
   const resetState = makePitcherState(gs.inning, gs.isTop);
 
   if (side === 'my') {
-    const nextMyLineup = replacePitcherInBattingOrder(gs.myLineup, pitcher?.id, nextPitcher);
+    const nextMyLineup = replacePitcherInBattingOrder(gs.myLineup, pitcher?.id, nextPitcher, gs.myPitcherBattingSlotIndex);
     return {
       ...gs,
       myPitcher: nextPitcher,
@@ -1034,7 +1081,7 @@ function autoSwapPitcher(gs, side) {
       myPitcherState: resetState,
     };
   }
-  const nextOpLineup = replacePitcherInBattingOrder(gs.opLineup, pitcher?.id, nextPitcher);
+  const nextOpLineup = replacePitcherInBattingOrder(gs.opLineup, pitcher?.id, nextPitcher, gs.opPitcherBattingSlotIndex);
   return {
     ...gs,
     opPitcher: nextPitcher,
@@ -1086,7 +1133,13 @@ function quickSimGame(myTeam, oppTeam, options = {}) {
   });
   while (!gs.gameOver) {
     gs = autoSwapPitcher(gs, isMyTeamDefending(gs) ? 'my' : 'opp');
-    gs = processAtBat(gs, 'normal');
+    const battingLineup = isMyTeamBatting(gs) ? gs.myLineup : gs.opLineup;
+    const battingIndex = isMyTeamBatting(gs) ? gs.myBatIdx : gs.opBatIdx;
+    const currentBatter = battingLineup[battingIndex % Math.max(battingLineup.length, 1)];
+    const autoStrategy = currentBatter?.isPitcher && gs.outs < 2 && gs.bases.some(Boolean)
+      ? 'bunt'
+      : 'normal';
+    gs = processAtBat(gs, autoStrategy);
     if (gs.outs >= 3) gs = endHalfInning(gs);
   }
   const safeLog = includeLog ? gs.log : [];
@@ -1163,4 +1216,4 @@ export function runFarmSeason(teams) {
   });
 }
 
-export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, matchupScore, calcFatigue, calcEffectiveFatigue, PITCH_TYPES, BASELINE, BASELINE_PA, BASELINE_TARGET_RATES, ABILITY_RANGE, STADIUMS, TEAM_STADIUM, resolveBattedBallOutcomeFromPhysicsForBalance, generateContactEVLA as _generateContactEVLA_TEST, getFenceDistanceBySpray as _getFenceDistanceBySpray_TEST, adjustResultByPhysics as _adjustResultByPhysics_TEST, resolveBattedBallOutcomeFromPhysics as _resolveBattedBallOutcomeFromPhysics_TEST, estimateFielderIntercept as _estimateFielderIntercept_TEST, checkHomeRunByTrajectory as _checkHomeRunByTrajectory_TEST, createLiveStats as _createLiveStats_TEST, applyLogEntryToLiveStats as _applyLogEntryToLiveStats_TEST };
+export { simAtBat, initGameState, processAtBat, endHalfInning, checkStopCondition, quickSimGame, replacePitcherInBattingOrder, matchupScore, calcFatigue, calcEffectiveFatigue, PITCH_TYPES, BASELINE, BASELINE_PA, BASELINE_TARGET_RATES, ABILITY_RANGE, STADIUMS, TEAM_STADIUM, resolveBattedBallOutcomeFromPhysicsForBalance, generateContactEVLA as _generateContactEVLA_TEST, getFenceDistanceBySpray as _getFenceDistanceBySpray_TEST, adjustResultByPhysics as _adjustResultByPhysics_TEST, resolveBattedBallOutcomeFromPhysics as _resolveBattedBallOutcomeFromPhysics_TEST, estimateFielderIntercept as _estimateFielderIntercept_TEST, checkHomeRunByTrajectory as _checkHomeRunByTrajectory_TEST, createLiveStats as _createLiveStats_TEST, applyLogEntryToLiveStats as _applyLogEntryToLiveStats_TEST };

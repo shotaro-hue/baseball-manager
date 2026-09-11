@@ -117,7 +117,7 @@ export default function HubSimPanel({
             onChange={(event) => setBatchAutoManage(event.target.checked)}
             style={{ accentColor: '#34d399', cursor: 'pointer' }}
           />
-          自動編成も実行
+          フル自動編成
         </label>
 
         <button
@@ -169,7 +169,7 @@ export default function HubSimPanel({
             onChange={(event) => setSeasonAutoManage(event.target.checked)}
             style={{ accentColor: '#a78bfa', cursor: 'pointer' }}
           />
-          自動編成も実行
+          フル自動編成
         </label>
         <button
           className="sim-btn"

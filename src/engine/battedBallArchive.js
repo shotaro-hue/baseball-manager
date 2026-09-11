@@ -6,6 +6,13 @@ import {
   updateBattedBallProfile,
 } from './battedBallProfile';
 import {
+  BATTED_BALL_AGGREGATE_SCHEMA_VERSION,
+  applyBattedBallBatchToAggregate,
+  createBattedBallAggregateId,
+  mergeBattedBallAggregateRows,
+  rebuildBattedBallAggregateRecords,
+} from './battedBallAggregate';
+import {
   BASEBALL_MANAGER_DB_STORES,
   openBaseballManagerDb,
 } from './baseballManagerDb';
@@ -14,9 +21,18 @@ const pendingById = new Map();
 const failedById = new Map();
 const perfSamples = [];
 const comparisonCache = new Map();
+const aggregateReadyBySave = new Set();
+const aggregateBackfillBySave = new Map();
 let activeFlush = null;
+let archiveMutationTail = Promise.resolve();
 let lastError = null;
 let retryCount = 0;
+
+function runArchiveMutation(task) {
+  const current = archiveMutationTail.then(task, task);
+  archiveMutationTail = current.catch(() => {});
+  return current;
+}
 
 function isValidId(value) {
   return typeof value === 'string' && value.trim().length > 0 && value.length <= 300;
@@ -76,14 +92,28 @@ async function writeRecords(records) {
     const transaction = db.transaction(
       [
         BASEBALL_MANAGER_DB_STORES.battedBallBatches,
+        BASEBALL_MANAGER_DB_STORES.battedBallAggregates,
         BASEBALL_MANAGER_DB_STORES.battedBallMeta,
       ],
       'readwrite',
     );
     const batchStore = transaction.objectStore(BASEBALL_MANAGER_DB_STORES.battedBallBatches);
+    const aggregateStore = transaction.objectStore(
+      BASEBALL_MANAGER_DB_STORES.battedBallAggregates,
+    );
     const metaStore = transaction.objectStore(BASEBALL_MANAGER_DB_STORES.battedBallMeta);
     const bySave = new Map();
     for (const record of records) {
+      const previousRecord = await idbRequest(batchStore.get(record.id));
+      const aggregateId = createBattedBallAggregateId(
+        record.saveId,
+        record.year,
+        record.playerId,
+      );
+      const currentAggregate = await idbRequest(aggregateStore.get(aggregateId));
+      aggregateStore.put(
+        applyBattedBallBatchToAggregate(currentAggregate, record, previousRecord),
+      );
       batchStore.put(record);
       const current = bySave.get(record.saveId) || {
         saveId: record.saveId,
@@ -92,24 +122,39 @@ async function writeRecords(records) {
         lastWriteAt: 0,
         lastFailureAt: null,
         failureCount: 0,
-        estimatedEventCount: 0,
+        eventDelta: 0,
       };
       current.archiveStartYear = Math.min(current.archiveStartYear, record.year);
       current.lastWriteAt = Date.now();
-      current.estimatedEventCount += record.eventCount;
+      current.eventDelta += record.eventCount - (Number(previousRecord?.eventCount) || 0);
       bySave.set(record.saveId, current);
     }
     for (const meta of bySave.values()) {
       const existing = await idbRequest(metaStore.get(meta.saveId));
-      metaStore.put({
+      const nextMeta = {
+        ...(existing || {}),
         ...meta,
         archiveStartYear: Math.min(
           Number(existing?.archiveStartYear) || meta.archiveStartYear,
           meta.archiveStartYear,
         ),
-        estimatedEventCount: (Number(existing?.estimatedEventCount) || 0) + meta.estimatedEventCount,
+        estimatedEventCount: Math.max(
+          0,
+          (Number(existing?.estimatedEventCount) || 0) + meta.eventDelta,
+        ),
         failureCount: Number(existing?.failureCount) || 0,
-      });
+      };
+      delete nextMeta.eventDelta;
+      if (!existing) {
+        nextMeta.aggregateSchemaVersion = BATTED_BALL_AGGREGATE_SCHEMA_VERSION;
+        nextMeta.aggregateBackfilledAt = Date.now();
+        aggregateReadyBySave.add(meta.saveId);
+      } else if (
+        Number(existing.aggregateSchemaVersion) >= BATTED_BALL_AGGREGATE_SCHEMA_VERSION
+      ) {
+        aggregateReadyBySave.add(meta.saveId);
+      }
+      metaStore.put(nextMeta);
     }
     await completeTransaction(transaction);
     comparisonCache.clear();
@@ -131,7 +176,7 @@ async function flushInternal() {
   if (records.length === 0) return { ok: true, written: 0 };
   records.forEach((record) => pendingById.delete(record.id));
   try {
-    await writeRecords(records);
+    await runArchiveMutation(() => writeRecords(records));
     records.forEach((record) => failedById.delete(record.id));
     lastError = null;
     retryCount = 0;
@@ -200,6 +245,23 @@ async function readAllFromIndex(indexName, query) {
   }
 }
 
+async function readAllAggregatesFromIndex(indexName, query) {
+  const db = await openBaseballManagerDb();
+  try {
+    const transaction = db.transaction(
+      BASEBALL_MANAGER_DB_STORES.battedBallAggregates,
+      'readonly',
+    );
+    const store = transaction.objectStore(BASEBALL_MANAGER_DB_STORES.battedBallAggregates);
+    const request = store.index(indexName).getAll(query);
+    const result = await idbRequest(request);
+    await completeTransaction(transaction);
+    return Array.isArray(result) ? result : [];
+  } finally {
+    db.close();
+  }
+}
+
 function aggregateRecords(records) {
   const sortedRecords = [...records].sort((a, b) =>
     (Number(a.year) - Number(b.year))
@@ -238,6 +300,98 @@ function aggregateRecords(records) {
     profile: profilesByResult.all,
     profilesByResult,
   };
+}
+
+async function replaceAggregateRowsForSave(saveId, rows, metaSnapshot) {
+  const db = await openBaseballManagerDb();
+  try {
+    const transaction = db.transaction(
+      [
+        BASEBALL_MANAGER_DB_STORES.battedBallAggregates,
+        BASEBALL_MANAGER_DB_STORES.battedBallMeta,
+      ],
+      'readwrite',
+    );
+    const aggregateStore = transaction.objectStore(
+      BASEBALL_MANAGER_DB_STORES.battedBallAggregates,
+    );
+    const metaStore = transaction.objectStore(BASEBALL_MANAGER_DB_STORES.battedBallMeta);
+    const cursorRequest = aggregateStore.index('bySave').openCursor(IDBKeyRange.only(saveId));
+    cursorRequest.onsuccess = () => {
+      const cursor = cursorRequest.result;
+      if (cursor) {
+        cursor.delete();
+        cursor.continue();
+        return;
+      }
+      for (const row of rows) aggregateStore.put(row);
+      const years = rows.map((row) => Number(row.year)).filter(Number.isFinite);
+      metaStore.put({
+        ...(metaSnapshot || {}),
+        saveId,
+        schemaVersion: BATTED_BALL_SCHEMA_VERSION,
+        archiveStartYear: years.length
+          ? Math.min(...years)
+          : Number(metaSnapshot?.archiveStartYear) || null,
+        estimatedEventCount: rows.reduce(
+          (sum, row) => sum + (Number(row?.totalEvents) || 0),
+          0,
+        ),
+        aggregateSchemaVersion: BATTED_BALL_AGGREGATE_SCHEMA_VERSION,
+        aggregateBackfilledAt: Date.now(),
+      });
+    };
+    cursorRequest.onerror = () => transaction.abort();
+    await completeTransaction(transaction);
+  } finally {
+    db.close();
+  }
+}
+
+async function performAggregateBackfill(saveId) {
+  const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const meta = await loadBattedBallArchiveMeta(saveId);
+  if (
+    Number(meta?.aggregateSchemaVersion) >= BATTED_BALL_AGGREGATE_SCHEMA_VERSION
+  ) {
+    aggregateReadyBySave.add(saveId);
+    return { backfilled: false, rows: 0 };
+  }
+  const records = await readAllFromIndex(
+    'byPlayer',
+    IDBKeyRange.bound([saveId, ''], [saveId, '\uffff']),
+  );
+  const aggregateRows = rebuildBattedBallAggregateRecords(records);
+  await replaceAggregateRowsForSave(saveId, aggregateRows, meta);
+  aggregateReadyBySave.add(saveId);
+  comparisonCache.clear();
+  const endedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  perfSamples.push({
+    at: Date.now(),
+    query: 'aggregate-backfill',
+    source: 'archive',
+    rows: records.length,
+    aggregateRows: aggregateRows.length,
+    eventCount: aggregateRows.reduce(
+      (sum, row) => sum + (Number(row?.totalEvents) || 0),
+      0,
+    ),
+    readMs: Math.max(0, endedAt - startedAt),
+  });
+  if (perfSamples.length > 30) perfSamples.splice(0, perfSamples.length - 30);
+  return { backfilled: true, rows: aggregateRows.length };
+}
+
+async function ensureAggregateBackfill(saveId) {
+  if (aggregateReadyBySave.has(saveId)) return { backfilled: false, rows: 0 };
+  const active = aggregateBackfillBySave.get(saveId);
+  if (active) return active;
+  const backfill = runArchiveMutation(() => performAggregateBackfill(saveId))
+    .finally(() => {
+      aggregateBackfillBySave.delete(saveId);
+    });
+  aggregateBackfillBySave.set(saveId, backfill);
+  return backfill;
 }
 
 export async function loadPlayerBattedBalls({
@@ -308,41 +462,56 @@ export async function loadBattedBallComparisonProfiles({
   playerIds,
 }) {
   if (!isValidId(saveId)) {
-    return { status: 'unavailable', peers: [], source: 'archive' };
+    return { status: 'unavailable', peers: [], source: 'aggregate' };
   }
   const ids = [...new Set((Array.isArray(playerIds) ? playerIds : []).filter(isValidId))].sort();
-  if (ids.length === 0) return { status: 'ready', peers: [], source: 'archive' };
+  if (ids.length === 0) return { status: 'ready', peers: [], source: 'aggregate' };
   const cacheKey = `${saveId}:${period}:${Math.trunc(Number(year) || 0)}:${ids.join(',')}`;
   const cached = comparisonCache.get(cacheKey);
   if (cached) return cached;
+  const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
   try {
+    await ensureAggregateBackfill(saveId);
     const query = period === 'career'
-      ? IDBKeyRange.bound([saveId, ''], [saveId, '\uffff'])
+      ? IDBKeyRange.only(saveId)
       : IDBKeyRange.only([saveId, Math.trunc(Number(year))]);
-    const records = await readAllFromIndex(
-      period === 'career' ? 'byPlayer' : 'bySaveYear',
+    const aggregateRows = await readAllAggregatesFromIndex(
+      period === 'career' ? 'bySave' : 'bySaveYear',
       query,
     );
     const allowed = new Set(ids);
     const byPlayer = new Map();
-    for (const record of records) {
-      if (!allowed.has(record?.playerId)) continue;
-      const list = byPlayer.get(record.playerId) || [];
-      list.push(record);
-      byPlayer.set(record.playerId, list);
+    for (const row of aggregateRows) {
+      if (!allowed.has(row?.playerId)) continue;
+      const list = byPlayer.get(row.playerId) || [];
+      list.push(row);
+      byPlayer.set(row.playerId, list);
     }
     const result = {
       status: 'ready',
-      source: 'archive',
+      source: 'aggregate',
       peers: ids.map((playerId) => {
-        const aggregate = aggregateRecords(byPlayer.get(playerId) || []);
+        const aggregate = mergeBattedBallAggregateRows(
+          byPlayer.get(playerId) || [],
+          playerId,
+        );
         return {
           playerId,
           profilesByResult: aggregate.profilesByResult,
-          totalEvents: aggregate.events.length,
+          totalEvents: aggregate.totalEvents,
         };
       }),
     };
+    const endedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    perfSamples.push({
+      at: Date.now(),
+      query: `comparison-${period}`,
+      source: 'aggregate',
+      rows: aggregateRows.length,
+      playerCount: ids.length,
+      readMs: Math.max(0, endedAt - startedAt),
+    });
+    if (perfSamples.length > 30) perfSamples.splice(0, perfSamples.length - 30);
     comparisonCache.set(cacheKey, result);
     if (comparisonCache.size > 8) {
       comparisonCache.delete(comparisonCache.keys().next().value);
@@ -351,7 +520,7 @@ export async function loadBattedBallComparisonProfiles({
   } catch (error) {
     return {
       status: typeof indexedDB === 'undefined' ? 'unavailable' : 'error',
-      source: 'archive',
+      source: 'aggregate',
       peers: [],
       error: error instanceof Error ? error.message : 'comparison_load_failed',
     };
@@ -388,33 +557,51 @@ export async function loadBattedBallArchiveMeta(saveId) {
 
 export async function deleteBattedBallArchiveBySaveId(saveId) {
   if (!isValidId(saveId)) return { ok: false, deleted: 0 };
-  const db = await openBaseballManagerDb();
-  let deleted = 0;
-  try {
-    const transaction = db.transaction(
-      [
-        BASEBALL_MANAGER_DB_STORES.battedBallBatches,
-        BASEBALL_MANAGER_DB_STORES.battedBallMeta,
-      ],
-      'readwrite',
-    );
-    const store = transaction.objectStore(BASEBALL_MANAGER_DB_STORES.battedBallBatches);
-    const cursorRequest = store.index('byPlayer').openCursor();
-    cursorRequest.onsuccess = () => {
-      const cursor = cursorRequest.result;
-      if (!cursor) return;
-      if (cursor.value?.saveId === saveId) {
+  return runArchiveMutation(async () => {
+    const db = await openBaseballManagerDb();
+    let deleted = 0;
+    try {
+      const transaction = db.transaction(
+        [
+          BASEBALL_MANAGER_DB_STORES.battedBallBatches,
+          BASEBALL_MANAGER_DB_STORES.battedBallAggregates,
+          BASEBALL_MANAGER_DB_STORES.battedBallMeta,
+        ],
+        'readwrite',
+      );
+      const batchStore = transaction.objectStore(BASEBALL_MANAGER_DB_STORES.battedBallBatches);
+      const batchCursorRequest = batchStore.index('byPlayer').openCursor(
+        IDBKeyRange.bound([saveId, ''], [saveId, '\uffff']),
+      );
+      batchCursorRequest.onsuccess = () => {
+        const cursor = batchCursorRequest.result;
+        if (!cursor) return;
         cursor.delete();
         deleted += 1;
-      }
-      cursor.continue();
-    };
-    transaction.objectStore(BASEBALL_MANAGER_DB_STORES.battedBallMeta).delete(saveId);
-    await completeTransaction(transaction);
-    return { ok: true, deleted };
-  } finally {
-    db.close();
-  }
+        cursor.continue();
+      };
+      const aggregateStore = transaction.objectStore(
+        BASEBALL_MANAGER_DB_STORES.battedBallAggregates,
+      );
+      const aggregateCursorRequest = aggregateStore.index('bySave').openCursor(
+        IDBKeyRange.only(saveId),
+      );
+      aggregateCursorRequest.onsuccess = () => {
+        const cursor = aggregateCursorRequest.result;
+        if (!cursor) return;
+        cursor.delete();
+        cursor.continue();
+      };
+      transaction.objectStore(BASEBALL_MANAGER_DB_STORES.battedBallMeta).delete(saveId);
+      await completeTransaction(transaction);
+      comparisonCache.clear();
+      aggregateReadyBySave.delete(saveId);
+      aggregateBackfillBySave.delete(saveId);
+      return { ok: true, deleted };
+    } finally {
+      db.close();
+    }
+  });
 }
 
 export function getBattedBallPerfMetrics() {

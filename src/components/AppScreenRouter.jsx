@@ -126,6 +126,7 @@ export default function AppScreenRouter({ app }) {
     return (
       <TitleScreen
         saveExists={saveExists}
+        initializationError={gs.newGameInitializationError}
         onLoad={handleLoad}
         onSelectTeam={gs.handleSelect}
         onSaveDeleted={() => setSaveExists(false)}
@@ -181,6 +182,7 @@ export default function AppScreenRouter({ app }) {
           gsResult={sf.gameResult}
           myTeam={myTeam}
           oppTeam={sf.gameResult.oppTeam}
+          teams={teams}
           gameDay={sf.gameResult.gameNo ?? gameDay - 1}
           onNext={() => setScreen(returnScreen)}
           nextLabel={returnLabel}
@@ -239,6 +241,7 @@ export default function AppScreenRouter({ app }) {
             teams={teams}
             myId={myId}
             year={year}
+            error={os.careerPersistenceError}
             onNext={os.handleRetirePhaseNext}
           />
         </ErrorBoundary>
@@ -432,6 +435,7 @@ export default function AppScreenRouter({ app }) {
           year={year}
           myTeam={myTeam}
           springData={os.springTrainingData}
+          error={os.careerPersistenceError}
           onComplete={os.handleSpringTrainingComplete}
         />
       </DeferredScreenFrame>

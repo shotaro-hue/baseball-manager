@@ -1,12 +1,14 @@
 import { saberBatter, saberPitcher } from './sabermetrics';
+import { normalizeCareerLogSummary } from './careerStats';
 
 function getCareerSummary(player) {
-  const summary = player?.careerLogSummary && typeof player.careerLogSummary === 'object' ? player.careerLogSummary : {};
+  const summary = normalizeCareerLogSummary(player?.careerLogSummary);
   return {
-    totalHomeRuns: Number(summary.totalHomeRuns || 0) || 0,
-    totalGames: Number(summary.totalGames || 0) || 0,
-    totalPlateAppearances: Number(summary.totalPlateAppearances || summary.totalGames || 0) || 0,
-    totalWins: Number(summary.totalWins || 0) || 0,
+    totalHomeRuns: summary.totalHomeRuns,
+    totalGames: summary.totalGames,
+    totalPlateAppearances: summary.totalPlateAppearances,
+    totalInningsPitched: summary.totalInningsPitched,
+    totalWins: summary.totalWins,
   };
 }
 
@@ -109,8 +111,10 @@ function pickSawamura(pitchers) {
 function pickRookie(allPlayers) {
   const rookies = allPlayers.filter(p => {
     const careerSummary = getCareerSummary(p);
-    const careerAB = careerSummary.totalPlateAppearances;
-    return p.age <= 27 && careerAB < 60;
+    const belowCareerLimit = p.isPitcher
+      ? careerSummary.totalInningsPitched < 30
+      : careerSummary.totalPlateAppearances < 60;
+    return p.age <= 27 && belowCareerLimit;
   });
   const scored = rookies.map(p => {
     let score;

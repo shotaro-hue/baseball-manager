@@ -12,6 +12,10 @@ import { generateCpuOffer, generateCpuCpuTrade, classifyTeam, evaluateFrontOffic
 import { selectAllStars, runAllStarGame } from '../engine/allstar';
 import { getCpuMatchups } from '../engine/scheduleGen';
 import {
+  applyEmergencyRosterMaintenance,
+  prepareTeamForGame,
+} from '../engine/rosterAutomation';
+import {
   SEASON_GAMES,
   NEWS_TEMPLATES_WIN,
   NEWS_TEMPLATES_LOSE,
@@ -19,16 +23,12 @@ import {
   INTERVIEW_QUESTIONS_LOSE,
   INTERVIEW_OPTIONS_WIN,
   INTERVIEW_OPTIONS_LOSE,
-  INJURY_AUTO_DEMOTE_DAYS,
-  REGISTRATION_COOLDOWN_DAYS,
   TRADE_DEADLINE_MONTH,
   TRADE_DEADLINE_PROB_EARLY,
   TRADE_DEADLINE_PROB_PEAK,
   TRADE_DEADLINE_CPU_CPU_PROB,
   INJURY_HISTORY_MAX,
 } from '../constants';
-
-const MAX_FOREIGN_ACTIVE = 4;
 
 function cloneValue(value) {
   if (typeof structuredClone === 'function') return structuredClone(value);
@@ -101,74 +101,8 @@ function tickCooldowns(players) {
   });
 }
 
-function autoInjuryDemote(team) {
-  const farm = team.farm ?? [];
-  const demoted = [];
-  const kept = [];
-  for (const player of team.players || []) {
-    if ((player.injuryDaysLeft ?? 0) > INJURY_AUTO_DEMOTE_DAYS) {
-      demoted.push({ ...player, registrationCooldownDays: REGISTRATION_COOLDOWN_DAYS });
-    } else {
-      kept.push(player);
-    }
-  }
-  if (demoted.length === 0) return team;
-  const demotedIds = new Set(demoted.map((player) => player.id));
-  return {
-    ...team,
-    players: kept,
-    lineup: (team.lineup ?? []).filter((id) => !demotedIds.has(id)),
-    lineupNoDh: (team.lineupNoDh ?? []).filter((id) => !demotedIds.has(id)),
-    lineupDh: (team.lineupDh ?? []).filter((id) => !demotedIds.has(id)),
-    rotation: (team.rotation ?? []).filter((id) => !demotedIds.has(id)),
-    farm: [...farm, ...demoted],
-  };
-}
-
-function buildSimLineup(team, useDh) {
-  const limit = useDh ? 9 : 8;
-  const nonPitchers = (team.players || []).filter((player) => !player.isPitcher && !player.isIkusei);
-  const nonPitcherIds = new Set(nonPitchers.map((player) => player.id));
-  const source = useDh ? (team.lineupDh || team.lineup || []) : (team.lineupNoDh || team.lineup || []);
-  let lineup = source.filter((id) => nonPitcherIds.has(id));
-
-  let foreignCount = 0;
-  lineup = lineup.filter((id) => {
-    const player = nonPitchers.find((entry) => entry.id === id);
-    if (player?.isForeign) {
-      if (foreignCount < MAX_FOREIGN_ACTIVE) {
-        foreignCount += 1;
-        return true;
-      }
-      return false;
-    }
-    return true;
-  });
-
-  if (lineup.length < limit) {
-    const inLineup = new Set(lineup);
-    for (const player of nonPitchers.filter((entry) => !inLineup.has(entry.id))) {
-      if (lineup.length >= limit) break;
-      if (player.isForeign && foreignCount >= MAX_FOREIGN_ACTIVE) continue;
-      if (player.isForeign) foreignCount += 1;
-      lineup.push(player.id);
-    }
-  }
-
-  const fixedLineup = lineup.slice(0, limit);
-  if (!useDh) {
-    const rotationLength = team.rotation?.length || 0;
-    const starterId = rotationLength > 0 ? team.rotation[team.rotIdx % rotationLength] : null;
-    const starter = (team.players || []).find((player) => player.id === starterId && player.isPitcher && !player.isIkusei)
-      || (team.players || []).find((player) => player.isPitcher && !player.isIkusei)
-      || null;
-    if (starter) return [...fixedLineup, starter.id];
-  }
-  return fixedLineup;
-}
-
 function applyDhToTeam(team, useDh) {
-  return { ...team, lineup: buildSimLineup(team, useDh) };
+  return prepareTeamForGame(team, useDh);
 }
 
 function buildGameResultsMapPatch(gameNo, result, oppTeam, isHome = true) {
@@ -328,7 +262,7 @@ function tryCpuCpuDeadlineTradeSingleDay(teams, snapshot) {
   teams.forEach((team) => {
     team.frontOfficePlan = evaluateFrontOfficePlan(team, teams, snapshot.gameDay);
   });
-  const result = generateCpuCpuTrade(teams);
+  const result = generateCpuCpuTrade(teams.filter((team) => team.id !== snapshot.myId));
   if (!result) return null;
   const { buyerId, sellerId, buyerGets, sellerGets, buyerName, sellerName } = result;
   const buyer = teams.find((team) => team.id === buyerId);
@@ -369,9 +303,9 @@ function updateTeamAfterGame(team, result, isMyPerspective, won, drew, gameDay, 
   }
   const newInjuries = checkForInjuries(updated.players, year);
   updated.players = applyInjuriesToPlayers(updated.players, newInjuries, year);
+  updated.farm = tickCooldowns(tickInjuries(updated.farm ?? []));
   if (isMyPerspective) {
-    updated.farm = tickCooldowns(updated.farm ?? []);
-    updated = autoInjuryDemote(updated);
+    updated = applyEmergencyRosterMaintenance(updated);
   }
   Object.assign(updated, applyPopularityDelta(team, won, drew));
   const revenue = calcRevenue(updated);
@@ -424,7 +358,7 @@ export function simulateSingleDay({
       saveId: safeSnapshot.saveId,
       year: safeSnapshot.year,
       gameDay: safeSnapshot.gameDay,
-      gameId: `${safeSnapshot.gameDay}:${firstTeam?.id || 'team1'}:${secondTeam?.id || 'team2'}`,
+      gameId: `${safeSnapshot.gameDay}:${firstTeam?.id ?? 'team1'}:${secondTeam?.id ?? 'team2'}`,
       teams: [firstTeam, secondTeam],
       source: 'worker',
     }));

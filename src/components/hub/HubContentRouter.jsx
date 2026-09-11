@@ -106,11 +106,13 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
           onSetPitchingPattern={gs.setPitchingPattern}
           onReplaceRotation={gs.replaceRotation}
           onReplaceFullRoster={gs.replaceFullRoster}
+          onApplyRosterPlan={gs.applyRosterPlan}
           onPlayerClick={gs.handlePlayerClick}
           onSetDevGoal={gs.setDevGoal}
           onPlayerTalk={gs.handlePlayerTalk}
           onSetConvertTarget={gs.setConvertTarget}
           onSetManagementPolicy={gs.setManagementPolicy}
+          onSetRosterAutomationMode={gs.setRosterAutomationMode}
           gameDay={gameDay}
         />
 
@@ -324,7 +326,7 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
   }
 
   if (tab === 'alumni') {
-    return <AlumniTab myTeam={myTeam} />;
+    return <AlumniTab myTeam={myTeam} year={year} />;
   }
 
   if (tab === 'fa') {

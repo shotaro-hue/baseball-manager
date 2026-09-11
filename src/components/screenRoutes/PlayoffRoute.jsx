@@ -17,6 +17,7 @@ export default function PlayoffRoute({
       playoff={sf.playoff}
       setPlayoff={sf.setPlayoff}
       teams={gs.teams}
+      setTeams={gs.setTeams}
       myId={myId}
       year={year}
       onFinish={() => {

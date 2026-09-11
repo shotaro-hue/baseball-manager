@@ -15,20 +15,32 @@ import {
 import { compactBattedBallEvent } from '../engine/postGame';
 import { createSaveId, ensureSaveId } from '../engine/saveIdentity';
 import { MANAGEMENT_POLICIES } from '../engine/managementPolicy';
-
-const STATE_RECENT_CAREER_LOG_YEARS = 3;
+import { ROSTER_AUTOMATION_MODES } from '../engine/rosterAutomation';
+import { isTeamIdSet } from '../engine/teamId';
+import {
+  buildCareerLogSummary,
+  collectCareerLogsForIndexedDb,
+  getRecentCareerLog,
+  normalizeCareerLogSummary,
+} from '../engine/careerStats';
 
 function slimPlayerForState(player) {
   if (!player || typeof player !== 'object') return player;
   const stats = player.stats && typeof player.stats === 'object' ? player.stats : {};
-  const recentCareerLog = Array.isArray(player.recentCareerLog)
-    ? player.recentCareerLog.slice(-STATE_RECENT_CAREER_LOG_YEARS)
-    : [];
+  const fullCareerLog = Array.isArray(player.careerLog) ? player.careerLog : [];
+  const recentCareerLog = getRecentCareerLog(
+    Array.isArray(player.recentCareerLog) ? player.recentCareerLog : fullCareerLog,
+  );
+  const careerLogSummary = normalizeCareerLogSummary(
+    player.careerLogSummary ?? buildCareerLogSummary(fullCareerLog),
+  );
   return {
     ...player,
     // React state軽量化: 全量履歴はIndexedDB側を参照する
     careerLog: [],
     recentCareerLog,
+    careerLogSummary,
+    trimmedCareerLogSummary: careerLogSummary,
     stats: {
       ...stats,
       sprayPoints: Array.isArray(stats.sprayPoints) ? stats.sprayPoints.slice(-MAX_SPRAY_POINTS) : [],
@@ -137,7 +149,7 @@ export function useGameState() {
   const setTeams   = useCallback((n) => { dispatch({ type: G.SET_TEAMS, teams: (prev) => slimTeamsForState(typeof n === 'function' ? n(prev) : n) }); markSaveDirty(); },    [markSaveDirty]);
   const setGameDay = useCallback((n) => { dispatch({ type: G.SET_GAME_DAY, day: n }); markSaveDirty(); }, [markSaveDirty]);
   const setYear    = useCallback((n) => { dispatch({ type: G.SET_YEAR, year: n }); markSaveDirty(); }, [markSaveDirty]);
-  const setMyId    = useCallback((id) => { dispatch({ type: G.SET_MY_ID, myId: id }); if(id) markSaveDirty(); }, [markSaveDirty]);
+  const setMyId    = useCallback((id) => { dispatch({ type: G.SET_MY_ID, myId: id }); markSaveDirty(); }, [markSaveDirty]);
   const setSaveId  = useCallback((id) => { dispatch({ type: G.SET_SAVE_ID, saveId: ensureSaveId(id) }); }, []);
   const [tab, setTab] = useState("dashboard");
   const [faPool, setFaPool] = useState([]);
@@ -160,6 +172,8 @@ export function useGameState() {
   const [isAutoSaveSuspended, setIsAutoSaveSuspended] = useState(false);
   const [saveQueueState, setSaveQueueState] = useState({ isSaving: false });
   const [persistentEnabled, setPersistentEnabled] = useState(false);
+  const [newGameInitializationError, setNewGameInitializationError] = useState(null);
+  const newGameInitializationRef = useRef(false);
 
   const persistentStoreRef = useRef(null);
   const [persistentSummaries, setPersistentSummaries] = useState(EMPTY_PERSISTENT_SUMMARIES);
@@ -316,7 +330,7 @@ export function useGameState() {
 
   // gameDay が進んだとき、記者会見インターバルを超えていれば会見イベントをセット
   useEffect(()=>{
-    if(!myId || gameDay <= 1 || gameDay > 143) return;
+    if(!isTeamIdSet(myId) || gameDay <= 1 || gameDay > 143) return;
     if(pressEvent) return; // 既にイベント表示中
     if(gameDay - lastPressDay >= PRESS_CONFERENCE_INTERVAL){
       loadPressConferenceModule()
@@ -536,25 +550,44 @@ export function useGameState() {
     if (teams.length === TEAM_DEFS.length) return teams;
     const { createInitialTeams } = await import('../engine/bootstrapTeams');
     const initialTeams = createInitialTeams();
+    const saveMod = await loadSaveModule();
+    const initialCareerLogs = collectCareerLogsForIndexedDb(initialTeams);
+    const initialized = await saveMod.initializeCareerLogsInIndexedDb(initialCareerLogs);
+    if (!initialized?.ok) {
+      throw new Error('initial_career_log_persistence_failed');
+    }
     setTeams(initialTeams);
     return initialTeams;
   }, [setTeams, teams]);
 
   const handleSelect = useCallback(async (id)=>{
-    const nextTeams = await ensureInitialTeams();
-    const playerMod = await loadPlayerModule();
-    setFaPool(playerMod.generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX)));
-    setSaveId(createSaveId());
-    setMyId(id);
-    setScreen("hub");
-    setTab("dashboard");
-    const scheduleMod = await loadScheduleModule();
-    const newSchedule = scheduleMod.generateSeasonSchedule(year,nextTeams);
-    setSchedule(newSchedule);
-    const params = SEASON_PARAMS[year] || getDefaultParams(year);
-    setAllStarTriggerDay(scheduleMod.calcAllStarTriggerDay(newSchedule, params.allStarSkipDates));
+    if (newGameInitializationRef.current) return;
+    newGameInitializationRef.current = true;
+    setNewGameInitializationError(null);
+    try {
+      const nextTeams = await ensureInitialTeams();
+      const [playerMod, scheduleMod] = await Promise.all([
+        loadPlayerModule(),
+        loadScheduleModule(),
+      ]);
+      setFaPool(playerMod.generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX)));
+      setSaveId(createSaveId());
+      setMyId(id);
+      const newSchedule = scheduleMod.generateSeasonSchedule(year,nextTeams);
+      setSchedule(newSchedule);
+      const params = SEASON_PARAMS[year] || getDefaultParams(year);
+      setAllStarTriggerDay(scheduleMod.calcAllStarTriggerDay(newSchedule, params.allStarSkipDates));
+      setTab("dashboard");
+      setScreen("hub");
+    } catch (error) {
+      console.error('新規ゲーム初期化に失敗しました:', error);
+      setNewGameInitializationError('過去成績の保存領域を初期化できませんでした。ブラウザのストレージ設定を確認して再試行してください。');
+      notify('新規ゲームを開始できませんでした','warn');
+    } finally {
+      newGameInitializationRef.current = false;
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[ensureInitialTeams, setSaveId, year]);
+  },[ensureInitialTeams, notify, setSaveId, year]);
 
   const handlePlayerClick = useCallback(
     (player, teamName, initialSection = 'profile') => setPlayerModal({
@@ -623,7 +656,6 @@ export function useGameState() {
     const maxLineup = dhMode ? 9 : 8;
     if(p?.injury){notify("故障中は出場不可","warn");return;}
     if(!inL&&myTeam.lineup.length>=maxLineup){notify(`打線は最大${maxLineup}人です`,"warn");return;}
-    if(inL&&myTeam.lineup.length<=4){notify("最低4人必要です","warn");return;}
     upd(myId,t=>{
       const nextLineup = inL ? t.lineup.filter(id=>id!==pid) : [...t.lineup,pid];
       return dhMode
@@ -633,19 +665,17 @@ export function useGameState() {
   },[myTeam,upd,myId,notify]);
 
   const replaceLineup = useCallback((entries) => {
-    // entries: [{id, pos}, ...] in batting order — ラインアップを一括置換しつつ守備位置も更新
+    // entries: [{id, pos}, ...] in batting order. 本職は変えず試合時の守備配置だけ保存する。
     upd(myId, t => {
       const dhMode = t.rosterDhMode ?? t.dhEnabled;
       const newLineup = entries.map(e => e.id);
-      const updatedPlayers = t.players.map(p => {
-        const entry = entries.find(e => e.id === p.id);
-        return entry && entry.pos !== p.pos ? { ...p, pos: entry.pos } : p;
-      });
+      const fielding = Object.fromEntries(entries.map(e => [e.id, e.pos]));
       return {
         ...t,
-        players: updatedPlayers,
         lineup: newLineup,
-        ...(dhMode ? { lineupDh: newLineup } : { lineupNoDh: newLineup }),
+        ...(dhMode
+          ? { lineupDh: newLineup, fieldingDh: fielding }
+          : { lineupNoDh: newLineup, fieldingNoDh: fielding }),
       };
     });
   }, [upd, myId]);
@@ -654,8 +684,6 @@ export function useGameState() {
     if (!myTeam) return;
     const p = myTeam.players.find(x => x.id === pid);
     if ((p?.injuryDaysLeft ?? 0) > 0) { notify("故障中は出場不可", "warn"); return; }
-    if (order === 0 && myTeam.lineup.length <= 4) { notify("最低4人必要です", "warn"); return; }
-
     const dhMode = myTeam.rosterDhMode ?? myTeam.dhEnabled;
     const maxLineup = dhMode ? 9 : 8;
     const targetIdx = order - 1;
@@ -695,10 +723,14 @@ export function useGameState() {
   }, [myTeam, upd, myId, notify]);
 
   const setPlayerPosition = useCallback((pid, pos) => {
-    upd(myId, t => ({
-      ...t,
-      players: t.players.map(p => p.id === pid ? { ...p, pos } : p),
-    }));
+    upd(myId, t => {
+      const dhMode = t.rosterDhMode ?? t.dhEnabled;
+      const key = dhMode ? 'fieldingDh' : 'fieldingNoDh';
+      return {
+        ...t,
+        [key]: { ...(t[key] || {}), [pid]: pos },
+      };
+    });
   }, [upd, myId]);
 
   const setConvertTarget = useCallback((pid, target) => {
@@ -736,6 +768,17 @@ export function useGameState() {
     notify(`起用方針を「${MANAGEMENT_POLICIES[policyId].label}」に変更`, 'ok');
   }, [myId, notify, upd]);
 
+  const setRosterAutomationMode = useCallback((mode) => {
+    if (!Object.values(ROSTER_AUTOMATION_MODES).includes(mode)) return;
+    upd(myId, t => ({ ...t, rosterAutomationMode: mode }));
+    const labels = {
+      [ROSTER_AUTOMATION_MODES.MANUAL]: '手動',
+      [ROSTER_AUTOMATION_MODES.EMERGENCY]: '緊急補充',
+      [ROSTER_AUTOMATION_MODES.FULL]: 'フル自動',
+    };
+    notify(`編成モードを「${labels[mode]}」に変更`, 'ok');
+  }, [myId, notify, upd]);
+
   const setStarter = useCallback((pid)=>{upd(myId,t=>({...t,rotation:t.rotation.includes(pid)?t.rotation:[...t.rotation,pid]}));notify("先発ローテに追加","ok");},[upd,myId,notify]);
   const moveRotation = useCallback((pid,dir)=>upd(myId,t=>{const r=[...t.rotation];const i=r.indexOf(pid);if(i<0)return t;const j=i+dir;if(j<0||j>=r.length)return t;[r[i],r[j]]=[r[j],r[i]];return{...t,rotation:r};}),[upd,myId]);
   const removeFromRotation = useCallback((pid)=>upd(myId,t=>({...t,rotation:t.rotation.filter(id=>id!==pid)})),[upd,myId]);
@@ -744,9 +787,22 @@ export function useGameState() {
   const replaceFullRoster = useCallback((lineupEntries, rotationIds, patternPatch)=>upd(myId,t=>{
     const dhMode=t.rosterDhMode??t.dhEnabled;
     const newLineup=lineupEntries.map(e=>e.id);
-    const updatedPlayers=t.players.map(p=>{const entry=lineupEntries.find(e=>e.id===p.id);return entry&&entry.pos!==p.pos?{...p,pos:entry.pos}:p;});
-    return{...t,players:updatedPlayers,lineup:newLineup,...(dhMode?{lineupDh:newLineup}:{lineupNoDh:newLineup}),rotation:rotationIds,pitchingPattern:{...(t.pitchingPattern??{}),...patternPatch}};
+    const fielding=Object.fromEntries(lineupEntries.map(e=>[e.id,e.pos]));
+    return{...t,lineup:newLineup,...(dhMode?{lineupDh:newLineup,fieldingDh:fielding}:{lineupNoDh:newLineup,fieldingNoDh:fielding}),rotation:rotationIds,pitchingPattern:{...(t.pitchingPattern??{}),...patternPatch}};
   }),[upd,myId]);
+
+  const applyRosterPlan = useCallback((plannedTeam) => {
+    if (!plannedTeam || plannedTeam.id !== myId) return;
+    upd(myId, current => ({
+      ...plannedTeam,
+      id: current.id,
+      rosterAutomationMode:
+        plannedTeam.rosterAutomationMode
+        ?? current.rosterAutomationMode
+        ?? ROSTER_AUTOMATION_MODES.EMERGENCY,
+    }));
+    notify('編成プランを一括反映しました', 'ok');
+  }, [myId, notify, upd]);
 
   const promote = useCallback((pid)=>{
     if(!myTeam) return;
@@ -914,6 +970,7 @@ export function useGameState() {
     saveDirty, setSaveDirty,
     saveRevision, setSaveRevision,
     persistentSummaries,
+    newGameInitializationError,
     getSeasonHistory,
     getNewsBySelector,
     getMailboxBySelector,
@@ -948,6 +1005,7 @@ export function useGameState() {
     setLineupOrder,
     setRosterDhMode,
     setManagementPolicy,
+    setRosterAutomationMode,
     setPlayerPosition,
     setConvertTarget,
     setStarter,
@@ -956,6 +1014,7 @@ export function useGameState() {
     setPitchingPattern,
     replaceRotation,
     replaceFullRoster,
+    applyRosterPlan,
     promote,
     convertIkusei,
     demote,

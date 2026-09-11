@@ -1,16 +1,29 @@
 import { useState } from "react";
 import { quickSimGame } from '../engine/simulation';
+import { applyGameStatsFromLog } from '../engine/postGame';
+import { prepareTeamForGame } from '../engine/rosterAutomation';
 
 
 
-export function PlayoffScreen({playoff,setPlayoff,teams,myId,year,onFinish}){
+export function PlayoffScreen({playoff,setPlayoff,teams,setTeams,myId,year,onFinish}){
   const myTeam=teams.find(t=>t.id===myId);
   const phase=playoff.phase;
   const [simMsg,setSimMsg]=useState(null);
-  const applyDhLineup = (team, useDh) => {
-    const nonPitcherIds = (team.players || []).filter(p => !p.isPitcher).map(p => p.id);
-    const source = useDh ? (team.lineupDh || team.lineup || []) : (team.lineupNoDh || team.lineup || []);
-    return { ...team, lineup: source.filter(id => nonPitcherIds.includes(id)).slice(0, useDh ? 9 : 8) };
+  const applyPlayoffGameStats = (teamList, t0, t1, result) => {
+    const won0 = result.score.my > result.score.opp;
+    return teamList.map((team) => {
+      if (team.id === t0.id) return {
+        ...team,
+        players: applyGameStatsFromLog(team.players || [], result.log || [], true, won0, 0, 'playoffStats'),
+        rotIdx: (Number(team.rotIdx) || 0) + 1,
+      };
+      if (team.id === t1.id) return {
+        ...team,
+        players: applyGameStatsFromLog(team.players || [], result.log || [], false, !won0, 0, 'playoffStats'),
+        rotIdx: (Number(team.rotIdx) || 0) + 1,
+      };
+      return team;
+    });
   };
 
   const simOneGame=(seriesKey,need,nextPhaseBuilder)=>{
@@ -18,7 +31,8 @@ export function PlayoffScreen({playoff,setPlayoff,teams,myId,year,onFinish}){
     const t0=teams.find(t=>t.id===s.teams[0].id)||s.teams[0];
     const t1=teams.find(t=>t.id===s.teams[1].id)||s.teams[1];
     const useDh = !!t0.dhEnabled;
-    const r=quickSimGame(applyDhLineup(t0, useDh),applyDhLineup(t1, useDh));
+    const r=quickSimGame(prepareTeamForGame(t0, useDh),prepareTeamForGame(t1, useDh));
+    setTeams(prev=>applyPlayoffGameStats(prev,t0,t1,r));
     const my=r.score.my||0;
     const op=r.score.opp||0;
     const scoreStr=my+"-"+op;
@@ -47,15 +61,17 @@ export function PlayoffScreen({playoff,setPlayoff,teams,myId,year,onFinish}){
     const order=["cs1_se","cs1_pa","cs2_se","cs2_pa","jpSeries"];
     const needs={cs1_se:2,cs1_pa:2,cs2_se:4,cs2_pa:4,jpSeries:4};
     let state={...playoff};
+    let workingTeams=teams;
 
     const simSeriesAll=(seriesKey,need)=>{
       let s=state[seriesKey];
       if(!s||s.done) return;
       while(!s.done){
-        const t0=teams.find(t=>t.id===s.teams[0].id)||s.teams[0];
-        const t1=teams.find(t=>t.id===s.teams[1].id)||s.teams[1];
+        const t0=workingTeams.find(t=>t.id===s.teams[0].id)||s.teams[0];
+        const t1=workingTeams.find(t=>t.id===s.teams[1].id)||s.teams[1];
         const useDh = !!t0.dhEnabled;
-        const r=quickSimGame(applyDhLineup(t0, useDh),applyDhLineup(t1, useDh));
+        const r=quickSimGame(prepareTeamForGame(t0, useDh),prepareTeamForGame(t1, useDh));
+        workingTeams=applyPlayoffGameStats(workingTeams,t0,t1,r);
         const my=r.score.my||0;const op=r.score.opp||0;
         const won0=my>op;
         const nw=[s.wins[0]+(won0?1:0),s.wins[1]+(!won0?1:0)];
@@ -93,6 +109,7 @@ export function PlayoffScreen({playoff,setPlayoff,teams,myId,year,onFinish}){
     }
 
     setPlayoff(state);
+    setTeams(workingTeams);
     setSimMsg("全試合シミュレーション完了！");
   };
 

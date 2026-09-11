@@ -14,7 +14,7 @@ import { createEmptyBattedBallProfile } from './battedBallProfile';
 // 空の成績オブジェクト
 export const emptyStats = () => ({
   PA: 0, AB: 0, H: 0, D: 0, T: 0, HR: 0, RBI: 0, BB: 0, K: 0, HBP: 0,
-  SB: 0, CS: 0, R: 0, SF: 0, evSum: 0, evN: 0, laSum: 0, laN: 0,
+  SB: 0, CS: 0, R: 0, SF: 0, SH: 0, evSum: 0, evN: 0, laSum: 0, laN: 0,
   pullBatted: 0, centerBatted: 0, oppositeBatted: 0, hardHit: 0,
   groundBatted: 0, lineBatted: 0, flyBatted: 0,
   sprayPoints: [], // 打球着弾点の簡易ログ（最新N件）

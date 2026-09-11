@@ -2,42 +2,7 @@ import { buildTeam } from './playerCore';
 import { buildRealTeam } from './realplayer';
 import { optimizeTeamForGameStart } from './rosterAutomation';
 import { NPB2025_ROSTERS } from '../data/npb2025';
-import { MAX_BATTED_BALL_EVENTS, MAX_SPRAY_POINTS, TEAM_DEFS } from '../constants';
-
-const STATE_RECENT_CAREER_LOG_YEARS = 3;
-
-function slimPlayerForState(player) {
-  if (!player || typeof player !== 'object') return player;
-  const stats = player.stats && typeof player.stats === 'object' ? player.stats : {};
-  const recentCareerLog = Array.isArray(player.recentCareerLog)
-    ? player.recentCareerLog.slice(-STATE_RECENT_CAREER_LOG_YEARS)
-    : [];
-  return {
-    ...player,
-    careerLog: [],
-    recentCareerLog,
-    stats: {
-      ...stats,
-      sprayPoints: Array.isArray(stats.sprayPoints)
-        ? stats.sprayPoints.slice(-MAX_SPRAY_POINTS)
-        : [],
-      battedBallEvents: Array.isArray(stats.battedBallEvents)
-        ? stats.battedBallEvents.slice(-MAX_BATTED_BALL_EVENTS)
-        : [],
-    },
-  };
-}
-
-function slimTeamForState(team) {
-  if (!team || typeof team !== 'object') return team;
-  return {
-    ...team,
-    players: Array.isArray(team.players)
-      ? team.players.map(slimPlayerForState)
-      : [],
-    farm: Array.isArray(team.farm) ? team.farm.map(slimPlayerForState) : [],
-  };
-}
+import { TEAM_DEFS } from '../constants';
 
 export function createInitialTeams() {
   return TEAM_DEFS.map((def) => {
@@ -57,6 +22,7 @@ export function createInitialTeams() {
     team.rosterDhMode = team.rosterDhMode ?? team.dhEnabled ?? false;
     team.lineup = (team.rosterDhMode ? team.lineupDh : team.lineupNoDh).slice();
     team.history = [];
-    return slimTeamForState(team);
+    // 呼び出し側が全履歴をIndexedDBへ保存してからReact state用に軽量化する。
+    return team;
   });
 }

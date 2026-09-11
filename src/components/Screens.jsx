@@ -426,7 +426,7 @@ export function SeasonEndScreen({teams,myId,year,onToDraft}){
    log の全打席を正確に選手statsへ反映する
 ═══════════════════════════════════════════════ */
 
-export function RetirePhaseScreen({teams,myId,year,onNext}){
+export function RetirePhaseScreen({teams,myId,year,error,onNext}){
   const myTeam=teams.find(t=>t.id===myId);
   const [results,setResults]=useState({}); // {pid: "retained"|"retain_failed"|"accepted"}
   const candidates=myTeam.players.filter(p=>p.age>=35&&!p.isRetired);
@@ -456,6 +456,7 @@ export function RetirePhaseScreen({teams,myId,year,onNext}){
       <div style={{padding:"16px 14px 0"}}>
         <div style={{fontSize:11,color:"#94a3b8",letterSpacing:".1em",marginBottom:4}}>OFFSEASON</div>
         <div style={{fontSize:20,fontWeight:700,color:"#f5c842",marginBottom:16}}>⚾ 引退フェーズ — {year}年</div>
+        {error&&<div role="alert" style={{padding:"9px 10px",marginBottom:10,borderRadius:6,background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.4)",color:"#f87171",fontSize:11}}>{error}</div>}
         {candidates.length===0&&(
           <div className="card" style={{textAlign:"center",padding:"32px 16px"}}>
             <div style={{fontSize:32,marginBottom:8}}>✅</div>
@@ -892,7 +893,7 @@ function PlayerCompareCard({ p, highlightWinner }) {
   );
 }
 
-export function SpringTrainingScreen({ year, myTeam, springData, onComplete }) {
+export function SpringTrainingScreen({ year, myTeam, springData, error, onComplete }) {
   const [tab, setTab] = useState("report");
   const { campEvents = [], conditionChanges = [], rosterBattles = [] } = springData || {};
 
@@ -910,6 +911,7 @@ export function SpringTrainingScreen({ year, myTeam, springData, onComplete }) {
           </div>
           <div style={{ fontSize: 11, color: "#374151" }}>{myTeam?.name} — キャンプ最終報告</div>
         </div>
+        {error&&<div role="alert" style={{padding:"9px 10px",marginBottom:10,borderRadius:6,background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.4)",color:"#f87171",fontSize:11}}>{error}</div>}
 
         {/* タブ */}
         <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>

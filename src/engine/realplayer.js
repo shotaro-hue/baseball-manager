@@ -2,6 +2,7 @@ import { clamp, rng, uid } from '../utils';
 import { POSITIONS } from '../constants';
 import { emptyStats, makePlayer, applyPositionFields } from './playerCore';
 import { DEFAULT_CONTRACT_END_YEAR } from '../data/npb2025';
+import { buildCareerLogSummary, compactCareerStats, getRecentCareerLog } from './careerStats';
 
 /* ═══════════════════════════════════════════════
    REAL PLAYER CONVERTER
@@ -80,38 +81,85 @@ function resolveTeamName(career, year, fallback) {
   return fallback;
 }
 
+function resolveHistoryTeamNames(history, career, fallback) {
+  const rows = Array.isArray(history) ? history : [];
+  const yearTotals = rows.reduce((counts, row) => {
+    counts.set(row.year, (counts.get(row.year) || 0) + 1);
+    return counts;
+  }, new Map());
+  const yearSeen = new Map();
+  return rows.map((row) => {
+    const year = row.year;
+    const seen = yearSeen.get(year) || 0;
+    yearSeen.set(year, seen + 1);
+    if ((yearTotals.get(year) || 0) <= 1) return resolveTeamName(career, year, fallback);
+    // 移籍年の分割成績はデータ上「移籍後→移籍前」の順で並ぶため、在籍履歴を新しい順に対応させる。
+    const matchingStints = (Array.isArray(career) ? career : [])
+      .filter((stint) => year >= stint.from && (stint.to === null || year <= stint.to))
+      .reverse();
+    return matchingStints[seen]?.team || resolveTeamName(career, year, fallback);
+  });
+}
+
 /* ─── 過去成績 → careerLog エントリ変換 ─── */
 
 function historyBatterEntry(h, teamId, teamName) {
-  const { year, AVG = 0.250, HR = 0, RBI = 0, SB = 0, BB = 0, PA = 0 } = h;
-  const AB  = Math.max(0, Math.round(PA - BB - PA * 0.01));
-  const H   = Math.round(AVG * AB);
-  const K   = Math.round(PA * 0.185); // NPB平均K%で推定
-  const HBP = Math.round(PA * 0.010);
-  const SF  = Math.round(PA * 0.010);
-  const R   = Math.round(RBI * 0.85);
-  const CS  = Math.round(SB * 0.25);
-  const empty = { PA:0,AB:0,H:0,D:0,T:0,HR:0,RBI:0,BB:0,K:0,HBP:0,SF:0,SB:0,CS:0,R:0,FO_LF:0,FO_CF:0,FO_RF:0,GO:0,LO:0,
-                  IP:0,ER:0,BBp:0,HBPp:0,Kp:0,HRp:0,Hp:0,BF:0,W:0,L:0,SV:0,HLD:0,QS:0,BS:0 };
+  const { year } = h;
+  // 過去実績は元データに存在する実数だけを使う。AVG/PAからの逆算・平均値補完は行わない。
+  const stats = compactCareerStats({
+    G: h.G,
+    AVG: h.AVG,
+    OBP: h.OBP,
+    SLG: h.SLG,
+    OPS: h.OPS,
+    PA: h.PA,
+    AB: h.AB,
+    H: h.H,
+    D: h['2B'],
+    T: h['3B'],
+    HR: h.HR,
+    RBI: h.RBI,
+    BB: h.BB,
+    K: h.SO,
+    HBP: h.HBP,
+    SF: h.SF,
+    SH: h.SH,
+    SB: h.SB,
+    CS: h.CS,
+    R: h.R,
+  });
   return {
     year, teamId, teamName,
-    stats: { ...empty, PA, AB, H, D:0, T:0, HR, RBI, BB, K, HBP, SF, SB, CS, R },
-    playoffStats: { ...empty },
+    stats,
+    playoffStats: compactCareerStats(),
   };
 }
 
 function historyPitcherEntry(h, teamId, teamName) {
-  const { year, ERA = 4.0, W = 0, L = 0, IP = 0, SO = 0, BB = 0, WHIP = 1.4, SV = 0 } = h;
-  const K = SO;
-  const ER  = Math.round(ERA * IP / 9);
-  const Hp  = Math.max(0, Math.round(WHIP * IP - BB));
-  const BF  = Math.round(IP * 3.8);
-  const empty = { PA:0,AB:0,H:0,D:0,T:0,HR:0,RBI:0,BB:0,K:0,HBP:0,SF:0,SB:0,CS:0,R:0,FO_LF:0,FO_CF:0,FO_RF:0,GO:0,LO:0,
-                  IP:0,ER:0,BBp:0,HBPp:0,Kp:0,HRp:0,Hp:0,BF:0,W:0,L:0,SV:0,HLD:0,QS:0,BS:0 };
+  const { year } = h;
+  const stats = compactCareerStats({
+    G: h.G,
+    GS: h.GS,
+    CG: h.CG,
+    SHO: h.SHO,
+    ERA: h.ERA,
+    WHIP: h.WHIP,
+    IP: h.IP,
+    ER: h.ER,
+    BBp: h.BB,
+    HBPp: h.HBP,
+    Kp: h.SO,
+    HRp: h.HR,
+    Hp: h.H,
+    W: h.W,
+    L: h.L,
+    SV: h.SV,
+    HLD: h.HLD,
+  });
   return {
     year, teamId, teamName,
-    stats: { ...empty, IP, ER, BBp:BB, Kp:K, Hp, BF, W, L, SV },
-    playoffStats: { ...empty },
+    stats,
+    playoffStats: compactCareerStats(),
   };
 }
 
@@ -147,9 +195,12 @@ export function realBatterToPlayer(b, teamDef) {
   const growthPhase = age <= 24 ? 'growth' : age <= 29 ? 'peak' : age <= 33 ? 'earlyDecline' : 'decline';
 
   // careerLog: 実際の過去成績から生成（なければ空配列）
-  const careerLog = (history ?? []).map(h =>
-    historyBatterEntry(h, teamDef.gameId, resolveTeamName(career, h.year, teamDef.name))
+  const historyTeamNames = resolveHistoryTeamNames(history, career, teamDef.name);
+  const careerLog = (history ?? []).map((h, index) =>
+    historyBatterEntry(h, teamDef.gameId, historyTeamNames[index])
   );
+  const recentCareerLog = getRecentCareerLog(careerLog);
+  const careerLogSummary = buildCareerLogSummary(careerLog);
   // serviceYears: 実績年数優先、なければ年齢から推定
   const serviceYears = careerLog.length > 0
     ? careerLog.length
@@ -175,6 +226,9 @@ export function realBatterToPlayer(b, teamDef) {
     stats: emptyStats(),
     batting,
     careerLog,
+    recentCareerLog,
+    careerLogSummary,
+    trimmedCareerLogSummary: careerLogSummary,
     serviceYears,
     entryAge,
     entryType: isForeign ? '外国人' : age <= 19 ? '高卒' : age <= 22 ? '大卒' : '社会人',
@@ -211,9 +265,12 @@ export function realPitcherToPlayer(p, teamDef) {
   const subtype = pos === '抑え' ? '抑え' : pos === '中継ぎ' ? '中継ぎ' : '先発';
   const growthPhase = age <= 24 ? 'growth' : age <= 29 ? 'peak' : age <= 33 ? 'earlyDecline' : 'decline';
 
-  const careerLog = (history ?? []).map(h =>
-    historyPitcherEntry(h, teamDef.gameId, resolveTeamName(career, h.year, teamDef.name))
+  const historyTeamNames = resolveHistoryTeamNames(history, career, teamDef.name);
+  const careerLog = (history ?? []).map((h, index) =>
+    historyPitcherEntry(h, teamDef.gameId, historyTeamNames[index])
   );
+  const recentCareerLog = getRecentCareerLog(careerLog);
+  const careerLogSummary = buildCareerLogSummary(careerLog);
   const serviceYears = careerLog.length > 0
     ? careerLog.length
     : rng(0, Math.max(0, age - 18));
@@ -240,6 +297,9 @@ export function realPitcherToPlayer(p, teamDef) {
     stats: { ...emptyStats(), W: 0, L: 0, SV: 0 },
     pitching,
     careerLog,
+    recentCareerLog,
+    careerLogSummary,
+    trimmedCareerLogSummary: careerLogSummary,
     serviceYears,
     entryAge,
     entryType: isForeign ? '外国人' : age <= 19 ? '高卒' : age <= 22 ? '大卒' : '社会人',

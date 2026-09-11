@@ -9,6 +9,7 @@ export default defineConfig({
     include: [
       'src/**/*.test.js',
       'scripts/**/*.test.js',
+      'tests/**/*.test.js',
     ],
 
     // PlaywrightのE2Eテストは絶対にVitestで拾わない

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { cancelDeferredPostGameWork, scheduleDeferredPostGameWork } from '../engine/postGameProcessing';
+import { resolvePlayerById } from '../engine/playerIdentity';
 
 const UNKNOWN_TEAM = {
   name: '対戦相手',
@@ -84,7 +85,7 @@ function buildResultScreenSummary(gsResult) {
   };
 }
 
-function buildResultScreenDetails(gsResult, myTeam, oppTeam) {
+function buildResultScreenDetails(gsResult, myTeam, oppTeam, teams = []) {
   const safeResult = normalizeResult(gsResult);
   const safeMyTeam = normalizeTeam(myTeam, { ...UNKNOWN_TEAM, name: '自チーム', short: 'MY', emoji: '🏟️', color: 'var(--gold)' });
   const safeOppTeam = normalizeTeam(oppTeam, UNKNOWN_TEAM);
@@ -133,7 +134,7 @@ function buildResultScreenDetails(gsResult, myTeam, oppTeam) {
       const targetMap = event.scorer ? myBatStatsMap : oppBatStatsMap;
       const targetOrder = event.scorer ? myBatOrder : oppBatOrder;
       const row = getBatterRow(targetMap, targetOrder, event);
-      if (!['bb', 'hbp', 'sf'].includes(event.result)) row.AB += 1;
+      if (!['bb', 'hbp', 'sf', 'sac'].includes(event.result)) row.AB += 1;
       if (isHit(event.result)) row.H += 1;
       if (event.result === 'hr') row.HR += 1;
       row.RBI += Number(event.rbi) || 0;
@@ -168,7 +169,7 @@ function buildResultScreenDetails(gsResult, myTeam, oppTeam) {
   const oppWinnerId = (!won && !drew) ? (oppStarterOuts >= 15 ? oppPitcherIds[0] : (oppPitcherIds[1] || oppPitcherIds[0])) : null;
   const oppLoserId = (won && !drew) ? oppPitcherIds[0] : null;
   const oppSaverId = !won && !drew && Math.abs(finalLead) <= 3 && oppPitcherIds.length >= 2 && oppPitcherIds.at(-1) !== oppWinnerId ? oppPitcherIds.at(-1) : null;
-  const findPlayer = (team, id) => team?.players?.find((player) => player.id === id) ?? team?.farm?.find((player) => player.id === id);
+  const findPlayer = (team, id) => resolvePlayerById(team, teams, id);
 
   return {
     myHitsTotal,
@@ -193,7 +194,7 @@ function buildResultScreenDetails(gsResult, myTeam, oppTeam) {
   };
 }
 
-export function ResultScreen({ gsResult, myTeam, oppTeam, gameDay, onNext, nextLabel = 'ハブに戻る', isPostGameProcessing: isPostGameProcessingProp }) {
+export function ResultScreen({ gsResult, myTeam, oppTeam, teams = [], gameDay, onNext, nextLabel = 'ハブに戻る', isPostGameProcessing: isPostGameProcessingProp }) {
   const safeResult = useMemo(() => normalizeResult(gsResult), [gsResult]);
   const safeMyTeam = useMemo(() => normalizeTeam(myTeam, { ...UNKNOWN_TEAM, name: '自チーム', short: 'MY', emoji: '🏟️', color: 'var(--gold)' }), [myTeam]);
   const safeOppTeam = useMemo(() => normalizeTeam(oppTeam || gsResult?.oppTeam, UNKNOWN_TEAM), [gsResult?.oppTeam, oppTeam]);
@@ -221,7 +222,7 @@ export function ResultScreen({ gsResult, myTeam, oppTeam, gameDay, onNext, nextL
     const handle = scheduleDeferredPostGameWork(() => {
       if (isCancelled) return;
       try {
-        const nextDetail = buildResultScreenDetails(safeResult, safeMyTeam, safeOppTeam);
+        const nextDetail = buildResultScreenDetails(safeResult, safeMyTeam, safeOppTeam, teams);
         if (isCancelled) return;
         setDetailData(nextDetail);
       } catch (error) {
@@ -237,7 +238,7 @@ export function ResultScreen({ gsResult, myTeam, oppTeam, gameDay, onNext, nextL
       isCancelled = true;
       cancelDeferredPostGameWork(handle);
     };
-  }, [gsResult, safeMyTeam, safeOppTeam, safeResult]);
+  }, [gsResult, safeMyTeam, safeOppTeam, safeResult, teams]);
 
   const fmtIPlocal = (outs) => {
     const f = Math.floor((Number(outs) || 0) / 3);
@@ -348,7 +349,7 @@ export function ResultScreen({ gsResult, myTeam, oppTeam, gameDay, onNext, nextL
                 <div key={index} className="fsb" style={{ padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span style={{ width: 12, fontWeight: 700, color: row.color, fontSize: 11 }}>{row.label}</span>
-                    <span style={{ fontSize: 12, color: 'var(--text)' }}>{row.player?.name || '?'}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text)' }}>{row.player?.name || '不明選手'}</span>
                   </div>
                   <span style={{ fontSize: 10, color: 'var(--dim)' }}>{row.team}</span>
                 </div>
@@ -441,7 +442,7 @@ export function ResultScreen({ gsResult, myTeam, oppTeam, gameDay, onNext, nextL
                                 <tr key={pitcherStats.id} style={{ borderBottom: '1px solid rgba(255,255,255,.03)' }}>
                                   <td style={{ padding: '4px 2px', color: 'var(--text)' }}>
                                     {role && <span style={{ fontSize: 9, fontWeight: 700, marginRight: 4, color: role === 'W' ? 'var(--green)' : role === 'L' ? 'var(--red)' : 'var(--blue)' }}>{role}</span>}
-                                    {player?.name || '?'}
+                                    {player?.name || '不明選手'}
                                   </td>
                                   <td style={{ ...cellSt, fontSize: 10 }}>{fmtIPlocal(pitcherStats.outs)}</td>
                                   <td style={{ ...cellSt, color: 'var(--dim)' }}>{pitcherStats.PC || 0}</td>

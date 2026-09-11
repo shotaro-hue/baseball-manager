@@ -207,6 +207,9 @@ export function PlayerModal({
   const safeSubtype = typeof p?.subtype === "string" ? p.subtype.slice(0, 30) : "";
   const safeInjury = typeof p?.injury === "string" ? p.injury.slice(0, 40) : "";
   const safeInjuryPart = typeof p?.injuryPart === "string" ? p.injuryPart.slice(0, 20) : "";
+  const careerTeamId = Array.isArray(teams)
+    ? teams.find((team) => team?.name === teamName)?.id
+    : undefined;
 
   return(
     <div
@@ -305,9 +308,11 @@ export function PlayerModal({
                   <StatRow label="ホールド" value={p.stats.HLD||0}/>
                   <div style={{margin:"7px 0 5px",paddingTop:7,borderTop:"1px solid rgba(255,255,255,.06)",fontSize:10,color:"#94a3b8",fontWeight:700,letterSpacing:".05em"}}>打撃成績</div>
                   <StatRow label="打席" value={p.stats.PA||0}/>
+                  <StatRow label="打数" value={p.stats.AB||0}/>
                   <StatRow label="打率" value={p.stats.AB>0?fmtAvg(p.stats.H,p.stats.AB):"---"}/>
                   <StatRow label="安打" value={p.stats.H||0}/>
                   <StatRow label="打点" value={p.stats.RBI||0}/>
+                  <StatRow label="犠打" value={p.stats.SH||0}/>
                   <StatRow label="OPS" value={sb.OPS>0?sb.OPS.toFixed(3):"---"}/>
                 </>
               ) : (
@@ -329,7 +334,9 @@ export function PlayerModal({
           <BattedBallAnalysisPanel player={p} saveId={saveId} year={year} teams={teams} teamName={teamName}/>
         )}
 
-        {activeSection === "career" && <CareerTable player={p}/>}
+        {activeSection === "career" && (
+          <CareerTable player={p} year={year} teamId={careerTeamId} teamName={teamName}/>
+        )}
 
         {onNavigate&&(
           <div className="player-decision-actions" aria-label="この選手について判断する">

@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { simAtBat, BASELINE, DEFAULT_LEAGUE_ENV, resolveBattedBallOutcomeFromPhysicsForBalance, STADIUMS } from '../../engine/simulation';
+import { isTeamIdSet } from '../../engine/teamId';
 
 /* ================================================================
    BALANCE TAB
@@ -158,7 +159,7 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
 
   const handleLeagueEnvSliderChange = useCallback((key, rawValue) => {
     const sliderDef = LEAGUE_ENV_SLIDER_CONFIG.find((item) => item.key === key);
-    if (!sliderDef || typeof upd !== 'function' || !myId) return;
+    if (!sliderDef || typeof upd !== 'function' || !isTeamIdSet(myId)) return;
     const sanitizedValue = sanitizeLeagueEnvValue(rawValue, sliderDef.min, sliderDef.max, leagueEnv[key]);
     upd(myId, (team) => ({
       ...team,
@@ -170,7 +171,7 @@ export function BalanceTab({ teams, myTeam, upd, myId }) {
   }, [leagueEnv, myId, upd]);
 
   const handleResetLeagueEnv = useCallback(() => {
-    if (typeof upd !== 'function' || !myId) return;
+    if (typeof upd !== 'function' || !isTeamIdSet(myId)) return;
     upd(myId, (team) => ({
       ...team,
       leagueEnv: { ...DEFAULT_LEAGUE_ENV },
