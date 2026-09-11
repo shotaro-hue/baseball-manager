@@ -1,0 +1,59 @@
+name: Bug report
+description: Report a reproducible gameplay, simulation, save/load, or UI bug
+title: "[Bug] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve NPB Franchise Manager. Please provide the smallest reproducible scenario you can.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the incorrect behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Numbered steps that reliably reproduce the problem.
+      placeholder: |
+        1. Start a new game with ...
+        2. Simulate ...
+        3. Open ...
+        4. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Simulation / game logic
+        - Roster / lineup / pitching
+        - Draft / trade / contracts / FA
+        - Save / load / persistence
+        - Statistics / sabermetrics
+        - UI / mobile / accessibility
+        - Performance / memory
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser / device
+      placeholder: "e.g. Safari on iPhone 16, Chrome 140 on macOS"
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Additional evidence
+      description: Screenshots, console errors, save-state details, or other context. Do not include secrets.
