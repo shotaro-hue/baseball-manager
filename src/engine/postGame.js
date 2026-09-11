@@ -29,7 +29,7 @@ const getFieldZone = (e) => {
 };
 
 const SPRAY_CHART_MAX_DISTANCE = 150;
-const isDevEnv = import.meta.env.DEV;
+const isDevEnv = import.meta.env?.DEV ?? false;
 
 function logPerf(label, startedAt) {
   if (!isDevEnv || !Number.isFinite(startedAt)) return;
@@ -168,17 +168,19 @@ export function computeBoxScore(log, inningSummary, homeTeamPlayers, awayTeamPla
     const order = [];
     log.forEach(e => {
       if (e.isTop !== battingIsTop || !e.batId || e.isStolenBase || !e.result || e.result === 'change') return;
-      if (!map[e.batId]) { map[e.batId] = { AB: 0, H: 0, HR: 0, RBI: 0, BB: 0, K: 0, FO_LF: 0, FO_CF: 0, FO_RF: 0, GO: 0, LO: 0 }; order.push(e.batId); }
+      if (!map[e.batId]) { map[e.batId] = { AB: 0, H: 0, HR: 0, RBI: 0, BB: 0, K: 0, SH: 0, FO_LF: 0, FO_CF: 0, FO_RF: 0, GO: 0, LO: 0 }; order.push(e.batId); }
       const m = map[e.batId];
       const isBB  = e.result === 'bb';
       const isHBP = e.result === 'hbp';
       const isSF  = e.result === 'sf';
-      if (!isBB && !isHBP && !isSF) m.AB++;
+      const isSH  = e.result === 'sac';
+      if (!isBB && !isHBP && !isSF && !isSH) m.AB++;
       if (IS_HIT(e.result)) m.H++;
       if (e.result === 'hr') m.HR++;
       m.RBI += (e.rbi || 0);
       if (isBB || isHBP) m.BB++;
       if (e.result === 'k') m.K++;
+      if (isSH) m.SH++;
       const battedType = getBattedBallType(e);
       if (battedType === 'fly') m[`FO_${getFieldZone(e)}`]++;
       else if (battedType === 'ground') m.GO++;
@@ -275,7 +277,7 @@ export function computeBoxScore(log, inningSummary, homeTeamPlayers, awayTeamPla
 ═══════════════════════════════════════════════ */
 
 // 試合ログから選手成績を反映
-export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0) {
+export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0, statsField = 'stats') {
   const sprayChartGenerationStart = isDevEnv ? performance.now() : 0;
   const myAtBats = log.filter((e) => e.scorer === isMyTeam && e.batId && e.result && e.result !== "change");
   const myPitchABs = log.filter((e) => e.scorer === !isMyTeam && e.pitcherId && e.result && e.result !== "change" && !e.isStolenBase);
@@ -330,7 +332,7 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0) 
     const pm = pitcherMap[p.id];
     const allMyEvents = batterEventsById.get(p.id) || [];
     if (!allMyEvents.length && !pm) return p;
-    const s = { ...emptyStats(), ...p.stats }; // STEP3安全弁: stats未初期化対策
+    const s = { ...emptyStats(), ...(p?.[statsField] || {}) }; // STEP3安全弁: stats未初期化対策
     const baseSprayPoints = Array.isArray(s.sprayPoints) ? s.sprayPoints : [];
     const baseBattedBallEvents = Array.isArray(s.battedBallEvents)
       ? s.battedBallEvents
@@ -355,7 +357,8 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0) 
       const isBB = e.result === "bb";
       const isHBP = e.result === "hbp";
       const isSF = e.result === "sf";
-      if (!isBB && !isHBP && !isSF) s.AB++;
+      const isSH = e.result === "sac";
+      if (!isBB && !isHBP && !isSF && !isSH) s.AB++;
       if (IS_HIT(e.result)) s.H++;
       if (e.result === "d") s.D++;
       if (e.result === "t") s.T++;
@@ -363,6 +366,7 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0) 
       if (isBB) s.BB++;
       if (isHBP) s.HBP++;
       if (isSF) s.SF++;
+      if (isSH) s.SH++;
       if (e.result === "k") s.K++;
       const battedType = getBattedBallType(e);
       if (battedType === 'fly') s[`FO_${getFieldZone(e)}`]++;
@@ -388,15 +392,17 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0) 
         
         const safeIsHrByTrajectory = Boolean(e?.physicsMeta?.isHrByTrajectory);
         
-        newSprayPoints.push({
-          dist: safeDist,
-          sprayAngle: safeSpray,
-          result: String(e.result || 'out'),
-          fenceDistance: safeFenceDistance,
-          isHrByTrajectory: safeIsHrByTrajectory,
-        });
-        const event = buildBattedBallEvent(e, gameDay);
-        if (event) newBattedBallEvents.push(event);
+        if (!p.isPitcher && statsField === 'stats') {
+          newSprayPoints.push({
+            dist: safeDist,
+            sprayAngle: safeSpray,
+            result: String(e.result || 'out'),
+            fenceDistance: safeFenceDistance,
+            isHrByTrajectory: safeIsHrByTrajectory,
+          });
+          const event = buildBattedBallEvent(e, gameDay);
+          if (event) newBattedBallEvents.push(event);
+        }
       }
       s.RBI += (e.rbi || 0);
       if (e.ev > 0) { s.evSum += e.ev; s.evN++; }
@@ -416,7 +422,7 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0) 
     s.battedBallEvents = [...baseBattedBallEvents, ...newBattedBallEvents].slice(-MAX_BATTED_BALL_EVENTS);
     battedBallProfile.recent = createRecentBattedBallProfile(s.battedBallEvents);
     s.battedBallProfile = battedBallProfile;
-    return { ...p, stats: s };
+    return { ...p, [statsField]: s };
   });
 
   // ② QS/SV/HLD/W/L の付与
@@ -453,7 +459,7 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0) 
     })();
 
     return updated.map((p) => {
-      const s = { ...p.stats };
+      const s = { ...emptyStats(), ...(p?.[statsField] || {}) };
 
       if (p.id === starterId) {
         if (p.id === winnerId) s.W++;
@@ -480,7 +486,7 @@ export function applyGameStatsFromLog(players, log, isMyTeam, won, gameDay = 0) 
         if (pitcherMap[p.id] && saveSit) s.HLD++;
       }
 
-      return { ...p, stats: s };
+      return { ...p, [statsField]: s };
     });
   }
   logPerf('sprayChartGeneration', sprayChartGenerationStart);

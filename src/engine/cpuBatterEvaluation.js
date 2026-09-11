@@ -1,4 +1,4 @@
-import { saberBatter } from './sabermetrics';
+import { saberBatter } from './sabermetrics.js';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const rate = (value, denominator) => denominator > 0 ? Number(value || 0) / denominator : 0;

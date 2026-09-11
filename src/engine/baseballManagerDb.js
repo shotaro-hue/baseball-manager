@@ -1,10 +1,11 @@
 export const BASEBALL_MANAGER_DB_NAME = 'baseball_manager_storage';
-export const BASEBALL_MANAGER_DB_VERSION = 2;
+export const BASEBALL_MANAGER_DB_VERSION = 3;
 
 export const BASEBALL_MANAGER_DB_STORES = {
   chunks: 'save_chunks',
   careerLogs: 'career_logs',
   battedBallBatches: 'batted_ball_batches',
+  battedBallAggregates: 'batted_ball_aggregates',
   battedBallMeta: 'batted_ball_meta',
 };
 
@@ -38,6 +39,15 @@ export function openBaseballManagerDb() {
       }
       if (!db.objectStoreNames.contains(BASEBALL_MANAGER_DB_STORES.battedBallMeta)) {
         db.createObjectStore(BASEBALL_MANAGER_DB_STORES.battedBallMeta, { keyPath: 'saveId' });
+      }
+      if (!db.objectStoreNames.contains(BASEBALL_MANAGER_DB_STORES.battedBallAggregates)) {
+        const store = db.createObjectStore(
+          BASEBALL_MANAGER_DB_STORES.battedBallAggregates,
+          { keyPath: 'id' },
+        );
+        store.createIndex('bySaveYear', ['saveId', 'year'], { unique: false });
+        store.createIndex('bySave', 'saveId', { unique: false });
+        store.createIndex('byPlayer', ['saveId', 'playerId'], { unique: false });
       }
     };
     request.onsuccess = () => resolve(request.result);

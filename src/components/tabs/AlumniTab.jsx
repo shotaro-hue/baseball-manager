@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { CareerTable } from './CareerTable';
 
-export function AlumniTab({myTeam}){
+export function AlumniTab({myTeam,year}){
   const [selId,setSelId]=useState(null);
   const history=(myTeam&&myTeam.history)||[];
   const current=(myTeam&&myTeam.players)||[];
@@ -42,7 +42,7 @@ export function AlumniTab({myTeam}){
             </div>
             <button className="bsm bga" onClick={()=>setSelId(null)}>✕</button>
           </div>
-          <CareerTable player={sel}/>
+          <CareerTable player={sel} year={year} teamId={myTeam?.id} teamName={myTeam?.name}/>
         </div>
       )}
     </div>

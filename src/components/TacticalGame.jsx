@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { STRATEGY_OPTS, PITCHING_POLICY_OPTS, RLABEL, IS_HIT, IS_OUT, BATCH, FATIGUE_WARNING } from '../constants';
 import { fmtAvg, fmtPct, fmtEra } from '../utils';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
-import { initGameState, matchupScore, calcEffectiveFatigue, processAtBat, endHalfInning, checkStopCondition, STADIUMS, TEAM_STADIUM } from '../engine/simulation';
+import { initGameState, matchupScore, calcEffectiveFatigue, processAtBat, endHalfInning, checkStopCondition, replacePitcherInBattingOrder, STADIUMS, TEAM_STADIUM } from '../engine/simulation';
 import { OV, CondBadge, HandBadge, PitchBadge } from './ui';
 import Baseball3DModal from './Baseball3DModal';
 import PhysicsInsightPanel from './game/PhysicsInsightPanel';
@@ -66,7 +66,11 @@ export function TacticalGameScreen({myTeam,oppTeam,isHome=true,onGameEnd}){
   },[]);
 
   // 続行（停止解除）
-  const resume = useCallback(()=>{setGs(prev=>({...prev,stopped:false,stopReason:null,stopData:null}));setShowMenu(null);setAutoRunning(true);},[]);
+  const resume = useCallback(()=>{
+    setGs(prev=>prev.myPitcherMustBeReplaced?prev:{...prev,stopped:false,stopReason:null,stopData:null});
+    setShowMenu(null);
+    if(!gs.myPitcherMustBeReplaced) setAutoRunning(true);
+  },[gs.myPitcherMustBeReplaced]);
 
   // 投球方針変更
   const changePitchingPolicy = useCallback((pol)=>{setPitchingPolicy(pol);setGs(prev=>({...prev,pitchingPolicy:pol}));},[]);
@@ -75,7 +79,14 @@ export function TacticalGameScreen({myTeam,oppTeam,isHome=true,onGameEnd}){
   const changePitcher=rpId=>{
     const rp=gs.myBullpen.find(p=>p.id===rpId);
     if(!rp) return;
-    setGs(prev=>({...prev,myPitcher:rp,myBullpen:prev.myBullpen.filter(p=>p.id!==rpId),myPitchCount:0,stopped:false,stopReason:null,stopData:null,log:[...prev.log,{inning:prev.inning,isTop:prev.isTop,result:"change",batter:"",text:`⬆️ 投手交代: ${prev.myPitcher?.name} → ${rp.name}`,scorer:false}]}));
+    setGs(prev=>({
+      ...prev,
+      myPitcher:rp,
+      myLineup:replacePitcherInBattingOrder(prev.myLineup,prev.myPitcher?.id,rp,prev.myPitcherBattingSlotIndex),
+      myPitcherMustBeReplaced:false,
+      myBullpen:prev.myBullpen.filter(p=>p.id!==rpId),myPitchCount:0,stopped:false,stopReason:null,stopData:null,
+      log:[...prev.log,{inning:prev.inning,isTop:prev.isTop,result:"change",batter:"",text:`⬆️ 投手交代: ${prev.myPitcher?.name} → ${rp.name}`,scorer:false}]
+    }));
     setShowMenu(null);setSelectedRP(null);setAutoRunning(true);
   };
 
@@ -84,10 +95,12 @@ export function TacticalGameScreen({myTeam,oppTeam,isHome=true,onGameEnd}){
     const ph=gs.myBench.find(p=>p.id===phId);
     if(!ph||!isMyBatting) return;
     const nextIdx=gs.myBatIdx%gs.myLineup.length;
+    const replacesPitcherSlot=nextIdx===gs.myPitcherBattingSlotIndex;
+    if(replacesPitcherSlot&&gs.myBullpen.length===0) return;
     setGs(prev=>{
       const newLineup=[...prev.myLineup];
       newLineup[nextIdx]=ph;
-      return{...prev,myLineup:newLineup,myBench:prev.myBench.filter(p=>p.id!==phId),stopped:false,stopReason:null,stopData:null,log:[...prev.log,{inning:prev.inning,isTop:prev.isTop,result:"change",text:`🔄 代打: ${ph.name}`,scorer:true}]};
+      return{...prev,myLineup:newLineup,myPitcherMustBeReplaced:replacesPitcherSlot,myBench:prev.myBench.filter(p=>p.id!==phId),stopped:false,stopReason:null,stopData:null,log:[...prev.log,{inning:prev.inning,isTop:prev.isTop,result:"change",text:`🔄 代打: ${ph.name}`,scorer:true}]};
     });
     setShowMenu(null);setSelectedPH(null);setAutoRunning(true);
   };
@@ -235,6 +248,7 @@ export function TacticalGameScreen({myTeam,oppTeam,isHome=true,onGameEnd}){
                 {gs.stopData.reason==="scoring_chance"&&`${gs.stopData.data?.gap===0?"同点":"1点差"}チャンス！作戦を指示`}
                 {gs.stopData.reason==="pinch_hit_chance"&&`次打者: ${gs.stopData.data?.batter?.name} (ミート:${gs.stopData.data?.batter?.batting?.contact})`}
                 {gs.stopData.reason==="closer_time"&&"終盤リード — クローザー投入を検討"}
+                {gs.stopData.reason==="pitcher_reentry_required"&&"投手の打順に代打を送ったため、守備開始前に投手交代してください"}
               </div>
             </div>
           )}
@@ -490,7 +504,7 @@ export function TacticalGameScreen({myTeam,oppTeam,isHome=true,onGameEnd}){
         )}
         {gs.stopped&&!gs.gameOver&&(
           <>
-            <button className="btn btn-green" onClick={resume}>▶ 続行</button>
+            <button className="btn btn-green" onClick={resume} disabled={gs.myPitcherMustBeReplaced} style={{opacity:gs.myPitcherMustBeReplaced?0.4:1}}>▶ 続行</button>
             <button className="btn btn-gold" onClick={()=>setShowMenu(m=>m==="pitcher"?null:"pitcher")} disabled={gs.myBullpen.length===0} style={{opacity:gs.myBullpen.length===0?0.4:1}}>🔄 投手交代</button>
             <button className="btn" style={{background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.2)",color:"#60a5fa",opacity:!isMyBatting||gs.myBench.length===0?0.4:1}} onClick={()=>setShowMenu(m=>m==="pinch"?null:"pinch")} disabled={!isMyBatting||gs.myBench.length===0}>👤 代打</button>
             <button className="btn" style={{background:"rgba(167,139,250,.1)",border:"1px solid rgba(167,139,250,.2)",color:"#a78bfa"}} onClick={()=>setShowMenu(m=>m==="strategy"?null:"strategy")}>🎯 作戦</button>

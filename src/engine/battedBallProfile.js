@@ -6,6 +6,7 @@ import {
   HARD_HIT_THRESHOLD_KMH,
 } from '../constants.js';
 import { isBarreledBattedBall } from './barrelClassification.js';
+import { serializeTeamId } from './teamId.js';
 
 export const BATTED_BALL_SCHEMA_VERSION = 1;
 const IN_PLAY_RESULTS = new Set(['s', 'd', 't', 'hr', 'out', 'sf', 'go', 'fo']);
@@ -312,8 +313,8 @@ export function createBattedBallBatchRecords(log, context = {}) {
       year: safeYear,
       gameId,
       gameDay,
-      teamId: safeString(team?.id) || null,
-      opponentTeamId: safeString(opponent?.id) || null,
+      teamId: serializeTeamId(team?.id),
+      opponentTeamId: serializeTeamId(opponent?.id),
       playerId,
       source: context.source === 'worker' ? 'worker' : 'normal',
       eventCount: events.length,

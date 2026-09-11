@@ -1,27 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { TEAM_DEFS } from '../../constants';
-import { NPB2025_ROSTERS } from '../../data/npb2025';
-import { buildRealTeam } from '../../engine/realplayer';
+import { createInitialTeams } from '../../engine/bootstrapTeams';
 import { generateSeasonSchedule, calcAllStarTriggerDay } from '../../engine/scheduleGen';
 import { simulateSeasonBatch } from '../seasonBatchCore';
 
 function buildSnapshot() {
-  const teams = TEAM_DEFS.map((definition) => {
-    const team = buildRealTeam(definition, NPB2025_ROSTERS[definition.id]);
-    const nonPitcherIds = (team.players || [])
-      .filter((player) => !player.isPitcher)
-      .map((player) => player.id);
-    team.lineupNoDh = (team.lineupNoDh || team.lineup || nonPitcherIds)
-      .filter((id) => nonPitcherIds.includes(id))
-      .slice(0, 8);
-    team.lineupDh = (team.lineupDh || team.lineup || nonPitcherIds)
-      .filter((id) => nonPitcherIds.includes(id))
-      .slice(0, 9);
-    team.rosterDhMode = team.rosterDhMode ?? team.dhEnabled ?? false;
-    team.lineup = (team.rosterDhMode ? team.lineupDh : team.lineupNoDh).slice();
-    team.history = [];
-    return team;
-  });
+  // Use the same validated DH/no-DH assignments as a real new game.
+  // Taking the first eight batters can omit a required defensive position.
+  const teams = createInitialTeams().map((team) => ({ ...team, history: [] }));
   const schedule = generateSeasonSchedule(2026, teams);
   return {
     teams,
@@ -76,7 +61,12 @@ function countPayload(result) {
 }
 
 describe('100-game season batch payload', () => {
-  it('stays compact enough to transfer without retaining physics trajectories', () => {
+  it.each([1, 42, 20260911])('stays compact enough to transfer without retaining physics trajectories (seed %i)', (initialSeed) => {
+    let seed = initialSeed;
+    const random = vi.spyOn(Math, 'random').mockImplementation(() => {
+      seed = (Math.imul(1664525, seed) + 1013904223) >>> 0;
+      return seed / 4294967296;
+    });
     const snapshot = buildSnapshot();
     const perfLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     let result;
@@ -84,6 +74,7 @@ describe('100-game season batch payload', () => {
       result = simulateSeasonBatch({ snapshot, count: 100 });
     } finally {
       perfLogSpy.mockRestore();
+      random.mockRestore();
     }
 
     const counts = countPayload(result);
