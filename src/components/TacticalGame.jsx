@@ -6,6 +6,7 @@ import { initGameState, matchupScore, calcEffectiveFatigue, processAtBat, endHal
 import { OV, CondBadge, HandBadge, PitchBadge } from './ui';
 import Baseball3DModal from './Baseball3DModal';
 import PhysicsInsightPanel from './game/PhysicsInsightPanel';
+import { advanceTacticalAction, canUseStrategy, requiresPitcherReplacement } from '../engine/tacticalActions';
 
 const VISIBLE_LOG_LIMIT = 80;
 
@@ -53,24 +54,17 @@ export function TacticalGameScreen({myTeam,oppTeam,isHome=true,onGameEnd}){
 
   // 手動1打席進める
   const advance = useCallback((strategy="normal")=>{
-    setGs(prev=>{
-      if(prev.stopped||prev.gameOver) return prev;
-      if(prev.outs>=3) return endHalfInning(prev);
-      let next=processAtBat(prev,strategy);
-      if(next.outs>=3) return endHalfInning(next);
-      const stop=checkStopCondition(next);
-      if(stop) return{...next,stopped:true,stopReason:stop.reason,stopData:stop};
-      return next;
-    });
+    setAutoRunning(false);
+    setGs(prev=>advanceTacticalAction(prev,strategy));
     setShowMenu(null);setSelectedStrat("normal");
   },[]);
 
   // 続行（停止解除）
   const resume = useCallback(()=>{
-    setGs(prev=>prev.myPitcherMustBeReplaced?prev:{...prev,stopped:false,stopReason:null,stopData:null});
+    setGs(prev=>requiresPitcherReplacement(prev)?prev:{...prev,stopped:false,stopReason:null,stopData:null});
     setShowMenu(null);
-    if(!gs.myPitcherMustBeReplaced) setAutoRunning(true);
-  },[gs.myPitcherMustBeReplaced]);
+    if(!requiresPitcherReplacement(gs)) setAutoRunning(true);
+  },[gs]);
 
   // 投球方針変更
   const changePitchingPolicy = useCallback((pol)=>{setPitchingPolicy(pol);setGs(prev=>({...prev,pitchingPolicy:pol}));},[]);
@@ -87,7 +81,7 @@ export function TacticalGameScreen({myTeam,oppTeam,isHome=true,onGameEnd}){
       myBullpen:prev.myBullpen.filter(p=>p.id!==rpId),myPitchCount:0,stopped:false,stopReason:null,stopData:null,
       log:[...prev.log,{inning:prev.inning,isTop:prev.isTop,result:"change",batter:"",text:`⬆️ 投手交代: ${prev.myPitcher?.name} → ${rp.name}`,scorer:false}]
     }));
-    setShowMenu(null);setSelectedRP(null);setAutoRunning(true);
+    setShowMenu(null);setSelectedRP(null);setAutoRunning(false);
   };
 
   // 代打
@@ -102,7 +96,7 @@ export function TacticalGameScreen({myTeam,oppTeam,isHome=true,onGameEnd}){
       newLineup[nextIdx]=ph;
       return{...prev,myLineup:newLineup,myPitcherMustBeReplaced:replacesPitcherSlot,myBench:prev.myBench.filter(p=>p.id!==phId),stopped:false,stopReason:null,stopData:null,log:[...prev.log,{inning:prev.inning,isTop:prev.isTop,result:"change",text:`🔄 代打: ${ph.name}`,scorer:true}]};
     });
-    setShowMenu(null);setSelectedPH(null);setAutoRunning(true);
+    setShowMenu(null);setSelectedPH(null);setAutoRunning(false);
   };
 
   const currentStadium = useMemo(() => {
@@ -354,7 +348,7 @@ export function TacticalGameScreen({myTeam,oppTeam,isHome=true,onGameEnd}){
           {/* Event Log */}
           {modalWarning && <div className="notif nwarn">{modalWarning}</div>}
           {safePhysicsMeta && <PhysicsInsightPanel physicsMeta={safePhysicsMeta} />}
-          <div className="evlog" ref={logRef}>
+          <div className="evlog" data-testid="game-log" ref={logRef}>
             {visibleLogIds.map((i)=>{ const e = gs.log[i]; if(!e) return null;
               if(e.result==="change") return <div key={i} style={{padding:"3px 8px",fontSize:10,color:"#a78bfa",borderLeft:"3px solid #a78bfa",margin:"4px 0"}}>{e.text}</div>;
               const cls=e.result==="hr"?"evi-hr":IS_HIT(e.result)?"evi-hit":IS_OUT(e.result)?"evi-out":"";
@@ -476,14 +470,14 @@ export function TacticalGameScreen({myTeam,oppTeam,isHome=true,onGameEnd}){
               <div className="card-h">作戦指示</div>
               <div className="strat-grid">
                 {STRATEGY_OPTS.map(s=>(
-                  <button key={s.id} className={`strat-btn ${selectedStrat===s.id?"sel":""}`} onClick={()=>setSelectedStrat(s.id)}>
+                  <button key={s.id} disabled={!canUseStrategy(gs,s.id)} title={!canUseStrategy(gs,s.id)?'現在の攻守・走者・アウト数では選択できません':s.desc} className={`strat-btn ${selectedStrat===s.id?"sel":""}`} onClick={()=>setSelectedStrat(s.id)}>
                     <div style={{fontSize:14,marginBottom:3}}>{s.icon} {s.label}</div>
                     <div style={{fontSize:10,color:"#374151"}}>{s.desc}</div>
                   </button>
                 ))}
               </div>
               <div style={{display:"flex",gap:8,marginTop:10}}>
-                <button className="btn btn-gold" style={{flex:1}} onClick={()=>advance(selectedStrat)}>
+                <button className="btn btn-gold" style={{flex:1}} disabled={!canUseStrategy(gs,selectedStrat)} onClick={()=>advance(selectedStrat)}>
                   {STRATEGY_OPTS.find(s=>s.id===selectedStrat)?.label}で実行！
                 </button>
                 <button className="bsm bgr" onClick={()=>setShowMenu(null)}>キャンセル</button>
@@ -496,15 +490,15 @@ export function TacticalGameScreen({myTeam,oppTeam,isHome=true,onGameEnd}){
       <div className="ctrl-bar">
         {!gs.stopped&&!gs.gameOver&&(
           <>
-            <button className="btn btn-green" onClick={()=>setAutoRunning(a=>!a)}>
+            <button className="btn btn-green" disabled={requiresPitcherReplacement(gs)} onClick={()=>{setShowMenu(null);setAutoRunning(a=>!a);}}>
               {autoRunning?"⏸ 一時停止":"▶ 自動進行"}
             </button>
-            {!autoRunning&&<button className="btn btn-gold" onClick={()=>advance("normal")}>▶▶ 1打席進む</button>}
+            {!autoRunning&&<button className="btn btn-gold" disabled={requiresPitcherReplacement(gs)} onClick={()=>advance("normal")}>▶▶ 1打席進む</button>}
           </>
         )}
-        {gs.stopped&&!gs.gameOver&&(
+        {(gs.stopped||!autoRunning)&&!gs.gameOver&&(
           <>
-            <button className="btn btn-green" onClick={resume} disabled={gs.myPitcherMustBeReplaced} style={{opacity:gs.myPitcherMustBeReplaced?0.4:1}}>▶ 続行</button>
+            {gs.stopped&&<button className="btn btn-green" onClick={resume} disabled={requiresPitcherReplacement(gs)} style={{opacity:requiresPitcherReplacement(gs)?0.4:1}}>▶ 続行</button>}
             <button className="btn btn-gold" onClick={()=>setShowMenu(m=>m==="pitcher"?null:"pitcher")} disabled={gs.myBullpen.length===0} style={{opacity:gs.myBullpen.length===0?0.4:1}}>🔄 投手交代</button>
             <button className="btn" style={{background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.2)",color:"#60a5fa",opacity:!isMyBatting||gs.myBench.length===0?0.4:1}} onClick={()=>setShowMenu(m=>m==="pinch"?null:"pinch")} disabled={!isMyBatting||gs.myBench.length===0}>👤 代打</button>
             <button className="btn" style={{background:"rgba(167,139,250,.1)",border:"1px solid rgba(167,139,250,.2)",color:"#a78bfa"}} onClick={()=>setShowMenu(m=>m==="strategy"?null:"strategy")}>🎯 作戦</button>

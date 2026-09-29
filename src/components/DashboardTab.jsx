@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import React, { useMemo } from "react";
 import { fmtM, gameDayToDate } from '../utils';
 import { getMyMatchup } from '../engine/scheduleLookup';
 import { MAX_ROSTER } from '../constants';
@@ -34,10 +34,10 @@ export function DashboardTab({
 
   const todayGame = useMemo(() => {
     if (!schedule || !myTeam) return null;
-    const matchup = getMyMatchup(schedule, gameDay + 1, myTeam.id);
+    const matchup = getMyMatchup(schedule, gameDay, myTeam.id);
     if (!matchup) return null;
     const opponent = teams.find(t => t.id === matchup.oppId);
-    const date = gameDayToDate(gameDay + 1, schedule);
+    const date = gameDayToDate(gameDay, schedule);
     if (!opponent || !date) return null;
     return { opponent, isHome: matchup.isHome, date, isInterleague: matchup.isInterleague };
   }, [schedule, gameDay, myTeam, teams]);
