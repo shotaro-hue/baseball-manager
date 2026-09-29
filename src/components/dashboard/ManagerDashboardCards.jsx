@@ -1,3 +1,5 @@
+import React from 'react';
+
 const toneClassByName = {
   good: 'cg',
   warning: 'cy',
@@ -23,7 +25,7 @@ export function TodayGameCard({ todayGame, gameDay, onGoGame }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 16, fontWeight: 700, overflowWrap: 'anywhere' }}>{todayGame.opponent.name}</div>
           <div style={{ color: '#94a3b8', fontSize: 11 }}>
-            {todayGame.date.month}/{todayGame.date.day} Game {gameDay + 1}
+            {todayGame.date.month}/{todayGame.date.day} Game {gameDay}
           </div>
         </div>
         <span className={`chip ${todayGame.isHome ? 'cg' : 'cb'}`}>{todayGame.isHome ? 'Home' : 'Away'}</span>
