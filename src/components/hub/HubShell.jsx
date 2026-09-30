@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { RetireModal } from '../RetireModal';
 import { PlayerModal } from '../PlayerModal';
@@ -10,6 +10,8 @@ import HubSimPanel from './HubSimPanel';
 import HubTabsNav from './HubTabsNav';
 import HubContentRouter from './HubContentRouter';
 import HubBottomNav from './HubBottomNav';
+import { House, CalendarBlank, Users, ChartBar, Flask, Envelope } from '@phosphor-icons/react';
+import '../../calm-ui.css';
 import {
   PlayerComparisonDialog,
   PlayerComparisonTray,
@@ -19,21 +21,21 @@ const PRIMARY_SECTIONS = [
   {
     id: 'home',
     label: 'ホーム',
-    icon: '🏠',
+    icon: <House size={22} />,
     defaultTab: 'dashboard',
     tabs: [['dashboard', 'ダッシュボード']],
   },
   {
     id: 'game',
     label: '日程',
-    icon: '⚾',
+    icon: <CalendarBlank size={22} />,
     defaultTab: 'schedule',
     tabs: [['schedule', '日程']],
   },
   {
     id: 'rosterOps',
     label: '編成',
-    icon: '🛠',
+    icon: <Users size={22} />,
     defaultTab: 'roster',
     tabs: [
       ['roster', 'ロスター'],
@@ -47,7 +49,7 @@ const PRIMARY_SECTIONS = [
   {
     id: 'analysis',
     label: '分析',
-    icon: '📊',
+    icon: <ChartBar size={22} />,
     defaultTab: 'stats',
     tabs: [
       ['stats', '成績'],
@@ -59,14 +61,14 @@ const PRIMARY_SECTIONS = [
   {
     id: 'developer',
     label: '開発',
-    icon: '🧪',
+    icon: <Flask size={22} />,
     defaultTab: 'balance',
     tabs: [['balance', 'バランス検証']],
   },
   {
     id: 'inbox',
     label: '受信箱',
-    icon: '✉',
+    icon: <Envelope size={22} />,
     defaultTab: 'mailbox',
     tabs: [
       ['mailbox', 'メール'],
@@ -186,10 +188,10 @@ export default function HubShell({ state, flows, app }) {
   }, [gs, handleTabChange]);
 
   return (
-    <div className="app">
+    <div className={`app calm-shell ${tab === 'dashboard' ? 'calm-home' : ''}`}>
       <div className="app-layout">
         <aside className="primary-sidebar" aria-label="監督メニュー">
-          <div className="primary-sidebar-title">監督メニュー</div>
+          <div className="primary-sidebar-title"><strong>{myTeam?.name}</strong><span>{year}年 シーズン</span></div>
           <div className="primary-sidebar-list">
             {PRIMARY_SECTIONS.map((section) => {
               const badgeTab =
@@ -206,6 +208,7 @@ export default function HubShell({ state, flows, app }) {
                     currentPrimarySection === section.id ? 'on' : ''
                   }`}
                   onClick={() => handlePrimarySectionChange(section.id)}
+                  aria-current={currentPrimarySection === section.id ? 'page' : undefined}
                 >
                   <span className="primary-sidebar-icon">{section.icon}</span>
                   <span>{section.label}</span>
@@ -247,7 +250,7 @@ export default function HubShell({ state, flows, app }) {
             </div>
           )}
 
-          {gameDay <= SEASON_GAMES && (
+          {gameDay <= SEASON_GAMES && tab !== 'dashboard' && (
             <HubSimPanel
               gameDay={gameDay}
               schedule={schedule}
@@ -259,12 +262,21 @@ export default function HubShell({ state, flows, app }) {
             />
           )}
 
-          <HubTabsNav
+          {tab === 'dashboard' && gameDay <= SEASON_GAMES && (
+            <details className="calm-batch" open={sf.batchProgress ? true : undefined}>
+              <summary>まとめて進行・自動編成</summary>
+              <HubSimPanel gameDay={gameDay} schedule={schedule} remain={remain}
+                batchProgress={sf.batchProgress} onStartGame={sf.handleStartGame}
+                onBatchSim={sf.handleBatchSim} onSeasonSim={sf.handleSeasonSim} />
+            </details>
+          )}
+
+          {tab !== 'dashboard' && <HubTabsNav
             activeSection={activeSection}
             tab={tab}
             tabBadges={tabBadges}
             onTabChange={handleTabChange}
-          />
+          />}
 
           <ErrorBoundary key={tab}>
             {decisionTarget?.tab === tab && (

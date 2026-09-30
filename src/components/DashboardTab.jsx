@@ -1,99 +1,89 @@
-import React, { useMemo } from "react";
-import { fmtM, gameDayToDate } from '../utils';
+import React, { useState } from 'react';
+import { Play, ListChecks, Smiley, SmileyMeh, FirstAid } from '@phosphor-icons/react';
+import { gameDayToDate } from '../utils';
 import { getMyMatchup } from '../engine/scheduleLookup';
-import { MAX_ROSTER } from '../constants';
-import { TodayGameCard, RecommendationCard, TeamConditionCard, DashboardKpiGrid, FeaturedPlayersCard } from './dashboard/ManagerDashboardCards';
-import {
-  buildDecisionInsights,
-  buildTeamConditions,
-} from '../engine/analysisComparison';
+import { buildTeamConditions } from '../engine/analysisComparison';
+import { DashboardOverview } from './DashboardOverview';
 
-export function DashboardTab({
-  myTeam,
-  teams,
-  schedule,
-  gameDay,
-  recentResults,
-  pendingTradeCount = 0,
-  faPool,
-  onTabSwitch,
-  onPlayerClick,
-}) {
-  const leagueStandings = useMemo(() => {
-    if (!myTeam || !teams) return { rank: 0, gb: 0, total: 0 };
-    const sameLeagueTeams = [...teams.filter(t => t.league === myTeam.league)].sort((a, b) => {
-      const aWinPct = a.wins / Math.max(1, a.wins + a.losses);
-      const bWinPct = b.wins / Math.max(1, b.wins + b.losses);
-      return bWinPct - aWinPct || (b.rf - b.ra) - (a.rf - a.ra);
-    });
-    const rank = sameLeagueTeams.findIndex(t => t.id === myTeam.id) + 1;
-    const leader = sameLeagueTeams[0];
-    const gamesBehind = rank === 1 ? 0 : ((leader.wins - myTeam.wins) + (myTeam.losses - leader.losses)) / 2;
-    return { rank, gb: gamesBehind, total: sameLeagueTeams.length };
-  }, [myTeam, teams]);
+export function playerCondition(player) {
+  if ((player.injuryDaysLeft ?? 0) > 0) return { label: '負傷中', tone: 'injured', Icon: FirstAid };
+  const value = player.condition ?? 70;
+  return value >= 80 ? { label: '良好', tone: 'good', Icon: Smiley }
+    : value >= 60 ? { label: '普通', tone: 'normal', Icon: SmileyMeh }
+      : { label: '疲労あり', tone: 'tired', Icon: SmileyMeh };
+}
 
-  const todayGame = useMemo(() => {
-    if (!schedule || !myTeam) return null;
-    const matchup = getMyMatchup(schedule, gameDay, myTeam.id);
-    if (!matchup) return null;
-    const opponent = teams.find(t => t.id === matchup.oppId);
-    const date = gameDayToDate(gameDay, schedule);
-    if (!opponent || !date) return null;
-    return { opponent, isHome: matchup.isHome, date, isInterleague: matchup.isInterleague };
-  }, [schedule, gameDay, myTeam, teams]);
+export function getDashboardLineup(team) {
+  const fielding = (team.rosterDhMode ?? team.dhEnabled) ? team.fieldingDh : team.fieldingNoDh;
+  return (team.lineup ?? []).map((id, index) => {
+    const player = (team.players ?? []).find(p => p.id === id);
+    return player ? { player, order: index + 1, position: fielding?.[id] ?? player.pos } : null;
+  }).filter(Boolean);
+}
 
-  const recommendationItems = useMemo(() => {
-    if (!myTeam) return [];
-    const items = [];
-    const over = myTeam.players.filter(p => !p.isIkusei).length - MAX_ROSTER;
-    if (over > 0) items.push({ tone: 'danger', title: `ロースター枠超過 +${over}人`, reason: '一軍登録枠を超えています。編成タブで調整が必要です。', tab: 'roster' });
-    const expiring = myTeam.players.filter(p => (p.contractYearsLeft ?? 99) <= 1 && !p.isIkusei).length;
-    if (expiring > 0) items.push({ tone: 'warning', title: `契約満了予定 ${expiring}人`, reason: '契約延長の判断を先送りすると戦力低下リスクがあります。', tab: 'contract' });
-    const injured = myTeam.players.filter(p => (p.injuryDaysLeft ?? 0) > 0).length;
-    if (injured > 0) items.push({ tone: 'warning', title: `負傷中 ${injured}人`, reason: '起用見直しと二軍入れ替えを検討してください。', tab: 'roster' });
-    if (pendingTradeCount > 0) items.push({ tone: 'danger', title: `トレードオファー ${pendingTradeCount}件`, reason: '期限切れ前に受諾・拒否の意思決定が必要です。', tab: 'mailbox' });
-    const playerInsights = buildDecisionInsights({ myTeam, teams })
-      .map((item) => ({ ...item, teamName: myTeam.name }));
-    items.push(...playerInsights);
-    if (items.length === 0) {
-      items.push({ tone: 'good', title: '大きな緊急課題なし', reason: '今日は試合準備と先発起用の確認を優先しましょう。', tab: 'schedule' });
-    }
-    return items.slice(0, 3);
-  }, [myTeam, pendingTradeCount, teams]);
-  const teamConditions = useMemo(() => buildTeamConditions(myTeam), [myTeam]);
+function Condition({ player }) {
+  const { label, tone, Icon } = playerCondition(player);
+  return <span className={`calm-condition ${tone}`}><Icon size={22} aria-hidden="true" />{label}</span>;
+}
 
+export function DashboardTab({ myTeam, teams = [], schedule, gameDay, year,
+  onTabSwitch, onPlayerClick, onStartGame, disableStart = false, recentResults = [], pendingTradeCount = 0, faPool }) {
+  const [selectedId, setSelectedId] = useState(null);
+  const [detailView, setDetailView] = useState('ability');
   if (!myTeam) return null;
-
-  const winPct = myTeam.wins + myTeam.losses > 0 ? (myTeam.wins / (myTeam.wins + myTeam.losses)).toFixed(3).replace(/^0/, '') : '.000';
-  const runDiff = (myTeam.rf ?? 0) - (myTeam.ra ?? 0);
-  const recentWins = recentResults.filter(r => r.won).length;
-  const recentLosses = recentResults.filter(r => !r.won && !r.drew).length;
-  const rpg = Number((myTeam.rf ?? 0) / Math.max(1, myTeam.wins + myTeam.losses)) || 0;
-  const rapg = Number((myTeam.ra ?? 0) / Math.max(1, myTeam.wins + myTeam.losses)) || 0;
-
-  const featuredPlayers = [...(myTeam.players || [])]
-    .filter(Boolean)
-    .sort((a, b) => (b.war ?? 0) - (a.war ?? 0))
-    .slice(0, 3);
-
-  return (
-    <div className="manager-dashboard-grid">
-      <TodayGameCard todayGame={todayGame} gameDay={gameDay} onGoGame={() => onTabSwitch('game_action')} />
-      <RecommendationCard
-        items={recommendationItems}
-        onTabSwitch={onTabSwitch}
-        onPlayerClick={onPlayerClick}
-      />
-      <TeamConditionCard
-        runDiff={runDiff}
-        recentWins={recentWins}
-        recentLosses={recentLosses}
-        winPct={winPct}
-        budgetLabel={fmtM(myTeam.budget ?? 0)}
-        conditions={teamConditions}
-      />
-      <DashboardKpiGrid rank={leagueStandings.rank} wins={myTeam.wins} losses={myTeam.losses} rpg={rpg} rapg={rapg} />
-      <FeaturedPlayersCard players={featuredPlayers} onPlayerClick={onPlayerClick} teamName={myTeam.name} />
+  const lineup = getDashboardLineup(myTeam);
+  const batters = (myTeam.players ?? []).filter(p => !p.isPitcher);
+  const selected = batters.find(p => p.id === selectedId) ?? lineup[0]?.player ?? batters[0];
+  const bench = batters.filter(p => !(myTeam.lineup ?? []).includes(p.id));
+  const matchup = schedule ? getMyMatchup(schedule, gameDay, myTeam.id) : null;
+  const opponent = teams.find(t => t.id === matchup?.oppId);
+  const date = gameDayToDate(gameDay, schedule);
+  const conditions = buildTeamConditions(myTeam);
+  const expiring = (myTeam.players ?? []).filter(p => !p.isIkusei && (p.contractYearsLeft ?? 99) <= 1).length;
+  const stats = selected?.stats ?? {};
+  const avg = stats.AB > 0 ? ((stats.H ?? 0) / stats.AB).toFixed(3).replace(/^0/, '') : '—';
+  return <main className="calm-dashboard">
+    <h1>コンディションを見て、今日のオーダーを。</h1>
+    <section className="calm-fixture" aria-label="本日の試合">
+      {opponent && date ? <>
+        <div className="calm-matchup"><strong>{myTeam.name}</strong><span>VS</span><strong>{opponent.name}</strong></div>
+        <p>{matchup.isHome ? 'ホーム' : 'アウェー'} / {year ? `${year}年 ` : ''}{`${date.month}/${date.day} Game ${gameDay}`}</p>
+      </> : <p>本日の対戦予定はありません <span lang="en">(No scheduled game)</span></p>}
+    </section>
+    <div className="calm-workspace">
+      <section className="calm-lineup" aria-labelledby="lineup-heading">
+        <h2 id="lineup-heading">現在の打線設定</h2>
+        <p className="calm-note">試合開始時の自動編成・DH設定により変更される場合があります。</p>
+        <div className="calm-table-scroll"><table>
+          <thead><tr><th scope="col">打順</th><th scope="col">選手</th><th scope="col">守備</th><th scope="col">体調</th></tr></thead>
+          <tbody>{lineup.map(({ player, order, position }) => <tr key={player.id} className={selected?.id === player.id ? 'selected' : ''}>
+            <td>{order}</td><td><button type="button" aria-pressed={selected?.id === player.id} onClick={() => setSelectedId(player.id)}>{player.name}</button></td>
+            <td>{position}</td><td><Condition player={player} /></td>
+          </tr>)}</tbody>
+        </table></div>
+        {!lineup.length && <p className="calm-empty">打線が未設定です。「オーダーを確認」から設定してください。</p>}
+        <div className="calm-bench"><h3>ベンチ野手</h3><div>{bench.map(p => <button type="button" key={p.id} aria-pressed={selected?.id === p.id} onClick={() => setSelectedId(p.id)}>{p.name} <small>{p.pos}</small></button>)}{!bench.length && <p>控え野手はいません</p>}</div></div>
+      </section>
+      <section className="calm-player" aria-labelledby="player-heading">
+        <h2 id="player-heading">選手詳細</h2>
+        {selected ? <><div className="calm-player-name"><h3>{selected.name}</h3><p>{selected.pos} / {selected.age ?? '—'}歳</p></div>
+          <div className="calm-detail-tabs" aria-label="表示内容">{[['ability', '能力'], ['stats', '成績']].map(([id, label]) => <button type="button" key={id} aria-pressed={detailView === id} onClick={() => setDetailView(id)}>{label}</button>)}</div>
+          {detailView === 'ability' ? <div className="calm-abilities">{[['contact', 'ミート'], ['power', 'パワー'], ['speed', '走力']].map(([key, label]) => {
+            const value = selected.batting?.[key];
+            return <div key={key}><span>{label}</span><strong>{value == null ? '—' : Math.round(value)}</strong>{value != null && <meter aria-label={label} min="0" max="100" value={value} />}</div>;
+          })}</div> : <dl className="calm-stats"><div><dt>打率</dt><dd>{avg}</dd></div><div><dt>本塁打</dt><dd>{stats.HR ?? 0}</dd></div><div><dt>打点</dt><dd>{stats.RBI ?? 0}</dd></div></dl>}
+          <div className="calm-player-condition"><span>体調</span><Condition player={selected} /><p>体調 {selected.condition ?? 70}/100 · 調子 {Math.round(selected.form ?? 50)}/100</p></div>
+          <button type="button" className="calm-secondary calm-wide" onClick={() => onPlayerClick?.(selected, myTeam.name)}>選手詳細を開く</button>
+        </> : <p className="calm-empty">表示できる野手がいません</p>}
+      </section>
     </div>
-  );
+    <div className="calm-actions">
+      <button type="button" className="calm-secondary" onClick={() => onTabSwitch('roster')}><ListChecks size={22} aria-hidden="true" />オーダーを確認</button>
+      <button type="button" className="calm-primary" disabled={!opponent || !date || disableStart} onClick={() => onStartGame ? onStartGame() : onTabSwitch('game_action')}><Play size={22} weight="fill" aria-hidden="true" />試合へ進む</button>
+    </div>
+    <section className="calm-notices" aria-label="チームの状況とお知らせ"><h2>チームの状況</h2><p>{conditions.map(c => c.label ?? c.text ?? '').filter(Boolean).join(' / ')}</p>
+      {expiring > 0 && <button type="button" onClick={() => onTabSwitch('contract')}>契約満了予定 {expiring}人 — 契約を確認</button>}
+    </section>
+    <details className="calm-overview"><summary>球団概況・おすすめ・注目選手</summary><div className="calm-legacy"><DashboardOverview myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} recentResults={recentResults} pendingTradeCount={pendingTradeCount} faPool={faPool} onTabSwitch={onTabSwitch} onPlayerClick={onPlayerClick} onStartGame={onStartGame} /></div></details>
+  </main>;
 }

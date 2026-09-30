@@ -70,6 +70,8 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
     return (
       <DashboardTab
         myTeam={myTeam}
+        onStartGame={sf.handleStartGame}
+        disableStart={Boolean(sf.batchProgress)}
         teams={teams}
         schedule={schedule}
         gameDay={gameDay}
