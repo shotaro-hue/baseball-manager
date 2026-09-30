@@ -687,6 +687,9 @@ function initGameState(myTeam, oppTeam, options = {}) {
     myPitcherMustBeReplaced: false,
     myBatIdx: 0, opBatIdx: 0,
     myPitcher: myStarter, opPitcher: opStarter,
+    // Game roles are independent of a player's registered pitching subtype.
+    myStartingPitcherId: myStarter?.id,
+    opStartingPitcherId: opStarter?.id,
     myPitchCount: 0, opPitchCount: 0,
     myPitcherState: makePitcherState(1, !isMyHome),
     opPitcherState: makePitcherState(1, isMyHome),
@@ -1006,7 +1009,7 @@ function replacePitcherInBattingOrder(lineup, currentPitcherId, nextPitcher, fix
 }
 
 // バッチシム用: 先発→中継ぎ→セットアッパー→抑えの流れを意識して自動継投
-function autoSwapPitcher(gs, side) {
+export function autoSwapPitcher(gs, side) {
   const pitcher = side === 'my' ? gs.myPitcher : gs.opPitcher;
   const pitchCount = side === 'my' ? gs.myPitchCount : gs.opPitchCount;
   const pitcherState = side === 'my' ? gs.myPitcherState : gs.opPitcherState;
@@ -1017,7 +1020,8 @@ function autoSwapPitcher(gs, side) {
 
   const myLead = gs.score.my - gs.score.opp;
   const lead = side === 'my' ? myLead : -myLead;
-  const isStarter = pitcher?.subtype === '先発';
+  const startingPitcherId = side === 'my' ? gs.myStartingPitcherId : gs.opStartingPitcherId;
+  const isStarter = startingPitcherId != null && pitcher?.id === startingPitcherId;
   const isReliever = !isStarter;
   const isLate = gs.inning >= 7;
   const isExtra = gs.inning >= 10;
