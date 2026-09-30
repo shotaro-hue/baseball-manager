@@ -1,5 +1,6 @@
 import { rng, rngf, clamp } from '../utils';
 import { PITCH_NORM, PITCH_HARD_CAP, FATIGUE_WARNING, FATIGUE_LIMIT, PHYSICS_BAT } from '../constants';
+import { reliefPitchBudget } from './reliefWorkload';
 import { calcSprayAngle, classifyBattedBallType, resolveFieldSideBySprayAngle, sanitizeEnvironment, simulateFlight } from './physics';
 import { STADIUMS, TEAM_STADIUM } from './stadiums';
 import { getFenceDistanceBySpray, evaluateTrajectoryAgainstPark, evaluateAcrossParks } from './parkEffects';
@@ -1031,11 +1032,13 @@ export function autoSwapPitcher(gs, side) {
   const fatigueWarning = effectiveFatigue >= FATIGUE_WARNING || pitchCount >= PITCH_HARD_CAP;
   const fatigueLimit   = effectiveFatigue >= FATIGUE_LIMIT   || pitchCount >= PITCH_HARD_CAP;
   const battersFaced = pitcherState?.battersFaced || 0;
-  const startedPreviousDefensiveFrame = Boolean(pitcherState) && pitcherState.enteredInning !== gs.inning;
+  const betweenInnings = gs.outs === 0 && !gs.bases.some(Boolean)
+    && Boolean(pitcherState) && pitcherState.enteredInning !== gs.inning;
+  const reliefRole = pitcherState?.role ?? 'middle';
+  const pitchBudget = reliefPitchBudget(pitcher, reliefRole);
 
   const saveSituation = gs.inning >= 9 && lead >= 1 && lead <= 3;
   const setupSituation = gs.inning === 8 && lead >= 0 && lead <= 3;
-  const bridgeSituation = gs.inning >= 6 && gs.inning <= 7 && lead >= -2 && lead <= 4;
   const leverageCrisis = isLate && isCloseGame && runnersInScoringPosition && gs.outs >= 1;
 
   const starterShouldYield = isStarter && (
@@ -1045,13 +1048,18 @@ export function autoSwapPitcher(gs, side) {
     || (leverageCrisis && effectiveFatigue >= Math.max(FATIGUE_WARNING - 10, 50))
   );
 
-  const hasCloserInBullpen = bullpen.some(p => p.subtype === '抑え');
+  const availableBullpen = bullpen.filter(p => (p.injuryDaysLeft ?? 0) <= 0);
+  const restedBullpen = availableBullpen.filter(p => (p.condition ?? 70) >= 60);
+  const hasCloserInBullpen = restedBullpen.some(p => p.subtype === '抑え');
+  const reliefLimit = isReliever && pitchCount >= pitchBudget + 15;
   const relieverShouldYield = isReliever && (
-    fatigueLimit
+    fatigueLimit || reliefLimit
     || (fatigueWarning && battersFaced >= 4)
-    || (startedPreviousDefensiveFrame && battersFaced >= 3)
-    || (saveSituation && pitcher?.subtype !== '抑え' && hasCloserInBullpen)  // ブルペンに抑えがいる場合のみ交代
-    || (setupSituation && effectiveFatigue >= Math.max(FATIGUE_WARNING - 15, 30))
+    || (betweenInnings && pitchCount >= pitchBudget)
+    || (pitchCount >= pitchBudget + 10 && battersFaced >= 3)
+    || (leverageCrisis && pitchCount >= pitchBudget * 0.7 && battersFaced >= 3)
+    || (betweenInnings && saveSituation && reliefRole !== 'closer'
+      && hasCloserInBullpen && pitchCount >= 15)
   );
 
   if (!starterShouldYield && !relieverShouldYield) return gs;
@@ -1064,15 +1072,17 @@ export function autoSwapPitcher(gs, side) {
       ? 'setup'
       : seventhSituation
         ? 'seventh'
-        : (isExtra || lead <= -2)
+        : (gs.inning <= 5 || isExtra || Math.abs(lead) >= 4)
           ? 'long'
           : 'middle';
 
-  const nextPitcher = pickBullpenArm(bullpen, targetRole, pattern);
+  // Avoid elective changes to tired arms; emergency limits can use the remaining healthy arms.
+  const candidates = fatigueLimit || reliefLimit ? availableBullpen : restedBullpen;
+  const nextPitcher = pickBullpenArm(candidates, targetRole, pattern);
   if (!nextPitcher) return gs;
 
   const newBullpen = bullpen.filter(p => p.id !== nextPitcher.id);
-  const resetState = makePitcherState(gs.inning, gs.isTop);
+  const resetState = { ...makePitcherState(gs.inning, gs.isTop), role: targetRole };
 
   if (side === 'my') {
     const nextMyLineup = replacePitcherInBattingOrder(gs.myLineup, pitcher?.id, nextPitcher, gs.myPitcherBattingSlotIndex);

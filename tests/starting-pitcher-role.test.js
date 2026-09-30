@@ -32,7 +32,7 @@ describe('game starting-pitcher roles', () => {
   it.each(['my', 'opp'])('uses relief rules for starter-registered bullpen arms on %s side', side => {
     const gs = makeState();
     const key = side === 'my' ? 'my' : 'op';
-    const next = autoSwapPitcher({ ...gs, [`${key}Pitcher`]: pitcher(10, '先発') }, side);
+    const next = autoSwapPitcher({ ...gs, [`${key}Pitcher`]: pitcher(10, '先発'), [`${key}PitchCount`]: 40 }, side);
     expect(next[`${key}Pitcher`].id).toBe(side === 'my' ? 2 : 3);
   });
   it('retains a pitcher when no replacement is available', () => {
