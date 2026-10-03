@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { CaretRight } from '@phosphor-icons/react';
+import '../calm-ui.css';
+import '../mobile-flow.css';
 import { cancelDeferredPostGameWork, scheduleDeferredPostGameWork } from "../engine/postGameProcessing";
 
 const INITIAL_VISIBLE_RESULTS = 8;
@@ -46,6 +49,7 @@ export function BatchResultScreen({
   batchMeta,
   myTeam,
   onEnd,
+  onReviewRoster,
   onViewDetail,
   isBatchProcessing: isBatchProcessingProp,
   initialVisibleCount,
@@ -91,132 +95,31 @@ export function BatchResultScreen({
   const visibleResults = useMemo(() => (results || []).slice(0, visibleCount), [results, visibleCount]);
   const hasMoreResults = (results?.length || 0) > visibleCount;
 
-  const rankDelta = batchMeta ? batchMeta.beforeRank - batchMeta.afterRank : 0;
-  const rankColor = rankDelta > 0 ? "#34d399" : rankDelta < 0 ? "#f87171" : "#94a3b8";
-  const rankArrow = rankDelta > 0 ? "▲" : rankDelta < 0 ? "▼" : "-";
-
-  return (
-    <div className="app">
-      <div style={{ maxWidth: 680, margin: "0 auto", padding: "16px 12px" }}>
-        <div className="card" style={{ textAlign: "center", marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: 42, letterSpacing: ".1em", color: summary.wins > summary.losses ? "#f5c842" : summary.wins < summary.losses ? "#f87171" : "#94a3b8", marginBottom: 4 }}>
-            {summary.wins}勝 {summary.losses}敗
-          </div>
-          <div style={{ fontSize: 12, color: "#374151", marginBottom: 10 }}>
-            第{summary.startGameNo ?? "-"}〜第{summary.endGameNo ?? "-"}戦 / {summary.totalGames}試合
-          </div>
-          {isBatchProcessing && (
-            <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 10 }}>
-              結果を整理中...
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-            {visibleResults.map((result, index) => (
-              <button
-                key={`${result?.gameNo || index}-${result?.oppTeam?.short || "opp"}`}
-                onClick={() => onViewDetail(result)}
-                className={`bsm ${result?.won ? "bga" : "bgr"}`}
-                style={{ minWidth: 70, padding: "7px 10px", fontSize: 12 }}
-              >
-                <span style={{ fontSize: 9, display: "block", color: "inherit", opacity: 0.7 }}>第{result?.gameNo}戦</span>
-                {result?.oppTeam?.short} {result?.score?.my}-{result?.score?.opp}
-                <span style={{ marginLeft: 4 }}>{result?.won ? "○" : "●"}</span>
-              </button>
-            ))}
-          </div>
-          {hasMoreResults && (
-            <button
-              className="bsm"
-              onClick={() => setVisibleCount((count) => Math.min((results?.length || 0), count + VISIBLE_RESULTS_STEP))}
-              style={{ marginTop: 10, padding: "7px 14px", fontSize: 11 }}
-            >
-              続きを表示
-            </button>
-          )}
-        </div>
-
-        {batchMeta && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
-            <div className="card" style={{ padding: "12px 10px", textAlign: "center", marginBottom: 0 }}>
-              <div className="card-h" style={{ marginBottom: 8 }}>順位変動</div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                <span style={{ fontSize: 18, color: "#94a3b8" }}>{batchMeta.beforeRank}位</span>
-                <span style={{ fontSize: 14, color: rankColor, fontWeight: 700 }}>{rankArrow}</span>
-                <span style={{ fontSize: 22, fontWeight: 700, color: rankColor }}>{batchMeta.afterRank}位</span>
-              </div>
-              <div style={{ fontSize: 10, color: "#374151", marginTop: 6 }}>
-                {batchMeta.beforeRecord.w}勝{batchMeta.beforeRecord.l}敗
-                <span style={{ margin: "0 4px" }}>→</span>
-                {batchMeta.afterRecord.w}勝{batchMeta.afterRecord.l}敗
-              </div>
-            </div>
-
-            <div className="card" style={{ padding: "12px 10px", marginBottom: 0 }}>
-              <div className="card-h" style={{ marginBottom: 8 }}>打撃ハイライト</div>
-              {!detailData ? (
-                <div style={{ fontSize: 11, color: "#374151" }}>集計中...</div>
-              ) : detailData.hrList.length > 0 ? (
-                detailData.hrList.map(([name, count], index) => (
-                  <div key={`${name}-${index}`} style={{ fontSize: 11, color: "#f5c842", marginBottom: 2 }}>
-                    ★ {name} <span style={{ fontWeight: 700 }}>{count}HR</span>
-                  </div>
-                ))
-              ) : (
-                <div style={{ fontSize: 11, color: "#374151" }}>本塁打なし</div>
-              )}
-              {detailData?.biggestWin && (
-                <div style={{ fontSize: 10, color: "#34d399", marginTop: 4 }}>
-                  最大勝利 {detailData.biggestWin.my}-{detailData.biggestWin.opp} vs {detailData.biggestWin.oppName}
-                </div>
-              )}
-              {detailData?.biggestLoss && (
-                <div style={{ fontSize: 10, color: "#f87171", marginTop: 2 }}>
-                  最大敗戦 {detailData.biggestLoss.my}-{detailData.biggestLoss.opp} vs {detailData.biggestLoss.oppName}
-                </div>
-              )}
-            </div>
-
-            <div className="card" style={{ padding: "12px 10px", marginBottom: 0 }}>
-              <div className="card-h" style={{ marginBottom: 8 }}>負傷アラート</div>
-              {isBatchProcessing ? (
-                <div style={{ fontSize: 11, color: "#374151" }}>整理中...</div>
-              ) : batchMeta.injuries.length === 0 ? (
-                <div style={{ fontSize: 11, color: "#374151" }}>負傷なし</div>
-              ) : (
-                batchMeta.injuries.slice(0, 4).map((injury, index) => (
-                  <div key={`${injury.name}-${index}`} style={{ fontSize: 10, color: injury.days >= 31 ? "#f87171" : injury.days >= 15 ? "#f5c842" : "#94a3b8", marginBottom: 3 }}>
-                    {injury.name}
-                    <span style={{ fontSize: 9, color: "#374151", marginLeft: 3 }}>{injury.type} {injury.days}日</span>
-                  </div>
-                ))
-              )}
-              {!isBatchProcessing && batchMeta.injuries.length > 4 && (
-                <div style={{ fontSize: 9, color: "#374151" }}>他{batchMeta.injuries.length - 4}件</div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {batchMeta && !isBatchProcessing && batchMeta.cpuHighlights.length > 0 && (
-          <div className="card" style={{ marginBottom: 12 }}>
-            <div className="card-h">同日リーグ注目試合</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              {batchMeta.cpuHighlights.slice(0, 5).map((highlight, index) => (
-                <div key={index} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 6px", background: "rgba(0,0,0,.2)", borderRadius: 5, fontSize: 11 }}>
-                  <span style={{ color: highlight.homeTeam.color || "#94a3b8" }}>{highlight.homeTeam.emoji} {highlight.homeTeam.short}</span>
-                  <span style={{ fontFamily: "'Share Tech Mono',monospace", fontWeight: 700, color: highlight.homeWon ? "#f5c842" : "#f87171" }}>{highlight.homeScore}</span>
-                  <span style={{ color: "#374151" }}>-</span>
-                  <span style={{ fontFamily: "'Share Tech Mono',monospace", fontWeight: 700, color: !highlight.homeWon ? "#f5c842" : "#f87171" }}>{highlight.awayScore}</span>
-                  <span style={{ color: highlight.awayTeam.color || "#94a3b8" }}>{highlight.awayTeam.emoji} {highlight.awayTeam.short}</span>
-                  <span className={`bsm ${highlight.label === "大敗" ? "bgr" : "bga"}`} style={{ marginLeft: "auto", padding: "1px 6px", fontSize: 9 }}>{highlight.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <button className="sim-btn" onClick={onEnd}>ハブに戻る →</button>
-      </div>
-    </div>
-  );
+  const draws = (results || []).filter(r => r.drew || r.score?.my === r.score?.opp).length;
+  const losses = Math.max(0, summary.totalGames - summary.wins - draws);
+  const tired = (myTeam?.players || []).filter(p => (p.condition ?? 70)<60 || (p.injuryDaysLeft || 0)>0);
+  return <div className="app" style={{background:'#fff'}}><main className="flow-screen flow-batch">
+    <p className="flow-muted">{myTeam?.name || myTeam?.short}</p><h1>{summary.totalGames}試合の結果</h1>
+    <p className="flow-muted">第{summary.startGameNo ?? '—'}〜第{summary.endGameNo ?? '—'}戦</p>
+    <section className="flow-summary"><strong>{summary.wins}勝 {losses}敗{draws>0 && ` ${draws}分`}</strong>
+      {batchMeta && <p>順位 {batchMeta.beforeRank}位 → {batchMeta.afterRank}位</p>}
+      {isBatchProcessing && <p role="status">結果を整理中...</p>}
+    </section>
+    {tired.length>0 && <div className="flow-warning">疲労・負傷のある選手が{tired.length}人{onReviewRoster && <button className="flow-link" onClick={onReviewRoster}>編成で確認</button>}</div>}
+    <section className="flow-section"><h2>打撃ハイライト</h2>
+      {!detailData ? <p className="flow-muted">集計中...</p> : detailData.hrList.length ? detailData.hrList.map(([name,count])=><div className="flow-row" key={name}><strong>{name}</strong><span>{count}本塁打</span></div>) : <p className="flow-muted">本塁打なし</p>}
+    </section>
+    <section className="flow-section"><h2>試合別の結果</h2>
+      {visibleResults.map((r,i)=><button className="flow-row" key={`${r.gameNo}-${i}`} onClick={()=>onViewDetail?.(r)}><span><small>第{r.gameNo}戦</small>{r.oppTeam?.short || r.oppTeam?.name || '相手球団'}</span><strong>{r.score?.my ?? '—'} − {r.score?.opp ?? '—'}</strong><span className={`flow-outcome ${r.drew || r.score?.my===r.score?.opp ? 'draw' : r.won ? 'win':'loss'}`}>{r.drew || r.score?.my===r.score?.opp ? '分' : r.won ? '勝':'敗'}</span><CaretRight size={18}/></button>)}
+      {!summary.totalGames && <p className="flow-muted">試合結果はありません</p>}
+      {hasMoreResults && <button className="flow-link" onClick={()=>setVisibleCount(n=>Math.min(results.length,n+VISIBLE_RESULTS_STEP))}>続きを表示</button>}
+    </section>
+    {batchMeta && <details className="flow-section"><summary>負傷・リーグの詳細</summary>
+      <h2>負傷アラート</h2>{!(batchMeta.injuries || []).length && <p>負傷なし</p>}{(batchMeta.injuries || []).map((r,i)=><p key={i}>{r.name} · {r.type} · {r.days}日</p>)}
+      <h2>リーグ注目試合</h2>{(batchMeta.cpuHighlights || []).map((h,i)=><p key={i}>{h.homeTeam?.short} {h.homeScore} − {h.awayScore} {h.awayTeam?.short} · {h.label}</p>)}
+      {detailData?.biggestWin && <p>最大勝利 {detailData.biggestWin.my} − {detailData.biggestWin.opp} vs {detailData.biggestWin.oppName}</p>}
+      {detailData?.biggestLoss && <p>最大敗戦 {detailData.biggestLoss.my} − {detailData.biggestLoss.opp} vs {detailData.biggestLoss.oppName}</p>}
+    </details>}
+    <div className="flow-actions">{onReviewRoster && <button className="calm-primary" onClick={onReviewRoster}>編成を見直す</button>}<button className="calm-secondary" onClick={onEnd}>ホームへ戻る</button></div>
+  </main></div>;
 }

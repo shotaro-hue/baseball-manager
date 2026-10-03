@@ -12,7 +12,8 @@ export default function BatchResultRoute({
       results={sf.batchResults}
       batchMeta={sf.batchMeta}
       myTeam={myTeam}
-      onEnd={() => setScreen('hub')}
+      onEnd={() => { gs.setTab('dashboard'); setScreen('hub'); }}
+      onReviewRoster={() => { gs.setTab('roster'); setScreen('hub'); }}
       onViewDetail={(result) => {
         const detail = gs.getGameResultsMap()?.[result.gameNo];
         if (!detail) return;

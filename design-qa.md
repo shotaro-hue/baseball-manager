@@ -1,40 +1,24 @@
-# Calm Dugout UI — visual verification pending
+# Mobile Calm Dugout — first implementation pass
 
 final result: blocked
 
-The user authorized implementation and a draft GitHub PR without agent visual verification on 2026-09-30, and will perform the visual check themselves. Do not merge based on this report.
+Approved targets: mobile home, roster, player detail and batch-result mocks from the 2026-09-30 conversation (390 × 844 CSS target). Source files: exec-4a511f8f-3e45-4bf2-9736-a693691ff520.png, exec-aa023279-1043-4de5-8194-96eabef36665.png, exec-577ff1b9-35c0-499b-b223-aadb641f3663.png, exec-c6270fb9-128f-4623-ae05-4c81f5f17dca.png under /workspace/scratch/66c5379939ed/generated_images/.
 
-## Source
+## Blocker
+Managed preview startup failed with `sh: 1: vite: not found`. Local build and tests resolve the existing dependency symlink successfully. No browser screenshots, interactions, console check, density normalization or full/focused visual comparison were completed. Typography, spacing, colors, assets and content fidelity remain unverified. User explicitly opted to perform visual review; publish as draft, not visually verified completion.
 
-Selected third displayed design: `generated_images/exec-34726bb3-9c2e-42fb-833d-5a082196215c.png` in the conversation workspace. Desktop light blue/white home with lineup and player detail pane. Target design frame: 1440 × 1024. Actual source file: 1488 × 1056.
+## Scope
+Mobile home, tap-based lineup order/replacement, fullscreen player detail, progressive seasonal metrics, batch results, five primary navigation destinations. Desktop home is retained. All existing administration tabs remain reachable. No simulation cancellation/checkpoint or data-retention changes.
 
-## Evidence and limitations
+## Intentional differences and remaining work
+Detailed roster/pitching/development controls remain in an expandable existing panel. Batted-ball and career analysis retain dark inner surfaces; schedule, individual result and administration screens still need full visual unification. Team labels use existing product identity rather than invented image assets. The mock player-history list and games-behind changes are not fabricated when absent from component inputs.
 
-- Browser implementation screenshot: unavailable. Local preview was reported running, but cloud browser returned `net::ERR_BLOCKED_BY_CLIENT`.
-- Viewport, density normalization, full-view and focused visual comparison: not performed.
-- Browser primary interaction tests and console inspection: not performed.
-- No visual fidelity or responsive acceptance claim is made.
+## Manual review before merge
+- Check 390px and 360px layouts, long names, safe areas and no page-wide horizontal overflow.
+- Open simulation settings, choose count/automation, run and verify progress/results.
+- Reorder/replace players, confirm assigned defense and validate lineup before play.
+- Open/close player detail from a scrolled roster; confirm focus/scroll restoration and access to advanced analysis.
+- Open batch game details; return to roster/home.
+- Check every old tab under the five navigation groups and desktop regressions.
 
-## Intentional implementation differences
-
-- First pass covers home and shared navigation, not all legacy screens or modals.
-- Team names are text; mock team logo imagery is not fabricated or used as an official asset.
-- Displays all configured lineup slots, not the mock's incomplete seven-player lineup.
-- Current lineup is explicitly labeled as saved configuration, not a guaranteed match-day lineup; the existing simulation prepares DH/automatic lineups.
-- Condition labels use the existing condition thresholds. Form is displayed separately.
-- Existing overview, recommendations and featured players remain available in a collapsed section; batch controls likewise remain accessible.
-- Legacy expanded controls and modals retain their existing dark styling to avoid unsafe blanket overrides.
-
-## User visual checklist
-
-- Typography: readable Japanese labels, no clipped names at 390px and desktop widths.
-- Layout: desktop lineup/detail split; mobile stacked sections; no page-wide horizontal overflow.
-- Colors: white/pale blue home, dark text, visible hover/focus/selected states.
-- Assets: standard Phosphor UI icons, no mock logos or mock player statistics.
-- Content: date/opponent match next game; correct assigned fielding, all lineup members, actual ability and statistics.
-- Interactions: select different starters/bench players, switch ability/stats, open player modal, navigate roster and return, start game, expand batch controls and overview, save.
-- Verify injury, empty lineup, end-of-season and batch-running states.
-
-## Comparison history
-
-No browser comparison iteration was possible. Await user screenshots/review before marking visual QA passed.
+This PR is the first implementation pass, not completion of the entire UI refresh.
