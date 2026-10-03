@@ -33,6 +33,7 @@ export default function HubSimPanel({
 
   return (
     <div
+      className="flow-sim-panel"
       style={{
         display: 'grid',
         gridTemplateColumns: '1fr 1fr 1fr',
@@ -44,6 +45,7 @@ export default function HubSimPanel({
         className="sim-btn"
         style={{ margin: 0, fontSize: 12 }}
         onClick={onStartGame}
+        disabled={Boolean(batchProgress) || remain <= 0}
       >
         1試合
         <br />

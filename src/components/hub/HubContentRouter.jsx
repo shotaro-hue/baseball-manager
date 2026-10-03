@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { DashboardTab } from '../DashboardTab';
+import { MobileHome } from '../MobileHome';
 import { ContractTab } from '../tabs/ContractTab';
 import { NewsTab } from '../tabs/NewsTab';
 import { MailboxTab } from '../tabs/MailboxTab';
@@ -68,7 +69,11 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
 
   if (tab === 'dashboard') {
     return (
-      <DashboardTab
+      <>
+      <MobileHome myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year}
+        recentResults={gs.recentResults} onTabSwitch={onTabChange} onStartGame={sf.handleStartGame}
+        onBatchSim={sf.handleBatchSim} onSeasonSim={sf.handleSeasonSim} batchProgress={sf.batchProgress}/>
+      <div className="desktop-dashboard"><DashboardTab
         myTeam={myTeam}
         onStartGame={sf.handleStartGame}
         disableStart={Boolean(sf.batchProgress)}
@@ -83,7 +88,8 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
         onPlayerClick={gs.handlePlayerClick}
         unreadMailboxCount={unreadMailboxCount}
         latestNewsId={latestNewsId}
-      />
+      /></div>
+      </>
     );
   }
 

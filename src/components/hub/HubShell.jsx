@@ -10,8 +10,9 @@ import HubSimPanel from './HubSimPanel';
 import HubTabsNav from './HubTabsNav';
 import HubContentRouter from './HubContentRouter';
 import HubBottomNav from './HubBottomNav';
-import { House, CalendarBlank, Users, ChartBar, Flask, Envelope } from '@phosphor-icons/react';
+import { House, CalendarBlank, Users, ChartBar, DotsThree } from '@phosphor-icons/react';
 import '../../calm-ui.css';
+import '../../mobile-flow.css';
 import {
   PlayerComparisonDialog,
   PlayerComparisonTray,
@@ -26,29 +27,21 @@ const PRIMARY_SECTIONS = [
     tabs: [['dashboard', 'ダッシュボード']],
   },
   {
-    id: 'game',
-    label: '日程',
-    icon: <CalendarBlank size={22} />,
-    defaultTab: 'schedule',
-    tabs: [['schedule', '日程']],
-  },
-  {
     id: 'rosterOps',
     label: '編成',
     icon: <Users size={22} />,
     defaultTab: 'roster',
     tabs: [
       ['roster', 'ロスター'],
-      ['trade', 'トレード'],
-      ['contract', '契約'],
-      ['fa', 'FA'],
-      ['scout', 'スカウト'],
-      ['finance', '球団運営'],
     ],
   },
   {
+    id: 'game', label: '日程', icon: <CalendarBlank size={22} />,
+    defaultTab: 'schedule', tabs: [['schedule', '日程']],
+  },
+  {
     id: 'analysis',
-    label: '分析',
+    label: '成績',
     icon: <ChartBar size={22} />,
     defaultTab: 'stats',
     tabs: [
@@ -59,21 +52,20 @@ const PRIMARY_SECTIONS = [
     ],
   },
   {
-    id: 'developer',
-    label: '開発',
-    icon: <Flask size={22} />,
-    defaultTab: 'balance',
-    tabs: [['balance', 'バランス検証']],
-  },
-  {
-    id: 'inbox',
-    label: '受信箱',
-    icon: <Envelope size={22} />,
+    id: 'other',
+    label: 'その他',
+    icon: <DotsThree size={22} />,
     defaultTab: 'mailbox',
     tabs: [
       ['mailbox', 'メール'],
       ['news', 'ニュース'],
       ['alumni', 'OB'],
+      ['trade', 'トレード'],
+      ['contract', '契約'],
+      ['fa', 'FA'],
+      ['scout', 'スカウト'],
+      ['finance', '球団運営'],
+      ['balance', 'バランス検証'],
     ],
   },
 ];
@@ -142,7 +134,6 @@ export default function HubShell({ state, flows, app }) {
     (sectionId) => {
       const section = PRIMARY_SECTIONS.find((item) => item.id === sectionId);
       if (!section) return;
-      setCurrentPrimarySection(sectionId);
       const targetTab = sectionLastTab[sectionId] || section.defaultTab;
       handleTabChange(targetTab);
     },
@@ -195,7 +186,7 @@ export default function HubShell({ state, flows, app }) {
           <div className="primary-sidebar-list">
             {PRIMARY_SECTIONS.map((section) => {
               const badgeTab =
-                section.id === 'inbox'
+                section.id === 'other'
                   ? 'mailbox'
                   : section.id === 'rosterOps'
                     ? 'contract'
@@ -251,6 +242,7 @@ export default function HubShell({ state, flows, app }) {
           )}
 
           {gameDay <= SEASON_GAMES && tab !== 'dashboard' && (
+            <details className="flow-sim-settings"><summary>試合を進める</summary>
             <HubSimPanel
               gameDay={gameDay}
               schedule={schedule}
@@ -259,11 +251,11 @@ export default function HubShell({ state, flows, app }) {
               onStartGame={sf.handleStartGame}
               onBatchSim={sf.handleBatchSim}
               onSeasonSim={sf.handleSeasonSim}
-            />
+            /></details>
           )}
 
           {tab === 'dashboard' && gameDay <= SEASON_GAMES && (
-            <details className="calm-batch" open={sf.batchProgress ? true : undefined}>
+            <details className="calm-batch desktop-dashboard" open={sf.batchProgress ? true : undefined}>
               <summary>まとめて進行・自動編成</summary>
               <HubSimPanel gameDay={gameDay} schedule={schedule} remain={remain}
                 batchProgress={sf.batchProgress} onStartGame={sf.handleStartGame}

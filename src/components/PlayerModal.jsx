@@ -3,6 +3,8 @@ import { fmtSal, fmtAvg, fmtIP } from '../utils';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 import { CareerTable } from './tabs/CareerTable';
 import { BattedBallAnalysisPanel } from './BattedBallAnalysisPanel';
+import '../mobile-flow.css';
+import { playerCondition } from './DashboardTab';
 
 /* ═══════════════════════════════════════════════
    PLAYER DETAIL MODAL
@@ -10,23 +12,23 @@ import { BattedBallAnalysisPanel } from './BattedBallAnalysisPanel';
 
 function abilityGrade(v){
   if(v>=90) return{g:"S",c:"#e879f9"};
-  if(v>=80) return{g:"A",c:"#34d399"};
-  if(v>=65) return{g:"B",c:"#f5c842"};
-  if(v>=50) return{g:"C",c:"#94a3b8"};
+  if(v>=80) return{g:"A",c:"#14714b"};
+  if(v>=65) return{g:"B",c:"#805700"};
+  if(v>=50) return{g:"C",c:"#53657c"};
   if(v>=35) return{g:"D",c:"#f97316"};
-  return{g:"E",c:"#f87171"};
+  return{g:"E",c:"#b42332"};
 }
 
-function AbilityBar({label, value, color="#60a5fa"}){
+function AbilityBar({label, value, color="#095cc7"}){
   const pct=Math.round((value/99)*100);
   const {g,c}=abilityGrade(value);
   return(
     <div style={{marginBottom:5}}>
       <div style={{display:"flex",justifyContent:"space-between",marginBottom:2,alignItems:"center"}}>
-        <span style={{fontSize:10,color:"#94a3b8"}}>{label}</span>
+        <span style={{fontSize:14,color:"#53657c"}}>{label}</span>
         <div style={{display:"flex",alignItems:"center",gap:5}}>
-          <span style={{fontSize:9,fontWeight:700,color:c,background:"rgba(0,0,0,.3)",borderRadius:3,padding:"0 4px",minWidth:14,textAlign:"center"}}>{g}</span>
-          <span style={{fontSize:10,fontFamily:"monospace",color:c,fontWeight:700}}>{value}</span>
+          <span style={{fontSize:14,fontWeight:700,color:c,background:"rgba(0,0,0,.3)",borderRadius:3,padding:"0 4px",minWidth:14,textAlign:"center"}}>{g}</span>
+          <span style={{fontSize:14,fontFamily:"monospace",color:c,fontWeight:700}}>{value}</span>
         </div>
       </div>
       <div style={{height:4,background:"rgba(255,255,255,.08)",borderRadius:2,overflow:"hidden"}}>
@@ -50,10 +52,10 @@ const FIELD_POSITIONS = [
 ];
 
 function profColor(prof){
-  if(prof>=80) return "#34d399";
-  if(prof>=60) return "#f5c842";
+  if(prof>=80) return "#14714b";
+  if(prof>=60) return "#805700";
   if(prof>=40) return "#f97316";
-  return "#f87171";
+  return "#b42332";
 }
 
 function PositionDiamond({player, convertTarget, onSetConvertTarget}){
@@ -67,8 +69,8 @@ function PositionDiamond({player, convertTarget, onSetConvertTarget}){
   return(
     <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-        <span style={{fontSize:10,color:"#94a3b8",fontWeight:700,letterSpacing:".05em"}}>守備適正</span>
-        {onSetConvertTarget&&<span style={{fontSize:8,color:"#818cf8"}}>ポジションをクリックでコンバート指示</span>}
+        <span style={{fontSize:14,color:"#53657c",fontWeight:700,letterSpacing:".05em"}}>守備適正</span>
+        {onSetConvertTarget&&<span style={{fontSize:14,color:"#818cf8"}}>ポジションをクリックでコンバート指示</span>}
       </div>
 
       <svg viewBox="0 0 300 180" style={{width:"100%",display:"block",maxHeight:160}}>
@@ -86,7 +88,7 @@ function PositionDiamond({player, convertTarget, onSetConvertTarget}){
           const hasProf = prof != null;
           const canClick = onSetConvertTarget && !isPrimary;
 
-          const color = isPrimary ? "#60a5fa" : hasProf ? profColor(prof) : "rgba(255,255,255,.2)";
+          const color = isPrimary ? "#095cc7" : hasProf ? profColor(prof) : "rgba(255,255,255,.2)";
           const r     = isPrimary ? 15 : 12;
           const bgOpacity = isPrimary ? ".18" : hasProf ? ".12" : ".03";
 
@@ -120,13 +122,13 @@ function PositionDiamond({player, convertTarget, onSetConvertTarget}){
       {/* コンバート状態表示 */}
       {convertTarget && convertTarget !== player.pos && (
         <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:4,padding:"4px 8px",background:"rgba(129,140,248,.08)",borderRadius:6,border:"1px solid rgba(129,140,248,.2)"}}>
-          <span style={{fontSize:9,color:"#818cf8"}}>
+          <span style={{fontSize:14,color:"#818cf8"}}>
             ▶ {convertTarget}にコンバート中&nbsp;
             ({Math.round(positions[convertTarget]??0)}/100)
           </span>
           {onSetConvertTarget&&(
             <button
-              style={{fontSize:8,background:"none",border:"1px solid rgba(129,140,248,.3)",color:"#818cf8",borderRadius:3,padding:"1px 6px",cursor:"pointer"}}
+              style={{fontSize:14,background:"none",border:"1px solid rgba(129,140,248,.3)",color:"#818cf8",borderRadius:3,padding:"1px 6px",cursor:"pointer"}}
               onClick={()=>onSetConvertTarget(null)}
             >解除</button>
           )}
@@ -135,7 +137,7 @@ function PositionDiamond({player, convertTarget, onSetConvertTarget}){
 
       {/* 凡例 */}
       <div style={{display:"flex",gap:10,justifyContent:"center",marginTop:6}}>
-        {[["#60a5fa","主"],["#34d399","80+"],["#f5c842","60+"],["#f97316","40+"],["#f87171","~39"]].map(([c,l])=>(
+        {[["#095cc7","主"],["#14714b","80+"],["#805700","60+"],["#f97316","40+"],["#b42332","~39"]].map(([c,l])=>(
           <span key={l} style={{fontSize:7.5,color:c,display:"flex",alignItems:"center",gap:2}}>
             <span style={{width:6,height:6,borderRadius:"50%",background:c,display:"inline-block"}}/>
             {l}
@@ -174,9 +176,13 @@ export function PlayerModal({
   );
 
   useEffect(()=>{
+    if (typeof document === 'undefined') return;
+    const overflow = document.body.style.overflow;
+    const opener = document.activeElement;
+    document.body.style.overflow = 'hidden';
     const handler=(e)=>{if(e.key==="Escape")onClose();};
     window.addEventListener("keydown",handler);
-    return()=>window.removeEventListener("keydown",handler);
+    return()=>{window.removeEventListener("keydown",handler);document.body.style.overflow=overflow;opener?.focus?.({preventScroll:true});};
   },[onClose]);
 
   if(!p) return null;
@@ -185,7 +191,7 @@ export function PlayerModal({
   const sp=p.isPitcher?saberPitcher(p.stats):null;
 
   const phase=p.growthPhase==="growth"?"成長期":p.growthPhase==="peak"?"全盛期":p.growthPhase==="earlyDecline"?"衰退初期":"衰退期";
-  const phaseColor=p.growthPhase==="growth"?"#34d399":p.growthPhase==="peak"?"#f5c842":p.growthPhase==="earlyDecline"?"#f97316":"#f87171";
+  const phaseColor=p.growthPhase==="growth"?"#14714b":p.growthPhase==="peak"?"#805700":p.growthPhase==="earlyDecline"?"#f97316":"#b42332";
 
   const FA_DAYS = 120;
   const domDays = (p.entryType==='高卒'||p.entryType==='外国人') ? 8*FA_DAYS : 7*FA_DAYS;
@@ -213,28 +219,30 @@ export function PlayerModal({
 
   return(
     <div
-      className="player-modal-overlay"
+      className="player-modal-overlay calm-player-surface"
       role="dialog"
       aria-modal="true"
       aria-labelledby={`player-modal-title-${p.id}`}
       onClick={e=>{if(e.target===e.currentTarget)onClose();}}
     >
       <div className={`player-modal-card ${activeSection === "battedBall" ? "wide" : ""}`}>
+        <button type="button" className="player-detail-back" onClick={onClose}>元の画面に戻る</button>
+        <p className="flow-muted">{playerCondition(p).label} · コンディション {p.condition ?? 70}</p>
 
         {/* ヘッダー */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
           <div>
-            <div id={`player-modal-title-${p.id}`} style={{fontSize:16,fontWeight:700,color:"#e0d4bf",marginBottom:2}}>
+            <div id={`player-modal-title-${p.id}`} style={{fontSize:16,fontWeight:700,color:"#17243a",marginBottom:2}}>
               {safePlayerName}
-              {p.isForeign&&<span style={{fontSize:9,background:"rgba(96,165,250,.15)",color:"#60a5fa",border:"1px solid rgba(96,165,250,.3)",borderRadius:3,padding:"1px 5px",marginLeft:6}}>外国人</span>}
-              {p.育成&&<span style={{fontSize:9,background:"rgba(167,139,250,.15)",color:"#a78bfa",border:"1px solid rgba(167,139,250,.3)",borderRadius:3,padding:"1px 5px",marginLeft:4}}>育成</span>}
+              {p.isForeign&&<span style={{fontSize:14,background:"rgba(96,165,250,.15)",color:"#095cc7",border:"1px solid rgba(96,165,250,.3)",borderRadius:3,padding:"1px 5px",marginLeft:6}}>外国人</span>}
+              {p.育成&&<span style={{fontSize:14,background:"rgba(167,139,250,.15)",color:"#7050ad",border:"1px solid rgba(167,139,250,.3)",borderRadius:3,padding:"1px 5px",marginLeft:4}}>育成</span>}
             </div>
-            <div style={{fontSize:11,color:"#94a3b8"}}>
+            <div style={{fontSize:14,color:"#53657c"}}>
               {p.age}歳 / {p.pos}
-              {p.isPitcher&&safeSubtype&&safeSubtype!==p.pos&&<span style={{marginLeft:6,color:"#94a3b8"}}>（{safeSubtype}）</span>}
-              {p.isPitcher&&<span style={{marginLeft:6,color:p.hand==="left"?"#a78bfa":"#94a3b8"}}>{p.hand==="left"?"左投":"右投"}</span>}
+              {p.isPitcher&&safeSubtype&&safeSubtype!==p.pos&&<span style={{marginLeft:6,color:"#53657c"}}>（{safeSubtype}）</span>}
+              {p.isPitcher&&<span style={{marginLeft:6,color:p.hand==="left"?"#7050ad":"#53657c"}}>{p.hand==="left"?"左投":"右投"}</span>}
             </div>
-            {safeTeamName&&<div style={{fontSize:10,color:"#60a5fa",marginTop:2}}>{safeTeamName}</div>}
+            {safeTeamName&&<div style={{fontSize:14,color:"#095cc7",marginTop:2}}>{safeTeamName}</div>}
           </div>
           <div className="player-modal-header-actions">
             {onToggleCompare&&(
@@ -249,18 +257,18 @@ export function PlayerModal({
             <button
               onClick={onClose}
               aria-label="選手詳細を閉じる"
-              style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",color:"#94a3b8",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontSize:12}}
+              style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",color:"#53657c",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontSize:14}}
             >✕</button>
           </div>
         </div>
 
         {/* 状態バッジ行 */}
         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
-          <span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(255,255,255,.05)",color:phaseColor,border:`1px solid ${phaseColor}40`}}>{phase}</span>
-          <span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(255,255,255,.05)",color:"#94a3b8"}}>在籍 {Math.floor(days/FA_DAYS)||p.serviceYears||0} 年目</span>
-          <span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(255,255,255,.05)",color:p.isFA?"#f5c842":"#94a3b8"}}>{faLabel}</span>
-          {foreignExemptDays>0&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(96,165,250,.08)",color:"#60a5fa",border:"1px solid rgba(96,165,250,.25)"}}>外国人枠免除まで {foreignExemptDays}日</span>}
-          {(p.injuryDaysLeft??0)>0&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(248,113,113,.1)",color:"#f87171",border:"1px solid rgba(248,113,113,.3)"}}>🤕 {safeInjury}{safeInjuryPart ? ` [${safeInjuryPart}]` : ''} 残{p.injuryDaysLeft}試合</span>}
+          <span style={{fontSize:14,padding:"2px 8px",borderRadius:10,background:"rgba(255,255,255,.05)",color:phaseColor,border:`1px solid ${phaseColor}40`}}>{phase}</span>
+          <span style={{fontSize:14,padding:"2px 8px",borderRadius:10,background:"rgba(255,255,255,.05)",color:"#53657c"}}>在籍 {Math.floor(days/FA_DAYS)||p.serviceYears||0} 年目</span>
+          <span style={{fontSize:14,padding:"2px 8px",borderRadius:10,background:"rgba(255,255,255,.05)",color:p.isFA?"#805700":"#53657c"}}>{faLabel}</span>
+          {foreignExemptDays>0&&<span style={{fontSize:14,padding:"2px 8px",borderRadius:10,background:"rgba(96,165,250,.08)",color:"#095cc7",border:"1px solid rgba(96,165,250,.25)"}}>外国人枠免除まで {foreignExemptDays}日</span>}
+          {(p.injuryDaysLeft??0)>0&&<span style={{fontSize:14,padding:"2px 8px",borderRadius:10,background:"rgba(248,113,113,.1)",color:"#b42332",border:"1px solid rgba(248,113,113,.3)"}}>🤕 {safeInjury}{safeInjuryPart ? ` [${safeInjuryPart}]` : ''} 残{p.injuryDaysLeft}試合</span>}
         </div>
 
         {/* セクション切替 */}
@@ -286,27 +294,31 @@ export function PlayerModal({
 
         {activeSection==="profile"&&(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12,minWidth:0}}>
           <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}>
-            <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>能力値</div>
+            <div style={{fontSize:14,color:"#53657c",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>能力値</div>
             {p.isPitcher?(<><AbilityBar label="球速" value={p.pitching.velocity}/><AbilityBar label="制球" value={p.pitching.control}/><AbilityBar label="スタミナ" value={p.pitching.stamina}/><AbilityBar label="変化球" value={p.pitching.breaking}/><AbilityBar label="球種" value={p.pitching.variety}/><AbilityBar label="ピンチ" value={p.pitching.clutchP}/></>):(<><AbilityBar label="ミート" value={p.batting.contact}/><AbilityBar label="長打" value={p.batting.power}/><AbilityBar label="走力" value={p.batting.speed}/><AbilityBar label="守備" value={p.batting.defense}/><AbilityBar label="選球眼" value={p.batting.eye}/><AbilityBar label="クラッチ" value={p.batting.clutch}/></>)}
-            <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",justifyContent:"space-between"}}><span style={{fontSize:9,color:"#94a3b8"}}>潜在能力</span><span style={{fontSize:10,color:"#a78bfa",fontFamily:"monospace",fontWeight:700}}>{p.potential}</span></div>
+            <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",justifyContent:"space-between"}}><span style={{fontSize:14,color:"#53657c"}}>潜在能力</span><span style={{fontSize:14,color:"#7050ad",fontFamily:"monospace",fontWeight:700}}>{p.potential}</span></div>
           </div>
-          <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>契約</div><StatRow label="年俸" value={fmtSal(p.salary)} color="#f5c842"/><StatRow label="残年数" value={`${p.contractYearsLeft}年`} color={p.contractYearsLeft===0?"#f87171":undefined}/><div style={{marginTop:6,paddingTop:6,borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",justifyContent:"space-between"}}><span style={{fontSize:9,color:"#94a3b8"}}>モラル</span><span style={{fontSize:10,fontFamily:"monospace",color:(p.morale??70)>=80?"#34d399":(p.morale??70)>=60?"#f5c842":"#f87171"}}>{p.morale??70}</span></div><div style={{marginTop:4,display:"flex",justifyContent:"space-between"}}><span style={{fontSize:9,color:"#94a3b8"}}>コンディション</span><span style={{fontSize:10,fontFamily:"monospace",color:(p.condition??70)>=80?"#34d399":(p.condition??70)>=60?"#f5c842":"#f87171"}}>{p.condition??70}</span></div></div>
+          <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:14,color:"#53657c",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>契約</div><StatRow label="年俸" value={fmtSal(p.salary)} color="#805700"/><StatRow label="残年数" value={`${p.contractYearsLeft}年`} color={p.contractYearsLeft===0?"#b42332":undefined}/><div style={{marginTop:6,paddingTop:6,borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",justifyContent:"space-between"}}><span style={{fontSize:14,color:"#53657c"}}>モラル</span><span style={{fontSize:14,fontFamily:"monospace",color:(p.morale??70)>=80?"#14714b":(p.morale??70)>=60?"#805700":"#b42332"}}>{p.morale??70}</span></div><div style={{marginTop:4,display:"flex",justifyContent:"space-between"}}><span style={{fontSize:14,color:"#53657c"}}>コンディション</span><span style={{fontSize:14,fontFamily:"monospace",color:(p.condition??70)>=80?"#14714b":(p.condition??70)>=60?"#805700":"#b42332"}}>{p.condition??70}</span></div></div>
         </div>)}
 
         {activeSection==="stats"&&(
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12,minWidth:0}}>
+            <dl className="flow-metrics">
+              {p.isPitcher ? <><div><dt>防御率</dt><dd>{p.stats.IP>0?sp.ERA:'—'}</dd></div><div><dt>投球回</dt><dd>{p.stats.IP>0?fmtIP(p.stats.IP):'—'}</dd></div><div><dt>奪三振</dt><dd>{p.stats.Kp ?? 0}</dd></div></> : <><div><dt>打率</dt><dd>{p.stats.AB>0?fmtAvg(p.stats.H,p.stats.AB):'—'}</dd></div><div><dt>本塁打</dt><dd>{p.stats.HR ?? 0}</dd></div><div><dt>打点</dt><dd>{p.stats.RBI ?? 0}</dd></div></>}
+            </dl>
+            <details><summary className="player-detail-back">詳細指標を見る</summary>
             <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}>
-              <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>今季成績</div>
+              <div style={{fontSize:14,color:"#53657c",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>今季成績</div>
               {p.isPitcher ? (
                 <>
-                  <StatRow label="防御率" value={sp.ERA>0?sp.ERA:"---"} color={sp.ERA>0&&sp.ERA<3?"#34d399":sp.ERA<4?"#f5c842":sp.ERA>0?"#f87171":undefined}/>
+                  <StatRow label="防御率" value={p.stats.IP>0?sp.ERA:"---"} color={sp.ERA>0&&sp.ERA<3?"#14714b":sp.ERA<4?"#805700":sp.ERA>0?"#b42332":undefined}/>
                   <StatRow label="勝-敗" value={`${p.stats.W}-${p.stats.L}`}/>
                   <StatRow label="投球回" value={p.stats.IP>0?fmtIP(p.stats.IP):"---"}/>
                   <StatRow label="奪三振" value={p.stats.Kp||0}/>
-                  <StatRow label="WHIP" value={sp.WHIP>0?sp.WHIP:"---"} color={sp.WHIP>0&&sp.WHIP<1.0?"#34d399":sp.WHIP<1.3?"#f5c842":undefined}/>
+                  <StatRow label="WHIP" value={p.stats.IP>0?sp.WHIP:"---"} color={sp.WHIP>0&&sp.WHIP<1.0?"#14714b":sp.WHIP<1.3?"#805700":undefined}/>
                   <StatRow label="セーブ" value={p.stats.SV||0}/>
                   <StatRow label="ホールド" value={p.stats.HLD||0}/>
-                  <div style={{margin:"7px 0 5px",paddingTop:7,borderTop:"1px solid rgba(255,255,255,.06)",fontSize:10,color:"#94a3b8",fontWeight:700,letterSpacing:".05em"}}>打撃成績</div>
+                  <div style={{margin:"7px 0 5px",paddingTop:7,borderTop:"1px solid rgba(255,255,255,.06)",fontSize:14,color:"#53657c",fontWeight:700,letterSpacing:".05em"}}>打撃成績</div>
                   <StatRow label="打席" value={p.stats.PA||0}/>
                   <StatRow label="打数" value={p.stats.AB||0}/>
                   <StatRow label="打率" value={p.stats.AB>0?fmtAvg(p.stats.H,p.stats.AB):"---"}/>
@@ -317,25 +329,30 @@ export function PlayerModal({
                 </>
               ) : (
                 <>
-                  <StatRow label="打率" value={fmtAvg(p.stats.H,p.stats.AB)} color={p.stats.AB>0&&(p.stats.H/p.stats.AB)>=.300?"#34d399":(p.stats.H/p.stats.AB)>=.250?"#f5c842":undefined}/>
-                  <StatRow label="本塁打" value={p.stats.HR} color={p.stats.HR>=20?"#f5c842":undefined}/>
+                  <StatRow label="打率" value={fmtAvg(p.stats.H,p.stats.AB)} color={p.stats.AB>0&&(p.stats.H/p.stats.AB)>=.300?"#14714b":(p.stats.H/p.stats.AB)>=.250?"#805700":undefined}/>
+                  <StatRow label="本塁打" value={p.stats.HR} color={p.stats.HR>=20?"#805700":undefined}/>
                   <StatRow label="打点" value={p.stats.RBI}/>
-                  <StatRow label="OPS" value={sb.OPS>0?sb.OPS.toFixed(3):"---"} color={sb.OPS>=.850?"#34d399":sb.OPS>=.700?"#f5c842":undefined}/>
+                  <StatRow label="OPS" value={sb.OPS>0?sb.OPS.toFixed(3):"---"} color={sb.OPS>=.850?"#14714b":sb.OPS>=.700?"#805700":undefined}/>
                   <StatRow label="盗塁" value={p.stats.SB||0}/>
                   <StatRow label="出塁率" value={sb.OBP>0?sb.OBP.toFixed(3):"---"}/>
-                  <StatRow label="強打球率" value={sb.hardHitPct>0?`${(sb.hardHitPct*100).toFixed(1)}%`:"---"} color={sb.hardHitPct>=0.4?"#34d399":undefined}/>
+                  <StatRow label="強打球率" value={sb.hardHitPct>0?`${(sb.hardHitPct*100).toFixed(1)}%`:"---"} color={sb.hardHitPct>=0.4?"#14714b":undefined}/>
                 </>
               )}
             </div>
+            </details>
           </div>
         )}
 
         {activeSection === "battedBall" && !p.isPitcher && (
+          <div className="flow-legacy-analysis">
           <BattedBallAnalysisPanel player={p} saveId={saveId} year={year} teams={teams} teamName={teamName}/>
+          </div>
         )}
 
         {activeSection === "career" && (
+          <div className="flow-legacy-analysis">
           <CareerTable player={p} year={year} teamId={careerTeamId} teamName={teamName}/>
+          </div>
         )}
 
         {onNavigate&&(
@@ -355,8 +372,8 @@ export function PlayerModal({
 function StatRow({label,value,color}){
   return(
     <div style={{display:"flex",justifyContent:"space-between",padding:"2px 0"}}>
-      <span style={{fontSize:10,color:"#94a3b8"}}>{label}</span>
-      <span style={{fontSize:10,fontFamily:"monospace",color:color||"#e0d4bf",fontWeight:color?700:400}}>{value}</span>
+      <span style={{fontSize:14,color:"#53657c"}}>{label}</span>
+      <span style={{fontSize:14,fontFamily:"monospace",color:color||"#17243a",fontWeight:color?700:400}}>{value}</span>
     </div>
   );
 }

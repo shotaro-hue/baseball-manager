@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { MobileRoster } from '../MobileRoster';
 import { MAX_ROSTER, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL, DEV_GOALS_BATTER, DEV_GOALS_PITCHER, TALK_COOLDOWN_DAYS, POSITIONS, FIELDING_POSITIONS } from '../../constants';
 import { fmtAvg, fmtEra } from '../../utils';
 import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
@@ -133,6 +134,9 @@ export function RosterTab({team,allTeams,onReplaceLineup,onSetLineupOrder,onSetR
   };
   return(
     <div>
+      <MobileRoster team={team} onPlayerClick={onPlayerClick} onReplaceLineup={onReplaceLineup} onSetLineupOrder={onSetLineupOrder} onSetRosterDhMode={onSetRosterDhMode}/>
+      <details className="roster-full-settings" open={undefined}>
+      <summary>詳細な編成・育成設定</summary>
       <div className="card" style={{marginBottom:10,borderColor:"rgba(96,165,250,.28)",background:"rgba(30,64,175,.06)"}}>
         <div className="card-h" style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
           <span>🧭 起用方針</span>
@@ -623,6 +627,7 @@ export function RosterTab({team,allTeams,onReplaceLineup,onSetLineupOrder,onSetR
           {team.players.length===0&&<div style={{color:"#374151",fontSize:11}}>一軍選手なし</div>}
         </div>
       )}
+      </details>
     </div>
   );
 }
