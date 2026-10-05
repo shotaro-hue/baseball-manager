@@ -4,16 +4,15 @@ import {
   ACTIVE_ROSTER_FA_DAYS_PER_YEAR, MAX_外国人_一軍,
   MAX_ROSTER, CPU_FA_BUDGET_RESERVE_RATIO, CPU_FA_MIN_SCORE,
   CPU_FA_REBUILD_YOUNG_BONUS, CPU_FA_REBUILD_OLD_PENALTY, CPU_FA_CONTEND_VET_BONUS,
-  MAX_SALARY_CUT_RATIO, MIN_OFFER_RATIO, CPU_RENEWAL_ROUNDS,
-  CPU_TEAM_OFFER_HIGH_TV_RAISE, CPU_TEAM_OFFER_MID_TV_RAISE, CPU_TEAM_OFFER_LOW_TV_RAISE,
-  CPU_TEAM_ROUND2_GAP_CLOSE, CPU_TEAM_ROUND3_GAP_CLOSE,
-  PLAYER_DEMAND_RAISE_ELITE, PLAYER_DEMAND_RAISE_GOOD, PLAYER_DEMAND_RAISE_OK,
-  PLAYER_DEMAND_MONEY_EXTRA, PLAYER_RESISTANCE_HIGH_MORALE, PLAYER_RESISTANCE_LOW_MORALE,
+  CPU_RENEWAL_ROUNDS,
+  CPU_TEAM_ROUND2_GAP_CLOSE,
+  PLAYER_RESISTANCE_HIGH_MORALE, PLAYER_RESISTANCE_LOW_MORALE,
   NEGOTIATION_MORALE_ACCEPT_BONUS, NEGOTIATION_MORALE_CUT_PENALTY,
-  NEGOTIATION_MORALE_FORCE_PENALTY, NEGOTIATION_MORALE_ROUND_HIT,
+  NEGOTIATION_MORALE_ROUND_HIT,
   NEGOTIATION_TRUST_HAPPY, NEGOTIATION_TRUST_HOLDOUT, NEGOTIATION_TRUST_RELEASED,
 } from '../constants';
-import { tradeValue, analyzeTeamNeeds, getFrontOfficePlanPublic } from './trade';
+import { analyzeTeamNeeds, getFrontOfficePlanPublic } from './trade';
+import { calculateSalaryDemand, renewalSalaryFloor } from './salaryDemand';
 
 /* ═══════════════════════════════════════════════
    FA 資格閾値 (NPB公式準拠・累積日数方式)
@@ -34,68 +33,42 @@ export function getFaThreshold(player) {
    選手が要求する年俸・抵抗係数を算出する
 ═══════════════════════════════════════════════ */
 
-export function calcPlayerDemand(player) {
-  const stats = player.stats || {};
-  const p     = player.personality || {};
-
-  // パフォーマンスティア判定
-  let tier;
-  if (player.isPitcher) {
-    const ip  = stats.IP || 0;
-    const era = (stats.BF || 0) > 0 ? (stats.ER || 0) / Math.max(ip, 0.1) * 9 : 9;
-    if      (ip >= 120 && era <= 2.80) tier = 'elite';
-    else if (ip >= 80  && era <= 4.00) tier = 'good';
-    else if (ip >= 40)                 tier = 'ok';
-    else                               tier = 'poor';
-  } else {
-    const pa  = stats.PA || 0;
-    const obp = pa > 0
-      ? ((stats.H || 0) + (stats.BB || 0) + (stats.HBP || 0))
-        / Math.max(1, (stats.AB || 0) + (stats.BB || 0) + (stats.HBP || 0) + (stats.SF || 0))
-      : 0.300;
-    if      (pa >= 400 && obp >= 0.370) tier = 'elite';
-    else if (pa >= 300 && obp >= 0.330) tier = 'good';
-    else if (pa >= 200)                 tier = 'ok';
-    else                                tier = 'poor';
-  }
-
-  // 基本要求増額率
-  let raise = tier === 'elite' ? PLAYER_DEMAND_RAISE_ELITE + (p.money || 50) / 100 * 0.20
-            : tier === 'good'  ? PLAYER_DEMAND_RAISE_GOOD
-            : tier === 'ok'    ? PLAYER_DEMAND_RAISE_OK
-            :                    0.00;
-
-  if ((p.money || 50) > 70) raise += PLAYER_DEMAND_MONEY_EXTRA;
-
+export function calcPlayerDemand(player, context = {}) {
+  const demand = calculateSalaryDemand(player, context);
+  const money = player.personality?.money ?? 50;
   const morale = player.morale ?? 70;
-  if (morale >= 80) raise += 0.05;
-  if (morale <= 40) raise -= 0.05;
-  raise = clamp(raise, -0.10, 0.55);
-
-  // 抵抗係数（高いほど強気: 1ラウンド目の受諾閾値が上がる）
-  let resistance = 0.50;
-  if ((p.money || 50) >= 70)                     resistance += 0.15;
-  if (morale >= PLAYER_RESISTANCE_HIGH_MORALE)   resistance += 0.15;
-  if (morale <= PLAYER_RESISTANCE_LOW_MORALE)    resistance -= 0.20;
-  if ((player.serviceYears || 0) >= 8)           resistance += 0.10;
-  resistance = clamp(resistance, 0.10, 0.95);
-
-  const demandSalary    = Math.max(MIN_SALARY_SHIHAKA, Math.round(player.salary * (1 + raise) / 100) * 100);
-  const minAcceptSalary = Math.max(MIN_SALARY_SHIHAKA, Math.round(player.salary * MIN_OFFER_RATIO / 100) * 100);
-
-  return { demandSalary, minAcceptSalary, resistanceFactor: resistance };
+  let resistance = .5;
+  if (money >= 70) resistance += .15;
+  if (morale >= PLAYER_RESISTANCE_HIGH_MORALE) resistance += .15;
+  if (morale <= PLAYER_RESISTANCE_LOW_MORALE) resistance -= .2;
+  if ((player.serviceYears ?? 0) >= 8) resistance += .1;
+  return { ...demand, resistanceFactor: clamp(resistance, .1, .95) };
 }
 
+export function evaluateRenewalOffer(player, offer, team, teams, demand, round = 1) {
+  const floor = demand.minOfferSalary ?? renewalSalaryFloor(player);
+  const salary = Number(offer.salary);
+  const years = Number(offer.years);
+  const valid = Number.isFinite(salary) && salary >= floor && Number.isInteger(years) && years >= 1 && years <= 7;
+  if (!valid) return { accepted: false, valid: false, score: null, reason: '提示下限または契約年数を満たしていません' };
+  const defaults = { money:50, winning:50, playing:50, hometown:30, loyalty:50, stability:50, future:50 };
+  const normalized = { ...player, trust: player.trust ?? 50, personality: { ...defaults, ...player.personality } };
+  const pitchScore = player.isPitcher
+    ? ((team.rotation || []).includes(player.id) ? 85 : /中継ぎ|抑え|救援/.test(player.subtype || player.pos || '') ? 75 : 40)
+    : undefined;
+  const score = evalOffer(normalized, offer, team, teams, { referenceSalary: demand.demandSalary, playingScore: pitchScore }).total;
+  const threshold = round === 1 ? ACCEPT_THRESHOLD + Math.round((demand.resistanceFactor ?? .5) * 20) : ACCEPT_THRESHOLD;
+  const accepted = salary >= demand.demandSalary || (salary >= (demand.minAcceptSalary ?? floor) && score >= threshold);
+  return { accepted, valid: true, score, threshold, reason: accepted ? '合意' : '要求額・契約条件の再検討が必要です' };
+}
 /* ═══════════════════════════════════════════════
    MULTI-ROUND NEGOTIATION SIMULATION
    CPU球団と選手間の交渉を最大3ラウンドでシミュレートする
 ═══════════════════════════════════════════════ */
 
-export function simulateNegotiationRounds(player, team, allTeams, demandSalary, resistanceFactor) {
-  const minAllowed = Math.max(
-    MIN_SALARY_SHIHAKA,
-    Math.round(player.salary * MIN_OFFER_RATIO / 100) * 100,
-  );
+export function simulateNegotiationRounds(player, team, allTeams, demandSalary, resistanceFactor, demandDetails = {}) {
+  const minAllowed = renewalSalaryFloor(player);
+  const demand = { ...demandDetails, demandSalary, resistanceFactor, minOfferSalary: minAllowed };
   const threshold = getFaThreshold(player);
   const days      = player.daysOnActiveRoster ?? (player.serviceYears ?? 0) * ACTIVE_ROSTER_FA_DAYS_PER_YEAR;
   const isFA      = days >= threshold.domestic;
@@ -104,19 +77,14 @@ export function simulateNegotiationRounds(player, team, allTeams, demandSalary, 
   let moraleDelta = 0;
   let trustDelta  = 0;
 
-  const tv = tradeValue(player);
-  const r1raise = tv >= 70 ? CPU_TEAM_OFFER_HIGH_TV_RAISE
-                : tv >= 50 ? CPU_TEAM_OFFER_MID_TV_RAISE
-                :            CPU_TEAM_OFFER_LOW_TV_RAISE;
-
-  const initialOffer = Math.max(minAllowed, Math.round(player.salary * (1 + r1raise) / 100) * 100);
+  const initialOffer = Math.min(demandSalary, Math.max(minAllowed, Math.round(demandSalary * .85 / 100) * 100));
   const gap          = Math.max(0, demandSalary - initialOffer);
 
   for (let round = 1; round <= CPU_RENEWAL_ROUNDS; round++) {
     let offered;
     if      (round === 1) offered = initialOffer;
     else if (round === 2) offered = Math.min(demandSalary, Math.round((initialOffer + gap * CPU_TEAM_ROUND2_GAP_CLOSE) / 100) * 100);
-    else                  offered = Math.min(demandSalary, Math.round((initialOffer + gap * CPU_TEAM_ROUND3_GAP_CLOSE) / 100) * 100);
+    else                  offered = demandSalary;
     offered = clamp(offered, minAllowed, demandSalary);
 
     if (budget < offered) {
@@ -125,13 +93,8 @@ export function simulateNegotiationRounds(player, team, allTeams, demandSalary, 
         : { result: 'released',   finalSalary: 0, years: 0, rounds: round, moraleDelta: -10, trustDelta: NEGOTIATION_TRUST_RELEASED };
     }
 
-    const score = evalOffer(player, { salary: offered, years: 1 }, team, allTeams).total;
-    // 1ラウンド目は抵抗係数で閾値を引き上げる（強気な選手は簡単に折れない）
-    const acceptScore = round === 1
-      ? ACCEPT_THRESHOLD + Math.round(resistanceFactor * 20)
-      : ACCEPT_THRESHOLD;
-
-    if (score >= acceptScore) {
+    const evaluation = evaluateRenewalOffer(player, { salary: offered, years: 1 }, team, allTeams, demand, round);
+    if (evaluation.accepted) {
       if (offered >= demandSalary)        moraleDelta += NEGOTIATION_MORALE_ACCEPT_BONUS;
       if (offered < player.salary * 0.90) moraleDelta += NEGOTIATION_MORALE_CUT_PENALTY;
       if (round > 1)                      moraleDelta += NEGOTIATION_MORALE_ROUND_HIT * (round - 1);
@@ -141,18 +104,7 @@ export function simulateNegotiationRounds(player, team, allTeams, demandSalary, 
     }
   }
 
-  // 3ラウンド決裂
-  if (!isFA && budget >= minAllowed) {
-    // 非FA: 球団保有権 → 最低提示額で強制更改
-    return {
-      result: 'signed',
-      finalSalary: minAllowed,
-      years: 1,
-      rounds: CPU_RENEWAL_ROUNDS,
-      moraleDelta: NEGOTIATION_MORALE_FORCE_PENALTY + NEGOTIATION_MORALE_ROUND_HIT * 2,
-      trustDelta: NEGOTIATION_TRUST_HOLDOUT,
-    };
-  }
+  // No forced agreement: renewal acceptance always uses the shared evaluator.
   return {
     result: isFA ? 'fa_declared' : 'released',
     finalSalary: 0,
@@ -167,7 +119,7 @@ export function simulateNegotiationRounds(player, team, allTeams, demandSalary, 
    CONTRACT EVALUATION
 ═══════════════════════════════════════════════ */
 
-export function evalOffer(player, offer, myTeam, allTeams) {
+export function evalOffer(player, offer, myTeam, allTeams, options = {}) {
   const p = player.personality || { money:50, winning:50, playing:50, hometown:30, loyalty:50, stability:50, future:50 };
   const g = myTeam.wins + myTeam.losses;
   const winPct = g > 0 ? myTeam.wins / g : 0.5;
@@ -176,10 +128,10 @@ export function evalOffer(player, offer, myTeam, allTeams) {
     .sort((a, b) => b.wins - a.wins)
     .findIndex((t) => t.id === myTeam.id) + 1;
 
-  const moneyScore = clamp((offer.salary / Math.max(player.salary, MIN_SALARY_SHIHAKA)) * 60 + 20, 0, 100);
+  const moneyScore = clamp((offer.salary / Math.max(options.referenceSalary ?? player.salary, MIN_SALARY_SHIHAKA)) * 60 + 20, 0, 100);
   const winScore = clamp(winPct * 100 * 1.2, 0, 100);
   const rankScore = clamp((7 - rank) / 6 * 100, 0, 100);
-  const playScore = myTeam.lineup.includes(player.id) ? 85 : 40;
+  const playScore = options.playingScore ?? ((myTeam.lineup || []).includes(player.id) ? 85 : 40);
   const homeScore = myTeam.city === player.hometown ? 80 : 30;
   const trustScore = clamp(player.trust, 0, 100);
   const avgAge = myTeam.players.reduce((s, x) => s + x.age, 0) / Math.max(myTeam.players.length, 1);
@@ -227,7 +179,7 @@ export function evalOffer(player, offer, myTeam, allTeams) {
    オフシーズンに CPU 球団が満了選手と再契約する
 ═══════════════════════════════════════════════ */
 
-export function cpuRenewContracts(teams, myId, allTeams) {
+export function cpuRenewContracts(teams, myId, allTeams, salaryContext = {}) {
   const updatedTeams = [];
   const newFaPlayers = [];
   const news = [];
@@ -274,8 +226,8 @@ export function cpuRenewContracts(teams, myId, allTeams) {
       }
 
       // 非FA / FA資格あり: マルチラウンド交渉シミュレーション
-      const { demandSalary, resistanceFactor } = calcPlayerDemand(p);
-      const neg = simulateNegotiationRounds(p, { ...t, budget }, allTeams, demandSalary, resistanceFactor);
+      const demand = calcPlayerDemand(p, { ...salaryContext, team: t, teams: allTeams });
+      const neg = simulateNegotiationRounds(p, { ...t, budget }, allTeams, demand.demandSalary, demand.resistanceFactor, demand);
 
       if (neg.result === 'signed') {
         players = players.map(x => x.id === p.id ? {
