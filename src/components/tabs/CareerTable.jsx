@@ -24,7 +24,7 @@ export function CareerTable({player,year,teamId,teamName,includeCurrentSeason=tr
       setIsLoading(true);
       try{
         const mod = await loadCareerSaveModule();
-        const detailLog=await mod.loadPlayerCareerLogById(String(player?.id||""));
+        const detailLog=await mod.loadPlayerCareerLogById(String(player?.id??""));
         const fallbackRecentLog = Array.isArray(player?.recentCareerLog) ? player.recentCareerLog : [];
         const nextLog = Array.isArray(detailLog) && detailLog.length > 0 ? detailLog : fallbackRecentLog;
         if(alive) setLog(nextLog);
@@ -40,7 +40,7 @@ export function CareerTable({player,year,teamId,teamName,includeCurrentSeason=tr
     return()=>{alive=false;};
   },[player?.id,player?.recentCareerLog]);
 
-  if(isLoading) return <div style={{marginTop:8,fontSize:10,color:"#94a3b8"}}>成績を読み込み中...</div>;
+  if(isLoading) return <div style={{marginTop:8,fontSize:14,color:"#53657c"}}>成績を読み込み中...</div>;
   const displayLog=mergeCareerLogWithCurrentSeason(log,{
     include:includeCurrentSeason,
     year,
@@ -49,7 +49,7 @@ export function CareerTable({player,year,teamId,teamName,includeCurrentSeason=tr
     stats:player?.stats,
     playoffStats:player?.playoffStats,
   });
-  if(displayLog.length===0) return null;
+  if(displayLog.length===0) return <p className="flow-muted" role="status">保存された年度別成績はありません。</p>;
   const hasPlayoff=displayLog.some(r=>{const ps=r.playoffStats||emptyStats();return ps.PA>0||ps.BF>0||ps.IP>0;});
   const ip=player.isPitcher;
 
@@ -98,13 +98,13 @@ export function CareerTable({player,year,teamId,teamName,includeCurrentSeason=tr
   const totalWHIP=weightedRate("WHIP","IP",s=>saberPitcher(s).WHIP);
 
   return(
-    <div style={{marginTop:8,background:"rgba(0,0,0,.2)",borderRadius:6,padding:"8px 10px"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-        <div style={{fontSize:10,color:"#f5c842",fontWeight:700}}>📅 年度別成績</div>
+    <div className="calm-detail career-detail" style={{marginTop:8,background:"#f6f9fd",borderRadius:6,padding:"8px 10px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:6}}>
+        <div style={{fontSize:14,color:"#805700",fontWeight:700}}>📅 年度別成績</div>
         {hasPlayoff&&(
           <div style={{display:"flex",gap:4}}>
-            <button onClick={()=>setMode("regular")} style={{padding:"2px 8px",fontSize:9,borderRadius:3,border:"none",cursor:"pointer",background:mode==="regular"?"#f5c842":"rgba(255,255,255,.08)",color:mode==="regular"?"#0f1923":"#94a3b8"}}>レギュラー</button>
-            <button onClick={()=>setMode("playoff")} style={{padding:"2px 8px",fontSize:9,borderRadius:3,border:"none",cursor:"pointer",background:mode==="playoff"?"#a78bfa":"rgba(255,255,255,.08)",color:mode==="playoff"?"#fff":"#94a3b8"}}>ポスト</button>
+            <button aria-pressed={mode==="regular"} onClick={()=>setMode("regular")} style={{padding:"2px 8px",fontSize:14,borderRadius:3,border:"none",cursor:"pointer",background:mode==="regular"?"#dcecff":"#edf4fc",color:mode==="regular"?"#0f1923":"#53657c"}}>レギュラー</button>
+            <button aria-pressed={mode==="playoff"} onClick={()=>setMode("playoff")} style={{padding:"2px 8px",fontSize:14,borderRadius:3,border:"none",cursor:"pointer",background:mode==="playoff"?"#dcecff":"#edf4fc",color:mode==="playoff"?"#095cc7":"#53657c"}}>ポスト</button>
           </div>
         )}
       </div>
@@ -112,25 +112,25 @@ export function CareerTable({player,year,teamId,teamName,includeCurrentSeason=tr
         <div style={{marginBottom:10}}>
           <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}>
             {metrics.map(m=>(
-              <button key={m.key} onClick={()=>setMetricKey(m.key)} style={{fontSize:9,padding:"2px 7px",borderRadius:10,cursor:"pointer",background:metricKey===m.key?"rgba(245,200,66,.15)":"transparent",color:metricKey===m.key?"#f5c842":"#6b7280",border:metricKey===m.key?"1px solid rgba(245,200,66,.5)":"1px solid rgba(255,255,255,.08)"}}>
+              <button key={m.key} aria-pressed={metricKey===m.key} onClick={()=>setMetricKey(m.key)} style={{fontSize:14,padding:"2px 7px",borderRadius:10,cursor:"pointer",background:metricKey===m.key?"rgba(245,200,66,.15)":"transparent",color:metricKey===m.key?"#805700":"#53657c",border:metricKey===m.key?"1px solid rgba(245,200,66,.5)":"1px solid #edf4fc"}}>
                 {m.label}
               </button>
             ))}
           </div>
           <ResponsiveContainer width="100%" height={120}>
             <LineChart data={chartData} margin={{top:4,right:8,bottom:0,left:-20}}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.05)"/>
-              <XAxis dataKey="year" tick={{fill:"#6b7280",fontSize:9}}/>
-              <YAxis tick={{fill:"#6b7280",fontSize:9}} width={36}/>
-              <Tooltip contentStyle={{background:"#0b1c30",border:"1px solid rgba(245,200,66,.3)",borderRadius:6,fontSize:10}} labelStyle={{color:"#f5c842"}} itemStyle={{color:"#c0cfe0"}} formatter={v=>[typeof v==="number"?(activeMet.isCount?String(v):v.toFixed(3)):v,activeMet.label]}/>
-              <Line type="monotone" dataKey="value" stroke="#f5c842" strokeWidth={2} dot={{r:3,fill:"#f5c842"}} activeDot={{r:5}}/>
+              <CartesianGrid strokeDasharray="3 3" stroke="#dce6f2"/>
+              <XAxis dataKey="year" tick={{fill:"#53657c",fontSize:14}}/>
+              <YAxis tick={{fill:"#53657c",fontSize:14}} width={36}/>
+              <Tooltip contentStyle={{background:"#fff",border:"1px solid rgba(245,200,66,.3)",borderRadius:6,fontSize:14}} labelStyle={{color:"#805700"}} itemStyle={{color:"#334962"}} formatter={v=>[typeof v==="number"?(activeMet.isCount?String(v):v.toFixed(3)):v,activeMet.label]}/>
+              <Line type="monotone" dataKey="value" stroke="#805700" strokeWidth={2} dot={{r:3,fill:"#805700"}} activeDot={{r:5}}/>
             </LineChart>
           </ResponsiveContainer>
         </div>
       )}
-      <div style={{overflowX:"auto"}}>
+      <div className="detail-table-scroll" tabIndex={0} role="region" aria-label="成績一覧。横にスクロールできます">
         {ip&&(
-          <table className="tbl" style={{fontSize:9,width:"100%"}}>
+          <table className="tbl" style={{fontSize:14,width:"100%"}}>
             <thead>
               <tr><th>年度</th><th>チーム</th><th>防御率</th><th>勝</th><th>負</th><th>S</th><th>回</th><th>K</th><th>WHIP</th></tr>
             </thead>
@@ -140,47 +140,47 @@ export function CareerTable({player,year,teamId,teamName,includeCurrentSeason=tr
                 if(mode==="playoff"&&s.BF===0&&s.IP===0) return null;
                 return(
                   <tr key={row.year+"-p-"+ri}>
-                    <td className="mono" style={{color:"#f5c842"}}>{row.year}</td>
-                    <td className="mono" style={{color:"#94a3b8",maxWidth:60,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.teamName||""}</td>
-                    <td className="mono">{pitcherRate(s,"ERA")}</td>
-                    <td className="mono" style={{color:"#34d399"}}>{s.W}</td>
-                    <td className="mono" style={{color:"#f87171"}}>{s.L}</td>
+                    <td className="mono" style={{color:"#805700"}}>{row.year}</td>
+                    <td className="mono" style={{color:"#53657c",maxWidth:60,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.teamName||""}</td>
+                    <td className="mono">{s.IP>0?pitcherRate(s,"ERA").toFixed(2):"---"}</td>
+                    <td className="mono" style={{color:"#14714b"}}>{s.W}</td>
+                    <td className="mono" style={{color:"#b42332"}}>{s.L}</td>
                     <td className="mono">{s.SV}</td>
                     <td className="mono">{fmtIP(s.IP)}</td>
                     <td className="mono">{s.Kp}</td>
-                    <td className="mono">{pitcherRate(s,"WHIP")}</td>
+                    <td className="mono">{s.IP>0?pitcherRate(s,"WHIP").toFixed(2):"---"}</td>
                   </tr>
                 );
               })}
               {hasTotals&&(
                 <tr style={{background:"rgba(245,200,66,.06)",fontWeight:700}}>
-                  <td style={{color:"#f5c842",fontSize:9}}>通算</td>
+                  <td style={{color:"#805700",fontSize:14}}>通算</td>
                   <td></td>
-                  <td className="mono">{totalERA>0?totalERA.toFixed(2):"---"}</td>
-                  <td className="mono" style={{color:"#34d399"}}>{totals.W}</td>
-                  <td className="mono" style={{color:"#f87171"}}>{totals.L}</td>
+                  <td className="mono">{totals.IP>0?totalERA.toFixed(2):"---"}</td>
+                  <td className="mono" style={{color:"#14714b"}}>{totals.W}</td>
+                  <td className="mono" style={{color:"#b42332"}}>{totals.L}</td>
                   <td className="mono">{totals.SV}</td>
                   <td className="mono">{fmtIP(totals.IP)}</td>
                   <td className="mono">{totals.Kp}</td>
-                  <td className="mono">{totalWHIP>0?totalWHIP.toFixed(2):"---"}</td>
+                  <td className="mono">{totals.IP>0?totalWHIP.toFixed(2):"---"}</td>
                 </tr>
               )}
             </tbody>
           </table>
         )}
         {ip&&totals.PA>0&&(
-          <table className="tbl" style={{fontSize:9,width:"100%",marginTop:8}}>
+          <table className="tbl" style={{fontSize:14,width:"100%",marginTop:8}}>
             <thead><tr><th>年度</th><th>打席</th><th>打数</th><th>打率</th><th>安打</th><th>犠打</th></tr></thead>
             <tbody>
               {[...displayLog].reverse().map((row,ri)=>{const s=getS(row);if(s.PA===0)return null;return(
-                <tr key={row.year+"-pb-"+ri}><td className="mono" style={{color:"#f5c842"}}>{row.year}</td><td className="mono">{s.PA}</td><td className="mono">{s.AB}</td><td className="mono">{fmtAvg(s.H,s.AB)}</td><td className="mono">{s.H}</td><td className="mono">{s.SH||0}</td></tr>
+                <tr key={row.year+"-pb-"+ri}><td className="mono" style={{color:"#805700"}}>{row.year}</td><td className="mono">{s.PA}</td><td className="mono">{s.AB}</td><td className="mono">{fmtAvg(s.H,s.AB)}</td><td className="mono">{s.H}</td><td className="mono">{s.SH||0}</td></tr>
               );})}
-              <tr style={{background:"rgba(245,200,66,.06)",fontWeight:700}}><td style={{color:"#f5c842",fontSize:9}}>通算</td><td className="mono">{totals.PA}</td><td className="mono">{totals.AB}</td><td className="mono">{fmtAvg(totals.H,totals.AB)}</td><td className="mono">{totals.H}</td><td className="mono">{totals.SH}</td></tr>
+              <tr style={{background:"rgba(245,200,66,.06)",fontWeight:700}}><td style={{color:"#805700",fontSize:14}}>通算</td><td className="mono">{totals.PA}</td><td className="mono">{totals.AB}</td><td className="mono">{fmtAvg(totals.H,totals.AB)}</td><td className="mono">{totals.H}</td><td className="mono">{totals.SH}</td></tr>
             </tbody>
           </table>
         )}
         {!ip&&(
-          <table className="tbl" style={{fontSize:9,width:"100%"}}>
+          <table className="tbl" style={{fontSize:14,width:"100%"}}>
             <thead>
               <tr><th>年度</th><th>チーム</th><th>打席</th><th>打率</th><th>HR</th><th>打点</th><th>盗塁</th><th>OPS</th></tr>
             </thead>
@@ -190,27 +190,27 @@ export function CareerTable({player,year,teamId,teamName,includeCurrentSeason=tr
                 if(mode==="playoff"&&s.PA===0) return null;
                 return(
                   <tr key={row.year+"-b-"+ri}>
-                    <td className="mono" style={{color:"#f5c842"}}>{row.year}</td>
-                    <td className="mono" style={{color:"#94a3b8",maxWidth:60,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.teamName||""}</td>
+                    <td className="mono" style={{color:"#805700"}}>{row.year}</td>
+                    <td className="mono" style={{color:"#53657c",maxWidth:60,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.teamName||""}</td>
                     <td className="mono">{s.PA}</td>
                     <td className="mono">{fmtAvg(s.H,s.AB)}</td>
-                    <td className="mono" style={{color:s.HR>=20?"#f5c842":undefined}}>{s.HR}</td>
+                    <td className="mono" style={{color:s.HR>=20?"#805700":undefined}}>{s.HR}</td>
                     <td className="mono">{s.RBI}</td>
                     <td className="mono">{s.SB}</td>
-                    <td className="mono">{batterRate(s,"OPS")>0?batterRate(s,"OPS").toFixed(3):"---"}</td>
+                    <td className="mono">{s.PA>0?batterRate(s,"OPS").toFixed(3):"---"}</td>
                   </tr>
                 );
               })}
               {hasTotals&&(
                 <tr style={{background:"rgba(245,200,66,.06)",fontWeight:700}}>
-                  <td style={{color:"#f5c842",fontSize:9}}>通算</td>
+                  <td style={{color:"#805700",fontSize:14}}>通算</td>
                   <td></td>
                   <td className="mono">{totals.PA}</td>
                   <td className="mono">{fmtAvg(totals.H,totals.AB)}</td>
-                  <td className="mono" style={{color:totals.HR>=200?"#f5c842":undefined}}>{totals.HR}</td>
+                  <td className="mono" style={{color:totals.HR>=200?"#805700":undefined}}>{totals.HR}</td>
                   <td className="mono">{totals.RBI}</td>
                   <td className="mono">{totals.SB}</td>
-                  <td className="mono">{totalOPS>0?totalOPS.toFixed(3):"---"}</td>
+                  <td className="mono">{totals.PA>0?totalOPS.toFixed(3):"---"}</td>
                 </tr>
               )}
             </tbody>

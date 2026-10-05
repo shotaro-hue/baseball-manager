@@ -5,14 +5,14 @@ import { PVAL_DEFS } from '../constants';
 ═══════════════════════════════════════════════ */
 
 export function OV({ v }) {
-  const c = v >= 85 ? "#ffd700" : v >= 75 ? "#34d399" : v >= 62 ? "#60a5fa" : v >= 50 ? "#94a3b8" : "#f87171";
+  const c = v >= 85 ? "var(--detail-warn, #ffd700)" : v >= 75 ? "var(--detail-good, #34d399)" : v >= 62 ? "var(--detail-blue, #60a5fa)" : v >= 50 ? "var(--detail-muted, #94a3b8)" : "var(--detail-bad, #f87171)";
   return <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 13, color: c, fontWeight: 700 }}>{v}</span>;
 }
 
 export function CondBadge({ p }) {
   if (p?.injury) return <span className="inj-badge">🤕{p.injury}{p.injuryPart ? ` [${p.injuryPart}]` : ''}</span>;
-  const c = (p?.condition || 100) >= 80 ? "#34d399" : (p?.condition || 100) >= 60 ? "#f5c842" : "#f87171";
-  return <span style={{ fontSize: 9, color: c }}>●{p?.condition || 100}</span>;
+  const c = (p?.condition ?? 100) >= 80 ? "var(--detail-good, #34d399)" : (p?.condition ?? 100) >= 60 ? "var(--detail-warn, #f5c842)" : "var(--detail-bad, #f87171)";
+  return <span style={{ fontSize: "var(--detail-small, 9px)", color: c }}>●{p?.condition ?? 100}</span>;
 }
 
 export function HandBadge({ p }) {
@@ -20,9 +20,9 @@ export function HandBadge({ p }) {
   const isLeft = p.hand === "left";
   return (
     <span style={{
-      fontSize: 9, fontFamily: "'Share Tech Mono',monospace",
+      fontSize: "var(--detail-small, 9px)", fontFamily: "'Share Tech Mono',monospace",
       background: isLeft ? "rgba(167,139,250,.15)" : "rgba(96,165,250,.12)",
-      color: isLeft ? "#a78bfa" : "#60a5fa",
+      color: isLeft ? "var(--detail-purple, #a78bfa)" : "var(--detail-blue, #60a5fa)",
       border: `1px solid ${isLeft ? "rgba(167,139,250,.4)" : "rgba(96,165,250,.3)"}`,
       borderRadius: 3, padding: "0px 4px", marginLeft: 4, fontWeight: 700,
     }}>
@@ -107,6 +107,7 @@ export function ThCell({
   const isOpen = openLabel === label;
   return (
     <th
+      aria-sort={sortDirection === "asc" ? "ascending" : sortDirection === "desc" ? "descending" : undefined}
       style={{ position: "relative", whiteSpace: "nowrap" }}
     >
       <button
@@ -134,13 +135,13 @@ export function ThCell({
       {isOpen && tip && (
         <div style={{
           position: "absolute", top: "100%", left: 0,
-          background: "#0d2030", border: "1px solid rgba(96,165,250,.3)",
+          background: "var(--detail-surface, #0d2030)", border: "1px solid rgba(96,165,250,.3)",
           borderRadius: 8, padding: "8px 11px", zIndex: 200, width: 180,
           boxShadow: "0 8px 24px rgba(0,0,0,.6)", marginTop: 4,
           animation: "fi .15s", pointerEvents: "none",
         }}>
-          <div style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 11, color: "#60a5fa", marginBottom: 3 }}>{tip.en}</div>
-          <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400, lineHeight: 1.5, whiteSpace: "normal", textAlign: "left" }}>{tip.desc}</div>
+          <div style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "var(--detail-small, 11px)", color: "var(--detail-blue, #60a5fa)", marginBottom: 3 }}>{tip.en}</div>
+          <div style={{ fontSize: "var(--detail-small, 11px)", color: "var(--detail-muted, #94a3b8)", fontWeight: 400, lineHeight: 1.5, whiteSpace: "normal", textAlign: "left" }}>{tip.desc}</div>
         </div>
       )}
     </th>
