@@ -11,7 +11,7 @@ const t = { id: 0, league: 'セ', name: '球団', city: '東京', wins: 80, loss
 function setup() {
   const onSign = vi.fn(); const demand = calcPlayerDemand(p); let view;
   act(() => { view = create(React.createElement(ContractRenewalPhaseScreen, { teams: [t], myId: 0, year: 2026, demands: { 0: demand }, onSign, onNext: vi.fn(), onRelease: vi.fn() })); });
-  const row = view.root.findAll(n => n.type === 'div' && n.props.onClick && text(n).includes(p.name))[0];
+  const row = view.root.findAllByType('button').find(n => n.props['aria-label'] === `${p.name}の契約更改`);
   act(() => row.props.onClick());
   return { view, onSign, demand };
 }
@@ -20,7 +20,7 @@ const send = view => act(() => view.root.findAllByType('button').find(n => text(
 describe('salary demand in renewal screen', () => {
   it('loads player ID 0 demand, exposes reasons, and signs at the requested salary', () => {
     const { view, onSign, demand } = setup();
-    expect(view.root.findByType('input').props.value).toBe(demand.demandSalary);
+    expect(Number(view.root.findByType('input').props.value)).toBe(demand.demandSalary);
     expect(text(view.root)).toContain('要求年俸の理由');
     expect(text(view.root)).toContain('野手の出場量・今季成績');
     send(view);
