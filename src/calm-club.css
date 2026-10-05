@@ -1,0 +1,53 @@
+/* Only the club screen and comparison surfaces opt into these styles. */
+.club-detail { color: #17243a; min-height: 100dvh; background: #f3f7fc; }
+.club-detail .hub { min-width: 0; width: 100%; max-width: 1100px; margin: auto; padding: 16px; box-sizing: border-box; }
+.club-detail .club-topbar { display: flex; flex-wrap: wrap; height: auto; gap: 12px; background: #fff; border-color: #dce6f2; padding: 12px; }
+.club-topbar > div { min-width: 0; overflow-wrap: anywhere; }
+.club-topbar > div:last-child { flex-wrap: wrap; }
+.club-detail .tabs-nav, .club-detail .tab-group, .club-detail .tabs { min-width: 0; width: 100%; }
+.club-detail .tabs { display: flex; flex-wrap: wrap; }
+.club-detail .tabs .tab { flex: 1 1 auto; }
+.club-detail .club-roster-table { min-width: 620px; }
+.club-detail .club-roster-table :is(th,td) { padding: 10px !important; }
+.club-detail .club-roster-table :is(th,td):first-child { width: 140px; min-width: 110px; max-width: 150px; white-space: normal; overflow-wrap: anywhere; }
+.club-detail .club-roster-table button { min-width: 44px; font-weight: 700; }
+.club-comparison-section { margin: 16px 0; }
+.club-comparison-section > button { width: 100%; text-align: left; }
+.club-detail .club-actions { bottom: max(8px, env(safe-area-inset-bottom)) !important; flex-wrap: wrap; }
+.club-detail .club-actions button { flex: 1 1 140px !important; }
+.calm-detail .team-comparison-panel { background: #fff; border-color: #c5d8ed; margin-top: 10px; }
+.calm-detail .team-comparison-heading { flex-wrap: wrap; }
+.calm-detail .team-comparison-heading h3 { font-size: 18px; color: #17243a; }
+.calm-detail .team-comparison-heading p, .calm-detail .team-comparison-heading > span,
+.calm-detail .team-comparison-table td span { color: #53657c; font-size: 14px; }
+.calm-detail .team-comparison-table strong { color: #17243a; }
+.calm-detail .team-comparison-table .comparison-better strong { color: #14714b; }
+.calm-detail .team-comparison-table td:first-child, .calm-detail .player-compare-table td:first-child { color: #53657c; }
+.player-compare-dialog.calm-detail { background: #fff; border-color: #c5d8ed; box-sizing: border-box; max-height: 92dvh; }
+.calm-detail .player-compare-header { position: sticky; top: -18px; background: #fff; z-index: 5; padding: 8px 0; }
+.calm-detail .player-compare-header h2 { color: #17243a; font-size: 22px; }
+.calm-detail .player-compare-header p { color: #53657c; font-size: 14px; }
+.calm-detail .player-compare-header > button { min-width: 44px; background: #edf4fc; color: #095cc7; border-color: #c5d8ed; }
+.calm-detail .player-compare-names { margin-left: 0; grid-template-columns: repeat(2,minmax(0,1fr)); }
+.calm-detail .player-compare-names > div { min-width: 0; align-content: start; padding: 10px; background: #f3f7fc; border-radius: 8px; overflow-wrap: anywhere; }
+.calm-detail .player-compare-names strong { color: #17243a; font-size: 16px; }
+.calm-detail .player-compare-names span { color: #53657c; font-size: 14px; }
+.calm-detail .player-compare-names button { color: #b42332; font-size: 14px; margin-left: 0; text-align: left; }
+.calm-detail .player-compare-table-wrap, .calm-detail .team-comparison-table-wrap { max-width: 100%; overflow: auto; overscroll-behavior: contain; }
+.calm-detail .player-compare-table, .calm-detail .team-comparison-table { width: 100%; table-layout: fixed; }
+.calm-detail .player-compare-table :is(th,td), .calm-detail .team-comparison-table :is(th,td) { white-space: normal; overflow-wrap: anywhere; padding: 10px 6px; }
+.player-compare-tray.calm-detail { background: #fff; border-color: #c5d8ed; box-shadow: 0 4px 20px #17243a26; flex-wrap: wrap; }
+.calm-detail .player-compare-tray-title { color: #095cc7; font-size: 14px; }
+.calm-detail .player-compare-tray-list { flex-wrap: wrap; overflow: visible; }
+.calm-detail .player-compare-tray-list > span { max-width: none; background: #edf4fc; color: #17243a; font-size: 14px; white-space: normal; overflow-wrap: anywhere; }
+.calm-detail .player-compare-tray-list button { min-width: 44px; flex-shrink: 0; color: #095cc7; }
+@media(max-width:760px) {
+  .club-detail .hub { padding: 10px; }
+  .player-compare-tray.calm-detail { left: 8px; right: 8px; bottom: calc(78px + env(safe-area-inset-bottom)); max-width: none; }
+  .calm-detail .player-compare-tray-list { flex: 1 1 100%; }
+  .calm-detail .player-compare-tray-list > span { flex: 1; justify-content: space-between; }
+  .calm-detail .player-compare-header { top: -14px; }
+  .calm-shell:has(.player-compare-tray) { padding-bottom: 260px; }
+}
+
+.club-data-note { font-size: 14px; color: #53657c; margin: 0 0 12px; }

@@ -12,7 +12,7 @@ export function TeamComparisonPanel({ myTeam, opponent, allTeams }) {
         </div>
         <span>{opponent.league}リーグ基準</span>
       </div>
-      <div className="team-comparison-table-wrap">
+      <div className="team-comparison-table-wrap" role="region" aria-label="球団比較表" tabIndex={0}>
         <table className="tbl team-comparison-table">
           <thead>
             <tr>
