@@ -1,33 +1,35 @@
-# Mobile Calm Dugout — detail screens, second implementation pass
+# Mobile Calm Dugout — schedule, results and league screens (pass 3)
 
 final result: blocked
 
-Approved targets: mobile home, roster, player detail and batch-result mocks from the 2026-09-30 conversation (390 × 844 CSS target). Source files: exec-4a511f8f-3e45-4bf2-9736-a693691ff520.png, exec-aa023279-1043-4de5-8194-96eabef36665.png, exec-577ff1b9-35c0-499b-b223-aadb641f3663.png, exec-c6270fb9-128f-4623-ae05-4c81f5f17dca.png under /workspace/scratch/66c5379939ed/generated_images/.
-
-## Blocker
-The preceding pass could not start managed preview (`sh: 1: vite: not found`). For this continuation the user's explicit instruction to perform visual review themselves remains in effect. No new browser screenshots, browser interactions, console check or visual comparison were performed. Typography, spacing, responsive overflow and visual fidelity remain unverified. Automated build/component checks are not visual QA. Handoff remains a draft for user review.
-
 ## Scope
-Continues merged PR #391 (base 7d990f0). This pass unifies the expanded roster/pitching/development controls, own-team statistics, player batted-ball analysis and career statistics using the approved white/pale-blue/navy palette. Controls have 44px minimum height; existing 7–12px local text is raised to 14px and selects to 16px. Dense tables have a bounded scroll region, sticky headings and an identity column (player/year). Filters, sorting, comparison entry points and roster handlers are retained. Shared badges/chart styles use scoped variables with legacy fallbacks.
 
-Recorded zero OPS/wOBA, career ERA/WHIP/OPS and condition are no longer rendered as missing/100. Career lookup also preserves player ID zero. No simulation, roster-selection algorithm or data-retention changes.
+Continues merged PR #392 (main 4941e0d), using the approved white/pale-blue/navy mobile direction.
 
-## Intentional differences and remaining work
-Detailed roster controls remain expandable; this pass refreshes their presentation without redesigning every operation. Schedule, individual results, league leaderboards/standings/records, comparison dialogs and management screens still need visual unification. The existing data-driven spray chart and career chart are retained; no new imagery or invented data. No Sites changes or merge.
+- Schedule: monthly list by default, optional locally scrollable calendar, month/year selection, preserved current/archive result routing, home/away, interleague, venue notes and All-Star data.
+- Current results and archived box scores: light surfaces, larger text, locally scrollable tables with fixed headers/identity columns. Existing deferred aggregation and return actions retained.
+- Score dialogs: accessible names, Escape, focus containment/restoration and background scroll lock. Mobile box-score dialog fills the viewport.
+- League leaders, standings and records: shared theme, wrapping, keyboard sorting and selected-state semantics.
+- Correct zero-rate display/sorting (including ERA 0.00), perfect winning percentage, and schedule win percentage excluding draws. Keep schedule hook order stable across loading and loaded states; archived home-only box scores open the detailed view.
 
-## Manual review before merge
-- Check 390px and 360px layouts, long names, safe areas and no page-wide horizontal overflow.
-- Open simulation settings, choose count/automation, run and verify progress/results.
-- Reorder/replace players, confirm assigned defense and validate lineup before play.
-- Open/close player detail from a scrolled roster; confirm focus/scroll restoration and access to advanced analysis.
-- Open batch game details; return to roster/home.
-- Check every old tab under the five navigation groups and desktop regressions.
+## Verification status
 
-Additional manual review for this pass:
-- Expand roster settings; switch fielders/pitchers/farm/conversations at 360px and 390px. Check long names, rotation controls, selects and wrapping.
-- Scroll the roster and season/career tables in both directions; check player/year and header visibility, tooltips and keyboard focus.
-- Switch major/detail metrics, sort, compare and open/close a player; ensure state is retained.
-- Inspect batted-ball filters, empty/loading/partial-archive states, league comparison and chart labels on white.
-- Inspect career regular/postseason toggle and rate zero versus no recorded appearances.
+User explicitly chose to perform visual review themselves. No browser capture, browser interaction, console check or pixel comparison was performed this pass. Prior managed preview failed to resolve vite. Automated checks are not visual QA; mobile overflow, sticky positioning and fidelity remain unverified. Handoff is a draft for user review.
 
-This remains a partial UI refresh; visual acceptance is pending user review.
+Approved direction references remain the four mobile mockups from pass 1, in /workspace/scratch/66c5379939ed/generated_images/. There is no separately approved exact calendar mock.
+
+## Automated checks
+
+Earlier full run: 297 tests passed. On resume, full run: 296 passed and one existing unseeded simulation sampling test failed (stuff=99 versus stuff=1 mean exit velocity). A targeted rerun of that simulation file and result/schedule UI files passed all 41 tests without code changes. This indicates nondeterminism, not a proven fix; the physics code/tests were not changed. Production build passed with the existing large-chunk warning. Five new tests cover monthly/current result routing, archived home-only box score routing, loading-to-ready hook order, zero ERA ranking/player navigation and perfect win percentage.
+
+## Manual review
+
+- At 360/390px: list/calendar/month/year switching, long names, venue notes, off days and All-Star data; horizontal scrolling stays inside calendar/table regions.
+- Open current/archived results, close by button/Escape, Tab/Shift-Tab through dialogs, verify focus and scroll restoration.
+- Individual result batting/pitching tabs and extra innings; return while details are processing.
+- League filters, qualification checkbox, sorting, comparison and player/team detail entry points.
+- All record tabs, empty histories and desktop regressions.
+
+## Remaining work
+
+Comparison dialogs, team details and management screens (mail/news/contracts/trade/scouting/finance) still need visual unification. Some deeper player-profile sections retain legacy styles. No Sites publication, merge, simulation changes or fabricated data.

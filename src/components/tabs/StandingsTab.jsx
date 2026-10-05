@@ -3,9 +3,9 @@ import { getFrontOfficePlanPublic } from "../../engine/trade";
 
 const MODE_LABEL = {
   contend: { text: "優勝争い", emoji: "🏆", color: "#f59e0b" },
-  retool:  { text: "戦力整備", emoji: "🔧", color: "#60a5fa" },
-  rebuild: { text: "再建中",   emoji: "🔄", color: "#a78bfa" },
-  neutral: { text: "中立",     emoji: "⚖️", color: "#6b7280" },
+  retool:  { text: "戦力整備", emoji: "🔧", color: "#095cc7" },
+  rebuild: { text: "再建中",   emoji: "🔄", color: "#7050ad" },
+  neutral: { text: "中立",     emoji: "⚖️", color: "#53657c" },
 };
 
 function TeamStrategyRow({ team, isMe }) {
@@ -25,18 +25,18 @@ function TeamStrategyRow({ team, isMe }) {
           borderRadius: 4,
           padding: "2px 7px",
           fontWeight: 700,
-          fontSize: 12,
+          fontSize: 14,
         }}>
           {label.emoji} {label.text}
         </span>
         {mode === "rebuild" && rebuildYears > 0 && (
-          <span style={{ color: "#a78bfa", fontSize: 11, marginLeft: 6 }}>（{rebuildYears}年目）</span>
+          <span style={{ color: "#7050ad", fontSize: 14, marginLeft: 6 }}>（{rebuildYears}年目）</span>
         )}
       </td>
-      <td style={{ color: mode === "contend" ? "#34d399" : mode === "rebuild" ? "#f87171" : "#9ca3af", fontSize: 12 }}>
+      <td style={{ color: mode === "contend" ? "#14714b" : mode === "rebuild" ? "#b42332" : "#53657c", fontSize: 14 }}>
         {stance}
       </td>
-      <td style={{ fontSize: 11, color: "#6b7280", maxWidth: 200 }}>
+      <td style={{ fontSize: 14, color: "#53657c", maxWidth: 200 }}>
         {plan?.reasons?.[0] || ""}
       </td>
     </tr>
@@ -56,13 +56,14 @@ export function StandingsTab({ teams, myId, onTeamClick }) {
   const top = sorted[0];
 
   return (
-    <div>
-      <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+    <div className="calm-detail detail-standings">
+      <h1>順位表</h1>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
         {["セ", "パ"].map(l => (
-          <button key={l} onClick={() => setLg(l)} className={`tab ${lg === l ? "on" : ""}`} style={{ flex: 0, padding: "6px 18px" }}>{l}リーグ</button>
+          <button key={l} aria-pressed={lg === l} onClick={() => setLg(l)} className={`tab ${lg === l ? "on" : ""}`} style={{ flex: 0, padding: "6px 18px" }}>{l}リーグ</button>
         ))}
         <button
-          onClick={() => setShowStrategy(s => !s)}
+          aria-pressed={showStrategy} onClick={() => setShowStrategy(s => !s)}
           className={`tab ${showStrategy ? "on" : ""}`}
           style={{ flex: 0, padding: "6px 18px", marginLeft: "auto" }}
         >
@@ -72,8 +73,8 @@ export function StandingsTab({ teams, myId, onTeamClick }) {
 
       {showStrategy ? (
         <div className="card">
-          <div style={{ marginBottom: 8, fontWeight: 700, color: "#94a3b8", fontSize: 13 }}>球団フロント方針（{lg}リーグ）</div>
-          <div style={{ overflowX: "auto" }}>
+          <div style={{ marginBottom: 8, fontWeight: 700, color: "#53657c", fontSize: 13 }}>球団フロント方針（{lg}リーグ）</div>
+          <div className="detail-table-scroll" tabIndex={0} role="region" aria-label="成績表。横にスクロールできます">
             <table className="tbl">
               <thead>
                 <tr>
@@ -87,8 +88,8 @@ export function StandingsTab({ teams, myId, onTeamClick }) {
                 {sorted.map(t => (
                   t.id === myId ? (
                     <tr key={t.id}>
-                      <td><span style={{ color: t.color }}>{t.emoji}</span> <span style={{ color: "#f5c842", fontWeight: 700 }}>{t.name} ★</span></td>
-                      <td colSpan={3} style={{ color: "#6b7280", fontSize: 12 }}>あなたのチーム（プレイヤー操作）</td>
+                      <td><span style={{ color: t.color }}>{t.emoji}</span> <span style={{ color: "#805700", fontWeight: 700 }}>{t.name} ★</span></td>
+                      <td colSpan={3} style={{ color: "#53657c", fontSize: 14 }}>あなたのチーム（プレイヤー操作）</td>
                     </tr>
                   ) : (
                     <TeamStrategyRow key={t.id} team={t} isMe={false} />
@@ -100,13 +101,13 @@ export function StandingsTab({ teams, myId, onTeamClick }) {
         </div>
       ) : (
         <div className="card">
-          <div style={{ overflowX: "auto" }}>
+          <div className="detail-table-scroll" tabIndex={0} role="region" aria-label="成績表。横にスクロールできます">
             <table className="tbl standings-tbl">
               <thead>
                 <tr>
                   <th style={{ width: 56 }}>順位</th><th>チーム</th><th>試合</th>
-                  <th style={{ color: "#34d399" }}>勝</th>
-                  <th style={{ color: "#f87171" }}>敗</th>
+                  <th style={{ color: "#14714b" }}>勝</th>
+                  <th style={{ color: "#b42332" }}>敗</th>
                   <th>勝率</th><th>G差</th><th>得点</th><th>失点</th><th>得失差</th>
                 </tr>
               </thead>
@@ -118,7 +119,7 @@ export function StandingsTab({ teams, myId, onTeamClick }) {
                   const rankCls = i === 0 ? "rank-1" : i === 1 ? "rank-2" : i === 2 ? "rank-3" : "rank-low";
                   // 3-tier size: top-3 = hero, mid = major, lower = meta
                   const rankSize = i < 3 ? 32 : 22;
-                  const winPct = t.wins + t.losses > 0 ? "." + String(Math.round(t.wins / (t.wins + t.losses) * 1000)).padStart(3, "0") : "---";
+                  const winPct = t.wins + t.losses > 0 ? (t.wins / (t.wins + t.losses)).toFixed(3).replace(/^0/, "") : "---";
                   return (
                     <tr key={t.id} style={{ background: isMe ? "rgba(245,200,66,.05)" : undefined, borderLeft: isMe ? "3px solid var(--gold)" : "3px solid transparent" }}>
                       <td style={{ paddingLeft: 10 }}>
@@ -132,17 +133,17 @@ export function StandingsTab({ teams, myId, onTeamClick }) {
                           style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontWeight: "inherit", padding: 0 }}
                         >
                           <span style={{ color: t.color, marginRight: 5 }}>{t.emoji}</span>
-                          <span style={{ fontWeight: isMe ? 700 : 500, color: isMe ? "#f5c842" : undefined }}>{t.name}{isMe && " ★"}</span>
+                          <span style={{ fontWeight: isMe ? 700 : 500, color: isMe ? "#805700" : undefined }}>{t.name}{isMe && " ★"}</span>
                         </button>
                       </td>
                       <td className="mono">{g}</td>
-                      <td className="mono" style={{ color: "#34d399" }}>{t.wins}</td>
-                      <td className="mono" style={{ color: "#f87171" }}>{t.losses}</td>
+                      <td className="mono" style={{ color: "#14714b" }}>{t.wins}</td>
+                      <td className="mono" style={{ color: "#b42332" }}>{t.losses}</td>
                       <td className="mono" style={{ fontSize: i < 3 ? 14 : 12, fontWeight: i < 3 ? 700 : 400, color: i < 3 ? "var(--gold)" : undefined }}>{winPct}</td>
-                      <td className="mono" style={{ color: i === 0 ? "var(--gold)" : "#94a3b8" }}>{gb}</td>
+                      <td className="mono" style={{ color: i === 0 ? "var(--gold)" : "#53657c" }}>{gb}</td>
                       <td className="mono">{t.rf}</td>
                       <td className="mono">{t.ra}</td>
-                      <td className="mono" style={{ color: (t.rf - t.ra) > 0 ? "#34d399" : (t.rf - t.ra) < 0 ? "#f87171" : "#374151" }}>
+                      <td className="mono" style={{ color: (t.rf - t.ra) > 0 ? "#14714b" : (t.rf - t.ra) < 0 ? "#b42332" : "#53657c" }}>
                         {(t.rf - t.ra) > 0 ? "+" : ""}{t.rf - t.ra}
                       </td>
                     </tr>
