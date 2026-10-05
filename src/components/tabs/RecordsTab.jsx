@@ -1,5 +1,15 @@
 import React, { useState } from "react";
 
+export function awardWinners(award) {
+  return Array.isArray(award?.winners) ? award.winners : award?.name ? [award] : [];
+}
+
+export function leagueAward(award, league) {
+  if (!award) return null;
+  if ('central' in award || 'pacific' in award) return award[league === 'セ' ? 'central' : 'pacific'];
+  return league === 'セ' ? award : null;
+}
+
 export function RecordsTab({ history }) {
   const [subTab, setSubTab] = useState("awards");
   const { awards = [], records = {}, hallOfFame = [], championships = [], standingsHistory = [] } = history || {};
@@ -10,7 +20,7 @@ export function RecordsTab({ history }) {
   // リーグ分割MVPの互換表示（旧: mvp={name,...}, 新: mvp={central,pacific}）
   const getMvp = (a, league) => {
     if (!a?.mvp) return null;
-    if (a.mvp.central || a.mvp.pacific) return league === 'セ' ? a.mvp.central : a.mvp.pacific;
+    if ('central' in a.mvp || 'pacific' in a.mvp) return league === 'セ' ? a.mvp.central : a.mvp.pacific;
     return league === 'セ' ? a.mvp : null; // 旧形式は全体MVPをセに表示
   };
 
@@ -46,7 +56,7 @@ export function RecordsTab({ history }) {
                 return mvp ? (
                   <div key={lg} style={{ fontSize: 14, padding: "4px 0", borderBottom: "1px solid rgba(255,255,255,.05)", display: "flex", justifyContent: "space-between" }}>
                     <span><span style={{ color: "#805700", fontWeight: 700 }}>{lg}MVP</span> <span style={{ color: "#17243a" }}>{mvp.name}</span></span>
-                    <span style={{ fontSize: 14, color: "#53657c" }}>({mvp.teamName}) OPS {mvp.OPS?.toFixed(3)}</span>
+                    <span style={{ fontSize: 14, color: "#53657c" }}>({mvp.teamName}) {mvp.pos === '投手' ? `防御率 ${mvp.ERA?.toFixed(2) ?? '—'}` : `OPS ${mvp.OPS?.toFixed(3) ?? '—'}`}</span>
                   </div>
                 ) : null;
               })}
@@ -56,13 +66,24 @@ export function RecordsTab({ history }) {
                   <span style={{ fontSize: 14, color: "#53657c" }}>({latest.sawamura.teamName}) {latest.sawamura.W}勝 ERA {latest.sawamura.ERA}</span>
                 </div>
               )}
-              {latest.rookie && (
-                <div style={{ fontSize: 14, padding: "4px 0" }}>
-                  <span style={{ color: "#14714b", fontWeight: 700 }}>新人王</span>
-                  <span style={{ marginLeft: 8, color: "#17243a" }}>{latest.rookie.name}</span>
-                  <span style={{ marginLeft: 6, fontSize: 14, color: "#53657c" }}>({latest.rookie.teamName})</span>
+              {latest.version >= 2 && !latest.sawamura && <div style={{ fontSize: 14, padding: '4px 0', color: '#53657c' }}>沢村賞：該当者なし</div>}
+              {['セ','パ'].map(lg => {
+                const rookie = leagueAward(latest.rookie, lg);
+                return rookie ? <div key={lg} style={{ fontSize: 14, padding: '4px 0' }}>
+                  <span style={{ color: '#14714b', fontWeight: 700 }}>{latest.version >= 2 ? `${lg}新人王` : '新人王（旧集計）'}</span>
+                  <span style={{ marginLeft: 8 }}>{rookie.name}（{rookie.teamName}）</span>
+                </div> : null;
+              })}
+              <details style={{ marginTop: 8 }}>
+                <summary style={{ minHeight: 44, cursor: 'pointer', padding: '10px 0' }}>表彰の選出基準</summary>
+                <div style={{ fontSize: 14, color: '#53657c', lineHeight: 1.7 }}>
+                  MVP・新人王・ベストナインはゲーム独自の成績評価です。MVPは野手80打席／投手40回以上の貢献スコアとチーム勝利数で選出します。
+                  新人王は27歳以下、過去の通算が投手30回未満／野手60打席未満で、今季出場した選手が対象です。
+                  沢村賞は130回・10勝・防御率3.50以下を満たす投手からFIPで選出します。
+                  最高勝率は13勝以上。最多ホールドはホールド数のみで、NPBのホールドポイントとは異なります。旧年度の記録は当時の集計を保持しています。
+                  首位打者・最高出塁率の規定打席はリーグ最多試合数（最低80）×3.1を四捨五入、防御率の規定投球回は同試合数です。
                 </div>
-              )}
+              </details>
             </div>
           ) : <div className="card"><div style={{ fontSize: 14, color: "#53657c" }}>シーズン未完了</div></div>}
           {championships.length > 0 && (
@@ -95,24 +116,27 @@ export function RecordsTab({ history }) {
                 if (!t) return null;
                 const rows = [
                   ["首位打者", t.avg, v => v != null ? `.${String(Math.round(v*1000)).padStart(3,"0")}` : ""],
+                  ["最高出塁率", t.obp, v => v != null ? v.toFixed(3).replace(/^0/, '') : ""],
                   ["本塁打王", t.hr,  v => v != null ? `${v}本` : ""],
                   ["打点王",   t.rbi, v => v != null ? `${v}打点` : ""],
                   ["盗塁王",   t.sb,  v => v != null ? `${v}盗塁` : ""],
                   ["防御率王", t.era, v => v != null ? `${v.toFixed(2)}` : ""],
                   ["最多勝",   t.win, v => v != null ? `${v}勝` : ""],
+                  ["最高勝率", t.winPct, v => v != null ? v.toFixed(3).replace(/^0/, '') : ""],
                   ["最多奪三振",t.so, v => v != null ? `${v}K` : ""],
-                  ["セーブ王", t.sv,  v => v != null ? `${v}S` : ""],
+                  [t.version >= 2 ? "最多セーブ" : "セーブ＋ホールド（旧集計）", t.sv, v => v != null ? `${v}${t.version >= 2 ? 'S' : ''}` : ""],
+                  ["最多ホールド", t.hld, v => v != null ? `${v}H` : ""],
                 ];
                 return (
                   <div key={lg} style={{ marginBottom: 6 }}>
                     <div style={{ fontSize: 14, color: "#53657c", marginBottom: 3, letterSpacing: ".05em" }}>{lg}リーグ</div>
-                    {rows.filter(([,r]) => r?.name).map(([label, r, fmt]) => (
-                      <div key={label} className="fsb" style={{ fontSize: 14, padding: "2px 0", borderBottom: "1px solid #dce6f2" }}>
+                    {rows.flatMap(([label, award, fmt]) => awardWinners(award).map((r, index) => (
+                      <div key={`${label}-${index}`} className="fsb" style={{ fontSize: 14, padding: "6px 0", gap: 8, flexWrap: 'wrap', borderBottom: "1px solid #dce6f2" }}>
                         <span style={{ color: "#53657c", minWidth: 70 }}>{label}</span>
                         <span style={{ flex: 1, color: "#17243a" }}>{r?.name}</span>
                         <span style={{ color: "#805700", fontSize: 14 }}>{r ? fmt(r.value) : ""} <span style={{ color: "#53657c" }}>{r?.teamName}</span></span>
                       </div>
-                    ))}
+                    )))}
                   </div>
                 );
               })}
