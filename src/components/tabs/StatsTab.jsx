@@ -11,8 +11,8 @@ const BATTER_COLUMNS = [
     key: 'OPS',
     label: 'OPS',
     value: (p, sb) => p.stats?.PA > 0 ? sb.OPS : null,
-    render: (p, sb) => sb.OPS > 0 ? sb.OPS.toFixed(3) : '---',
-    color: (p, sb) => sb.OPS >= .850 ? '#34d399' : sb.OPS >= .700 ? '#f5c842' : undefined,
+    render: (p, sb) => p.stats?.PA > 0 ? sb.OPS.toFixed(3) : '---',
+    color: (p, sb) => sb.OPS >= .850 ? '#14714b' : sb.OPS >= .700 ? '#805700' : undefined,
   },
   { key: 'HR', label: '本塁打', value: (p) => Number(p.stats?.HR) || 0, render: (p) => p.stats.HR },
   { key: 'RBI', label: '打点', value: (p) => Number(p.stats?.RBI) || 0, render: (p) => p.stats.RBI },
@@ -21,16 +21,16 @@ const BATTER_COLUMNS = [
     label: 'WAR',
     value: (p, sb) => sb.WAR,
     render: (p, sb) => sb.WAR ?? '---',
-    color: (p, sb) => sb.WAR >= 4 ? '#34d399' : sb.WAR >= 2 ? '#f5c842' : sb.WAR < 0 ? '#f87171' : undefined,
+    color: (p, sb) => sb.WAR >= 4 ? '#14714b' : sb.WAR >= 2 ? '#805700' : sb.WAR < 0 ? '#b42332' : undefined,
   },
-  { key: 'wOBA', label: 'wOBA', advanced: true, value: (p, sb) => p.stats?.PA > 0 ? sb.wOBA : null, render: (p, sb) => sb.wOBA > 0 ? sb.wOBA.toFixed(3) : '---' },
+  { key: 'wOBA', label: 'wOBA', advanced: true, value: (p, sb) => p.stats?.PA > 0 ? sb.wOBA : null, render: (p, sb) => p.stats?.PA > 0 ? sb.wOBA.toFixed(3) : '---' },
   {
     key: 'wRCp',
     label: 'wRC+',
     advanced: true,
     value: (p, sb) => p.stats?.PA > 0 ? sb.wRCp : null,
     render: (p, sb) => p.stats?.PA > 0 ? sb.wRCp : '---',
-    color: (p, sb) => sb.wRCp >= 130 ? '#34d399' : sb.wRCp >= 100 ? '#f5c842' : p.stats?.PA > 0 ? '#f87171' : undefined,
+    color: (p, sb) => sb.wRCp >= 130 ? '#14714b' : sb.wRCp >= 100 ? '#805700' : p.stats?.PA > 0 ? '#b42332' : undefined,
   },
   { key: 'ISO', label: 'ISO', advanced: true, value: (p, sb) => p.stats?.AB > 0 ? sb.ISO : null, render: (p, sb) => p.stats?.AB > 0 ? sb.ISO.toFixed(3) : '---' },
   { key: 'BABIP', label: 'BABIP', advanced: true, value: (p, sb) => p.stats?.AB > 0 ? sb.BABIP : null, render: (p, sb) => p.stats?.AB > 0 ? sb.BABIP.toFixed(3) : '---' },
@@ -41,7 +41,7 @@ const BATTER_COLUMNS = [
     advanced: true,
     value: (p, sb) => p.stats?.PA > 0 ? sb.Kpct : null,
     render: (p, sb) => p.stats?.PA > 0 ? fmtPct(sb.Kpct) : '---',
-    color: (p, sb) => sb.Kpct > .25 ? '#f87171' : sb.Kpct > 0 && sb.Kpct < .15 ? '#34d399' : undefined,
+    color: (p, sb) => sb.Kpct > .25 ? '#b42332' : sb.Kpct > 0 && sb.Kpct < .15 ? '#14714b' : undefined,
   },
   {
     key: 'EVavg',
@@ -49,7 +49,7 @@ const BATTER_COLUMNS = [
     advanced: true,
     value: (p, sb) => sb.EVavg > 0 ? sb.EVavg : null,
     render: (p, sb) => sb.EVavg > 0 ? sb.EVavg.toFixed(1) : '---',
-    color: (p, sb) => sb.EVavg >= 145 ? '#34d399' : sb.EVavg >= 130 ? '#f5c842' : undefined,
+    color: (p, sb) => sb.EVavg >= 145 ? '#14714b' : sb.EVavg >= 130 ? '#805700' : undefined,
   },
   { key: 'LAavg', label: '打球角度', advanced: true, value: (p, sb) => p.stats?.laN > 0 ? sb.LAavg : null, render: (p, sb) => p.stats?.laN > 0 ? sb.LAavg.toFixed(1) : '---' },
   { key: 'SB', label: '盗塁', advanced: true, value: (p) => Number(p.stats?.SB) || 0, render: (p) => p.stats.SB },
@@ -68,9 +68,9 @@ const PITCHER_COLUMNS = [
     render: (p) => p.subtype,
     className: 'text-cell',
   },
-  { key: 'W', label: '勝', value: (p) => Number(p.stats?.W) || 0, render: (p) => p.stats.W, color: () => '#34d399' },
+  { key: 'W', label: '勝', value: (p) => Number(p.stats?.W) || 0, render: (p) => p.stats.W, color: () => '#14714b' },
   { key: 'L', label: '敗', value: (p) => Number(p.stats?.L) || 0, render: (p) => p.stats.L },
-  { key: 'ERA', label: '防御率', value: (p, sp) => p.stats?.IP > 0 ? sp.ERA : null, render: (p, sp) => p.stats?.IP > 0 ? sp.ERA.toFixed(2) : '---', color: (p, sp) => sp.ERA > 0 && sp.ERA < 3 ? '#34d399' : sp.ERA < 4 ? '#f5c842' : p.stats?.IP > 0 ? '#f87171' : undefined },
+  { key: 'ERA', label: '防御率', value: (p, sp) => p.stats?.IP > 0 ? sp.ERA : null, render: (p, sp) => p.stats?.IP > 0 ? sp.ERA.toFixed(2) : '---', color: (p, sp) => sp.ERA > 0 && sp.ERA < 3 ? '#14714b' : sp.ERA < 4 ? '#805700' : p.stats?.IP > 0 ? '#b42332' : undefined },
   { key: 'IP', label: '投球回', value: (p) => p.stats?.IP > 0 ? inningsToOuts(p.stats.IP) : null, render: (p) => p.stats?.IP > 0 ? fmtIP(p.stats.IP) : '---' },
   { key: 'Kp', label: '奪三振', value: (p) => Number(p.stats?.Kp) || 0, render: (p) => p.stats.Kp },
   { key: 'WHIP', label: 'WHIP', value: (p, sp) => p.stats?.IP > 0 ? sp.WHIP : null, render: (p, sp) => p.stats?.IP > 0 ? sp.WHIP.toFixed(2) : '---' },
@@ -184,7 +184,7 @@ function StatsTable({
           <div className="stats-sort-label">{sortLabel} · 見出しを押すと降順→昇順→初期順</div>
         </div>
       </div>
-      <div className="stats-table-wrap">
+      <div className="stats-table-wrap" tabIndex={0} role="region" aria-label={`${title}。横にスクロールできます`}>
         <table className="tbl stats-table">
           <thead>
             <tr>
@@ -207,6 +207,7 @@ function StatsTable({
             </tr>
           </thead>
           <tbody>
+            {sortedPlayers.length === 0 && <tr><td colSpan={1 + columns.length + (onToggleCompare ? 1 : 0)}>対象の選手はいません。</td></tr>}
             {sortedPlayers.map((player) => (
               <InteractivePlayerRow
                 key={player.id}
@@ -275,10 +276,12 @@ export function StatsTab({
   };
 
   return (
-    <div>
+    <section className="calm-detail detail-stats" aria-label="自チーム成績">
+      <h1>自チーム成績</h1>
+      <p className="flow-muted">選手をタップして詳細へ。表は横にスクロールできます。</p>
       <div className="stats-toolbar">
         <div className="tabs" role="tablist" aria-label="成績種別">
-          {[['batter', '🏏 打者'], ['pitcher', '⚾ 投手']].map(([key, label]) => (
+          {[['batter', '打者'], ['pitcher', '投手']].map(([key, label]) => (
             <button
               key={key}
               role="tab"
@@ -291,8 +294,8 @@ export function StatsTab({
           ))}
         </div>
         <div className="stats-column-toggle" aria-label="表示する指標">
-          <button className={!showAdvanced ? 'on' : ''} onClick={() => setShowAdvanced(false)}>主要指標</button>
-          <button className={showAdvanced ? 'on' : ''} onClick={() => setShowAdvanced(true)}>詳細指標</button>
+          <button aria-pressed={!showAdvanced} className={!showAdvanced ? 'on' : ''} onClick={() => setShowAdvanced(false)}>主要指標</button>
+          <button aria-pressed={showAdvanced} className={showAdvanced ? 'on' : ''} onClick={() => setShowAdvanced(true)}>詳細指標</button>
         </div>
       </div>
 
@@ -329,6 +332,6 @@ export function StatsTab({
           comparePlayerIds={comparePlayerIds}
         />
       )}
-    </div>
+    </section>
   );
 }

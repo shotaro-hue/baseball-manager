@@ -1,3 +1,4 @@
+@import './calm-details.css';
 /* Shared mobile-first surfaces for the approved Calm Dugout flow. */
 .flow-screen{color:#17243a;background:#fff;font:16px/1.6 'Noto Sans JP',sans-serif;min-width:0;}
 .flow-screen h1{font-size:28px;line-height:1.3;margin:20px 0;letter-spacing:-.03em;}

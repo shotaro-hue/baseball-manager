@@ -1,11 +1,11 @@
 import React from "react";
 
 const HIT_TYPE_STYLES = {
-  single: { color: "#f59e0b", label: "単打" },
-  double: { color: "#3b82f6", label: "二塁打" },
-  triple: { color: "#facc15", label: "三塁打" },
-  homeRun: { color: "#f472b6", label: "本塁打" },
-  out: { color: "#9ca3af", label: "アウト" },
+  single: { color: "var(--detail-warn, #f59e0b)", label: "単打" },
+  double: { color: "var(--detail-blue, #3b82f6)", label: "二塁打" },
+  triple: { color: "var(--detail-good, #facc15)", label: "三塁打" },
+  homeRun: { color: "var(--detail-purple, #f472b6)", label: "本塁打" },
+  out: { color: "var(--detail-muted, #9ca3af)", label: "アウト" },
 };
 
 const DEFAULT_STYLE = { color: "#6b7280", label: "その他" };
@@ -108,7 +108,7 @@ export function SprayChart({ events }) {
     return (
       <div className="card" style={{ marginTop: 10 }}>
         <div className="card-h">スプレーチャート</div>
-        <div style={{ fontSize: 12, color: "#9ca3af", padding: "12px 2px" }}>打球データなし</div>
+        <div style={{ fontSize: 12, color: "var(--detail-muted, #9ca3af)", padding: "12px 2px" }}>打球データなし</div>
       </div>
     );
   }
@@ -145,14 +145,14 @@ export function SprayChart({ events }) {
         />
 
         {/* ファウルライン */}
-        <line x1={HOME_X} y1={HOME_Y} x2={leftFoulPoint.x} y2={leftFoulPoint.y} stroke="rgba(255,255,255,0.28)" strokeWidth="1.2" />
-        <line x1={HOME_X} y1={HOME_Y} x2={rightFoulPoint.x} y2={rightFoulPoint.y} stroke="rgba(255,255,255,0.28)" strokeWidth="1.2" />
+        <line x1={HOME_X} y1={HOME_Y} x2={leftFoulPoint.x} y2={leftFoulPoint.y} stroke="var(--detail-line, rgba(255,255,255,0.28))" strokeWidth="1.2" />
+        <line x1={HOME_X} y1={HOME_Y} x2={rightFoulPoint.x} y2={rightFoulPoint.y} stroke="var(--detail-line, rgba(255,255,255,0.28))" strokeWidth="1.2" />
 
         {/* 内野弧 */}
         <path
           d={`M ${infieldLeftPoint.x} ${infieldLeftPoint.y} A ${INFIELD_RADIUS} ${INFIELD_RADIUS} 0 0 1 ${infieldRightPoint.x} ${infieldRightPoint.y}`}
           fill="none"
-          stroke="rgba(255,255,255,0.18)"
+          stroke="var(--detail-line, rgba(255,255,255,0.18))"
           strokeWidth="1"
         />
 
@@ -171,7 +171,7 @@ export function SprayChart({ events }) {
       </svg>
 
       {warnings.length > 0 && (
-        <div style={{ marginTop: 8, fontSize: 11, color: "#fca5a5", lineHeight: 1.5 }}>
+        <div style={{ marginTop: 8, fontSize: "var(--detail-small, 11px)", color: "var(--detail-bad, #fca5a5)", lineHeight: 1.5 }}>
           <div>表示警告: {warnings.length}件</div>
           {warnings.slice(0, 3).map((warning) => (
             <div key={warning}>- {warning}</div>
@@ -181,7 +181,7 @@ export function SprayChart({ events }) {
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 8 }}>
         {Object.entries(HIT_TYPE_STYLES).map(([key, item]) => (
-          <div key={key} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: "#cbd5e1" }}>
+          <div key={key} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--detail-small, 11px)", color: "var(--detail-text, #cbd5e1)" }}>
             <span style={{ width: 10, height: 10, borderRadius: "50%", background: item.color, display: "inline-block" }} />
             {item.label}
           </div>

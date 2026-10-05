@@ -1,0 +1,93 @@
+/* Detail surfaces share the approved mobile palette; legacy routes keep their theme. */
+.calm-detail {
+  --card: #fff;
+  --border: #dce6f2;
+  --dim: #53657c;
+  --detail-text: #17243a;
+  --detail-muted: #53657c;
+  --detail-blue: #095cc7;
+  --detail-good: #14714b;
+  --detail-warn: #805700;
+  --detail-bad: #b42332;
+  --detail-purple: #7050ad;
+  --detail-surface: #fff;
+  --detail-line: #90a5bb;
+  --detail-small: 14px;
+  min-width: 0;
+  color: var(--detail-text);
+  background: #fff;
+  font-size: 16px;
+  line-height: 1.6;
+}
+.calm-shell:has(.detail-stats) { background: #fff; }
+.calm-detail h1 { font-size: 28px; margin: 20px 0 12px; }
+.calm-detail .card { padding: 16px; min-width: 0; }
+.calm-detail .card2 { background: #f6f9fd; border-color: #dce6f2; }
+.calm-detail .card-h { font-size: 17px; color: #17243a; letter-spacing: normal; font-weight: 700; }
+.calm-detail button, .calm-detail select { min-height: 44px; font-family: inherit; font-size: 14px; }
+.calm-detail button { cursor: pointer; }
+.calm-detail select { max-width: 100%; font-size: 16px !important; }
+.calm-detail input[type=range] { min-height: 44px; }
+.calm-detail .bsm, .calm-detail .tab, .calm-detail .compare-add-button {
+  border: 1px solid #c5d8ed; background: #edf4fc; color: #095cc7;
+  min-width: 44px; padding: 8px 12px; font-size: 14px;
+}
+.calm-detail .bgr { background: #fff0f1; color: #b42332; border-color: #eac1c7; }
+.calm-detail .bga { background: #e8f5ee; color: #14714b; border-color: #b7d8c7; }
+.calm-detail .tab.on, .calm-detail .compare-add-button.on { background: #dcecff; border-color: #095cc7; color: #095cc7; font-weight: 700; }
+.calm-detail button:disabled { opacity: .5; cursor: not-allowed; }
+.calm-detail :is(button,select,input,[tabindex]):focus-visible { outline: 3px solid #377ccc; outline-offset: 2px; }
+.calm-detail .tabs, .calm-detail .stats-column-toggle { background: #edf4fc; }
+.calm-detail .stats-column-toggle button { color: #53657c; }
+.calm-detail .stats-column-toggle button.on { color: #095cc7; background: #dcecff; }
+.calm-detail .stats-sort-label { font-size: 14px; color: #53657c; }
+.calm-detail .stats-table-wrap, .detail-table-scroll { overflow: auto; max-height: 65vh; max-width: 100%; overscroll-behavior: contain; }
+.calm-detail .tbl { font-size: 14px; }
+.calm-detail .tbl th { position: sticky !important; top: 0; z-index: 3; background: #edf4fc; color: #38506f; font-size: 14px; letter-spacing: normal; border-bottom: 1px solid #c5d8ed; }
+.calm-detail .tbl td { padding: 12px 10px; border-bottom: 1px solid #dce6f2; }
+.calm-detail .tbl :is(th,td):first-child { position: sticky !important; left: 0; z-index: 2; background: #fff; }
+.calm-detail .tbl th:first-child { z-index: 4; background: #edf4fc; }
+.calm-detail .detail-lineup-table :is(th,td):first-child { position: static !important; }
+.calm-detail .detail-lineup-table :is(th,td):nth-child(2) { position: sticky; left: 0; z-index: 2; background: #fff; max-width: 150px; white-space: normal; }
+.calm-detail .detail-lineup-table th:nth-child(2) { z-index: 4; background: #edf4fc; }
+.calm-detail .stats-player-cell { color: #095cc7; font-size: 16px; min-width: 110px; max-width: 160px; white-space: normal; overflow-wrap: anywhere; }
+.calm-detail .tbl tr:hover td, .calm-detail .interactive-player-row:focus-visible td { background: #edf6ff; }
+.calm-detail .stats-table .text-cell { color: #53657c; font-size: 14px; }
+.calm-detail .table-sort-direction, .calm-detail .table-tip-button { color: #095cc7; font-size: 14px; }
+.calm-detail .table-tip-button { min-width: 44px; }
+.calm-detail .chip { font-size: 13px; color: #38506f; background: #edf4fc; border-color: #c5d8ed; }
+.detail-roster-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0; }
+.detail-roster-toolbar .tab { flex: 1 0 auto !important; }
+.roster-full-settings.calm-detail[open] { padding: 12px 0; color: #17243a; background: #fff; }
+.roster-full-settings.calm-detail[open]>summary { color: #095cc7; }
+.career-detail button[aria-pressed=true] { box-shadow: inset 0 -3px #095cc7; }
+.detail-analysis { padding: 0; }
+.calm-detail .batted-ball-analysis { gap: 16px; }
+.calm-detail .batted-ball-heading h3, .calm-detail .batted-ball-metric-value,
+.calm-detail .batted-ball-empty strong, .calm-detail .league-comparison-heading strong,
+.calm-detail .league-comparison-card>strong { color: #17243a; }
+.calm-detail .batted-ball-heading p, .calm-detail .batted-ball-controls label,
+.calm-detail .batted-ball-metric-label, .calm-detail .batted-ball-metric-note,
+.calm-detail .batted-ball-sample-note, .calm-detail .league-comparison-heading span,
+.calm-detail .league-comparison-card>span, .calm-detail .league-comparison-card>small,
+.calm-detail .league-comparison-summary { color: #53657c; font-size: 14px; }
+.calm-detail .batted-ball-controls, .calm-detail .batted-ball-metric,
+.calm-detail .league-comparison-block, .calm-detail .league-comparison-card { background: #f6f9fd; border-color: #dce6f2; }
+.calm-detail .batted-ball-controls select { color: #17243a; background: #fff; border-color: #b7cce4; width: 100%; }
+.calm-detail .batted-ball-reliability { font-size: 14px; }
+.calm-detail .reliability-low, .calm-detail .batted-ball-warning { color: #805700; background: #fff5dd; border-color: #e6cc8c; }
+.calm-detail .reliability-mid, .calm-detail .batted-ball-coverage { color: #095cc7; background: #edf6ff; border-color: #c5d8ed; }
+.calm-detail .reliability-high { color: #14714b; background: #e8f5ee; border-color: #b7d8c7; }
+.calm-detail .batted-ball-warning, .calm-detail .batted-ball-coverage { font-size: 14px; }
+.calm-detail .batted-ball-breakdown span { color: #38506f; background: #edf4fc; font-size: 14px; }
+.calm-detail .batted-ball-loading, .calm-detail .batted-ball-empty { color: #53657c; font-size: 14px; border-color: #b7cce4; }
+.calm-detail .league-comparison-card>b, .calm-detail .league-comparison-heading em { color: #805700; font-size: 14px; }
+.calm-detail .percentile-track { background: #c5d8ed; }
+@media(max-width:760px) {
+  .calm-detail .card { padding: 12px; }
+  .detail-roster-toolbar .tab { flex: 1 0 40% !important; }
+  .calm-detail .stats-toolbar { align-items: stretch; }
+  .calm-detail .stats-toolbar>div { width: 100%; display: flex; }
+  .calm-detail .stats-toolbar button { flex: 1; }
+  .calm-detail .league-comparison-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}

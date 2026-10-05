@@ -344,13 +344,13 @@ export function PlayerModal({
         )}
 
         {activeSection === "battedBall" && !p.isPitcher && (
-          <div className="flow-legacy-analysis">
+          <div className="calm-detail detail-analysis">
           <BattedBallAnalysisPanel player={p} saveId={saveId} year={year} teams={teams} teamName={teamName}/>
           </div>
         )}
 
         {activeSection === "career" && (
-          <div className="flow-legacy-analysis">
+          <div className="calm-detail detail-analysis">
           <CareerTable player={p} year={year} teamId={careerTeamId} teamName={teamName}/>
           </div>
         )}
