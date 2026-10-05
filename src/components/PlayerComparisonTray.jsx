@@ -1,70 +1,74 @@
+import '../mobile-flow.css';
+import '../calm-club.css';
+import { useResultDialog } from './useResultDialog';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 import { fmtAvg, fmtIP, fmtSal } from '../utils';
 
-function battedBallRows(player) {
-  const profile = player?.stats?.battedBallProfile || {};
-  const bip = Number(profile.bip) || 0;
-  return [
-    ['平均打球速度', Number(profile.evN) > 0 ? `${(Number(profile.evSum) / Number(profile.evN)).toFixed(1)} km/h` : '---'],
-    ['強打球率', bip > 0 ? `${((Number(profile.hardHit || 0) / bip) * 100).toFixed(1)}%` : '---'],
-    ['対象打球', bip ? `${bip}` : '---'],
+const missing = '---';
+const recorded = (stats, keys) => keys.every(key => Number.isFinite(stats?.[key]));
+const value = n => Number.isFinite(n) ? n : missing;
+
+function playerMetrics(player) {
+  const s = player.stats || {};
+  const profile = s.battedBallProfile || {};
+  const metrics = [
+    ['年齢', player.age == null ? missing : `${player.age}歳`],
+    ['ポジション', player.pos ?? missing],
+    ['年俸', player.salary == null ? missing : fmtSal(player.salary)],
+    ['コンディション', value(player.condition)],
+    ['モラル', value(player.morale)],
+  ];
+  if (player.isPitcher) {
+    const pitching = saberPitcher(s);
+    return [...metrics,
+      ['防御率', s.IP > 0 && recorded(s, ['ER']) ? pitching.ERA.toFixed(2) : missing],
+      ['投球回', recorded(s, ['IP']) ? fmtIP(s.IP) : missing],
+      ['WHIP', s.IP > 0 && recorded(s, ['Hp', 'BBp']) ? pitching.WHIP.toFixed(2) : missing],
+      ['球速', player.pitching?.velocity == null ? missing : `${player.pitching.velocity} km/h`],
+      ['制球', value(player.pitching?.control)],
+    ];
+  }
+  const batting = saberBatter(s);
+  return [...metrics,
+    ['打率', s.AB > 0 && recorded(s, ['H']) ? fmtAvg(s.H, s.AB) : missing],
+    ['OPS', s.AB > 0 && recorded(s, ['H', 'AB', 'D', 'T', 'HR', 'BB', 'HBP', 'SF']) ? batting.OPS.toFixed(3) : missing],
+    ['本塁打', value(s.HR)],
+    ['平均打球速度', profile.evN > 0 && recorded(profile, ['evSum']) ? `${(profile.evSum / profile.evN).toFixed(1)} km/h` : missing],
+    ['強打球率', profile.bip > 0 && recorded(profile, ['hardHit']) ? `${(profile.hardHit / profile.bip * 100).toFixed(1)}%` : missing],
+    ['対象打球', value(profile.bip)],
+    ['ミート', value(player.batting?.contact)],
+    ['守備', value(player.batting?.defense)],
   ];
 }
 
-function compareRows(left, right) {
-  const common = [
-    ['年齢', `${left.age}歳`, `${right.age}歳`],
-    ['ポジション', left.pos, right.pos],
-    ['年俸', fmtSal(left.salary || 0), fmtSal(right.salary || 0)],
-    ['コンディション', left.condition ?? 70, right.condition ?? 70],
-    ['モラル', left.morale ?? 70, right.morale ?? 70],
-  ];
-  if (left.isPitcher && right.isPitcher) {
-    const l = saberPitcher(left.stats || {});
-    const r = saberPitcher(right.stats || {});
-    return [
-      ...common,
-      ['防御率', l.ERA ? l.ERA.toFixed(2) : '---', r.ERA ? r.ERA.toFixed(2) : '---'],
-      ['投球回', left.stats?.IP ? fmtIP(left.stats.IP) : '---', right.stats?.IP ? fmtIP(right.stats.IP) : '---'],
-      ['WHIP', l.WHIP || '---', r.WHIP || '---'],
-      ['球速', left.pitching?.velocity ?? '---', right.pitching?.velocity ?? '---'],
-      ['制球', left.pitching?.control ?? '---', right.pitching?.control ?? '---'],
-    ];
-  }
-  if (!left.isPitcher && !right.isPitcher) {
-    const l = saberBatter(left.stats || {});
-    const r = saberBatter(right.stats || {});
-    const lBatted = Object.fromEntries(battedBallRows(left));
-    const rBatted = Object.fromEntries(battedBallRows(right));
-    return [
-      ...common,
-      ['打率', fmtAvg(left.stats?.H || 0, left.stats?.AB || 0), fmtAvg(right.stats?.H || 0, right.stats?.AB || 0)],
-      ['OPS', l.OPS ? l.OPS.toFixed(3) : '---', r.OPS ? r.OPS.toFixed(3) : '---'],
-      ['本塁打', left.stats?.HR || 0, right.stats?.HR || 0],
-      ['平均打球速度', lBatted['平均打球速度'], rBatted['平均打球速度']],
-      ['強打球率', lBatted['強打球率'], rBatted['強打球率']],
-      ['守備', left.batting?.defense ?? '---', right.batting?.defense ?? '---'],
-    ];
-  }
-  return [
-    ...common,
-    ['今季 WAR', left.isPitcher ? saberPitcher(left.stats || {}).WAR : saberBatter(left.stats || {}).WAR,
-      right.isPitcher ? saberPitcher(right.stats || {}).WAR : saberBatter(right.stats || {}).WAR],
-    ['主能力', left.isPitcher ? left.pitching?.velocity : left.batting?.contact,
-      right.isPitcher ? right.pitching?.velocity : right.batting?.contact],
-  ];
+export function compareRows(left, right) {
+  const l = new Map(playerMetrics(left));
+  const r = new Map(playerMetrics(right));
+  // Mixed pitcher/batter comparisons retain each role's meaningful measures.
+  const labels = [...new Set([...l.keys(), ...r.keys()])];
+  const war = player => {
+    const s = player.stats;
+    const keys = player.isPitcher ? ['IP', 'HRp', 'BBp', 'HBPp', 'Kp'] : ['PA', 'AB', 'H', 'D', 'T', 'HR', 'BB', 'HBP', 'SF'];
+    const sample = player.isPitcher ? s?.IP : s?.PA;
+    if (!(sample > 0) || !recorded(s, keys)) return missing;
+    return value((player.isPitcher ? saberPitcher(s) : saberBatter(s)).WAR);
+  };
+  return [...labels.map(label => [label, l.get(label) ?? missing, r.get(label) ?? missing]),
+    ['今季 WAR', war(left), war(right)]];
 }
 
 export function PlayerComparisonDialog({ players, onRemove, onClose }) {
-  if (!Array.isArray(players) || players.length !== 2) return null;
+  const enabled = Array.isArray(players) && players.length === 2;
+  const dialogRef = useResultDialog(onClose, enabled);
+  if (!enabled) return null;
   const [left, right] = players;
   return (
-    <div className="player-compare-overlay" role="dialog" aria-modal="true" aria-labelledby="player-compare-title">
-      <div className="player-compare-dialog">
+    <div className="player-compare-overlay" onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
+      <div ref={dialogRef} className="player-compare-dialog calm-detail" role="dialog" aria-modal="true" aria-labelledby="player-compare-title">
         <div className="player-compare-header">
           <div>
             <h2 id="player-compare-title">選手比較</h2>
-            <p>同じ指標を横並びで確認します。</p>
+            <p>同じ指標を横並びで確認。--- は未記録・算出不可・対象外です。</p>
           </div>
           <button type="button" onClick={onClose} aria-label="選手比較を閉じる">✕</button>
         </div>
@@ -73,11 +77,11 @@ export function PlayerComparisonDialog({ players, onRemove, onClose }) {
             <div key={player.id}>
               <strong>{player.name}</strong>
               <span>{player._teamName || ''}</span>
-              <button type="button" onClick={() => onRemove(player.id)}>比較から外す</button>
+              <button type="button" onClick={() => onRemove(player.id)} aria-label={`${player.name}を比較から外す`}>比較から外す</button>
             </div>
           ))}
         </div>
-        <div className="player-compare-table-wrap">
+        <div className="player-compare-table-wrap" role="region" aria-label="選手比較表" tabIndex={0}>
           <table className="tbl player-compare-table">
             <thead>
               <tr>
@@ -105,7 +109,7 @@ export function PlayerComparisonDialog({ players, onRemove, onClose }) {
 export function PlayerComparisonTray({ players, onRemove, onClear, onOpen }) {
   if (!Array.isArray(players) || players.length === 0) return null;
   return (
-    <aside className="player-compare-tray" aria-label="選手比較">
+    <aside className="player-compare-tray calm-detail" aria-label="選手比較">
       <div className="player-compare-tray-title">比較 {players.length}/2</div>
       <div className="player-compare-tray-list">
         {players.map((player) => (
