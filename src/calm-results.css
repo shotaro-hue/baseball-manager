@@ -1,0 +1,43 @@
+/* Schedule, result and league screens continue the shared detail theme. */
+.calm-detail {
+  --text: #17243a; --gold: #095cc7; --green: #14714b; --red: #b42332; --blue: #095cc7;
+}
+.calm-shell:has(:is(.detail-schedule,.detail-leaders,.detail-standings,.detail-records)) { background: #fff; }
+.app.detail-result { min-height: 100dvh; padding-bottom: env(safe-area-inset-bottom); background: #fff; color: #17243a; }
+.detail-result .btn-gold { background: #1262d4; color: #fff; border: 1px solid #1262d4; }
+.detail-result .fsb, .detail-records .fsb { gap: 12px; flex-wrap: wrap; }
+.detail-result .tbl { min-width: 440px !important; }
+.detail-result .tbl :is(th,td):first-child { min-width: 100px; max-width: 160px; white-space: normal !important; overflow-wrap: anywhere; }
+.detail-score-dialog { box-sizing: border-box; overflow-wrap: anywhere; }
+.detail-score-dialog button { min-width: 44px; }
+.detail-score-dialog .tbl { min-width: 440px; }
+.detail-score-dialog .tbl :is(th,td):first-child { min-width: 100px; }
+.detail-score-dialog .tbl td { font-size: 14px; }
+.detail-leaders input[type=checkbox] { width: 20px; height: 20px; }
+.detail-leaders label { min-height: 44px; flex-wrap: wrap; }
+.calm-detail :is(.identity-second-table,.standings-tbl) :is(th,td):first-child { position: static !important; }
+.calm-detail :is(.identity-second-table,.standings-tbl) :is(th,td):nth-child(2) { position: sticky; left: 0; z-index: 2; background: #fff; min-width: 110px; max-width: 160px; white-space: normal; }
+.calm-detail :is(.identity-second-table,.standings-tbl) th:nth-child(2) { z-index: 4; background: #edf4fc; }
+.detail-standings :is(.rank-1,.rank-2,.rank-3,.rank-low) { color: #095cc7; }
+.calm-detail button[aria-pressed=true] { box-shadow: inset 0 -3px #095cc7; }
+.detail-records summary { min-height: 44px; }
+.detail-schedule h1 { margin-bottom: 0; }
+.schedule-months { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0; }
+.schedule-months button { flex: 1 0 20%; padding: 8px; border: 1px solid #c5d8ed; border-radius: 6px; background: #f6f9fd; color: #38506f; }
+.schedule-months button[aria-pressed=true] { color: #095cc7; background: #edf6ff; }
+.schedule-agenda-row { display: flex; align-items: center; gap: 10px; padding: 14px 0; border-bottom: 1px solid #dce6f2; }
+.schedule-agenda-row[data-selected=true] { background: #f0f7ff; }
+.schedule-agenda-date { flex: 0 0 44px; font-size: 14px; font-weight: 700; color: #38506f; }
+.schedule-agenda-row small { display: block; font-size: 13px; color: #53657c; }
+.schedule-agenda-date small { color: #095cc7; }
+.schedule-agenda-match { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.schedule-opponent { border: 0; background: transparent; color: #17243a; text-align: left; padding: 4px 0; width: 100%; font-size: 16px !important; font-weight: 700; }
+.schedule-score { flex: 0 0 auto; color: #095cc7; background: #edf6ff; border: 1px solid #c5d8ed; padding: 8px; border-radius: 6px; }
+.schedule-score strong { font-size: 16px; }
+.schedule-calendar-scroll { overflow-x: auto; max-width: 100%; }
+.schedule-calendar-grid { min-width: 620px; }
+.calendar-day-button { background: transparent; color: #095cc7; border: 0; min-width: 44px; padding: 4px; }
+@media(max-width:760px) {
+  .detail-score-overlay { padding: 0 !important; }
+  .detail-score-overlay .detail-score-dialog { border-radius: 0 !important; min-height: 100dvh; margin: 0 !important; padding: 16px 16px calc(24px + env(safe-area-inset-bottom)) !important; }
+}
