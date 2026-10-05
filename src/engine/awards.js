@@ -30,10 +30,11 @@ export function calcSeasonAwards(teams, year) {
   const paPitchers = pitchers.filter(p => p._league === 'パ');
 
   return {
+    version: 2,
     year,
-    mvp:        { central: pickMVP(seBatters, allPlayers), pacific: pickMVP(paBatters, allPlayers) },
+    mvp:        { central: pickMVP(seBatters, sePitchers, seTeams), pacific: pickMVP(paBatters, paPitchers, paTeams) },
     sawamura:   pickSawamura(pitchers),
-    rookie:     pickRookie(allPlayers),
+    rookie:     { central: pickRookie(allPlayers.filter(p => p._league === 'セ')), pacific: pickRookie(allPlayers.filter(p => p._league === 'パ')) },
     bestNine:   { central: pickBestNine(seBatters, sePitchers), pacific: pickBestNine(paBatters, paPitchers) },
     titles:     { central: calcTitles(seTeams), pacific: calcTitles(paTeams) },
     farmAwards: calcFarmAwards(teams),
@@ -42,55 +43,69 @@ export function calcSeasonAwards(teams, year) {
 
 // リーグ内タイトル計算（首位打者・本塁打王・打点王・盗塁王・最優秀防御率・最多勝・最多奪三振・最多セーブ）
 function calcTitles(leagueTeams) {
-  const lgGames = Math.max(...leagueTeams.map(t => (t.wins||0)+(t.losses||0)), 80);
+  const lgGames = Math.max(...leagueTeams.map(t => (t.wins||0)+(t.losses||0)+(t.draws||0)), 80);
   const minPA = Math.round(lgGames * 3.1);
   const minIP = lgGames;
 
-  const lp = leagueTeams.flatMap(t => t.players.map(p => ({...p, _teamName: t.name})));
+  const lp = leagueTeams.flatMap(t => t.players.map(p => ({...p, _teamName: t.name, _teamId: t.id})));
   const batters  = lp.filter(p => !p.isPitcher);
   const pitchers = lp.filter(p =>  p.isPitcher);
 
-  const top = (arr, fn) => {
-    if (!arr.length) return null;
-    const sorted = [...arr].sort((a,b) => fn(b) - fn(a));
-    const winner = sorted[0];
-    return { name: winner.name, teamName: winner._teamName, value: fn(winner) };
+  const top = (arr, fn, ascending = false) => {
+    const scored = arr.map(p => ({ p, value: fn(p) })).filter(x => Number.isFinite(x.value));
+    if (!scored.length) return null;
+    const best = (ascending ? Math.min : Math.max)(...scored.map(x => x.value));
+    const winners = scored.filter(x => Math.abs(x.value - best) < 1e-12).map(({p, value}) => ({
+      playerId: p.id, teamId: p._teamId, name: p.name, teamName: p._teamName, value,
+    }));
+    // Keep the first winner's legacy fields for existing saves/consumers.
+    return { ...winners[0], winners };
   };
 
   const qBatters  = batters.filter(p => (p.stats?.PA||0) >= minPA);
   const qPitchers = pitchers.filter(p => (p.stats?.IP||0) >= minIP);
 
-  const era = qPitchers.length ? (() => {
-    const sorted = [...qPitchers].sort((a,b) => {
-      const ea = a.stats.IP>0?a.stats.ER/a.stats.IP*9:99;
-      const eb = b.stats.IP>0?b.stats.ER/b.stats.IP*9:99;
-      return ea - eb;
-    });
-    const w = sorted[0];
-    return { name: w.name, teamName: w._teamName, value: +(w.stats.ER/w.stats.IP*9).toFixed(2) };
-  })() : null;
+  const era = top(qPitchers, p => p.stats.IP > 0 && Number.isFinite(p.stats.ER) ? p.stats.ER / p.stats.IP * 9 : NaN, true);
 
   return {
-    avg: top(qBatters,  p => p.stats.AB>0?p.stats.H/p.stats.AB:0),
-    hr:  top(batters,   p => p.stats?.HR||0),
-    rbi: top(batters,   p => p.stats?.RBI||0),
-    sb:  top(batters,   p => p.stats?.SB||0),
+    version: 2,
+    avg: top(qBatters,  p => p.stats.AB>0?p.stats.H/p.stats.AB:NaN),
+    obp: top(qBatters, p => {
+      const s = p.stats;
+      if (!['H','AB','BB','HBP','SF'].every(k => Number.isFinite(s[k]))) return NaN;
+      const denominator = s.AB + s.BB + s.HBP + s.SF;
+      return denominator > 0 ? (s.H + s.BB + s.HBP) / denominator : NaN;
+    }),
+    hr:  top(batters,   p => p.stats?.HR),
+    rbi: top(batters,   p => p.stats?.RBI),
+    sb:  top(batters,   p => p.stats?.SB),
     era,
-    win: top(pitchers,  p => p.stats?.W||0),
-    so:  top(pitchers,  p => p.stats?.Kp||0),
-    sv:  top(pitchers,  p => (p.stats?.SV||0)+(p.stats?.HLD||0)),
+    win: top(pitchers,  p => p.stats?.W),
+    winPct: top(pitchers.filter(p => p.stats?.W >= 13), p => Number.isFinite(p.stats.L) ? p.stats.W / (p.stats.W + p.stats.L) : NaN),
+    so:  top(pitchers,  p => p.stats?.Kp),
+    sv:  top(pitchers,  p => p.stats?.SV),
+    hld: top(pitchers,  p => p.stats?.HLD),
   };
 }
 
-function pickMVP(batters, allPlayers) {
-  if (!batters.length) return null;
+function pickMVP(batters, pitchers, teams) {
+  const measured = teams.flatMap(t => t.players).filter(p => p.isPitcher && p.stats?.IP > 0 && Number.isFinite(p.stats.ER));
+  const ip = measured.reduce((sum, p) => sum + p.stats.IP, 0);
+  const leagueERA = ip > 0 ? measured.reduce((sum, p) => sum + p.stats.ER, 0) / ip * 9 : null;
   const scored = batters.map(p => {
     const sb = saberBatter(p.stats ?? {});
     const teamBonus = Math.min((p._teamWins || 0) / 12, 4);
-    const score = sb.WAR * 0.6 + sb.OPS * 18 + (p.stats?.RBI || 0) * 0.04 + teamBonus;
-    return { name: p.name, teamName: p._teamName, age: p.age, pos: p.pos, score, WAR: sb.WAR, OPS: sb.OPS, RBI: p.stats?.RBI || 0 };
+    // Both roles use a run-contribution proxy / 10, plus the same team bonus.
+    const score = sb.WAR + teamBonus;
+    return { playerId: p.id, teamId: p._teamId, name: p.name, teamName: p._teamName, age: p.age, pos: p.pos, score, WAR: sb.WAR, OPS: sb.OPS, RBI: p.stats?.RBI || 0 };
   });
-  return scored.sort((a, b) => b.score - a.score)[0] ?? null;
+  if (leagueERA != null) for (const p of pitchers) {
+    if (!Number.isFinite(p.stats?.ER)) continue;
+    const ERA = p.stats.ER / p.stats.IP * 9;
+    scored.push({ playerId: p.id, teamId: p._teamId, name: p.name, teamName: p._teamName, age: p.age, pos: '投手', ERA,
+      score: (leagueERA - ERA) * p.stats.IP / 90 + Math.min((p._teamWins || 0) / 12, 4) });
+  }
+  return scored.filter(p => Number.isFinite(p.score)).sort((a, b) => b.score - a.score)[0] ?? null;
 }
 
 function pickSawamura(pitchers) {
@@ -100,11 +115,11 @@ function pickSawamura(pitchers) {
     const sp = saberPitcher(p.stats ?? {});
     return (p.stats?.IP || 0) >= 130 && sp.ERA <= 3.50 && (p.stats?.W || 0) >= 10;
   });
-  const pool = eligible.length ? eligible : pitchers;
+  const pool = eligible;
   const best = pool.map(p => {
     const sp = saberPitcher(p.stats ?? {});
-    return { name: p.name, teamName: p._teamName, age: p.age, ERA: sp.ERA, FIP: sp.FIP, W: p.stats?.W || 0, IP: p.stats?.IP || 0 };
-  }).sort((a, b) => a.FIP - b.FIP);
+    return { playerId: p.id, teamId: p._teamId, name: p.name, teamName: p._teamName, age: p.age, ERA: sp.ERA, FIP: sp.FIP, W: p.stats?.W || 0, IP: p.stats?.IP || 0 };
+  }).filter(p => Number.isFinite(p.FIP)).sort((a, b) => a.FIP - b.FIP);
   return best[0] ?? null;
 }
 
@@ -114,19 +129,19 @@ function pickRookie(allPlayers) {
     const belowCareerLimit = p.isPitcher
       ? careerSummary.totalInningsPitched < 30
       : careerSummary.totalPlateAppearances < 60;
-    return p.age <= 27 && belowCareerLimit;
+    return p.age <= 27 && belowCareerLimit && (p.isPitcher ? p.stats?.IP > 0 : p.stats?.PA > 0);
   });
   const scored = rookies.map(p => {
     let score;
     if (p.isPitcher) {
       const ip = p.stats?.IP || 0;
-      score = ip > 0 ? Math.max(0, 4 - (saberPitcher(p.stats ?? {}).ERA || 4)) * 3 + ip * 0.05 : 0;
+      score = ip > 0 ? Math.max(0, 4 - saberPitcher(p.stats ?? {}).ERA) * 3 + ip * 0.05 : 0;
     } else {
       score = saberBatter(p.stats ?? {}).WAR * 2;
     }
-    return { name: p.name, teamName: p._teamName, age: p.age, pos: p.isPitcher ? '投手' : p.pos, score };
+    return { playerId: p.id, teamId: p._teamId, name: p.name, teamName: p._teamName, age: p.age, pos: p.isPitcher ? '投手' : p.pos, score };
   });
-  return scored.sort((a, b) => b.score - a.score)[0] ?? null;
+  return scored.filter(p => Number.isFinite(p.score)).sort((a, b) => b.score - a.score)[0] ?? null;
 }
 
 function pickBestNine(batters, pitchers) {
@@ -144,12 +159,12 @@ function pickBestNine(batters, pitchers) {
     result[label] = cands
       .sort((a, b) => saberBatter(b.stats ?? {}).WAR - saberBatter(a.stats ?? {}).WAR)
       .slice(0, count)
-      .map(p => ({ name: p.name, teamName: p._teamName, pos: p.pos }));
+      .map(p => ({ playerId: p.id, teamId: p._teamId, name: p.name, teamName: p._teamName, pos: p.pos }));
   }
   if (pitchers.length) {
     const bp = pitchers.map(p => ({ ...p, _war: saberPitcher(p.stats ?? {}).WAR }))
       .sort((a, b) => b._war - a._war)[0];
-    result['投手'] = bp ? [{ name: bp.name, teamName: bp._teamName, pos: '投手' }] : [];
+    result['投手'] = bp ? [{ playerId: bp.id, teamId: bp._teamId, name: bp.name, teamName: bp._teamName, pos: '投手' }] : [];
   }
   return result;
 }
@@ -158,19 +173,21 @@ function pickBestNine(batters, pitchers) {
 
 function calcFarmAwards(teams) {
   const leagueAwards = (leagueTeams, leagueName) => {
-    const all = leagueTeams.flatMap(t => (t.farm||[]).map(p => ({ ...p, _teamName: t.name })));
+    const all = leagueTeams.flatMap(t => (t.farm||[]).map(p => ({ ...p, _teamName: t.name, _teamId: t.id })));
     const batters  = all.filter(p => !p.isPitcher && (p.stats2?.PA||0) >= 50);
     const pitchers = all.filter(p =>  p.isPitcher && (p.stats2?.IP||0) >= 30);
     const top = (arr, fn) => {
-      if (!arr.length) return null;
-      const winner = arr.reduce((a,b) => fn(a) >= fn(b) ? a : b);
-      return { name: winner.name, teamName: winner._teamName, value: fn(winner) };
+      const scored = arr.map(p => ({ p, value: fn(p) })).filter(x => Number.isFinite(x.value));
+      if (!scored.length) return null;
+      const best = Math.max(...scored.map(x => x.value));
+      const winners = scored.filter(x => Math.abs(x.value - best) < 1e-12).map(({p, value}) => ({ playerId: p.id, teamId: p._teamId, name: p.name, teamName: p._teamName, value }));
+      return { ...winners[0], winners };
     };
     return {
       league:  leagueName,
-      batting: top(batters, p => p.stats2.PA > 0 ? (p.stats2.H||0) / p.stats2.PA : 0),
-      hr:      top(all.filter(p=>!p.isPitcher), p => p.stats2?.HR||0),
-      wins:    top(pitchers, p => p.stats2?.W||0),
+      batting: top(batters.filter(p => p.stats2.AB > 0 && Number.isFinite(p.stats2.H)), p => p.stats2.H / p.stats2.AB),
+      hr:      top(all.filter(p=>!p.isPitcher), p => p.stats2?.HR),
+      wins:    top(pitchers, p => p.stats2?.W),
     };
   };
   const seTeams = teams.filter(t => t.league === 'セ');
