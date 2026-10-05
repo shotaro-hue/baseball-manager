@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { TEAM_DEFS, ACCEPT_THRESHOLD, CPU_RENEWAL_ROUNDS,
+import { TEAM_DEFS, CPU_RENEWAL_ROUNDS,
   NEGOTIATION_MORALE_ACCEPT_BONUS, NEGOTIATION_MORALE_CUT_PENALTY,
   NEGOTIATION_MORALE_ROUND_HIT, NEGOTIATION_TRUST_HAPPY, NEGOTIATION_TRUST_HOLDOUT } from '../constants';
 import { fmtSal, fmtM, fmtAvg, clamp } from '../utils';
 import { calcRetireWill } from '../engine/playerCore';
-import { evalOffer, getFaThreshold } from '../engine/contract';
+import { evaluateRenewalOffer, getFaThreshold } from '../engine/contract';
 import { saberBatter } from '../engine/sabermetrics';
 import { OV, CondBadge, HandBadge } from './ui';
 
@@ -1087,7 +1087,7 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, onSign,
   const [retryCount, setRetryCount] = useState({});
 
   const selectedPlayer = expiringPlayers.find(p => p.id === selectedId);
-  const selectedDemand = selectedId ? (demands?.[selectedId] || {}) : {};
+  const selectedDemand = selectedId != null ? (demands?.[selectedId] || {}) : {};
 
   const appendLog = (pid, entry) => {
     setDialogLogs(prev => ({ ...prev, [pid]: [...(prev[pid] || []), entry] }));
@@ -1105,21 +1105,20 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, onSign,
     const sanitizedOfferSal = Number.isFinite(Number(offerSal)) ? Math.round(Number(offerSal)) : 0;
     if (sanitizedOfferSal <= 0) return;
     const p = selectedPlayer;
+    if (settled[p.id]) return;
     const { demandSalary = p.salary, minAcceptSalary = Math.round(p.salary * 0.6), resistanceFactor = 0.5 } = selectedDemand;
     const logs = dialogLogs[p.id] || [];
     const round = logs.filter(l => l.from === 'team').length + 1;
+    const evaluation = evaluateRenewalOffer(p, { salary: sanitizedOfferSal, years: offerYrs }, myTeam, teams,
+      { ...selectedDemand, demandSalary, minAcceptSalary, resistanceFactor }, round);
+    if (!evaluation.valid) {
+      appendLog(p.id, { from: 'player', text: evaluation.reason });
+      return;
+    }
 
     appendLog(p.id, { from: 'team', text: `「${fmtSal(sanitizedOfferSal)}、${offerYrs}年ではいかがでしょうか？」`, salary: sanitizedOfferSal, years: offerYrs });
 
-    if (settled[p.id]) return;
-
-    const isDemandMet = sanitizedOfferSal >= demandSalary && offerYrs >= 1;
-    const score = evalOffer(p, { salary: sanitizedOfferSal, years: offerYrs }, myTeam, teams).total;
-    const acceptScore = round === 1
-      ? ACCEPT_THRESHOLD + Math.round(resistanceFactor * 20)
-      : ACCEPT_THRESHOLD;
-
-    if (isDemandMet || score >= acceptScore) {
+    if (evaluation.accepted) {
       const moraleDelta = sanitizedOfferSal >= demandSalary ? NEGOTIATION_MORALE_ACCEPT_BONUS
                         : sanitizedOfferSal < p.salary * 0.90 ? NEGOTIATION_MORALE_CUT_PENALTY : 0;
       const extraRounds = Math.max(0, round - 1);
@@ -1239,6 +1238,14 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, onSign,
                 <div style={{ fontSize: 12, color: '#d97706', fontWeight: 600 }}>
                   要求推定: {fmtSal(selectedDemand.demandSalary || selectedPlayer.salary)}
                 </div>
+                {selectedDemand.assessment && <details style={{ fontSize: 14, marginTop: 6, color: '#334155' }}>
+                  <summary style={{ cursor: 'pointer', padding: '8px 0' }}>要求年俸の理由</summary>
+                  <div>前年 {fmtSal(selectedDemand.assessment.previousSalary)} → 要求 {fmtSal(selectedDemand.demandSalary)}</div>
+                  {selectedDemand.assessment.reasons.map((reason, i) => <div key={i}>{reason.label}</div>)}
+                  {selectedDemand.assessment.roleSource && <div>投手の分類：{selectedDemand.assessment.roleSource}</div>}
+                  <div>提示下限 {fmtSal(selectedDemand.minOfferSalary)}／合意判定の下限 {fmtSal(selectedDemand.minAcceptSalary)}</div>
+                  <div>タイトル加点は最大25%、チーム加点は最大5%。合意額は契約条件によって変わります。</div>
+                </details>}
                 <div style={{ fontSize: 11, color: '#9ca3af' }}>
                   morale {Math.round(selectedPlayer.morale ?? 70)} / trust {Math.round(selectedPlayer.trust ?? 50)} / 再交渉 {retryCount[selectedPlayer.id] || 0} 回
                 </div>
@@ -1293,7 +1300,7 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, onSign,
                     value={offerSal}
                     onChange={e => setOfferSal(Number(e.target.value))}
                     step={100}
-                    min={selectedDemand.minAcceptSalary || 420}
+                    min={selectedDemand.minOfferSalary ?? selectedDemand.minAcceptSalary ?? 420}
                     style={{ width: 90, padding: '4px 6px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 13, textAlign: 'right' }}
                   />
                   <span style={{ fontSize: 12 }}>万円</span>

@@ -573,13 +573,14 @@ export function useOffseason(gs) {
     // 自チーム満了選手の要求額を事前計算して state に保持
     const myDeveloped=developedTeams.find(t=>t.id===myId);
     const expiringMine=(myDeveloped?.players||[]).filter(p=>(p.contractYearsLeft??99)<=1&&!p.isRetired&&!p._retireNow);
+    const awards=calcSeasonAwards(developedTeams,year);
+    const currentSeasonHistory = getSeasonHistory();
+    const salaryContext = { year, awards, championship: currentSeasonHistory.championships?.find(c => c.year === year), teams: developedTeams, team: myDeveloped };
     const demands={};
-    for(const p of expiringMine) demands[p.id]=calcPlayerDemand(p);
+    for(const p of expiringMine) demands[p.id]=calcPlayerDemand(p, salaryContext);
     setContractRenewalDemands(demands);
     setTeams(developedTeams);
     setDevelopmentSummary(mySummary);
-    const awards=calcSeasonAwards(developedTeams,year);
-    const currentSeasonHistory = getSeasonHistory();
     const {records:newRec,broken:brokenRecs}=updateRecords(currentSeasonHistory.records,developedTeams);
     if(brokenRecs.length>0){const recLabel={singleSeasonHR:"シーズン本塁打",singleSeasonAVG:"シーズン打率",singleSeasonK:"シーズン奪三振"};const fmtVal=r=>r.type==="singleSeasonAVG"?`.${String(Math.round(r.value*1000)).padStart(3,"0")}`:r.type==="singleSeasonK"?`${r.value}奪三振`:`${r.value}本塁打`;const fmtOld=r=>r.type==="singleSeasonAVG"?`.${String(Math.round(r.oldValue*1000)).padStart(3,"0")}`:r.type==="singleSeasonK"?`${r.oldValue}奪三振`:`${r.oldValue}本塁打`;brokenRecs.forEach(r=>addNews({type:"record",headline:`🏅 ${r.playerName}（${r.teamName}）が${recLabel[r.type]}記録を更新！`,source:"NPB記録部",dateLabel:`${year}年`,body:`${r.playerName}（${r.teamName}）が${year}年シーズンに${fmtVal(r)}を記録し、従来の${recLabel[r.type]}記録（${fmtOld(r)}）を塗り替えた。`}));}
     const allAlumni=developedTeams.flatMap(t=>t.history||[]);
@@ -626,7 +627,7 @@ export function useOffseason(gs) {
   // 契約更改フェーズ完了: CPU球団の更改シミュ + 人気計算 → development_phase へ
   const handleContractRenewalPhaseNext = (faDeclaredPlayerIds = []) => {
     const safeDeclaredIds = Array.isArray(faDeclaredPlayerIds)
-      ? [...new Set(faDeclaredPlayerIds.filter(id => typeof id === "string" && id.trim().length > 0))]
+      ? [...new Set(faDeclaredPlayerIds.filter(id => (typeof id === "string" && id.trim().length > 0) || (typeof id === "number" && Number.isFinite(id))))]
       : [];
 
     const declaredIdSet = new Set(safeDeclaredIds);
@@ -656,7 +657,10 @@ export function useOffseason(gs) {
     const baseTeams = declaredIdSet.size > 0
       ? teams.map(t => (t.id === myId ? { ...t, players: t.players.filter(p => !declaredIdSet.has(p.id)) } : t))
       : teams;
-    const renewResult = cpuRenewContracts(baseTeams, myId, baseTeams);
+    const renewalHistory = getSeasonHistory();
+    const renewResult = cpuRenewContracts(baseTeams, myId, baseTeams, { year,
+      awards: renewalHistory.awards?.find(a => a.year === year),
+      championship: renewalHistory.championships?.find(c => c.year === year) });
     const postCpuTeams = renewResult.updatedTeams;
     // オフシーズン人気変動（handleRetirePhaseNextから移動）
     const makeLeagueRanking = (lg) => [...postCpuTeams.filter(t => t.league === lg)].sort((a, b) => {
