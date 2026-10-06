@@ -15,6 +15,7 @@ export default function ContractRenewalRoute({
       myId={myId}
       year={year}
       demands={os.contractRenewalDemands || {}}
+      renewalPlayerIds={os.contractRenewalDemands == null ? undefined : Object.keys(os.contractRenewalDemands)}
       onSign={os.handleContractRenewalSign}
       onRelease={(pid, reason = 'offseason_release') => {
         const player = myTeam?.players.find((entry) => entry.id === pid);
@@ -26,7 +27,7 @@ export default function ContractRenewalRoute({
 
         if (!player) return;
 
-        gs.setFaPool((prev) => [...prev, { ...player, isFA: true, contractYearsLeft: 0, departureReason: reason }]);
+        gs.setFaPool((prev) => [...prev, { ...player, isFA: true, contractYearsLeft: 0, departureReason: reason, marketLastStats: player.stats, faEnteredYear: year, faOriginTeamId: myId, faOriginTeamName: myTeam?.name }]);
         gs.addToHistory(myId, player, reason === 'salary_cut' ? '自由契約（減額制限超過）' : reason);
         gs.addNews({
           type: 'season',

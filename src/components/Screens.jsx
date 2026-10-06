@@ -457,7 +457,7 @@ export function RetirePhaseScreen({teams,myId,year,error,onNext}){
           <div className="card" style={{textAlign:"center",padding:"32px 16px"}}>
             <div style={{fontSize:32,marginBottom:8}}>✅</div>
             <div style={{fontSize:13,color:"#94a3b8"}}>引退候補の選手はいません</div>
-            <button className="btn btn-gold" style={{marginTop:16,padding:"10px 32px"}} onClick={()=>onNext({})}>次へ（戦力外フェーズ）→</button>
+            <button className="btn btn-gold" style={{marginTop:16,padding:"10px 32px"}} onClick={()=>onNext({})}>国内FA・自由契約補強へ →</button>
           </div>
         )}
         {candidates.map(p=>{
@@ -503,7 +503,7 @@ export function RetirePhaseScreen({teams,myId,year,error,onNext}){
         })}
         {candidates.length>0&&(
           <button className="btn btn-gold" style={{width:"100%",padding:"12px 0",marginTop:8,opacity:allDone?1:0.5}} onClick={()=>{if(allDone)handleNext();}}>
-            戦力外フェーズへ →
+            国内FA・自由契約補強へ →
           </button>
         )}
       </div>

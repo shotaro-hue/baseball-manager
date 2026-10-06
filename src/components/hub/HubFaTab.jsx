@@ -18,7 +18,7 @@ function Confirm({ offer, budget, placement, onClose, onConfirm, error }) {
   </section></div>;
 }
 
-export default function HubFaTab({ myTeam, faPool = [], faYears = {}, setFaYears, foreignActiveCount, gameDay, year, myId, notify, upd, setFaPool, onPlayerClick, onToggleCompare, comparePlayerIds = [] }) {
+export default function HubFaTab({ myTeam, faPool = [], faYears = {}, setFaYears, foreignActiveCount, gameDay, year, myId, notify, upd, setFaPool, onPlayerClick, onToggleCompare, comparePlayerIds = [], marketMode = 'season' }) {
   const [selectedId, setSelectedId] = useState(null);
   const [snapshot, setSnapshot] = useState(null);
   const [type, setType] = useState('all');
@@ -79,7 +79,7 @@ export default function HubFaTab({ myTeam, faPool = [], faYears = {}, setFaYears
     processing.current = true; signedIds.current.add(offer.player.id);
     const placement = marketPlacement(myTeam, offer.player);
     ledger.current.spent += offer.salary * offer.years;
-    upd(myId, team => addMarketSigning(team, offer.player, offer.salary, offer.years, year));
+    upd(myId, team => addMarketSigning(team, offer.player, offer.salary, offer.years, year, marketMode));
     setFaPool(prev => prev.filter(p => p.id !== offer.player.id));
     setFaYears(prev => { const next = { ...prev }; delete next[offer.player.id]; return next; });
     setReceipt({ ...offer, placement }); setOffer(null);
@@ -105,7 +105,7 @@ export default function HubFaTab({ myTeam, faPool = [], faYears = {}, setFaYears
     <header><h2>FA・自由契約市場</h2><p>補強候補を比較し、条件と配属先を確認して契約します。</p>
       <div className="fa-summary"><span>予算 <strong>{money(budget)}</strong></span><span>登録 {myTeam.players.length}/{MAX_ROSTER}人</span><span>外国人 {Number.isFinite(foreignActiveCount) ? foreignActiveCount : myTeam.players.filter(p => p.isForeign).length}/4人</span><span>市場 {faPool.length}人</span></div>
       <details><summary>人数から見る補強ポイント</summary><p>先発4・中継ぎ3・抑え1は登録選手、捕手は登録{MIN_ACTIVE_CATCHERS}・登録＋ファーム{MIN_TOTAL_BY_POS['捕手']}の目安です。選手の能力や将来性を保証する評価ではありません。</p>{needs.length ? <ul>{needs.map(h => <li key={h}>{h}</li>)}</ul> : <p>この人数の目安を満たしています。</p>}</details>
-      <p className="fa-note">外国人補強：{gameDay > FOREIGN_DEADLINE_DAY ? '期限終了' : Number.isFinite(gameDay) ? `期限まであと${FOREIGN_DEADLINE_DAY - gameDay}日（第${FOREIGN_DEADLINE_DAY}日まで）` : '日程未記録'}</p>
+      <p className="fa-note">{marketMode === 'offseason' ? '国内FA・自由契約の補強期間です。外国人補強は翌シーズンの市場で行えます。' : `外国人補強：${gameDay > FOREIGN_DEADLINE_DAY ? '期限終了' : Number.isFinite(gameDay) ? `期限まであと${FOREIGN_DEADLINE_DAY - gameDay}日（第${FOREIGN_DEADLINE_DAY}日まで）` : '日程未記録'}`}</p>
     </header>
     <div className="fa-layout"><section className="fa-list" ref={list} tabIndex={-1} aria-label="市場の候補一覧">
       <div className="fa-filters"><label>市場<select value={type} onChange={e => setType(e.target.value)}><option value="all">全員</option><option value="domestic">国内FA・自由契約</option><option value="foreign">外国人FA</option></select></label><label>役割<select value={role} onChange={e => setRole(e.target.value)}><option value="all">全役割</option><option value="pitcher">投手</option><option value="batter">野手</option></select></label><label>並び順<select value={sort} onChange={e => setSort(e.target.value)}><option value="default">市場の順</option><option value="salary">年俸が安い順</option><option value="age">年齢が若い順</option></select></label><label>選手名<input type="search" value={search} onChange={e => setSearch(e.target.value)} /></label></div>
