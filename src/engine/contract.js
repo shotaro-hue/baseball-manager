@@ -13,6 +13,7 @@ import {
 } from '../constants';
 import { analyzeTeamNeeds, getFrontOfficePlanPublic } from './trade';
 import { calculateSalaryDemand, renewalSalaryFloor } from './salaryDemand';
+import { salaryCutRule } from './renewalRules';
 
 /* ═══════════════════════════════════════════════
    FA 資格閾値 (NPB公式準拠・累積日数方式)
@@ -21,11 +22,24 @@ import { calculateSalaryDemand, renewalSalaryFloor } from './salaryDemand';
    判定フィールド: daysOnActiveRoster（一軍在籍累積日数）
 ═══════════════════════════════════════════════ */
 export function getFaThreshold(player) {
-  const base = (player.entryType === '高卒' || player.entryType === '外国人') ? 8 : 7;
+  const base = (['高卒', '高校生', '外国人'].includes(player.entryType)) ? 8 : 7;
   return {
     domestic: base * ACTIVE_ROSTER_FA_DAYS_PER_YEAR,
     overseas: 9 * ACTIVE_ROSTER_FA_DAYS_PER_YEAR,
   };
+}
+
+export function getFaProgress(player) {
+  const measured = Number.isFinite(player.daysOnActiveRoster) && player.daysOnActiveRoster >= 0;
+  const estimated = !measured && Number.isFinite(player.serviceYears) && player.serviceYears >= 0;
+  if (!measured && !estimated) return { recorded: false };
+  const days = measured ? player.daysOnActiveRoster : player.serviceYears * ACTIVE_ROSTER_FA_DAYS_PER_YEAR;
+  const threshold = getFaThreshold(player);
+  const progress = required => {
+    const remainingDays = Math.max(0, required - days);
+    return { remainingDays, years: Math.ceil(remainingDays / ACTIVE_ROSTER_FA_DAYS_PER_YEAR), eligible: remainingDays === 0 };
+  };
+  return { recorded: true, estimated, days, domestic: progress(threshold.domestic), overseas: progress(threshold.overseas) };
 }
 
 /* ═══════════════════════════════════════════════
@@ -46,11 +60,12 @@ export function calcPlayerDemand(player, context = {}) {
 }
 
 export function evaluateRenewalOffer(player, offer, team, teams, demand, round = 1) {
-  const floor = demand.minOfferSalary ?? renewalSalaryFloor(player);
   const salary = Number(offer.salary);
   const years = Number(offer.years);
-  const valid = Number.isFinite(salary) && salary >= floor && Number.isInteger(years) && years >= 1 && years <= 7;
-  if (!valid) return { accepted: false, valid: false, score: null, reason: '提示下限または契約年数を満たしていません' };
+  const valid = offer.salary !== '' && Number.isFinite(salary) && salary > 0 && Number.isInteger(years) && years >= 1 && years <= 7;
+  if (!valid) return { accepted: false, valid: false, score: null, reason: '年俸は正の金額、契約年数は1〜7年で入力してください' };
+  const minimum = player.育成 ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA;
+  const cut = salaryCutRule(player, salary);
   const defaults = { money:50, winning:50, playing:50, hometown:30, loyalty:50, stability:50, future:50 };
   const normalized = { ...player, trust: player.trust ?? 50, personality: { ...defaults, ...player.personality } };
   const pitchScore = player.isPitcher
@@ -58,8 +73,9 @@ export function evaluateRenewalOffer(player, offer, team, teams, demand, round =
     : undefined;
   const score = evalOffer(normalized, offer, team, teams, { referenceSalary: demand.demandSalary, playingScore: pitchScore }).total;
   const threshold = round === 1 ? ACCEPT_THRESHOLD + Math.round((demand.resistanceFactor ?? .5) * 20) : ACCEPT_THRESHOLD;
-  const accepted = salary >= demand.demandSalary || (salary >= (demand.minAcceptSalary ?? floor) && score >= threshold);
-  return { accepted, valid: true, score, threshold, reason: accepted ? '合意' : '要求額・契約条件の再検討が必要です' };
+  const accepted = salary >= minimum && (salary >= demand.demandSalary || (salary >= (demand.minAcceptSalary ?? minimum) && score >= threshold));
+  return { accepted, valid: true, score, threshold, cut, freeAgencyRequested: !accepted && cut.exceeds,
+    reason: accepted ? (cut.exceeds ? '減額制限超過に同意して合意' : '合意') : salary < minimum ? `最低年俸保障（${minimum}万円）を下回るため合意できません` : cut.exceeds ? '減額制限超過に同意しません。制限内の条件を提示しない場合は自由契約を希望します' : '要求額・契約条件の再検討が必要です' };
 }
 /* ═══════════════════════════════════════════════
    MULTI-ROUND NEGOTIATION SIMULATION

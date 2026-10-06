@@ -27,12 +27,13 @@ describe('salary demand in renewal screen', () => {
     expect(onSign).toHaveBeenCalledWith(0, demand.demandSalary, 1, expect.any(Number), expect.any(Number));
     act(() => view.unmount());
   });
-  it('does not sign a manually entered offer below the floor', () => {
+  it('allows a low amount to be presented but never signs below the minimum salary guarantee', () => {
     const { view, onSign } = setup();
     act(() => view.root.findByType('input').props.onChange({ target: { value: '100' } }));
     send(view);
+    act(() => view.root.findAllByType('button').find(n => text(n) === 'この条件で提示する').props.onClick());
     expect(onSign).not.toHaveBeenCalled();
-    expect(text(view.root)).toContain('提示下限または契約年数');
+    expect(text(view.root)).toContain('最低年俸保障');
     act(() => view.unmount());
   });
 });

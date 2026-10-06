@@ -21,6 +21,52 @@ function setup(players, demandOverride = {}, farm = []) {
 }
 
 describe('contract renewal workflow', () => {
+  it('batch confirmation sends one offer per selected player with the shared rules and no automatic release', () => {
+    const ui = setup([player(0), player(1), player(2)], { 0: { demandSalary: 1000, minAcceptSalary: 750 }, 1: { demandSalary: 5000, minAcceptSalary: 4000 } });
+    ui.select(1); ui.salary('1000'); ui.click('← 選手一覧に戻る');
+    ui.click('まとめて提示を開く');
+    for (const id of [0, 1]) act(() => ui.view.root.findAllByType('input').find(n => n.props['aria-label'] === `選手${id}をまとめて提示の対象にする`).props.onChange({ target: { checked: true } }));
+    ui.click('選択した選手の提示内容を確認'); expect(ui.props.onSign).not.toHaveBeenCalled();
+    const confirm = ui.button('各選手へ1回ずつ提示する').props.onClick;
+    act(() => { confirm(); confirm(); });
+    expect(ui.props.onSign).toHaveBeenCalledTimes(1); expect(ui.props.onSign.mock.calls[0][0]).toBe(0);
+    expect(ui.props.onRelease).not.toHaveBeenCalled(); expect(ui.props.onNext).not.toHaveBeenCalled();
+    const result = text(ui.view.root.findByProps({ role: 'dialog' }));
+    expect(result).toContain('選手0：合意'); expect(result).toContain('選手1：未合意'); expect(result).not.toContain('選手2');
+    ui.click('結果を閉じる'); ui.click('まとめて提示を閉じる'); ui.select(1);
+    expect(text(ui.view.root)).toContain('第1回'); expect(text(ui.view.root)).not.toContain('第2回');
+    act(() => ui.view.unmount());
+  });
+  it('rejecting an over-limit cut requires an explicit free-contract decision, without FA rights', () => {
+    const ui = setup([player(0, { salary: 10000, daysOnActiveRoster: 0 })], { 0: { demandSalary: 20000, minAcceptSalary: 15000 } });
+    ui.select(0); ui.salary('5000'); ui.click('オファーを出す'); expect(ui.props.onSign).not.toHaveBeenCalled();
+    ui.click('この条件で提示する');
+    expect(text(ui.view.root)).toContain('減額制限の対応待ち'); expect(ui.button('更改結果を確認する').props.disabled).toBe(true);
+    expect(ui.props.onRelease).not.toHaveBeenCalled();
+    ui.click('自由契約の手続きへ'); ui.click('戻る'); expect(ui.props.onRelease).not.toHaveBeenCalled();
+    ui.click('自由契約の手続きへ'); ui.click('自由契約を確定する');
+    expect(ui.props.onRelease).toHaveBeenCalledWith(0, 'salary_cut');
+    ui.rerender([]); ui.click('更改結果を確認する'); expect(text(ui.view.root.findByProps({ role: 'dialog' }))).toContain('選手0：自由契約');
+    ui.click('確定して次へ進む'); expect(ui.props.onNext).toHaveBeenCalledWith([]);
+    act(() => ui.view.unmount());
+  });
+  it('can revise to the exact cut boundary and keeps rejection history', () => {
+    const ui = setup([player(0, { salary: 10000 })], { 0: { demandSalary: 20000, minAcceptSalary: 15000 } });
+    ui.select(0); ui.salary('5000'); ui.click('オファーを出す'); ui.click('この条件で提示する');
+    ui.click('減額制限内で再提示する'); expect(ui.view.root.findByType('input').props.value).toBe('7500');
+    expect(text(ui.view.root)).toContain('同意しません'); expect(ui.props.onRelease).not.toHaveBeenCalled();
+    act(() => ui.view.unmount());
+  });
+  it('batch presets remain drafts until confirmed and disclose over-limit cuts', () => {
+    const ui = setup([player(0, { salary: 10000 })]); ui.click('まとめて提示を開く'); ui.click('提示可能な全員を選択');
+    act(() => ui.view.root.findAllByType('select').find(n => n.props.value === 'demand').props.onChange({ target: { value: 'previous' } }));
+    act(() => ui.view.root.findAllByType('input').find(n => n.props.type === 'number').props.onChange({ target: { value: '50' } }));
+    ui.click('選択した選手の下書きに適用'); expect(ui.props.onSign).not.toHaveBeenCalled();
+    ui.click('選択した選手の提示内容を確認');
+    expect(text(ui.view.root.findByProps({ role: 'dialog' }))).toContain('減額制限超過');
+    ui.click('戻る'); expect(ui.props.onSign).not.toHaveBeenCalled(); expect(ui.props.onRelease).not.toHaveBeenCalled();
+    act(() => ui.view.unmount());
+  });
   it('includes non-expiring and farm salaries and marks missing payroll as unrecorded', () => {
     const ui = setup([player(0), player(1, { salary: 2000, contractYearsLeft: 3 })], {}, [player(2, { salary: 800 })]);
     expect(text(ui.view.root)).toContain('年俸総額の見込み 3,800万円');

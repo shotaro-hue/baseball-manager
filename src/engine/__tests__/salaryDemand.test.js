@@ -78,9 +78,9 @@ describe('performance-based salary demand', () => {
 });
 
 describe('shared renewal negotiation', () => {
-  it('rejects invalid/under-floor offers even when personality would favor them', () => {
+  it('allows below-boundary offers to be evaluated but rejects invalid amounts and years', () => {
     const p = batter(10000); const demand = calcPlayerDemand(p);
-    expect(evaluateRenewalOffer(p, { salary: 7000, years: 1 }, team, [team, other], demand).valid).toBe(false);
+    expect(evaluateRenewalOffer(p, { salary: 7000, years: 1 }, team, [team, other], demand).valid).toBe(true);
     expect(evaluateRenewalOffer(p, { salary: demand.demandSalary, years: 0 }, team, [team, other], demand).valid).toBe(false);
     expect(evaluateRenewalOffer(p, { salary: NaN, years: 1 }, team, [team, other], demand).valid).toBe(false);
   });
