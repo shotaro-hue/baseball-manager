@@ -151,7 +151,7 @@ export default function HubShell({ state, flows, app }) {
   const totalGames = (myTeam?.wins || 0) + (myTeam?.losses || 0);
   const remain = SEASON_GAMES - totalGames;
   const toggleCompare = useCallback((player, teamName) => {
-    if (!player?.id) return;
+    if (player?.id == null) return;
     if (comparePlayers.some((entry) => entry.id === player.id)) {
       setComparePlayers((current) =>
         current.filter((entry) => entry.id !== player.id),
