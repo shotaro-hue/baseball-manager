@@ -1,8 +1,9 @@
 import { MAX_ROSTER, FOREIGN_DEADLINE_DAY, MIN_ACTIVE_CATCHERS, MIN_TOTAL_BY_POS } from '../../constants';
 import { fmtIP } from '../../utils';
+import { prepareOffseasonFreeAgent } from '../../engine/offseasonMarket';
 
 export function marketMetrics(player) {
-  const s = player.stats || {};
+  const s = (player.isFA && player.marketLastStats) || player.stats || {};
   const measured = keys => keys.every(key => Number.isFinite(s[key]));
   const value = n => Number.isFinite(n) ? n : '未記録';
   if (player.isPitcher) return [['投球回', Number.isFinite(s.IP) ? fmtIP(s.IP) : '未記録'], ['防御率', measured(['IP', 'ER']) && s.IP > 0 ? (s.ER / s.IP * 9).toFixed(2) : '—'], ['勝利', value(s.W)], ['奪三振', value(s.Kp)], ['セーブ', value(s.SV)], ['ホールド', value(s.HLD)]];
@@ -46,9 +47,10 @@ export function validateMarketContract({ team, pool, player, salary, years, game
   return null;
 }
 
-export function addMarketSigning(team, player, salary, years, year) {
+export function addMarketSigning(team, player, salary, years, year, marketMode = 'season') {
   const placement = marketPlacement(team, player);
-  const signed = { ...player, isFA: false, salary, contractYears: years, contractYearsLeft: years };
+  const prepared = marketMode === 'offseason' ? prepareOffseasonFreeAgent(player, year) : player;
+  const signed = { ...prepared, isFA: false, salary, contractYears: years, contractYearsLeft: years };
   return { ...team, budget: team.budget - salary * years,
     players: placement.farm ? team.players : [...team.players, signed],
     farm: placement.farm ? [...(team.farm || []), signed] : team.farm || [],

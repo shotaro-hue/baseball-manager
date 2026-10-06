@@ -15,6 +15,7 @@ describe('appScreenConfig', () => {
       'tactical_game',
       'allstar',
       'retire_phase',
+      'offseason_fa_phase',
       'contract_renewal_phase',
       'development_phase',
       'waiver_phase',

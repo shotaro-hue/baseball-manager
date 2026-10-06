@@ -124,6 +124,17 @@ describe('processCpuFaBids multi-signing', () => {
     trust: 60, hometown: '東京',
   });
 
+  it('オフシーズン獲得では旧球団の成績を保存して新球団への計上を防ぐ', () => {
+    const cpu = { id: 1, name: 'CPU', league: 'セ', wins: 70, losses: 70, city: '東京', budget: 20000000, players: [mkStarter('s1')], farm: [] };
+    const my = { id: 0, name: 'ME', league: 'セ', wins: 60, losses: 60, city: '大阪', budget: 0, players: [], farm: [] };
+    const fa = { ...mkBatter('fa'), isFA: true, faEnteredYear: 2026, faOriginTeamId: 0, faOriginTeamName: 'ME', stats: { PA: 500, HR: 20 } };
+    const res = processCpuFaBids([my, cpu], 0, [fa], [my, cpu], 2026, 'offseason');
+    const signed = res.updatedTeams[1].players.find(p => p.id === 'fa');
+    expect(signed.stats.PA).toBe(0);
+    expect(signed.recentCareerLog[0]).toMatchObject({ year: 2026, teamId: 0, stats: { PA: 500, HR: 20 } });
+    expect(res.remainingFaPool).toHaveLength(0);
+  });
+
   it('CPU チームが予算内で2名を獲得できる', () => {
     const cpu = {
       id: 1, name: 'CPU', league: 'セ', wins: 70, losses: 70, city: '東京',

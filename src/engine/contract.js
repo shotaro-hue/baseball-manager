@@ -14,6 +14,7 @@ import {
 import { analyzeTeamNeeds, getFrontOfficePlanPublic } from './trade';
 import { calculateSalaryDemand, renewalSalaryFloor } from './salaryDemand';
 import { salaryCutRule } from './renewalRules';
+import { prepareOffseasonFreeAgent } from './offseasonMarket';
 
 /* ═══════════════════════════════════════════════
    FA 資格閾値 (NPB公式準拠・累積日数方式)
@@ -310,7 +311,7 @@ function calcNeedMatch(player, needs) {
   return bonus;
 }
 
-export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = null) {
+export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = null, marketMode = 'season') {
   if (!faPool.length) return { updatedTeams: teams, remainingFaPool: faPool, news: [] };
 
   const news = [];
@@ -375,7 +376,8 @@ export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = nu
         foreignActiveOnTeam === MAX_外国人_一軍 - 1 && (wouldBeAllPitchers || wouldBeAllBatters);
       const goToFarm = player.isForeign && (foreignActiveOnTeam >= MAX_外国人_一軍 || balanceViolation);
 
-      const newPlayerEntry = { ...player, isFA: false, contractYearsLeft: 1, salary: best.salary };
+      const prepared = marketMode === 'offseason' ? prepareOffseasonFreeAgent(player, currentYear) : player;
+      const newPlayerEntry = { ...prepared, isFA: false, contractYearsLeft: 1, salary: best.salary };
       const acquireReason = player.isForeign ? '外国人獲得' : (player.isWaiverReleased ? '戦力外獲得' : 'FA獲得');
       const historyRecord = { ...newPlayerEntry, exitYear: currentYear ?? 0, exitReason: acquireReason, tenure: 0 };
 

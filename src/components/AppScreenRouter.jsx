@@ -10,6 +10,7 @@ import PlayoffRoute from './screenRoutes/PlayoffRoute';
 import TeamDetailRoute from './screenRoutes/TeamDetailRoute';
 
 const ModeSelectScreen = lazy(() => import('./screens/ModeSelectScreen'));
+const OffseasonFaPhaseScreen = lazy(() => import('./OffseasonFaPhaseScreen'));
 const BatchResultScreen = lazy(() =>
   import('./BatchResult').then((module) => ({
     default: module.BatchResultScreen,
@@ -247,6 +248,12 @@ export default function AppScreenRouter({ app }) {
         </ErrorBoundary>
       </DeferredScreenFrame>
     );
+  }
+
+  if (screen === 'offseason_fa_phase') {
+    return <DeferredScreenFrame screen={screen}><ErrorBoundary onReset={() => setScreen('hub')}>
+      <OffseasonFaPhaseScreen gs={gs} os={os} myTeam={myTeam} myId={myId} year={year} />
+    </ErrorBoundary></DeferredScreenFrame>;
   }
 
   if (screen === 'contract_renewal_phase') {
