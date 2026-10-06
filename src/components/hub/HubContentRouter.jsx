@@ -351,6 +351,9 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
         notify={gs.notify}
         upd={gs.upd}
         setFaPool={gs.setFaPool}
+        onPlayerClick={gs.handlePlayerClick}
+        onToggleCompare={comparison?.onToggle}
+        comparePlayerIds={comparison?.players?.map(player => player.id) || []}
       />
     );
   }
