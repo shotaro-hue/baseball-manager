@@ -1,4 +1,5 @@
 import { MIN_SALARY_SHIHAKA, MIN_SALARY_IKUSEI } from '../constants';
+import { salaryCutRule } from './renewalRules';
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const measured = (s, keys) => keys.every(k => Number.isFinite(s?.[k]) && s[k] >= 0);
@@ -15,7 +16,7 @@ export const SALARY_MODEL = {
 export function renewalSalaryFloor(player) {
   const minimum = player.育成 ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA;
   const previous = Number.isFinite(player.salary) ? Math.max(minimum, player.salary) : minimum;
-  const cut = previous > 10000 ? .4 : .25;
+  const cut = salaryCutRule({ salary: previous }).rate;
   // Round upward so the cut limit cannot be exceeded by rounding.
   return Math.max(minimum, Math.ceil(previous * (1 - cut) / 100) * 100);
 }
@@ -127,7 +128,8 @@ export function calculateSalaryDemand(player, context = {}) {
   if (change > 0 && smallSampleCap != null) change = Math.min(change, smallSampleCap);
   let demandSalary = Math.max(floor, minimum, roundSalary(previous + change));
   if (change > 0 && smallSampleCap != null) demandSalary = Math.min(demandSalary, Math.max(previous, Math.floor((previous + smallSampleCap) / 100) * 100));
-  const minAcceptSalary = Math.min(demandSalary, Math.max(floor, Math.ceil(demandSalary * .75 / 100) * 100));
+  // Consent can be given beyond the cut boundary; it is not an input floor.
+  const minAcceptSalary = Math.min(demandSalary, Math.max(minimum, Math.ceil(demandSalary * .75 / 100) * 100));
   if (money !== 50) reasons.push({ label: '金銭へのこだわり', bonus: personalityBonus });
   return { demandSalary, minOfferSalary: floor, minAcceptSalary,
     assessment: { recorded: true, previousSalary: previous, targetSalary: roundSalary(target), ...current,

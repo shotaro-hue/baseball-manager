@@ -5,6 +5,7 @@ import { CareerTable } from './tabs/CareerTable';
 import { BattedBallAnalysisPanel } from './BattedBallAnalysisPanel';
 import '../mobile-flow.css';
 import { playerCondition } from './DashboardTab';
+import { getFaProgress } from '../engine/contract';
 
 /* ═══════════════════════════════════════════════
    PLAYER DETAIL MODAL
@@ -193,14 +194,11 @@ export function PlayerModal({
   const phase=p.growthPhase==="growth"?"成長期":p.growthPhase==="peak"?"全盛期":p.growthPhase==="earlyDecline"?"衰退初期":"衰退期";
   const phaseColor=p.growthPhase==="growth"?"#14714b":p.growthPhase==="peak"?"#805700":p.growthPhase==="earlyDecline"?"#f97316":"#b42332";
 
-  const FA_DAYS = 120;
-  const domDays = (p.entryType==='高卒'||p.entryType==='外国人') ? 8*FA_DAYS : 7*FA_DAYS;
-  const days = p.daysOnActiveRoster ?? (p.serviceYears??0)*FA_DAYS;
-  const domLeft = Math.max(0, domDays - days);
+  const faProgress = getFaProgress(p);
   const faLabel = p.isFA ? "FA中"
-    : domLeft===0 ? "FA資格あり"
-    : `FA まで ${domLeft}日（${Math.ceil(domLeft/FA_DAYS)}年相当）`;
-  const foreignExemptDays = p.isForeign && !p.isFA ? Math.max(0, (9*FA_DAYS) - days) : 0;
+    : !faProgress.recorded ? 'FA登録日数未記録'
+    : `${faProgress.domestic.eligible ? '国内FA資格あり' : `国内FA 最短あと${faProgress.domestic.years}年（${faProgress.domestic.remainingDays}日）`}${faProgress.estimated ? '・推定' : ''}`;
+  const foreignExemptDays = p.isForeign && !p.isFA && faProgress.recorded ? faProgress.overseas.remainingDays : 0;
 
   const handleConvert = (pos) => {
     setLocalConvertTarget(pos);
@@ -265,7 +263,7 @@ export function PlayerModal({
         {/* 状態バッジ行 */}
         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
           <span style={{fontSize:14,padding:"2px 8px",borderRadius:10,background:"rgba(255,255,255,.05)",color:phaseColor,border:`1px solid ${phaseColor}40`}}>{phase}</span>
-          <span style={{fontSize:14,padding:"2px 8px",borderRadius:10,background:"rgba(255,255,255,.05)",color:"#53657c"}}>在籍 {Math.floor(days/FA_DAYS)||p.serviceYears||0} 年目</span>
+          <span style={{fontSize:14,padding:"2px 8px",borderRadius:10,background:"rgba(255,255,255,.05)",color:"#53657c"}}>在籍 {Number.isFinite(p.serviceYears) ? `${p.serviceYears}年` : '未記録'}</span>
           <span style={{fontSize:14,padding:"2px 8px",borderRadius:10,background:"rgba(255,255,255,.05)",color:p.isFA?"#805700":"#53657c"}}>{faLabel}</span>
           {foreignExemptDays>0&&<span style={{fontSize:14,padding:"2px 8px",borderRadius:10,background:"rgba(96,165,250,.08)",color:"#095cc7",border:"1px solid rgba(96,165,250,.25)"}}>外国人枠免除まで {foreignExemptDays}日</span>}
           {(p.injuryDaysLeft??0)>0&&<span style={{fontSize:14,padding:"2px 8px",borderRadius:10,background:"rgba(248,113,113,.1)",color:"#b42332",border:"1px solid rgba(248,113,113,.3)"}}>🤕 {safeInjury}{safeInjuryPart ? ` [${safeInjuryPart}]` : ''} 残{p.injuryDaysLeft}試合</span>}
