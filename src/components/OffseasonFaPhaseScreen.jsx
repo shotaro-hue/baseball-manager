@@ -41,7 +41,7 @@ export default function OffseasonFaPhaseScreen({ gs, os, myTeam, myId, year }) {
   };
   return <main className="fa-market offseason-fa-screen">
     <header><h1>{year}年 オフシーズン補強</h1><p>引退整理 → <strong>国内FA・自由契約補強</strong> → 契約更改 → 成長結果・戦力外・ドラフト</p>
-      <p>他球団のFA・自由契約選手を補強し、その後に自チームの既存選手と契約更改します。補強せずに進むこともできます。</p>
+      <p>全球団のFA宣言を判定済みです。他球団の補強候補と、自球団から宣言した選手の残留契約を確認し、その後に既存選手と契約更改します。補強せずに進むこともできます。</p>
     </header>
     <HubFaTab myTeam={myTeam} myId={myId} year={year} gameDay={gs.gameDay}
       faPool={(gs.faPool || []).filter(p => !p.isForeign)} faYears={gs.faYears} setFaYears={gs.setFaYears}

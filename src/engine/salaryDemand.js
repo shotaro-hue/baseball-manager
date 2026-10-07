@@ -11,6 +11,9 @@ export const SALARY_MODEL = {
   pitcherBase: 9000,
   titleBonusCap: .25,
   teamBonusCap: .05,
+  productiveQuality: .75,
+  significantDeclineRatio: .85,
+  incumbentCeilingMultiplier: 1.8,
 };
 
 export function renewalSalaryFloor(player) {
@@ -121,8 +124,21 @@ export function calculateSalaryDemand(player, context = {}) {
   const base = current.role === '野手' ? SALARY_MODEL.batterBase : SALARY_MODEL.pitcherBase;
   let target = minimum + base * value * (1 + titles.bonus + Math.min(teamBonus, SALARY_MODEL.teamBonusCap) * workloadFactor);
   target *= 1 + personalityBonus;
-  // Do not cut an established player's pay solely because the simplified valuation is lower.
-  if (current.workload >= .8 && current.quality >= 1) target = Math.max(previous, target);
+  const absoluteTargetSalary = target;
+  // Anchor established regulars to their previous pay, not only a low absolute
+  // model valuation. A recorded large decline still permits a cut.
+  const sustained = historyValue == null || current.value >= historyValue * SALARY_MODEL.significantDeclineRatio;
+  const productive = current.workload >= .8 && current.quality >= SALARY_MODEL.productiveQuality;
+  let incumbentRaise = 0;
+  if (productive && sustained) {
+    incumbentRaise = Math.max(0, .04 + clamp((current.quality - SALARY_MODEL.productiveQuality) * .1, 0, .1)
+      + titles.bonus + Math.min(teamBonus, SALARY_MODEL.teamBonusCap) + personalityBonus);
+    const anchoredTarget = Math.max(previous, Math.min(previous * (1 + incumbentRaise), target * SALARY_MODEL.incumbentCeilingMultiplier));
+    target = Math.max(target, anchoredTarget);
+    reasons.push({ label: '十分な出場・活躍を前年年俸から評価', bonus: (anchoredTarget / previous - 1) * SALARY_MODEL.adjustment });
+  } else if (productive && !sustained) {
+    reasons.push({ label: '出場量は十分だが、記録された直近実績から大幅に低下' });
+  }
   let change = (target - previous) * SALARY_MODEL.adjustment;
   const smallSampleCap = current.workload < .4 ? previous * .25 * current.workload / .4 : null;
   if (change > 0 && smallSampleCap != null) change = Math.min(change, smallSampleCap);
@@ -132,6 +148,6 @@ export function calculateSalaryDemand(player, context = {}) {
   const minAcceptSalary = Math.min(demandSalary, Math.max(minimum, Math.ceil(demandSalary * .75 / 100) * 100));
   if (money !== 50) reasons.push({ label: '金銭へのこだわり', bonus: personalityBonus });
   return { demandSalary, minOfferSalary: floor, minAcceptSalary,
-    assessment: { recorded: true, previousSalary: previous, targetSalary: roundSalary(target), ...current,
-      historyYears: perYear.size, titleBonus: titles.bonus, teamBonus, personalityBonus, reasons } };
+    assessment: { recorded: true, previousSalary: previous, absoluteTargetSalary, targetSalary: roundSalary(target), ...current,
+      historyYears: perYear.size, titleBonus: titles.bonus, teamBonus, personalityBonus, incumbentRaise, reasons } };
 }
