@@ -1,21 +1,12 @@
 import { uid, rng, rngf, gameDayToDate } from '../utils';
-import {
-  checkForInjuries,
-  tickInjuries,
-  tickPositionTraining,
-} from '../engine/player';
+import * as playerRules from '../engine/player';
+import { applyRegularSeasonTeamUpdate } from '../engine/regularGameUpdates';
 import { quickSimGame } from '../engine/simulation';
-import {
-  applyGameStatsFromLog,
-  applyPostGameCondition,
-  computeBoxScore,
-} from '../engine/postGame';
-import { calcRevenue } from '../engine/finance';
+import { computeBoxScore } from '../engine/postGame';
 import {
   createBattedBallArchiveChunker,
   createBattedBallBatchRecords,
 } from '../engine/battedBallProfile';
-import { applyPopularityDelta } from '../engine/fanSentiment';
 import {
   generateCpuOffer,
   generateCpuCpuTrade,
@@ -38,7 +29,6 @@ import {
   TRADE_DEADLINE_PROB_EARLY,
   TRADE_DEADLINE_PROB_PEAK,
   TRADE_DEADLINE_CPU_CPU_PROB,
-  INJURY_HISTORY_MAX,
 } from '../constants';
 import {
   applyEmergencyRosterMaintenance,
@@ -121,55 +111,6 @@ function emitProgress({
   });
 }
 
-function applyDefenseCoachRecovery(players, coaches) {
-  const defBonus = (coaches || [])
-    .filter((coach) => coach.type === 'defense')
-    .reduce((sum, coach) => sum + (coach.bonus || 0), 0);
-  if (!defBonus) return players;
-  return players.map((player) => {
-    if (!player.injuryDaysLeft) return player;
-    const extra = rngf(0, 1) < (defBonus * 0.1) ? 1 : 0;
-    if (!extra) return player;
-    const next = Math.max(0, player.injuryDaysLeft - extra);
-    return {
-      ...player,
-      injuryDaysLeft: next,
-      injury: next > 0 ? player.injury : null,
-      injuryPart: next > 0 ? player.injuryPart : null,
-    };
-  });
-}
-
-function applyInjuriesToPlayers(players, injuries, year) {
-  if (!injuries.length) return players;
-  const injuriesById = new Map(injuries.map((injury) => [injury.id, injury]));
-  return players.map((player) => {
-    const injury = injuriesById.get(player.id);
-    if (!injury) return player;
-    const history = [
-      ...(player.injuryHistory ?? []),
-      { part: injury.part, year },
-    ].slice(-INJURY_HISTORY_MAX);
-    return {
-      ...player,
-      injury: injury.type,
-      injuryDaysLeft: injury.days,
-      injuryPart: injury.part,
-      injuryHistory: history,
-    };
-  });
-}
-
-function tickCooldowns(players) {
-  return players.map((player) => {
-    const cooldown = player.registrationCooldownDays ?? 0;
-    if (!cooldown) return player;
-    return {
-      ...player,
-      registrationCooldownDays: Math.max(0, cooldown - 1),
-    };
-  });
-}
 
 function applyDhToTeam(team, useDh) {
   return prepareTeamForGame(team, useDh);
@@ -688,55 +629,8 @@ export function simulateSeasonBatch({
         });
       }
 
-      if (homeWon) {
-        homeTeam.wins += 1;
-        homeTeam.rf += sim.score.my;
-        homeTeam.ra += sim.score.opp;
-        awayTeam.losses += 1;
-        awayTeam.rf += sim.score.opp;
-        awayTeam.ra += sim.score.my;
-      } else if (drew) {
-        homeTeam.draws += 1;
-        homeTeam.rf += sim.score.my;
-        homeTeam.ra += sim.score.opp;
-        awayTeam.draws += 1;
-        awayTeam.rf += sim.score.opp;
-        awayTeam.ra += sim.score.my;
-      } else {
-        awayTeam.wins += 1;
-        awayTeam.rf += sim.score.opp;
-        awayTeam.ra += sim.score.my;
-        homeTeam.losses += 1;
-        homeTeam.rf += sim.score.my;
-        homeTeam.ra += sim.score.opp;
-      }
-
-      Object.assign(homeTeam, applyPopularityDelta(homeTeam, homeWon, drew));
-      Object.assign(awayTeam, applyPopularityDelta(awayTeam, !homeWon && !drew, drew));
-
-      const homeRevenue = calcRevenue(homeTeam);
-      homeTeam.budget = (homeTeam.budget ?? 0) + homeRevenue.ticket + homeRevenue.sponsor + homeRevenue.merch;
-      homeTeam.revenueThisSeason = (homeTeam.revenueThisSeason ?? 0) + homeRevenue.ticket + homeRevenue.sponsor + homeRevenue.merch;
-      const awayRevenue = calcRevenue(awayTeam);
-      awayTeam.budget = (awayTeam.budget ?? 0) + awayRevenue.ticket + awayRevenue.sponsor + awayRevenue.merch;
-      awayTeam.revenueThisSeason = (awayTeam.revenueThisSeason ?? 0) + awayRevenue.ticket + awayRevenue.sponsor + awayRevenue.merch;
-
-      homeTeam.players = applyGameStatsFromLog(homeTeam.players, sim.log || [], true, homeWon, newDay);
-      homeTeam.players = applyPostGameCondition(homeTeam.players, sim.log || [], true, newDay);
-      homeTeam.players = tickInjuries(homeTeam.players);
-      homeTeam.players = homeTeam.players.map((player) => ({ ...player, daysOnActiveRoster: (player.daysOnActiveRoster ?? 0) + 1 }));
-      homeTeam.players = applyInjuriesToPlayers(homeTeam.players, checkForInjuries(homeTeam.players, state.year), state.year);
-      homeTeam.farm = tickCooldowns(tickInjuries(homeTeam.farm ?? []));
-
-      awayTeam.players = applyGameStatsFromLog(awayTeam.players, sim.log || [], false, !homeWon && !drew, newDay);
-      awayTeam.players = applyPostGameCondition(awayTeam.players, sim.log || [], false, newDay);
-      awayTeam.players = tickInjuries(awayTeam.players);
-      awayTeam.players = awayTeam.players.map((player) => ({ ...player, daysOnActiveRoster: (player.daysOnActiveRoster ?? 0) + 1 }));
-      awayTeam.players = applyInjuriesToPlayers(awayTeam.players, checkForInjuries(awayTeam.players, state.year), state.year);
-      awayTeam.farm = tickCooldowns(tickInjuries(awayTeam.farm ?? []));
-
-      homeTeam.rotIdx = (homeTeam.rotIdx || 0) + 1;
-      awayTeam.rotIdx = (awayTeam.rotIdx || 0) + 1;
+      Object.assign(homeTeam, applyRegularSeasonTeamUpdate(homeTeam, sim, { isFirstTeam: true, isHomeTeam: true, gameDay: newDay, year: state.year }, playerRules).team);
+      Object.assign(awayTeam, applyRegularSeasonTeamUpdate(awayTeam, sim, { isFirstTeam: false, isHomeTeam: false, gameDay: newDay, year: state.year }, playerRules).team);
     }
 
     const foreignFaResult = tryCpuForeignFaInBatch(newTeams, newDay, newFaPool, state);
@@ -780,77 +674,14 @@ export function simulateSeasonBatch({
       }
 
       const won = sim.score.my > sim.score.opp;
-      const drew = sim.score.my === sim.score.opp;
-      if (won) {
-        myTeam.wins += 1;
-        myTeam.rf += sim.score.my;
-        myTeam.ra += sim.score.opp;
-      } else if (drew) {
-        myTeam.draws += 1;
-        myTeam.rf += sim.score.my;
-        myTeam.ra += sim.score.opp;
-      } else {
-        myTeam.losses += 1;
-        myTeam.rf += sim.score.my;
-        myTeam.ra += sim.score.opp;
-      }
-      Object.assign(myTeam, applyPopularityDelta(myTeam, won, drew));
-      myTeam.rotIdx = (myTeam.rotIdx || 0) + 1;
-      myTeam.players = applyGameStatsFromLog(myTeam.players, sim.log || [], true, won, newDay);
-      myTeam.players = applyPostGameCondition(myTeam.players, sim.log || [], true, newDay, scheduleMatchup.isHome);
-      myTeam.players = tickInjuries(myTeam.players);
-      myTeam.players = tickPositionTraining(myTeam.players);
-      myTeam.players = myTeam.players.map((player) => ({ ...player, daysOnActiveRoster: (player.daysOnActiveRoster ?? 0) + 1 }));
-      myTeam.players = applyDefenseCoachRecovery(myTeam.players, myTeam.coaches);
-      const myInjuries = checkForInjuries(myTeam.players, state.year);
-      if (myInjuries.length > 0) {
-        myInjuries.forEach((injury) => {
-          const player = myTeam.players.find((entry) => entry.id === injury.id);
-          if (player) {
-            batchInjuries.push({
-              name: player.name,
-              pos: player.pos,
-              type: injury.type,
-              days: injury.days,
-              part: injury.part,
-            });
-          }
-        });
-      }
-      myTeam.players = applyInjuriesToPlayers(myTeam.players, myInjuries, state.year);
-      myTeam.players = tickCooldowns(myTeam.players);
-      myTeam.farm = tickInjuries(myTeam.farm ?? []);
-      myTeam.farm = tickCooldowns(myTeam.farm ?? []);
-      Object.assign(myTeam, applyEmergencyRosterMaintenance(myTeam));
-
+      const myUpdate = applyRegularSeasonTeamUpdate(myTeam, sim, { isFirstTeam: true, isHomeTeam: scheduleMatchup.isHome, gameDay: newDay, year: state.year }, playerRules);
+      myUpdate.injuries.forEach(injury => {
+        const player = myUpdate.team.players.find(p => p.id === injury.id);
+        if (player) batchInjuries.push({ name: player.name, pos: player.pos, type: injury.type, days: injury.days, part: injury.part });
+      });
+      Object.assign(myTeam, applyEmergencyRosterMaintenance(myUpdate.team));
       const oppTeam = teamMap.get(opp.id);
-      if (oppTeam) {
-        if (won) {
-          oppTeam.losses += 1;
-          oppTeam.rf += sim.score.opp;
-          oppTeam.ra += sim.score.my;
-        } else if (drew) {
-          oppTeam.draws += 1;
-          oppTeam.rf += sim.score.opp;
-          oppTeam.ra += sim.score.my;
-        } else {
-          oppTeam.wins += 1;
-          oppTeam.rf += sim.score.opp;
-          oppTeam.ra += sim.score.my;
-        }
-        Object.assign(oppTeam, applyPopularityDelta(oppTeam, !won && !drew, drew));
-        oppTeam.players = applyGameStatsFromLog(oppTeam.players, sim.log || [], false, !won && !drew, newDay);
-        oppTeam.players = applyPostGameCondition(oppTeam.players, sim.log || [], false, newDay, !scheduleMatchup.isHome);
-        oppTeam.players = tickInjuries(oppTeam.players);
-        oppTeam.players = applyInjuriesToPlayers(oppTeam.players, checkForInjuries(oppTeam.players, state.year), state.year);
-        oppTeam.farm = tickCooldowns(tickInjuries(oppTeam.farm ?? []));
-        oppTeam.rotIdx = (oppTeam.rotIdx || 0) + 1;
-      }
-
-      const revenue = calcRevenue(myTeam);
-      const revenueTotal = revenue.ticket + revenue.sponsor + revenue.merch;
-      myTeam.budget = (myTeam.budget ?? 0) + revenueTotal;
-      myTeam.revenueThisSeason = (myTeam.revenueThisSeason ?? 0) + revenueTotal;
+      if (oppTeam) Object.assign(oppTeam, applyRegularSeasonTeamUpdate(oppTeam, sim, { isFirstTeam: false, isHomeTeam: !scheduleMatchup.isHome, gameDay: newDay, year: state.year }, playerRules).team);
 
       results.push(buildBatchGameResult(sim, won, opp, newDay, scheduleMatchup.isHome));
 

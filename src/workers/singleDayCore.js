@@ -1,13 +1,13 @@
 import { uid, rng, rngf, gameDayToDate } from '../utils';
-import { checkForInjuries, tickInjuries, tickPositionTraining, calcRetireWill } from '../engine/player';
+import * as playerRules from '../engine/player';
+import { calcRetireWill } from '../engine/player';
+import { applyRegularSeasonTeamUpdate } from '../engine/regularGameUpdates';
 import { quickSimGame } from '../engine/simulation';
-import { applyGameStatsFromLog, applyPostGameCondition, computeBoxScore } from '../engine/postGame';
-import { calcRevenue } from '../engine/finance';
+import { computeBoxScore } from '../engine/postGame';
 import {
   createBattedBallArchiveChunker,
   createBattedBallBatchRecords,
 } from '../engine/battedBallProfile';
-import { applyPopularityDelta } from '../engine/fanSentiment';
 import { generateCpuOffer, generateCpuCpuTrade, classifyTeam, evaluateFrontOfficePlan } from '../engine/trade';
 import { executeCpuTrade } from '../engine/cpuTradeExecution';
 import { selectAllStars, runAllStarGame } from '../engine/allstar';
@@ -28,7 +28,6 @@ import {
   TRADE_DEADLINE_PROB_EARLY,
   TRADE_DEADLINE_PROB_PEAK,
   TRADE_DEADLINE_CPU_CPU_PROB,
-  INJURY_HISTORY_MAX,
 } from '../constants';
 
 function cloneValue(value) {
@@ -53,54 +52,6 @@ function emitProgress(onProgress, phase, force = false) {
   });
 }
 
-function applyDefenseCoachRecovery(players, coaches) {
-  const defBonus = (coaches || [])
-    .filter((coach) => coach.type === 'defense')
-    .reduce((sum, coach) => sum + (coach.bonus || 0), 0);
-  if (!defBonus) return players;
-  return players.map((player) => {
-    if (!player.injuryDaysLeft) return player;
-    const extra = rngf(0, 1) < (defBonus * 0.1) ? 1 : 0;
-    if (!extra) return player;
-    const next = Math.max(0, player.injuryDaysLeft - extra);
-    return {
-      ...player,
-      injuryDaysLeft: next,
-      injury: next > 0 ? player.injury : null,
-      injuryPart: next > 0 ? player.injuryPart : null,
-    };
-  });
-}
-
-function applyInjuriesToPlayers(players, injuries, year) {
-  if (!injuries.length) return players;
-  return players.map((player) => {
-    const injury = injuries.find((entry) => entry.id === player.id);
-    if (!injury) return player;
-    const history = [
-      ...(player.injuryHistory ?? []),
-      { part: injury.part, year },
-    ].slice(-INJURY_HISTORY_MAX);
-    return {
-      ...player,
-      injury: injury.type,
-      injuryDaysLeft: injury.days,
-      injuryPart: injury.part,
-      injuryHistory: history,
-    };
-  });
-}
-
-function tickCooldowns(players) {
-  return players.map((player) => {
-    const cooldown = player.registrationCooldownDays ?? 0;
-    if (!cooldown) return player;
-    return {
-      ...player,
-      registrationCooldownDays: Math.max(0, cooldown - 1),
-    };
-  });
-}
 
 function applyDhToTeam(team, useDh) {
   return prepareTeamForGame(team, useDh);
@@ -280,42 +231,10 @@ function tryCpuCpuDeadlineTradeSingleDay(teams, snapshot) {
   };
 }
 
-function updateTeamAfterGame(team, result, isMyPerspective, won, drew, gameDay, year, isHomeTeam = isMyPerspective) {
-  let updated = {
-    ...team,
-    wins: team.wins + (won ? 1 : 0),
-    losses: team.losses + (!won && !drew ? 1 : 0),
-    draws: team.draws + (drew ? 1 : 0),
-    rf: team.rf + (isMyPerspective ? result.score.my : result.score.opp),
-    ra: team.ra + (isMyPerspective ? result.score.opp : result.score.my),
-    rotIdx: isMyPerspective ? team.rotIdx + 1 : team.rotIdx,
-  };
-  updated.players = applyGameStatsFromLog(updated.players, result.log || [], isMyPerspective, won, gameDay);
-  updated.players = applyPostGameCondition(updated.players, result.log || [], isMyPerspective, gameDay, isHomeTeam);
-  updated.players = tickInjuries(updated.players);
-  if (isMyPerspective) {
-    updated.players = tickPositionTraining(updated.players);
-    updated.players = updated.players.map((player) => ({
-      ...player,
-      daysOnActiveRoster: (player.daysOnActiveRoster ?? 0) + 1,
-    }));
-    updated.players = applyDefenseCoachRecovery(updated.players, team.coaches);
-  }
-  const newInjuries = checkForInjuries(updated.players, year);
-  updated.players = applyInjuriesToPlayers(updated.players, newInjuries, year);
-  updated.farm = tickCooldowns(tickInjuries(updated.farm ?? []));
-  if (isMyPerspective) {
-    updated = applyEmergencyRosterMaintenance(updated);
-  }
-  Object.assign(updated, applyPopularityDelta(team, won, drew));
-  const revenue = calcRevenue(updated);
-  const totalRevenue = revenue.ticket + revenue.sponsor + revenue.merch;
-  updated.budget = (updated.budget ?? 0) + totalRevenue;
-  updated.revenueThisSeason = (updated.revenueThisSeason ?? 0) + totalRevenue;
-  return {
-    team: updated,
-    injuries: newInjuries,
-  };
+function updateTeamAfterGame(team, result, isMyPerspective, gameDay, year, isHomeTeam = isMyPerspective, maintainRoster = false) {
+  const update = applyRegularSeasonTeamUpdate(team, result, { isFirstTeam: isMyPerspective, isHomeTeam, gameDay, year }, playerRules);
+  if (maintainRoster) update.team = applyEmergencyRosterMaintenance(update.team);
+  return update;
 }
 
 function maybeBuildRetireAnnouncement(team, year, gameDay) {
@@ -382,8 +301,8 @@ export function simulateSingleDay({
   }));
   const myTeamIndex = nextTeams.findIndex((team) => team.id === safeSnapshot.myId);
   const oppTeamIndex = nextTeams.findIndex((team) => team.id === currentOpp.id);
-  const myUpdate = updateTeamAfterGame(nextTeams[myTeamIndex], userGameResult, true, won, drew, safeSnapshot.gameDay, safeSnapshot.year, isHome);
-  const oppUpdate = updateTeamAfterGame(nextTeams[oppTeamIndex], userGameResult, false, !won && !drew, drew, safeSnapshot.gameDay, safeSnapshot.year, !isHome);
+  const myUpdate = updateTeamAfterGame(nextTeams[myTeamIndex], userGameResult, true, safeSnapshot.gameDay, safeSnapshot.year, isHome, true);
+  const oppUpdate = updateTeamAfterGame(nextTeams[oppTeamIndex], userGameResult, false, safeSnapshot.gameDay, safeSnapshot.year, !isHome);
   nextTeams[myTeamIndex] = myUpdate.team;
   nextTeams[oppTeamIndex] = oppUpdate.team;
 
@@ -437,10 +356,8 @@ export function simulateSingleDay({
       { simulationMode: gameContext?.simulationMode || 'detailed' },
     );
     archiveGame(cpuResult.log, homeTeam, awayTeam);
-    const homeWon = cpuResult.won;
-    const cpuDrew = cpuResult.score.my === cpuResult.score.opp;
-    nextTeams[homeIndex] = updateTeamAfterGame(homeTeam, cpuResult, true, homeWon, cpuDrew, safeSnapshot.gameDay, safeSnapshot.year).team;
-    nextTeams[awayIndex] = updateTeamAfterGame(awayTeam, cpuResult, false, !homeWon && !cpuDrew, cpuDrew, safeSnapshot.gameDay, safeSnapshot.year).team;
+    nextTeams[homeIndex] = updateTeamAfterGame(homeTeam, cpuResult, true, safeSnapshot.gameDay, safeSnapshot.year).team;
+    nextTeams[awayIndex] = updateTeamAfterGame(awayTeam, cpuResult, false, safeSnapshot.gameDay, safeSnapshot.year).team;
     const cpuBoxScore = computeBoxScore(
       cpuResult.log || [],
       cpuResult.inningSummary || [],

@@ -2,15 +2,14 @@ import { useState, useRef, useEffect } from "react";
 import SeasonBatchWorker from "../workers/seasonBatchWorker?worker";
 import { uid, rng, rngf, gameDayToDate } from '../utils';
 import { quickSimGame, runFarmSeason } from '../engine/simulation';
-import { applyGameStatsFromLog, applyPostGameCondition, computeBoxScore } from '../engine/postGame';
-import { calcRevenue } from '../engine/finance';
-import { applyPopularityDelta } from '../engine/fanSentiment';
+import { computeBoxScore } from '../engine/postGame';
+import { applyRegularSeasonTeamUpdate } from '../engine/regularGameUpdates';
 import { generateCpuOffer, generateCpuCpuTrade, classifyTeam, evaluateFrontOfficePlan } from '../engine/trade';
 import { executeCpuTrade } from '../engine/cpuTradeExecution';
 import { initPlayoff } from '../engine/playoff';
 import { processCpuFaBids } from '../engine/contract';
 import { cancelDeferredPostGameWork, scheduleDeferredPostGameWork } from '../engine/postGameProcessing';
-import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, INJURY_HISTORY_MAX, MAX_ROSTER } from '../constants';
+import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, MAX_ROSTER } from '../constants';
 import { createBattedBallBatchRecords } from '../engine/battedBallProfile';
 import {
   applyEmergencyRosterMaintenance,
@@ -74,36 +73,6 @@ export function buildSafeGameResult(rawResult, { oppTeam = null, gameNo = null, 
   return nextResult;
 }
 
-function applyDefenseCoachRecovery(players, coaches) {
-  const defBonus=(coaches||[]).filter(c=>c.type==='defense').reduce((s,c)=>s+(c.bonus||0),0);
-  if(!defBonus) return players;
-  return players.map(p=>{if(!p.injuryDaysLeft) return p;const extra=rngf(0,1)<(defBonus*0.1)?1:0;if(!extra) return p;const next=Math.max(0,p.injuryDaysLeft-extra);return{...p,injuryDaysLeft:next,injury:next>0?p.injury:null,injuryPart:next>0?p.injuryPart:null};});
-}
-
-
-function applyInjuriesToPlayers(players, injuries, year) {
-  if (!injuries.length) return players;
-  return players.map((p) => {
-    const inj = injuries.find((i) => i.id === p.id);
-    if (!inj) return p;
-    const history = [
-      ...(p.injuryHistory ?? []),
-      { part: inj.part, year },
-    ].slice(-INJURY_HISTORY_MAX);
-    return {
-      ...p,
-      injury: inj.type,
-      injuryDaysLeft: inj.days,
-      injuryPart: inj.part,
-      injuryHistory: history,
-    };
-  });
-}
-
-function tickCooldowns(players) {
-  return players.map(p=>{const cd=p.registrationCooldownDays??0;if(!cd)return p;return{...p,registrationCooldownDays:Math.max(0,cd-1)};});
-}
-
 function applyScheduledCpuManagement(teams, gameDay, myId) {
   return teams.map((team) => (
     team.id === myId
@@ -121,7 +90,7 @@ export function useSeasonFlow(gs) {
     teams, setTeams, myId, myTeam, saveId,
     gameDay, setGameDay, year,
     schedule, setScreen,
-    notify, upd, addNews, addTransferLog, pushResult,
+    notify, addNews, addTransferLog, pushResult,
     setMailbox, setNews, setRetireModal,
     faPool, setFaPool, faYears, setSeasonHistory,
     saveRevision, setSaveRevision,
@@ -211,8 +180,9 @@ export function useSeasonFlow(gs) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[myTeam]);
 
-  const tryGenerateCpuOffer = () => {
-    if (!myTeam) return;
+  const tryGenerateCpuOffer = (teamsArr = teams) => {
+    const offerMyTeam = teamsArr.find(t => t.id === myId);
+    if (!offerMyTeam) return;
     const currentDate = gameDayToDate(gameDay, schedule);
     if (currentDate && currentDate.month > TRADE_DEADLINE_MONTH) return;
     let prob = 0.15;
@@ -220,17 +190,17 @@ export function useSeasonFlow(gs) {
       prob = currentDate.day > 15 ? TRADE_DEADLINE_PROB_PEAK : TRADE_DEADLINE_PROB_EARLY;
     }
     if (rngf(0, 1) > prob || cpuTradeOffers.length >= 2) return;
-    const others=teams.filter(t=>t.id!==myId);
-    others.forEach((t) => { t.frontOfficePlan = evaluateFrontOfficePlan(t, teams, gameDay); });
+    const others=teamsArr.filter(t=>t.id!==myId);
+    others.forEach((t) => { t.frontOfficePlan = evaluateFrontOfficePlan(t, teamsArr, gameDay); });
     if(!others.length) return;
     let cpuTeam;
     if (currentDate && currentDate.month === TRADE_DEADLINE_MONTH) {
-      const buyers = others.filter((t) => classifyTeam(t, teams) === "buyer");
+      const buyers = others.filter((t) => classifyTeam(t, teamsArr) === "buyer");
       cpuTeam = buyers.length ? buyers[rng(0, buyers.length - 1)] : others[rng(0, others.length - 1)];
     } else {
       cpuTeam = others[rng(0, others.length - 1)];
     }
-    const offer=generateCpuOffer(cpuTeam,myTeam);
+    const offer=generateCpuOffer(cpuTeam,offerMyTeam);
     if(offer){
       const mail={
         id:uid(),
@@ -690,52 +660,17 @@ export function useSeasonFlow(gs) {
       loadSeasonAllStarModule(),
     ]);
     const won=r.score.my>r.score.opp;
-    const drew=r.score.my===r.score.opp;
     archiveNormalGame(r.log || [], myT, currentOpp);
-    upd(myId,t=>{
-      let updated={...t,
-        wins:t.wins+(won?1:0),losses:t.losses+(!won&&!drew?1:0),draws:t.draws+(drew?1:0),
-        rf:t.rf+r.score.my,ra:t.ra+r.score.opp,
-        rotIdx:t.rotIdx+1,
-      };
-      updated.players=applyGameStatsFromLog(updated.players, r.log||[], true, won, gameDay);
-      updated.players=applyPostGameCondition(updated.players, r.log||[], true, gameDay, isHome);
-      updated.players=playerMod.tickInjuries(updated.players);
-      updated.players=playerMod.tickPositionTraining(updated.players);
-      updated.players=updated.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
-      updated.players=applyDefenseCoachRecovery(updated.players,t.coaches);
-      const newInj=playerMod.checkForInjuries(updated.players, year);
-      if(newInj.length>0){
-        const injNames=newInj.reduce((acc,i)=>{const p=updated.players.find(x=>x.id===i.id);if(p)acc.push({name:p.name,...i});return acc;},[]);
-        updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
-        injNames.filter(i=>i.days>=7).forEach(i=>{addNews({type:"season",headline:`${i.name} injured`,source:"Team News",dateLabel:`${year} Year Day ${gameDay}`,body:`${i.name} is expected to miss ${i.days} days due to ${i.type}. The roster will be adjusted.`});});
-      }
-      updated.farm=tickCooldowns(updated.farm??[]);
-      updated=applyEmergencyRosterMaintenance(updated);
-      const popFields=applyPopularityDelta(t,won,drew);updated={...updated,...popFields};
-      const rev=calcRevenue(updated);
-      const revTotal=rev.ticket+rev.sponsor+rev.merch;
-      updated.budget+=revTotal;
-      updated.revenueThisSeason=(updated.revenueThisSeason??0)+revTotal;
-      return updated;
+    const myUpdate = applyRegularSeasonTeamUpdate(myT, r, { isFirstTeam: true, isHomeTeam: isHome, gameDay, year }, playerMod);
+    myUpdate.injuries.filter(i => i.days >= 7).forEach(i => {
+      const p = myUpdate.team.players.find(p => p.id === i.id);
+      if (p) addNews({type:"season",headline:`${p.name} injured`,source:"Team News",dateLabel:`${year} Year Day ${gameDay}`,body:`${p.name} is expected to miss ${i.days} days due to ${i.type}. The roster will be adjusted.`});
     });
-    // Update opponent's team record and individual player stats
-    upd(currentOpp.id,t=>{
-      let updated={...t,
-        wins:t.wins+(!won&&!drew?1:0),
-        losses:t.losses+(won?1:0),
-        draws:t.draws+(drew?1:0),
-        rf:t.rf+r.score.opp,
-        ra:t.ra+r.score.my,
-      };
-      updated.players=applyGameStatsFromLog(updated.players,r.log||[],false,!won&&!drew, gameDay);
-      updated.players=applyPostGameCondition(updated.players,r.log||[],false,gameDay, !isHome);
-      updated.players=playerMod.tickInjuries(updated.players);
-      const newInj=playerMod.checkForInjuries(updated.players, year);
-      updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
-      Object.assign(updated,applyPopularityDelta(t,!won&&!drew,drew));
-      return updated;
-    });
+    let updatedTeams = teams.map(t => t.id === myId
+      ? applyEmergencyRosterMaintenance(myUpdate.team)
+      : t.id === currentOpp.id
+        ? applyRegularSeasonTeamUpdate(t, r, { isFirstTeam: false, isHomeTeam: !isHome, gameDay, year }, playerMod).team
+        : { ...t });
     // Simulate remaining CPU vs CPU games for this day (schedule-based matchups)
     const _oppId=currentOpp.id;
     const _cpuMatchups=scheduleMod.getCpuMatchups(schedule,gameDay,myId,_oppId);
@@ -754,33 +689,14 @@ export function useSeasonFlow(gs) {
       archiveNormalGame(cr.log || [], a, b);
       cpuSimResults.push({matchup,cr,homeTeam:a,awayTeam:b,useDh});
     }
-    setTeams(prev=>{
-      let newTeams=prev.map(t=>({...t,players:t.players.map(p=>({...p,stats:{...p.stats}}))}));
-      for(const{matchup,cr}of cpuSimResults){
-        const a=newTeams.find(t=>t.id===matchup.homeId);
-        const b=newTeams.find(t=>t.id===matchup.awayId);
-        if(!a||!b) continue;
-        const cdrew=cr.score.my===cr.score.opp;
-        const aWon=cr.won;
-        if(aWon){a.wins++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.losses++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
-        else if(cdrew){a.draws++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.draws++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
-        else{b.wins++;b.rf+=cr.score.opp;b.ra+=cr.score.my;a.losses++;a.rf+=cr.score.my;a.ra+=cr.score.opp;}
-        Object.assign(a,applyPopularityDelta(a,aWon,cdrew));Object.assign(b,applyPopularityDelta(b,!aWon&&!cdrew,cdrew));
-        const aRev=calcRevenue(a);a.budget=(a.budget??0)+aRev.ticket+aRev.sponsor+aRev.merch;a.revenueThisSeason=(a.revenueThisSeason??0)+aRev.ticket+aRev.sponsor+aRev.merch;
-        const bRev=calcRevenue(b);b.budget=(b.budget??0)+bRev.ticket+bRev.sponsor+bRev.merch;b.revenueThisSeason=(b.revenueThisSeason??0)+bRev.ticket+bRev.sponsor+bRev.merch;
-        a.players=applyGameStatsFromLog(a.players,cr.log||[],true,aWon, gameDay);
-        a.players=applyPostGameCondition(a.players,cr.log||[],true,gameDay);
-        a.players=playerMod.tickInjuries(a.players);
-        const aInj=playerMod.checkForInjuries(a.players,year);
-        a.players=applyInjuriesToPlayers(a.players,aInj,year);
-        b.players=applyGameStatsFromLog(b.players,cr.log||[],false,!aWon&&!cdrew, gameDay);
-        b.players=applyPostGameCondition(b.players,cr.log||[],false,gameDay);
-        b.players=playerMod.tickInjuries(b.players);
-        const bInj=playerMod.checkForInjuries(b.players,year);
-        b.players=applyInjuriesToPlayers(b.players,bInj,year);
-      }
-      return applyScheduledCpuManagement(newTeams, gameDay, myId);
-    });
+    for (const { matchup, cr } of cpuSimResults) {
+      const a = updatedTeams.find(t => t.id === matchup.homeId);
+      const b = updatedTeams.find(t => t.id === matchup.awayId);
+      if (!a || !b) continue;
+      Object.assign(a, applyRegularSeasonTeamUpdate(a, cr, { isFirstTeam: true, isHomeTeam: true, gameDay, year }, playerMod).team);
+      Object.assign(b, applyRegularSeasonTeamUpdate(b, cr, { isFirstTeam: false, isHomeTeam: false, gameDay, year }, playerMod).team);
+    }
+    updatedTeams = applyScheduledCpuManagement(updatedTeams, gameDay, myId);
     setAllTeamResultsMap(prev=>{
       const next={...prev};
       const recordGame=(homeId,awayId,cr,hPlayers,aPlayers,oppHName,oppAName)=>{
@@ -795,13 +711,12 @@ export function useSeasonFlow(gs) {
       return next;
     });
     setGameResult({score:r.score,won,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:currentOpp,gameNo:gameDay,isHome});
-    tryGenerateCpuOffer();
     const autoDate = gameDayToDate(gameDay, schedule);
     if (autoDate && autoDate.month === TRADE_DEADLINE_MONTH) {
-      const liveTeams = teams.map((t) => ({ ...t, players: [...(t.players || [])] }));
+      const liveTeams = updatedTeams.map((t) => ({ ...t, players: [...(t.players || [])] }));
       const newsItem = tryCpuCpuDeadlineTrade(liveTeams, gameDay);
       if (newsItem) {
-        setTeams(liveTeams);
+        updatedTeams = liveTeams;
         addNews({ type: 'trade', headline: newsItem.headline, source: 'Baseball Times', dateLabel: `${year}年 ${gameDay}日目`, body: newsItem.body });
         addTransferLog({
           year,
@@ -816,6 +731,8 @@ export function useSeasonFlow(gs) {
         });
       }
     }
+    tryGenerateCpuOffer(updatedTeams);
+    setTeams(updatedTeams);
     if(Math.random()<0.04&&myTeam){
       const cands=myTeam.players.filter(p=>p.age>=35&&!p._retireNow&&playerMod.calcRetireWill(p)>=40);
       if(cands.length>0){
@@ -838,7 +755,7 @@ export function useSeasonFlow(gs) {
     gs.pushGameResult(gameDay,{won,drew:_adrew,isHome,oppName:currentOpp?.name||"",myScore:r.score.my,oppScore:r.score.opp,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:currentOpp});
     setGameDay(d=>d+1);
     if(!allStarDone && gameDay+1===allStarTriggerDay){
-      const rosters=allStarMod.selectAllStars(teams);
+      const rosters=allStarMod.selectAllStars(updatedTeams);
       const asResult=allStarMod.runAllStarGame(rosters, year);
       setTeams(prev=>applyAllStarSelections(prev, rosters));
       setAllStarDone(true);
@@ -1138,55 +1055,12 @@ export function useSeasonFlow(gs) {
     const drew=gsResult.drew;
     const isHome = currentGameTeams?.isHome ?? true;
     archiveNormalGame(gsResult.log || [], myTeam, currentOpp);
-    upd(myId,t=>{
-      try {
-        let updated={...t,
-        wins:t.wins+(won?1:0),losses:t.losses+(!won&&!drew?1:0),draws:t.draws+(drew?1:0),
-        rf:t.rf+gsResult.score.my,ra:t.ra+gsResult.score.opp,
-        rotIdx:t.rotIdx+1,
-        };
-        updated.players=applyGameStatsFromLog(updated.players, gsResult.log, true, won, gameDay);
-        updated.players=applyPostGameCondition(updated.players, gsResult.log, true, gameDay, isHome);
-        updated.players=playerMod.tickInjuries(updated.players);
-        updated.players=playerMod.tickPositionTraining(updated.players);
-        updated.players=updated.players.map(p=>({...p,daysOnActiveRoster:(p.daysOnActiveRoster??0)+1}));
-        updated.players=applyDefenseCoachRecovery(updated.players,t.coaches);
-        const newInj=playerMod.checkForInjuries(updated.players, year);
-        updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
-        updated.farm=tickCooldowns(updated.farm??[]);
-        updated=applyEmergencyRosterMaintenance(updated);
-        const popFieldsT=applyPopularityDelta(t,won,drew);updated={...updated,...popFieldsT};
-        const rev=calcRevenue(updated);
-        const revTotal=rev.ticket+rev.sponsor+rev.merch;
-        updated.budget+=revTotal;
-        updated.revenueThisSeason=(updated.revenueThisSeason??0)+revTotal;
-        return updated;
-      } catch (error) {
-        console.error("[TacticalPostGame] failed to update my team", error);
-        return t;
-      }
-    });
-    upd(currentOpp.id,t=>{
-      try {
-        let updated={...t,
-        wins:t.wins+(!won&&!drew?1:0),
-        losses:t.losses+(won?1:0),
-        draws:t.draws+(drew?1:0),
-        rf:t.rf+gsResult.score.opp,
-        ra:t.ra+gsResult.score.my,
-        };
-        updated.players=applyGameStatsFromLog(updated.players,gsResult.log,false,!won&&!drew, gameDay);
-        updated.players=applyPostGameCondition(updated.players,gsResult.log,false,gameDay, !isHome);
-        updated.players=playerMod.tickInjuries(updated.players);
-        const newInj=playerMod.checkForInjuries(updated.players, year);
-        updated.players=applyInjuriesToPlayers(updated.players, newInj, year);
-        Object.assign(updated,applyPopularityDelta(t,!won&&!drew,drew));
-        return updated;
-      } catch (error) {
-        console.error("[TacticalPostGame] failed to update opponent team", error);
-        return t;
-      }
-    });
+    const myUpdate = applyRegularSeasonTeamUpdate(myTeam, gsResult, { isFirstTeam: true, isHomeTeam: isHome, gameDay, year }, playerMod);
+    let updatedTeams = teams.map(t => t.id === myId
+      ? applyEmergencyRosterMaintenance(myUpdate.team)
+      : t.id === currentOpp.id
+        ? applyRegularSeasonTeamUpdate(t, gsResult, { isFirstTeam: false, isHomeTeam: !isHome, gameDay, year }, playerMod).team
+        : { ...t });
     const _tOppId=currentOpp.id;
     const _tCpuMatchups=scheduleMod.getCpuMatchups(schedule,gameDay,myId,_tOppId);
     const _tFallbackOthers=teams.filter(t=>t.id!==myId&&t.id!==_tOppId);
@@ -1206,38 +1080,14 @@ export function useSeasonFlow(gs) {
       archiveNormalGame(cr.log || [], a, b);
       tCpuSimResults.push({matchup,cr,homeTeam:a,awayTeam:b});
     }
-    setTeams(prev=>{
-      try {
-        let newTeams=prev.map(t=>({...t,players:t.players.map(p=>({...p,stats:{...p.stats}}))}));
-        for(const{matchup,cr}of tCpuSimResults){
-          const a=newTeams.find(t=>t.id===matchup.homeId);
-          const b=newTeams.find(t=>t.id===matchup.awayId);
-          if(!a||!b) continue;
-          const cdrew=cr.drew;
-          const aWon=cr.won;
-          if(aWon){a.wins++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.losses++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
-          else if(cdrew){a.draws++;a.rf+=cr.score.my;a.ra+=cr.score.opp;b.draws++;b.rf+=cr.score.opp;b.ra+=cr.score.my;}
-          else{b.wins++;b.rf+=cr.score.opp;b.ra+=cr.score.my;a.losses++;a.rf+=cr.score.my;a.ra+=cr.score.opp;}
-          Object.assign(a,applyPopularityDelta(a,aWon,cdrew));Object.assign(b,applyPopularityDelta(b,!aWon&&!cdrew,cdrew));
-          const aRevT=calcRevenue(a);a.budget=(a.budget??0)+aRevT.ticket+aRevT.sponsor+aRevT.merch;a.revenueThisSeason=(a.revenueThisSeason??0)+aRevT.ticket+aRevT.sponsor+aRevT.merch;
-          const bRevT=calcRevenue(b);b.budget=(b.budget??0)+bRevT.ticket+bRevT.sponsor+bRevT.merch;b.revenueThisSeason=(b.revenueThisSeason??0)+bRevT.ticket+bRevT.sponsor+bRevT.merch;
-          a.players=applyGameStatsFromLog(a.players,cr.log,true,aWon, gameDay);
-          a.players=applyPostGameCondition(a.players,cr.log,true,gameDay);
-          a.players=playerMod.tickInjuries(a.players);
-          const aInj=playerMod.checkForInjuries(a.players,year);
-          a.players=applyInjuriesToPlayers(a.players,aInj,year);
-          b.players=applyGameStatsFromLog(b.players,cr.log,false,!aWon&&!cdrew, gameDay);
-          b.players=applyPostGameCondition(b.players,cr.log,false,gameDay);
-          b.players=playerMod.tickInjuries(b.players);
-          const bInj=playerMod.checkForInjuries(b.players,year);
-          b.players=applyInjuriesToPlayers(b.players,bInj,year);
-        }
-        return applyScheduledCpuManagement(newTeams, gameDay, myId);
-      } catch (error) {
-        console.error("[TacticalPostGame] failed to update cpu matchups", error);
-        return prev;
-      }
-    });
+    for (const { matchup, cr } of tCpuSimResults) {
+      const a = updatedTeams.find(t => t.id === matchup.homeId);
+      const b = updatedTeams.find(t => t.id === matchup.awayId);
+      if (!a || !b) continue;
+      Object.assign(a, applyRegularSeasonTeamUpdate(a, cr, { isFirstTeam: true, isHomeTeam: true, gameDay, year }, playerMod).team);
+      Object.assign(b, applyRegularSeasonTeamUpdate(b, cr, { isFirstTeam: false, isHomeTeam: false, gameDay, year }, playerMod).team);
+    }
+    updatedTeams = applyScheduledCpuManagement(updatedTeams, gameDay, myId);
     setAllTeamResultsMap(prev=>{
       try {
         const next={...prev};
@@ -1283,13 +1133,12 @@ export function useSeasonFlow(gs) {
       const _opts=won?INTERVIEW_OPTIONS_WIN:INTERVIEW_OPTIONS_LOSE;
       addNews({type:"interview",headline:`インタビュー ${myTeam?.name||""}戦後会見`,source:"球団広報",dateLabel:`${year}年 ${gameDay}日目`,body:"試合後、監督にコメントを求められた。",question:_qs[rng(0,_qs.length-1)],options:_opts});
     }
-    tryGenerateCpuOffer();
     const tacticalDate = gameDayToDate(gameDay, schedule);
     if (tacticalDate && tacticalDate.month === TRADE_DEADLINE_MONTH) {
-      const liveTeams = teams.map((t) => ({ ...t, players: [...(t.players || [])] }));
+      const liveTeams = updatedTeams.map((t) => ({ ...t, players: [...(t.players || [])] }));
       const newsItem = tryCpuCpuDeadlineTrade(liveTeams, gameDay);
       if (newsItem) {
-        setTeams(liveTeams);
+        updatedTeams = liveTeams;
         addNews({ type: 'trade', headline: newsItem.headline, source: 'Baseball Times', dateLabel: `${year}年 ${gameDay}日目`, body: newsItem.body });
         addTransferLog({
           year,
@@ -1304,11 +1153,13 @@ export function useSeasonFlow(gs) {
         });
       }
     }
+    tryGenerateCpuOffer(updatedTeams);
+    setTeams(updatedTeams);
     pushResult(won,drew,currentOpp?.name||"",gsResult.score.my,gsResult.score.opp,gameDay);
     gs.pushGameResult(gameDay,{won,drew,isHome,oppName:currentOpp?.name||"",myScore:gsResult.score.my,oppScore:gsResult.score.opp,log:gsResult.log,inningSummary:gsResult.inningSummary,oppTeam:currentOpp});
     setGameDay(d=>d+1);
     if(!allStarDone && gameDay+1===allStarTriggerDay){
-      const rosters=allStarMod.selectAllStars(teams);
+      const rosters=allStarMod.selectAllStars(updatedTeams);
       const asResult=allStarMod.runAllStarGame(rosters, year);
       setTeams(prev=>applyAllStarSelections(prev, rosters));
       setAllStarDone(true);
