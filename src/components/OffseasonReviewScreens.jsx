@@ -10,12 +10,13 @@ const PlayerModal = lazy(() => import('./PlayerModal').then(m => ({ default: m.P
 const money = n => Number.isFinite(n) ? fmtSal(n) : '未記録';
 const sum = values => values.every(Number.isFinite) ? values.reduce((a, b) => a + b, 0) : undefined;
 const retirementLabels = { accepted: '引退を受け入れ', retained: '引き留め成功', retain_failed: '引き留め不成立・引退' };
-function Frame({ title, year, teams = [], myId, saveId, children }) {
+function Frame({ title, year, teams = [], myId, saveId, children, embedded = false }) {
   const [profile, setProfile] = useState(null);
   const myTeam = teams.find(t => t.id === myId);
-  return <main className="offseason-review"><div className="review-content"><header><p>オフシーズン · {year}年</p><h1>{title}</h1></header>{children(setProfile)}
+  const Tag = embedded ? 'section' : 'main'; const Heading = embedded ? 'h2' : 'h1';
+  return <Tag className="offseason-review"><div className="review-content"><header><p>オフシーズン · {year}年</p><Heading>{title}</Heading></header>{children(setProfile)}
     {profile && <Suspense fallback={<p role="status">選手詳細を読み込み中です。</p>}><PlayerModal key={profile.id} player={profile} teamName={myTeam?.name || '選手記録'} isMyTeam={[...(myTeam?.players || []), ...(myTeam?.farm || [])].some(p => p.id === profile.id)} saveId={saveId} teams={teams} year={year} onClose={() => setProfile(null)} /></Suspense>}
-  </div></main>;
+  </div></Tag>;
 }
 function Confirm({ title, children, onClose, onConfirm, label, disabled, busy, error }) {
   const ref = useResultDialog(onClose, true);
@@ -94,22 +95,23 @@ export function WaiverResultScreen({ results, year, teams, myId, saveId, onNext 
       {!claimed.length && !unclaimed.length && <p>今回は放出対象の選手はいませんでした。</p>}
       <h2>他球団へ入団</h2>{claimed.map(({ player, teamName, teamEmoji }) => <article className="review-card" key={player.id}><PlayerInfo player={player} onProfile={profile} /><p>{teamEmoji} {teamName || '入団先未記録'}へ入団</p></article>)}
       <h2>自由契約市場に残る選手</h2>{unclaimed.map(p => <article className="review-card" key={p.id}><PlayerInfo player={p} onProfile={profile} /><p>自由契約として市場に残っています。</p></article>)}</>}
+    {Array.isArray(results?.allClaimed) && <details className="review-card"><summary>各球団の補強結果（{results.allClaimed.length}人）</summary>{results.allClaimed.map(c => <article key={c.player.id}><PlayerInfo player={c.player} onProfile={profile} /><p>{c.teamName}へ入団 · 年俸 {money(c.player.salary)}</p></article>)}</details>}
     <footer><button className="review-primary" disabled={advance.busy} onClick={() => advance.run()}>ドラフトへ進む</button>{advance.failure && <p role="alert">{advance.failure}</p>}</footer>
   </>}</Frame>;
 }
 const abilityNames = { velocity: '球速', control: '制球', stamina: 'スタミナ', breaking: '変化球', variety: '球種', sharpness: 'キレ', tempo: 'テンポ', clutchP: 'ピンチ', recovery: '回復', durability: '耐久', contact: 'ミート', power: '長打', eye: '選球眼', speed: '走力', arm: '肩', defense: '守備', catching: '捕球', stealSkill: '盗塁', baseRunning: '走塁', clutch: 'クラッチ', vsLeft: '対左', breakingBall: '変化球対応' };
 const delta = n => Number.isFinite(n) ? `${n > 0 ? '+' : ''}${n}` : '未記録';
-export function GrowthSummaryScreen({ summary, year, teams, myId, saveId, onNext }) {
+export function GrowthSummaryScreen({ summary, year, teams, myId, saveId, onNext, embedded = false, faPool = [] }) {
   const advance = useAdvance(onNext); const team = teams?.find(t => t.id === myId);
   const groups = [['breakout', '急成長'], ['growth', '成長'], ['decline', '下降']];
   const warnings = (summary?.decline || []).filter(item => item.p?.age >= 33 && Number.isFinite(item.diff) && Math.abs(item.diff) >= 5);
-  return <Frame {...{ teams, myId, year, saveId }} title="選手成長レポート">{profile => <>
+  return <Frame {...{ teams, myId, year, saveId, embedded }} title="選手成長レポート">{profile => <>
     <p>今季終了後の登録選手の成長記録です。変化量は記録対象の能力値の合計差です。</p><div className="review-metrics">{groups.map(([key, label]) => <span key={key}>{label} {Array.isArray(summary?.[key]) ? `${summary[key].length}人` : '未記録'}</span>)}</div>
     {!summary ? <p>成長結果が未記録です。</p> : groups.every(([key]) => Array.isArray(summary[key]) && summary[key].length === 0) && <p>記録された大きな変化はありません。</p>}
     {warnings.length > 0 && <aside className="review-warning"><h2>起用の見直し候補</h2><p>33歳以上で5pt以上下降した選手です。放出の推奨ではありません。</p><ul>{warnings.map((item, i) => <li key={i}>{item.p.name} · {delta(item.diff)}pt</li>)}</ul></aside>}
     {groups.map(([key, label]) => <details className="review-card" key={key}><summary>{label}の選手と能力の内訳（{Array.isArray(summary?.[key]) ? `${summary[key].length}人` : '未記録'}）</summary>{(summary?.[key] || []).map((item, i) => {
       const p = item.p; if (!p) return <p key={i}>選手情報未記録 · {delta(item.diff)}pt</p>;
-      const current = [...(team?.players || []), ...(team?.farm || [])].find(entry => entry.id === p.id);
+      const current = [...(team?.players || []), ...(team?.farm || []), ...faPool].find(entry => entry.id === p.id);
       const before = (p.isPitcher ? p.pitching : p.batting) || {}; const after = (p.isPitcher ? current?.pitching : current?.batting) || {};
       const keys = Object.keys(abilityNames).filter(k => k in before || k in after);
       return <article className="review-card" key={i}><h3>{p.name} · {delta(item.diff)}pt</h3><p>{Number.isFinite(p.age) ? `${p.age}歳` : '年齢未記録'} · {p.pos}</p>
@@ -118,6 +120,6 @@ export function GrowthSummaryScreen({ summary, year, teams, myId, saveId, onNext
       </article>;
     })}</details>)}
     <p className="review-note">このレポートに記録されていない小さな変化やファームの成長内訳は補完していません。</p>
-    <footer><button className="review-primary" disabled={advance.busy} onClick={() => advance.run()}>戦力外・自由契約の整理へ</button>{advance.failure && <p role="alert">{advance.failure}</p>}</footer>
+    {!embedded && <footer><button className="review-primary" disabled={advance.busy} onClick={() => advance.run()}>戦力外・自由契約の整理へ</button>{advance.failure && <p role="alert">{advance.failure}</p>}</footer>}
   </>}</Frame>;
 }

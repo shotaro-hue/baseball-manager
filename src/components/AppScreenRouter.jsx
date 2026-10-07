@@ -10,6 +10,7 @@ import TeamDetailRoute from './screenRoutes/TeamDetailRoute';
 
 const ModeSelectScreen = lazy(() => import('./screens/ModeSelectScreen'));
 const OffseasonFaPhaseScreen = lazy(() => import('./OffseasonFaPhaseScreen'));
+const OffseasonPlanningScreen = lazy(() => import('./OffseasonPlanningScreen'));
 const BatchResultScreen = lazy(() =>
   import('./BatchResult').then((module) => ({
     default: module.BatchResultScreen,
@@ -250,6 +251,11 @@ export default function AppScreenRouter({ app }) {
     );
   }
 
+  if (screen === 'offseason_planning') {
+    return <DeferredScreenFrame screen={screen}><ErrorBoundary onReset={() => setScreen('offseason_planning')}>
+      <OffseasonPlanningScreen gs={gs} os={os} myTeam={myTeam} myId={myId} year={year} />
+    </ErrorBoundary></DeferredScreenFrame>;
+  }
   if (screen === 'offseason_fa_phase') {
     return <DeferredScreenFrame screen={screen}><ErrorBoundary onReset={() => setScreen('hub')}>
       <OffseasonFaPhaseScreen gs={gs} os={os} myTeam={myTeam} myId={myId} year={year} />
@@ -317,7 +323,14 @@ export default function AppScreenRouter({ app }) {
             teams={teams}
             myId={myId}
             saveId={gs.saveId}
-            onNext={() => setScreen('draft_preview')}
+            onNext={async () => {
+              if (gs.offseasonPlan) {
+                const result = await gs.handleSave();
+                if (!result?.ok) return false;
+              }
+              setScreen('draft_preview');
+              return true;
+            }}
           />
         </ErrorBoundary>
       </DeferredScreenFrame>

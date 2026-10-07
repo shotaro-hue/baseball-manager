@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { CPU_RENEWAL_ROUNDS, NEGOTIATION_MORALE_ACCEPT_BONUS, NEGOTIATION_MORALE_CUT_PENALTY, NEGOTIATION_MORALE_ROUND_HIT, NEGOTIATION_TRUST_HAPPY, NEGOTIATION_TRUST_HOLDOUT } from '../constants';
 import { evaluateRenewalOffer, getFaThreshold, getFaProgress } from '../engine/contract';
 import { salaryCutRule, renewalEligible } from '../engine/renewalRules';
+import { compactRenewalSession, reconcileRenewalSession } from '../engine/offseasonPlanning';
 import { fmtSal, fmtIP, clamp } from '../utils';
 import { useResultDialog } from './useResultDialog';
 import '../calm-renewal.css';
@@ -50,12 +51,13 @@ function Confirmation({ title, children, onClose, onConfirm, confirmLabel }) {
   </section></div>;
 }
 
-export function ContractRenewalPhaseScreen({ teams, myId, year, demands, renewalPlayerIds, onSign, onRelease, onNext }) {
+export function ContractRenewalPhaseScreen({ teams, myId, year, demands, renewalPlayerIds, onSign, onRelease, onNext,
+  embedded = false, savedSession, onSessionChange, savedView, onViewChange, onDeclare }) {
   const myTeam = teams?.find(t => t.id === myId);
-  const [session, setSession] = useState(() => createSession(myTeam, demands, renewalPlayerIds, year));
+  const [session, setSession] = useState(() => savedSession || createSession(myTeam, demands, renewalPlayerIds, year));
   const sessionRef = useRef(session);
-  const [selectedId, setSelectedId] = useState(null);
-  const [filter, setFilter] = useState('all');
+  const [selectedId, setSelectedId] = useState(savedView?.selectedId ?? null);
+  const [filter, setFilter] = useState(savedView?.filter ?? 'all');
   const [modal, setModal] = useState(null);
   const [careerOpen, setCareerOpen] = useState(false);
   const [batchMode, setBatchMode] = useState(false);
@@ -71,6 +73,14 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, renewal
   const list = useRef(null);
   const returning = useRef(null);
   const selectedStatus = session?.entries.find(e => e.player.id === selectedId)?.status;
+  useEffect(() => { if (session) onSessionChange?.(compactRenewalSession(session)); }, [session, onSessionChange]);
+  useEffect(() => { onViewChange?.({ selectedId, filter }); }, [selectedId, filter, onViewChange]);
+  useEffect(() => {
+    if (!embedded || !sessionRef.current) return;
+    const current = sessionRef.current;
+    const next = reconcileRenewalSession(current, myTeam, year, savedSession);
+    if (JSON.stringify(next) !== JSON.stringify(current)) { sessionRef.current = next; setSession(next); }
+  }, [embedded, myTeam, year, savedSession]);
   useEffect(() => {
     if (!sessionRef.current && myTeam) {
       const next = createSession(myTeam, demands, renewalPlayerIds, year); sessionRef.current = next; setSession(next);
@@ -106,6 +116,7 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, renewal
   const offerOne = entry => {
     if (!entry || entry.status !== 'pending' || advanced.current) return;
     const p = myTeam?.players.find(p => p.id === entry.player.id) || entry.player;
+    if (embedded && (!myTeam?.players.some(p => p.id === entry.player.id) || p.contractSignedYear === year)) return;
     const salary = draftAmount(entry);
     const years = Number(entry.years);
     const demand = { demandSalary: p.salary, minAcceptSalary: Math.round(p.salary * .6), resistanceFactor: .5, ...entry.demand };
@@ -122,6 +133,7 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, renewal
     } else if (round >= CPU_RENEWAL_ROUNDS) {
       const isFA = (p.daysOnActiveRoster ?? (p.serviceYears ?? 0) * 120) >= getFaThreshold(p).domestic;
       update(p.id, { status: isFA ? 'fa' : 'cooldown', round, logs: [...logs, isFA ? '選手：FA権を行使します。' : '選手：今回は合意できません。一度持ち帰り、再交渉します。'] });
+      if (isFA) onDeclare?.(p.id);
     } else {
       const counter = Math.max(demand.minAcceptSalary, salary + 100, Math.round(demand.demandSalary * (round === 1 ? .95 : 1) / 100) * 100);
       update(p.id, { round, salary: String(counter), logs: [...logs, `選手：${money(counter)}を希望します。`] });
@@ -168,12 +180,14 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, renewal
   const releaseEntry = ['release', 'free'].includes(modal?.type) ? entries.find(e => e.player.id === modal.id) : null;
   const batchEntries = entries.filter(e => batchIds.includes(e.player.id) && e.status === 'pending');
   const cut = selected ? salaryCutRule(selected.player, Number(selected.salary)) : null;
-  return <main className={`renewal-screen ${selected ? 'renewal-has-selection' : ''}`}>
-    <header><h1>契約更改</h1><p>{year}年オフシーズン · {myTeam?.name}</p>
+  const Frame = embedded ? 'section' : 'main';
+  return <Frame className={`renewal-screen ${selected ? 'renewal-has-selection' : ''}`}>
+    {!embedded && <header><h1>契約更改</h1><p>{year}年オフシーズン · {myTeam?.name}</p>
       <div className="renewal-overview"><span>未合意 <strong>{unresolved.length}</strong> / {entries.length}人</span><span>合意 <strong>{agreed.length}</strong>人</span><span>再交渉待ち <strong>{entries.filter(e => e.status === 'cooldown').length}</strong>人</span></div>
       <p>年俸総額の見込み <strong>{money(projected)}</strong> <span>（更改前比 {difference == null ? '未記録' : `${difference > 0 ? '+' : ''}${money(difference)}`}）</span></p>
       <p className="renewal-note">未合意は前年年俸で仮計上。FA宣言・自由契約・戦力外の選手は除外します。</p>
-    </header>
+    </header>}
+    {embedded && <h2>契約更改</h2>}
     <div className="renewal-layout">
       <section className="renewal-list" aria-label="更改対象選手" ref={list}>
         <button onClick={() => { setBatchMode(!batchMode); setBatchIds([]); }}>{batchMode ? 'まとめて提示を閉じる' : 'まとめて提示を開く'}</button>
@@ -207,7 +221,7 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, renewal
             {selected.terms && <p className="renewal-status renewal-signed">合意条件：{money(selected.terms.salary)}・{selected.terms.years}年</p>}
             {selected.status === 'pending' && <><div className="renewal-fields"><label>提示年俸（万円）<input type="number" inputMode="numeric" step="1" value={selected.salary} onChange={event => update(selectedId, { salary: event.target.value })} /></label><label>契約年数<select value={selected.years} onChange={event => update(selectedId, { years: Number(event.target.value) })}>{[1, 2, 3].map(n => <option key={n} value={n}>{n}年</option>)}</select></label></div>
               <p>前年との差額：{Number.isFinite(Number(selected.salary)) && selected.salary.trim() !== '' && Number.isFinite(selected.player.salary) ? money(Number(selected.salary) - selected.player.salary) : '未記録'} · 今回の交渉 {selected.round}/{CPU_RENEWAL_ROUNDS}回</p>
-              <button className="renewal-primary" onClick={() => cut.exceeds ? setModal({ type: 'cut', id: selectedId, salary: selected.salary, years: selected.years }) : offer()}>オファーを出す</button><p className="renewal-note">不合意が{CPU_RENEWAL_ROUNDS}回続くと、FA権のある選手は宣言し、その他の選手は再交渉待ちになります。減額制限超過への不同意は、回数・FA資格に関係なく別途対応が必要です。</p></>}
+              <button className="renewal-primary" onClick={() => cut.exceeds ? setModal({ type: 'cut', id: selectedId, salary: selected.salary, years: selected.years }) : embedded ? setModal({ type: 'offer', id: selectedId }) : offer()}>オファーを出す</button><p className="renewal-note">不合意が{CPU_RENEWAL_ROUNDS}回続くと、FA権のある選手は宣言し、その他の選手は再交渉待ちになります。減額制限超過への不同意は、回数・FA資格に関係なく別途対応が必要です。</p></>}
             {selected.status === 'free_requested' && <><p>選手は減額制限超過に同意していません。制限内の条件を再提示するか、自由契約の手続きへ進んでください。</p><button onClick={() => update(selectedId, { status: 'pending', round: 0, salary: String(Math.ceil(cut.boundary)), retries: selected.retries + 1, logs: [...selected.logs, '減額制限内で交渉を再開しました。'] })}>減額制限内で再提示する</button><button className="renewal-danger" onClick={() => setModal({ type: 'free', id: selectedId })}>自由契約の手続きへ</button></>}
             {selected.status === 'cooldown' && <button className="renewal-primary" onClick={() => update(selectedId, { status: 'pending', round: 0, retries: selected.retries + 1, salary: String(Math.max(selected.demand.minAcceptSalary ?? selected.player.salary * .6, Math.round((selected.demand.demandSalary ?? selected.player.salary) * .95))), logs: [...selected.logs, '再交渉を開始しました。'] })}>再交渉する</button>}
           </div>
@@ -217,8 +231,9 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, renewal
         </>}
       </section>
     </div>
-    <footer className="renewal-footer">{unresolved.length > 0 && <p>未合意の{unresolved.length}人を合意・FA宣言・自由契約・戦力外のいずれかにする必要があります。<button onClick={() => { setFilter('pending'); select(unresolved[0].player.id); }}>未合意の選手を確認</button></p>}<button className="renewal-primary" disabled={unresolved.length > 0} onClick={() => setModal({ type: 'review' })}>更改結果を確認する</button></footer>
+    {!embedded && <footer className="renewal-footer">{unresolved.length > 0 && <p>未合意の{unresolved.length}人を合意・FA宣言・自由契約・戦力外のいずれかにする必要があります。<button onClick={() => { setFilter('pending'); select(unresolved[0].player.id); }}>未合意の選手を確認</button></p>}<button className="renewal-primary" disabled={unresolved.length > 0} onClick={() => setModal({ type: 'review' })}>更改結果を確認する</button></footer>}
     {releaseEntry && <Confirmation title={`${releaseEntry.player.name}を${modal.type === 'free' ? '自由契約' : '戦力外'}にしますか？`} onClose={closeModal} onConfirm={release} confirmLabel={modal.type === 'free' ? '自由契約を確定する' : '戦力外を確定する'}><p>契約を更新せず、球団から外します。この更改画面では取り消せません。</p>{modal.type === 'free' && <p>減額制限超過への不同意による自由契約です。FA権の行使ではなく、FA資格がなくても市場へ移ります。</p>}<p>前年年俸：{money(releaseEntry.player.salary)} · 要求：{money(releaseEntry.demand.demandSalary)}</p></Confirmation>}
+    {modal?.type === 'offer' && <Confirmation title="提示する契約条件の確認" onClose={closeModal} confirmLabel="この条件を提示する" onConfirm={() => { offer(); setModal(null); }}><p>{selected?.player.name}へ{money(Number(selected?.salary))}・{selected?.years}年を提示します。合意すると契約が成立し、原則取り消せません。</p></Confirmation>}
     {modal?.type === 'cut' && <Confirmation title="減額制限を超える提示" onClose={closeModal} confirmLabel="この条件で提示する" onConfirm={() => {
       if (busy.current || advanced.current) return;
       busy.current = true;
@@ -231,5 +246,5 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, renewal
     })}</ul><p>下書きの条件で1回ずつ提示します。不合意・再交渉待ち・減額制限の対応待ちは個別に対応できます。自動で戦力外・自由契約にはしません。</p></Confirmation>}
     {modal?.type === 'batch_results' && <Confirmation title="まとめて提示の返答" onClose={closeModal} onConfirm={closeModal} confirmLabel="結果を閉じる"><ul>{entries.filter(e => modal.ids.includes(e.player.id)).map(e => <li key={e.player.id}><strong>{e.player.name}：{labels[e.status]}</strong><p>{e.logs.at(-1)}</p></li>)}</ul><p>未合意の選手は一覧から個別交渉を続けられます。</p></Confirmation>}
     {modal?.type === 'review' && <Confirmation title="契約更改の最終確認" onClose={closeModal} onConfirm={next} confirmLabel="確定して次へ進む"><p>年俸総額の見込み：{money(projected)}（更改前 {money(session.baseline)}）</p><ul>{entries.map(e => <li key={e.player.id}>{e.player.name}：{labels[e.status]}{e.terms ? ` · ${money(e.terms.salary)}・${e.terms.years}年` : ''}</li>)}</ul><p>確定後、CPU球団の更改と次のオフシーズン処理へ進みます。</p></Confirmation>}
-  </main>;
+  </Frame>;
 }
