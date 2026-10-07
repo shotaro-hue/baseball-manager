@@ -150,7 +150,7 @@ describe('processCpuFaBids multi-signing', () => {
     expect(res.news.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('ロスター MAX_ROSTER(28) 到達で獲得を停止する', () => {
+  it('一軍28人でも支配下枠に空きがあれば二軍へ獲得する', () => {
     const players = Array.from({ length: 28 }, (_, i) => mkBatter(`p${i}`));
     const cpu = {
       id: 1, name: 'CPU', league: 'セ', wins: 70, losses: 70, city: '東京',
@@ -160,6 +160,49 @@ describe('processCpuFaBids multi-signing', () => {
     const res = processCpuFaBids([my, cpu], 0, [mkBatter('faX')], [my, cpu]);
     const updatedCpu = res.updatedTeams.find((t) => t.id === 1);
     expect(updatedCpu.players.length).toBe(28);
+    expect(updatedCpu.farm.map(p => p.id)).toContain('faX');
+    expect(res.remainingFaPool).toHaveLength(0);
+  });
+
+  it('支配下69人からは1人だけ獲得し、育成選手は70人に含めない', () => {
+    const my = { id: 0, players: [], farm: [], budget: 0 };
+    const cpu = { id: 1, name: 'CPU', league: 'セ', wins: 70, losses: 70, city: '東京', budget: 99999999,
+      players: Array.from({ length: 28 }, (_, i) => mkBatter(`a${i}`)),
+      farm: [...Array.from({ length: 41 }, (_, i) => mkBatter(`f${i}`)), { ...mkBatter('ikusei'), 育成: true }] };
+    const original = structuredClone(cpu);
+    const result = processCpuFaBids([my, cpu], 0, [mkBatter('fa1'), mkBatter('fa2')], [my, cpu], 2026);
+    const after = result.updatedTeams[1];
+    expect([...after.players, ...after.farm].filter(p => !p.育成)).toHaveLength(70);
+    expect(result.claimed).toHaveLength(1);
+    expect(result.remainingFaPool).toHaveLength(1);
+    expect(after.players).toHaveLength(28);
+    expect(cpu).toEqual(original);
+  });
+
+  it('支配下70人では獲得せず、育成契約だけ二軍へ獲得できる', () => {
+    const my = { id: 0, players: [], farm: [], budget: 0 };
+    const cpu = { id: 1, name: 'CPU', league: 'セ', wins: 70, losses: 70, city: '東京', budget: 99999999,
+      players: Array.from({ length: 27 }, (_, i) => mkBatter(`a${i}`)), farm: Array.from({ length: 43 }, (_, i) => mkBatter(`f${i}`)) };
+    const result = processCpuFaBids([my, cpu], 0, [mkBatter('shihaka'), { ...mkBatter('ikusei'), 育成: true }], [my, cpu], 2026);
+    expect(result.updatedTeams[1].players).toHaveLength(27);
+    expect(result.updatedTeams[1].farm.some(p => p.id === 'ikusei')).toBe(true);
+    expect(result.remainingFaPool.map(p => p.id)).toEqual(['shihaka']);
+  });
+
+  it.each([undefined, NaN, 0, 100])('未記録・不足予算では獲得しない（%s）', budget => {
+    const my = { id: 0, players: [], farm: [] };
+    const cpu = { id: 1, name: 'CPU', budget, players: [], farm: [] };
+    const result = processCpuFaBids([my, cpu], 0, [mkBatter('fa')], [my, cpu], 2026);
+    expect(result.remainingFaPool).toHaveLength(1);
+    expect(result.claimed).toEqual([]);
+  });
+
+  it('市場に旧所属の選手が混ざっても重複獲得しない（ID 0）', () => {
+    const p = mkBatter(0), my = { id: 0, players: [], farm: [p], budget: 0 };
+    const cpu = { id: 1, name: 'CPU', league: 'セ', wins: 70, losses: 70, city: '東京', budget: 99999999, players: [], farm: [] };
+    const result = processCpuFaBids([my, cpu], 0, [p, { ...mkBatter('missing'), salary: undefined }], [my, cpu], 2026);
+    expect(result.claimed).toEqual([]);
+    expect(result.updatedTeams[1].players).toEqual([]);
   });
 
   it('先発不足チームが先発投手を野手より優先して獲得する', () => {

@@ -1,5 +1,7 @@
-import { MAX_ROSTER, FOREIGN_DEADLINE_DAY, MIN_ACTIVE_CATCHERS, MIN_TOTAL_BY_POS } from '../../constants';
+import { FOREIGN_DEADLINE_DAY, MIN_ACTIVE_CATCHERS, MIN_TOTAL_BY_POS } from '../../constants';
 import { fmtIP } from '../../utils';
+import { marketPlacement, marketRosterError } from '../../engine/marketRoster';
+export { marketPlacement } from '../../engine/marketRoster';
 import { prepareOffseasonFreeAgent } from '../../engine/offseasonMarket';
 
 export function marketMetrics(player) {
@@ -27,20 +29,10 @@ export function marketNeeds(team) {
   return hints;
 }
 
-export function marketPlacement(team, player) {
-  if (player.育成) return { farm: true, reason: '育成契約のためファーム所属' };
-  const active = team?.players || [];
-  if (active.length >= MAX_ROSTER) return { farm: true, reason: '登録枠が満員' };
-  if (player.isForeign) {
-    const foreigners = active.filter(p => p.isForeign);
-    if (foreigners.length >= 4) return { farm: true, reason: '外国人枠が満員' };
-    if (foreigners.length === 3 && foreigners.every(p => Boolean(p.isPitcher) === Boolean(player.isPitcher))) return { farm: true, reason: '外国人4人が全員投手／全員野手になるため' };
-  }
-  return { farm: false, reason: '登録枠に空きあり' };
-}
-
 export function validateMarketContract({ team, pool, player, salary, years, gameDay }) {
   if (!pool.some(p => p.id === player.id)) return 'この選手は現在の市場にいません';
+  const rosterError = marketRosterError(team, player);
+  if (rosterError) return rosterError;
   if (player.isForeign && (!Number.isFinite(gameDay) || gameDay > FOREIGN_DEADLINE_DAY)) return '外国人補強の期限を過ぎているか、日程が未記録です';
   if (!Number.isFinite(salary) || salary <= 0 || !Number.isInteger(years) || years < 1 || years > 3) return '契約金額または年数を確認してください';
   if (player.育成 && player.departureReason !== 'ikusei_expiry' && years > Math.max(1, 3 - (player.ikuseiYears || 0))) return '育成3年満了までに収まる契約年数を選んでください';
@@ -50,6 +42,7 @@ export function validateMarketContract({ team, pool, player, salary, years, game
 }
 
 export function addMarketSigning(team, player, salary, years, year, marketMode = 'season') {
+  if (marketRosterError(team, player)) return team;
   const placement = marketPlacement(team, player);
   const prepared = marketMode === 'offseason' ? prepareOffseasonFreeAgent(player, year, team.id) : player;
   const signed = { ...prepared, isFA: false, salary, contractYears: years, contractYearsLeft: years, contractSignedYear: year,

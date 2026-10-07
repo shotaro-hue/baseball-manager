@@ -1,8 +1,9 @@
 import { useState, useReducer, useMemo, useCallback, useEffect, useRef } from "react";
+import { contractReplyIsDue, resolveContractReplies } from '../engine/contractReplies';
 import { gameStateReducer, G } from './gameStateReducer';
 import { createSaveDirtyTracker } from '../state/saveDirtyTracker';
 import { OFFSEASON_SAVE_SCREENS } from '../engine/offseasonResume';
-import { uid, clamp, rng, pname, scoutedValue, fmtSal } from '../utils';
+import { uid, clamp, rng, pname, scoutedValue } from '../utils';
 // Player helpers are loaded lazily to keep the initial title flow lighter.
 import { SEASON_PARAMS, getDefaultParams } from '../data/scheduleParams.js';
 import {
@@ -430,58 +431,19 @@ export function useGameState() {
     }));
   },[]);
 
-  useEffect(()=>{
-    const dueMails=mailbox.filter(m=>
-      (m.type==="contract_decision_pending" || m.type==="contract_decision") &&
-      !m.resolved &&
-      (m.deliverOnDay??0)<=gameDay &&
-      m.decision?.playerId
-    );
-    if(dueMails.length===0||!myTeam) return;
-
-    for(const mail of dueMails){
-      const d=mail.decision;
-      const target=myTeam.players.find(p=>p.id===d.playerId);
-      if(!target) continue;
-      if(d.accepted){
-        upd(myId,t=>({...t,players:t.players.map(p=>p.id===d.playerId?{...p,salary:d.salary,contractYears:d.years,contractYearsLeft:d.years,contractIncentives:d.incentives||null}:p)}));
-        notify(`✅ ${d.playerName}が契約を受諾しました`,"ok");
-      }else{
-        addToHistory(myId,target,"FA移籍");
-        upd(myId,t=>({...t,players:t.players.filter(p=>p.id!==d.playerId)}));
-        setFaPool(prev=>[...prev,{...target,isFA:true,highestBid:0}]);
-        notify(`❌ ${d.playerName}が契約を拒否しFA宣言しました`,"warn");
-      }
-    }
-
-    setMailbox(prev=>{
-      const dueIds=new Set(dueMails.map(m=>m.id));
-      const keptMails=prev.filter(m=>!dueIds.has(m.id));
-      const resultMails=dueMails.map(m=>({
-        id:uid(),
-        type:"contract_reply",
-        read:false,
-        resolved:false,
-        deliverOnDay:gameDay,
-        title:`【契約回答】${m.decision?.playerName||m.title}`,
-        from:`${m.decision?.playerName||"選手"} / 代理人`,
-        dateLabel:`${year}年 ${gameDay}日目`,
-        timestamp:Date.now(),
-        body:m.decision?.accepted
-          ? `${m.decision.playerName}より契約受諾の連絡が届きました。\n\n契約条件: ${m.decision.years}年 / ${fmtSal(m.decision.salary)}${(() => {
-            const i = m.decision?.incentives || {};
-            const parts = [];
-            if ((Number(i.performanceBonusRate) || 0) > 0) parts.push(`出来高+${i.performanceBonusRate}%`);
-            if ((Number(i.titleBonus) || 0) > 0) parts.push(`タイトル${fmtSal(i.titleBonus)}`);
-            if (i.optOut) parts.push("オプトアウト");
-            return parts.length ? `\nインセンティブ: ${parts.join(" / ")}` : "";
-          })()}`
-          : `${m.decision.playerName}より契約辞退の連絡が届きました。\n\n選手はFA市場へ移行します。`,
-      }));
-      return [...keptMails, ...resultMails];
-    });
-  },[mailbox, gameDay, myTeam, myId, upd, notify, addToHistory, setFaPool, year]);
-
+  useEffect(() => {
+    const dueMails = mailbox.filter(m => contractReplyIsDue(m, gameDay, year));
+    if (!dueMails.length || !myTeam) return;
+    const result = resolveContractReplies(myTeam, dueMails, gameDay, year);
+    // Validate again against the current reducer state, not a captured roster.
+    upd(myId, team => resolveContractReplies(team, dueMails, gameDay, year).team);
+    const replies = new Map(result.replies.map(m => [m.id, m]));
+    setMailbox(prev => prev.map(m => replies.has(m.id) ? replies.get(m.id) : m));
+    result.replies.forEach(m => notify(m.resolution === 'signed'
+      ? `${m.decision.playerName || '選手'}が契約を受諾しました`
+      : m.resolution === 'rejected' ? '契約は辞退されました。所属と現契約を維持します'
+        : '変更済みの契約回答を取り消しました', m.resolution === 'signed' ? 'ok' : 'warn'));
+  }, [mailbox, gameDay, myTeam, myId, upd, notify, year]);
 
   useEffect(() => {
     if (!persistentEnabled) return;
