@@ -4,20 +4,19 @@ import { createInitialTeams } from '../src/engine/bootstrapTeams';
 import { generateSeasonSchedule, calcAllStarTriggerDay } from '../src/engine/scheduleGen';
 import { simulateSeasonBatch } from '../src/workers/seasonBatchCore';
 import { calcSeasonAwards } from '../src/engine/awards';
-import { calcPlayerDemand, cpuRenewContracts, processCpuFaBids, getFaProgress } from '../src/engine/contract';
-import { resolveOffseasonFaDeclarations, assessFaDeclaration } from '../src/engine/faDeclaration';
-import { renewalEligible } from '../src/engine/renewalRules';
-import { emptyStats } from '../src/engine/playerCore';
+import { cpuRenewContracts, processCpuFaBids } from '../src/engine/contract';
+import { resolveOffseasonFaDeclarations } from '../src/engine/faDeclaration';
 import { developPlayers } from '../src/engine/player';
-import { makeCareerEntry, appendCareerEntryToPlayer } from '../src/engine/careerStats';
 import { prepareOffseasonFreeAgent } from '../src/engine/offseasonMarket';
-import { SEASON_GAMES, TEAM_DEFS } from '../src/constants';
+import { SEASON_GAMES } from '../src/constants';
+import { nextEconomyYear, collectEconomyDemands, createEconomyMarketEntries, economyPriceMismatches } from './faEconomyModel';
 
 const totalPay = teams => teams.reduce((sum, t) => sum + [...t.players, ...t.farm].reduce((s, p) => s + p.salary, 0), 0);
 const median = values => { const v = values.slice().sort((a, b) => a - b); return v.length ? (v[Math.floor((v.length - 1) / 2)] + v[Math.floor(v.length / 2)]) / 2 : null; };
 const round = n => Number.isFinite(n) ? Math.round(n * 1000) / 1000 : null;
 const salaryGroups = rows => [
   ['29歳以下', r => r.age <= 29], ['30歳以上', r => r.age >= 30],
+  ['一軍所属', r => r.roster === 'active'], ['二軍所属・支配下', r => r.roster === 'farm' && !r.ikusei], ['育成', r => r.ikusei],
   ['野手400打席以上', r => !r.pitcher && r.pa >= 400],
   ['野手400打席・OPS.800以上', r => !r.pitcher && r.pa >= 400 && r.ops >= .8],
   ['野手20本塁打以上', r => !r.pitcher && r.hr >= 20],
@@ -28,34 +27,13 @@ const salaryGroups = rows => [
   medianPrevious: median(group.map(r => r.previous)), medianDemand: median(group.map(r => r.demand)),
   medianChangeRatio: round(median(group.filter(r => r.previous > 0).map(r => r.demand / r.previous))) }; });
 
-// A controlled economy experiment, NOT a reproduction of every offseason UI.
-// Every club renews as CPU; no user-first purchases, draft, retirement or posting.
-// Real match, growth, renewal and market engines run. New-year cashflow mirrors
-// useOffseason's CPU formula, kept explicit so this experiment cannot alter saves.
-function nextYear(teams, year) {
-  return teams.map(t => {
-    const advance = (p, active) => ({ ...appendCareerEntryToPlayer(p, makeCareerEntry(p.stats, p.playoffStats, year, t.id, t.name)),
-      age: p.age + 1, serviceYears: (p.serviceYears || 0) + (p.育成 ? 0 : 1),
-      stats: emptyStats(), playoffStats: emptyStats(), injury: null, injuryDaysLeft: 0,
-      condition: Math.max(60, Math.min(100, p.condition + 20)),
-      ...(active ? { contractYearsLeft: Math.max(0, p.contractYearsLeft - 1) } : {}),
-      growthPhase: p.age + 1 <= 24 ? 'growth' : p.age + 1 <= 29 ? 'peak' : p.age + 1 <= 33 ? 'earlyDecline' : 'decline' });
-    const players = t.players.map(p => advance(p, true));
-    const farm = t.farm.map(p => advance(p, false));
-    const base = TEAM_DEFS.find(d => d.id === t.id).budget;
-    const payroll = [...players, ...farm].reduce((s, p) => s + p.salary, 0);
-    return { ...t, players, farm, wins: 0, losses: 0, draws: 0, rf: 0, ra: 0, rotIdx: 0,
-      winStreak: 0, loseStreak: 0, revenueThisSeason: 0,
-      budget: Math.max(Math.round(base * .5), base + Math.round((t.revenueThisSeason || 0) * .6) - payroll) };
-  });
-}
-
 describe.skipIf(!process.env.RUN_FA_ECONOMY_BENCHMARK)('seeded multi-season FA economy', () => {
   it('records full seasons, asking salaries, market outcomes and cashflow separately', () => {
     const seeds = (process.env.FA_ECONOMY_SEEDS || '1,42').split(',').map(Number);
     const years = Number(process.env.FA_ECONOMY_YEARS || 3);
-    const report = { seeds, years, scenario: 'All clubs use CPU renewal and acquisition; no user-first signing',
-      limitations: ['No draft, retirement, posting, playoffs or championship salary bonus',
+    const report = { modelVersion: 2, sourceCommit: process.env.FA_ECONOMY_SOURCE_COMMIT || null,
+      seeds, years, scenario: 'All clubs use CPU renewal and acquisition; no user-first signing',
+      limitations: ['No draft, retirement, posting, playoffs, ikusei expiry or championship salary bonus',
         'Growth and aging run; roster replenishment is omitted, so long-term population is not validated',
         'Initial registration days/personality are game-generated, not historical NPB observations',
         'FA re-qualification after exercise remains the current cumulative-days policy',
@@ -81,22 +59,11 @@ describe.skipIf(!process.env.RUN_FA_ECONOMY_BENCHMARK)('seeded multi-season FA e
             farm: developPlayers(t.farm, t.coaches || []).players }));
           pool = season.nextState.faPool;
           const context = { year, awards: calcSeasonAwards(teams, year) };
-          const demandRows = teams.flatMap(t => t.players.filter(p => renewalEligible(p, year)).map(p => {
-            const d = calcPlayerDemand(p, { ...context, team: t, teams });
-            return { id: p.id, name: p.name, age: p.age, pitcher: !!p.isPitcher, role: p.subtype,
-              pa: p.stats.PA, ip: p.stats.IP, hr: p.stats.HR,
-              ops: Number.isFinite(d.assessment.obp) && Number.isFinite(d.assessment.slg) ? d.assessment.obp + d.assessment.slg : null,
-              era: d.assessment.era ?? null, previous: p.salary, demand: d.demandSalary,
-              recorded: d.assessment.recorded, qualified: !!getFaProgress(p).domestic?.eligible,
-              decision: assessFaDeclaration(p, t, year, d) };
-          }));
+          const demandRows = collectEconomyDemands(teams, context);
           const payrollBefore = totalPay(teams);
           const declarations = resolveOffseasonFaDeclarations(teams, year, context);
           const renewal = cpuRenewContracts(declarations.updatedTeams, null, teams, context);
-          const cpuEntries = renewal.newFaPlayers.map(p => {
-            const origin = teams.find(t => t.players.some(x => x.id === p.id));
-            return { ...p, marketLastStats: p.stats, faEnteredYear: year, faOriginTeamId: origin.id, faOriginTeamName: origin.name };
-          });
+          const cpuEntries = createEconomyMarketEntries(renewal.newFaPlayers, teams, year);
           const entries = [...declarations.newFaPlayers, ...cpuEntries];
           const market = processCpuFaBids(renewal.updatedTeams, null, [...pool, ...entries], teams, year, 'offseason');
           const claimed = market.claimed || [];
@@ -116,7 +83,7 @@ describe.skipIf(!process.env.RUN_FA_ECONOMY_BENCHMARK)('seeded multi-season FA e
             domesticStays: newDomestic.filter(c => c.teamId === c.player.faOriginTeamId).length,
             domesticUnsigned: entries.filter(p => domesticIds.has(p.id) && !newDomestic.some(c => c.player.id === p.id)).length,
             payrollBefore, payrollAfter: totalPay(after), salaryGroups: salaryGroups(demandRows),
-            marketPriceMismatches: entries.filter(p => p.marketEntryReason === '国内FA宣言' && p.salary !== demandRows.find(r => r.id === p.id)?.demand).map(p => ({ name: p.name, previous: demandRows.find(r => r.id === p.id)?.previous, asking: p.salary, sharedDemand: demandRows.find(r => r.id === p.id)?.demand })),
+            marketPriceMismatches: economyPriceMismatches(entries, demandRows),
             teams: after.map(t => ({ name: t.name, active: t.players.length, farm: t.farm.length,
               budgetBeforeRenewal: teams.find(x => x.id === t.id).budget,
               budgetAfterRenewal: renewal.updatedTeams.find(x => x.id === t.id).budget,
@@ -125,10 +92,13 @@ describe.skipIf(!process.env.RUN_FA_ECONOMY_BENCHMARK)('seeded multi-season FA e
           expect(after.every(t => Number.isFinite(t.budget) && t.budget >= 0)).toBe(true);
           expect(new Set(claimed.map(c => c.player.id)).size).toBe(claimed.length);
           expect(demandRows.every(r => Number.isFinite(r.demand) && r.demand > 0)).toBe(true);
+          expect(row.marketPriceMismatches).toEqual([]);
+          const ownedIds = after.flatMap(t => [...t.players, ...t.farm].map(p => p.id));
+          expect(new Set(ownedIds).size).toBe(ownedIds.length);
           run.seasons.push(row);
           if (process.env.FA_ECONOMY_REPORT) writeFileSync(process.env.FA_ECONOMY_REPORT, JSON.stringify(report, null, 2) + '\n');
           console.info('[fa-economy-progress]', initialSeed, year, row.independentDeclarations, row.negotiationDeclarations, row.marketPriceMismatches.length);
-          teams = nextYear(after, year);
+          teams = nextEconomyYear(after, year);
           pool = market.remainingFaPool.map(p => ({ ...prepareOffseasonFreeAgent(p, year), age: p.age + 1 }));
         }
       } finally { random.mockRestore(); logging.mockRestore(); }

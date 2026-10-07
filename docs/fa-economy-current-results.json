@@ -1,0 +1,1901 @@
+{
+  "modelVersion": 2,
+  "sourceCommit": "0c0f13ba470be1ef5d40d30caac7eadb2c6b3b3f",
+  "seeds": [
+    1,
+    42,
+    20260911
+  ],
+  "years": 3,
+  "scenario": "All clubs use CPU renewal and acquisition; no user-first signing",
+  "limitations": [
+    "No draft, retirement, posting, playoffs, ikusei expiry or championship salary bonus",
+    "Growth and aging run; roster replenishment is omitted, so long-term population is not validated",
+    "Initial registration days/personality are game-generated, not historical NPB observations",
+    "FA re-qualification after exercise remains the current cumulative-days policy",
+    "Budgets are game money with CPU renewal deductions and the annual budget floor; not NPB accounting"
+  ],
+  "runs": [
+    {
+      "seed": 1,
+      "initialPayroll": 3286780,
+      "seasons": [
+        {
+          "year": 2026,
+          "completedTeamGames": [
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143
+          ],
+          "expiring": 505,
+          "faQualified": 124,
+          "declarationEligible": 117,
+          "expectedIndependentDeclarations": 24.218,
+          "independentDeclarations": 27,
+          "negotiationDeclarations": 0,
+          "freeContracts": 0,
+          "domesticTransfers": 15,
+          "domesticStays": 3,
+          "domesticUnsigned": 9,
+          "payrollBefore": 3286780,
+          "payrollAfter": 3138885,
+          "salaryGroups": [
+            {
+              "label": "29歳以下",
+              "count": 408,
+              "medianPrevious": 1900,
+              "medianDemand": 3250,
+              "medianChangeRatio": 1.038
+            },
+            {
+              "label": "30歳以上",
+              "count": 97,
+              "medianPrevious": 9300,
+              "medianDemand": 9100,
+              "medianChangeRatio": 0.758
+            },
+            {
+              "label": "一軍所属",
+              "count": 282,
+              "medianPrevious": 3800,
+              "medianDemand": 5500,
+              "medianChangeRatio": 1.165
+            },
+            {
+              "label": "二軍所属・支配下",
+              "count": 223,
+              "medianPrevious": 2200,
+              "medianDemand": 2200,
+              "medianChangeRatio": 0.857
+            },
+            {
+              "label": "育成",
+              "count": 0,
+              "medianPrevious": null,
+              "medianDemand": null,
+              "medianChangeRatio": null
+            },
+            {
+              "label": "野手400打席以上",
+              "count": 50,
+              "medianPrevious": 3750,
+              "medianDemand": 5100,
+              "medianChangeRatio": 1.438
+            },
+            {
+              "label": "野手400打席・OPS.800以上",
+              "count": 3,
+              "medianPrevious": 16000,
+              "medianDemand": 17800,
+              "medianChangeRatio": 1.113
+            },
+            {
+              "label": "野手20本塁打以上",
+              "count": 6,
+              "medianPrevious": 5400,
+              "medianDemand": 8350,
+              "medianChangeRatio": 1.544
+            },
+            {
+              "label": "投手100回以上",
+              "count": 68,
+              "medianPrevious": 3825,
+              "medianDemand": 8250,
+              "medianChangeRatio": 2.178
+            },
+            {
+              "label": "投手120回・防御率3.00以下",
+              "count": 47,
+              "medianPrevious": 4200,
+              "medianDemand": 9100,
+              "medianChangeRatio": 2.156
+            },
+            {
+              "label": "救援40回以上",
+              "count": 65,
+              "medianPrevious": 5000,
+              "medianDemand": 8600,
+              "medianChangeRatio": 1.92
+            }
+          ],
+          "marketPriceMismatches": [],
+          "teams": [
+            {
+              "name": "東京ヤクルトスワローズ",
+              "active": 28,
+              "farm": 24,
+              "budgetBeforeRenewal": 1065634,
+              "budgetAfterRenewal": 880564,
+              "budgetAfterMarket": 845864
+            },
+            {
+              "name": "横浜DeNAベイスターズ",
+              "active": 28,
+              "farm": 30,
+              "budgetBeforeRenewal": 984235,
+              "budgetAfterRenewal": 704495,
+              "budgetAfterMarket": 704495
+            },
+            {
+              "name": "広島東洋カープ",
+              "active": 28,
+              "farm": 22,
+              "budgetBeforeRenewal": 930063,
+              "budgetAfterRenewal": 755923,
+              "budgetAfterMarket": 745723
+            },
+            {
+              "name": "阪神タイガース",
+              "active": 28,
+              "farm": 26,
+              "budgetBeforeRenewal": 1117062,
+              "budgetAfterRenewal": 809442,
+              "budgetAfterMarket": 801242
+            },
+            {
+              "name": "読売ジャイアンツ",
+              "active": 28,
+              "farm": 28,
+              "budgetBeforeRenewal": 1102002,
+              "budgetAfterRenewal": 856722,
+              "budgetAfterMarket": 856722
+            },
+            {
+              "name": "中日ドラゴンズ",
+              "active": 28,
+              "farm": 32,
+              "budgetBeforeRenewal": 909084,
+              "budgetAfterRenewal": 726544,
+              "budgetAfterMarket": 717444
+            },
+            {
+              "name": "福岡ソフトバンクホークス",
+              "active": 28,
+              "farm": 24,
+              "budgetBeforeRenewal": 1102085,
+              "budgetAfterRenewal": 945330,
+              "budgetAfterMarket": 943530
+            },
+            {
+              "name": "東北楽天ゴールデンイーグルス",
+              "active": 28,
+              "farm": 30,
+              "budgetBeforeRenewal": 899224,
+              "budgetAfterRenewal": 707999,
+              "budgetAfterMarket": 675699
+            },
+            {
+              "name": "埼玉西武ライオンズ",
+              "active": 28,
+              "farm": 26,
+              "budgetBeforeRenewal": 1050589,
+              "budgetAfterRenewal": 840954,
+              "budgetAfterMarket": 835254
+            },
+            {
+              "name": "千葉ロッテマリーンズ",
+              "active": 28,
+              "farm": 25,
+              "budgetBeforeRenewal": 861934,
+              "budgetAfterRenewal": 635854,
+              "budgetAfterMarket": 635854
+            },
+            {
+              "name": "北海道日本ハムファイターズ",
+              "active": 28,
+              "farm": 21,
+              "budgetBeforeRenewal": 1089195,
+              "budgetAfterRenewal": 910575,
+              "budgetAfterMarket": 892475
+            },
+            {
+              "name": "オリックス・バファローズ",
+              "active": 28,
+              "farm": 28,
+              "budgetBeforeRenewal": 985260,
+              "budgetAfterRenewal": 780280,
+              "budgetAfterMarket": 756580
+            }
+          ]
+        },
+        {
+          "year": 2027,
+          "completedTeamGames": [
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143
+          ],
+          "expiring": 394,
+          "faQualified": 121,
+          "declarationEligible": 113,
+          "expectedIndependentDeclarations": 22.243,
+          "independentDeclarations": 20,
+          "negotiationDeclarations": 0,
+          "freeContracts": 0,
+          "domesticTransfers": 8,
+          "domesticStays": 0,
+          "domesticUnsigned": 12,
+          "payrollBefore": 3138885,
+          "payrollAfter": 2907431,
+          "salaryGroups": [
+            {
+              "label": "29歳以下",
+              "count": 265,
+              "medianPrevious": 1000,
+              "medianDemand": 2200,
+              "medianChangeRatio": 1.093
+            },
+            {
+              "label": "30歳以上",
+              "count": 129,
+              "medianPrevious": 8300,
+              "medianDemand": 7200,
+              "medianChangeRatio": 0.776
+            },
+            {
+              "label": "一軍所属",
+              "count": 206,
+              "medianPrevious": 4200,
+              "medianDemand": 5050,
+              "medianChangeRatio": 1.12
+            },
+            {
+              "label": "二軍所属・支配下",
+              "count": 188,
+              "medianPrevious": 1850,
+              "medianDemand": 2250,
+              "medianChangeRatio": 0.903
+            },
+            {
+              "label": "育成",
+              "count": 0,
+              "medianPrevious": null,
+              "medianDemand": null,
+              "medianChangeRatio": null
+            },
+            {
+              "label": "野手400打席以上",
+              "count": 33,
+              "medianPrevious": 4000,
+              "medianDemand": 5300,
+              "medianChangeRatio": 1.257
+            },
+            {
+              "label": "野手400打席・OPS.800以上",
+              "count": 1,
+              "medianPrevious": 17800,
+              "medianDemand": 18400,
+              "medianChangeRatio": 1.034
+            },
+            {
+              "label": "野手20本塁打以上",
+              "count": 1,
+              "medianPrevious": 8400,
+              "medianDemand": 10900,
+              "medianChangeRatio": 1.298
+            },
+            {
+              "label": "投手100回以上",
+              "count": 51,
+              "medianPrevious": 7700,
+              "medianDemand": 11000,
+              "medianChangeRatio": 1.408
+            },
+            {
+              "label": "投手120回・防御率3.00以下",
+              "count": 35,
+              "medianPrevious": 8400,
+              "medianDemand": 11300,
+              "medianChangeRatio": 1.345
+            },
+            {
+              "label": "救援40回以上",
+              "count": 41,
+              "medianPrevious": 8700,
+              "medianDemand": 11200,
+              "medianChangeRatio": 1.345
+            }
+          ],
+          "marketPriceMismatches": [],
+          "teams": [
+            {
+              "name": "東京ヤクルトスワローズ",
+              "active": 28,
+              "farm": 23,
+              "budgetBeforeRenewal": 1190664,
+              "budgetAfterRenewal": 1008261,
+              "budgetAfterMarket": 976361
+            },
+            {
+              "name": "横浜DeNAベイスターズ",
+              "active": 28,
+              "farm": 29,
+              "budgetBeforeRenewal": 944860,
+              "budgetAfterRenewal": 727145,
+              "budgetAfterMarket": 727145
+            },
+            {
+              "name": "広島東洋カープ",
+              "active": 28,
+              "farm": 22,
+              "budgetBeforeRenewal": 1044604,
+              "budgetAfterRenewal": 935768,
+              "budgetAfterMarket": 931768
+            },
+            {
+              "name": "阪神タイガース",
+              "active": 28,
+              "farm": 23,
+              "budgetBeforeRenewal": 1175368,
+              "budgetAfterRenewal": 996647,
+              "budgetAfterMarket": 990147
+            },
+            {
+              "name": "読売ジャイアンツ",
+              "active": 28,
+              "farm": 25,
+              "budgetBeforeRenewal": 1135197,
+              "budgetAfterRenewal": 980277,
+              "budgetAfterMarket": 980277
+            },
+            {
+              "name": "中日ドラゴンズ",
+              "active": 28,
+              "farm": 32,
+              "budgetBeforeRenewal": 966841,
+              "budgetAfterRenewal": 833968,
+              "budgetAfterMarket": 823868
+            },
+            {
+              "name": "福岡ソフトバンクホークス",
+              "active": 28,
+              "farm": 23,
+              "budgetBeforeRenewal": 951827,
+              "budgetAfterRenewal": 692057,
+              "budgetAfterMarket": 692057
+            },
+            {
+              "name": "東北楽天ゴールデンイーグルス",
+              "active": 28,
+              "farm": 28,
+              "budgetBeforeRenewal": 1002843,
+              "budgetAfterRenewal": 861805,
+              "budgetAfterMarket": 861805
+            },
+            {
+              "name": "埼玉西武ライオンズ",
+              "active": 28,
+              "farm": 26,
+              "budgetBeforeRenewal": 1236122,
+              "budgetAfterRenewal": 1112062,
+              "budgetAfterMarket": 1100662
+            },
+            {
+              "name": "千葉ロッテマリーンズ",
+              "active": 28,
+              "farm": 25,
+              "budgetBeforeRenewal": 872106,
+              "budgetAfterRenewal": 690080,
+              "budgetAfterMarket": 690080
+            },
+            {
+              "name": "北海道日本ハムファイターズ",
+              "active": 28,
+              "farm": 21,
+              "budgetBeforeRenewal": 1339232,
+              "budgetAfterRenewal": 1215426,
+              "budgetAfterMarket": 1203126
+            },
+            {
+              "name": "オリックス・バファローズ",
+              "active": 28,
+              "farm": 28,
+              "budgetBeforeRenewal": 1082623,
+              "budgetAfterRenewal": 958350,
+              "budgetAfterMarket": 949450
+            }
+          ]
+        },
+        {
+          "year": 2028,
+          "completedTeamGames": [
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143
+          ],
+          "expiring": 551,
+          "faQualified": 147,
+          "declarationEligible": 138,
+          "expectedIndependentDeclarations": 29.515,
+          "independentDeclarations": 28,
+          "negotiationDeclarations": 0,
+          "freeContracts": 0,
+          "domesticTransfers": 8,
+          "domesticStays": 1,
+          "domesticUnsigned": 19,
+          "payrollBefore": 2907431,
+          "payrollAfter": 2724257,
+          "salaryGroups": [
+            {
+              "label": "29歳以下",
+              "count": 397,
+              "medianPrevious": 1000,
+              "medianDemand": 2100,
+              "medianChangeRatio": 1.057
+            },
+            {
+              "label": "30歳以上",
+              "count": 154,
+              "medianPrevious": 6600,
+              "medianDemand": 6300,
+              "medianChangeRatio": 0.769
+            },
+            {
+              "label": "一軍所属",
+              "count": 285,
+              "medianPrevious": 3100,
+              "medianDemand": 4300,
+              "medianChangeRatio": 1.143
+            },
+            {
+              "label": "二軍所属・支配下",
+              "count": 266,
+              "medianPrevious": 1800,
+              "medianDemand": 1900,
+              "medianChangeRatio": 0.921
+            },
+            {
+              "label": "育成",
+              "count": 0,
+              "medianPrevious": null,
+              "medianDemand": null,
+              "medianChangeRatio": null
+            },
+            {
+              "label": "野手400打席以上",
+              "count": 46,
+              "medianPrevious": 3300,
+              "medianDemand": 5300,
+              "medianChangeRatio": 1.712
+            },
+            {
+              "label": "野手400打席・OPS.800以上",
+              "count": 0,
+              "medianPrevious": null,
+              "medianDemand": null,
+              "medianChangeRatio": null
+            },
+            {
+              "label": "野手20本塁打以上",
+              "count": 4,
+              "medianPrevious": 5150,
+              "medianDemand": 8800,
+              "medianChangeRatio": 1.883
+            },
+            {
+              "label": "投手100回以上",
+              "count": 65,
+              "medianPrevious": 7900,
+              "medianDemand": 10100,
+              "medianChangeRatio": 1.31
+            },
+            {
+              "label": "投手120回・防御率3.00以下",
+              "count": 43,
+              "medianPrevious": 8200,
+              "medianDemand": 10700,
+              "medianChangeRatio": 1.394
+            },
+            {
+              "label": "救援40回以上",
+              "count": 48,
+              "medianPrevious": 8050,
+              "medianDemand": 9950,
+              "medianChangeRatio": 1.263
+            }
+          ],
+          "marketPriceMismatches": [],
+          "teams": [
+            {
+              "name": "東京ヤクルトスワローズ",
+              "active": 28,
+              "farm": 21,
+              "budgetBeforeRenewal": 1294646,
+              "budgetAfterRenewal": 1116174,
+              "budgetAfterMarket": 1113274
+            },
+            {
+              "name": "横浜DeNAベイスターズ",
+              "active": 28,
+              "farm": 29,
+              "budgetBeforeRenewal": 1019237,
+              "budgetAfterRenewal": 841693,
+              "budgetAfterMarket": 820893
+            },
+            {
+              "name": "広島東洋カープ",
+              "active": 28,
+              "farm": 22,
+              "budgetBeforeRenewal": 1035700,
+              "budgetAfterRenewal": 865201,
+              "budgetAfterMarket": 865201
+            },
+            {
+              "name": "阪神タイガース",
+              "active": 28,
+              "farm": 20,
+              "budgetBeforeRenewal": 1248527,
+              "budgetAfterRenewal": 1086020,
+              "budgetAfterMarket": 1075220
+            },
+            {
+              "name": "読売ジャイアンツ",
+              "active": 28,
+              "farm": 24,
+              "budgetBeforeRenewal": 1183218,
+              "budgetAfterRenewal": 1006846,
+              "budgetAfterMarket": 1006846
+            },
+            {
+              "name": "中日ドラゴンズ",
+              "active": 28,
+              "farm": 31,
+              "budgetBeforeRenewal": 896310,
+              "budgetAfterRenewal": 683858,
+              "budgetAfterMarket": 678258
+            },
+            {
+              "name": "福岡ソフトバンクホークス",
+              "active": 28,
+              "farm": 23,
+              "budgetBeforeRenewal": 883613,
+              "budgetAfterRenewal": 634947,
+              "budgetAfterMarket": 631947
+            },
+            {
+              "name": "東北楽天ゴールデンイーグルス",
+              "active": 28,
+              "farm": 26,
+              "budgetBeforeRenewal": 1020418,
+              "budgetAfterRenewal": 861496,
+              "budgetAfterMarket": 861496
+            },
+            {
+              "name": "埼玉西武ライオンズ",
+              "active": 28,
+              "farm": 22,
+              "budgetBeforeRenewal": 1173476,
+              "budgetAfterRenewal": 1022870,
+              "budgetAfterMarket": 1022870
+            },
+            {
+              "name": "千葉ロッテマリーンズ",
+              "active": 28,
+              "farm": 24,
+              "budgetBeforeRenewal": 831996,
+              "budgetAfterRenewal": 639138,
+              "budgetAfterMarket": 639138
+            },
+            {
+              "name": "北海道日本ハムファイターズ",
+              "active": 28,
+              "farm": 19,
+              "budgetBeforeRenewal": 1419769,
+              "budgetAfterRenewal": 1262181,
+              "budgetAfterMarket": 1254981
+            },
+            {
+              "name": "オリックス・バファローズ",
+              "active": 28,
+              "farm": 26,
+              "budgetBeforeRenewal": 1143201,
+              "budgetAfterRenewal": 931500,
+              "budgetAfterMarket": 931500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "seed": 42,
+      "initialPayroll": 3292360,
+      "seasons": [
+        {
+          "year": 2026,
+          "completedTeamGames": [
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143
+          ],
+          "expiring": 516,
+          "faQualified": 121,
+          "declarationEligible": 112,
+          "expectedIndependentDeclarations": 21.776,
+          "independentDeclarations": 21,
+          "negotiationDeclarations": 0,
+          "freeContracts": 0,
+          "domesticTransfers": 7,
+          "domesticStays": 1,
+          "domesticUnsigned": 13,
+          "payrollBefore": 3292360,
+          "payrollAfter": 3092825,
+          "salaryGroups": [
+            {
+              "label": "29歳以下",
+              "count": 419,
+              "medianPrevious": 1800,
+              "medianDemand": 3300,
+              "medianChangeRatio": 1.06
+            },
+            {
+              "label": "30歳以上",
+              "count": 97,
+              "medianPrevious": 9300,
+              "medianDemand": 8900,
+              "medianChangeRatio": 0.775
+            },
+            {
+              "label": "一軍所属",
+              "count": 271,
+              "medianPrevious": 2700,
+              "medianDemand": 5100,
+              "medianChangeRatio": 1.26
+            },
+            {
+              "label": "二軍所属・支配下",
+              "count": 245,
+              "medianPrevious": 2700,
+              "medianDemand": 2900,
+              "medianChangeRatio": 0.868
+            },
+            {
+              "label": "育成",
+              "count": 0,
+              "medianPrevious": null,
+              "medianDemand": null,
+              "medianChangeRatio": null
+            },
+            {
+              "label": "野手400打席以上",
+              "count": 52,
+              "medianPrevious": 3300,
+              "medianDemand": 5100,
+              "medianChangeRatio": 1.36
+            },
+            {
+              "label": "野手400打席・OPS.800以上",
+              "count": 2,
+              "medianPrevious": 23000,
+              "medianDemand": 23700,
+              "medianChangeRatio": 1.044
+            },
+            {
+              "label": "野手20本塁打以上",
+              "count": 1,
+              "medianPrevious": 30000,
+              "medianDemand": 30000,
+              "medianChangeRatio": 1
+            },
+            {
+              "label": "投手100回以上",
+              "count": 66,
+              "medianPrevious": 3750,
+              "medianDemand": 7950,
+              "medianChangeRatio": 2.1
+            },
+            {
+              "label": "投手120回・防御率3.00以下",
+              "count": 41,
+              "medianPrevious": 3700,
+              "medianDemand": 8500,
+              "medianChangeRatio": 2.5
+            },
+            {
+              "label": "救援40回以上",
+              "count": 65,
+              "medianPrevious": 5000,
+              "medianDemand": 8400,
+              "medianChangeRatio": 1.88
+            }
+          ],
+          "marketPriceMismatches": [],
+          "teams": [
+            {
+              "name": "東京ヤクルトスワローズ",
+              "active": 28,
+              "farm": 22,
+              "budgetBeforeRenewal": 1090434,
+              "budgetAfterRenewal": 888134,
+              "budgetAfterMarket": 888134
+            },
+            {
+              "name": "横浜DeNAベイスターズ",
+              "active": 28,
+              "farm": 29,
+              "budgetBeforeRenewal": 961947,
+              "budgetAfterRenewal": 680307,
+              "budgetAfterMarket": 680307
+            },
+            {
+              "name": "広島東洋カープ",
+              "active": 28,
+              "farm": 24,
+              "budgetBeforeRenewal": 913871,
+              "budgetAfterRenewal": 724751,
+              "budgetAfterMarket": 699651
+            },
+            {
+              "name": "阪神タイガース",
+              "active": 28,
+              "farm": 26,
+              "budgetBeforeRenewal": 1085473,
+              "budgetAfterRenewal": 793773,
+              "budgetAfterMarket": 789973
+            },
+            {
+              "name": "読売ジャイアンツ",
+              "active": 28,
+              "farm": 26,
+              "budgetBeforeRenewal": 1108680,
+              "budgetAfterRenewal": 921105,
+              "budgetAfterMarket": 915805
+            },
+            {
+              "name": "中日ドラゴンズ",
+              "active": 28,
+              "farm": 31,
+              "budgetBeforeRenewal": 848518,
+              "budgetAfterRenewal": 677358,
+              "budgetAfterMarket": 663658
+            },
+            {
+              "name": "福岡ソフトバンクホークス",
+              "active": 28,
+              "farm": 24,
+              "budgetBeforeRenewal": 1205057,
+              "budgetAfterRenewal": 1015457,
+              "budgetAfterMarket": 1015457
+            },
+            {
+              "name": "東北楽天ゴールデンイーグルス",
+              "active": 28,
+              "farm": 29,
+              "budgetBeforeRenewal": 927638,
+              "budgetAfterRenewal": 723468,
+              "budgetAfterMarket": 723468
+            },
+            {
+              "name": "埼玉西武ライオンズ",
+              "active": 28,
+              "farm": 26,
+              "budgetBeforeRenewal": 950742,
+              "budgetAfterRenewal": 771052,
+              "budgetAfterMarket": 743152
+            },
+            {
+              "name": "千葉ロッテマリーンズ",
+              "active": 28,
+              "farm": 26,
+              "budgetBeforeRenewal": 962256,
+              "budgetAfterRenewal": 733821,
+              "budgetAfterMarket": 733821
+            },
+            {
+              "name": "北海道日本ハムファイターズ",
+              "active": 28,
+              "farm": 22,
+              "budgetBeforeRenewal": 1000879,
+              "budgetAfterRenewal": 827219,
+              "budgetAfterMarket": 810119
+            },
+            {
+              "name": "オリックス・バファローズ",
+              "active": 28,
+              "farm": 27,
+              "budgetBeforeRenewal": 1019736,
+              "budgetAfterRenewal": 771661,
+              "budgetAfterMarket": 771661
+            }
+          ]
+        },
+        {
+          "year": 2027,
+          "completedTeamGames": [
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143
+          ],
+          "expiring": 394,
+          "faQualified": 116,
+          "declarationEligible": 108,
+          "expectedIndependentDeclarations": 23.501,
+          "independentDeclarations": 21,
+          "negotiationDeclarations": 0,
+          "freeContracts": 0,
+          "domesticTransfers": 2,
+          "domesticStays": 2,
+          "domesticUnsigned": 17,
+          "payrollBefore": 3092825,
+          "payrollAfter": 2858515,
+          "salaryGroups": [
+            {
+              "label": "29歳以下",
+              "count": 267,
+              "medianPrevious": 1200,
+              "medianDemand": 2400,
+              "medianChangeRatio": 1.043
+            },
+            {
+              "label": "30歳以上",
+              "count": 127,
+              "medianPrevious": 8000,
+              "medianDemand": 7100,
+              "medianChangeRatio": 0.769
+            },
+            {
+              "label": "一軍所属",
+              "count": 202,
+              "medianPrevious": 3800,
+              "medianDemand": 4950,
+              "medianChangeRatio": 1.117
+            },
+            {
+              "label": "二軍所属・支配下",
+              "count": 192,
+              "medianPrevious": 2800,
+              "medianDemand": 2700,
+              "medianChangeRatio": 0.857
+            },
+            {
+              "label": "育成",
+              "count": 0,
+              "medianPrevious": null,
+              "medianDemand": null,
+              "medianChangeRatio": null
+            },
+            {
+              "label": "野手400打席以上",
+              "count": 44,
+              "medianPrevious": 3350,
+              "medianDemand": 4500,
+              "medianChangeRatio": 1.525
+            },
+            {
+              "label": "野手400打席・OPS.800以上",
+              "count": 2,
+              "medianPrevious": 10100,
+              "medianDemand": 11700,
+              "medianChangeRatio": 1.214
+            },
+            {
+              "label": "野手20本塁打以上",
+              "count": 3,
+              "medianPrevious": 16100,
+              "medianDemand": 16900,
+              "medianChangeRatio": 1.05
+            },
+            {
+              "label": "投手100回以上",
+              "count": 38,
+              "medianPrevious": 6950,
+              "medianDemand": 9400,
+              "medianChangeRatio": 1.344
+            },
+            {
+              "label": "投手120回・防御率3.00以下",
+              "count": 26,
+              "medianPrevious": 6900,
+              "medianDemand": 9600,
+              "medianChangeRatio": 1.607
+            },
+            {
+              "label": "救援40回以上",
+              "count": 34,
+              "medianPrevious": 7950,
+              "medianDemand": 10200,
+              "medianChangeRatio": 1.271
+            }
+          ],
+          "marketPriceMismatches": [],
+          "teams": [
+            {
+              "name": "東京ヤクルトスワローズ",
+              "active": 28,
+              "farm": 20,
+              "budgetBeforeRenewal": 1224021,
+              "budgetAfterRenewal": 1031259,
+              "budgetAfterMarket": 1031259
+            },
+            {
+              "name": "横浜DeNAベイスターズ",
+              "active": 28,
+              "farm": 27,
+              "budgetBeforeRenewal": 930163,
+              "budgetAfterRenewal": 733744,
+              "budgetAfterMarket": 721344
+            },
+            {
+              "name": "広島東洋カープ",
+              "active": 28,
+              "farm": 24,
+              "budgetBeforeRenewal": 1039647,
+              "budgetAfterRenewal": 898971,
+              "budgetAfterMarket": 898971
+            },
+            {
+              "name": "阪神タイガース",
+              "active": 28,
+              "farm": 25,
+              "budgetBeforeRenewal": 1050079,
+              "budgetAfterRenewal": 844960,
+              "budgetAfterMarket": 844960
+            },
+            {
+              "name": "読売ジャイアンツ",
+              "active": 28,
+              "farm": 25,
+              "budgetBeforeRenewal": 1105036,
+              "budgetAfterRenewal": 963506,
+              "budgetAfterMarket": 963506
+            },
+            {
+              "name": "中日ドラゴンズ",
+              "active": 28,
+              "farm": 30,
+              "budgetBeforeRenewal": 926432,
+              "budgetAfterRenewal": 794152,
+              "budgetAfterMarket": 794152
+            },
+            {
+              "name": "福岡ソフトバンクホークス",
+              "active": 28,
+              "farm": 24,
+              "budgetBeforeRenewal": 1084583,
+              "budgetAfterRenewal": 813643,
+              "budgetAfterMarket": 809343
+            },
+            {
+              "name": "東北楽天ゴールデンイーグルス",
+              "active": 28,
+              "farm": 24,
+              "budgetBeforeRenewal": 1020103,
+              "budgetAfterRenewal": 905914,
+              "budgetAfterMarket": 905914
+            },
+            {
+              "name": "埼玉西武ライオンズ",
+              "active": 28,
+              "farm": 25,
+              "budgetBeforeRenewal": 1086600,
+              "budgetAfterRenewal": 940192,
+              "budgetAfterMarket": 940192
+            },
+            {
+              "name": "千葉ロッテマリーンズ",
+              "active": 28,
+              "farm": 26,
+              "budgetBeforeRenewal": 1115497,
+              "budgetAfterRenewal": 961232,
+              "budgetAfterMarket": 951632
+            },
+            {
+              "name": "北海道日本ハムファイターズ",
+              "active": 28,
+              "farm": 22,
+              "budgetBeforeRenewal": 1197665,
+              "budgetAfterRenewal": 1072946,
+              "budgetAfterMarket": 1072946
+            },
+            {
+              "name": "オリックス・バファローズ",
+              "active": 28,
+              "farm": 25,
+              "budgetBeforeRenewal": 1151929,
+              "budgetAfterRenewal": 1010111,
+              "budgetAfterMarket": 994911
+            }
+          ]
+        },
+        {
+          "year": 2028,
+          "completedTeamGames": [
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143
+          ],
+          "expiring": 528,
+          "faQualified": 138,
+          "declarationEligible": 127,
+          "expectedIndependentDeclarations": 25.521,
+          "independentDeclarations": 25,
+          "negotiationDeclarations": 0,
+          "freeContracts": 0,
+          "domesticTransfers": 5,
+          "domesticStays": 3,
+          "domesticUnsigned": 17,
+          "payrollBefore": 2858515,
+          "payrollAfter": 2777598,
+          "salaryGroups": [
+            {
+              "label": "29歳以下",
+              "count": 384,
+              "medianPrevious": 1061,
+              "medianDemand": 1800,
+              "medianChangeRatio": 1
+            },
+            {
+              "label": "30歳以上",
+              "count": 144,
+              "medianPrevious": 6600,
+              "medianDemand": 6250,
+              "medianChangeRatio": 0.823
+            },
+            {
+              "label": "一軍所属",
+              "count": 270,
+              "medianPrevious": 3800,
+              "medianDemand": 4700,
+              "medianChangeRatio": 1.133
+            },
+            {
+              "label": "二軍所属・支配下",
+              "count": 258,
+              "medianPrevious": 1700,
+              "medianDemand": 1600,
+              "medianChangeRatio": 0.9
+            },
+            {
+              "label": "育成",
+              "count": 0,
+              "medianPrevious": null,
+              "medianDemand": null,
+              "medianChangeRatio": null
+            },
+            {
+              "label": "野手400打席以上",
+              "count": 48,
+              "medianPrevious": 3350,
+              "medianDemand": 5150,
+              "medianChangeRatio": 1.516
+            },
+            {
+              "label": "野手400打席・OPS.800以上",
+              "count": 2,
+              "medianPrevious": 16050,
+              "medianDemand": 18000,
+              "medianChangeRatio": 1.336
+            },
+            {
+              "label": "野手20本塁打以上",
+              "count": 6,
+              "medianPrevious": 10000,
+              "medianDemand": 11000,
+              "medianChangeRatio": 1.346
+            },
+            {
+              "label": "投手100回以上",
+              "count": 53,
+              "medianPrevious": 7500,
+              "medianDemand": 10400,
+              "medianChangeRatio": 1.303
+            },
+            {
+              "label": "投手120回・防御率3.00以下",
+              "count": 37,
+              "medianPrevious": 8800,
+              "medianDemand": 10900,
+              "medianChangeRatio": 1.235
+            },
+            {
+              "label": "救援40回以上",
+              "count": 42,
+              "medianPrevious": 7400,
+              "medianDemand": 10500,
+              "medianChangeRatio": 1.307
+            }
+          ],
+          "marketPriceMismatches": [],
+          "teams": [
+            {
+              "name": "東京ヤクルトスワローズ",
+              "active": 28,
+              "farm": 20,
+              "budgetBeforeRenewal": 1244364,
+              "budgetAfterRenewal": 1082823,
+              "budgetAfterMarket": 1065323
+            },
+            {
+              "name": "横浜DeNAベイスターズ",
+              "active": 28,
+              "farm": 25,
+              "budgetBeforeRenewal": 947935,
+              "budgetAfterRenewal": 724271,
+              "budgetAfterMarket": 724271
+            },
+            {
+              "name": "広島東洋カープ",
+              "active": 28,
+              "farm": 24,
+              "budgetBeforeRenewal": 1055318,
+              "budgetAfterRenewal": 867469,
+              "budgetAfterMarket": 867469
+            },
+            {
+              "name": "阪神タイガース",
+              "active": 28,
+              "farm": 24,
+              "budgetBeforeRenewal": 1021173,
+              "budgetAfterRenewal": 785309,
+              "budgetAfterMarket": 785309
+            },
+            {
+              "name": "読売ジャイアンツ",
+              "active": 28,
+              "farm": 24,
+              "budgetBeforeRenewal": 1094879,
+              "budgetAfterRenewal": 936363,
+              "budgetAfterMarket": 936363
+            },
+            {
+              "name": "中日ドラゴンズ",
+              "active": 28,
+              "farm": 29,
+              "budgetBeforeRenewal": 922710,
+              "budgetAfterRenewal": 766285,
+              "budgetAfterMarket": 751985
+            },
+            {
+              "name": "福岡ソフトバンクホークス",
+              "active": 28,
+              "farm": 24,
+              "budgetBeforeRenewal": 1084420,
+              "budgetAfterRenewal": 776301,
+              "budgetAfterMarket": 776301
+            },
+            {
+              "name": "東北楽天ゴールデンイーグルス",
+              "active": 28,
+              "farm": 22,
+              "budgetBeforeRenewal": 1058397,
+              "budgetAfterRenewal": 919691,
+              "budgetAfterMarket": 916291
+            },
+            {
+              "name": "埼玉西武ライオンズ",
+              "active": 28,
+              "farm": 25,
+              "budgetBeforeRenewal": 1094729,
+              "budgetAfterRenewal": 947770,
+              "budgetAfterMarket": 943370
+            },
+            {
+              "name": "千葉ロッテマリーンズ",
+              "active": 28,
+              "farm": 25,
+              "budgetBeforeRenewal": 1161894,
+              "budgetAfterRenewal": 971578,
+              "budgetAfterMarket": 951578
+            },
+            {
+              "name": "北海道日本ハムファイターズ",
+              "active": 28,
+              "farm": 20,
+              "budgetBeforeRenewal": 1296014,
+              "budgetAfterRenewal": 1134337,
+              "budgetAfterMarket": 1131337
+            },
+            {
+              "name": "オリックス・バファローズ",
+              "active": 28,
+              "farm": 23,
+              "budgetBeforeRenewal": 1190354,
+              "budgetAfterRenewal": 1029532,
+              "budgetAfterMarket": 1013832
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "seed": 20260911,
+      "initialPayroll": 3297220,
+      "seasons": [
+        {
+          "year": 2026,
+          "completedTeamGames": [
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143
+          ],
+          "expiring": 503,
+          "faQualified": 120,
+          "declarationEligible": 113,
+          "expectedIndependentDeclarations": 24.816,
+          "independentDeclarations": 23,
+          "negotiationDeclarations": 0,
+          "freeContracts": 0,
+          "domesticTransfers": 10,
+          "domesticStays": 2,
+          "domesticUnsigned": 11,
+          "payrollBefore": 3297220,
+          "payrollAfter": 3043220,
+          "salaryGroups": [
+            {
+              "label": "29歳以下",
+              "count": 406,
+              "medianPrevious": 1925,
+              "medianDemand": 3300,
+              "medianChangeRatio": 1
+            },
+            {
+              "label": "30歳以上",
+              "count": 97,
+              "medianPrevious": 9300,
+              "medianDemand": 8200,
+              "medianChangeRatio": 0.76
+            },
+            {
+              "label": "一軍所属",
+              "count": 270,
+              "medianPrevious": 2900,
+              "medianDemand": 5050,
+              "medianChangeRatio": 1.204
+            },
+            {
+              "label": "二軍所属・支配下",
+              "count": 233,
+              "medianPrevious": 3000,
+              "medianDemand": 2900,
+              "medianChangeRatio": 0.84
+            },
+            {
+              "label": "育成",
+              "count": 0,
+              "medianPrevious": null,
+              "medianDemand": null,
+              "medianChangeRatio": null
+            },
+            {
+              "label": "野手400打席以上",
+              "count": 45,
+              "medianPrevious": 3100,
+              "medianDemand": 5600,
+              "medianChangeRatio": 1.5
+            },
+            {
+              "label": "野手400打席・OPS.800以上",
+              "count": 1,
+              "medianPrevious": 13000,
+              "medianDemand": 14100,
+              "medianChangeRatio": 1.085
+            },
+            {
+              "label": "野手20本塁打以上",
+              "count": 5,
+              "medianPrevious": 16000,
+              "medianDemand": 13400,
+              "medianChangeRatio": 1
+            },
+            {
+              "label": "投手100回以上",
+              "count": 64,
+              "medianPrevious": 4250,
+              "medianDemand": 8550,
+              "medianChangeRatio": 2.009
+            },
+            {
+              "label": "投手120回・防御率3.00以下",
+              "count": 47,
+              "medianPrevious": 4200,
+              "medianDemand": 8500,
+              "medianChangeRatio": 2.059
+            },
+            {
+              "label": "救援40回以上",
+              "count": 58,
+              "medianPrevious": 5000,
+              "medianDemand": 8450,
+              "medianChangeRatio": 2.019
+            }
+          ],
+          "marketPriceMismatches": [],
+          "teams": [
+            {
+              "name": "東京ヤクルトスワローズ",
+              "active": 28,
+              "farm": 24,
+              "budgetBeforeRenewal": 1053294,
+              "budgetAfterRenewal": 855729,
+              "budgetAfterMarket": 855729
+            },
+            {
+              "name": "横浜DeNAベイスターズ",
+              "active": 28,
+              "farm": 29,
+              "budgetBeforeRenewal": 958156,
+              "budgetAfterRenewal": 714506,
+              "budgetAfterMarket": 706606
+            },
+            {
+              "name": "広島東洋カープ",
+              "active": 28,
+              "farm": 24,
+              "budgetBeforeRenewal": 909797,
+              "budgetAfterRenewal": 702477,
+              "budgetAfterMarket": 702477
+            },
+            {
+              "name": "阪神タイガース",
+              "active": 28,
+              "farm": 25,
+              "budgetBeforeRenewal": 1047938,
+              "budgetAfterRenewal": 777603,
+              "budgetAfterMarket": 769203
+            },
+            {
+              "name": "読売ジャイアンツ",
+              "active": 28,
+              "farm": 26,
+              "budgetBeforeRenewal": 1183125,
+              "budgetAfterRenewal": 954025,
+              "budgetAfterMarket": 954025
+            },
+            {
+              "name": "中日ドラゴンズ",
+              "active": 28,
+              "farm": 31,
+              "budgetBeforeRenewal": 857808,
+              "budgetAfterRenewal": 672708,
+              "budgetAfterMarket": 672708
+            },
+            {
+              "name": "福岡ソフトバンクホークス",
+              "active": 28,
+              "farm": 24,
+              "budgetBeforeRenewal": 1192928,
+              "budgetAfterRenewal": 1033208,
+              "budgetAfterMarket": 1026408
+            },
+            {
+              "name": "東北楽天ゴールデンイーグルス",
+              "active": 28,
+              "farm": 32,
+              "budgetBeforeRenewal": 908196,
+              "budgetAfterRenewal": 705156,
+              "budgetAfterMarket": 698556
+            },
+            {
+              "name": "埼玉西武ライオンズ",
+              "active": 28,
+              "farm": 25,
+              "budgetBeforeRenewal": 993756,
+              "budgetAfterRenewal": 808331,
+              "budgetAfterMarket": 803331
+            },
+            {
+              "name": "千葉ロッテマリーンズ",
+              "active": 28,
+              "farm": 25,
+              "budgetBeforeRenewal": 866185,
+              "budgetAfterRenewal": 646835,
+              "budgetAfterMarket": 634035
+            },
+            {
+              "name": "北海道日本ハムファイターズ",
+              "active": 28,
+              "farm": 24,
+              "budgetBeforeRenewal": 1104297,
+              "budgetAfterRenewal": 903447,
+              "budgetAfterMarket": 884647
+            },
+            {
+              "name": "オリックス・バファローズ",
+              "active": 28,
+              "farm": 25,
+              "budgetBeforeRenewal": 1041796,
+              "budgetAfterRenewal": 836031,
+              "budgetAfterMarket": 828131
+            }
+          ]
+        },
+        {
+          "year": 2027,
+          "completedTeamGames": [
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143
+          ],
+          "expiring": 404,
+          "faQualified": 125,
+          "declarationEligible": 115,
+          "expectedIndependentDeclarations": 24.996,
+          "independentDeclarations": 26,
+          "negotiationDeclarations": 0,
+          "freeContracts": 0,
+          "domesticTransfers": 8,
+          "domesticStays": 2,
+          "domesticUnsigned": 16,
+          "payrollBefore": 3043220,
+          "payrollAfter": 2829427,
+          "salaryGroups": [
+            {
+              "label": "29歳以下",
+              "count": 277,
+              "medianPrevious": 1200,
+              "medianDemand": 2300,
+              "medianChangeRatio": 1
+            },
+            {
+              "label": "30歳以上",
+              "count": 127,
+              "medianPrevious": 7500,
+              "medianDemand": 6800,
+              "medianChangeRatio": 0.767
+            },
+            {
+              "label": "一軍所属",
+              "count": 218,
+              "medianPrevious": 3950,
+              "medianDemand": 5050,
+              "medianChangeRatio": 1.073
+            },
+            {
+              "label": "二軍所属・支配下",
+              "count": 186,
+              "medianPrevious": 2400,
+              "medianDemand": 2350,
+              "medianChangeRatio": 0.855
+            },
+            {
+              "label": "育成",
+              "count": 0,
+              "medianPrevious": null,
+              "medianDemand": null,
+              "medianChangeRatio": null
+            },
+            {
+              "label": "野手400打席以上",
+              "count": 38,
+              "medianPrevious": 2650,
+              "medianDemand": 4750,
+              "medianChangeRatio": 1.76
+            },
+            {
+              "label": "野手400打席・OPS.800以上",
+              "count": 0,
+              "medianPrevious": null,
+              "medianDemand": null,
+              "medianChangeRatio": null
+            },
+            {
+              "label": "野手20本塁打以上",
+              "count": 1,
+              "medianPrevious": 4600,
+              "medianDemand": 6900,
+              "medianChangeRatio": 1.5
+            },
+            {
+              "label": "投手100回以上",
+              "count": 35,
+              "medianPrevious": 7700,
+              "medianDemand": 10400,
+              "medianChangeRatio": 1.427
+            },
+            {
+              "label": "投手120回・防御率3.00以下",
+              "count": 24,
+              "medianPrevious": 7850,
+              "medianDemand": 11050,
+              "medianChangeRatio": 1.426
+            },
+            {
+              "label": "救援40回以上",
+              "count": 40,
+              "medianPrevious": 7450,
+              "medianDemand": 10500,
+              "medianChangeRatio": 1.318
+            }
+          ],
+          "marketPriceMismatches": [],
+          "teams": [
+            {
+              "name": "東京ヤクルトスワローズ",
+              "active": 28,
+              "farm": 23,
+              "budgetBeforeRenewal": 1015001,
+              "budgetAfterRenewal": 837850,
+              "budgetAfterMarket": 827250
+            },
+            {
+              "name": "横浜DeNAベイスターズ",
+              "active": 28,
+              "farm": 29,
+              "budgetBeforeRenewal": 999781,
+              "budgetAfterRenewal": 815931,
+              "budgetAfterMarket": 815931
+            },
+            {
+              "name": "広島東洋カープ",
+              "active": 28,
+              "farm": 24,
+              "budgetBeforeRenewal": 992578,
+              "budgetAfterRenewal": 857259,
+              "budgetAfterMarket": 851959
+            },
+            {
+              "name": "阪神タイガース",
+              "active": 28,
+              "farm": 23,
+              "budgetBeforeRenewal": 1130923,
+              "budgetAfterRenewal": 946373,
+              "budgetAfterMarket": 933473
+            },
+            {
+              "name": "読売ジャイアンツ",
+              "active": 28,
+              "farm": 26,
+              "budgetBeforeRenewal": 1309207,
+              "budgetAfterRenewal": 1134308,
+              "budgetAfterMarket": 1134308
+            },
+            {
+              "name": "中日ドラゴンズ",
+              "active": 28,
+              "farm": 30,
+              "budgetBeforeRenewal": 866636,
+              "budgetAfterRenewal": 759096,
+              "budgetAfterMarket": 741776
+            },
+            {
+              "name": "福岡ソフトバンクホークス",
+              "active": 28,
+              "farm": 23,
+              "budgetBeforeRenewal": 1029273,
+              "budgetAfterRenewal": 752047,
+              "budgetAfterMarket": 752047
+            },
+            {
+              "name": "東北楽天ゴールデンイーグルス",
+              "active": 28,
+              "farm": 27,
+              "budgetBeforeRenewal": 1054407,
+              "budgetAfterRenewal": 898019,
+              "budgetAfterMarket": 895419
+            },
+            {
+              "name": "埼玉西武ライオンズ",
+              "active": 28,
+              "farm": 23,
+              "budgetBeforeRenewal": 1146519,
+              "budgetAfterRenewal": 1050253,
+              "budgetAfterMarket": 1050253
+            },
+            {
+              "name": "千葉ロッテマリーンズ",
+              "active": 28,
+              "farm": 24,
+              "budgetBeforeRenewal": 937157,
+              "budgetAfterRenewal": 776821,
+              "budgetAfterMarket": 774821
+            },
+            {
+              "name": "北海道日本ハムファイターズ",
+              "active": 28,
+              "farm": 23,
+              "budgetBeforeRenewal": 1292098,
+              "budgetAfterRenewal": 1146097,
+              "budgetAfterMarket": 1146097
+            },
+            {
+              "name": "オリックス・バファローズ",
+              "active": 28,
+              "farm": 25,
+              "budgetBeforeRenewal": 1253173,
+              "budgetAfterRenewal": 1120562,
+              "budgetAfterMarket": 1105462
+            }
+          ]
+        },
+        {
+          "year": 2028,
+          "completedTeamGames": [
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143,
+            143
+          ],
+          "expiring": 522,
+          "faQualified": 149,
+          "declarationEligible": 139,
+          "expectedIndependentDeclarations": 29.397,
+          "independentDeclarations": 34,
+          "negotiationDeclarations": 0,
+          "freeContracts": 0,
+          "domesticTransfers": 12,
+          "domesticStays": 4,
+          "domesticUnsigned": 18,
+          "payrollBefore": 2829427,
+          "payrollAfter": 2670805,
+          "salaryGroups": [
+            {
+              "label": "29歳以下",
+              "count": 378,
+              "medianPrevious": 1000,
+              "medianDemand": 2200,
+              "medianChangeRatio": 1
+            },
+            {
+              "label": "30歳以上",
+              "count": 144,
+              "medianPrevious": 6600,
+              "medianDemand": 6300,
+              "medianChangeRatio": 0.773
+            },
+            {
+              "label": "一軍所属",
+              "count": 272,
+              "medianPrevious": 3200,
+              "medianDemand": 4300,
+              "medianChangeRatio": 1.16
+            },
+            {
+              "label": "二軍所属・支配下",
+              "count": 250,
+              "medianPrevious": 1900,
+              "medianDemand": 2000,
+              "medianChangeRatio": 0.865
+            },
+            {
+              "label": "育成",
+              "count": 0,
+              "medianPrevious": null,
+              "medianDemand": null,
+              "medianChangeRatio": null
+            },
+            {
+              "label": "野手400打席以上",
+              "count": 49,
+              "medianPrevious": 3300,
+              "medianDemand": 4800,
+              "medianChangeRatio": 1.433
+            },
+            {
+              "label": "野手400打席・OPS.800以上",
+              "count": 2,
+              "medianPrevious": 9600,
+              "medianDemand": 11250,
+              "medianChangeRatio": 1.192
+            },
+            {
+              "label": "野手20本塁打以上",
+              "count": 5,
+              "medianPrevious": 11300,
+              "medianDemand": 12200,
+              "medianChangeRatio": 1.08
+            },
+            {
+              "label": "投手100回以上",
+              "count": 53,
+              "medianPrevious": 7400,
+              "medianDemand": 10600,
+              "medianChangeRatio": 1.4
+            },
+            {
+              "label": "投手120回・防御率3.00以下",
+              "count": 31,
+              "medianPrevious": 8000,
+              "medianDemand": 11800,
+              "medianChangeRatio": 1.494
+            },
+            {
+              "label": "救援40回以上",
+              "count": 49,
+              "medianPrevious": 7600,
+              "medianDemand": 9700,
+              "medianChangeRatio": 1.229
+            }
+          ],
+          "marketPriceMismatches": [],
+          "teams": [
+            {
+              "name": "東京ヤクルトスワローズ",
+              "active": 28,
+              "farm": 22,
+              "budgetBeforeRenewal": 990212,
+              "budgetAfterRenewal": 797681,
+              "budgetAfterMarket": 785681
+            },
+            {
+              "name": "横浜DeNAベイスターズ",
+              "active": 28,
+              "farm": 26,
+              "budgetBeforeRenewal": 1015846,
+              "budgetAfterRenewal": 841358,
+              "budgetAfterMarket": 834758
+            },
+            {
+              "name": "広島東洋カープ",
+              "active": 28,
+              "farm": 23,
+              "budgetBeforeRenewal": 998648,
+              "budgetAfterRenewal": 843524,
+              "budgetAfterMarket": 834124
+            },
+            {
+              "name": "阪神タイガース",
+              "active": 28,
+              "farm": 21,
+              "budgetBeforeRenewal": 1248832,
+              "budgetAfterRenewal": 1080281,
+              "budgetAfterMarket": 1076881
+            },
+            {
+              "name": "読売ジャイアンツ",
+              "active": 28,
+              "farm": 26,
+              "budgetBeforeRenewal": 1362648,
+              "budgetAfterRenewal": 1177217,
+              "budgetAfterMarket": 1163517
+            },
+            {
+              "name": "中日ドラゴンズ",
+              "active": 28,
+              "farm": 29,
+              "budgetBeforeRenewal": 850407,
+              "budgetAfterRenewal": 692961,
+              "budgetAfterMarket": 676561
+            },
+            {
+              "name": "福岡ソフトバンクホークス",
+              "active": 28,
+              "farm": 23,
+              "budgetBeforeRenewal": 1018660,
+              "budgetAfterRenewal": 760093,
+              "budgetAfterMarket": 760093
+            },
+            {
+              "name": "東北楽天ゴールデンイーグルス",
+              "active": 28,
+              "farm": 25,
+              "budgetBeforeRenewal": 1147059,
+              "budgetAfterRenewal": 994890,
+              "budgetAfterMarket": 986390
+            },
+            {
+              "name": "埼玉西武ライオンズ",
+              "active": 28,
+              "farm": 23,
+              "budgetBeforeRenewal": 1088178,
+              "budgetAfterRenewal": 967088,
+              "budgetAfterMarket": 957488
+            },
+            {
+              "name": "千葉ロッテマリーンズ",
+              "active": 28,
+              "farm": 23,
+              "budgetBeforeRenewal": 877605,
+              "budgetAfterRenewal": 694502,
+              "budgetAfterMarket": 689702
+            },
+            {
+              "name": "北海道日本ハムファイターズ",
+              "active": 28,
+              "farm": 21,
+              "budgetBeforeRenewal": 1350409,
+              "budgetAfterRenewal": 1203261,
+              "budgetAfterMarket": 1186561
+            },
+            {
+              "name": "オリックス・バファローズ",
+              "active": 28,
+              "farm": 23,
+              "budgetBeforeRenewal": 1325284,
+              "budgetAfterRenewal": 1164927,
+              "budgetAfterMarket": 1164927
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
