@@ -166,7 +166,7 @@ export function calcRetireWill(player) {
   if ((player.contractYearsLeft || 0) === 0) score += 20;
   if ((player.injuryDaysLeft || 0) >= 100) score += 25;
 
-  const retireStyle = player.retireStyle || 50;
+  const retireStyle = player.retireStyle ?? 50;
   if (retireStyle >= 70) score = Math.round(score * 1.4);
   else if (retireStyle <= 30) score = Math.round(score * 0.6);
 

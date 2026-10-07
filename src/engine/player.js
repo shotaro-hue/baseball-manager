@@ -235,7 +235,7 @@ export function calcRetireWill(p) {
   if ((p.injuryDaysLeft || 0) >= 100) score += 25;
 
   // 引退に関する価値観
-  const rs = p.retireStyle || 50;
+  const rs = p.retireStyle ?? 50;
   if (rs >= 70) {
     score = Math.round(score * 1.4);
   } else if (rs <= 30) {

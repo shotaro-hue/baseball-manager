@@ -3,7 +3,6 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { isDeferredScreen } from './appScreenConfig';
 import AppScreenFallback from './AppScreenFallback';
 import TitleScreen from './TitleScreen';
-import { POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD } from '../constants';
 import BatchResultRoute from './screenRoutes/BatchResultRoute';
 import ContractRenewalRoute from './screenRoutes/ContractRenewalRoute';
 import PlayoffRoute from './screenRoutes/PlayoffRoute';
@@ -242,6 +241,7 @@ export default function AppScreenRouter({ app }) {
             teams={teams}
             myId={myId}
             year={year}
+            saveId={gs.saveId}
             error={os.careerPersistenceError}
             onNext={os.handleRetirePhaseNext}
           />
@@ -281,6 +281,9 @@ export default function AppScreenRouter({ app }) {
           <GrowthSummaryScreen
             summary={os.developmentSummary}
             year={year}
+            teams={teams}
+            myId={myId}
+            saveId={gs.saveId}
             onNext={() => setScreen('waiver_phase')}
           />
         </ErrorBoundary>
@@ -296,24 +299,7 @@ export default function AppScreenRouter({ app }) {
             teams={teams}
             myId={myId}
             year={year}
-            onRelease={(pid) => {
-              const player = myTeam?.players.find((entry) => entry.id === pid);
-              const popPenalty =
-                (player?.salary ?? 0) > POP_RELEASE_SALARY_THRESHOLD
-                  ? POP_RELEASE_PENALTY
-                  : 0;
-              gs.upd(myId, (team) => ({
-                ...team,
-                players: team.players.filter((entry) => entry.id !== pid),
-                popularity: Math.min(
-                  100,
-                  Math.max(0, (team.popularity ?? 50) + popPenalty),
-                ),
-              }));
-              if (player) {
-                gs.setFaPool((prev) => [...prev, { ...player, isFA: true }]);
-              }
-            }}
+            saveId={gs.saveId}
             onNext={os.handleWaiverPhaseNext}
           />
         </ErrorBoundary>
@@ -328,6 +314,9 @@ export default function AppScreenRouter({ app }) {
           <WaiverResultScreen
             results={os.waiverClaimResults}
             year={year}
+            teams={teams}
+            myId={myId}
+            saveId={gs.saveId}
             onNext={() => setScreen('draft_preview')}
           />
         </ErrorBoundary>
