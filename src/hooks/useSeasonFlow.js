@@ -6,7 +6,8 @@ import { computeBoxScore } from '../engine/postGame';
 import { applyRegularSeasonTeamUpdate } from '../engine/regularGameUpdates';
 import { generateCpuOffer, generateCpuCpuTrade, classifyTeam, evaluateFrontOfficePlan } from '../engine/trade';
 import { executeCpuTrade } from '../engine/cpuTradeExecution';
-import { initPlayoff } from '../engine/playoff';
+import { encodePlayoff, initPlayoff } from '../engine/playoff';
+import { standingsContext } from '../engine/standings';
 import { processCpuFaBids } from '../engine/contract';
 import { cancelDeferredPostGameWork, scheduleDeferredPostGameWork } from '../engine/postGameProcessing';
 import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, MAX_ROSTER } from '../constants';
@@ -111,7 +112,18 @@ export function useSeasonFlow(gs) {
   const [gameMode, setGameMode] = useState(null);
   const [batchResults, setBatchResults] = useState([]);
   const [batchMeta, setBatchMeta] = useState(null);
-  const [playoff, setPlayoff] = useState(null);
+  const [playoffState, setPlayoffState] = useState(null);
+  const savedPostseason = gs.offseasonPlan?.stage === 'postseason'
+    && gs.offseasonPlan.year === year && gs.offseasonPlan.myId === myId ? gs.offseasonPlan.playoff : null;
+  const playoff = playoffState ?? savedPostseason;
+  const setPlayoff = value => {
+    const next = typeof value === 'function' ? value(playoff) : value;
+    setPlayoffState(next);
+    if (next) gs.setOffseasonPlan?.({ version: 1, year, myId, stage: 'postseason',
+      resumeScreen: 'playoff', playoff: encodePlayoff(next) });
+  };
+  const startPlayoff = teamList => initPlayoff(teamList, { year,
+    ...standingsContext(getSeasonHistory?.(), getGameResultsMap?.(), year) });
   const [currentGameTeams, setCurrentGameTeams] = useState(null);
   const [batchProgress, setBatchProgress] = useState(null);
   const pendingPlayoffRef = useRef(false);
@@ -142,7 +154,7 @@ export function useSeasonFlow(gs) {
       pendingPlayoffRef.current=false;
       const withFarm=runFarmSeason(teams);
       setTeams(withFarm);
-      setPlayoff(initPlayoff(withFarm));
+      setPlayoff(startPlayoff(withFarm));
       setScreen('playoff');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -556,7 +568,7 @@ export function useSeasonFlow(gs) {
       if (screenDirective === "playoff") {
         const withFarm = runFarmSeason(nextState.teams);
         setTeams(withFarm);
-        setPlayoff(initPlayoff(withFarm));
+        setPlayoff(startPlayoff(withFarm));
         setScreen("playoff");
         return;
       }
@@ -575,6 +587,7 @@ export function useSeasonFlow(gs) {
 
   // Pick opponent and go to mode select
   const handleStartGame = async () => {
+    if (savedPostseason) { setScreen(gs.offseasonPlan.resumeScreen === 'retire_phase' ? 'retire_phase' : 'playoff'); return; }
     if(batchProgress) return;
     if(!myTeam) return;
     const {opp,isHome}=await pickOpponentFromSchedule(gameDay);
@@ -771,6 +784,7 @@ export function useSeasonFlow(gs) {
   };
 
   const handleBatchSim = (count, autoManageMyTeam=false) => {
+    if (savedPostseason) { setScreen(gs.offseasonPlan.resumeScreen === 'retire_phase' ? 'retire_phase' : 'playoff'); return; }
     if(!myTeam) return;
     const requestedCount = Number.isFinite(count) ? Math.floor(count) : BATCH;
     const safeRequestedCount = Math.max(0, requestedCount);
@@ -1004,7 +1018,7 @@ export function useSeasonFlow(gs) {
       if (shouldEnterPlayoff) {
         const withFarm = runFarmSeason(nextState.teams);
         setTeams(withFarm);
-        setPlayoff(initPlayoff(withFarm));
+        setPlayoff(startPlayoff(withFarm));
         setScreen("playoff");
       } else {
         setScreen("batch_result");

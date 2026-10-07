@@ -218,6 +218,12 @@ export default function HubShell({ state, flows, app }) {
         </aside>
 
         <div className="hub">
+          {gs.offseasonPlan?.stage === 'postseason' && sf.playoff && (
+            <button className="btn btn-gold" style={{ margin: '12px 16px', minHeight: 44 }}
+              onClick={() => gs.setScreen(gs.offseasonPlan.resumeScreen === 'retire_phase' ? 'retire_phase' : 'playoff')}>
+              {gs.offseasonPlan.resumeScreen === 'retire_phase' ? 'シーズン終了後の手続きに戻る' : 'ポストシーズンに戻る'}
+            </button>
+          )}
           <HubHeader
             myTeam={myTeam}
             year={year}

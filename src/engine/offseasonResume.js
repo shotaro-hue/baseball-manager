@@ -1,4 +1,4 @@
-export const OFFSEASON_SAVE_SCREENS = new Set(['offseason_planning', 'waiver_result', 'draft_preview',
+export const OFFSEASON_SAVE_SCREENS = new Set(['playoff', 'retire_phase', 'offseason_planning', 'waiver_result', 'draft_preview',
   'draft_lottery', 'draft', 'draft_review', 'spring_training', 'new_season']);
 
 const teamFields = ['activeTeams', 'lotteryTeams', 'allLotteryLosers'];

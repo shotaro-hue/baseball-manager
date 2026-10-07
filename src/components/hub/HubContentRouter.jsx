@@ -19,6 +19,7 @@ import {
 } from '../../constants';
 import { ownedPlayers, renewalEligible } from '../../engine/renewalRules';
 import { releaseWaiverPlayers } from '../../engine/offseasonReview';
+import { standingsContext } from '../../engine/standings';
 import HubFaTab from './HubFaTab';
 import HubScoutTab from './HubScoutTab';
 import HubTabFallback from './HubTabFallback';
@@ -384,6 +385,7 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
         <StandingsTab
           teams={teams}
           myId={myId}
+          rankingContext={standingsContext(gs.getSeasonHistory(), gs.getGameResultsMap(), year)}
           onTeamClick={gs.handleTeamClick}
         />
       </DeferredHubTab>

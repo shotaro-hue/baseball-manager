@@ -680,6 +680,9 @@ function initGameState(myTeam, oppTeam, options = {}) {
 
   return {
     isMyHome,
+    maxInnings: options.maxInnings === null ? null : options.maxInnings ?? 12,
+    postseason: Boolean(options.postseason),
+    homeClinchOnDraw: Boolean(options.homeClinchOnDraw),
     inning: 1, isTop: true, score: { my: 0, opp: 0 },
     outs: 0, bases: [null,null,null], log: [], inningSummary: [],
     myLineup: [...myL], opLineup: [...opL],
@@ -897,6 +900,11 @@ function processAtBat(gs, strategy = 'normal') {
     : gs.opPitcherState;
 
   const nextState = { ...gs, outs, bases:newBases, score:newScore, log:[...gs.log,logEntry], myBatIdx:isMyAtBat?gs.myBatIdx+1:gs.myBatIdx, opBatIdx:!isMyAtBat?gs.opBatIdx+1:gs.opBatIdx, myPitchCount:newMyPC, opPitchCount:newOpPC, myPitcherState:nextMyPitcherState, opPitcherState:nextOpPitcherState, momentum:newMomentum, myInningRuns:isMyAtBat?gs.myInningRuns+runs:gs.myInningRuns, opInningRuns:!isMyAtBat?gs.opInningRuns+runs:gs.opInningRuns, stopped:false, stopReason:null, pendingStrategy:'normal', liveStats:nextLiveStats };
+  if (postseasonAtBatEndsGame(nextState)) {
+    nextState.gameOver = true;
+    const halfRuns = nextState.isMyHome ? nextState.myInningRuns : nextState.opInningRuns;
+    nextState.inningSummary = [...nextState.inningSummary, { inning: gs.inning, isTop: false, runs: halfRuns }];
+  }
   logPerf('simulatePlateAppearance', plateAppearanceStart);
   return nextState;
 }
@@ -941,6 +949,12 @@ function applyLogEntryToLiveStats(liveStats, entry) {
   return liveStats;
 }
 
+export function postseasonAtBatEndsGame(gs) {
+  if (!gs.postseason || gs.isTop || gs.inning < 9) return false;
+  const { home, away } = getHomeAwayScores(gs);
+  return home > away || (gs.homeClinchOnDraw && gs.inning === (gs.maxInnings ?? 12) && home === away);
+}
+
 function endHalfInning(gs) {
   const isTop      = gs.isTop;
   const newInn     = isTop ? gs.inning : gs.inning+1;
@@ -950,8 +964,10 @@ function endHalfInning(gs) {
   const newSummary = [...gs.inningSummary, { inning:gs.inning, isTop, runs:halfInningRuns }];
   const { home: homeScore, away: awayScore } = getHomeAwayScores(gs);
   if (isTop && gs.inning >= 9 && homeScore > awayScore)    return { ...gs, inningSummary:newSummary, gameOver:true, outs:0, bases:[null,null,null] };
+  if (isTop && gs.homeClinchOnDraw && gs.inning === (gs.maxInnings ?? 12) && homeScore === awayScore)
+    return { ...gs, inningSummary:newSummary, gameOver:true, outs:0, bases:[null,null,null] };
   if (!isTop && newInn>9  && homeScore!==awayScore)        return { ...gs, inningSummary:newSummary, gameOver:true, outs:0, bases:[null,null,null] };
-  if (newInn>12)                                            return { ...gs, inningSummary:newSummary, gameOver:true, outs:0, bases:[null,null,null] };
+  if (gs.maxInnings !== null && newInn > (gs.maxInnings ?? 12)) return { ...gs, inningSummary:newSummary, gameOver:true, outs:0, bases:[null,null,null] };
   const nextState = { ...gs, inning:newInn, isTop:!isTop, outs:0, bases:[null,null,null], inningSummary:newSummary, myInningRuns:0, opInningRuns:0 };
   if (isMyTeamDefending(nextState) && nextState.myPitcherMustBeReplaced) {
     return {
@@ -1142,10 +1158,17 @@ function quickSimGame(myTeam, oppTeam, options = {}) {
   const includePhysics = options?.includePhysics !== false;
   const includeCrossParkAnalysis = options?.includeCrossParkAnalysis !== false;
   let gs = initGameState(myTeam, oppTeam, {
+    maxInnings: options.maxInnings,
+    postseason: options.postseason,
+    homeClinchOnDraw: options.homeClinchOnDraw,
     isMyHome: options?.isMyHome !== false,
     compactLogs: Boolean(options?.compactLogs),
   });
+  if (!gs.myLineup.length || !gs.opLineup.length) throw new Error('試合を行う打順が設定されていません');
+  let appearances = 0;
   while (!gs.gameOver) {
+    // An execution safeguard is not a baseball result: never manufacture a draw/winner.
+    if (++appearances > 10000) throw new Error('試合の計算が長すぎるため中断しました');
     gs = autoSwapPitcher(gs, isMyTeamDefending(gs) ? 'my' : 'opp');
     const battingLineup = isMyTeamBatting(gs) ? gs.myLineup : gs.opLineup;
     const battingIndex = isMyTeamBatting(gs) ? gs.myBatIdx : gs.opBatIdx;
@@ -1154,7 +1177,7 @@ function quickSimGame(myTeam, oppTeam, options = {}) {
       ? 'bunt'
       : 'normal';
     gs = processAtBat(gs, autoStrategy);
-    if (gs.outs >= 3) gs = endHalfInning(gs);
+    if (!gs.gameOver && gs.outs >= 3) gs = endHalfInning(gs);
   }
   const safeLog = includeLog ? gs.log : [];
   const result = {
