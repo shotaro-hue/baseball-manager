@@ -25,6 +25,7 @@ import {
 import { selectAllStars, runAllStarGame } from '../engine/allstar';
 import { getMyMatchup, getCpuMatchups } from '../engine/scheduleGen';
 import { processCpuFaBids } from '../engine/contract';
+import { executeCpuTrade } from '../engine/cpuTradeExecution';
 import {
   SEASON_GAMES,
   NEWS_TEMPLATES_WIN,
@@ -207,8 +208,7 @@ function tryCpuCpuDeadlineTrade(teamsArr, currentGameDay, schedule, myId) {
   const seller = teamsArr.find((team) => team.id === sellerId);
   if (!buyer || !seller) return null;
 
-  buyer.players = [...buyer.players.filter((player) => player.id !== sellerGets.id), buyerGets];
-  seller.players = [...seller.players.filter((player) => player.id !== buyerGets.id), sellerGets];
+  if (!executeCpuTrade(teamsArr, result, currentGameDay)) return null;
 
   return {
     headline: `移籍情報 ${buyerGets.name} が${buyerName}へ`,
@@ -739,16 +739,6 @@ export function simulateSeasonBatch({
       awayTeam.rotIdx = (awayTeam.rotIdx || 0) + 1;
     }
 
-    const cpuCpuTradeNews = tryCpuCpuDeadlineTrade(newTeams, newDay, state.schedule, state.myId);
-    if (cpuCpuTradeNews) {
-      results.push({ type: 'trade_news', ...cpuCpuTradeNews, day: newDay });
-    }
-
-    const tradeMail = tryGenerateCpuOfferInBatch(newTeams, newDay, pendingTradeCountBase + batchTradeMails.length, state);
-    if (tradeMail) {
-      batchTradeMails.push(tradeMail);
-    }
-
     const foreignFaResult = tryCpuForeignFaInBatch(newTeams, newDay, newFaPool, state);
     newTeams = foreignFaResult.updatedTeams;
     newFaPool = foreignFaResult.remainingFaPool;
@@ -894,6 +884,14 @@ export function simulateSeasonBatch({
         });
       }
     }
+
+    // Finish every scheduled game before changing CPU ownership. Otherwise an
+    // opponent can lose a starter between morning roster checks and its game,
+    // or a transferred player can appear for two teams on the same day.
+    const cpuCpuTradeNews = tryCpuCpuDeadlineTrade(newTeams, newDay, state.schedule, state.myId);
+    if (cpuCpuTradeNews) results.push({ type: 'trade_news', ...cpuCpuTradeNews, day: newDay });
+    const tradeMail = tryGenerateCpuOfferInBatch(newTeams, newDay, pendingTradeCountBase + batchTradeMails.length, state);
+    if (tradeMail) batchTradeMails.push(tradeMail);
 
     if (!allStarDoneLocal && newDay === state.allStarTriggerDay) {
       const rosters = selectAllStars(newTeams);
