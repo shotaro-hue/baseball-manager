@@ -22,6 +22,7 @@ import { resolveOffseasonFaDeclarations } from '../engine/faDeclaration';
 import { renewalEligible } from '../engine/renewalRules';
 import { planningPlayer, planningSummary } from '../engine/offseasonPlanning';
 import { draftPicksForTeam } from '../engine/offseasonResume';
+import { hasRecordedFirstTeamSeason } from '../engine/seasonParticipants';
 
 let offseasonPlayerModulePromise = null;
 let offseasonScheduleModulePromise = null;
@@ -141,13 +142,17 @@ export function useOffseason(gs) {
     const currentGameResultsMap = getGameResultsMap();
     const foreignPool = playerMod.generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX));
     const indexedDbEntries = [];
+    const archiveSeason = (p, t) => {
+      const transferredThisWinter = p.faArchivedYear === year && p.contractSignedYear === year
+        && isTeamIdSet(p.faOriginTeamId) && p.faOriginTeamId !== t.id;
+      if (transferredThisWinter) return p;
+      const entry = mkCareerEntry(p.stats, p.playoffStats, year, t.id, t.name);
+      indexedDbEntries.push({ playerId: String(p.id ?? ''), careerEntry: entry });
+      return appendCareerEntryWithSummary(p, entry);
+    };
     const nextTeams = (Array.isArray(sourceTeams) ? sourceTeams : teams).map(t=>{
       const nextPlayers=t.players.filter(p=>!p._retireNow).map(p=>{
-        const entry = mkCareerEntry(p.stats,p.playoffStats,year,t.id,t.name);
-        const transferredThisWinter = p.faArchivedYear === year && p.contractSignedYear === year
-          && isTeamIdSet(p.faOriginTeamId) && p.faOriginTeamId !== t.id;
-        if (!transferredThisWinter) indexedDbEntries.push({ playerId: String(p.id ?? ''), careerEntry: entry });
-        const compactPlayer = transferredThisWinter ? p : appendCareerEntryWithSummary(p, entry);
+        const compactPlayer = archiveSeason(p, t);
         return {...compactPlayer,age:p.age+1,stats:createEmptyStats(),playoffStats:createEmptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:Math.max(0,p.contractYearsLeft-1),postingRequested:false,growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlyDecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0};
       });
       const nextIds=new Set(nextPlayers.map(p=>p.id));
@@ -157,7 +162,14 @@ export function useOffseason(gs) {
       const trust=t.ownerTrust??50;
       const trustFactor=t.id===myId?(trust<OWNER_TRUST_BUDGET_LOW?OWNER_TRUST_FACTOR_LOW:trust>OWNER_TRUST_BUDGET_HIGH?OWNER_TRUST_FACTOR_HIGH:1.0):1.0;
       const newBudget=Math.max(Math.round(baseBudget*0.5),Math.round(rawBudget*trustFactor));
-      return{...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,revenueThisSeason:0,winStreak:0,loseStreak:0,stadiumLevel:t.stadiumLevel??0,budget:newBudget,players:nextPlayers,lineup:(t.lineup||[]).filter(id=>nextIds.has(id)),lineupNoDh:(t.lineupNoDh||[]).filter(id=>nextIds.has(id)),lineupDh:(t.lineupDh||[]).filter(id=>nextIds.has(id)),rotation:(t.rotation||[]).filter(id=>nextIds.has(id)),farm:t.farm.map(p=>({...p,age:p.age+1,stats:createEmptyStats(),injury:null,serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0}))};
+      const nextFarm = (t.farm || []).map(p => {
+        const played = hasRecordedFirstTeamSeason(p) || hasRecordedFirstTeamSeason({ stats: p.playoffStats });
+        const archived = played ? archiveSeason(p, t) : p;
+        return { ...archived, age: p.age + 1, stats: createEmptyStats(), playoffStats: createEmptyStats(),
+          injury: null, serviceYears: p.育成 ? (p.serviceYears || 0) : (p.serviceYears || 0) + 1,
+          ikuseiYears: p.育成 ? (p.ikuseiYears || 0) + 1 : 0 };
+      });
+      return{...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,revenueThisSeason:0,winStreak:0,loseStreak:0,stadiumLevel:t.stadiumLevel??0,budget:newBudget,players:nextPlayers,lineup:(t.lineup||[]).filter(id=>nextIds.has(id)),lineupNoDh:(t.lineupNoDh||[]).filter(id=>nextIds.has(id)),lineupDh:(t.lineupDh||[]).filter(id=>nextIds.has(id)),rotation:(t.rotation||[]).filter(id=>nextIds.has(id)),farm:nextFarm};
     });
     const unsignedDomestic = faPool.filter(p => !p.isForeign).map(p => {
       if (p.faEnteredYear === year && p.faArchivedYear !== year) indexedDbEntries.push({ playerId: String(p.id), careerEntry: mkCareerEntry(p.stats, p.playoffStats, year, p.faOriginTeamId, p.faOriginTeamName) });
@@ -631,7 +643,7 @@ export function useOffseason(gs) {
     // Other clubs settle renewals before the user's market phase so candidates
     // are available before the user's own renewals. Never renew CPU clubs twice.
     // 自チーム満了選手の要求額を事前計算して state に保持
-    const awards=calcSeasonAwards(developedTeams,year);
+    const awards=calcSeasonAwards(teams,year);
     const currentSeasonHistory = getSeasonHistory();
     const sharedSalaryContext = { year, awards, championship: currentSeasonHistory.championships?.find(c => c.year === year) };
     const declarations = resolveOffseasonFaDeclarations(developedTeams, year, sharedSalaryContext);
@@ -651,7 +663,7 @@ export function useOffseason(gs) {
     declarations.news.forEach(n => addNews(n));
     renewResult.news.forEach(n => addNews(n));
     setDevelopmentSummary(mySummary);
-    const {records:newRec,broken:brokenRecs}=updateRecords(currentSeasonHistory.records,developedTeams);
+    const {records:newRec,broken:brokenRecs}=updateRecords(currentSeasonHistory.records,teams);
     if(brokenRecs.length>0){const recLabel={singleSeasonHR:"シーズン本塁打",singleSeasonAVG:"シーズン打率",singleSeasonK:"シーズン奪三振"};const fmtVal=r=>r.type==="singleSeasonAVG"?`.${String(Math.round(r.value*1000)).padStart(3,"0")}`:r.type==="singleSeasonK"?`${r.value}奪三振`:`${r.value}本塁打`;const fmtOld=r=>r.type==="singleSeasonAVG"?`.${String(Math.round(r.oldValue*1000)).padStart(3,"0")}`:r.type==="singleSeasonK"?`${r.oldValue}奪三振`:`${r.oldValue}本塁打`;brokenRecs.forEach(r=>addNews({type:"record",headline:`🏅 ${r.playerName}（${r.teamName}）が${recLabel[r.type]}記録を更新！`,source:"NPB記録部",dateLabel:`${year}年`,body:`${r.playerName}（${r.teamName}）が${year}年シーズンに${fmtVal(r)}を記録し、従来の${recLabel[r.type]}記録（${fmtOld(r)}）を塗り替えた。`}));}
     const allAlumni=developedTeams.flatMap(t=>t.history||[]);
     const newInductees=checkHallOfFame(currentSeasonHistory.hallOfFame,allAlumni,year);
