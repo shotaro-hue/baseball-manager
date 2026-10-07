@@ -1,6 +1,7 @@
 import { useState, useReducer, useMemo, useCallback, useEffect, useRef } from "react";
 import { gameStateReducer, G } from './gameStateReducer';
 import { createSaveDirtyTracker } from '../state/saveDirtyTracker';
+import { OFFSEASON_SAVE_SCREENS } from '../engine/offseasonResume';
 import { uid, clamp, rng, pname, scoutedValue, fmtSal } from '../utils';
 // Player helpers are loaded lazily to keep the initial title flow lighter.
 import { SEASON_PARAMS, getDefaultParams } from '../data/scheduleParams.js';
@@ -536,13 +537,11 @@ export function useGameState() {
   },[screen,isAutoSaveSuspended,saveDirty,lastAutoSaveAt,saveRevision,saveQueueState.isSaving]);
 
   const handleSave = useCallback(async (options = {})=>{
-    if (offseasonPlan && !['offseason_planning', 'waiver_result'].includes(screen)) {
-      if (!options.silent) notify('ドラフト以降の途中保存は対象外です。編成終了時の保存から再開できます', 'warn');
-      return { ok: false, unsupportedPhase: true };
-    }
+    if (offseasonPlan && isAutoSaveSuspended && !options.payload) return { ok: false, reason: 'transition_in_progress' };
     const request = beginTrackedSave();
     const result=await queueSave(
-      {teams,myId,gameDay,year,saveId,faPool,faYears,seasonHistory,news,mailbox,saveRevision,offseasonPlan},
+      {teams,myId,gameDay,year,saveId,faPool,faYears,seasonHistory,news,mailbox,saveRevision,
+        offseasonPlan: offseasonPlan && { ...offseasonPlan, resumeScreen: screen }, ...options.payload},
       request.options,
     );
     if(result.ok){
@@ -552,10 +551,10 @@ export function useGameState() {
     if (!options.silent || !result.ok) notify(result.ok?'💾 セーブしました':result.quota?'💾 ストレージ容量が不足しています':'セーブに失敗しました',result.ok?'ok':'warn');
     return result;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision,offseasonPlan,screen,notify,queueSave,beginTrackedSave,completeTrackedSave]);
+  },[teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision,offseasonPlan,screen,isAutoSaveSuspended,notify,queueSave,beginTrackedSave,completeTrackedSave]);
 
   useEffect(() => {
-    if (!offseasonPlan || !['offseason_planning', 'waiver_result'].includes(screen) || !saveDirty || isAutoSaveSuspended) return;
+    if (!offseasonPlan || !OFFSEASON_SAVE_SCREENS.has(screen) || !saveDirty || isAutoSaveSuspended) return;
     const timer = setTimeout(() => { handleSave({ silent: true }).catch(() => notify('編成内容の保存に失敗しました。保存ボタンで再試行してください', 'warn')); }, 750);
     return () => clearTimeout(timer);
   }, [offseasonPlan, screen, saveDirty, isAutoSaveSuspended, handleSave, notify]);

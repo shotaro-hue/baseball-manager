@@ -113,9 +113,7 @@ export default function App() {
     gs.setCpuTradeOffers([]);
 
     sf.setPlayoff(null);
-    os.setDraftPool(null);
-    os.setDraftResult(null);
-    os.setDevelopmentSummary(null);
+    os.resetTransientOffseason();
 
     gs.setTab('dashboard');
     gs.setScreen(planningResumeScreen(saved.offseasonPlan, saved.year, saved.myId));

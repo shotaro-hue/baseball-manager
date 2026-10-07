@@ -1,5 +1,6 @@
 import { renewalEligible } from './renewalRules';
 import { marketNeeds } from '../components/hub/faMarket';
+import { OFFSEASON_SAVE_SCREENS } from './offseasonResume';
 
 export const renewalFinished = status => ['signed', 'released', 'free', 'fa'].includes(status);
 export const sumRecorded = values => values.every(Number.isFinite) ? values.reduce((a, b) => a + b, 0) : null;
@@ -39,5 +40,13 @@ export function planningSummary(team, plan, year) {
 }
 export function planningResumeScreen(plan, year, myId) {
   if (plan?.version !== 1 || plan.year !== year || plan.myId !== myId) return 'hub';
+  if (OFFSEASON_SAVE_SCREENS.has(plan.resumeScreen)) {
+    const screen = plan.resumeScreen;
+    if (['draft_preview', 'draft_lottery', 'draft', 'draft_review'].includes(screen)
+      && !Array.isArray(plan.draftPool)) return plan.stage === 'results' ? 'waiver_result' : 'hub';
+    if (screen === 'draft_review' && !plan.draftResult) return 'draft';
+    if (screen === 'spring_training' && !plan.spring) return plan.draftResult ? 'draft_review' : 'waiver_result';
+    return screen;
+  }
   return ['planning', 'open'].includes(plan.stage) ? 'offseason_planning' : plan.stage === 'results' ? 'waiver_result' : 'hub';
 }

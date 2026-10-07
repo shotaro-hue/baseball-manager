@@ -1,4 +1,5 @@
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useState, useCallback } from 'react';
+import '../calm-draft.css';
 import { ErrorBoundary } from './ErrorBoundary';
 import { isDeferredScreen } from './appScreenConfig';
 import AppScreenFallback from './AppScreenFallback';
@@ -97,11 +98,19 @@ const TeamDetailScreen = lazy(() =>
   })),
 );
 
-function DeferredScreenFrame({ screen, children }) {
+const draftSteps = ['draft_preview', 'draft_lottery', 'draft', 'draft_review', 'spring_training', 'new_season'];
+const draftLabels = ['候補確認', '1巡目・抽選', '2巡目以降', '獲得結果', 'キャンプ', '新シーズン'];
+function DeferredScreenFrame({ screen, children, gs }) {
   if (!isDeferredScreen(screen)) return children;
   return (
     <Suspense fallback={<AppScreenFallback label={`Loading ${screen}...`} />}>
-      {children}
+      {gs && draftSteps.includes(screen) ? <div className="calm-detail calm-draft">
+        <header className="draft-save-bar"><strong>{draftLabels[draftSteps.indexOf(screen)]}</strong>
+          <span>{draftSteps.indexOf(screen) + 1} / {draftSteps.length}</span>
+          <span role="status">{gs.saveDirty ? '変更あり・保存待ち' : '保存済み'}</span>
+          <button disabled={gs.saveQueueState?.isSaving || gs.isAutoSaveSuspended} onClick={() => gs.handleSave()}>途中保存</button>
+          <p>自動保存します。画面を閉じる前は「途中保存」で保存完了を確認できます。</p>
+        </header>{children}</div> : children}
     </Suspense>
   );
 }
@@ -109,6 +118,10 @@ function DeferredScreenFrame({ screen, children }) {
 export default function AppScreenRouter({ app }) {
   const { gs, sf, os, handleLoad } = app;
   const [draftAutoSkip, setDraftAutoSkip] = useState(false);
+  const savePreview = useCallback(value => os.saveDraftView('preview', value), [os.saveDraftView]);
+  const saveLottery = useCallback(value => os.saveDraftView('lottery', value), [os.saveDraftView]);
+  const saveDraft = useCallback(value => os.saveDraftView('draft', value), [os.saveDraftView]);
+  const saveReview = useCallback(value => os.saveDraftView('review', value), [os.saveDraftView]);
   const {
     screen,
     myTeam,
@@ -357,7 +370,7 @@ export default function AppScreenRouter({ app }) {
 
   if (screen === 'draft_preview' && os.draftPool) {
     return (
-      <DeferredScreenFrame screen={screen}>
+      <DeferredScreenFrame screen={screen} gs={gs}>
         <DraftPreviewScreen
           teams={teams}
           myId={myId}
@@ -365,6 +378,7 @@ export default function AppScreenRouter({ app }) {
           pool={os.draftPool}
           draftAllocation={os.draftAllocation}
           onAllocationChange={os.setDraftAllocation}
+          savedState={gs.offseasonPlan?.draftViews?.preview} onStateChange={savePreview}
           onStart={() => setScreen('draft_lottery')}
         />
       </DeferredScreenFrame>
@@ -373,12 +387,13 @@ export default function AppScreenRouter({ app }) {
 
   if (screen === 'draft_lottery' && os.draftPool) {
     return (
-      <DeferredScreenFrame screen={screen}>
+      <DeferredScreenFrame screen={screen} gs={gs}>
         <DraftLotteryScreen
           teams={teams}
           myId={myId}
           year={year}
           pool={os.draftPool}
+          savedState={gs.offseasonPlan?.draftViews?.lottery} onStateChange={saveLottery}
           onDone={(roundOneWinners, autoSkip) => {
             os.setDraftPool((prev) =>
               prev.map((player) => {
@@ -393,6 +408,7 @@ export default function AppScreenRouter({ app }) {
               }),
             );
             if (autoSkip) setDraftAutoSkip(true);
+            gs.setOffseasonPlan(prev => prev && ({ ...prev, draftAutoSkip: !!autoSkip }));
             setScreen('draft');
           }}
         />
@@ -402,14 +418,15 @@ export default function AppScreenRouter({ app }) {
 
   if (screen === 'draft' && os.draftPool) {
     return (
-      <DeferredScreenFrame screen={screen}>
+      <DeferredScreenFrame screen={screen} gs={gs}>
         <DraftScreen
           teams={teams}
           myId={myId}
           year={year}
           pool={os.draftPool}
           draftAllocation={os.draftAllocation}
-          autoSkip={draftAutoSkip}
+          autoSkip={gs.offseasonPlan?.draftAutoSkip ?? draftAutoSkip}
+          savedState={gs.offseasonPlan?.draftViews?.draft} onStateChange={saveDraft}
           onDraftDone={(pool, drafted) => {
             setDraftAutoSkip(false);
             os.setDraftResult({ pool, drafted });
@@ -422,13 +439,14 @@ export default function AppScreenRouter({ app }) {
 
   if (screen === 'draft_review' && os.draftResult) {
     return (
-      <DeferredScreenFrame screen={screen}>
+      <DeferredScreenFrame screen={screen} gs={gs}>
         <DraftReviewScreen
           teams={teams}
           myId={myId}
           year={year}
           pool={os.draftResult.pool}
           drafted={os.draftResult.drafted}
+          savedState={gs.offseasonPlan?.draftViews?.review} onStateChange={saveReview}
           onEnd={() =>
             os.handleDraftComplete(os.draftResult.pool, os.draftResult.drafted)
           }
@@ -439,7 +457,7 @@ export default function AppScreenRouter({ app }) {
 
   if (screen === 'spring_training') {
     return (
-      <DeferredScreenFrame screen={screen}>
+      <DeferredScreenFrame screen={screen} gs={gs}>
         <SpringTrainingScreen
           year={year}
           myTeam={myTeam}
@@ -453,7 +471,7 @@ export default function AppScreenRouter({ app }) {
 
   if (screen === 'new_season') {
     return (
-      <DeferredScreenFrame screen={screen}>
+      <DeferredScreenFrame screen={screen} gs={gs}>
         <NewSeasonScreen
           year={year}
           info={os.newSeasonInfo}
@@ -463,6 +481,7 @@ export default function AppScreenRouter({ app }) {
             gs.upd(myId, (team) => ({ ...team, ownerGoal: goal }))
           }
           onStart={() => {
+            gs.setOffseasonPlan(null);
             setScreen('hub');
             setTab('dashboard');
             gs.notify(`${year}年シーズン開始`, 'ok');
