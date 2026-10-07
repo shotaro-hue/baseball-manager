@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { CPU_RENEWAL_ROUNDS, NEGOTIATION_MORALE_ACCEPT_BONUS, NEGOTIATION_MORALE_CUT_PENALTY, NEGOTIATION_MORALE_ROUND_HIT, NEGOTIATION_TRUST_HAPPY, NEGOTIATION_TRUST_HOLDOUT } from '../constants';
 import { evaluateRenewalOffer, getFaThreshold, getFaProgress } from '../engine/contract';
-import { salaryCutRule } from '../engine/renewalRules';
+import { salaryCutRule, renewalEligible } from '../engine/renewalRules';
 import { fmtSal, fmtIP, clamp } from '../utils';
 import { useResultDialog } from './useResultDialog';
 import '../calm-renewal.css';
@@ -30,9 +30,9 @@ function performance(player) {
 }
 const abilityNames = { velocity: '球速', control: '制球', stamina: 'スタミナ', breaking: '変化球', variety: '球種', sharpness: 'キレ', tempo: 'テンポ', clutchP: 'ピンチ', recovery: '回復', durability: '耐久', contact: 'ミート', power: '長打', eye: '選球眼', speed: '走力', arm: '肩', defense: '守備', catching: '捕球', stealSkill: '盗塁', baseRunning: '走塁', clutch: 'クラッチ', vsLeft: '対左', breakingBall: '変化球対応' };
 
-function createSession(team, demands, renewalPlayerIds) {
+function createSession(team, demands, renewalPlayerIds, year) {
   if (!team) return null;
-  const eligible = p => (p.contractYearsLeft ?? 99) <= 1 && !p.isRetired && !p._retireNow && (renewalPlayerIds == null || renewalPlayerIds.some(id => String(id) === String(p.id)));
+  const eligible = p => renewalEligible(p, year) && (renewalPlayerIds == null || renewalPlayerIds.some(id => String(id) === String(p.id)));
   return {
     baseline: total([...team.players, ...(team.farm || [])].map(p => p.salary)),
     others: [...team.players.filter(p => !eligible(p)), ...(team.farm || [])].map(p => p.salary),
@@ -52,7 +52,7 @@ function Confirmation({ title, children, onClose, onConfirm, confirmLabel }) {
 
 export function ContractRenewalPhaseScreen({ teams, myId, year, demands, renewalPlayerIds, onSign, onRelease, onNext }) {
   const myTeam = teams?.find(t => t.id === myId);
-  const [session, setSession] = useState(() => createSession(myTeam, demands, renewalPlayerIds));
+  const [session, setSession] = useState(() => createSession(myTeam, demands, renewalPlayerIds, year));
   const sessionRef = useRef(session);
   const [selectedId, setSelectedId] = useState(null);
   const [filter, setFilter] = useState('all');
@@ -73,9 +73,9 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, renewal
   const selectedStatus = session?.entries.find(e => e.player.id === selectedId)?.status;
   useEffect(() => {
     if (!sessionRef.current && myTeam) {
-      const next = createSession(myTeam, demands, renewalPlayerIds); sessionRef.current = next; setSession(next);
+      const next = createSession(myTeam, demands, renewalPlayerIds, year); sessionRef.current = next; setSession(next);
     }
-  }, [myTeam, demands, renewalPlayerIds]);
+  }, [myTeam, demands, renewalPlayerIds, year]);
   useEffect(() => { busy.current = false; }, [session]);
   useEffect(() => {
     if (selectedId != null) heading.current?.focus({ preventScroll: true });

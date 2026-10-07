@@ -53,6 +53,42 @@ describe('performance-based salary demand', () => {
   it('does not cut a productive established player solely on a lower model valuation', () => {
     expect(calculateSalaryDemand(batter(30000)).demandSalary).toBeGreaterThanOrEqual(30000);
   });
+  // Synthetic components matching the screenshot's rounded AVG/OPS, not
+  // recovered player data (the screenshot does not supply BB, doubles, etc.).
+  const regularStats = { PA: 684, AB: 623, H: 184, BB: 45, HBP: 8, SF: 8, D: 10, T: 0, HR: 27, RBI: 83 };
+  it('anchors a .295/27HR/.788 OPS full-season regular to previous 21000 rather than cutting 15%', () => {
+    const p = batter(21000, regularStats);
+    const d = calculateSalaryDemand(p);
+    expect((p.stats.H / p.stats.AB).toFixed(3)).toBe('0.295');
+    expect((d.assessment.obp + d.assessment.slg).toFixed(3)).toBe('0.788');
+    expect(d.demandSalary).toBeGreaterThanOrEqual(21000);
+    expect(d.demandSalary).toBeLessThanOrEqual(23100);
+    expect(d.assessment.reasons.some(r => r.label.includes('前年年俸から評価'))).toBe(true);
+  });
+  it('retains cuts for poor full-season performance, reduced appearances and documented decline', () => {
+    const poor = { PA: 550, AB: 500, H: 100, BB: 35, HBP: 5, SF: 10, D: 15, T: 0, HR: 5 };
+    expect(calculateSalaryDemand(batter(21000, poor)).demandSalary).toBeLessThan(21000);
+    expect(calculateSalaryDemand(batter(21000, { ...regularStats, PA: 100 })).demandSalary).toBeLessThan(21000);
+    const p = batter(21000, regularStats, { recentCareerLog: [{ year: 2025, stats: batter().stats }] });
+    expect(calculateSalaryDemand(p, { year: 2026 }).demandSalary).toBeLessThan(21000);
+  });
+  it('evaluates a productive starter and reliever relative to previous pay', () => {
+    expect(calculateSalaryDemand(pitcher(21000, { IP: 160, ER: 53, Kp: 140, BBp: 45 })).demandSalary).toBeGreaterThanOrEqual(21000);
+    expect(calculateSalaryDemand(pitcher(21000, { IP: 60, ER: 20, Kp: 60, BBp: 20, G: 60, GS: 0, SV: 30 })).demandSalary).toBeGreaterThanOrEqual(21000);
+  });
+  it('gives productive expensive incumbents higher demands with supplied titles/team success', () => {
+    const p = batter(21000, regularStats);
+    const baseline = calculateSalaryDemand(p);
+    const awards = { version: 2, year: 2026, titles: { central: { hr: { value: 27, winners: [{ playerId: 0 }] } } } };
+    expect(calculateSalaryDemand(p, { ...context, awards }).demandSalary).toBeGreaterThan(baseline.demandSalary);
+  });
+  it('bounds repeated identical good seasons rather than compounding raises forever', () => {
+    let p = batter(21000, regularStats);
+    for (let year = 0; year < 200; year++) p = { ...p, salary: calculateSalaryDemand(p).demandSalary };
+    expect(p.salary).toBeLessThan(40000);
+    expect(calculateSalaryDemand(p).demandSalary).toBe(p.salary);
+    expect(calculateSalaryDemand(batter(100000, regularStats)).demandSalary).toBe(100000);
+  });
   it('honors zero money preference, and missing preferences use the neutral default', () => {
     const p = batter();
     expect(calculateSalaryDemand({ ...p, personality: { money: 0 } }).demandSalary).toBeLessThan(calculateSalaryDemand(p).demandSalary);

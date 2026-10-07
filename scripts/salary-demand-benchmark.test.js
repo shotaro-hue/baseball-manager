@@ -6,6 +6,9 @@ import { simulateSeasonBatch } from '../src/workers/seasonBatchCore';
 import { calcSeasonAwards } from '../src/engine/awards';
 import { calcPlayerDemand } from '../src/engine/contract';
 import { emptyStats } from '../src/engine/playerCore';
+import { SALARY_MODEL } from '../src/engine/salaryDemand';
+import { resolveOffseasonFaDeclarations } from '../src/engine/faDeclaration';
+import { renewalEligible } from '../src/engine/renewalRules';
 
 function realExamples() {
   const team = { id: 0, league: 'セ', wins: 85, losses: 53 };
@@ -47,19 +50,30 @@ describe.skipIf(!process.env.RUN_SALARY_BENCHMARK)('salary balance benchmark', (
         expect(demands.every(d => Number.isFinite(d.demandSalary) && d.demandSalary >= d.minOfferSalary)).toBe(true);
         let fixed = team.players;
         const repeated = [];
-        for (let y = 0; y < 15; y++) {
+        for (let y = 0; y < 100; y++) {
           fixed = fixed.map(p => ({ ...p, salary: calcPlayerDemand(p, { ...salaryContext, team }).demandSalary }));
           repeated.push(fixed.reduce((sum, p) => sum + p.salary, 0));
         }
-        // Fixed roles, statistics and awards; this is a convergence check, not full 15-year gameplay.
+        // Previous-pay anchors converge more slowly than the old absolute-only
+        // model. Check the hard individual ceiling as well as eventual convergence.
+        fixed.forEach((p, index) => {
+          const ceiling = demands[index].assessment.absoluteTargetSalary;
+          if (Number.isFinite(ceiling)) expect(p.salary).toBeLessThanOrEqual(Math.max(team.players[index].salary, ceiling * SALARY_MODEL.incumbentCeilingMultiplier) + 100);
+        });
         expect(Math.abs(repeated.at(-1) - repeated.at(-2))).toBeLessThan(before * .01 + 1000);
         return { team: team.name, games: team.wins + team.losses + (team.draws || 0), activePlayers: team.players.length,
           previousPayroll: before, nextDemandPayroll: after, ratio: +(after / before).toFixed(3), budget: team.budget,
           missingAssessments: demands.filter(d => !d.assessment.recorded).length, fixedPerformancePayroll: repeated };
       });
       const total = key => rows.reduce((sum, row) => sum + row[key], 0);
+      const market = resolveOffseasonFaDeclarations(simulated, 2026, salaryContext);
+      const candidates = simulated.flatMap(t => t.players).filter(p => renewalEligible(p, 2026));
       report = { seed: 42, simulatedUserGames: result.batchResults.length,
-        limitations: ['100-game partial-season data, not full-season final awards', 'Demand amounts, not negotiated payroll', 'All active players hypothetically renewed, regardless of remaining contract', 'No team championship supplied', '15-year check holds statistics/awards fixed; no aging, injuries, roster changes or cashflow simulation'],
+        declarationCheck: { expiryCandidates: candidates.length,
+          qualifiedCandidates: market.newFaPlayers.length + market.updatedTeams.flatMap(t => t.players).filter(p => p.faDeclarationDecision?.year === 2026).length,
+          independentDeclarations: market.newFaPlayers.length,
+          players: market.newFaPlayers.map(p => ({ name: p.name, origin: p.faOriginTeamName, demand: p.salary, reasons: p.faDeclarationDecision.reasons })) },
+        limitations: ['100-game partial-season data, not full-season final awards', 'Demand amounts, not negotiated payroll', 'All active players hypothetically renewed, regardless of remaining contract', 'No team championship supplied', '100-iteration stress check holds statistics/awards fixed; not full 100-year gameplay; no aging, injuries, roster changes or cashflow simulation'],
         npbExamples: realExamples(), previousPayroll: total('previousPayroll'), nextDemandPayroll: total('nextDemandPayroll'), teams: rows };
       expect(result.batchResults.length).toBeGreaterThanOrEqual(100);
       expect(report.nextDemandPayroll).toBeLessThan(report.previousPayroll * 1.5);

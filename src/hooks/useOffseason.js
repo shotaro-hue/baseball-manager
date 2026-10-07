@@ -18,6 +18,8 @@ import { isTeamIdSet } from '../engine/teamId';
 import { appendCareerEntryToPlayer, makeCareerEntry } from '../engine/careerStats';
 import { prepareOffseasonFreeAgent } from '../engine/offseasonMarket';
 import { pruneRosterReferences, releaseWaiverPlayers, waiverEligible } from '../engine/offseasonReview';
+import { resolveOffseasonFaDeclarations } from '../engine/faDeclaration';
+import { renewalEligible } from '../engine/renewalRules';
 
 let offseasonPlayerModulePromise = null;
 let offseasonScheduleModulePromise = null;
@@ -582,22 +584,24 @@ export function useOffseason(gs) {
     // Other clubs settle renewals before the user's market phase so candidates
     // are available before the user's own renewals. Never renew CPU clubs twice.
     // 自チーム満了選手の要求額を事前計算して state に保持
-    const myDeveloped=developedTeams.find(t=>t.id===myId);
-    const expiringMine=(myDeveloped?.players||[]).filter(p=>(p.contractYearsLeft??99)<=1&&!p.isRetired&&!p._retireNow);
     const awards=calcSeasonAwards(developedTeams,year);
     const currentSeasonHistory = getSeasonHistory();
-    const renewResult = cpuRenewContracts(developedTeams, myId, developedTeams, {
-      year, awards, championship: currentSeasonHistory.championships?.find(c => c.year === year),
-    });
+    const sharedSalaryContext = { year, awards, championship: currentSeasonHistory.championships?.find(c => c.year === year) };
+    const declarations = resolveOffseasonFaDeclarations(developedTeams, year, sharedSalaryContext);
+    const myDeveloped=declarations.updatedTeams.find(t=>t.id===myId);
+    const expiringMine=(myDeveloped?.players||[]).filter(p=>renewalEligible(p, year));
+    const renewResult = cpuRenewContracts(declarations.updatedTeams, myId, developedTeams, sharedSalaryContext);
     const salaryContext = { year, awards, championship: currentSeasonHistory.championships?.find(c => c.year === year), teams: developedTeams, team: myDeveloped };
     const demands={};
     for(const p of expiringMine) demands[p.id]=calcPlayerDemand(p, salaryContext);
     setContractRenewalDemands(demands);
     setTeams(renewResult.updatedTeams);
-    setFaPool(prev => [...prev, ...renewResult.newFaPlayers.map(p => {
+    const marketEntries = [...declarations.newFaPlayers, ...renewResult.newFaPlayers.map(p => {
       const origin = developedTeams.find(t => t.players.some(entry => entry.id === p.id));
       return { ...p, marketLastStats: p.stats, faEnteredYear: year, faOriginTeamId: origin?.id, faOriginTeamName: origin?.name };
-    })]);
+    })];
+    setFaPool(prev => [...prev.filter(p => !marketEntries.some(entry => entry.id === p.id)), ...marketEntries]);
+    declarations.news.forEach(n => addNews(n));
     renewResult.news.forEach(n => addNews(n));
     setDevelopmentSummary(mySummary);
     const {records:newRec,broken:brokenRecs}=updateRecords(currentSeasonHistory.records,developedTeams);

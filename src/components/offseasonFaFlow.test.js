@@ -30,6 +30,20 @@ it('opens domestic candidates despite season day 143, and confirms skipping befo
   ui.click('補強を終了して契約更改へ'); const next = ui.button('契約更改に進む').props.onClick;
   act(() => { next(); next(); }); expect(ui.props.os.handleFaPhaseNext).toHaveBeenCalledTimes(1);
 });
+it('shows own FA declaration reasons and allows a stay through the existing market contract', () => {
+  const declared = player(0, { isFA: true, marketEntryReason: '国内FA宣言', faPreviousSalary: 900,
+    faOriginTeamId: 0, faEnteredYear: 2026, faDeclarationDecision: { year: 2026, declared: true, reasons: ['出場機会を求める'] } });
+  const ui = setup({ myTeam: team(), gs: { faPool: [declared], faYears: {}, gameDay: 143,
+    setFaYears: vi.fn(), upd: vi.fn(), setFaPool: vi.fn(), notify: vi.fn() } });
+  const row = ui.view.root.findAllByType('button').find(n => n.props['aria-label'] === '選手0の条件を見る');
+  act(() => row.props.onClick());
+  expect(text(ui.view.root)).toContain('宣言残留');
+  expect(text(ui.view.root)).toContain('出場機会を求める');
+  ui.click('契約条件を確認する'); ui.click('契約を確定する');
+  expect(ui.props.gs.upd).toHaveBeenCalledOnce();
+  const updater = ui.props.gs.upd.mock.calls[0][1];
+  expect(updater(team()).players[0]).toMatchObject({ id: 0, isFA: false, contractSignedYear: 2026 });
+});
 it('compares a market candidate against own player ID 0 in the offseason screen', () => {
   const ui = setup(); ui.click('比較に追加'); ui.click('選手0を比較に追加'); ui.click('2人を比較');
   const dialog = text(ui.view.root.findByProps({ role: 'dialog' })); expect(dialog).toContain('選手0'); expect(dialog).toContain('選手1');
