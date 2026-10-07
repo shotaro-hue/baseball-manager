@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { uid, clamp, rng, rngf, fmtM } from '../utils';
 import { calcSeasonAwards, updateRecords, checkHallOfFame } from '../engine/awards';
-import { evalOffer, cpuRenewContracts, processCpuFaBids, getFaThreshold, calcPlayerDemand } from '../engine/contract';
+import { evalOffer, cpuRenewContracts, processCpuFaBids, getFaThreshold, getFaProgress, calcPlayerDemand } from '../engine/contract';
 import { initDraftPool } from '../engine/draft';
 import { calcPostingRequestProb, calcPostingBid, POSTING_FEE_RATE } from '../engine/posting';
 import { calcOffseasonPopDelta, driftPopularity } from '../engine/fanSentiment';
@@ -20,6 +20,7 @@ import { prepareOffseasonFreeAgent } from '../engine/offseasonMarket';
 import { pruneRosterReferences, releaseWaiverPlayers, waiverEligible } from '../engine/offseasonReview';
 import { resolveOffseasonFaDeclarations } from '../engine/faDeclaration';
 import { renewalEligible } from '../engine/renewalRules';
+import { planningPlayer, planningSummary } from '../engine/offseasonPlanning';
 
 let offseasonPlayerModulePromise = null;
 let offseasonScheduleModulePromise = null;
@@ -74,19 +75,25 @@ export function useOffseason(gs) {
     getGameResultsMap,
   } = gs;
 
-  const [developmentSummary, setDevelopmentSummary] = useState(null);
-  const [newSeasonInfo, setNewSeasonInfo] = useState(null);
+  const [developmentSummaryState, setDevelopmentSummary] = useState(null);
+  const developmentSummary = developmentSummaryState ?? gs.offseasonPlan?.growth;
+  const [newSeasonInfoState, setNewSeasonInfo] = useState(null);
+  const newSeasonInfo = newSeasonInfoState ?? gs.offseasonPlan?.seasonInfo;
   const [springTrainingData, setSpringTrainingData] = useState(null);
-  const [draftPool, setDraftPool] = useState(null);
+  const [draftPoolState, setDraftPool] = useState(null);
+  const draftPool = draftPoolState ?? gs.offseasonPlan?.draftPool;
   const [draftResult, setDraftResult] = useState(null);
   const [draftAllocation, setDraftAllocation] = useState({pitcher:50,batter:50});
-  const [waiverClaimResults, setWaiverClaimResults] = useState(null);
-  const [contractRenewalDemands, setContractRenewalDemands] = useState(null);
+  const [waiverClaimResultsState, setWaiverClaimResults] = useState(null);
+  const waiverClaimResults = waiverClaimResultsState ?? gs.offseasonPlan?.results;
+  const [contractRenewalDemandsState, setContractRenewalDemands] = useState(null);
+  const contractRenewalDemands = contractRenewalDemandsState ?? gs.offseasonPlan?.demands;
   const [careerPersistenceError, setCareerPersistenceError] = useState(null);
   const nextYearTransitionRef = useRef(false);
   const retireTransitionRef = useRef(false);
   const faPhaseCompletedYear = useRef(null);
   const waiverCompletedYear = useRef(null);
+  const planningActionIds = useRef(new Set());
   // { [playerId]: { demandSalary, minAcceptSalary, resistanceFactor } }
 
   // careerLogをコンパクト形式で保存（打球詳細などの不要フィールドを除外）
@@ -146,6 +153,7 @@ export function useOffseason(gs) {
     // Unsigned domestic players remain available. Archive their saved season before
     // resetting current stats, just as for rostered players; do not invent a team.
     setYear(nextYear);setGameDay(1);setFaPool([...unsignedDomestic, ...foreignPool]);setDraftAllocation({pitcher:50,batter:50});
+    gs.setOffseasonPlan?.(null);
     setAllStarDone(false);
     setAllStarResult(null);
     // 現シーズンの日程・試合結果をアーカイブに保存
@@ -617,7 +625,12 @@ export function useOffseason(gs) {
     setNewSeasonInfo({retiredNames:retiredMyNames,year:year+1,draftCount:0,draftNames:[]});
     faPhaseCompletedYear.current = null;
     waiverCompletedYear.current = null;
-    setScreen("offseason_fa_phase");
+    if (gs.setOffseasonPlan) {
+      gs.setOffseasonPlan({ version: 1, year, myId, stage: 'planning', tab: 'roster', intents: [], demands,
+        growth: mySummary && Object.fromEntries(Object.entries(mySummary).map(([key, rows]) => [key, Array.isArray(rows) ? rows.map(row => ({ ...row, p: row.p ? planningPlayer(row.p) : row.p })) : rows])),
+        seasonInfo: { retiredNames: retiredMyNames, year: year + 1, draftCount: 0, draftNames: [] }, releasedIds: [] });
+      setScreen('offseason_planning');
+    } else setScreen("offseason_fa_phase");
     return true;
     } catch (error) {
       console.error('引退フェーズ処理に失敗しました:', error);
@@ -658,7 +671,7 @@ export function useOffseason(gs) {
   };
 
   // 契約更改フェーズ完了: CPU球団の更改シミュ + 人気計算 → development_phase へ
-  const handleContractRenewalPhaseNext = (faDeclaredPlayerIds = []) => {
+  const handleContractRenewalPhaseNext = (faDeclaredPlayerIds = [], options = {}) => {
     const safeDeclaredIds = Array.isArray(faDeclaredPlayerIds)
       ? [...new Set(faDeclaredPlayerIds.filter(id => (typeof id === "string" && id.trim().length > 0) || (typeof id === "number" && Number.isFinite(id))))]
       : [];
@@ -710,23 +723,26 @@ export function useOffseason(gs) {
     });
     setTeams(teamsWithPop);
     setContractRenewalDemands(null);
+    if (options.planning) return { teams: teamsWithPop, declaredPlayers };
     setScreen("development_phase");
   };
 
   // ウェーバーフェーズ処理（戦力外確定→CPU FA獲得→ドラフトへ）
-  const handleWaiverPhaseNext = (markedIds) => {
-    if (gs.screen !== 'waiver_phase' || waiverCompletedYear.current === year) return false;
+  const handleWaiverPhaseNext = (markedIds, options = {}) => {
+    if ((!options.planning && gs.screen !== 'waiver_phase') || waiverCompletedYear.current === year || gs.offseasonPlan?.stage === 'results') return false;
+    const sourceTeams = options.teams || teams;
+    const sourceTeam = sourceTeams.find(t => t.id === myId);
     const ids = Array.isArray(markedIds) ? [...new Set(markedIds)] : [];
-    if (!Array.isArray(markedIds) || ids.some(id => !myTeam?.players.some(p => p.id === id && waiverEligible(p)))) {
+    if (!Array.isArray(markedIds) || ids.some(id => !sourceTeam?.players.some(p => p.id === id && waiverEligible(p) && p.contractSignedYear !== year))) {
       notify('放出対象が変更されています。選手を確認してください', 'warn'); return false;
     }
     waiverCompletedYear.current = year;
     const waiverReleased=[];
-    ids.forEach(pid => { const p = myTeam.players.find(x => x.id === pid); waiverReleased.push({ ...p, isFA: true, isWaiverReleased: true });
+    ids.forEach(pid => { const p = sourceTeam.players.find(x => x.id === pid); waiverReleased.push({ ...p, isFA: true, isWaiverReleased: true });
       addNews({ type: 'season', headline: `【戦力外】${p.name}選手に戦力外通告`, source: '野球速報', dateLabel: `${year}年`, body: `${p.name}選手（${p.age}歳）が戦力外通告を受けた。` }); });
-    const baseTeams = teams.map(t => t.id === myId ? releaseWaiverPlayers(t, ids, year, POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD) : t);
-    const releasedIds=new Set(waiverReleased.map(p=>p.id));
-    const combinedPool=[...faPool,...waiverReleased.map(p => ({ ...p, marketLastStats: p.stats, faEnteredYear: year, faOriginTeamId: myId, faOriginTeamName: myTeam?.name }))];
+    const baseTeams = sourceTeams.map(t => t.id === myId ? releaseWaiverPlayers(t, ids, year, POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD) : t);
+    const releasedIds=new Set([...waiverReleased.map(p=>p.id), ...(options.planning ? gs.offseasonPlan?.releasedIds || [] : [])]);
+    const combinedPool=[...(options.pool || faPool),...waiverReleased.map(p => ({ ...p, marketLastStats: p.stats, faEnteredYear: year, faOriginTeamId: myId, faOriginTeamName: myTeam?.name }))];
     const faResult=processCpuFaBids(baseTeams,myId,combinedPool,baseTeams,year,'offseason');
     setTeams(faResult.updatedTeams);
     setFaPool(faResult.remainingFaPool);
@@ -756,11 +772,60 @@ export function useOffseason(gs) {
     // 今回の戦力外通告分のみ結果表示（既存FAプールとは分離）
     const claimedNew=(faResult.claimed||[]).filter(c=>releasedIds.has(c.player.id));
     const unclaimedNew=faResult.remainingFaPool.filter(p=>releasedIds.has(p.id));
-    setWaiverClaimResults({claimed:claimedNew,unclaimed:unclaimedNew});
+    setWaiverClaimResults({claimed:claimedNew,unclaimed:unclaimedNew,allClaimed:faResult.claimed || []});
     setFaYears({});
-    setDraftPool(initDraftPool(faResult.updatedTeams.find(t => t.id === myId)));
+    const nextDraftPool = initDraftPool(faResult.updatedTeams.find(t => t.id === myId));
+    setDraftPool(nextDraftPool);
+    if (options.planning) gs.setOffseasonPlan(prev => ({ ...prev, stage: 'results',
+      results: { claimed: claimedNew.map(c => ({ ...c, player: planningPlayer(c.player) })), unclaimed: unclaimedNew.map(planningPlayer),
+        allClaimed: (faResult.claimed || []).map(c => ({ ...c, player: planningPlayer(c.player) })) }, draftPool: nextDraftPool }));
     setScreen("waiver_result");
     return true;
+  };
+
+  const handlePlanningRelease = (pid, reason = 'release') => {
+    if (gs.screen !== 'offseason_planning' || gs.offseasonPlan?.stage !== 'open' || gs.offseasonPlan.year !== year || gs.offseasonPlan.myId !== myId) return false;
+    const key = JSON.stringify([year, typeof pid, pid]);
+    const p = myTeam?.players.find(x => x.id === pid);
+    if (planningActionIds.current.has(key) || !p || !renewalEligible(p, year)) return false;
+    if (reason === 'fa' && !getFaProgress(p).domestic?.eligible) return false;
+    planningActionIds.current.add(key);
+    const declared = reason === 'fa';
+    upd(myId, t => {
+      if (!t.players.some(x => x.id === pid && renewalEligible(x, year))) return t;
+      if (!declared) {
+        const released = releaseWaiverPlayers(t, [pid], year, POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD);
+        return reason === 'salary_cut' ? { ...released, history: released.history.map(h => h.id === pid && h.exitYear === year ? { ...h, exitReason: '自由契約（減額制限超過）' } : h) } : released;
+      }
+      return { ...t, players: t.players.filter(x => x.id !== pid), ...pruneRosterReferences(t, new Set([pid])),
+        history: [...(t.history || []), { ...p, exitYear: year, exitReason: 'FA宣言', tenure: p.serviceYears ?? 1 }] };
+    });
+    setFaPool(prev => prev.some(x => x.id === pid) ? prev : [...prev, { ...p, isFA: true, contractYearsLeft: 0,
+      salary: declared ? gs.offseasonPlan.demands?.[pid]?.demandSalary ?? p.salary : p.salary,
+      ...(declared ? { faPreviousSalary: p.salary, faNegotiationReason: '契約更改で合意できなかったため' } : {}),
+      isWaiverReleased: !declared && reason !== 'salary_cut', marketEntryReason: declared ? '国内FA宣言' : '自由契約', departureReason: reason,
+      marketLastStats: p.stats, faEnteredYear: year, faOriginTeamId: myId, faOriginTeamName: myTeam?.name }]);
+    gs.setOffseasonPlan(prev => ({ ...prev, releasedIds: declared ? prev.releasedIds : [...new Set([...(prev.releasedIds || []), pid])],
+      intents: (prev.intents || []).filter(i => i.id !== pid),
+      session: prev.session && { ...prev.session, entries: prev.session.entries.map(e => e.player.id === pid
+        ? { ...e, status: declared ? 'fa' : reason === 'salary_cut' ? 'free' : 'released' } : e) } }));
+    addNews({ type: 'season', headline: `${p.name}が${declared ? 'FA宣言' : '自由契約'}`, source: '球団発表', dateLabel: `${year}年`,
+      body: declared ? `${p.name}が国内FA権を行使。市場で宣言残留も可能です。`
+        : reason === 'salary_cut' ? `${p.name}が減額制限超過に同意せず自由契約となりました。FA権の行使ではありません。` : `${p.name}を戦力外として放出しました。` });
+    return true;
+  };
+
+  const handlePlanningFinish = () => {
+    const plan = gs.offseasonPlan;
+    if (gs.screen !== 'offseason_planning' || plan?.year !== year || plan.myId !== gs.myId || plan.stage !== 'open' || waiverCompletedYear.current === year) return false;
+    const overview = planningSummary(myTeam, plan, year);
+    if (overview.pending.some(p => !overview.releaseCandidates.some(x => x.id === p.id))) {
+      notify('未合意・対応待ちの選手を確認してください', 'warn'); return false;
+    }
+    // Use the returned teams directly: do not read a stale React snapshot after
+    // the renewal completion updates state. CPU market processing runs once.
+    const completed = handleContractRenewalPhaseNext([], { planning: true });
+    return handleWaiverPhaseNext(overview.releaseCandidates.map(p => p.id), { planning: true, teams: completed.teams, pool: faPool });
   };
 
   return {
@@ -791,5 +856,7 @@ export function useOffseason(gs) {
     handleSkipRetireGame,
     handleRetirePhaseNext,
     handleWaiverPhaseNext,
+    handlePlanningRelease,
+    handlePlanningFinish,
   };
 }

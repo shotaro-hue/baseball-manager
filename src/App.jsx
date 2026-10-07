@@ -7,6 +7,7 @@ import { useSeasonFlow } from './hooks/useSeasonFlow';
 import { useOffseason } from './hooks/useOffseason';
 import AppScreenRouter from './components/AppScreenRouter';
 import HubShell from './components/hub/HubShell';
+import { planningResumeScreen } from './engine/offseasonPlanning';
 
 let appSaveModulePromise = null;
 let appScheduleModulePromise = null;
@@ -72,6 +73,7 @@ export default function App() {
     gs.setSaveId(saved.saveId);
     gs.setGameDay(saved.gameDay);
     gs.setYear(saved.year);
+    gs.setOffseasonPlan(planningResumeScreen(saved.offseasonPlan, saved.year, saved.myId) === 'hub' ? null : saved.offseasonPlan);
 
     const loadedSchedule = scheduleMod.generateSeasonSchedule(saved.year, normalizedTeams);
     gs.setSchedule(loadedSchedule);
@@ -116,7 +118,7 @@ export default function App() {
     os.setDevelopmentSummary(null);
 
     gs.setTab('dashboard');
-    gs.setScreen('hub');
+    gs.setScreen(planningResumeScreen(saved.offseasonPlan, saved.year, saved.myId));
   };
 
   const app = { gs, sf, os, handleLoad };

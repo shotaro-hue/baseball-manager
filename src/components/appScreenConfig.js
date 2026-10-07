@@ -6,6 +6,7 @@ export const DEFERRED_SCREEN_IDS = [
   'allstar',
   'retire_phase',
   'offseason_fa_phase',
+  'offseason_planning',
   'contract_renewal_phase',
   'development_phase',
   'waiver_phase',

@@ -17,12 +17,13 @@ function FinishDialog({ acquired, onClose, onConfirm }) {
   </section></div>;
 }
 
-export default function OffseasonFaPhaseScreen({ gs, os, myTeam, myId, year }) {
+export default function OffseasonFaPhaseScreen({ gs, os, myTeam, myId, year, embedded = false }) {
   const [profile, setProfile] = useState(null);
   const [compared, setCompared] = useState([]);
   const [compareOpen, setCompareOpen] = useState(false);
   const [finishOpen, setFinishOpen] = useState(false);
   const advanced = useRef(false);
+  const saveMarketView = useCallback(marketView => gs.setOffseasonPlan?.(prev => ({ ...prev, marketView })), [gs.setOffseasonPlan]);
   const initialCandidates = useRef(new Set((gs.faPool || []).filter(p => !p.isForeign).map(p => p.id)));
   const closeFinish = useCallback(() => setFinishOpen(false), []);
   const closeCompare = useCallback(() => setCompareOpen(false), []);
@@ -39,19 +40,21 @@ export default function OffseasonFaPhaseScreen({ gs, os, myTeam, myId, year }) {
     advanced.current = true;
     os.handleFaPhaseNext();
   };
-  return <main className="fa-market offseason-fa-screen">
-    <header><h1>{year}年 オフシーズン補強</h1><p>引退整理 → <strong>国内FA・自由契約補強</strong> → 契約更改 → 成長結果・戦力外・ドラフト</p>
+  const Frame = embedded ? 'section' : 'main';
+  return <Frame className="fa-market offseason-fa-screen">
+    {!embedded && <header><h1>{year}年 オフシーズン補強</h1><p>引退整理 → <strong>国内FA・自由契約補強</strong> → 契約更改 → 成長結果・戦力外・ドラフト</p>
       <p>全球団のFA宣言を判定済みです。他球団の補強候補と、自球団から宣言した選手の残留契約を確認し、その後に既存選手と契約更改します。補強せずに進むこともできます。</p>
-    </header>
+    </header>}
     <HubFaTab myTeam={myTeam} myId={myId} year={year} gameDay={gs.gameDay}
       faPool={(gs.faPool || []).filter(p => !p.isForeign)} faYears={gs.faYears} setFaYears={gs.setFaYears}
       upd={gs.upd} setFaPool={gs.setFaPool} notify={gs.notify} marketMode="offseason"
+      savedView={embedded ? gs.offseasonPlan?.marketView : undefined} onViewChange={embedded ? saveMarketView : undefined}
       onPlayerClick={(player, teamName) => setProfile({ player, teamName })} onToggleCompare={toggle} comparePlayerIds={compared.map(p => p.id)} />
     <details><summary>自チームの選手を比較に追加</summary><div className="fa-actions">{owned.map(p => <button key={p.id} aria-pressed={compared.some(entry => entry.id === p.id)} onClick={() => toggle(p, myTeam?.name)}>{p.name}を比較{compared.some(entry => entry.id === p.id) ? 'から外す' : 'に追加'}</button>)}</div></details>
-    <footer><p>補強後も既存選手の更改が残っています。予算と年俸を確認して進んでください。</p><button className="fa-primary" onClick={() => setFinishOpen(true)}>補強を終了して契約更改へ</button></footer>
+    {!embedded && <footer><p>補強後も既存選手の更改が残っています。予算と年俸を確認して進んでください。</p><button className="fa-primary" onClick={() => setFinishOpen(true)}>補強を終了して契約更改へ</button></footer>}
     <PlayerComparisonTray players={compared} onRemove={remove} onClear={() => { setCompared([]); setCompareOpen(false); }} onOpen={() => setCompareOpen(true)} />
     {compareOpen && <PlayerComparisonDialog players={compared} onRemove={remove} onClose={closeCompare} />}
     {profile && <Suspense fallback={<p role="status">選手詳細を読み込み中です。</p>}><PlayerModal player={profile.player} teamName={profile.teamName} isMyTeam={profile.teamName === myTeam?.name} saveId={gs.saveId} year={year} teams={gs.teams} onClose={() => setProfile(null)} onToggleCompare={toggle} isCompared={compared.some(p => p.id === profile.player.id)} /></Suspense>}
     {finishOpen && <FinishDialog acquired={acquired} onClose={closeFinish} onConfirm={next} />}
-  </main>;
+  </Frame>;
 }

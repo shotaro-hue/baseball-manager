@@ -153,7 +153,10 @@ export function useGameState() {
   const setSaveId  = useCallback((id) => { dispatch({ type: G.SET_SAVE_ID, saveId: ensureSaveId(id) }); }, []);
   const [tab, setTab] = useState("dashboard");
   const [faPool, setFaPool] = useState([]);
-  const [faYears, setFaYears] = useState({});
+  const [faYears, setFaYearsState] = useState({});
+  const setFaYears = useCallback(value => { setFaYearsState(value); markSaveDirty(); }, [markSaveDirty]);
+  const [offseasonPlan, setOffseasonPlanState] = useState(null);
+  const setOffseasonPlan = useCallback(value => { setOffseasonPlanState(value); markSaveDirty(); }, [markSaveDirty]);
   const [notif, setNotif] = useState(null);
   const [seasonHistory, setSeasonHistoryState] = useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[],transfers:[]});
   const [saveExists, setSaveExists] = useState(false);
@@ -516,7 +519,7 @@ export function useGameState() {
       }
       const request = beginTrackedSave();
       return queueSave(
-        {teams,myId,gameDay,year,saveId,faPool,faYears,seasonHistory,news,mailbox,saveRevision},
+        {teams,myId,gameDay,year,saveId,faPool,faYears,seasonHistory,news,mailbox,saveRevision,offseasonPlan},
         request.options,
       ).then((result) => ({ result, snapshot: request.snapshot }));
     }).then(({ result, snapshot })=>{
@@ -532,19 +535,30 @@ export function useGameState() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[screen,isAutoSaveSuspended,saveDirty,lastAutoSaveAt,saveRevision,saveQueueState.isSaving]);
 
-  const handleSave = useCallback(async ()=>{
+  const handleSave = useCallback(async (options = {})=>{
+    if (offseasonPlan && !['offseason_planning', 'waiver_result'].includes(screen)) {
+      if (!options.silent) notify('ドラフト以降の途中保存は対象外です。編成終了時の保存から再開できます', 'warn');
+      return { ok: false, unsupportedPhase: true };
+    }
     const request = beginTrackedSave();
     const result=await queueSave(
-      {teams,myId,gameDay,year,saveId,faPool,faYears,seasonHistory,news,mailbox,saveRevision},
+      {teams,myId,gameDay,year,saveId,faPool,faYears,seasonHistory,news,mailbox,saveRevision,offseasonPlan},
       request.options,
     );
     if(result.ok){
       setSaveExists(true);
       completeTrackedSave(request.snapshot);
     }
-    notify(result.ok?'💾 セーブしました':result.quota?'💾 ストレージ容量が不足しています':'セーブに失敗しました',result.ok?'ok':'warn');
+    if (!options.silent || !result.ok) notify(result.ok?'💾 セーブしました':result.quota?'💾 ストレージ容量が不足しています':'セーブに失敗しました',result.ok?'ok':'warn');
+    return result;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision,notify,queueSave,beginTrackedSave,completeTrackedSave]);
+  },[teams,myId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision,offseasonPlan,screen,notify,queueSave,beginTrackedSave,completeTrackedSave]);
+
+  useEffect(() => {
+    if (!offseasonPlan || !['offseason_planning', 'waiver_result'].includes(screen) || !saveDirty || isAutoSaveSuspended) return;
+    const timer = setTimeout(() => { handleSave({ silent: true }).catch(() => notify('編成内容の保存に失敗しました。保存ボタンで再試行してください', 'warn')); }, 750);
+    return () => clearTimeout(timer);
+  }, [offseasonPlan, screen, saveDirty, isAutoSaveSuspended, handleSave, notify]);
 
   const ensureInitialTeams = useCallback(async () => {
     if (teams.length === TEAM_DEFS.length) return teams;
@@ -572,6 +586,7 @@ export function useGameState() {
       ]);
       setFaPool(playerMod.generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX)));
       setSaveId(createSaveId());
+      setOffseasonPlan(null);
       setMyId(id);
       const newSchedule = scheduleMod.generateSeasonSchedule(year,nextTeams);
       setSchedule(newSchedule);
@@ -951,6 +966,7 @@ export function useGameState() {
     year, setYear,
     faPool, setFaPool,
     faYears, setFaYears,
+    offseasonPlan, setOffseasonPlan,
     notif,
     seasonHistory, setSeasonHistory,
     saveExists, setSaveExists,
@@ -968,6 +984,7 @@ export function useGameState() {
     allStarTriggerDay, setAllStarTriggerDay,
     isAutoSaveSuspended, setIsAutoSaveSuspended,
     saveDirty, setSaveDirty,
+    saveQueueState,
     saveRevision, setSaveRevision,
     persistentSummaries,
     newGameInitializationError,
