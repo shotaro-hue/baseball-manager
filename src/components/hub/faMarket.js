@@ -28,6 +28,7 @@ export function marketNeeds(team) {
 }
 
 export function marketPlacement(team, player) {
+  if (player.育成) return { farm: true, reason: '育成契約のためファーム所属' };
   const active = team?.players || [];
   if (active.length >= MAX_ROSTER) return { farm: true, reason: '登録枠が満員' };
   if (player.isForeign) {
@@ -42,6 +43,7 @@ export function validateMarketContract({ team, pool, player, salary, years, game
   if (!pool.some(p => p.id === player.id)) return 'この選手は現在の市場にいません';
   if (player.isForeign && (!Number.isFinite(gameDay) || gameDay > FOREIGN_DEADLINE_DAY)) return '外国人補強の期限を過ぎているか、日程が未記録です';
   if (!Number.isFinite(salary) || salary <= 0 || !Number.isInteger(years) || years < 1 || years > 3) return '契約金額または年数を確認してください';
+  if (player.育成 && player.departureReason !== 'ikusei_expiry' && years > Math.max(1, 3 - (player.ikuseiYears || 0))) return '育成3年満了までに収まる契約年数を選んでください';
   if (!Number.isFinite(team?.budget)) return '予算が未記録のため契約できません';
   if (team.budget < salary * years) return '予算が不足しています';
   return null;
@@ -50,7 +52,8 @@ export function validateMarketContract({ team, pool, player, salary, years, game
 export function addMarketSigning(team, player, salary, years, year, marketMode = 'season') {
   const placement = marketPlacement(team, player);
   const prepared = marketMode === 'offseason' ? prepareOffseasonFreeAgent(player, year, team.id) : player;
-  const signed = { ...prepared, isFA: false, salary, contractYears: years, contractYearsLeft: years, contractSignedYear: year };
+  const signed = { ...prepared, isFA: false, salary, contractYears: years, contractYearsLeft: years, contractSignedYear: year,
+    ...(player.育成 && player.departureReason === 'ikusei_expiry' ? { ikuseiYears: 0 } : {}) };
   return { ...team, budget: team.budget - salary * years,
     players: placement.farm ? team.players : [...team.players, signed],
     farm: placement.farm ? [...(team.farm || []), signed] : team.farm || [],

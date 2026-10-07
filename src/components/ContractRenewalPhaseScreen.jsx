@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { CPU_RENEWAL_ROUNDS, NEGOTIATION_MORALE_ACCEPT_BONUS, NEGOTIATION_MORALE_CUT_PENALTY, NEGOTIATION_MORALE_ROUND_HIT, NEGOTIATION_TRUST_HAPPY, NEGOTIATION_TRUST_HOLDOUT } from '../constants';
-import { evaluateRenewalOffer, getFaThreshold, getFaProgress } from '../engine/contract';
-import { salaryCutRule, renewalEligible } from '../engine/renewalRules';
+import { evaluateRenewalOffer, getFaThreshold, getFaProgress, calcPlayerDemand } from '../engine/contract';
+import { salaryCutRule, renewalEligible, ikuseiContractYears } from '../engine/renewalRules';
 import { compactRenewalSession, reconcileRenewalSession } from '../engine/offseasonPlanning';
 import { fmtSal, fmtIP, clamp } from '../utils';
 import { useResultDialog } from './useResultDialog';
@@ -16,6 +16,7 @@ const stat = value => Number.isFinite(value) ? value : '未記録';
 const total = values => values.every(Number.isFinite) ? values.reduce((sum, value) => sum + value, 0) : null;
 const draftAmount = e => e.salary.trim() === '' ? NaN : Math.round(Number(e.salary));
 function faLabel(player, overseas = false) {
+  if (player.育成) return '育成契約中・FA対象外';
   const progress = getFaProgress(player);
   if (!progress.recorded) return '登録日数未記録';
   const p = overseas ? progress.overseas : progress.domestic;
@@ -33,14 +34,23 @@ const abilityNames = { velocity: '球速', control: '制球', stamina: 'スタ�
 
 function createSession(team, demands, renewalPlayerIds, year) {
   if (!team) return null;
-  const eligible = p => renewalEligible(p, year) && (renewalPlayerIds == null || renewalPlayerIds.some(id => String(id) === String(p.id)));
+  const farmIds = new Set((team.farm || []).map(p => p.id));
+  const eligible = p => renewalEligible(p, year) && (farmIds.has(p.id) || renewalPlayerIds == null || renewalPlayerIds.some(id => String(id) === String(p.id)));
   return {
     baseline: total([...team.players, ...(team.farm || [])].map(p => p.salary)),
-    others: [...team.players.filter(p => !eligible(p)), ...(team.farm || [])].map(p => p.salary),
-    entries: team.players.filter(eligible).map(player => ({
-      player: { ...player }, demand: demands?.[player.id] || {}, status: 'pending', salary: String(demands?.[player.id]?.demandSalary ?? player.salary ?? ''), years: 1, round: 0, retries: 0, logs: [],
-    })),
+    others: [...team.players, ...(team.farm || [])].filter(p => !eligible(p)).map(p => p.salary),
+    entries: [...team.players, ...(team.farm || [])].filter(eligible).map(player => {
+      const demand = demands?.[player.id] || calcPlayerDemand(player, { team, year });
+      return { player: { ...player }, demand, status: 'pending', salary: String(demand.demandSalary ?? player.salary ?? ''), years: 1, round: 0, retries: 0, logs: [] };
+    }),
   };
+}
+
+function includeMissingFarmEntries(session, team, demands, ids, year) {
+  if (!session || !team) return session;
+  const fresh = createSession(team, demands, ids, year);
+  const entries = [...session.entries, ...fresh.entries.filter(e => !session.entries.some(old => old.player.id === e.player.id))];
+  return { ...session, entries, others: [...team.players, ...(team.farm || [])].filter(p => !entries.some(e => e.player.id === p.id)).map(p => p.salary) };
 }
 
 function Confirmation({ title, children, onClose, onConfirm, confirmLabel }) {
@@ -54,7 +64,7 @@ function Confirmation({ title, children, onClose, onConfirm, confirmLabel }) {
 export function ContractRenewalPhaseScreen({ teams, myId, year, demands, renewalPlayerIds, onSign, onRelease, onNext,
   embedded = false, savedSession, onSessionChange, savedView, onViewChange, onDeclare }) {
   const myTeam = teams?.find(t => t.id === myId);
-  const [session, setSession] = useState(() => savedSession || createSession(myTeam, demands, renewalPlayerIds, year));
+  const [session, setSession] = useState(() => includeMissingFarmEntries(savedSession || createSession(myTeam, demands, renewalPlayerIds, year), myTeam, demands, renewalPlayerIds, year));
   const sessionRef = useRef(session);
   const [selectedId, setSelectedId] = useState(savedView?.selectedId ?? null);
   const [filter, setFilter] = useState(savedView?.filter ?? 'all');
@@ -78,7 +88,7 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, renewal
   useEffect(() => {
     if (!embedded || !sessionRef.current) return;
     const current = sessionRef.current;
-    const next = reconcileRenewalSession(current, myTeam, year, savedSession);
+    const next = includeMissingFarmEntries(reconcileRenewalSession(current, myTeam, year, savedSession), myTeam, demands, renewalPlayerIds, year);
     if (JSON.stringify(next) !== JSON.stringify(current)) { sessionRef.current = next; setSession(next); }
   }, [embedded, myTeam, year, savedSession]);
   useEffect(() => {
@@ -115,8 +125,9 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, renewal
   // Both individual and batch offers execute exactly this one-round path.
   const offerOne = entry => {
     if (!entry || entry.status !== 'pending' || advanced.current) return;
-    const p = myTeam?.players.find(p => p.id === entry.player.id) || entry.player;
-    if (embedded && (!myTeam?.players.some(p => p.id === entry.player.id) || p.contractSignedYear === year)) return;
+    const owned = [...(myTeam?.players || []), ...(myTeam?.farm || [])];
+    const p = owned.find(p => p.id === entry.player.id) || entry.player;
+    if (embedded && (!owned.some(p => p.id === entry.player.id) || p.contractSignedYear === year)) return;
     const salary = draftAmount(entry);
     const years = Number(entry.years);
     const demand = { demandSalary: p.salary, minAcceptSalary: Math.round(p.salary * .6), resistanceFactor: .5, ...entry.demand };
@@ -131,7 +142,7 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, renewal
     } else if (result.freeAgencyRequested) {
       update(p.id, { status: 'free_requested', round, logs: [...logs, `選手：${result.reason}`] });
     } else if (round >= CPU_RENEWAL_ROUNDS) {
-      const isFA = (p.daysOnActiveRoster ?? (p.serviceYears ?? 0) * 120) >= getFaThreshold(p).domestic;
+      const isFA = !p.育成 && (p.daysOnActiveRoster ?? (p.serviceYears ?? 0) * 120) >= getFaThreshold(p).domestic;
       update(p.id, { status: isFA ? 'fa' : 'cooldown', round, logs: [...logs, isFA ? '選手：FA権を行使します。' : '選手：今回は合意できません。一度持ち帰り、再交渉します。'] });
       if (isFA) onDeclare?.(p.id);
     } else {
@@ -196,14 +207,14 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, renewal
           <button disabled={!batchEntries.length || !Number.isFinite(Number(batchPercent)) || Number(batchPercent) <= 0} onClick={() => {
             for (const e of batchEntries) {
               const base = batchBase === 'demand' ? e.demand.demandSalary : e.player.salary;
-              update(e.player.id, { salary: Number.isFinite(base) ? String(Math.round(base * Number(batchPercent) / 100)) : '', years: batchYears });
+              update(e.player.id, { salary: Number.isFinite(base) ? String(Math.round(base * Number(batchPercent) / 100)) : '', years: e.player.育成 ? Math.min(batchYears, ikuseiContractYears(e.player)) : batchYears });
             }
           }}>選択した選手の下書きに適用</button><p>{batchEntries.length}人を選択中。金額の変更は下書きへの適用だけでは送信されません。</p>
           <button className="renewal-primary" disabled={!batchEntries.length} onClick={() => setModal({ type: 'batch', drafts: batchEntries.map(e => ({ ...e })) })}>選択した選手の提示内容を確認</button>
         </div>}
         <div className="renewal-filters">{[['all', '全員'], ['pending', '未合意'], ['done', '完了']].map(([value, label]) => <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}</button>)}</div>
         {visible.map(e => <div className="renewal-list-item" key={e.player.id}>{batchMode && <label className="renewal-pick"><input type="checkbox" aria-label={`${e.player.name}をまとめて提示の対象にする`} disabled={e.status !== 'pending'} checked={batchIds.includes(e.player.id) && e.status === 'pending'} onChange={event => setBatchIds(ids => event.target.checked ? [...new Set([...ids, e.player.id])] : ids.filter(id => id !== e.player.id))} /></label>}<button className="renewal-row" ref={node => { if (node) rows.current.set(e.player.id, node); else rows.current.delete(e.player.id); }} aria-label={`${e.player.name}の契約更改`} aria-pressed={selectedId === e.player.id} onClick={() => select(e.player.id)}>
-          <span><strong>{e.player.name}</strong><small>{e.player.pos} · {e.player.age}歳</small></span><span className={`renewal-status renewal-${e.status}`}>{labels[e.status]}</span>
+          <span><strong>{e.player.name}</strong><small>{e.player.pos} · {e.player.age}歳 · {e.player.育成 ? '育成' : myTeam.farm?.some(p => p.id === e.player.id) ? '二軍' : '一軍'}</small></span><span className={`renewal-status renewal-${e.status}`}>{labels[e.status]}</span>
           <span className="renewal-row-money">前年 {money(e.player.salary)} → {e.terms ? `合意 ${money(e.terms.salary)}・${e.terms.years}年` : `要求 ${money(e.demand.demandSalary)}`}</span>
           <span className="renewal-row-money">国内FA：{faLabel(e.player)}</span>
         </button></div>)}
@@ -219,7 +230,7 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, renewal
             <p>減額制限：{cut.recorded ? `${Math.round(cut.rate * 100)}%（制限内の年俸 ${money(cut.boundary)}以上）` : '前年年俸未記録'}</p><p className="renewal-note">制限を超える提示も可能ですが、選手の同意が必要です。最低年俸保障は契約成立時に適用します。</p>
             <details><summary>要求年俸の理由</summary><ul>{(selected.demand.assessment?.reasons || []).map((r, i) => <li key={i}>{r.label}{r.bonus != null ? `（${r.bonus >= 0 ? '+' : ''}${Math.round(r.bonus * 100)}%）` : ''}</li>)}</ul>{!selected.demand.assessment?.reasons?.length && <p>査定の詳細は未記録です。</p>}{selected.demand.assessment?.roleSource && <p>投手の分類：{selected.demand.assessment.roleSource}</p>}<p>合意判定の下限：{money(selected.demand.minAcceptSalary)}。下限以上でも、条件によって不合意になる場合があります。</p><p>タイトル加点は最大25%、チーム加点は最大5%。実際の合意額は契約条件によって変わります。</p></details>
             {selected.terms && <p className="renewal-status renewal-signed">合意条件：{money(selected.terms.salary)}・{selected.terms.years}年</p>}
-            {selected.status === 'pending' && <><div className="renewal-fields"><label>提示年俸（万円）<input type="number" inputMode="numeric" step="1" value={selected.salary} onChange={event => update(selectedId, { salary: event.target.value })} /></label><label>契約年数<select value={selected.years} onChange={event => update(selectedId, { years: Number(event.target.value) })}>{[1, 2, 3].map(n => <option key={n} value={n}>{n}年</option>)}</select></label></div>
+            {selected.status === 'pending' && <><div className="renewal-fields"><label>提示年俸（万円）<input type="number" inputMode="numeric" step="1" value={selected.salary} onChange={event => update(selectedId, { salary: event.target.value })} /></label><label>契約年数<select value={selected.years} onChange={event => update(selectedId, { years: Number(event.target.value) })}>{[1, 2, 3].filter(n => !selected.player.育成 || n <= ikuseiContractYears(selected.player)).map(n => <option key={n} value={n}>{n}年</option>)}</select></label></div>
               <p>前年との差額：{Number.isFinite(Number(selected.salary)) && selected.salary.trim() !== '' && Number.isFinite(selected.player.salary) ? money(Number(selected.salary) - selected.player.salary) : '未記録'} · 今回の交渉 {selected.round}/{CPU_RENEWAL_ROUNDS}回</p>
               <button className="renewal-primary" onClick={() => cut.exceeds ? setModal({ type: 'cut', id: selectedId, salary: selected.salary, years: selected.years }) : embedded ? setModal({ type: 'offer', id: selectedId }) : offer()}>オファーを出す</button><p className="renewal-note">不合意が{CPU_RENEWAL_ROUNDS}回続くと、FA権のある選手は宣言し、その他の選手は再交渉待ちになります。減額制限超過への不同意は、回数・FA資格に関係なく別途対応が必要です。</p></>}
             {selected.status === 'free_requested' && <><p>選手は減額制限超過に同意していません。制限内の条件を再提示するか、自由契約の手続きへ進んでください。</p><button onClick={() => update(selectedId, { status: 'pending', round: 0, salary: String(Math.ceil(cut.boundary)), retries: selected.retries + 1, logs: [...selected.logs, '減額制限内で交渉を再開しました。'] })}>減額制限内で再提示する</button><button className="renewal-danger" onClick={() => setModal({ type: 'free', id: selectedId })}>自由契約の手続きへ</button></>}

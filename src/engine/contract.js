@@ -13,7 +13,7 @@ import {
 } from '../constants';
 import { analyzeTeamNeeds, getFrontOfficePlanPublic } from './trade';
 import { calculateSalaryDemand, renewalSalaryFloor } from './salaryDemand';
-import { salaryCutRule, renewalEligible } from './renewalRules';
+import { salaryCutRule, renewalEligible, ownedPlayers, ikuseiContractYears } from './renewalRules';
 import { pruneRosterReferences } from './offseasonReview';
 import { prepareOffseasonFreeAgent } from './offseasonMarket';
 
@@ -66,6 +66,7 @@ export function evaluateRenewalOffer(player, offer, team, teams, demand, round =
   const years = Number(offer.years);
   const valid = offer.salary !== '' && Number.isFinite(salary) && salary > 0 && Number.isInteger(years) && years >= 1 && years <= 7;
   if (!valid) return { accepted: false, valid: false, score: null, reason: '年俸は正の金額、契約年数は1〜7年で入力してください' };
+  if (player.育成 && years > ikuseiContractYears(player)) return { accepted: false, valid: false, score: null, reason: '育成3年満了までに収まる契約年数を選んでください' };
   const minimum = player.育成 ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA;
   const cut = salaryCutRule(player, salary);
   const defaults = { money:50, winning:50, playing:50, hometown:30, loyalty:50, stability:50, future:50 };
@@ -89,7 +90,7 @@ export function simulateNegotiationRounds(player, team, allTeams, demandSalary, 
   const demand = { ...demandDetails, demandSalary, resistanceFactor, minOfferSalary: minAllowed };
   const threshold = getFaThreshold(player);
   const days      = player.daysOnActiveRoster ?? (player.serviceYears ?? 0) * ACTIVE_ROSTER_FA_DAYS_PER_YEAR;
-  const isFA      = days >= threshold.domestic;
+  const isFA      = !player.育成 && days >= threshold.domestic;
 
   let budget      = team.budget;
   let moraleDelta = 0;
@@ -117,7 +118,7 @@ export function simulateNegotiationRounds(player, team, allTeams, demandSalary, 
       if (offered < player.salary * 0.90) moraleDelta += NEGOTIATION_MORALE_CUT_PENALTY;
       if (round > 1)                      moraleDelta += NEGOTIATION_MORALE_ROUND_HIT * (round - 1);
       trustDelta = round === 1 ? NEGOTIATION_TRUST_HAPPY : NEGOTIATION_TRUST_HOLDOUT;
-      const years = player.age <= 28 ? rng(1, 2) : 1;
+      const years = Math.min(player.age <= 28 ? rng(1, 2) : 1, player.育成 ? ikuseiContractYears(player) : 7);
       return { result: 'signed', finalSalary: offered, years, rounds: round, moraleDelta, trustDelta };
     }
   }
@@ -205,8 +206,9 @@ export function cpuRenewContracts(teams, myId, allTeams, salaryContext = {}) {
   for (const t of teams) {
     if (t.id === myId) { updatedTeams.push(t); continue; }
 
-    const expiring = t.players.filter(p => renewalEligible(p, salaryContext.year));
-    let players = [...t.players];
+    const expiring = ownedPlayers(t).filter(p => renewalEligible(p, salaryContext.year));
+    const farmIds = new Set((t.farm || []).map(p => p.id));
+    let players = ownedPlayers(t);
     let budget = t.budget;
 
     for (const p of expiring) {
@@ -215,7 +217,7 @@ export function cpuRenewContracts(teams, myId, allTeams, salaryContext = {}) {
       const overseas = p.personality?.overseas || 0;
 
       // 海外志向かつ海外FA資格あり: NPB離脱（変更なし）
-      if (overseas >= 70 && days >= threshold.overseas) {
+      if (!p.育成 && overseas >= 70 && days >= threshold.overseas) {
         players = players.filter(x => x.id !== p.id);
         news.push({
           type: 'season',
@@ -228,8 +230,8 @@ export function cpuRenewContracts(teams, myId, allTeams, salaryContext = {}) {
       }
 
       // 海外志向かつ国内FA資格はあるが海外FA資格なし: 国内FAをスキップして待機（変更なし）
-      if (overseas >= 70 && days < threshold.overseas) {
-        const salary = Math.max(MIN_SALARY_SHIHAKA, Math.round(p.salary * 1.03));
+      if (!p.育成 && overseas >= 70 && days < threshold.overseas) {
+        const salary = Math.max(p.育成 ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA, Math.round(p.salary * 1.03));
         if (budget >= salary) {
           players = players.map(x => x.id === p.id
             ? { ...x, salary, contractYears: 1, contractYearsLeft: 1, contractSignedYear: salaryContext.year }
@@ -281,8 +283,8 @@ export function cpuRenewContracts(teams, myId, allTeams, salaryContext = {}) {
       }
     }
 
-    const removed = new Set(t.players.filter(p => !players.some(x => x.id === p.id)).map(p => p.id));
-    updatedTeams.push({ ...t, players, budget, ...pruneRosterReferences(t, removed) });
+    const removed = new Set(ownedPlayers(t).filter(p => !players.some(x => x.id === p.id)).map(p => p.id));
+    updatedTeams.push({ ...t, players: players.filter(p => !farmIds.has(p.id)), farm: players.filter(p => farmIds.has(p.id)), budget, ...pruneRosterReferences(t, removed) });
   }
 
   return { updatedTeams, newFaPlayers, news };
@@ -336,18 +338,17 @@ export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = nu
     for (const origTeam of cpuTeams) {
       const team = teamMap.get(origTeam.id);
       if (!team) continue;
-      if (team.players.length >= MAX_ROSTER) continue;
 
       const reserve = team.budget * CPU_FA_BUDGET_RESERVE_RATIO;
-      if (team.budget - reserve < MIN_SALARY_SHIHAKA) continue;
+      if (team.budget - reserve < MIN_SALARY_IKUSEI) continue;
 
       const needs = analyzeTeamNeeds(team);
       const plan = getFrontOfficePlanPublic(team);
       const foMode = plan.mode;
       const candidates = remainingPool
-        .filter((p) => !signedPlayers.has(p.id))
+        .filter((p) => !signedPlayers.has(p.id) && (team.players.length < MAX_ROSTER || p.育成))
         .map((p) => {
-          const salary = Math.max(MIN_SALARY_SHIHAKA, p.salary);
+          const salary = Math.max(p.育成 ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA, p.salary);
           if (team.budget - reserve < salary) return null;
           const r = evalOffer(p, { salary, years: 1 }, team, allTeams);
           const needBonus = calcNeedMatch(p, needs);
@@ -377,10 +378,11 @@ export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = nu
       const wouldBeAllBatters = !player.isPitcher && foreignBatters === MAX_外国人_一軍 - 1;
       const balanceViolation =
         foreignActiveOnTeam === MAX_外国人_一軍 - 1 && (wouldBeAllPitchers || wouldBeAllBatters);
-      const goToFarm = player.isForeign && (foreignActiveOnTeam >= MAX_外国人_一軍 || balanceViolation);
+      const goToFarm = player.育成 || (player.isForeign && (foreignActiveOnTeam >= MAX_外国人_一軍 || balanceViolation));
 
       const prepared = marketMode === 'offseason' ? prepareOffseasonFreeAgent(player, currentYear, team.id) : player;
-      const newPlayerEntry = { ...prepared, isFA: false, contractYears: 1, contractYearsLeft: 1, contractSignedYear: currentYear, salary: best.salary };
+      const newPlayerEntry = { ...prepared, isFA: false, contractYears: 1, contractYearsLeft: 1, contractSignedYear: currentYear, salary: best.salary,
+        ...(player.育成 && player.departureReason === 'ikusei_expiry' ? { ikuseiYears: 0 } : {}) };
       const acquireReason = player.isForeign ? '外国人獲得' : (player.isWaiverReleased ? '戦力外獲得' : 'FA獲得');
       const historyRecord = { ...newPlayerEntry, exitYear: currentYear ?? 0, exitReason: acquireReason, tenure: 0 };
 

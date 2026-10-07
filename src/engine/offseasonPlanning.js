@@ -1,4 +1,4 @@
-import { renewalEligible } from './renewalRules';
+import { renewalEligible, ownedPlayers } from './renewalRules';
 import { marketNeeds } from '../components/hub/faMarket';
 import { OFFSEASON_SAVE_SCREENS } from './offseasonResume';
 
@@ -16,7 +16,7 @@ export function compactRenewalSession(session) {
 export function reconcileRenewalSession(session, team, year, previous) {
   if (!session) return session;
   return { ...session, entries: session.entries.map(e => {
-    const live = team?.players?.find(p => p.id === e.player.id);
+    const live = ownedPlayers(team).find(p => p.id === e.player.id);
     if (live?.contractSignedYear === year) return { ...e, status: 'signed', terms: { salary: live.salary, years: live.contractYears } };
     const prior = previous?.entries.find(p => p.player.id === e.player.id);
     if (!live && !renewalFinished(e.status)) return { ...e, status: renewalFinished(prior?.status) ? prior.status : 'released' };
@@ -27,8 +27,8 @@ export function planningSummary(team, plan, year) {
   const owned = [...(team?.players || []), ...(team?.farm || [])];
   const entries = plan?.session?.entries || [];
   const intents = plan?.intents || [];
-  const pending = (team?.players || []).filter(p => renewalEligible(p, year) && !renewalFinished(entries.find(e => e.player.id === p.id)?.status));
-  const releaseCandidates = (team?.players || []).filter(p => renewalEligible(p, year) && intents.some(i => i.id === p.id && i.value === 'release'));
+  const pending = owned.filter(p => renewalEligible(p, year) && !renewalFinished(entries.find(e => e.player.id === p.id)?.status));
+  const releaseCandidates = owned.filter(p => renewalEligible(p, year) && intents.some(i => i.id === p.id && i.value === 'release'));
   const kept = owned.filter(p => !releaseCandidates.some(x => x.id === p.id));
   const salary = p => p.contractSignedYear === year ? p.salary : entries.find(e => e.player.id === p.id)?.terms?.salary ?? p.salary;
   return { owned: owned.length, active: team?.players?.length ?? 0, farm: team?.farm?.length ?? 0,

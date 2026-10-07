@@ -1,5 +1,5 @@
 import { calcPlayerDemand, getFaProgress } from './contract';
-import { renewalEligible } from './renewalRules';
+import { renewalEligible, ownedPlayers } from './renewalRules';
 import { pruneRosterReferences } from './offseasonReview';
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
@@ -59,7 +59,8 @@ export function resolveOffseasonFaDeclarations(teams, year, salaryContext = {}) 
   const newFaPlayers = []; const news = [];
   const updatedTeams = teams.map(team => {
     const removed = new Set();
-    const players = team.players.map(player => {
+    const farmIds = new Set((team.farm || []).map(p => p.id));
+    const players = ownedPlayers(team).map(player => {
       if (!renewalEligible(player, year)) return player;
       const demand = calcPlayerDemand(player, { ...salaryContext, year, team, teams });
       const decision = assessFaDeclaration(player, team, year, demand);
@@ -69,14 +70,14 @@ export function resolveOffseasonFaDeclarations(teams, year, salaryContext = {}) 
       removed.add(player.id);
       newFaPlayers.push({ ...updated, salary: demand.demandSalary, faPreviousSalary: player.salary,
         isFA: true, contractYearsLeft: 0, marketEntryReason: '国内FA宣言', marketLastStats: player.stats,
-        faEnteredYear: year, faOriginTeamId: team.id, faOriginTeamName: team.name });
+        faEnteredYear: year, faOriginTeamId: team.id, faOriginTeamName: team.name, faOriginRoster: farmIds.has(player.id) ? 'farm' : 'active' });
       news.push({ type: 'season', headline: `【FA】${player.name}（${team.name}）が国内FA宣言`,
         source: '野球速報', dateLabel: `${year}年`,
         body: `${player.name}選手が国内FA権を行使。${decision.reasons.join('・')}。宣言残留も可能です。` });
       return updated;
     }).filter(p => !removed.has(p.id));
-    return { ...team, players, ...pruneRosterReferences(team, removed),
-      history: [...(team.history || []), ...team.players.filter(p => removed.has(p.id)).map(p => ({
+    return { ...team, players: players.filter(p => !farmIds.has(p.id)), farm: players.filter(p => farmIds.has(p.id)), ...pruneRosterReferences(team, removed),
+      history: [...(team.history || []), ...ownedPlayers(team).filter(p => removed.has(p.id)).map(p => ({
         ...p, exitYear: year, exitReason: 'FA宣言', tenure: p.serviceYears ?? 1,
       }))] };
   });
