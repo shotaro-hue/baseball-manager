@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { uid, clamp, rng, rngf, fmtM } from '../utils';
 import { calcSeasonAwards, updateRecords, checkHallOfFame } from '../engine/awards';
 import { evalOffer, cpuRenewContracts, processCpuFaBids, getFaThreshold, getFaProgress, calcPlayerDemand } from '../engine/contract';
@@ -21,6 +21,7 @@ import { pruneRosterReferences, releaseWaiverPlayers, waiverEligible } from '../
 import { resolveOffseasonFaDeclarations } from '../engine/faDeclaration';
 import { renewalEligible } from '../engine/renewalRules';
 import { planningPlayer, planningSummary } from '../engine/offseasonPlanning';
+import { draftPicksForTeam } from '../engine/offseasonResume';
 
 let offseasonPlayerModulePromise = null;
 let offseasonScheduleModulePromise = null;
@@ -79,11 +80,20 @@ export function useOffseason(gs) {
   const developmentSummary = developmentSummaryState ?? gs.offseasonPlan?.growth;
   const [newSeasonInfoState, setNewSeasonInfo] = useState(null);
   const newSeasonInfo = newSeasonInfoState ?? gs.offseasonPlan?.seasonInfo;
-  const [springTrainingData, setSpringTrainingData] = useState(null);
-  const [draftPoolState, setDraftPool] = useState(null);
+  const [springTrainingState, setSpringTrainingData] = useState(null);
+  const springTrainingData = springTrainingState ?? gs.offseasonPlan?.spring;
+  const [draftPoolState, setDraftPoolState] = useState(null);
   const draftPool = draftPoolState ?? gs.offseasonPlan?.draftPool;
-  const [draftResult, setDraftResult] = useState(null);
-  const [draftAllocation, setDraftAllocation] = useState({pitcher:50,batter:50});
+  const setDraftPool = value => { const next = typeof value === 'function' ? value(draftPool) : value;
+    setDraftPoolState(next); gs.setOffseasonPlan?.(prev => prev && ({ ...prev, draftPool: next })); };
+  const [draftResultState, setDraftResultState] = useState(null);
+  const draftResult = draftResultState ?? gs.offseasonPlan?.draftResult;
+  const setDraftResult = value => { setDraftResultState(value); gs.setOffseasonPlan?.(prev => prev && ({ ...prev, draftResult: value })); };
+  const [draftAllocationState, setDraftAllocationState] = useState(null);
+  const draftAllocation = draftAllocationState ?? gs.offseasonPlan?.draftAllocation ?? {pitcher:50,batter:50};
+  const setDraftAllocation = value => { setDraftAllocationState(value); gs.setOffseasonPlan?.(prev => prev && ({ ...prev, draftAllocation: value })); };
+  const saveDraftView = useCallback((key, value) => gs.setOffseasonPlan?.(prev => prev && ({ ...prev,
+    draftViews: { ...prev.draftViews, [key]: value } })), [gs.setOffseasonPlan]);
   const [waiverClaimResultsState, setWaiverClaimResults] = useState(null);
   const waiverClaimResults = waiverClaimResultsState ?? gs.offseasonPlan?.results;
   const [contractRenewalDemandsState, setContractRenewalDemands] = useState(null);
@@ -94,6 +104,15 @@ export function useOffseason(gs) {
   const faPhaseCompletedYear = useRef(null);
   const waiverCompletedYear = useRef(null);
   const planningActionIds = useRef(new Set());
+  const draftAppliedRef = useRef(null);
+  const resetTransientOffseason = () => {
+    setDevelopmentSummary(null); setNewSeasonInfo(null); setSpringTrainingData(null);
+    setDraftPoolState(null); setDraftResultState(null); setDraftAllocationState(null);
+    setWaiverClaimResults(null); setContractRenewalDemands(null); setCareerPersistenceError(null);
+    draftAppliedRef.current = null; nextYearTransitionRef.current = false;
+    retireTransitionRef.current = false; faPhaseCompletedYear.current = null; waiverCompletedYear.current = null;
+    planningActionIds.current.clear();
+  };
   // { [playerId]: { demandSalary, minAcceptSalary, resistanceFactor } }
 
   // careerLogをコンパクト形式で保存（打球詳細などの不要フィールドを除外）
@@ -109,7 +128,9 @@ export function useOffseason(gs) {
 
   const handleNextYear = async (sourceTeams = teams) => {
     if (nextYearTransitionRef.current) return false;
+    if (gs.offseasonPlan && gs.screen !== 'spring_training') return false;
     nextYearTransitionRef.current = true;
+    gs.setIsAutoSaveSuspended?.(true);
     setCareerPersistenceError(null);
     try {
     const [playerMod, scheduleMod, saveMod] = await Promise.all([
@@ -123,8 +144,10 @@ export function useOffseason(gs) {
     const nextTeams = (Array.isArray(sourceTeams) ? sourceTeams : teams).map(t=>{
       const nextPlayers=t.players.filter(p=>!p._retireNow).map(p=>{
         const entry = mkCareerEntry(p.stats,p.playoffStats,year,t.id,t.name);
-        indexedDbEntries.push({ playerId: String(p.id || ''), careerEntry: entry });
-        const compactPlayer = appendCareerEntryWithSummary(p, entry);
+        const transferredThisWinter = p.faArchivedYear === year && p.contractSignedYear === year
+          && isTeamIdSet(p.faOriginTeamId) && p.faOriginTeamId !== t.id;
+        if (!transferredThisWinter) indexedDbEntries.push({ playerId: String(p.id ?? ''), careerEntry: entry });
+        const compactPlayer = transferredThisWinter ? p : appendCareerEntryWithSummary(p, entry);
         return {...compactPlayer,age:p.age+1,stats:createEmptyStats(),playoffStats:createEmptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:Math.max(0,p.contractYearsLeft-1),postingRequested:false,growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlyDecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0};
       });
       const nextIds=new Set(nextPlayers.map(p=>p.id));
@@ -149,11 +172,23 @@ export function useOffseason(gs) {
     }
 
     const nextYear=year+1;
+    const newSchedule=scheduleMod.generateSeasonSchedule(nextYear, nextTeams);
+    const params=SEASON_PARAMS[nextYear]||getDefaultParams(nextYear);
+    const allStarTrigger=scheduleMod.calcAllStarTriggerDay(newSchedule, params.allStarSkipDates);
+    const nextPool = [...unsignedDomestic, ...foreignPool];
+    const nextPlan = gs.offseasonPlan ? { version: 1, year: nextYear, myId,
+      stage: 'new_season', resumeScreen: 'new_season', completedYear: year,
+      seasonInfo: newSeasonInfo, growth: developmentSummary } : null;
+    if (gs.handleSave && nextPlan) {
+      const saved = await gs.handleSave({ silent: true, payload: { teams: nextTeams, year: nextYear,
+        gameDay: 1, faPool: nextPool, faYears: {}, offseasonPlan: nextPlan } });
+      if (!saved?.ok) { setCareerPersistenceError('新年度の保存に失敗しました。年度は進めていません。再試行してください。'); return false; }
+    }
     setTeams(nextTeams);
     // Unsigned domestic players remain available. Archive their saved season before
     // resetting current stats, just as for rostered players; do not invent a team.
-    setYear(nextYear);setGameDay(1);setFaPool([...unsignedDomestic, ...foreignPool]);setDraftAllocation({pitcher:50,batter:50});
-    gs.setOffseasonPlan?.(null);
+    setYear(nextYear);setGameDay(1);setFaPool(nextPool);setDraftAllocationState(null);
+    gs.setOffseasonPlan?.(nextPlan);
     setAllStarDone(false);
     setAllStarResult(null);
     // 現シーズンの日程・試合結果をアーカイブに保存
@@ -162,12 +197,10 @@ export function useOffseason(gs) {
       const myTeamResultsMap = isTeamIdSet(myId) ? (allTeamResultsMap?.[myId] || {}) : {};
       setScheduleArchive(prev=>[...prev,{year,schedule,gameResultsMap: currentGameResultsMap,myTeamResultsMap}].slice(-5));
     }
-    const newSchedule=scheduleMod.generateSeasonSchedule(nextYear, nextTeams);
     setSchedule(newSchedule);
     setGameResultsMap({});
     setAllTeamResultsMap({});
-    const params=SEASON_PARAMS[nextYear]||getDefaultParams(nextYear);
-    setAllStarTriggerDay(scheduleMod.calcAllStarTriggerDay(newSchedule, params.allStarSkipDates));
+    setAllStarTriggerDay(allStarTrigger);
     setScreen("new_season");
     return true;
     } catch (error) {
@@ -178,6 +211,7 @@ export function useOffseason(gs) {
       return false;
     } finally {
       nextYearTransitionRef.current = false;
+      gs.setIsAutoSaveSuspended?.(gs.isAutoSaveSuspended ?? false);
     }
   };
 
@@ -210,9 +244,9 @@ export function useOffseason(gs) {
     // 一軍選手のコンディション変動リスト（表示用）
     const conditionChanges = myT.players.map(p => ({
       id: p.id, name: p.name, pos: p.pos, isPitcher: p.isPitcher, age: p.age,
-      oldCond: p.condition || 100,
+      oldCond: p.condition ?? 100,
       delta: conditionDeltas[p.id] || 0,
-      newCond: clamp((p.condition || 100) + (conditionDeltas[p.id] || 0), CAMP_MIN_CONDITION, 100),
+      newCond: clamp((p.condition ?? 100) + (conditionDeltas[p.id] || 0), CAMP_MIN_CONDITION, 100),
       stats: p.stats,
       pitching: p.pitching,
       batting: p.batting,
@@ -232,7 +266,7 @@ export function useOffseason(gs) {
       posGroups[p.pos].push({
         ...p,
         condChange: conditionDeltas[p.id] || 0,
-        newCond: clamp((p.condition || 100) + (conditionDeltas[p.id] || 0), CAMP_MIN_CONDITION, 100),
+        newCond: clamp((p.condition ?? 100) + (conditionDeltas[p.id] || 0), CAMP_MIN_CONDITION, 100),
       });
     });
     const rosterBattles = Object.entries(posGroups)
@@ -246,25 +280,29 @@ export function useOffseason(gs) {
   };
 
   const handleDraftComplete = (pl, dr) => {
-    const sameTeam=(a,b)=>Number(a)===Number(b);
-    const picksFor=teamId=>[
-      ...pl.filter(p=>p._drafted&&sameTeam(p._r1winner,teamId)),
-      ...pl.filter(p=>sameTeam(dr[p.id],teamId)),
-    ];
+    if (draftAppliedRef.current === year || gs.offseasonPlan?.draftApplied || (gs.offseasonPlan && gs.screen !== 'draft_review')) return false;
+    const ownedIds = new Set(teams.flatMap(t => [...t.players, ...(t.farm || [])].map(p => p.id)));
+    const picksFor=teamId=>draftPicksForTeam(pl, dr, teamId).filter(p => !ownedIds.has(p.id));
     const myPicks=picksFor(myId);
     const updatedTeams = teams.map(t => {
       const picks=picksFor(t.id);
       if(!picks.length) return t;
-      return{...t,farm:[...t.farm,...picks.map(p=>({...p,育成:false,salary:Math.max(MIN_SALARY_SHIHAKA,p.salary),contractYears:1,contractYearsLeft:1,ikuseiYears:0}))]};
+      const owned = new Set([...t.players, ...t.farm].map(p => p.id));
+      return{...t,farm:[...t.farm,...picks.filter(p => !owned.has(p.id)).map(p=>({...p,育成:false,salary:Math.max(MIN_SALARY_SHIHAKA,p.salary),contractYears:1,contractYearsLeft:1,ikuseiYears:0}))]};
     });
+    const stData = generateSpringTraining(updatedTeams);
+    draftAppliedRef.current = year;
     setTeams(updatedTeams);
     setNewSeasonInfo(prev=>({...(prev||{}),draftCount:myPicks.length,draftNames:myPicks.slice(0,3).map(p=>p.name)}));
-    const stData = generateSpringTraining(updatedTeams);
     setSpringTrainingData(stData);
+    gs.setOffseasonPlan?.(prev => prev && ({ ...prev, draftApplied: true, spring: stData,
+      seasonInfo: { ...(newSeasonInfo || {}), draftCount: myPicks.length, draftNames: myPicks.slice(0,3).map(p=>p.name) } }));
     setScreen("spring_training");
+    return true;
   };
 
   const handleSpringTrainingComplete = async () => {
+    if (gs.offseasonPlan && gs.screen !== 'spring_training') return false;
     let preparedTeams = teams;
     if (springTrainingData?.conditionDeltas) {
       const deltas = springTrainingData.conditionDeltas;
@@ -272,16 +310,17 @@ export function useOffseason(gs) {
         ...t,
         players: t.players.map(p => ({
           ...p,
-          condition: clamp((p.condition || 100) + (deltas[p.id] || 0), CAMP_MIN_CONDITION, 100),
+          condition: clamp((p.condition ?? 100) + (deltas[p.id] || 0), CAMP_MIN_CONDITION, 100),
         })),
         farm: (t.farm || []).map(p => ({
           ...p,
-          condition: p.育成 ? (p.condition || 100) : clamp((p.condition || 100) + (deltas[p.id] || 0), CAMP_MIN_CONDITION, 100),
+          condition: p.育成 ? (p.condition ?? 100) : clamp((p.condition ?? 100) + (deltas[p.id] || 0), CAMP_MIN_CONDITION, 100),
         })),
       }));
     }
     const completed = await handleNextYear(preparedTeams);
     if (completed) setSpringTrainingData(null);
+    return completed;
   };
 
   const handleContractOffer = (pid, sal, yrs, meta = {}) => {
@@ -829,6 +868,7 @@ export function useOffseason(gs) {
   };
 
   return {
+    saveDraftView, resetTransientOffseason,
     developmentSummary, setDevelopmentSummary,
     newSeasonInfo, setNewSeasonInfo,
     springTrainingData,
