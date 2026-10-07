@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import HubFaTab from './HubFaTab';
 import { rngf } from '../../utils';
 import { addMarketSigning, marketMetrics, marketNeeds, marketPlacement, validateMarketContract } from './faMarket';
-import { MAX_ROSTER, FOREIGN_DEADLINE_DAY } from '../../constants';
+import { MAX_ROSTER, MAX_SHIHAKA_TOTAL, FOREIGN_DEADLINE_DAY } from '../../constants';
 
 vi.mock('../../utils', async importOriginal => ({ ...await importOriginal(), rngf: vi.fn() }));
 const text = node => typeof node === 'string' ? node : (node.children || []).map(text).join('');
@@ -25,6 +25,16 @@ function setup(pool = [player(0)], extra = {}) {
 }
 
 describe('FA market saved data and signing rules', () => {
+  it('counts active and farm players against 70 slots, excludes ikusei, and rejects duplicate ownership', () => {
+    const full = team({ players: Array.from({ length: 28 }, (_, i) => player(i + 1)),
+      farm: Array.from({ length: MAX_SHIHAKA_TOTAL - 28 }, (_, i) => player(i + 29)) });
+    const p = player(0), args = { team: full, pool: [p], player: p, salary: 1000, years: 1, gameDay: 10 };
+    expect(validateMarketContract(args)).toContain('支配下登録枠');
+    expect(addMarketSigning(full, p, 1000, 1, 2026)).toBe(full);
+    expect(validateMarketContract({ ...args, player: { ...p, 育成: true } })).toBeNull();
+    expect(validateMarketContract({ ...args, team: { ...full, farm: full.farm.map((p, i) => i === 0 ? { ...p, 育成: true } : p) } })).toBeNull();
+    expect(validateMarketContract({ ...args, team: team({ farm: [p] }) })).toContain('すでに球団に所属');
+  });
   it('distinguishes measured zero, missing counts, and undefined rates', () => {
     expect(Object.fromEntries(marketMetrics(player(0, { stats: { AB: 10, H: 0, HR: 0, RBI: 0 } })))).toMatchObject({ 打率: '0.000', 本塁打: 0, 打点: 0, 打席: '未記録', OPS: '—' });
     expect(Object.fromEntries(marketMetrics(player(0, { isPitcher: true, stats: { IP: 9, ER: 0, W: 0 } })))).toMatchObject({ 防御率: '0.00', 勝利: 0, 奪三振: '未記録' });

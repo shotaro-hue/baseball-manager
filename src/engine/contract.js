@@ -1,8 +1,8 @@
 import { clamp, rng } from '../utils';
 import {
   ACCEPT_THRESHOLD, MIN_SALARY_SHIHAKA, MIN_SALARY_IKUSEI,
-  ACTIVE_ROSTER_FA_DAYS_PER_YEAR, MAX_外国人_一軍,
-  MAX_ROSTER, CPU_FA_BUDGET_RESERVE_RATIO, CPU_FA_MIN_SCORE,
+  ACTIVE_ROSTER_FA_DAYS_PER_YEAR,
+  CPU_FA_BUDGET_RESERVE_RATIO, CPU_FA_MIN_SCORE,
   CPU_FA_REBUILD_YOUNG_BONUS, CPU_FA_REBUILD_OLD_PENALTY, CPU_FA_CONTEND_VET_BONUS,
   CPU_RENEWAL_ROUNDS,
   CPU_TEAM_ROUND2_GAP_CLOSE,
@@ -15,6 +15,7 @@ import { analyzeTeamNeeds, getFrontOfficePlanPublic } from './trade';
 import { calculateSalaryDemand, renewalSalaryFloor } from './salaryDemand';
 import { salaryCutRule, renewalEligible, ownedPlayers, ikuseiContractYears } from './renewalRules';
 import { pruneRosterReferences } from './offseasonReview';
+import { marketPlacement, marketRosterError } from './marketRoster';
 import { prepareOffseasonFreeAgent } from './offseasonMarket';
 
 /* ═══════════════════════════════════════════════
@@ -343,6 +344,7 @@ export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = nu
       const team = teamMap.get(origTeam.id);
       if (!team) continue;
 
+      if (!Number.isFinite(team.budget)) continue;
       const reserve = team.budget * CPU_FA_BUDGET_RESERVE_RATIO;
       if (team.budget - reserve < MIN_SALARY_IKUSEI) continue;
 
@@ -350,8 +352,9 @@ export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = nu
       const plan = getFrontOfficePlanPublic(team);
       const foMode = plan.mode;
       const candidates = remainingPool
-        .filter((p) => !signedPlayers.has(p.id) && (team.players.length < MAX_ROSTER || p.育成))
+        .filter((p) => !signedPlayers.has(p.id) && !marketRosterError(team, p, [...teamMap.values()]))
         .map((p) => {
+          if (!Number.isFinite(p.salary) || p.salary < 0) return null;
           const salary = Math.max(p.育成 ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA, p.salary);
           if (team.budget - reserve < salary) return null;
           const r = evalOffer(p, { salary, years: 1 }, team, allTeams);
@@ -374,15 +377,7 @@ export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = nu
       const player = remainingPool.find((p) => p.id === best.pid);
       if (!player) continue;
 
-      const foreignPlayers = team.players.filter((p) => p.isForeign);
-      const foreignActiveOnTeam = foreignPlayers.length;
-      const foreignPitchers = foreignPlayers.filter((p) => p.isPitcher).length;
-      const foreignBatters = foreignPlayers.length - foreignPitchers;
-      const wouldBeAllPitchers = player.isPitcher && foreignPitchers === MAX_外国人_一軍 - 1;
-      const wouldBeAllBatters = !player.isPitcher && foreignBatters === MAX_外国人_一軍 - 1;
-      const balanceViolation =
-        foreignActiveOnTeam === MAX_外国人_一軍 - 1 && (wouldBeAllPitchers || wouldBeAllBatters);
-      const goToFarm = player.育成 || (player.isForeign && (foreignActiveOnTeam >= MAX_外国人_一軍 || balanceViolation));
+      const goToFarm = marketPlacement(team, player).farm;
 
       const prepared = marketMode === 'offseason' ? prepareOffseasonFreeAgent(player, currentYear, team.id) : player;
       const newPlayerEntry = { ...prepared, isFA: false, contractYears: 1, contractYearsLeft: 1, contractSignedYear: currentYear, salary: best.salary,

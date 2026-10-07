@@ -19,7 +19,8 @@ import { appendCareerEntryToPlayer, makeCareerEntry } from '../engine/careerStat
 import { prepareOffseasonFreeAgent, shouldArchiveFreeAgentSeason } from '../engine/offseasonMarket';
 import { pruneRosterReferences, releaseWaiverPlayers, waiverEligible } from '../engine/offseasonReview';
 import { resolveOffseasonFaDeclarations } from '../engine/faDeclaration';
-import { renewalEligible, ownedPlayers, mapOwnedPlayers, remainingContractAfterSeason, ikuseiContractYears } from '../engine/renewalRules';
+import { renewalEligible, ownedPlayers, mapOwnedPlayers, remainingContractAfterSeason, validContractOffer, validContractTerms, applyAgreedContract } from '../engine/renewalRules';
+import { contractSnapshot, isPendingContractReply } from '../engine/contractReplies';
 import { planningPlayer, planningSummary } from '../engine/offseasonPlanning';
 import { draftPicksForTeam } from '../engine/offseasonResume';
 import { hasRecordedFirstTeamSeason } from '../engine/seasonParticipants';
@@ -337,18 +338,20 @@ export function useOffseason(gs) {
   };
 
   const handleContractOffer = (pid, sal, yrs, meta = {}) => {
-    const p=myTeam?.players.find(x=>x.id===pid);if(!p) return;
+    const p=ownedPlayers(myTeam).find(x=>x.id===pid);
+    if (!p || !renewalEligible(p, year) || !validContractOffer(p, sal, yrs)) { notify('選手の契約状況・提示金額・年数を確認してください', 'warn'); return false; }
     const incentives = meta.incentives || {};
     const r=evalOffer(p,{salary:sal,years:yrs,incentives},myTeam,teams);
     const waitDays=Math.max(1, Math.min(7, Number(meta.responseAfterDays)||rng(2,4)));
-    const willAccept=r.total>=ACCEPT_THRESHOLD;
+    const willAccept=r.total>=ACCEPT_THRESHOLD && validContractTerms(p, sal, yrs);
     const deliveryDay=gameDay+waitDays;
     const incentiveParts = [];
     if ((Number(incentives.performanceBonusRate) || 0) > 0) incentiveParts.push(`出来高+${incentives.performanceBonusRate}%`);
     if ((Number(incentives.titleBonus) || 0) > 0) incentiveParts.push(`タイトル${fmtM(incentives.titleBonus)}`);
     if (incentives.optOut) incentiveParts.push("オプトアウト");
     const incentiveLabel = incentiveParts.length ? incentiveParts.join(" / ") : "なし";
-    setMailbox(prev=>[...prev,{
+    setMailbox(prev=>[...prev.map(m => isPendingContractReply(m) && m.decision?.playerId === pid
+      ? { ...m, type: "contract_reply", resolved: true, resolution: "superseded", body: "新しい提示を受け付けたため、この契約回答予定は取り消しました。" } : m),{
       id:uid(),
       type:"contract_decision_pending",
       read:false,
@@ -362,6 +365,9 @@ export function useOffseason(gs) {
       decision:{
         playerId:pid,
         playerName:p.name,
+        teamId:myId,
+        offeredYear:year,
+        contractSnapshot:contractSnapshot(p),
         salary:sal,
         years:yrs,
         incentives,
@@ -370,6 +376,7 @@ export function useOffseason(gs) {
       },
     }]);
     notify(`📨 ${p.name}の最終回答は${waitDays}日後に受信箱へ届きます`,"ok");
+    return true;
   };
 
   const handleTrade = (myOut, theirIn, tgtTeam, cash) => {
@@ -712,18 +719,12 @@ export function useOffseason(gs) {
   const handleContractRenewalSign = (pid, finalSalary, years, moraleDelta, trustDelta) => {
     const p = ownedPlayers(myTeam).find(x => x.id === pid);
     const actionKey = `sign:${JSON.stringify([year, typeof pid, pid])}`;
-    if (!p || planningActionIds.current.has(actionKey) || !renewalEligible(p, year) || !Number.isFinite(finalSalary) || finalSalary < (p.育成 ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA)
-      || !Number.isInteger(years) || years < 1 || years > 7 || (p.育成 && years > ikuseiContractYears(p))) return false;
+    if (!p || planningActionIds.current.has(actionKey) || !renewalEligible(p, year) || !validContractTerms(p, finalSalary, years)) return false;
     planningActionIds.current.add(actionKey);
-    upd(myId, t => mapOwnedPlayers(t, x => x.id === pid ? {
-        ...x,
-        salary: finalSalary,
-        contractYears: years,
-        contractYearsLeft: years,
-        contractSignedYear: year,
+    upd(myId, t => mapOwnedPlayers(t, x => x.id === pid ? applyAgreedContract(x, finalSalary, years, year, {
         morale: clamp((x.morale ?? 70) + (moraleDelta || 0), 20, 100),
         trust:  clamp((x.trust  ?? 50) + (trustDelta  || 0), 0, 100),
-      } : x));
+      }) : x));
     if (p) {
       addNews({ type: 'season', headline: `【契約更改】${p.name}（${myTeam?.name}）が${years}年契約`, source: '野球速報', dateLabel: `${year}年`, body: `${p.name}選手（${p.age}歳）が${myTeam?.name}と${years}年契約（${finalSalary}万円）を結んだ。` });
     }

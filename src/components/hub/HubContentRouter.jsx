@@ -17,6 +17,8 @@ import {
   COACH_GRADES,
   SCOUT_REGIONS,
 } from '../../constants';
+import { ownedPlayers, renewalEligible } from '../../engine/renewalRules';
+import { releaseWaiverPlayers } from '../../engine/offseasonReview';
 import HubFaTab from './HubFaTab';
 import HubScoutTab from './HubScoutTab';
 import HubTabFallback from './HubTabFallback';
@@ -307,26 +309,13 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
         year={year}
         onOffer={os.handleContractOffer}
         onRelease={(pid) => {
-          const player = myTeam?.players.find((entry) => entry.id === pid);
-          const popPenalty =
-            (player?.salary ?? 0) > POP_RELEASE_SALARY_THRESHOLD
-              ? POP_RELEASE_PENALTY
-              : 0;
-
-          gs.upd(myId, (team) => ({
-            ...team,
-            players: team.players.filter((entry) => entry.id !== pid),
-            popularity: Math.min(
-              100,
-              Math.max(0, (team.popularity ?? 50) + popPenalty),
-            ),
-          }));
-
-          if (player) {
-            gs.addToHistory(myId, player, 'release');
-            gs.setFaPool((prev) => [...prev, { ...player, isFA: true }]);
-          }
-
+          const player = ownedPlayers(myTeam).find(entry => entry.id === pid);
+          if (!player || !renewalEligible(player, year)) return;
+          gs.upd(myId, team => releaseWaiverPlayers(team, [pid], year, POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD));
+          gs.setFaPool(prev => prev.some(p => p.id === pid) ? prev : [...prev, { ...player, isFA: true, isWaiverReleased: true,
+            contractYearsLeft: 0, marketEntryReason: '自由契約', departureReason: 'release', marketLastStats: player.stats,
+            faEnteredYear: year, faOriginTeamId: myId, faOriginTeamName: myTeam.name,
+            faOriginRoster: myTeam.farm?.some(p => p.id === pid) ? 'farm' : 'active' }]);
           gs.notify('選手を自由契約にしました', 'warn');
         }}
       />

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { PVAL_DEFS, ACCEPT_THRESHOLD } from '../../constants';
 import { fmtSal } from '../../utils';
+import { ownedPlayers, renewalEligible, ikuseiContractYears, validContractOffer } from '../../engine/renewalRules';
 import { evalOffer } from '../../engine/contract';
 import { PersonalityView } from '../ui';
 
@@ -84,8 +85,8 @@ export function ContractTab({team,allTeams,onOffer,onRelease,year}){
   const [optOut, setOptOut] = useState(false);
   const [negotiationLogs, setNegotiationLogs] = useState({});
   const [offerRounds, setOfferRounds] = useState({});
-  const expiring=team.players.filter(p=>p.contractYearsLeft<=1);
-  const sel=team.players.find(p=>p.id===selId);
+  const expiring=ownedPlayers(team).filter(p=>renewalEligible(p, year));
+  const sel=expiring.find(p=>p.id===selId);
   const salaryOptions=sel
     ? Array.from(new Set([
         2000, 3000, 5000,
@@ -104,9 +105,10 @@ export function ContractTab({team,allTeams,onOffer,onRelease,year}){
 
   const finalOfferDisabled = useMemo(() => {
     if (!sel) return true;
+    if (!validContractOffer(sel, offerSal, offerYrs)) return true;
     const logs = negotiationLogs[sel.id] || [];
     return logs.some(line => line.tag === "final-offer");
-  }, [negotiationLogs, sel]);
+  }, [negotiationLogs, sel, offerSal, offerYrs]);
 
   const appendOfferRally = () => {
     if(!sel || !preview) return;
@@ -147,23 +149,21 @@ export function ContractTab({team,allTeams,onOffer,onRelease,year}){
       { speaker: "代理人", text: `代理人「最終回答は数日後に受信箱へお送りします。」`, align: "left", color: "#c084fc", tag: "final-offer" },
     ];
 
-    setNegotiationLogs(prev => ({
-      ...prev,
-      [sel.id]: [...(prev[sel.id] || []), ...finalReaction],
-    }));
-
-    onOffer(sel.id, offerSal, offerYrs, {
+    const submitted = onOffer(sel.id, offerSal, offerYrs, {
       score: preview.total,
       responseAfterDays,
       summary: tone,
       incentives,
     });
+    if (submitted === false) return;
+    setNegotiationLogs(prev => ({ ...prev, [sel.id]: [...(prev[sel.id] || []), ...finalReaction] }));
   };
 
   return(
     <div>
       <div className="card">
         <div className="card-h">契約満了選手 ({expiring.length}人)</div>
+        <p style={{color:"#2a3a4c",fontSize:13}}>登録・ファームの選手が対象です。提示を辞退されても所属と現契約は維持し、満了時の処理はシーズン終了後に行います。</p>
         {expiring.length===0&&<p style={{color:"#2a3a4c",fontSize:12}}>今季満了の選手はいません</p>}
         <div style={{overflowX:"auto"}}>{expiring.length>0&&(
           <table className="tbl">
@@ -195,7 +195,7 @@ export function ContractTab({team,allTeams,onOffer,onRelease,year}){
               </div>
               <div style={{marginBottom:12}}>
                 <label style={{fontSize:11,color:"#4b5563",display:"block",marginBottom:4}}>契約年数</label>
-                <div style={{display:"flex",gap:6}}>{[1,2,3,4,5].map(y=><button key={y} className={`bsm ${offerYrs===y?"bgy":"bgb"}`} onClick={()=>setOfferYrs(y)}>{y}年</button>)}</div>
+                <div style={{display:"flex",gap:6}}>{[1,2,3,4,5].filter(y => !sel.育成 || y <= ikuseiContractYears(sel)).map(y=><button key={y} className={`bsm ${offerYrs===y?"bgy":"bgb"}`} onClick={()=>setOfferYrs(y)}>{y}年</button>)}</div>
               </div>
               <div style={{marginBottom:12}}>
                 <label style={{fontSize:11,color:"#4b5563",display:"block",marginBottom:4}}>インセンティブ（出来高）</label>
