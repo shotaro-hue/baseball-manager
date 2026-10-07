@@ -17,6 +17,7 @@ import { createEmptyBattedBallProfile } from '../engine/battedBallProfile';
 import { isTeamIdSet } from '../engine/teamId';
 import { appendCareerEntryToPlayer, makeCareerEntry } from '../engine/careerStats';
 import { prepareOffseasonFreeAgent } from '../engine/offseasonMarket';
+import { pruneRosterReferences, releaseWaiverPlayers, waiverEligible } from '../engine/offseasonReview';
 
 let offseasonPlayerModulePromise = null;
 let offseasonScheduleModulePromise = null;
@@ -83,6 +84,7 @@ export function useOffseason(gs) {
   const nextYearTransitionRef = useRef(false);
   const retireTransitionRef = useRef(false);
   const faPhaseCompletedYear = useRef(null);
+  const waiverCompletedYear = useRef(null);
   // { [playerId]: { demandSalary, minAcceptSalary, resistanceFactor } }
 
   // careerLogをコンパクト形式で保存（打球詳細などの不要フィールドを除外）
@@ -398,7 +400,7 @@ export function useOffseason(gs) {
 
   // 引退モーダル：引き留め
   const handleRetain = (p) => {
-    const success=Math.random()*100>(p.retireStyle||50);
+    const success=Math.random()*100>(p.retireStyle??50);
     if(success){
       notify(p.name+"の引き留めに成功！","ok");
       upd(myId,t=>({...t,players:t.players.map(x=>x.id===p.id?{...x,morale:Math.min(100,(x.morale||60)+10)}:x)}));
@@ -451,7 +453,7 @@ export function useOffseason(gs) {
     );
     Object.entries(safeDecisions).forEach(([playerId, decision]) => {
       if (decision !== 'retained') return;
-      const player = myTeam?.players.find((candidate) => candidate.id === playerId);
+      const player = myTeam?.players.find((candidate) => String(candidate.id) === playerId);
       if (player) notify(player.name+"の引き留め成功！","ok");
     });
 
@@ -459,11 +461,11 @@ export function useOffseason(gs) {
     const retirementCareerEntries = [];
     for (const team of teams) {
       const retiringPlayers = team.id === myId
-        ? team.players.filter((player) => userRetiredIds.has(player.id) || player._retireNow)
+        ? team.players.filter((player) => userRetiredIds.has(String(player.id)) || player._retireNow)
         : team.players.filter((player) => player.age >= 35 && playerMod.rollRetire(player));
       const alumni = retiringPlayers.map((player) => {
         const careerEntry = mkCareerEntry(player.stats, player.playoffStats, year, team.id, team.name);
-        retirementCareerEntries.push({ playerId: String(player.id || ''), careerEntry });
+        retirementCareerEntries.push({ playerId: String(player.id ?? ''), careerEntry });
         const archivedPlayer = appendCareerEntryWithSummary(player, careerEntry);
         return {
           ...archivedPlayer,
@@ -575,7 +577,7 @@ export function useOffseason(gs) {
         });
       }
 
-      return{...t,players:postingPlayers,farm:farmAfterIkusei,history:[...(t.history||[]),...retirement.alumni]};
+      return{...t,players:postingPlayers,...pruneRosterReferences(t, new Set(t.players.filter(p => !postingPlayers.some(entry => entry.id === p.id)).map(p => p.id))),farm:farmAfterIkusei,history:[...(t.history||[]),...retirement.alumni]};
     });
     // Other clubs settle renewals before the user's market phase so candidates
     // are available before the user's own renewals. Never renew CPU clubs twice.
@@ -607,9 +609,10 @@ export function useOffseason(gs) {
     const makeRanking=(lg)=>developedTeams.filter(t=>t.league===lg).sort((a,b)=>{const pa=a.wins/Math.max(1,a.wins+a.losses);const pb=b.wins/Math.max(1,b.wins+b.losses);return pb-pa||(b.rf-b.ra)-(a.rf-a.ra);}).map(t=>({id:t.id,name:t.name,emoji:t.emoji,wins:t.wins,losses:t.losses,rf:t.rf,ra:t.ra}));
     const standingsSnap={year,central:makeRanking("セ"),pacific:makeRanking("パ"),titles:awards.titles,playerAwards:{mvpCentral:awards.mvp?.central,mvpPacific:awards.mvp?.pacific,sawamura:awards.sawamura,rookie:awards.rookie}};
     setSeasonHistory(prev=>({...prev,awards:[...prev.awards,awards],records:newRec,hallOfFame:newHoF,standingsHistory:[...(prev.standingsHistory||[]),standingsSnap]}));
-    const retiredMyNames=Object.entries(safeDecisions).filter(([,d])=>d==="accepted"||d==="retain_failed").map(([pid])=>myTeam?.players.find(x=>x.id===pid)?.name).filter(Boolean);
+    const retiredMyNames=Object.entries(safeDecisions).filter(([,d])=>d==="accepted"||d==="retain_failed").map(([pid])=>myTeam?.players.find(x=>String(x.id)===pid)?.name).filter(Boolean);
     setNewSeasonInfo({retiredNames:retiredMyNames,year:year+1,draftCount:0,draftNames:[]});
     faPhaseCompletedYear.current = null;
+    waiverCompletedYear.current = null;
     setScreen("offseason_fa_phase");
     return true;
     } catch (error) {
@@ -640,6 +643,7 @@ export function useOffseason(gs) {
         salary: finalSalary,
         contractYears: years,
         contractYearsLeft: years,
+        contractSignedYear: year,
         morale: clamp((x.morale ?? 70) + (moraleDelta || 0), 20, 100),
         trust:  clamp((x.trust  ?? 50) + (trustDelta  || 0), 0, 100),
       } : x),
@@ -707,11 +711,19 @@ export function useOffseason(gs) {
 
   // ウェーバーフェーズ処理（戦力外確定→CPU FA獲得→ドラフトへ）
   const handleWaiverPhaseNext = (markedIds) => {
+    if (gs.screen !== 'waiver_phase' || waiverCompletedYear.current === year) return false;
+    const ids = Array.isArray(markedIds) ? [...new Set(markedIds)] : [];
+    if (!Array.isArray(markedIds) || ids.some(id => !myTeam?.players.some(p => p.id === id && waiverEligible(p)))) {
+      notify('放出対象が変更されています。選手を確認してください', 'warn'); return false;
+    }
+    waiverCompletedYear.current = year;
     const waiverReleased=[];
-    markedIds.forEach(pid=>{const p=myTeam?.players.find(x=>x.id===pid);const popPenalty=(p?.salary??0)>POP_RELEASE_SALARY_THRESHOLD?POP_RELEASE_PENALTY:0;upd(myId,t=>({...t,players:t.players.filter(x=>x.id!==pid),popularity:Math.min(100,Math.max(0,(t.popularity??50)+popPenalty))}));if(p){addToHistory(myId,p,"戦力外");waiverReleased.push({...p,isFA:true,isWaiverReleased:true});addNews({type:"season",headline:"【戦力外】"+p.name+"選手に戦力外通告",source:"野球速報",dateLabel:year+"年",body:p.name+"選手（"+p.age+"歳）が戦力外通告を受けた。"});}});
+    ids.forEach(pid => { const p = myTeam.players.find(x => x.id === pid); waiverReleased.push({ ...p, isFA: true, isWaiverReleased: true });
+      addNews({ type: 'season', headline: `【戦力外】${p.name}選手に戦力外通告`, source: '野球速報', dateLabel: `${year}年`, body: `${p.name}選手（${p.age}歳）が戦力外通告を受けた。` }); });
+    const baseTeams = teams.map(t => t.id === myId ? releaseWaiverPlayers(t, ids, year, POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD) : t);
     const releasedIds=new Set(waiverReleased.map(p=>p.id));
     const combinedPool=[...faPool,...waiverReleased.map(p => ({ ...p, marketLastStats: p.stats, faEnteredYear: year, faOriginTeamId: myId, faOriginTeamName: myTeam?.name }))];
-    const faResult=processCpuFaBids(teams,myId,combinedPool,teams,year,'offseason');
+    const faResult=processCpuFaBids(baseTeams,myId,combinedPool,baseTeams,year,'offseason');
     setTeams(faResult.updatedTeams);
     setFaPool(faResult.remainingFaPool);
     faResult.news.forEach(n=>addNews(n));
@@ -742,8 +754,9 @@ export function useOffseason(gs) {
     const unclaimedNew=faResult.remainingFaPool.filter(p=>releasedIds.has(p.id));
     setWaiverClaimResults({claimed:claimedNew,unclaimed:unclaimedNew});
     setFaYears({});
-    setDraftPool(initDraftPool(myTeam));
+    setDraftPool(initDraftPool(faResult.updatedTeams.find(t => t.id === myId)));
     setScreen("waiver_result");
+    return true;
   };
 
   return {

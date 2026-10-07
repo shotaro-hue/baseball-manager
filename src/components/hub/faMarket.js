@@ -50,7 +50,7 @@ export function validateMarketContract({ team, pool, player, salary, years, game
 export function addMarketSigning(team, player, salary, years, year, marketMode = 'season') {
   const placement = marketPlacement(team, player);
   const prepared = marketMode === 'offseason' ? prepareOffseasonFreeAgent(player, year) : player;
-  const signed = { ...prepared, isFA: false, salary, contractYears: years, contractYearsLeft: years };
+  const signed = { ...prepared, isFA: false, salary, contractYears: years, contractYearsLeft: years, contractSignedYear: year };
   return { ...team, budget: team.budget - salary * years,
     players: placement.farm ? team.players : [...team.players, signed],
     farm: placement.farm ? [...(team.farm || []), signed] : team.farm || [],
