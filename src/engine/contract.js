@@ -260,7 +260,11 @@ export function cpuRenewContracts(teams, myId, allTeams, salaryContext = {}) {
         budget -= neg.finalSalary;
       } else {
         players = players.filter(x => x.id !== p.id);
-        newFaPlayers.push({ ...p, isFA: true, marketEntryReason: neg.result === 'fa_declared' ? '国内FA宣言' : '自由契約' });
+        const declared = neg.result === 'fa_declared';
+        newFaPlayers.push({ ...p, isFA: true, contractYearsLeft: 0,
+          ...(declared ? { salary: demand.demandSalary, faPreviousSalary: p.salary,
+            faNegotiationReason: '契約更改で合意できなかったため' } : {}),
+          marketEntryReason: declared ? '国内FA宣言' : '自由契約' });
         if (neg.result === 'fa_declared') {
           news.push({
             type: 'season',
