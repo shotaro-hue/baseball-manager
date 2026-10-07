@@ -1,5 +1,6 @@
 import { saberBatter, saberPitcher } from './sabermetrics';
 import { normalizeCareerLogSummary } from './careerStats';
+import { seasonParticipants } from './seasonParticipants';
 
 function getCareerSummary(player) {
   const summary = normalizeCareerLogSummary(player?.careerLogSummary);
@@ -18,7 +19,7 @@ function getCareerSummary(player) {
 ═══════════════════════════════════════════════ */
 
 export function calcSeasonAwards(teams, year) {
-  const allPlayers = teams.flatMap(t => t.players.map(p => ({ ...p, _teamId: t.id, _teamName: t.name, _teamWins: t.wins || 0, _league: t.league })));
+  const allPlayers = teams.flatMap(t => seasonParticipants(t).map(p => ({ ...p, _teamId: t.id, _teamName: t.name, _teamWins: t.wins || 0, _league: t.league })));
   const batters  = allPlayers.filter(p => !p.isPitcher && (p.stats?.PA  || 0) >= 80);
   const pitchers = allPlayers.filter(p =>  p.isPitcher && (p.stats?.IP  || 0) >= 40);
 
@@ -47,7 +48,7 @@ function calcTitles(leagueTeams) {
   const minPA = Math.round(lgGames * 3.1);
   const minIP = lgGames;
 
-  const lp = leagueTeams.flatMap(t => t.players.map(p => ({...p, _teamName: t.name, _teamId: t.id})));
+  const lp = leagueTeams.flatMap(t => seasonParticipants(t).map(p => ({...p, _teamName: t.name, _teamId: t.id})));
   const batters  = lp.filter(p => !p.isPitcher);
   const pitchers = lp.filter(p =>  p.isPitcher);
 
@@ -89,7 +90,7 @@ function calcTitles(leagueTeams) {
 }
 
 function pickMVP(batters, pitchers, teams) {
-  const measured = teams.flatMap(t => t.players).filter(p => p.isPitcher && p.stats?.IP > 0 && Number.isFinite(p.stats.ER));
+  const measured = teams.flatMap(seasonParticipants).filter(p => p.isPitcher && p.stats?.IP > 0 && Number.isFinite(p.stats.ER));
   const ip = measured.reduce((sum, p) => sum + p.stats.IP, 0);
   const leagueERA = ip > 0 ? measured.reduce((sum, p) => sum + p.stats.ER, 0) / ip * 9 : null;
   const scored = batters.map(p => {
@@ -211,7 +212,7 @@ export function updateRecords(records, teams) {
   const broken = [];
 
   for (const t of teams) {
-    for (const p of t.players) {
+    for (const p of seasonParticipants(t)) {
       const s = p.stats;
       if (!s) continue;
 
