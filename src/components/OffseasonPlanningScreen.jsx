@@ -30,7 +30,7 @@ export default function OffseasonPlanningScreen({ gs, os, myTeam, myId, year }) 
   const saveView = useCallback(renewalView => gs.setOffseasonPlan(prev => ({ ...prev, renewalView })), [gs.setOffseasonPlan]);
   const overview = planningSummary(myTeam, plan, year);
   const pending = overview.pending.filter(p => !overview.releaseCandidates.some(c => c.id === p.id));
-  const releasePlayer = myTeam?.players.find(p => p.id === modal?.id);
+  const releasePlayer = [...(myTeam?.players || []), ...(myTeam?.farm || [])].find(p => p.id === modal?.id);
   const finish = () => {
     if (processing.current) return;
     processing.current = true; setBusy(true); setFailure('');
@@ -62,9 +62,9 @@ export default function OffseasonPlanningScreen({ gs, os, myTeam, myId, year }) 
     <section hidden={open && tab !== 'roster'} aria-label="自球団の編成方針">
       <details open={!open}><summary>編成方針・放出候補を見直す</summary><div className="planning-roster">{owned.map(p => {
         const active = myTeam.players.some(x => x.id === p.id);
-        const eligible = active && renewalEligible(p, year);
+        const eligible = renewalEligible(p, year);
         const intent = plan.intents?.find(i => i.id === p.id)?.value || 'negotiate';
-        return <article className="planning-player" key={p.id}><h3>{p.name}</h3><p>{p.pos} · {p.age ?? '未記録'}歳 · 年俸 {money(p.salary)} · {active ? '登録選手' : 'ファーム'}</p><button onClick={() => setProfile(p)}>選手詳細・年度別成績</button>
+        return <article className="planning-player" key={p.id}><h3>{p.name}</h3><p>{p.pos} · {p.age ?? '未記録'}歳 · 年俸 {money(p.salary)} · {p.育成 ? '育成・ファーム' : active ? '登録選手' : '二軍・支配下'}</p><button onClick={() => setProfile(p)}>選手詳細・年度別成績</button>
           {eligible ? <><label>編成方針<select aria-label={`${p.name}の編成方針`} value={intent} onChange={event => setIntent(p.id, event.target.value)}>{Object.entries(intentLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>{open && intent === 'release' && <button className="planning-danger" onClick={() => { setFailure(''); setModal({ type: 'release', id: p.id }); }}>放出の影響を確認する</button>}</> : <p>{p.contractSignedYear === year ? '今オフ契約済み' : active ? '複数年契約など・今回の更改対象外' : 'ファーム・今回の更改対象外'}</p>}</article>;
       })}</div></details>
       {open && <ContractRenewalPhaseScreen teams={gs.teams} myId={myId} year={year} embedded demands={plan.demands}
@@ -82,7 +82,7 @@ export default function OffseasonPlanningScreen({ gs, os, myTeam, myId, year }) 
     </section>}
     {!open && <footer><button className="planning-primary" onClick={() => gs.setOffseasonPlan(prev => ({ ...prev, stage: 'open', tab: 'market' }))}>方針を確認して補強市場を開く</button></footer>}
     {modal && <Confirm title={modal.type === 'release' ? '放出の最終確認' : 'オフシーズン編成の最終確認'} {...{ onClose: close, onConfirm: finish, busy }}>
-      {modal.type === 'release' ? <><p>{releasePlayer?.name || '対象選手'}を放出します。確定後は取り消せません。</p><p>登録人数 {overview.active} → {overview.active - 1}人 · 年俸総額 {money(overview.payroll)} → {money(overview.payroll == null || !Number.isFinite(releasePlayer?.salary) ? null : overview.payroll - releasePlayer.salary)}</p></> : <><p>来季人数の見込み {overview.projectedCount}人 · 年俸見込み {money(overview.projectedPayroll)}</p>{overview.releaseCandidates.length ? <ul>{overview.releaseCandidates.map(p => <li key={p.id}>放出確定予定：{p.name} · {money(p.salary)}</li>)}</ul> : <p>追加の放出候補はありません。</p>}<p>編成を終了し、CPUの獲得結果とドラフトへ進みます。</p></>}
+      {modal.type === 'release' ? <><p>{releasePlayer?.name || '対象選手'}を放出します。確定後は取り消せません。</p><p>所属人数 {overview.owned} → {overview.owned - 1}人 · 年俸総額 {money(overview.payroll)} → {money(overview.payroll == null || !Number.isFinite(releasePlayer?.salary) ? null : overview.payroll - releasePlayer.salary)}</p></> : <><p>来季人数の見込み {overview.projectedCount}人 · 年俸見込み {money(overview.projectedPayroll)}</p>{overview.releaseCandidates.length ? <ul>{overview.releaseCandidates.map(p => <li key={p.id}>放出確定予定：{p.name} · {money(p.salary)}</li>)}</ul> : <p>追加の放出候補はありません。</p>}<p>編成を終了し、CPUの獲得結果とドラフトへ進みます。</p></>}
       {failure && <p role="alert">{failure}</p>}
       {overview.needs.length > 0 && <p>人数の不足目安：{overview.needs.join('、')}。補強やドラフト後の編成で確認してください。</p>}
     </Confirm>}
