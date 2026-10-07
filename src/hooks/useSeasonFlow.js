@@ -6,6 +6,7 @@ import { applyGameStatsFromLog, applyPostGameCondition, computeBoxScore } from '
 import { calcRevenue } from '../engine/finance';
 import { applyPopularityDelta } from '../engine/fanSentiment';
 import { generateCpuOffer, generateCpuCpuTrade, classifyTeam, evaluateFrontOfficePlan } from '../engine/trade';
+import { executeCpuTrade } from '../engine/cpuTradeExecution';
 import { initPlayoff } from '../engine/playoff';
 import { processCpuFaBids } from '../engine/contract';
 import { cancelDeferredPostGameWork, scheduleDeferredPostGameWork } from '../engine/postGameProcessing';
@@ -269,8 +270,7 @@ export function useSeasonFlow(gs) {
     const seller = teamsArr.find((t) => t.id === sellerId);
     if (!buyer || !seller) return null;
 
-    buyer.players = [...buyer.players.filter((p) => p.id !== sellerGets.id), buyerGets];
-    seller.players = [...seller.players.filter((p) => p.id !== buyerGets.id), sellerGets];
+    if (!executeCpuTrade(teamsArr, result, currentGameDay)) return null;
 
     return {
       headline: `移籍情報 ${buyerGets.name} が ${buyerName} へ`,

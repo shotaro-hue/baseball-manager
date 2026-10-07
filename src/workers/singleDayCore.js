@@ -9,6 +9,7 @@ import {
 } from '../engine/battedBallProfile';
 import { applyPopularityDelta } from '../engine/fanSentiment';
 import { generateCpuOffer, generateCpuCpuTrade, classifyTeam, evaluateFrontOfficePlan } from '../engine/trade';
+import { executeCpuTrade } from '../engine/cpuTradeExecution';
 import { selectAllStars, runAllStarGame } from '../engine/allstar';
 import { getCpuMatchups } from '../engine/scheduleGen';
 import {
@@ -268,8 +269,7 @@ function tryCpuCpuDeadlineTradeSingleDay(teams, snapshot) {
   const buyer = teams.find((team) => team.id === buyerId);
   const seller = teams.find((team) => team.id === sellerId);
   if (!buyer || !seller) return null;
-  buyer.players = [...buyer.players.filter((player) => player.id !== sellerGets.id), buyerGets];
-  seller.players = [...seller.players.filter((player) => player.id !== buyerGets.id), sellerGets];
+  if (!executeCpuTrade(teams, result, snapshot.gameDay)) return null;
   return {
     headline: `移籍情報 ${buyerGets.name}が${buyerName}へ`,
     body: `${sellerName}と${buyerName}の間でトレードが成立。${buyerName}は${buyerGets.name}を獲得し、${sellerGets.name}を放出しました。`,
