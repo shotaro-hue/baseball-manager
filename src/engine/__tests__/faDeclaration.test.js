@@ -18,6 +18,28 @@ const lowDrawPlayer = t => {
 };
 
 describe('common offseason expiry', () => {
+  it.each([1000, 50000])('keeps the shared asking salary after CPU renewal failure (previous %i)', previous => {
+    const p = player(7, { salary: previous, ...(previous === 50000 ? { stats: { PA: 0 } } : {}) });
+    const cpu = { ...team(1, [p]), budget: 0 };
+    const context = { year };
+    const demand = calcPlayerDemand(p, { ...context, team: cpu, teams: [cpu] });
+    expect(demand.demandSalary).not.toBe(p.salary);
+    const result = cpuRenewContracts([cpu], null, [cpu], context);
+    expect(result.newFaPlayers).toHaveLength(1);
+    const market = result.newFaPlayers[0];
+    expect(market.marketEntryReason).toBe('国内FA宣言');
+    expect(market.salary).toBe(demand.demandSalary);
+    expect(market.faPreviousSalary).toBe(p.salary);
+    expect(market.faNegotiationReason).toBeTruthy();
+    expect(market.contractYearsLeft).toBe(0);
+  });
+  it('does not reprice a non-FA free contract as an independent declaration', () => {
+    const p = player(8, { salary: 1000, daysOnActiveRoster: 0 });
+    const cpu = { ...team(1, [p]), budget: 0 };
+    const result = cpuRenewContracts([cpu], null, [cpu], { year });
+    expect(result.newFaPlayers[0]).toMatchObject({ salary: p.salary, marketEntryReason: '自由契約', contractYearsLeft: 0 });
+    expect(result.newFaPlayers[0].faPreviousSalary).toBeUndefined();
+  });
   it('includes left=0/1, excludes multi-year, retired, unknown and this-year signed', () => {
     for (const left of [0, 1]) expect(renewalEligible(player(0, { contractYearsLeft: left }), year)).toBe(true);
     for (const extra of [{ contractYearsLeft: 2 }, { contractYearsLeft: undefined }, { contractYearsLeft: NaN }, { isRetired: true }, { _retireNow: true }, { contractSignedYear: year }]) expect(renewalEligible(player(0, extra), year)).toBe(false);
