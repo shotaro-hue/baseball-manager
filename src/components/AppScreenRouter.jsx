@@ -206,9 +206,11 @@ export default function AppScreenRouter({ app }) {
   }
 
   if (screen === 'tactical_game') {
+    const tacticalMyTeam = sf.currentGameTeams?.my ?? myTeam;
+    const tacticalOppTeam = sf.currentGameTeams?.opp ?? sf.currentOpp;
     return (
       <DeferredScreenFrame screen={screen}>
-        {!sf.currentOpp || !myTeam ? (
+        {!tacticalOppTeam || !tacticalMyTeam ? (
           <div className="app">
             <div className="rw">
               <div className="rtitle rlose">試合情報を準備できません</div>
@@ -223,8 +225,8 @@ export default function AppScreenRouter({ app }) {
         ) : (
           <ErrorBoundary onReset={() => setScreen('hub')}>
             <TacticalGameScreen
-              myTeam={myTeam}
-              oppTeam={sf.currentOpp}
+              myTeam={tacticalMyTeam}
+              oppTeam={tacticalOppTeam}
               isHome={sf.currentGameTeams?.isHome ?? true}
               onGameEnd={sf.handleTacticalGameEnd}
             />
