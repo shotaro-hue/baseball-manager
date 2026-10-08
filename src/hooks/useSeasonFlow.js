@@ -558,9 +558,11 @@ export function useSeasonFlow(gs) {
   
       let preparedMyTeam;
       let preparedOpponent;
+      let managedOpponent;
       try {
         preparedMyTeam = applyDhToTeam(myTeam, useDh);
-        preparedOpponent = applyDhToTeam(applyManagementPolicy(opp, { teams, gameDay, includeRosterChanges: true, automationMode: ROSTER_AUTOMATION_MODES.FULL }), useDh);
+        managedOpponent = applyManagementPolicy(opp, { teams, gameDay, includeRosterChanges: true, automationMode: ROSTER_AUTOMATION_MODES.FULL });
+        preparedOpponent = applyDhToTeam(managedOpponent, useDh);
       } catch (error) {
         setPregameError({
           message: error?.validation?.errors?.[0] || error?.message || '編成が成立していません。',
@@ -568,7 +570,7 @@ export function useSeasonFlow(gs) {
         return;
       }
   
-      setCurrentOpp(opp);
+      setCurrentOpp(managedOpponent);
       setCurrentGameTeams({
         my: preparedMyTeam,
         opp: preparedOpponent,
@@ -962,9 +964,19 @@ export function useSeasonFlow(gs) {
     const won=gsResult.won;
     const drew=gsResult.drew;
     const isHome = currentGameTeams?.isHome ?? true;
-    archiveNormalGame(gsResult.log || [], myTeam, currentOpp);
+    // Reuse the roster that actually played the tactical game. Other CPU
+    // clubs need the same pregame maintenance as the single-day Worker;
+    // post-game management is too late for strict lineup validation.
+    const gameTeams = teams.map(team => team.id === myId ? team
+      : team.id === currentOpp.id ? currentOpp
+      : applyManagementPolicy(team, {
+          teams, gameDay, includeRosterChanges: true,
+          automationMode: ROSTER_AUTOMATION_MODES.FULL,
+        }));
+    const playedOpponent = gameTeams.find(team => team.id === currentOpp.id);
+    archiveNormalGame(gsResult.log || [], myTeam, playedOpponent);
     const myUpdate = applyRegularSeasonTeamUpdate(myTeam, gsResult, { isFirstTeam: true, isHomeTeam: isHome, gameDay, year }, playerMod);
-    let updatedTeams = teams.map(t => t.id === myId
+    let updatedTeams = gameTeams.map(t => t.id === myId
       ? applyEmergencyRosterMaintenance(myUpdate.team)
       : t.id === currentOpp.id
         ? applyRegularSeasonTeamUpdate(t, gsResult, { isFirstTeam: false, isHomeTeam: !isHome, gameDay, year }, playerMod).team
@@ -974,8 +986,8 @@ export function useSeasonFlow(gs) {
     const tMatchupList = _tCpuMatchups;
     const tCpuSimResults=[];
     for(const matchup of tMatchupList){
-      const a=teams.find(t=>t.id===matchup.homeId);
-      const b=teams.find(t=>t.id===matchup.awayId);
+      const a=gameTeams.find(t=>t.id===matchup.homeId);
+      const b=gameTeams.find(t=>t.id===matchup.awayId);
       if(!a||!b) continue;
       const useDh=!!a.dhEnabled;
       const cr=buildSafeGameResult(
@@ -1017,8 +1029,8 @@ export function useSeasonFlow(gs) {
           isHome ? myId : _tOppId,
           isHome ? _tOppId : myId,
           homePerspectiveGameResult,
-          isHome ? myTeam.players : currentOpp.players,
-          isHome ? currentOpp.players : myTeam.players,
+          isHome ? myTeam.players : playedOpponent.players,
+          isHome ? playedOpponent.players : myTeam.players,
           isHome ? myTeam.name : currentOpp.name,
           isHome ? currentOpp.name : myTeam.name,
         );
