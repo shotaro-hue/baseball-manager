@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { getFrontOfficePlanPublic } from "../../engine/trade";
+import { rankLeague } from '../../engine/standings';
 
 const MODE_LABEL = {
   contend: { text: "優勝争い", emoji: "🏆", color: "#f59e0b" },
@@ -43,21 +44,19 @@ function TeamStrategyRow({ team, isMe }) {
   );
 }
 
-export function StandingsTab({ teams, myId, onTeamClick }) {
+export function StandingsTab({ teams, myId, onTeamClick, rankingContext }) {
   const myLeague = teams.find(t => t.id === myId)?.league;
   const [lg, setLg] = useState(myLeague || "セ");
   const [showStrategy, setShowStrategy] = useState(false);
 
-  const sorted = [...teams.filter(t => t.league === lg)].sort((a, b) => {
-    const pa = a.wins / Math.max(1, a.wins + a.losses);
-    const pb = b.wins / Math.max(1, b.wins + b.losses);
-    return pb - pa || (b.rf - b.ra) - (a.rf - a.ra);
-  });
+  const { teams: sorted, warnings } = rankLeague(teams, lg, rankingContext);
   const top = sorted[0];
 
   return (
     <div className="calm-detail detail-standings">
       <h1>順位表</h1>
+      {rankingContext && warnings.length > 0 && <details><summary>同率時の順位判定について</summary>
+        {warnings.map(w => <p key={w}>{w}</p>)}</details>}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
         {["セ", "パ"].map(l => (
           <button key={l} aria-pressed={lg === l} onClick={() => setLg(l)} className={`tab ${lg === l ? "on" : ""}`} style={{ flex: 0, padding: "6px 18px" }}>{l}リーグ</button>

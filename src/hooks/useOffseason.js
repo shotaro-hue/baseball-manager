@@ -22,6 +22,7 @@ import { resolveOffseasonFaDeclarations } from '../engine/faDeclaration';
 import { renewalEligible, ownedPlayers, mapOwnedPlayers, remainingContractAfterSeason, validContractOffer, validContractTerms, applyAgreedContract } from '../engine/renewalRules';
 import { contractSnapshot, isPendingContractReply } from '../engine/contractReplies';
 import { planningPlayer, planningSummary } from '../engine/offseasonPlanning';
+import { rankLeague, standingsContext } from '../engine/standings';
 import { draftPicksForTeam } from '../engine/offseasonResume';
 import { hasRecordedFirstTeamSeason } from '../engine/seasonParticipants';
 
@@ -683,7 +684,8 @@ export function useOffseason(gs) {
     const newInductees=checkHallOfFame(currentSeasonHistory.hallOfFame,allAlumni,year);
     const newHoF=[...currentSeasonHistory.hallOfFame,...newInductees];
     if(newInductees.length>0){newInductees.forEach(h=>{setMailbox(prev=>[...prev,{id:uid(),type:"hof",read:false,title:"🏛 殿堂入り: "+h.playerName,from:"球団殿堂委員会",dateLabel:year+"年",timestamp:Date.now(),body:h.playerName+"選手が"+year+"年度の球団殿堂入りを果たした。"+[h.careerHR>0?"通算"+h.careerHR+"本塁打":"",h.careerW>0?"通算"+h.careerW+"勝":"",h.careerPA>0?"通算"+h.careerPA+"打席":""].filter(Boolean).join(" / ")}]);});}
-    const makeRanking=(lg)=>developedTeams.filter(t=>t.league===lg).sort((a,b)=>{const pa=a.wins/Math.max(1,a.wins+a.losses);const pb=b.wins/Math.max(1,b.wins+b.losses);return pb-pa||(b.rf-b.ra)-(a.rf-a.ra);}).map(t=>({id:t.id,name:t.name,emoji:t.emoji,wins:t.wins,losses:t.losses,rf:t.rf,ra:t.ra}));
+    const makeRanking=(lg)=>rankLeague(developedTeams, lg, standingsContext(currentSeasonHistory, getGameResultsMap(), year))
+      .teams.map(t=>({id:t.id,name:t.name,emoji:t.emoji,wins:t.wins,losses:t.losses,draws:t.draws,rf:t.rf,ra:t.ra}));
     const standingsSnap={year,central:makeRanking("セ"),pacific:makeRanking("パ"),titles:awards.titles,playerAwards:{mvpCentral:awards.mvp?.central,mvpPacific:awards.mvp?.pacific,sawamura:awards.sawamura,rookie:awards.rookie}};
     setSeasonHistory(prev=>({...prev,awards:[...prev.awards,awards],records:newRec,hallOfFame:newHoF,standingsHistory:[...(prev.standingsHistory||[]),standingsSnap]}));
     const retiredMyNames=Object.entries(safeDecisions).filter(([,d])=>d==="accepted"||d==="retain_failed").map(([pid])=>myTeam?.players.find(x=>String(x.id)===pid)?.name).filter(Boolean);

@@ -42,6 +42,11 @@ export function planningResumeScreen(plan, year, myId) {
   if (plan?.version !== 1 || plan.year !== year || plan.myId !== myId) return 'hub';
   if (OFFSEASON_SAVE_SCREENS.has(plan.resumeScreen)) {
     const screen = plan.resumeScreen;
+    if (screen === 'playoff' || screen === 'retire_phase') {
+      if (plan.stage !== 'postseason' || !plan.playoff?.se1 || !plan.playoff?.pa1
+        || !plan.playoff.cs1_se || !plan.playoff.cs1_pa) return 'hub';
+      if (screen === 'retire_phase' && !plan.playoff.champion) return 'playoff';
+    }
     if (['draft_preview', 'draft_lottery', 'draft', 'draft_review'].includes(screen)
       && !Array.isArray(plan.draftPool)) return plan.stage === 'results' ? 'waiver_result' : 'hub';
     if (screen === 'draft_review' && !plan.draftResult) return 'draft';

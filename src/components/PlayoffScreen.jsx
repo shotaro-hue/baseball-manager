@@ -1,193 +1,88 @@
-import { useState } from "react";
-import { quickSimGame } from '../engine/simulation';
-import { applyGameStatsFromLog } from '../engine/postGame';
-import { prepareTeamForGame } from '../engine/rosterAutomation';
+import { useEffect, useRef, useState } from 'react';
+import { advancePlayoff, nextPlayoffFixture, PLAYOFF_ORDER, seriesRules } from '../engine/playoff';
+import { simulateNextPlayoffGame } from '../engine/playoffGame';
 
-
-
-export function PlayoffScreen({playoff,setPlayoff,teams,setTeams,myId,year,onFinish}){
-  const myTeam=teams.find(t=>t.id===myId);
-  const phase=playoff.phase;
-  const [simMsg,setSimMsg]=useState(null);
-  const applyPlayoffGameStats = (teamList, t0, t1, result) => {
-    const won0 = result.score.my > result.score.opp;
-    return teamList.map((team) => {
-      if (team.id === t0.id) return {
-        ...team,
-        players: applyGameStatsFromLog(team.players || [], result.log || [], true, won0, 0, 'playoffStats'),
-        rotIdx: (Number(team.rotIdx) || 0) + 1,
-      };
-      if (team.id === t1.id) return {
-        ...team,
-        players: applyGameStatsFromLog(team.players || [], result.log || [], false, !won0, 0, 'playoffStats'),
-        rotIdx: (Number(team.rotIdx) || 0) + 1,
-      };
-      return team;
-    });
-  };
-
-  const simOneGame=(seriesKey,need,nextPhaseBuilder)=>{
-    const s=playoff[seriesKey];
-    const t0=teams.find(t=>t.id===s.teams[0].id)||s.teams[0];
-    const t1=teams.find(t=>t.id===s.teams[1].id)||s.teams[1];
-    const useDh = !!t0.dhEnabled;
-    const r=quickSimGame(prepareTeamForGame(t0, useDh),prepareTeamForGame(t1, useDh));
-    setTeams(prev=>applyPlayoffGameStats(prev,t0,t1,r));
-    const my=r.score.my||0;
-    const op=r.score.opp||0;
-    const scoreStr=my+"-"+op;
-    const won0=my>op;
-    const nw=[s.wins[0]+(won0?1:0),s.wins[1]+(!won0?1:0)];
-    const ng=[...s.games,{score:scoreStr,won0}];
-    const w=nw[0]>=need?0:nw[1]>=need?1:null;
-    const ns={...s,wins:nw,games:ng,done:w!==null,winner:w};
-    const msg=(won0?t0.name:t1.name)+" が勝利！（"+scoreStr+"）"+(w!==null?"→ "+[t0,t1][w].name+"がシリーズ突破！":"");
-    setSimMsg(msg);
-    if(w!==null&&nextPhaseBuilder){
-      const {nextPhase,extra}=nextPhaseBuilder([t0,t1][w],ns);
-      setPlayoff(prev=>({...prev,[seriesKey]:ns,...extra,phase:nextPhase}));
-    } else {
-      setPlayoff(prev=>({...prev,[seriesKey]:ns}));
-    }
-  };
-
-  const isMyGame=(seriesKey)=>{
-    const s=playoff[seriesKey];
-    return s&&!s.done&&(s.teams[0].id===myId||s.teams[1].id===myId);
-  };
-
-  // 全試合まとめてオートシム
-  const simAllRemaining=()=>{
-    const order=["cs1_se","cs1_pa","cs2_se","cs2_pa","jpSeries"];
-    const needs={cs1_se:2,cs1_pa:2,cs2_se:4,cs2_pa:4,jpSeries:4};
-    let state={...playoff};
-    let workingTeams=teams;
-
-    const simSeriesAll=(seriesKey,need)=>{
-      let s=state[seriesKey];
-      if(!s||s.done) return;
-      while(!s.done){
-        const t0=workingTeams.find(t=>t.id===s.teams[0].id)||s.teams[0];
-        const t1=workingTeams.find(t=>t.id===s.teams[1].id)||s.teams[1];
-        const useDh = !!t0.dhEnabled;
-        const r=quickSimGame(prepareTeamForGame(t0, useDh),prepareTeamForGame(t1, useDh));
-        workingTeams=applyPlayoffGameStats(workingTeams,t0,t1,r);
-        const my=r.score.my||0;const op=r.score.opp||0;
-        const won0=my>op;
-        const nw=[s.wins[0]+(won0?1:0),s.wins[1]+(!won0?1:0)];
-        const ng=[...s.games,{score:my+"-"+op,won0}];
-        const w=nw[0]>=need?0:nw[1]>=need?1:null;
-        s={...s,wins:nw,games:ng,done:w!==null,winner:w};
+export function PlayoffScreen({ playoff, setPlayoff, teams, setTeams, myId, year, onFinish, onSave, onRoster }) {
+  const [simMsg, setSimMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+  const running = useRef(false), cancelled = useRef(false);
+  useEffect(() => () => { cancelled.current = true; }, []);
+  const state = advancePlayoff(playoff, year);
+  const publish = result => { setTeams(result.teams); setPlayoff(result.playoff); setSimMsg(result.message); };
+  const run = async all => {
+    if (running.current) return;
+    running.current = true; cancelled.current = false; setBusy(true);
+    let current = { playoff: state, teams };
+    try {
+      // Yield between games so progress can be saved and the user can stop.
+      for (let n = 0; n < (all ? 40 : 1) && !current.playoff.champion && !cancelled.current; n++) {
+        current = simulateNextPlayoffGame(current.playoff, current.teams, year);
+        publish(current);
+        if (all) await new Promise(resolve => setTimeout(resolve, 0));
       }
-      state[seriesKey]=s;
-      return [s.teams[0],s.teams[1]][s.winner];
-    };
-
-    // CS1
-    const seW1=simSeriesAll("cs1_se",2);
-    const paW1=simSeriesAll("cs1_pa",2);
-
-    // CS2（CS1の勝者が確定してから）
-    if(seW1&&state.cs1_se&&state.cs1_se.done){
-      const seTop=state.se1; // リーグ1位チーム（アドバンテージあり）
-      state.cs2_se={label:"CSファイナルステージ（セ）",teams:[seTop,seW1],wins:[1,0],adv:[1,0],games:[],done:false,winner:null};
-      simSeriesAll("cs2_se",4);
+      if (!cancelled.current && all) setSimMsg(current.playoff.champion
+        ? '全試合シミュレーション完了' : '途中まで進めました。続きから再開できます。');
+    } catch (error) {
+      if (!cancelled.current) setSimMsg(error.message || '試合の計算に失敗しました');
+    } finally {
+      running.current = false;
+      if (!cancelled.current) setBusy(false);
     }
-    if(paW1&&state.cs1_pa&&state.cs1_pa.done){
-      const paTop=state.pa1; // リーグ1位チーム（アドバンテージあり）
-      state.cs2_pa={label:"CSファイナルステージ（パ）",teams:[paTop,paW1],wins:[1,0],adv:[1,0],games:[],done:false,winner:null};
-      simSeriesAll("cs2_pa",4);
-    }
-
-    // 日本シリーズ
-    const seChamp=state.cs2_se&&state.cs2_se.done?[state.cs2_se.teams[0],state.cs2_se.teams[1]][state.cs2_se.winner]:null;
-    const paChamp=state.cs2_pa&&state.cs2_pa.done?[state.cs2_pa.teams[0],state.cs2_pa.teams[1]][state.cs2_pa.winner]:null;
-    if(seChamp&&paChamp){
-      state.jpSeries={label:"日本シリーズ",teams:[seChamp,paChamp],wins:[0,0],adv:[0,0],games:[],done:false,winner:null};
-      const jpW=simSeriesAll("jpSeries",4);
-      if(jpW) state={...state,champion:jpW,phase:"champion"};
-    }
-
-    setPlayoff(state);
-    setTeams(workingTeams);
-    setSimMsg("全試合シミュレーション完了！");
   };
-
-  const renderSeries=(seriesKey,need,label)=>{
-    const s=playoff[seriesKey];
-    if(!s) return null;
-    const t0=s.teams[0];const t1=s.teams[1];
-    const active=phase===seriesKey&&!s.done;
-    return(
-      <div className="card" style={{marginBottom:8,border:active?"1px solid rgba(245,200,66,.3)":"1px solid rgba(255,255,255,.06)"}}>
-        <div style={{fontSize:10,color:"#f5c842",fontWeight:700,marginBottom:6}}>{s.label}</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",alignItems:"center",gap:8,marginBottom:8}}>
-          <div style={{textAlign:"center"}}>
-            <div style={{fontSize:12,fontWeight:700,color:t0.color}}>{t0.emoji} {t0.short||t0.name}</div>
-            {s.adv[0]>0&&<div style={{fontSize:9,color:"#94a3b8"}}>({s.adv[0]}勝アドバンテージ)</div>}
-          </div>
-          <div style={{textAlign:"center"}}>
-            <div style={{fontSize:22,fontWeight:700,color:"#f5c842"}}>{s.wins[0]} - {s.wins[1]}</div>
-            <div style={{fontSize:9,color:"#374151"}}>先に{need}勝</div>
-          </div>
-          <div style={{textAlign:"center"}}>
-            <div style={{fontSize:12,fontWeight:700,color:t1.color}}>{t1.emoji} {t1.short||t1.name}</div>
-          </div>
-        </div>
-        {s.games.length>0&&(
-          <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:6}}>
-            {s.games.map((g,i)=><span key={i} style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:g.won0?"rgba(59,130,246,.2)":"rgba(239,68,68,.2)",color:g.won0?"#60a5fa":"#f87171"}}>{g.score}</span>)}
-          </div>
-        )}
-        {s.done&&<div style={{fontSize:11,color:"#34d399",textAlign:"center"}}>✅ {[t0,t1][s.winner].name} 突破！</div>}
-        {active&&(
-          <button className="btn btn-gold" style={{width:"100%",marginTop:6}} onClick={()=>{
-            const need2=seriesKey==="cs1_se"||seriesKey==="cs1_pa"?2:seriesKey==="jpSeries"?4:4;
-            const nextPhaseBuilder=
-              seriesKey==="cs1_se"?((w)=>({nextPhase:"cs1_pa",extra:{cs2_se:{...{label:"CSファイナルステージ（セ）",teams:[playoff.se1,w],wins:[1,0],adv:[1,0],games:[],done:false,winner:null}}}})):
-              seriesKey==="cs1_pa"?((w)=>({nextPhase:"cs2_se",extra:{cs2_pa:{...{label:"CSファイナルステージ（パ）",teams:[playoff.pa1,w],wins:[1,0],adv:[1,0],games:[],done:false,winner:null}}}})):
-              seriesKey==="cs2_se"?((w,s)=>({nextPhase:"cs2_pa",extra:{}})):
-              seriesKey==="cs2_pa"?((w,s)=>{
-                const seChamp=playoff.cs2_se?[playoff.cs2_se.teams[0],playoff.cs2_se.teams[1]][playoff.cs2_se.winner]:playoff.se1;
-                return{nextPhase:"jpSeries",extra:{jpSeries:{label:"日本シリーズ",teams:[seChamp,w],wins:[0,0],adv:[0,0],games:[],done:false,winner:null}}};
-              }):
-              seriesKey==="jpSeries"?((w)=>({nextPhase:"champion",extra:{champion:w}})):null;
-            simOneGame(seriesKey,need2,nextPhaseBuilder?((w,sNew)=>nextPhaseBuilder(w,sNew)):null);
-          }}>
-            {isMyGame(seriesKey)?"⚾ 試合を行う（自動シム）":"⚾ 試合を進める"}
-          </button>
-        )}
+  const renderSeries = key => {
+    const s = state[key];
+    if (!s) return null;
+    const { need, maxGames, kind } = seriesRules(s);
+    const active = state.phase === key && !s.done;
+    const fixture = !s.done ? nextPlayoffFixture(s, year) : null;
+    const home = fixture && s.teams.find(t => t.id === fixture.homeId);
+    const draws = s.games.filter(g => g.drew || g.score?.split('-')[0] === g.score?.split('-')[1]).length;
+    return <section className="card playoff-series" key={key} aria-label={s.label} data-active={active}>
+      <h2>{s.label}</h2>
+      <p>{maxGames ? '最大' + maxGames + '試合・' : ''}先に{need}勝{kind !== 'japan' ? '／同勝数ならシーズン上位が進出' : ''}</p>
+      {s.specialReason && <p className="playoff-note">2勝アドバンテージの理由：{s.specialReason}</p>}
+      <div className="playoff-match">
+        {s.teams.map((team, i) => <div key={team.id}>
+          <strong>{team.emoji} {team.short || team.name}{team.id === myId ? ' ★' : ''}</strong>
+          <div className="playoff-wins">{s.wins[i]}勝</div>
+          <span>実際の勝利 {s.wins[i] - (s.adv?.[i] ?? 0)}勝</span>
+          {(s.adv?.[i] ?? 0) > 0 && <span>アドバンテージ {s.adv[i]}勝</span>}
+          {!s.done && <span>先勝条件まであと{Math.max(0, need - s.wins[i])}勝</span>}
+        </div>)}
       </div>
-    );
+      <p>{s.games.length}試合消化／{draws}引分</p>
+      {s.games.length > 0 && <details><summary>試合結果を見る</summary>
+        <ol className="playoff-games">{s.games.map((g, i) => {
+          const drew = g.drew || g.score?.split('-')[0] === g.score?.split('-')[1];
+          const winner = g.winner ?? (g.won0 ? 0 : 1);
+          const venue = s.teams.find(t => t.id === g.homeId);
+          return <li key={i}><strong>第{i + 1}戦　{g.score}</strong>
+            <span>{drew ? '引分' : s.teams[winner].name + ' 勝利'}{venue ? '／' + venue.short + '本拠地' : ''}</span></li>;
+        })}</ol>
+      </details>}
+      {s.done && <p className="playoff-success">{s.teams[s.winner].name} {kind === 'japan' ? '日本一' : '進出決定'}</p>}
+      {active && <>
+        <p>次は第{fixture.number}戦／{home.name}本拠地／{fixture.useDh ? 'DHあり' : 'DHなし'}</p>
+        <p>{fixture.maxInnings === null ? '延長回数の制限なし' : '延長12回まで'}{fixture.homeClinchOnDraw ? '・引分でも上位球団の進出が決定' : ''}</p>
+        <button className="btn btn-gold" disabled={busy} onClick={() => run(false)}>次の1試合を進める</button>
+      </>}
+    </section>;
   };
-
-  if(phase==="champion"&&playoff.champion){
-    const champ=playoff.champion;
-    const isMe=champ.id===myId;
-    return(
-      <div className="app"><div style={{maxWidth:580,margin:"0 auto",padding:"40px 20px",textAlign:"center"}}>
-        <div style={{fontSize:64,marginBottom:10}}>🏆</div>
-        <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:48,color:"#f5c842",letterSpacing:".1em",marginBottom:8}}>{year}年 日本一！</div>
-        <div style={{fontSize:20,color:champ.color,fontWeight:700,marginBottom:4}}>{champ.emoji} {champ.name}</div>
-        {isMe&&<div style={{fontSize:16,color:"#34d399",margin:"12px 0"}}>おめでとうございます！日本一達成！🎊</div>}
-        {!isMe&&<div style={{fontSize:13,color:"#94a3b8",margin:"12px 0"}}>あなたのチームは今年の頂点には届きませんでした。</div>}
-        <button className="btn btn-gold" style={{padding:"12px 36px",marginTop:16}} onClick={onFinish}>⚾ 引退フェーズへ →</button>
-      </div></div>
-    );
-  }
-
-  return(
-    <div className="app"><div style={{maxWidth:580,margin:"0 auto",padding:"20px"}}>
-      <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:32,color:"#f5c842",letterSpacing:".1em",marginBottom:16,textAlign:"center"}}>🏆 {year}年 ポストシーズン</div>
-      {simMsg&&<div style={{padding:"8px 12px",borderRadius:6,background:"rgba(245,200,66,.08)",border:"1px solid rgba(245,200,66,.2)",fontSize:11,color:"#f5c842",marginBottom:10,textAlign:"center"}}>{simMsg}</div>}
-      <button className="bsm bga" style={{width:"100%",padding:"8px 0",marginBottom:10,fontSize:11}} onClick={simAllRemaining}>
-        ⚡ 全試合まとめてオートシム
-      </button>
-      {renderSeries("cs1_se",2)}
-      {renderSeries("cs1_pa",2)}
-      {playoff.cs2_se&&renderSeries("cs2_se",4)}
-      {playoff.cs2_pa&&renderSeries("cs2_pa",4)}
-      {playoff.jpSeries&&renderSeries("jpSeries",4)}
-    </div></div>
-  );
+  return <div className="app calm-detail detail-result detail-playoff"><main>
+    <h1>{year}年 {state.champion ? '日本シリーズ結果' : 'ポストシーズン'}</h1>
+    {simMsg && <p className="playoff-status" role="status">{simMsg}</p>}
+    {state.rankingWarnings?.length > 0 && <details className="card"><summary>順位判定に使える記録について</summary>
+      {state.rankingWarnings.map(w => <p key={w}>{w}</p>)}</details>}
+    {state.champion ? <section className="card playoff-champion">
+      <div aria-hidden="true">🏆</div><h2>{state.champion.name} 日本一</h2>
+      <p>{state.champion.id === myId ? '日本一達成、おめでとうございます！' : '今季の日本シリーズが終了しました。'}</p>
+      <button className="btn btn-gold" onClick={onFinish}>引退・シーズン終了後の手続きへ</button>
+    </section> : <div className="playoff-actions">
+      <button className="btn btn-gold" disabled={busy} onClick={() => run(true)}>残り全試合をまとめてシム</button>
+      {busy && <button className="btn" onClick={() => { cancelled.current = true; setBusy(false); }}>ここで止める</button>}
+    </div>}
+    {onSave && <button className="btn" disabled={busy} onClick={onSave}>進行を保存</button>}
+    {onRoster && !state.champion && <button className="btn" disabled={busy} onClick={onRoster}>編成を見直す</button>}
+    {PLAYOFF_ORDER.map(renderSeries)}
+  </main></div>;
 }

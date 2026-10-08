@@ -1,5 +1,6 @@
 import { calcOwnerTrustDelta } from '../../engine/frontend';
 import { clamp, uid } from '../../utils';
+import { useRef } from 'react';
 
 export default function PlayoffRoute({
   gs,
@@ -10,6 +11,7 @@ export default function PlayoffRoute({
   setScreen,
   ScreenComponent,
 }) {
+  const finished = useRef(false);
   if (gs.screen !== 'playoff' || !sf.playoff) return null;
 
   return (
@@ -20,7 +22,11 @@ export default function PlayoffRoute({
       setTeams={gs.setTeams}
       myId={myId}
       year={year}
+      onSave={() => gs.handleSave()}
+      onRoster={() => { gs.setTab('roster'); setScreen('hub'); }}
       onFinish={() => {
+        if (finished.current || !sf.playoff?.champion) return;
+        finished.current = true;
         const playoff = sf.playoff;
         if (playoff?.champion) {
           const jpSeries = playoff.jpSeries;
@@ -70,6 +76,7 @@ export default function PlayoffRoute({
           }));
         }
 
+        gs.setOffseasonPlan?.(prev => prev && ({ ...prev, resumeScreen: 'retire_phase' }));
         setScreen('retire_phase');
       }}
     />

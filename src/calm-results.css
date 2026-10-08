@@ -1,4 +1,21 @@
 /* Schedule, result and league screens continue the shared detail theme. */
+.detail-playoff main { max-width: 580px; margin: auto; padding: 20px 16px; overflow-wrap: anywhere; }
+.detail-playoff .card { margin: 16px 0; }
+.detail-playoff :is(p,span,summary,button) { font-size: 15px; line-height: 1.6; }
+.detail-playoff h2 { font-size: 19px; }
+.detail-playoff .btn { min-height: 44px; white-space: normal; margin: 4px 0; }
+.playoff-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.playoff-match { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; text-align: center; }
+.playoff-match span { display: block; color: #53657c; }
+.playoff-wins { color: #095cc7; font-size: 28px; font-weight: 700; }
+.playoff-series[data-active=true] { border: 2px solid #095cc7; }
+.playoff-series > .btn { width: 100%; }
+.playoff-games { padding-left: 24px; }
+.playoff-games li { padding: 8px 0; }
+.playoff-games span { display: block; }
+.playoff-success { color: #14714b; font-weight: 700; }
+.playoff-status, .playoff-note { padding: 10px; background: #edf4fc; border-radius: 8px; color: #38506f; }
+.playoff-champion { text-align: center; }
 .calm-detail {
   --text: #17243a; --gold: #095cc7; --green: #14714b; --red: #b42332; --blue: #095cc7;
 }

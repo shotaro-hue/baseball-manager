@@ -503,7 +503,8 @@ export function useGameState() {
     const request = beginTrackedSave();
     const result=await queueSave(
       {teams,myId,gameDay,year,saveId,faPool,faYears,seasonHistory,news,mailbox,saveRevision,
-        offseasonPlan: offseasonPlan && { ...offseasonPlan, resumeScreen: screen }, ...options.payload},
+        offseasonPlan: offseasonPlan && { ...offseasonPlan, resumeScreen:
+          offseasonPlan.stage === 'postseason' && screen === 'hub' ? offseasonPlan.resumeScreen : screen }, ...options.payload},
       request.options,
     );
     if(result.ok){
