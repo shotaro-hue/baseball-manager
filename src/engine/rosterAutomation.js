@@ -802,6 +802,33 @@ function repairLineupPreservingOrder(team, useDh, options = {}) {
     assignPlayer(candidate, pos);
   }
 
+  // If a vacancy has no unused specialist, move an existing starter only
+  // when another healthy player can cover the position they leave behind.
+  const fillVacancy = (pos, visited = new Set()) => {
+    if (visited.has(pos)) return false;
+    const nextVisited = new Set([...visited, pos]);
+    const candidates = eligible
+      .filter((player) => proficiencyAt(player, pos) > 0)
+      .sort((a, b) => Number(usedPlayers.has(a.id)) - Number(usedPlayers.has(b.id))
+        || proficiencyAt(b, pos) - proficiencyAt(a, pos));
+    for (const player of candidates) {
+      const entry = entries.find((candidate) => candidate.id === player.id);
+      if (!entry) {
+        usedPlayers.add(player.id);
+        entries.push({ id: player.id, pos });
+        return true;
+      }
+      if (fillVacancy(entry.pos, nextVisited)) {
+        entry.pos = pos;
+        return true;
+      }
+    }
+    return false;
+  };
+  for (const pos of required.filter((candidate) => !usedPositions.has(candidate))) {
+    if (fillVacancy(pos)) usedPositions.add(pos);
+  }
+
   return {
     lineup: entries.slice(0, targetSize).map((entry) => entry.id),
     fielding: entriesToFieldingMap(entries.slice(0, targetSize)),

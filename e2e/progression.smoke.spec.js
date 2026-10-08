@@ -135,3 +135,57 @@ test('E3 invalid lineup, useful guidance, UI repair, one game', async ({ page })
   const after = progressSignature(await saveHub(page));
   expect(after.played).toBe(before.played+1); expect(after.gameDay).toBe(before.gameDay+1);
 });
+
+test('E4 shortstop injury, emergency fielding moves, batch and persisted reload', async ({ page }) => {
+  await loadFixture(page, 'new');
+  const fixture = await readSave(page);
+  const expected = await page.evaluate(async state => {
+    const { createInitialTeams } = await import('/baseball-manager/src/engine/bootstrapTeams.js');
+    const { saveGame } = await import('/baseball-manager/src/engine/saveload.js');
+    const random = Math.random;
+    let seed = 1;
+    // Fix only fixture construction; Worker simulation and storage stay real.
+    try {
+      Math.random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+      state.teams = createInitialTeams();
+    } finally { Math.random = random; }
+    state.myId = 4;
+    const team = state.teams.find(t => t.id === state.myId);
+    const shortstop = team.players.find(p => team.fieldingNoDh[p.id] === '遊撃手');
+    const second = team.players.find(p => team.fieldingNoDh[p.id] === '二塁手');
+    shortstop.injuryDaysLeft = 10;
+    shortstop.injury = '軽微';
+    const result = await saveGame(state);
+    if (!result.ok) throw new Error('injury fixture save failed');
+    return { shortstop: shortstop.id, second: second.id,
+      retainedOrder: team.lineupNoDh.filter(id => id !== shortstop.id), rotation: team.rotation,
+      starter: team.rotation[team.rotIdx % team.rotation.length] };
+  }, fixture);
+  await reloadAndLoad(page);
+  await runBatch(page, false);
+  const saved = await saveHub(page);
+  const team = saved.teams.find(t => t.id === saved.myId);
+  expect(progressSignature(saved).played).toBe(5);
+  expect(team.lineupNoDh).toHaveLength(8);
+  expect(team.lineupNoDh).not.toContain(expected.shortstop);
+  // The first game starts before any new post-game injuries. Check its exact
+  // batting order and starter rather than assuming five random games stay healthy.
+  const firstLog = saved.gameResultsMap[1].log;
+  const batting = firstLog.filter(e => e.scorer && e.batId && !e.isStolenBase && e.result !== 'change');
+  const pitching = firstLog.filter(e => !e.scorer && e.pitcherId && !e.isStolenBase && e.result !== 'change');
+  expect(batting.slice(0, 7).map(e => e.batId)).toEqual(expected.retainedOrder);
+  expect(new Set(batting.slice(0, 8).map(e => e.batId)).size).toBe(8);
+  expect(pitching[0].pitcherId).toBe(expected.starter);
+  const healthy = new Set(team.players.filter(p => !(p.injuryDaysLeft > 0)).map(p => p.id));
+  const retainedHealthy = expected.retainedOrder.filter(id => healthy.has(id));
+  expect(team.lineupNoDh.filter(id => retainedHealthy.includes(id))).toEqual(retainedHealthy);
+  if (healthy.has(expected.second)) expect(team.fieldingNoDh[expected.second]).toBe('遊撃手');
+  const healthyRotation = expected.rotation.filter(id => healthy.has(id));
+  expect(team.rotation.filter(id => healthyRotation.includes(id))).toEqual(healthyRotation);
+  await reloadAndLoad(page);
+  const reopened = await saveHub(page);
+  expect(progressSignature(reopened)).toEqual(progressSignature(saved));
+  const resumed = reopened.teams.find(t => t.id === reopened.myId);
+  expect(resumed.lineupNoDh).toEqual(team.lineupNoDh);
+  expect(resumed.fieldingNoDh).toEqual(team.fieldingNoDh);
+});
