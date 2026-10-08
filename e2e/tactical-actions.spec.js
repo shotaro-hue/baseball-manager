@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openBatch } from './helpers/progression';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -11,12 +12,14 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('opening dashboard uses the same game number and date as the sim button', async ({ page }) => {
+  await openBatch(page, false);
   const simText = await page.getByRole('button', { name: /^1試合/ }).innerText();
   const date = simText.match(/\d+\/\d+/)[0];
-  await expect(page.getByText(`${date} Game 1`, { exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: '本日の試合', exact:true })).toContainText(`${date} Game 1`);
 });
 
 test('manual pause exposes tactics, and an advisory stop can execute a command', async ({ page }) => {
+  await openBatch(page, false);
   await page.getByRole('button', { name: /^1試合/ }).click();
   await page.getByRole('button', { name: /🎮 試合モード/ }).click();
   const tactics = page.getByRole('button', { name: '🎯 作戦', exact: true });
