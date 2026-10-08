@@ -183,3 +183,18 @@ it('updates only playoff stats and gives neither pitcher a win on a draw', () =>
     expect(t.players.find(p => p.id === pitchers[i].id).stats).toEqual(initial[i].players.find(p => p.id === pitchers[i].id).stats);
   });
 });
+
+it('repairs injured CPU assignments at postseason entry without adding regular-season games', () => {
+  const teams = [TEAM_DEFS[0],TEAM_DEFS[6]].map(d => optimizeTeamForGameStart(buildTeam(d)));
+  const injuredId=teams[1].lineupNoDh[0];
+  teams[1].players=teams[1].players.map(p=>p.id===injuredId?{...p,injury:'test',injuryDaysLeft:3}:p);
+  teams.forEach(t=>Object.assign(t,{wins:80,losses:60,draws:3}));
+  const series=createSeries(teams[0],teams[1],'japan');
+  const p={...initPlayoff(six()),cs1_se:{done:true},cs1_pa:{done:true},cs2_se:{done:true},cs2_pa:{done:true},jpSeries:series,phase:'jpSeries'};
+  const before=structuredClone(teams);
+  const next=simulateNextPlayoffGame(p,teams,2026,()=>({...result(1,0),log:[]}),{myId:teams[0].id});
+  expect(next.playoff.jpSeries.games).toHaveLength(1);
+  expect(next.teams[1].lineupNoDh).not.toContain(injuredId);
+  for(const t of next.teams) expect(t).toMatchObject({wins:80,losses:60,draws:3});
+  expect(teams).toEqual(before);
+});

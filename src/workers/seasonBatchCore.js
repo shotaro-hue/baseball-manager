@@ -1,3 +1,4 @@
+import { regularSeasonRequest } from '../engine/seasonProgress';
 import { uid, rng, rngf, gameDayToDate } from '../utils';
 import * as playerRules from '../engine/player';
 import { applyRegularSeasonTeamUpdate } from '../engine/regularGameUpdates';
@@ -507,13 +508,15 @@ export function simulateSeasonBatch({
   onArchiveChunk,
   isCancelled,
 }) {
+  const request = regularSeasonRequest(snapshot, count);
+  if (!request.count) throw new Error(request.reason);
   const state = normalizeSnapshot(snapshot);
   const myTeamBefore = state.teams.find((team) => team.id === state.myId);
   if (!myTeamBefore) {
     throw new Error('My team was not found in snapshot');
   }
 
-  const safeCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+  const safeCount = request.count;
   if (safeCount <= 0) {
     throw new Error('Season batch count must be greater than zero');
   }

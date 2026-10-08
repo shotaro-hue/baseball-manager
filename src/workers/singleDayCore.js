@@ -1,3 +1,5 @@
+import { regularSeasonRequest } from '../engine/seasonProgress';
+import { getMyMatchup } from '../engine/scheduleGen';
 import { uid, rng, rngf, gameDayToDate } from '../utils';
 import * as playerRules from '../engine/player';
 import { calcRetireWill } from '../engine/player';
@@ -14,6 +16,8 @@ import { selectAllStars, runAllStarGame } from '../engine/allstar';
 import { getCpuMatchups } from '../engine/scheduleGen';
 import {
   applyEmergencyRosterMaintenance,
+  applyManagementPolicy,
+  ROSTER_AUTOMATION_MODES,
   prepareTeamForGame,
 } from '../engine/rosterAutomation';
 import {
@@ -261,8 +265,14 @@ export function simulateSingleDay({
   onProgress,
   onArchiveChunk,
 }) {
+  const request = regularSeasonRequest(snapshot, 1);
+  if (!request.count) throw new Error(request.reason);
+  const matchup = getMyMatchup(snapshot.schedule, snapshot.gameDay, snapshot.myId);
+  if (matchup.oppId !== gameContext?.selectedOpponentId || matchup.isHome !== gameContext?.isHome) throw new Error('対戦日程と要求が一致しません。');
   const safeSnapshot = cloneValue(snapshot || {});
-  const teams = safeSnapshot.teams || [];
+  const teams = (safeSnapshot.teams || []).map(team => team.id === safeSnapshot.myId ? team : applyManagementPolicy(team, {
+    teams: safeSnapshot.teams, gameDay: safeSnapshot.gameDay, includeRosterChanges: true, automationMode: ROSTER_AUTOMATION_MODES.FULL,
+  }));
   const myTeam = teams.find((team) => team.id === safeSnapshot.myId);
   const currentOpp = teams.find((team) => team.id === gameContext?.selectedOpponentId);
   if (!myTeam || !currentOpp) {
@@ -310,16 +320,7 @@ export function simulateSingleDay({
   ensureNotCancelled(isCancelled);
 
   const cpuMatchups = getCpuMatchups(safeSnapshot.schedule, safeSnapshot.gameDay, safeSnapshot.myId, currentOpp.id);
-  const fallbackOthers = nextTeams.filter((team) => team.id !== safeSnapshot.myId && team.id !== currentOpp.id);
-  const matchupList = cpuMatchups.length > 0
-    ? cpuMatchups
-    : (() => {
-        const pairs = [];
-        for (let index = 0; index < fallbackOthers.length - 1; index += 2) {
-          pairs.push({ homeId: fallbackOthers[index].id, awayId: fallbackOthers[index + 1].id });
-        }
-        return pairs;
-      })();
+  const matchupList = cpuMatchups;
 
   const allTeamResultsPatch = {};
   const gameResultsMapPatch = buildGameResultsMapPatch(safeSnapshot.gameDay, userGameResult, currentOpp, isHome);

@@ -16,7 +16,7 @@ export function PlayoffScreen({ playoff, setPlayoff, teams, setTeams, myId, year
     try {
       // Yield between games so progress can be saved and the user can stop.
       for (let n = 0; n < (all ? 40 : 1) && !current.playoff.champion && !cancelled.current; n++) {
-        current = simulateNextPlayoffGame(current.playoff, current.teams, year);
+        current = simulateNextPlayoffGame(current.playoff, current.teams, year, undefined, { myId });
         publish(current);
         if (all) await new Promise(resolve => setTimeout(resolve, 0));
       }

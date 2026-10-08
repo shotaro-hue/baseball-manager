@@ -1,3 +1,4 @@
+import { regularSeasonRequest } from '../engine/seasonProgress';
 import { useState, useRef, useEffect } from "react";
 import SeasonBatchWorker from "../workers/seasonBatchWorker?worker";
 import { uid, rng, rngf, gameDayToDate } from '../utils';
@@ -15,6 +16,7 @@ import { createBattedBallBatchRecords } from '../engine/battedBallProfile';
 import {
   applyEmergencyRosterMaintenance,
   applyManagementPolicy,
+  ROSTER_AUTOMATION_MODES,
   prepareTeamForGame,
 } from '../engine/rosterAutomation';
 import { isTeamIdSet } from '../engine/teamId';
@@ -127,6 +129,14 @@ export function useSeasonFlow(gs) {
   const [currentGameTeams, setCurrentGameTeams] = useState(null);
   const [batchProgress, setBatchProgress] = useState(null);
   const pendingPlayoffRef = useRef(false);
+  const startingRef = useRef(false);
+  const appliedGameRef = useRef(null);
+  const requestRegularGames = count => regularSeasonRequest({ teams, myId, gameDay, year, schedule, offseasonPlan: gs.offseasonPlan, gameResultsMap: getGameResultsMap() }, count);
+  const allowRegularGames = count => {
+    const request = requestRegularGames(count);
+    if (!request.count) notify(request.reason, 'warn');
+    return request.count;
+  };
   const isBatchCancelledRef = useRef(false);
   const seasonProgressWorkerRef = useRef(null);
   const seasonProgressTaskIdRef = useRef(null);
@@ -359,9 +369,7 @@ export function useSeasonFlow(gs) {
     if(matchup){
       return {opp:teams.find(t=>t.id===matchup.oppId)||null, isHome:matchup.isHome, venueNote:matchup.venueNote};
     }
-    const myLeague=myTeam?.league;
-    const pool=teams.filter(t=>t.id!==myId&&t.league===myLeague);
-    return {opp:pool[rng(0,pool.length-1)]||teams.find(t=>t.id!==myId),isHome:true,venueNote:null};
+    return { opp: null, isHome: true, venueNote: null };
   };
 
   const mergeAllTeamResultsPatch = (patch) => {
@@ -411,7 +419,7 @@ export function useSeasonFlow(gs) {
   };
 
   const runSingleDaySimulation = async ({ oppId, useDh, isHome, simulationMode = "detailed" }) => {
-    if (!myTeam || !isTeamIdSet(oppId)) return;
+    if (!myTeam || !isTeamIdSet(oppId) || seasonProgressTaskIdRef.current || !allowRegularGames(1)) return;
 
     const startedAt = Date.now();
     const taskId = uid();
@@ -432,6 +440,7 @@ export function useSeasonFlow(gs) {
       allStarResult,
       allStarTriggerDay,
       saveRevision,
+      offseasonPlan: gs.offseasonPlan,
     };
 
     const cleanupWorker = () => {
@@ -588,52 +597,55 @@ export function useSeasonFlow(gs) {
   // Pick opponent and go to mode select
   const handleStartGame = async () => {
     if (savedPostseason) { setScreen(gs.offseasonPlan.resumeScreen === 'retire_phase' ? 'retire_phase' : 'playoff'); return; }
-    if(batchProgress) return;
-    if(!myTeam) return;
-    const {opp,isHome}=await pickOpponentFromSchedule(gameDay);
-    if(!opp) return;
-
-    const useDh = isHome ? !!myTeam.dhEnabled : !!opp.dhEnabled;
-    const neededBatters = useDh ? 9 : 8;
-    const activeCount = myTeam.players.filter(p => !p.isIkusei).length;
-    if (activeCount > MAX_ROSTER) {
-      setPregameError({ message: `一軍登録人数が ${MAX_ROSTER} 人を超えています。現在 ${activeCount} 人です。` });
-      return;
-    }
-    const myNonPitchers = myTeam.players.filter(p => !p.isPitcher && !p.isIkusei);
-    const myNonPitcherIds = new Set(myNonPitchers.map(p => p.id));
-    const lineupSrc = useDh ? (myTeam.lineupDh || myTeam.lineup || []) : (myTeam.lineupNoDh || myTeam.lineup || []);
-    const myLineup = lineupSrc.filter(id => myNonPitcherIds.has(id));
-    if (myLineup.length < neededBatters) {
-      setPregameError({ message: `先発メンバーが不足しています。必要 ${neededBatters} 人 / 現在 ${myLineup.length} 人です。` });
-      return;
-    }
-    const foreignInLineup = myLineup.filter(id => myNonPitchers.find(p => p.id === id)?.isForeign).length;
-    if (foreignInLineup > MAX_FOREIGN_ACTIVE) {
-      setPregameError({ message: `先発メンバーの外国人枠は ${MAX_FOREIGN_ACTIVE} 人までです。現在 ${foreignInLineup} 人います。` });
-      return;
-    }
-
-    let preparedMyTeam;
-    let preparedOpponent;
+    if (startingRef.current || seasonProgressTaskIdRef.current || batchProgress || !allowRegularGames(1)) return;
+    startingRef.current = true;
     try {
-      preparedMyTeam = applyDhToTeam(myTeam, useDh);
-      preparedOpponent = applyDhToTeam(opp, useDh);
-    } catch (error) {
-      setPregameError({
-        message: error?.validation?.errors?.[0] || error?.message || '編成が成立していません。',
+      const {opp,isHome}=await pickOpponentFromSchedule(gameDay);
+      if(!opp) return;
+  
+      const useDh = isHome ? !!myTeam.dhEnabled : !!opp.dhEnabled;
+      const neededBatters = useDh ? 9 : 8;
+      const activeCount = myTeam.players.filter(p => !p.isIkusei).length;
+      if (activeCount > MAX_ROSTER) {
+        setPregameError({ message: `一軍登録人数が ${MAX_ROSTER} 人を超えています。現在 ${activeCount} 人です。` });
+        return;
+      }
+      const myNonPitchers = myTeam.players.filter(p => !p.isPitcher && !p.isIkusei);
+      const myNonPitcherIds = new Set(myNonPitchers.map(p => p.id));
+      const lineupSrc = useDh ? (myTeam.lineupDh || myTeam.lineup || []) : (myTeam.lineupNoDh || myTeam.lineup || []);
+      const myLineup = lineupSrc.filter(id => myNonPitcherIds.has(id));
+      if (myLineup.length < neededBatters) {
+        setPregameError({ message: `先発メンバーが不足しています。必要 ${neededBatters} 人 / 現在 ${myLineup.length} 人です。` });
+        return;
+      }
+      const foreignInLineup = myLineup.filter(id => myNonPitchers.find(p => p.id === id)?.isForeign).length;
+      if (foreignInLineup > MAX_FOREIGN_ACTIVE) {
+        setPregameError({ message: `先発メンバーの外国人枠は ${MAX_FOREIGN_ACTIVE} 人までです。現在 ${foreignInLineup} 人います。` });
+        return;
+      }
+  
+      let preparedMyTeam;
+      let preparedOpponent;
+      try {
+        preparedMyTeam = applyDhToTeam(myTeam, useDh);
+        preparedOpponent = applyDhToTeam(applyManagementPolicy(opp, { teams, gameDay, includeRosterChanges: true, automationMode: ROSTER_AUTOMATION_MODES.FULL }), useDh);
+      } catch (error) {
+        setPregameError({
+          message: error?.validation?.errors?.[0] || error?.message || '編成が成立していません。',
+        });
+        return;
+      }
+  
+      setCurrentOpp(opp);
+      setCurrentGameTeams({
+        my: preparedMyTeam,
+        opp: preparedOpponent,
+        useDh,
+        isHome,
       });
-      return;
-    }
-
-    setCurrentOpp(opp);
-    setCurrentGameTeams({
-      my: preparedMyTeam,
-      opp: preparedOpponent,
-      useDh,
-      isHome,
-    });
-    setScreen("mode_select");
+      setPregameError(null);
+      setScreen("mode_select");
+    } finally { startingRef.current = false; }
   };
 
   // Mode selected ↁEstart appropriate game type
@@ -664,6 +676,8 @@ export function useSeasonFlow(gs) {
 
   // Auto sim result handler
   const handleAutoSimEnd = async (r) => {
+    if (appliedGameRef.current === `${year}:${gameDay}` || !allowRegularGames(1)) return;
+    appliedGameRef.current = `${year}:${gameDay}`;
     const myT=teams.find(t=>t.id===myId);
     if(!myT) return;
     const isHome = currentGameTeams?.isHome ?? true;
@@ -687,10 +701,7 @@ export function useSeasonFlow(gs) {
     // Simulate remaining CPU vs CPU games for this day (schedule-based matchups)
     const _oppId=currentOpp.id;
     const _cpuMatchups=scheduleMod.getCpuMatchups(schedule,gameDay,myId,_oppId);
-    const _fallbackOthers=teams.filter(t=>t.id!==myId&&t.id!==_oppId);
-    const matchupList=_cpuMatchups.length>0
-      ?_cpuMatchups
-      :(()=>{const pairs=[];for(let i=0;i<_fallbackOthers.length-1;i+=2)pairs.push({homeId:_fallbackOthers[i].id,awayId:_fallbackOthers[i+1].id});return pairs;})();
+    const matchupList = _cpuMatchups;
 
     const cpuSimResults=[];
     for(const matchup of matchupList){
@@ -785,12 +796,9 @@ export function useSeasonFlow(gs) {
 
   const handleBatchSim = (count, autoManageMyTeam=false) => {
     if (savedPostseason) { setScreen(gs.offseasonPlan.resumeScreen === 'retire_phase' ? 'retire_phase' : 'playoff'); return; }
-    if(!myTeam) return;
-    const requestedCount = Number.isFinite(count) ? Math.floor(count) : BATCH;
-    const safeRequestedCount = Math.max(0, requestedCount);
-    const actual=Math.min(safeRequestedCount, SEASON_GAMES-(gameDay-1));
-    if(actual<=0) return;
-    runBatchGames(actual, autoManageMyTeam);
+    if (startingRef.current || seasonProgressTaskIdRef.current) return;
+    const actual = allowRegularGames(count);
+    if (actual) runBatchGames(actual, autoManageMyTeam);
   };
 
 
@@ -805,10 +813,7 @@ export function useSeasonFlow(gs) {
   },[]);
 
   const handleSeasonSim = (autoManageMyTeam=false) => {
-    if(!myTeam) return;
-    const count=SEASON_GAMES-(gameDay-1);
-    if(count<=0) return;
-    runBatchGames(count, autoManageMyTeam);
+    handleBatchSim(SEASON_GAMES, autoManageMyTeam);
   };
 
   const calcLeagueRank = (teamId, allTeams, league) => {
@@ -822,8 +827,8 @@ export function useSeasonFlow(gs) {
   };
 
   const runBatchGames = async (count, autoManageMyTeam=false) => {
-    if(!myTeam) return;
-    const safeCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+    if (seasonProgressTaskIdRef.current || startingRef.current) return;
+    const safeCount = allowRegularGames(count);
     if (safeCount <= 0) {
       notify("Failed to start batch processing", "warn");
       return;
@@ -853,6 +858,7 @@ export function useSeasonFlow(gs) {
       allStarResult,
       allStarTriggerDay,
       saveRevision,
+      offseasonPlan: gs.offseasonPlan,
     };
 
     const mergeAllTeamResultsPatch = (patch) => {
@@ -1048,6 +1054,8 @@ export function useSeasonFlow(gs) {
 
   // Game over callback from TacticalGameScreen
   const handleTacticalGameEnd = async rawGameResult => {
+    if (appliedGameRef.current === `${year}:${gameDay}` || !allowRegularGames(1)) return;
+    appliedGameRef.current = `${year}:${gameDay}`;
     if (!myTeam || !currentOpp) {
       notify("試合結果を保存できませんでした。対戦データを再読み込みしてください。", "error");
       setScreen("hub");
@@ -1077,10 +1085,7 @@ export function useSeasonFlow(gs) {
         : { ...t });
     const _tOppId=currentOpp.id;
     const _tCpuMatchups=scheduleMod.getCpuMatchups(schedule,gameDay,myId,_tOppId);
-    const _tFallbackOthers=teams.filter(t=>t.id!==myId&&t.id!==_tOppId);
-    const tMatchupList=_tCpuMatchups.length>0
-      ?_tCpuMatchups
-      :(()=>{const pairs=[];for(let i=0;i<_tFallbackOthers.length-1;i+=2)pairs.push({homeId:_tFallbackOthers[i].id,awayId:_tFallbackOthers[i+1].id});return pairs;})();
+    const tMatchupList = _tCpuMatchups;
     const tCpuSimResults=[];
     for(const matchup of tMatchupList){
       const a=teams.find(t=>t.id===matchup.homeId);

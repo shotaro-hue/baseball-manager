@@ -1,3 +1,4 @@
+import { regularSeasonRequest } from '../../engine/seasonProgress';
 import { Suspense, lazy } from 'react';
 import { DashboardTab } from '../DashboardTab';
 import { MobileHome } from '../MobileHome';
@@ -70,16 +71,17 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
   const foreignActiveCount =
     myTeam?.players?.filter((player) => player.isForeign).length || 0;
 
+  const canSim = regularSeasonRequest({ teams, myId, year, gameDay, schedule, offseasonPlan: gs.offseasonPlan }, 1).count > 0;
   if (tab === 'dashboard') {
     return (
       <>
       <MobileHome myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year}
         recentResults={gs.recentResults} onTabSwitch={onTabChange} onStartGame={sf.handleStartGame}
-        onBatchSim={sf.handleBatchSim} onSeasonSim={sf.handleSeasonSim} batchProgress={sf.batchProgress}/>
+        onBatchSim={sf.handleBatchSim} onSeasonSim={sf.handleSeasonSim} batchProgress={sf.batchProgress} canSim={canSim}/>
       <div className="desktop-dashboard"><DashboardTab
         myTeam={myTeam}
         onStartGame={sf.handleStartGame}
-        disableStart={Boolean(sf.batchProgress)}
+        disableStart={!canSim || Boolean(sf.batchProgress)}
         teams={teams}
         schedule={schedule}
         gameDay={gameDay}

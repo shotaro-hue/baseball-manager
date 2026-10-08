@@ -1,15 +1,20 @@
 import { quickSimGame } from './simulation';
 import { applyGameStatsFromLog } from './postGame';
-import { prepareTeamForGame } from './rosterAutomation';
+import { prepareTeamForGame, applyManagementPolicy, ROSTER_AUTOMATION_MODES } from './rosterAutomation';
 import { advancePlayoff, nextPlayoffFixture, recordSeriesGame } from './playoff';
 
-export function simulateNextPlayoffGame(playoff, teams, year, simulate = quickSimGame) {
+export function simulateNextPlayoffGame(playoff, teams, year, simulate = quickSimGame, { myId } = {}) {
   const state = advancePlayoff(playoff, year);
   if (state.champion) return { playoff: state, teams, message: '全試合終了' };
   const key = state.phase, series = state[key], fixture = nextPlayoffFixture(series, year);
   const clubs = series.teams.map(snapshot => teams.find(t => t.id === snapshot.id));
   if (clubs.some(t => !t)) throw new Error('出場球団のデータが見つかりません');
-  const prepared = clubs.map(t => prepareTeamForGame(t, fixture.useDh));
+  // CPU clubs can enter October with an injured regular-season assignment.
+  // Use the existing CPU management; leave the user roster to the normal UI.
+  const ready = clubs.map(t => t.id === myId ? t : applyManagementPolicy(t, {
+    teams, includeRosterChanges: true, automationMode: ROSTER_AUTOMATION_MODES.FULL,
+  }));
+  const prepared = ready.map(t => prepareTeamForGame(t, fixture.useDh));
   const result = simulate(prepared[0], prepared[1], fixture);
   const updated = recordSeriesGame(series, result, fixture);
   // Score/log remain in series team order even when team 1 is the home club.
@@ -17,7 +22,7 @@ export function simulateNextPlayoffGame(playoff, teams, year, simulate = quickSi
     const i = clubs.findIndex(t => t.id === team.id);
     if (i < 0) return team;
     const won = i === 0 ? result.score.my > result.score.opp : result.score.opp > result.score.my;
-    return { ...team, players: applyGameStatsFromLog(prepared[i].players, result.log || [], i === 0, won, 0, 'playoffStats'),
+    return { ...ready[i], players: applyGameStatsFromLog(prepared[i].players, result.log || [], i === 0, won, 0, 'playoffStats'),
       rotIdx: (team.rotIdx ?? 0) + 1 };
   });
   const game = updated.games.at(-1);
