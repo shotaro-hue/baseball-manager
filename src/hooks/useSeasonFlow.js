@@ -10,7 +10,6 @@ import { executeCpuTrade } from '../engine/cpuTradeExecution';
 import { encodePlayoff, initPlayoff } from '../engine/playoff';
 import { standingsContext } from '../engine/standings';
 import { processCpuFaBids } from '../engine/contract';
-import { cancelDeferredPostGameWork, scheduleDeferredPostGameWork } from '../engine/postGameProcessing';
 import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, MAX_ROSTER } from '../constants';
 import { createBattedBallBatchRecords } from '../engine/battedBallProfile';
 import {
@@ -100,13 +99,12 @@ export function useSeasonFlow(gs) {
     setSaveExists, cpuTradeOffers,
     allStarDone, setAllStarDone, allStarResult, setAllStarResult,
     allStarTriggerDay,
-    setAllTeamResultsMap, setAllTeamBoxScoresMap, setPregameError,
+    setAllTeamResultsMap, setPregameError,
     getSeasonHistory,
     getNewsBySelector,
     getMailboxBySelector,
     getGameResultsMap,
     getScheduleArchive,
-    resetSaveTracking,
   } = gs;
 
   const [gameResult, setGameResult] = useState(null);
@@ -140,7 +138,6 @@ export function useSeasonFlow(gs) {
   const isBatchCancelledRef = useRef(false);
   const seasonProgressWorkerRef = useRef(null);
   const seasonProgressTaskIdRef = useRef(null);
-  const deferredBatchPatchRef = useRef(null);
   const archiveNormalGame = (log, firstTeam, secondTeam, archiveGameDay = gameDay) => {
     const records = createBattedBallBatchRecords(log, {
       saveId,
@@ -172,10 +169,6 @@ export function useSeasonFlow(gs) {
 
   useEffect(() => () => {
     isBatchCancelledRef.current = true;
-    if (deferredBatchPatchRef.current) {
-      cancelDeferredPostGameWork(deferredBatchPatchRef.current);
-      deferredBatchPatchRef.current = null;
-    }
   }, []);
   useEffect(()=>{
     if(!myTeam) return;
@@ -372,52 +365,6 @@ export function useSeasonFlow(gs) {
     return { opp: null, isHome: true, venueNote: null };
   };
 
-  const mergeAllTeamResultsPatch = (patch) => {
-    if (!patch || typeof patch !== "object") return;
-    setAllTeamResultsMap((prev) => {
-      let next = prev;
-      for (const [teamId, days] of Object.entries(patch)) {
-        const currentTeamMap = prev[teamId] || {};
-        let hasDiff = false;
-        for (const [dayKey, dayValue] of Object.entries(days || {})) {
-          if (currentTeamMap[dayKey] !== dayValue) {
-            hasDiff = true;
-            break;
-          }
-        }
-        if (!hasDiff) continue;
-        next = {
-          ...next,
-          [teamId]: { ...currentTeamMap, ...days },
-        };
-      }
-      return next;
-    });
-  };
-
-  const mergeAllTeamBoxScoresPatch = (patch) => {
-    if (!patch || typeof patch !== "object") return;
-    setAllTeamBoxScoresMap((prev) => {
-      let next = prev;
-      for (const [teamId, days] of Object.entries(patch)) {
-        const currentTeamMap = prev[teamId] || {};
-        let hasDiff = false;
-        for (const [dayKey, dayValue] of Object.entries(days || {})) {
-          if (currentTeamMap[dayKey] !== dayValue) {
-            hasDiff = true;
-            break;
-          }
-        }
-        if (!hasDiff) continue;
-        next = {
-          ...next,
-          [teamId]: { ...currentTeamMap, ...days },
-        };
-      }
-      return next;
-    });
-  };
-
   const runSingleDaySimulation = async ({ oppId, useDh, isHome, simulationMode = "detailed" }) => {
     if (!myTeam || !isTeamIdSet(oppId) || seasonProgressTaskIdRef.current || !allowRegularGames(1)) return;
 
@@ -539,13 +486,8 @@ export function useSeasonFlow(gs) {
       const {
         nextState,
         userGameResult,
-        recentResultsPatch,
-        gameResultsMapPatch,
-        allTeamResultsPatch,
         summaryCounts,
         screenDirective,
-        nextAllStarDone,
-        allStarPayload,
         retireAnnouncement,
       } = result;
 
@@ -555,20 +497,10 @@ export function useSeasonFlow(gs) {
       setTeams(nextState.teams);
       setGameDay(nextState.gameDay);
       setGameResult(userGameResult);
-      mergeAllTeamResultsPatch(allTeamResultsPatch);
-      gs.setGameResultsMap((prev) => ({ ...prev, ...gameResultsMapPatch }));
-      (recentResultsPatch || []).slice().reverse().forEach((entry) => {
-        pushResult(entry.won, entry.drew, entry.oppName, entry.myScore, entry.oppScore, entry.gameNo);
-      });
+      gs.applyMatchResultPatch(result);
 
       if (retireAnnouncement) {
         setRetireModal(retireAnnouncement);
-      }
-      if (nextAllStarDone) {
-        setAllStarDone(true);
-      }
-      if (allStarPayload) {
-        setAllStarResult(allStarPayload);
       }
       if ((summaryCounts?.tradeMailCount || 0) > 0) {
         notify(`トレードオファーが${summaryCounts.tradeMailCount}件届きました`, "ok");
@@ -861,29 +793,6 @@ export function useSeasonFlow(gs) {
       offseasonPlan: gs.offseasonPlan,
     };
 
-    const mergeAllTeamResultsPatch = (patch) => {
-      if (!patch || typeof patch !== "object") return;
-      setAllTeamResultsMap((prev) => {
-        let next = prev;
-        for (const [teamId, days] of Object.entries(patch)) {
-          const currentTeamMap = prev[teamId] || {};
-          let hasDiff = false;
-          for (const [dayKey, dayValue] of Object.entries(days || {})) {
-            if (currentTeamMap[dayKey] !== dayValue) {
-              hasDiff = true;
-              break;
-            }
-          }
-          if (!hasDiff) continue;
-          next = {
-            ...next,
-            [teamId]: { ...currentTeamMap, ...days },
-          };
-        }
-        return next;
-      });
-    };
-
     const cleanupWorker = () => {
       if (seasonProgressWorkerRef.current) {
         seasonProgressWorkerRef.current.terminate();
@@ -978,12 +887,6 @@ export function useSeasonFlow(gs) {
         nextState,
         batchResults,
         batchMeta,
-        recentResults: nextRecentResults,
-        gameResultsMapPatch,
-        allTeamResultsPatch,
-        allTeamBoxScoresPatch,
-        nextAllStarDone,
-        allStarPayload,
         summaryCounts,
         shouldEnterPlayoff,
       } = result;
@@ -996,23 +899,7 @@ export function useSeasonFlow(gs) {
       setGameDay(nextState.gameDay);
       setBatchMeta(batchMeta);
       setBatchResults(batchResults);
-      mergeAllTeamResultsPatch(allTeamResultsPatch);
-      gs.setRecentResults((prev) => [...nextRecentResults, ...prev].slice(0, 5));
-      gs.setGameResultsMap((prev) => ({ ...prev, ...gameResultsMapPatch }));
-      if (deferredBatchPatchRef.current) {
-        cancelDeferredPostGameWork(deferredBatchPatchRef.current);
-      }
-      deferredBatchPatchRef.current = scheduleDeferredPostGameWork(() => {
-        mergeAllTeamBoxScoresPatch(allTeamBoxScoresPatch);
-        deferredBatchPatchRef.current = null;
-      });
-
-      if (nextAllStarDone) {
-        setAllStarDone(true);
-      }
-      if (allStarPayload) {
-        setAllStarResult(allStarPayload);
-      }
+      const nextMatchHistory = gs.applyMatchResultPatch(result);
 
       if ((summaryCounts?.tradeMailCount || 0) > 0) {
         notify(`Batch trade offers: ${summaryCounts.tradeMailCount}`, "ok");
@@ -1031,7 +918,7 @@ export function useSeasonFlow(gs) {
       }
 
       loadSeasonSaveModule()
-        .then((saveMod) => saveMod.enqueueSaveGame(nextState, { skipBackupRotation: true, preferMainSave: true }))
+        .then((saveMod) => saveMod.enqueueSaveGame({ ...nextState, ...nextMatchHistory }, { skipBackupRotation: true, preferMainSave: true }))
         .then((saveResult) => {
           if (!saveResult?.ok) {
             console.warn("[BatchSave] saveGame failed after batch", saveResult);
@@ -1039,7 +926,6 @@ export function useSeasonFlow(gs) {
           }
           setSaveRevision((prev) => Math.max(prev, Number(nextState.saveRevision) || prev));
           setSaveExists(true);
-          resetSaveTracking();
         })
         .catch((error) => {
           console.warn("[BatchSave] saveGame failed after batch", error);
