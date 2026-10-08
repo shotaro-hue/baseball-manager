@@ -48,7 +48,7 @@ it('caps a real Worker batch at three and ends the regular season', () => {
 });
 it('rejects ended, nonregular, invalid, replayed and inconsistent Worker requests', () => {
   const base = snapshot();
-  const cases = [snapshot(143),{...base,gameDay:1},{...base,schedule:[]}, {...base,gameResultsMap:{141:{}}},
+  const cases = [snapshot(143),{...base,gameDay:1},{...base,schedule:[]}, {...base,gameResultsMap:{141:{}}}, {...base,teams:[base.teams[0],null]},
     {...base,offseasonPlan:{year:2026,myId:base.myId,stage:'postseason'}}];
   for (const state of cases) {
     expect(regularSeasonRequest(state,1).count).toBe(0);

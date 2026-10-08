@@ -44,7 +44,7 @@ export function regularSeasonRequest(snapshot, requestedCount) {
     const mine = Array.isArray(matchups) ? matchups.filter(m => m && (m.homeId === team.id || m.awayId === team.id)) : null;
     if (mine?.length !== 1 || snapshot.gameResultsMap?.[round]) return fail('未実行の対戦日程を確認できません。保存データを読み直してください。');
     const opponentId = mine[0].homeId === team.id ? mine[0].awayId : mine[0].homeId;
-    if (opponentId === team.id || !snapshot.teams.some(t => t.id === opponentId)) return fail('対戦相手を確認できません。');
+    if (opponentId === team.id || !snapshot.teams.some(t => t?.id === opponentId)) return fail('対戦相手を確認できません。');
   }
   return { count, reason: null };
 }
