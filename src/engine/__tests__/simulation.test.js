@@ -315,12 +315,23 @@ describe('generateContactEVLA', () => {
     const weakPit = { pitching: { velocity: 1, breaking: 1 } };
     const strongPit = { pitching: { velocity: 99, breaking: 99 } };
 
-    const sample = (pitcher) => {
-      const values = Array.from({ length: 600 }, () => _generateContactEVLA_TEST(batter, pitcher).ev);
-      return values.reduce((a, b) => a + b, 0) / values.length;
-    };
+    // Compare matched random samples rather than unrelated noise. The old
+    // independent 600-sample averages occasionally reversed this small effect.
+    for (const initialSeed of [1, 42, 20260929]) {
+      const sample = (pitcher) => {
+        let seed = initialSeed;
+        const random = vi.spyOn(Math, 'random').mockImplementation(() => {
+          seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+          return seed / 4294967296;
+        });
+        try {
+          const values = Array.from({ length: 600 }, () => _generateContactEVLA_TEST(batter, pitcher).ev);
+          return values.reduce((a, b) => a + b, 0) / values.length;
+        } finally { random.mockRestore(); }
+      };
+      expect(sample(strongPit)).toBeLessThan(sample(weakPit));
+    }
 
-    expect(sample(strongPit)).toBeLessThan(sample(weakPit));
   });
 
   it('LA は仕様レンジ内に収まる', () => {

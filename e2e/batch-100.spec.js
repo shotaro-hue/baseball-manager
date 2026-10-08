@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openBatch } from './helpers/progression';
 
 test('100試合バッチが完走し、保存データから再開できる', async ({ page }) => {
   test.setTimeout(180_000);
@@ -9,18 +10,19 @@ test('100試合バッチが完走し、保存データから再開できる', as
   await page.getByRole('button', { name: '読売ジャイアンツ' }).click();
   await expect(page.getByRole('button', { name: /ホーム/ })).toBeVisible({ timeout: 10_000 });
 
-  const batchSelect = page.locator('select').filter({
+  const panel = await openBatch(page, false);
+  const batchSelect = panel.locator('select').filter({
     has: page.locator('option[value="100"]'),
   });
   await batchSelect.selectOption('100');
   await page.getByRole('button', { name: /まとめてシム/ }).click();
 
-  await expect(page.getByRole('button', { name: /ハブに戻る/ })).toBeVisible({
+  await expect(page.getByRole('button', { name: /ホームへ戻る/ })).toBeVisible({
     timeout: 120_000,
   });
   await expect(page.getByText(/100試合/)).toBeVisible();
 
-  await page.getByRole('button', { name: /ハブに戻る/ }).click();
+  await page.getByRole('button', { name: /ホームへ戻る/ }).click();
   await expect(page.getByRole('button', { name: /ホーム/ })).toBeVisible({ timeout: 10_000 });
 
   await expect.poll(

@@ -3,11 +3,11 @@ import { test, expect } from '@playwright/test';
 async function mount(page, view) {
   await page.goto('/');
   await page.evaluate(async (view) => {
-    const React = await import('/node_modules/.vite/deps/react.js');
-    const { createRoot } = await import('/node_modules/.vite/deps/react-dom_client.js');
-    const { TeamDetailScreen } = await import('/src/components/TeamDetailScreen.jsx');
-    const { PlayerComparisonDialog } = await import('/src/components/PlayerComparisonTray.jsx');
-    const { emptyStats } = await import('/src/engine/playerCore.js');
+    const React = await import('/baseball-manager/node_modules/.vite/deps/react.js');
+    const { createRoot } = await import('/baseball-manager/node_modules/.vite/deps/react-dom_client.js');
+    const { TeamDetailScreen } = await import('/baseball-manager/src/components/TeamDetailScreen.jsx');
+    const { PlayerComparisonDialog } = await import('/baseball-manager/src/components/PlayerComparisonTray.jsx');
+    const { emptyStats } = await import('/baseball-manager/src/engine/playerCore.js');
     document.getElementById('root').style.display = 'none';
     const host = document.createElement('div'); document.body.append(host);
     const root = createRoot(host), h = React.createElement;
