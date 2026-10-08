@@ -109,6 +109,7 @@ export function useOffseason(gs) {
   const waiverCompletedYear = useRef(null);
   const planningActionIds = useRef(new Set());
   const draftAppliedRef = useRef(null);
+  const handledPostingRequests = useRef(new Set());
   const resetTransientOffseason = () => {
     setDevelopmentSummary(null); setNewSeasonInfo(null); setSpringTrainingData(null);
     setDraftPoolState(null); setDraftResultState(null); setDraftAllocationState(null);
@@ -116,6 +117,7 @@ export function useOffseason(gs) {
     draftAppliedRef.current = null; nextYearTransitionRef.current = false;
     retireTransitionRef.current = false; faPhaseCompletedYear.current = null; waiverCompletedYear.current = null;
     planningActionIds.current.clear();
+    handledPostingRequests.current.clear();
   };
   // { [playerId]: { demandSalary, minAcceptSalary, resistanceFactor } }
 
@@ -429,6 +431,9 @@ export function useOffseason(gs) {
 
     // ポスティング申請の承諾/拒否
     if(mail.type==="posting_request"){
+      // resolved protects loaded saves; IDs also protect stale callbacks after a mail-read update.
+      if(mail.resolved || handledPostingRequests.current.has(mail.id)) return;
+      handledPostingRequests.current.add(mail.id);
       const player=myTeam?.players.find(p=>p.id===mail.playerId);
       if(player){
         if(action==="accept"){

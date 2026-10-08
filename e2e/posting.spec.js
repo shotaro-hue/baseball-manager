@@ -35,6 +35,7 @@ for (const legacy of [false, true]) {
   test(`D01 approved posting survives real save/reload (${legacy ? 'legacy inline v4' : 'chunked v4'})`, async ({ page }) => {
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     const { playerId, name } = await loadPostingFixture(page, legacy);
+    const initial = await saveHub(page);
     await openMail(page);
     // tradeValue=20, rngf(0.8,1.5)=1: use real bid logic with a fixed random draw.
     await page.evaluate(() => { window.postingOriginalRandom = Math.random; Math.random = () => 2 / 7; });
@@ -55,6 +56,12 @@ for (const legacy of [false, true]) {
     expect(own.players.some(p => p.id === playerId)).toBe(false);
     for (const key of ['lineup', 'lineupNoDh', 'lineupDh', 'rotation']) expect(own[key] || []).not.toContain(playerId);
     expect(after.mailbox).toEqual(before.mailbox);
+    for (const other of initial.teams.filter(t => t.id !== initial.myId)) {
+      const saved = after.teams.find(t => t.id === other.id);
+      expect(saved.budget).toBe(other.budget);
+      expect(saved.players.map(p => p.id)).toEqual(other.players.map(p => p.id));
+      expect(saved.farm.map(p => p.id)).toEqual(other.farm.map(p => p.id));
+    }
     await page.getByRole('complementary', { name: '監督メニュー' }).getByRole('button', { name: /その他/ }).click();
     await page.getByText('D01 ポスティング申請', { exact: true }).click();
     await expect(page.getByRole('button', { name: '✅ 承認する', exact: true })).toHaveCount(0);
@@ -62,9 +69,11 @@ for (const legacy of [false, true]) {
   });
 }
 
-test('D01 rejection preserves the budget and roster through real save/reload', async ({ page }) => {
+for (const legacy of [false, true]) {
+test(`D01 rejection preserves the budget and roster through real save/reload (${legacy ? 'legacy inline v4' : 'chunked v4'})`, async ({ page }) => {
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  const { playerId, morale } = await loadPostingFixture(page, false);
+  const { playerId, morale } = await loadPostingFixture(page, legacy);
+  const initial = await saveHub(page);
   await openMail(page);
   await page.getByRole('button', { name: '❌ 拒否する', exact: true }).click();
   const before = await saveHub(page);
@@ -77,8 +86,18 @@ test('D01 rejection preserves the budget and roster through real save/reload', a
   expect(after.teams).toEqual(before.teams);
   expect(after.mailbox.some(m => m.type === 'posting_result')).toBe(false);
   expect(after.mailbox.find(m => m.id === 'posting-request')).toMatchObject({ resolved: true, read: true });
+  for (const other of initial.teams.filter(t => t.id !== initial.myId)) {
+    const saved = after.teams.find(t => t.id === other.id);
+    expect(saved.budget).toBe(other.budget);
+    expect(saved.players.map(p => p.id)).toEqual(other.players.map(p => p.id));
+    expect(saved.farm.map(p => p.id)).toEqual(other.farm.map(p => p.id));
+  }
+  await openMail(page);
+  await expect(page.getByRole('button', { name: '✅ 承認する', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '❌ 拒否する', exact: true })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+}
 
 test('D01 leaves a legacy budget unchanged rather than guessing a historical correction', async ({ page }) => {
   await loadPostingFixture(page, true, 20_001_000);

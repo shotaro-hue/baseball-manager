@@ -35,3 +35,43 @@ it('connects the actual game state mail lookup to rejection and marks the reques
   expect(gs.myTeam.players[0].morale).toBe(60);
   expect(gs.getMailboxBySelector()).toEqual([expect.objectContaining({ resolved: true, read: true })]);
 });
+
+it('credits only once when approval is repeated before React commits the update', async () => {
+  await setup();
+  const approve = os.handleMailAction;
+  act(() => { approve('request', 'accept'); approve('request', 'accept'); });
+  expect(gs.myTeam.budget).toBe(3000);
+  expect(gs.myTeam.players).toEqual([]);
+  expect(gs.getMailboxBySelector().filter(m => m.type === 'posting_result')).toHaveLength(1);
+});
+
+it('applies rejection only once and ignores approval of the resolved request', async () => {
+  await setup();
+  const decide = os.handleMailAction;
+  act(() => { decide('request', 'decline'); decide('request', 'decline'); });
+  expect(gs.myTeam.players[0].morale).toBe(60);
+  act(() => os.handleMailAction('request', 'accept'));
+  expect(gs.myTeam.budget).toBe(1000);
+  expect(gs.myTeam.players[0].id).toBe(0);
+  expect(gs.getMailboxBySelector()).toEqual([expect.objectContaining({ resolved: true, read: true })]);
+});
+
+it('ignores a resolved request loaded into a fresh hook instance', async () => {
+  await setup();
+  act(() => gs.setMailbox([{ id: 'request', type: 'posting_request', playerId: 0, resolved: true, read: true }]));
+  act(() => { os.handleMailAction('request', 'accept'); os.handleMailAction('request', 'decline'); });
+  expect(gs.myTeam.budget).toBe(1000);
+  expect(gs.myTeam.players[0].morale).toBe(70);
+  expect(gs.getMailboxBySelector()).toHaveLength(1);
+});
+
+it('ignores stale decisions after reading clones the mail and a newer callback resolves it', async () => {
+  await setup();
+  const staleDecision = os.handleMailAction;
+  act(() => os.handleMailRead('request'));
+  act(() => os.handleMailAction('request', 'decline'));
+  act(() => { staleDecision('request', 'decline'); staleDecision('request', 'accept'); });
+  expect(gs.myTeam.budget).toBe(1000);
+  expect(gs.myTeam.players[0]).toMatchObject({ id: 0, morale: 60 });
+  expect(gs.getMailboxBySelector()).toEqual([expect.objectContaining({ resolved: true, read: true })]);
+});
