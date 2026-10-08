@@ -5,6 +5,7 @@ import { simulateSeasonBatch } from '../../workers/seasonBatchCore';
 import { simulateSingleDay } from '../../workers/singleDayCore';
 import { buildTeam } from '../player';
 import { generateSeasonSchedule } from '../scheduleGen';
+import { teamWinRate, rankLeague } from '../standings';
 import { TEAM_DEFS, SEASON_GAMES } from '../../constants';
 
 it.each([[0,0,0,0,143],[10,5,0,15,128],[60,50,5,115,28],[70,70,3,143,0],[10,5,undefined,15,128]])('counts %i wins %i losses %s draws', (wins,losses,draws,playedGames,remainingGames) => {
@@ -58,8 +59,12 @@ it('rejects ended, nonregular, invalid, replayed and inconsistent Worker request
 });
 it('preserves standings winning percentage excluding draws', () => {
   const t = {wins:60,losses:50,draws:5};
-  const before = t.wins/(t.wins+t.losses);
-  regularSeasonProgress(t);
-  expect(t.wins/(t.wins+t.losses)).toBe(before);
+  const clubs = [{...t,id:1,league:'セ'}, {id:2,league:'セ',wins:59,losses:50,draws:0}];
+  const before = rankLeague(clubs, 'セ');
+  expect(teamWinRate(t)).toBe(60/110);
+  clubs.forEach(club => regularSeasonProgress(club));
+  expect(rankLeague(clubs, 'セ')).toEqual(before);
+  expect(before.teams.map(club => club.id)).toEqual([1,2]);
+  expect(teamWinRate(t)).toBe(60/110);
   expect(t).toEqual({wins:60,losses:50,draws:5});
 });

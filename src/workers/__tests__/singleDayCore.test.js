@@ -87,3 +87,27 @@ describe('simulateSingleDay', () => {
     expect(result.allTeamResultsPatch[teams[0].id]?.[1]?.awayId).toBe(teams[0].id);
   });
 });
+
+it('maintains injured CPU assignments before a single day, including other CPU matchups', () => {
+  const teams = TEAM_DEFS.slice(0,4).map(buildTeam);
+  const cpu = teams[2], injuredId = cpu.lineupNoDh[0];
+  cpu.players = cpu.players.map(p => p.id === injuredId ? {...p,injury:'test',injuryDaysLeft:3} : p);
+  const original = structuredClone(teams);
+  const result = simulateSingleDay({snapshot:{teams,myId:teams[0].id,gameDay:1,year:2026,allStarDone:true,
+    schedule:[null,{matchups:[{homeId:teams[0].id,awayId:teams[1].id},{homeId:teams[2].id,awayId:teams[3].id}]}]},
+    gameContext:{selectedOpponentId:teams[1].id,isHome:true,useDh:false}});
+  expect(result.nextState.gameDay).toBe(2);
+  expect(result.nextState.teams[2].wins+result.nextState.teams[2].losses+result.nextState.teams[2].draws).toBe(1);
+  expect(result.nextState.teams[2].lineupNoDh).not.toContain(injuredId);
+  expect(teams).toEqual(original);
+});
+
+it('does not invent other CPU games when none are scheduled', () => {
+  const teams = TEAM_DEFS.slice(0,4).map(buildTeam);
+  const result=simulateSingleDay({snapshot:{teams,myId:teams[0].id,gameDay:1,year:2026,allStarDone:true,
+    schedule:[null,{matchups:[{homeId:teams[0].id,awayId:teams[1].id}]}]},
+    gameContext:{selectedOpponentId:teams[1].id,isHome:true,useDh:false}});
+  expect(result.nextState.teams[2]).toMatchObject({wins:0,losses:0,draws:0});
+  expect(result.nextState.teams[3]).toMatchObject({wins:0,losses:0,draws:0});
+  expect(Object.keys(result.allTeamResultsPatch)).toHaveLength(2);
+});

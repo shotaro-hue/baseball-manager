@@ -16,6 +16,7 @@ import { createBattedBallBatchRecords } from '../engine/battedBallProfile';
 import {
   applyEmergencyRosterMaintenance,
   applyManagementPolicy,
+  ROSTER_AUTOMATION_MODES,
   prepareTeamForGame,
 } from '../engine/rosterAutomation';
 import { isTeamIdSet } from '../engine/teamId';
@@ -627,7 +628,7 @@ export function useSeasonFlow(gs) {
       let preparedOpponent;
       try {
         preparedMyTeam = applyDhToTeam(myTeam, useDh);
-        preparedOpponent = applyDhToTeam(opp, useDh);
+        preparedOpponent = applyDhToTeam(applyManagementPolicy(opp, { teams, gameDay, includeRosterChanges: true, automationMode: ROSTER_AUTOMATION_MODES.FULL }), useDh);
       } catch (error) {
         setPregameError({
           message: error?.validation?.errors?.[0] || error?.message || '編成が成立していません。',
@@ -700,10 +701,7 @@ export function useSeasonFlow(gs) {
     // Simulate remaining CPU vs CPU games for this day (schedule-based matchups)
     const _oppId=currentOpp.id;
     const _cpuMatchups=scheduleMod.getCpuMatchups(schedule,gameDay,myId,_oppId);
-    const _fallbackOthers=teams.filter(t=>t.id!==myId&&t.id!==_oppId);
-    const matchupList=_cpuMatchups.length>0
-      ?_cpuMatchups
-      :(()=>{const pairs=[];for(let i=0;i<_fallbackOthers.length-1;i+=2)pairs.push({homeId:_fallbackOthers[i].id,awayId:_fallbackOthers[i+1].id});return pairs;})();
+    const matchupList = _cpuMatchups;
 
     const cpuSimResults=[];
     for(const matchup of matchupList){
@@ -1087,10 +1085,7 @@ export function useSeasonFlow(gs) {
         : { ...t });
     const _tOppId=currentOpp.id;
     const _tCpuMatchups=scheduleMod.getCpuMatchups(schedule,gameDay,myId,_tOppId);
-    const _tFallbackOthers=teams.filter(t=>t.id!==myId&&t.id!==_tOppId);
-    const tMatchupList=_tCpuMatchups.length>0
-      ?_tCpuMatchups
-      :(()=>{const pairs=[];for(let i=0;i<_tFallbackOthers.length-1;i+=2)pairs.push({homeId:_tFallbackOthers[i].id,awayId:_tFallbackOthers[i+1].id});return pairs;})();
+    const tMatchupList = _tCpuMatchups;
     const tCpuSimResults=[];
     for(const matchup of tMatchupList){
       const a=teams.find(t=>t.id===matchup.homeId);
