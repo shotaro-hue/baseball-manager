@@ -47,7 +47,7 @@ function snapshot(isHome) {
 async function runHook(state, isHome, mode) {
   let api, updated;
   const gs = { ...state, myTeam: state.teams[0], setTeams: next => { updated = typeof next === 'function' ? next(updated || state.teams) : next; },
-    setGameDay: vi.fn(), setScreen: vi.fn(), notify: vi.fn(), addNews: vi.fn(), addTransferLog: vi.fn(), pushResult: vi.fn(), pushGameResult: vi.fn(),
+    getGameResultsMap: () => state.gameResultsMap, setGameDay: vi.fn(), setScreen: vi.fn(), notify: vi.fn(), addNews: vi.fn(), addTransferLog: vi.fn(), pushResult: vi.fn(), pushGameResult: vi.fn(),
     setMailbox: vi.fn(), setRetireModal: vi.fn(), setAllTeamResultsMap: vi.fn(), cpuTradeOffers: [],
   };
   function Harness() { api = useSeasonFlow(gs); return null; }

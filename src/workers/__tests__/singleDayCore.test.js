@@ -11,7 +11,7 @@ describe('simulateSingleDay', () => {
     const result = simulateSingleDay({
       snapshot: {
         teams,
-        schedule: [],
+        schedule: [null, { matchups: [{ homeId: teams[0].id, awayId: teams[1].id }, { homeId: teams[2].id, awayId: teams[3].id }] }],
         faPool: [],
         seasonHistory: { transfers: [] },
         news: [],
@@ -55,7 +55,7 @@ describe('simulateSingleDay', () => {
     const result = simulateSingleDay({
       snapshot: {
         teams,
-        schedule: [],
+        schedule: [null, { matchups: [{ homeId: teams[1].id, awayId: teams[0].id }, { homeId: teams[2].id, awayId: teams[3].id }] }],
         faPool: [],
         seasonHistory: { transfers: [] },
         news: [],

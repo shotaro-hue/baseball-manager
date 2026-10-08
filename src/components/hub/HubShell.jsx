@@ -1,3 +1,4 @@
+import { regularSeasonProgress, regularSeasonRequest } from '../../engine/seasonProgress';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { RetireModal } from '../RetireModal';
@@ -148,8 +149,9 @@ export default function HubShell({ state, flows, app }) {
     [currentPrimarySection],
   );
 
-  const totalGames = (myTeam?.wins || 0) + (myTeam?.losses || 0);
-  const remain = SEASON_GAMES - totalGames;
+  const progress = regularSeasonProgress(myTeam);
+  const remain = progress.remainingGames;
+  const canSim = regularSeasonRequest({ teams: gs.teams, myId: gs.myId, year: gs.year, gameDay, schedule, offseasonPlan: gs.offseasonPlan }, 1).count > 0;
   const toggleCompare = useCallback((player, teamName) => {
     if (player?.id == null) return;
     if (comparePlayers.some((entry) => entry.id === player.id)) {
@@ -233,6 +235,7 @@ export default function HubShell({ state, flows, app }) {
             onSave={gs.handleSave}
           />
 
+          {(!progress.valid || (!canSim && remain > 0)) && <p role="status">成績・日程・進行フェーズを確認できないため試合を開始できません。保存データを読み直してください。</p>}
           {notif && (
             <div
               className={`notif ${
@@ -252,7 +255,7 @@ export default function HubShell({ state, flows, app }) {
             <HubSimPanel
               gameDay={gameDay}
               schedule={schedule}
-              remain={remain}
+              remain={remain} canSim={canSim}
               batchProgress={sf.batchProgress}
               onStartGame={sf.handleStartGame}
               onBatchSim={sf.handleBatchSim}
@@ -263,7 +266,7 @@ export default function HubShell({ state, flows, app }) {
           {tab === 'dashboard' && gameDay <= SEASON_GAMES && (
             <details className="calm-batch desktop-dashboard" open={sf.batchProgress ? true : undefined}>
               <summary>まとめて進行・自動編成</summary>
-              <HubSimPanel gameDay={gameDay} schedule={schedule} remain={remain}
+              <HubSimPanel gameDay={gameDay} schedule={schedule} remain={remain} canSim={canSim}
                 batchProgress={sf.batchProgress} onStartGame={sf.handleStartGame}
                 onBatchSim={sf.handleBatchSim} onSeasonSim={sf.handleSeasonSim} />
             </details>
@@ -425,7 +428,7 @@ export default function HubShell({ state, flows, app }) {
             tabBadges={tabBadges}
             onSectionChange={handlePrimarySectionChange}
             onStartGame={sf.handleStartGame}
-            disableStart={gameDay > SEASON_GAMES}
+            disableStart={!canSim || Boolean(sf.batchProgress)}
           />
 
           <PlayerComparisonTray

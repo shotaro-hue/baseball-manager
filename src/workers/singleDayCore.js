@@ -1,3 +1,5 @@
+import { regularSeasonRequest } from '../engine/seasonProgress';
+import { getMyMatchup } from '../engine/scheduleGen';
 import { uid, rng, rngf, gameDayToDate } from '../utils';
 import * as playerRules from '../engine/player';
 import { calcRetireWill } from '../engine/player';
@@ -261,6 +263,10 @@ export function simulateSingleDay({
   onProgress,
   onArchiveChunk,
 }) {
+  const request = regularSeasonRequest(snapshot, 1);
+  if (!request.count) throw new Error(request.reason);
+  const matchup = getMyMatchup(snapshot.schedule, snapshot.gameDay, snapshot.myId);
+  if (matchup.oppId !== gameContext?.selectedOpponentId || matchup.isHome !== gameContext?.isHome) throw new Error('対戦日程と要求が一致しません。');
   const safeSnapshot = cloneValue(snapshot || {});
   const teams = safeSnapshot.teams || [];
   const myTeam = teams.find((team) => team.id === safeSnapshot.myId);

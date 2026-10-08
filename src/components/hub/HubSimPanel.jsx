@@ -1,3 +1,4 @@
+import { batchGameOptions } from '../../engine/seasonProgress';
 import { useMemo, useState } from 'react';
 import { gameDayToDate } from '../../utils';
 import { SEASON_GAMES } from '../../constants';
@@ -6,6 +7,7 @@ export default function HubSimPanel({
   gameDay,
   schedule,
   remain,
+  canSim = false,
   batchProgress,
   onStartGame,
   onBatchSim,
@@ -15,16 +17,12 @@ export default function HubSimPanel({
   const [batchAutoManage, setBatchAutoManage] = useState(false);
   const [seasonAutoManage, setSeasonAutoManage] = useState(false);
 
-  const options = useMemo(() => {
-    const next = [];
-    for (let i = 5; i <= remain; i += 5) next.push(i);
-    if (next.length === 0) next.push(Math.max(1, remain));
-    return next;
-  }, [remain]);
+  const options = useMemo(() => batchGameOptions(remain), [remain]);
+  const disabled = Boolean(batchProgress) || !canSim || options.length === 0;
 
   const effectiveBatchCount = options.includes(batchCount)
     ? batchCount
-    : options[0];
+    : (options[0] ?? 0);
   const startDate = gameDayToDate(gameDay, schedule);
   const endDate = gameDayToDate(
     Math.min(gameDay + effectiveBatchCount - 1, SEASON_GAMES),
@@ -45,7 +43,7 @@ export default function HubSimPanel({
         className="sim-btn"
         style={{ margin: 0, fontSize: 12 }}
         onClick={onStartGame}
-        disabled={Boolean(batchProgress) || remain <= 0}
+        disabled={disabled}
       >
         1試合
         <br />
@@ -68,6 +66,8 @@ export default function HubSimPanel({
         }}
       >
         <select
+          aria-label="まとめて進める試合数"
+          disabled={disabled}
           value={effectiveBatchCount}
           onChange={(event) => setBatchCount(Number(event.target.value))}
           style={{
@@ -83,6 +83,7 @@ export default function HubSimPanel({
             cursor: 'pointer',
           }}
         >
+          {options.length === 0 && <option value={0}>実行可能な試合なし</option>}
           {options.map((count) => {
             const date = gameDayToDate(
               Math.min(gameDay + count - 1, SEASON_GAMES),
@@ -134,7 +135,7 @@ export default function HubSimPanel({
             letterSpacing: '.15em',
             opacity: batchProgress ? 0.5 : 1,
           }}
-          disabled={!!batchProgress}
+          disabled={disabled}
           onClick={() => onBatchSim(effectiveBatchCount, batchAutoManage)}
         >
           まとめてシム
@@ -186,7 +187,7 @@ export default function HubSimPanel({
             padding: '2px 4px',
             opacity: batchProgress ? 0.5 : 1,
           }}
-          disabled={!!batchProgress}
+          disabled={disabled}
           onClick={() => onSeasonSim(seasonAutoManage)}
         >
           残り全{remain}試合
