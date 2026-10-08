@@ -80,3 +80,62 @@ test('T11 legacy version-4 fixture with no history remains playable and gains hi
   expect(loaded.gameResultsMap).toEqual({});
   await runSingle(page, false); await roundTrip(page, 1);
 });
+
+test('tactical CPU injury preparation commits every scheduled game and survives reload', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => {
+    if (message.type() === 'error' && message.text().includes('[TacticalPostGame]')) errors.push(message.text());
+  });
+  await loadFixture(page, 'legacy');
+  const setup = await page.evaluate(async () => {
+    const { loadGame, saveGame } = await import('/baseball-manager/src/engine/saveload.js');
+    const { getMyMatchup, generateSeasonSchedule } = await import('/baseball-manager/src/engine/scheduleGen.js');
+    const state = await loadGame();
+    state.schedule = generateSeasonSchedule(state.year, state.teams);
+    const opponentId = getMyMatchup(state.schedule, 1, state.myId).oppId;
+    const injuries = [];
+    for (const team of state.teams.filter(t => t.id !== state.myId)) {
+      const id = team.lineupNoDh[0];
+      team.players = team.players.map(p => p.id === id ? { ...p, injury: 'test', injuryDaysLeft: 3 } : p);
+      team.rosterAutomationMode = 'manual';
+      injuries.push({ teamId: team.id, playerId: id });
+    }
+    if (!(await saveGame(state)).ok) throw new Error('fixture save failed');
+    return { opponentId, injuries };
+  });
+  await reloadAndLoad(page);
+  await startSingle(page, false);
+  await page.getByRole('button', { name: /🎮 試合モード/ }).click();
+  const finish = page.getByRole('button', { name: /試合終了 → 結果へ/ });
+  await expect.poll(async () => {
+    if (await finish.count()) return true;
+    const resume = page.getByRole('button', { name: '▶ 続行', exact: true });
+    if (await resume.count()) {
+      if (await resume.isEnabled()) await resume.click();
+      else {
+        await page.getByRole('button', { name: '🔄 投手交代', exact: true }).click();
+        await page.getByRole('button', { name: 'この投手に交代', exact: true }).first().click();
+      }
+    } else {
+      const auto = page.getByRole('button', { name: '▶ 自動進行', exact: true });
+      if (await auto.count()) await auto.click();
+    }
+    return false;
+  }, { timeout: 60_000, intervals: [200] }).toBe(true);
+  await finish.click();
+  await page.getByRole('button', { name: 'ホームに戻る', exact: true }).click();
+  const saved = await roundTrip(page, 1);
+  expect(saved.gameDay).toBe(2);
+  for (const team of saved.teams) expect(team.wins + team.losses + team.draws).toBe(1);
+  for (const injury of setup.injuries) {
+    const team = saved.teams.find(t => t.id === injury.teamId);
+    expect(team.lineupNoDh).not.toContain(injury.playerId);
+    expect(team.lineupDh).not.toContain(injury.playerId);
+  }
+  const opponent = saved.teams.find(t => t.id === setup.opponentId);
+  const injuredId = setup.injuries.find(i => i.teamId === opponent.id).playerId;
+  expect(opponent.farm.find(p => p.id === injuredId).injuryDaysLeft).toBe(2);
+  expect(saved.recentResults).toHaveLength(1);
+  expect(errors).toEqual([]);
+});
