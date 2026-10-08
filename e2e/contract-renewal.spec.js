@@ -3,8 +3,8 @@ import { test, expect } from '@playwright/test';
 async function mount(page) {
   await page.goto('/');
   await page.evaluate(async () => {
-    const React = await import('/baseball-manager/node_modules/.vite/deps/react.js');
-    const { createRoot } = await import('/baseball-manager/node_modules/.vite/deps/react-dom_client.js');
+    const { default: React } = await import('/baseball-manager/node_modules/.vite/deps/react.js');
+    const { createRoot } = (await import('/baseball-manager/node_modules/.vite/deps/react-dom_client.js')).default;
     const { ContractRenewalPhaseScreen } = await import('/baseball-manager/src/components/ContractRenewalPhaseScreen.jsx');
     const { emptyStats } = await import('/baseball-manager/src/engine/playerCore.js');
     const { calcPlayerDemand } = await import('/baseball-manager/src/engine/contract.js');

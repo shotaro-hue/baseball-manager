@@ -14,7 +14,7 @@ test.describe('オートシム1試合', () => {
     await runSingle(page, false);
     await mainNavigation(page,false).getByRole('button',{name:'成績',exact:true}).click();
     await page.locator('.tabs-nav').getByRole('button',{name:'成績',exact:true}).click();
-    await page.getByRole('button',{name:'投手',exact:true}).click();
+    await page.getByRole('tab',{name:'投手',exact:true}).click();
     await expect(page.getByText('投手成績',{exact:true})).toBeVisible();
     await expect(page.locator('table tbody tr').nth(0)).toBeVisible();
   });
