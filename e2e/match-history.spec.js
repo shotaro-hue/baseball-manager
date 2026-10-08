@@ -1,6 +1,129 @@
 import { test, expect } from '@playwright/test';
 import { startNewGame, runSingle, runBatch, startSingle, saveHub, reloadAndLoad, loadFixture, readSave } from './helpers/progression';
 
+for (const useDh of [false, true]) for (const isHome of [false, true]) {
+  test(`confirmed tactical roster, substitutions and saved stats (DH=${useDh}, home=${isHome})`, async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    page.on('console', m => {
+      if (m.type() === 'error' && m.text().includes('[TacticalPostGame]')) errors.push(m.text());
+    });
+    await loadFixture(page, 'legacy');
+    const setup = await page.evaluate(async ({ useDh, isHome }) => {
+      const { loadGame, saveGame } = await import('/baseball-manager/src/engine/saveload.js');
+      const { generateSeasonSchedule } = await import('/baseball-manager/src/engine/scheduleGen.js');
+      const { prepareTeamForGame } = await import('/baseball-manager/src/engine/rosterAutomation.js');
+      const s = await loadGame();
+      const schedule = generateSeasonSchedule(s.year, s.teams);
+      const match = schedule[1].matchups[0];
+      s.myId = isHome ? match.homeId : match.awayId;
+      const my = s.teams.find(t => t.id === s.myId);
+      const opp = s.teams.find(t => t.id === (isHome ? match.awayId : match.homeId));
+      // Home's rule must win when the clubs have opposite DH preferences.
+      my.dhEnabled = isHome ? useDh : !useDh;
+      opp.dhEnabled = isHome ? !useDh : useDh;
+      my.rosterAutomationMode = 'manual';
+      my.rosterDhMode = !useDh;
+      my.lineupNoDh.reverse(); my.lineupDh.reverse();
+      my.lineup = [...(useDh ? my.lineupNoDh : my.lineupDh)];
+      my.rotIdx = 1;
+      const prepared = prepareTeamForGame(my, useDh);
+      const starterId = prepared.rotation[prepared.rotIdx % prepared.rotation.length];
+      const pitcherName = my.players.find(p => p.id === starterId).name;
+      const ordinary = Object.fromEntries(['lineup', 'lineupNoDh', 'lineupDh', 'fieldingNoDh', 'fieldingDh', 'rotation'].map(k => [k, my[k]]));
+      if (!(await saveGame(s)).ok) throw new Error('fixture save failed');
+      return { myId: my.id, oppId: opp.id, lineup: prepared.lineup, starterId, pitcherName, ordinary,
+        players: my.players.concat(my.farm) };
+    }, { useDh, isHome });
+    await reloadAndLoad(page);
+    // The opposite saved lineup survives load; the game must still use its DH-specific lineup.
+    const before = await saveHub(page);
+    await startSingle(page, false);
+    await page.getByRole('button', { name: /🎮 試合モード/ }).click();
+    await expect(page.locator('.gscreen')).toBeVisible();
+    await expect(page.locator('.tg-section').nth(1)).toContainText(setup.pitcherName);
+    const advance = page.getByRole('button', { name: '▶▶ 1打席進む', exact: true });
+    const stepOnce = async () => {
+      if (await advance.count()) await advance.click();
+      else {
+        // Advisory stops hide the single-step button. A normal strategy command
+        // deliberately clears the stop and advances exactly one plate appearance.
+        await page.getByRole('button', { name: '🎯 作戦', exact: true }).click();
+        await page.getByRole('button', { name: '通常で実行！', exact: true }).click();
+      }
+    };
+    // In non-DH games, pinch-hit for the pitcher and verify the relief pitcher's
+    // inherited batting slot on the next turn through the order.
+    const pinch = page.getByRole('button', { name: '👤 代打', exact: true });
+    const readyForPinch = async () => (await pinch.isEnabled()) && (useDh || (await page.locator('.tg-section').nth(2).innerText()).includes(setup.pitcherName));
+    for (let i = 0; !(await readyForPinch()) && i < 120; i++) await stepOnce();
+    expect(await readyForPinch()).toBe(true);
+    await pinch.click();
+    const phRow = page.locator('.gscreen .card2').filter({ has: page.getByRole('button', { name: '代打！', exact: true }) }).first();
+    const phName = await phRow.locator('.fsb > div > span').first().innerText();
+    await phRow.getByRole('button', { name: '代打！', exact: true }).click();
+    await advance.click(); // Record the substitute's actual plate appearance.
+    await page.getByRole('button', { name: '🔄 投手交代', exact: true }).click();
+    const rpRow = page.locator('.gscreen .card2').filter({ has: page.getByRole('button', { name: 'この投手に交代', exact: true }) }).first();
+    const rpName = await rpRow.locator('.fsb > div > span').first().innerText();
+    await rpRow.getByRole('button', { name: 'この投手に交代', exact: true }).click();
+    const finish = page.getByRole('button', { name: /試合終了 → 結果へ/ });
+    await expect.poll(async () => {
+      if (await finish.count()) return true;
+      const resume = page.getByRole('button', { name: '▶ 続行', exact: true });
+      if (await resume.count()) {
+        if (await resume.isEnabled()) await resume.click();
+        else {
+          await page.getByRole('button', { name: '🔄 投手交代', exact: true }).click();
+          await page.getByRole('button', { name: 'この投手に交代', exact: true }).first().click();
+        }
+      } else {
+        const auto = page.getByRole('button', { name: '▶ 自動進行', exact: true });
+        if (await auto.count()) await auto.click();
+      }
+      return false;
+    }, { timeout: 60_000, intervals: [200] }).toBe(true);
+    await finish.click();
+    await page.getByRole('button', { name: 'ホームに戻る', exact: true }).click();
+    const after = await roundTrip(page, 1);
+    const my = after.teams.find(t => t.id === setup.myId);
+    const old = before.teams.find(t => t.id === setup.myId);
+    for (const k of Object.keys(setup.ordinary)) expect(my[k]).toEqual(old[k]);
+    const log = after.gameResultsMap[1].log;
+    const batting = log.filter(e => e.scorer && e.batId && !e.isStolenBase && e.result !== 'change');
+    const pitching = log.filter(e => !e.scorer && e.pitcherId && !e.isStolenBase && e.result !== 'change');
+    const players = my.players.concat(my.farm);
+    const ph = players.find(p => p.name === phName.trim());
+    const rp = players.find(p => p.name === rpName.trim());
+    expect(ph).toBeDefined(); expect(rp).toBeDefined();
+    expect(batting[useDh ? 0 : 8].batId).toBe(ph.id);
+    // The remaining original batting slots, including the non-DH pitcher slot,
+    // must stay in order. A relief pitcher inherits the fixed pitcher slot.
+    const firstRound = [...setup.lineup]; firstRound[useDh ? 0 : 8] = ph.id;
+    expect(batting.slice(0, 9).map(e => e.batId)).toEqual(firstRound);
+    expect(pitching.some(e => e.pitcherId === rp.id)).toBe(true);
+    if (isHome || !useDh) expect(pitching[0].pitcherId).toBe(setup.starterId);
+    else expect(pitching[0].pitcherId).toBe(rp.id);
+    if (!useDh) {
+      expect(batting[17].batId).toBe(rp.id);
+      expect(batting.filter(e => e.batId === setup.starterId)).toHaveLength(0);
+    }
+    for (const [teamId, scorer] of [[setup.myId, true], [setup.oppId, false]]) {
+      const team = after.teams.find(t => t.id === teamId);
+      const previous = before.teams.find(t => t.id === teamId);
+      for (const p of team.players.concat(team.farm)) {
+        const base = previous.players.concat(previous.farm).find(q => q.id === p.id);
+        const atBats = log.filter(e => e.scorer === scorer && e.batId === p.id && !e.isStolenBase && e.result !== 'change');
+        const faced = log.filter(e => e.scorer !== scorer && e.pitcherId === p.id && !e.isStolenBase && e.result !== 'change');
+        expect((p.stats?.PA || 0) - (base?.stats?.PA || 0)).toBe(atBats.length);
+        expect((p.stats?.BF || 0) - (base?.stats?.BF || 0)).toBe(faced.length);
+      }
+    }
+    expect(after.gameResultsMap[1].isHome).toBe(isHome);
+    expect(errors).toEqual([]);
+  });
+}
+
 test.setTimeout(180_000); // Includes three actual mode transitions and a manual tactical game.
 const history = s => ({ gameResultsMap: s.gameResultsMap, allTeamResultsMap: s.allTeamResultsMap,
   allTeamBoxScoresMap: s.allTeamBoxScoresMap, scheduleArchive: s.scheduleArchive,
