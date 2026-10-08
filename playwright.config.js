@@ -42,5 +42,11 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
       },
     },
+    {
+      name: 'mobile-webkit',
+      testMatch: '**/progression.smoke.spec.js',
+      grep: /E1 new game/,
+      use: { ...devices['iPhone 13'], viewport: { width: 390, height: 844 } },
+    },
   ],
 });

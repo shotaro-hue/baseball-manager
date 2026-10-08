@@ -19,7 +19,7 @@ export function PressConferenceModal({ event, onAnswer }) {
   const choice = selected !== null ? event.choices[selected] : null;
 
   return (
-    <div style={{
+    <div role="dialog" aria-label="記者会見" aria-modal="true" style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,.72)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       zIndex: 2000, padding: 16,

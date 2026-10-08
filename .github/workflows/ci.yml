@@ -4,7 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    # Validate the dependent history PR before the preparation PR is merged.
+    branches: [main, test/restore-progression-e2e-main]
 
 jobs:
   build-and-test:
@@ -32,3 +33,30 @@ jobs:
 
       - name: Validate physics HR
         run: npm run validate:physics-hr
+
+  progression-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium and WebKit
+        run: npx playwright install --with-deps chromium webkit
+      - name: Progression smoke tests (no retries)
+        run: npm run test:e2e:smoke
+      - name: Upload E2E report and failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: progression-e2e-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14

@@ -18,7 +18,8 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:all": "npm run test && npm run test:e2e",
-    "validate:physics-hr": "vitest run scripts/validate-physics-hr.test.js"
+    "validate:physics-hr": "vitest run scripts/validate-physics-hr.test.js",
+    "test:e2e:smoke": "playwright test progression.smoke.spec.js --retries=0"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
