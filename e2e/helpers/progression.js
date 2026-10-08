@@ -88,7 +88,11 @@ export async function loadFixture(page, kind) {
     const state = fixture;
     const { generateSeasonSchedule } = await import('/baseball-manager/src/engine/scheduleGen.js');
     state.schedule = generateSeasonSchedule(state.year, state.teams);
-    const played = kind === 'draw-complete' ? SEASON_GAMES : kind === 'late' ? SEASON_GAMES - 1 : 0;
+    const { calcAllStarTriggerDay } = await import('/baseball-manager/src/engine/scheduleGen.js');
+    const { SEASON_PARAMS, getDefaultParams } = await import('/baseball-manager/src/data/scheduleParams.js');
+    const params = SEASON_PARAMS[state.year] || getDefaultParams(state.year);
+    const allStarTrigger = calcAllStarTriggerDay(state.schedule, params.allStarSkipDates);
+    const played = kind === 'allstar' ? allStarTrigger - 2 : kind === 'draw-complete' ? SEASON_GAMES : kind === 'late' ? SEASON_GAMES - 1 : 0;
     const byId = new Map(state.teams.map(t => [t.id, t]));
     state.gameResultsMap = {}; state.allTeamResultsMap = {}; state.allTeamBoxScoresMap = {};
     for (const team of state.teams) {
@@ -111,10 +115,16 @@ export async function loadFixture(page, kind) {
         }
       }
     }
-    state.gameDay = played + 1; state.allStarDone = played > 0; state.recentResults = [];
+    state.gameDay = played + 1; state.allStarDone = played > 0 && kind !== 'allstar'; state.recentResults = [];
     state.offseasonPlan = kind === 'draw-complete' ? { version:1,year:state.year,myId:state.myId,stage:'postseason',resumeScreen:'playoff',playoff:encodePlayoff(initPlayoff(state.teams,{year:state.year})) } : null;
     if (kind === 'invalid-lineup') {
       const team = byId.get(state.myId); team.lineup = []; team.lineupNoDh = []; team.lineupDh = [];
+    }
+    if (kind === 'legacy') {
+      // Original inline version-4 fixture; no optional history marker or chunks.
+      localStorage.setItem('baseball_manager_v1', JSON.stringify(fixture));
+      localStorage.setItem('baseball_manager_v1_meta', JSON.stringify({ year: fixture.year, gameDay: 1 }));
+      return;
     }
     const result = await saveGame(state);
     if (!result.ok) throw new Error('fixture save failed');

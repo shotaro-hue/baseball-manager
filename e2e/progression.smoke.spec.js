@@ -93,6 +93,14 @@ test('E2 final regular game, postseason save/reload, offseason and next year', a
   const previousStandings = next.seasonHistory.standingsHistory.find(entry => entry.year === before.year);
   const previousTeam = [...previousStandings.central, ...previousStandings.pacific].find(team => team.id === before.myId);
   expect(previousTeam.wins + previousTeam.losses + previousTeam.draws).toBe(143);
+  expect(next.scheduleArchive.at(-1).year).toBe(before.year);
+  expect(Object.keys(next.scheduleArchive.at(-1).gameResultsMap)).toHaveLength(143);
+  expect(next.gameResultsMap).toEqual({}); expect(next.recentResults).toEqual([]);
+  expect(next.allStarDone).toBe(false); expect(next.lastPressDay).toBe(0);
+  await reloadAndLoad(page);
+  const reopened = await saveHub(page);
+  expect(reopened.scheduleArchive).toEqual(next.scheduleArchive);
+  expect(progressSignature(reopened)).toEqual(nextProgress);
   await runSingle(page, false);
   expect(progressSignature(await saveHub(page)).played).toBe(1);
 });

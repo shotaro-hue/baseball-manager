@@ -1,3 +1,4 @@
+import { nextSeasonMatchHistory } from '../engine/matchHistory';
 import { useCallback, useRef, useState } from "react";
 import { uid, clamp, rng, rngf, fmtM } from '../utils';
 import { calcSeasonAwards, updateRecords, checkHallOfFame } from '../engine/awards';
@@ -194,9 +195,10 @@ export function useOffseason(gs) {
     const nextPlan = gs.offseasonPlan ? { version: 1, year: nextYear, myId,
       stage: 'new_season', resumeScreen: 'new_season', completedYear: year,
       seasonInfo: newSeasonInfo, growth: developmentSummary } : null;
+    const nextMatchHistory = nextSeasonMatchHistory({ ...gs, gameResultsMap: currentGameResultsMap }, year, schedule, myId);
     if (gs.handleSave && nextPlan) {
       const saved = await gs.handleSave({ silent: true, payload: { teams: nextTeams, year: nextYear,
-        gameDay: 1, faPool: nextPool, faYears: {}, offseasonPlan: nextPlan } });
+        gameDay: 1, faPool: nextPool, faYears: {}, offseasonPlan: nextPlan, ...nextMatchHistory } });
       if (!saved?.ok) { setCareerPersistenceError('新年度の保存に失敗しました。年度は進めていません。再試行してください。'); return false; }
     }
     setTeams(nextTeams);
@@ -204,17 +206,15 @@ export function useOffseason(gs) {
     // resetting current stats, just as for rostered players; do not invent a team.
     setYear(nextYear);setGameDay(1);setFaPool(nextPool);setDraftAllocationState(null);
     gs.setOffseasonPlan?.(nextPlan);
-    setAllStarDone(false);
-    setAllStarResult(null);
-    // 現シーズンの日程・試合結果をアーカイブに保存
-    // 詳細ボックススコアは自チーム分のみ保持して容量増加を抑える
-    if(schedule){
-      const myTeamResultsMap = isTeamIdSet(myId) ? (allTeamResultsMap?.[myId] || {}) : {};
-      setScheduleArchive(prev=>[...prev,{year,schedule,gameResultsMap: currentGameResultsMap,myTeamResultsMap}].slice(-5));
+    gs.hydrateMatchHistory?.(nextMatchHistory);
+    gs.markSaveDirty?.(["matchHistory"]);
+    // Compatibility for hook-only callers; the application always uses hydration.
+    if (!gs.hydrateMatchHistory) {
+      setAllStarDone(false); setAllStarResult(null);
+      if (schedule) setScheduleArchive(nextMatchHistory.scheduleArchive);
+      setGameResultsMap({}); setAllTeamResultsMap({});
     }
     setSchedule(newSchedule);
-    setGameResultsMap({});
-    setAllTeamResultsMap({});
     setAllStarTriggerDay(allStarTrigger);
     setScreen("new_season");
     return true;

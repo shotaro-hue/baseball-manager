@@ -3,7 +3,7 @@ import { resolveIndexedDbChunkScopes } from '../saveload';
 
 describe('resolveIndexedDbChunkScopes', () => {
   it('writes every chunk when no explicit scope list is supplied', () => {
-    expect(resolveIndexedDbChunkScopes()).toEqual(['seasonHistory', 'news', 'mailbox']);
+    expect(resolveIndexedDbChunkScopes()).toEqual(['seasonHistory', 'news', 'mailbox', 'matchHistory']);
   });
 
   it('skips unchanged chunks for an explicit empty scope list', () => {

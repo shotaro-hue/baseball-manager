@@ -108,6 +108,7 @@ export default function App() {
       news: saved.news || [],
       mailbox: saved.mailbox || [],
     });
+    gs.hydrateMatchHistory(saved);
     gs.setSaveRevision(Number(saved.saveRevision) || 0);
     gs.resetSaveTracking();
     gs.setCpuTradeOffers([]);
