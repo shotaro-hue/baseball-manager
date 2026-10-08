@@ -43,11 +43,20 @@ for (const useDh of [false, true]) for (const isHome of [false, true]) {
     await expect(page.locator('.gscreen')).toBeVisible();
     await expect(page.locator('.tg-section').nth(1)).toContainText(setup.pitcherName);
     const advance = page.getByRole('button', { name: '▶▶ 1打席進む', exact: true });
+    const stepOnce = async () => {
+      if (await advance.count()) await advance.click();
+      else {
+        // Advisory stops hide the single-step button. A normal strategy command
+        // deliberately clears the stop and advances exactly one plate appearance.
+        await page.getByRole('button', { name: '🎯 作戦', exact: true }).click();
+        await page.getByRole('button', { name: '通常で実行！', exact: true }).click();
+      }
+    };
     // In non-DH games, pinch-hit for the pitcher and verify the relief pitcher's
     // inherited batting slot on the next turn through the order.
     const pinch = page.getByRole('button', { name: '👤 代打', exact: true });
     const readyForPinch = async () => (await pinch.isEnabled()) && (useDh || (await page.locator('.tg-section').nth(2).innerText()).includes(setup.pitcherName));
-    for (let i = 0; !(await readyForPinch()) && i < 120; i++) await advance.click();
+    for (let i = 0; !(await readyForPinch()) && i < 120; i++) await stepOnce();
     expect(await readyForPinch()).toBe(true);
     await pinch.click();
     const phRow = page.locator('.gscreen .card2').filter({ has: page.getByRole('button', { name: '代打！', exact: true }) }).first();
