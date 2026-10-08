@@ -131,8 +131,8 @@ function PitchingTable({ pitching, teamName }) {
  * ボックススコアモーダル
  *
  * result: allTeamResultsMap[teamId][dayNo] の形式
- *   ホームチームエントリ: { homeBatting, awayBatting, homePitching, awayPitching, inningScores, ... }
- *   アウェイチームエントリ: { myBatting, oppBatting, myPitching, oppPitching, inningScores, ... }
+ *   Workerの視点形式: { myBatting, oppBatting, myPitching, oppPitching, inningScores, ... }
+ *   旧形式・戦術ホーム: { homeBatting, awayBatting, homePitching, awayPitching, inningScores, ... }
  *
  * teamId: 表示視点チームの ID（home/away 判定に使用）
  */
@@ -146,11 +146,12 @@ export function BoxScoreModal({ result, myTeamName, oppTeamName, teamId, dayNo, 
   // ホーム/アウェイ判定: homeId に teamId が含まれているか
   const isMyHome = homeId === teamId;
 
-  // 打撃・投手成績を視点チームから取得（キー構造が home/away で異なる）
-  const myBatting  = isMyHome ? result.homeBatting  : result.myBatting;
-  const oppBatting = isMyHome ? result.awayBatting  : result.oppBatting;
-  const myPitching  = isMyHome ? result.homePitching  : result.myPitching;
-  const oppPitching = isMyHome ? result.awayPitching  : result.oppPitching;
+  // Worker records use team-perspective keys even at home. Preserve legacy
+  // records as a fallback, but do not replace explicitly recorded empty arrays.
+  const myBatting = result.myBatting ?? (isMyHome ? result.homeBatting : result.awayBatting);
+  const oppBatting = result.oppBatting ?? (isMyHome ? result.awayBatting : result.homeBatting);
+  const myPitching = result.myPitching ?? (isMyHome ? result.homePitching : result.awayPitching);
+  const oppPitching = result.oppPitching ?? (isMyHome ? result.awayPitching : result.homePitching);
 
   // イニング別スコア表のホーム/アウェイ名・合計
   const homeTeamName = isMyHome ? myTeamName : oppTeamName;
