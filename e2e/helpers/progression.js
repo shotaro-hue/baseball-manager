@@ -40,8 +40,18 @@ export async function runSingle(page, mobile) {
   await expect(page.getByRole('button', { name: 'ホームに戻る', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'ホームに戻る', exact: true }).click();
 }
-export async function readSave(page) {
-  return page.evaluate(async () => (await import('/baseball-manager/src/engine/saveload.js')).loadGame());
+export async function readSave(page, options = {}) {
+  return page.evaluate(async options => {
+    const saved = await (await import('/baseball-manager/src/engine/saveload.js')).loadGame();
+    if (!options.progressOnly || !saved) return saved;
+    // The progression smoke compares one player's full stats. Returning unused
+    // rosters/history made WebKit traces expensive; the actual load stays real.
+    const team = saved.teams.find(t => t.id === saved.myId);
+    const player = [...team.players, ...team.farm].find(p => p.id === (options.playerId ?? team.players[0].id));
+    return { year: saved.year, gameDay: saved.gameDay, myId: saved.myId,
+      teams: [{ id: team.id, wins: team.wins, losses: team.losses, draws: team.draws,
+        players: [{ id: player.id, name: player.name, stats: player.stats }], farm: [] }] };
+  }, options);
 }
 export async function waitSaveIdle(page) {
   const idle = async () => page.evaluate(async () => {
@@ -50,11 +60,11 @@ export async function waitSaveIdle(page) {
   });
   await expect.poll(idle, { timeout: 15_000 }).toBe(true);
 }
-export async function saveHub(page) {
+export async function saveHub(page, options = {}) {
   await waitSaveIdle(page);
   await page.getByRole('button', { name: '保存', exact: true }).click();
   await waitSaveIdle(page);
-  const saved = await readSave(page);
+  const saved = await readSave(page, options);
   const signature = progressSignature(saved);
   await expect(page.locator('.topbar')).toContainText(`第${signature.gameDay}戦`);
   await expect(page.locator('.topbar')).toContainText(`${signature.wins}勝${signature.losses}敗`);
@@ -88,7 +98,11 @@ export async function loadFixture(page, kind) {
     const state = fixture;
     const { generateSeasonSchedule } = await import('/baseball-manager/src/engine/scheduleGen.js');
     state.schedule = generateSeasonSchedule(state.year, state.teams);
-    const played = kind === 'draw-complete' ? SEASON_GAMES : kind === 'late' ? SEASON_GAMES - 1 : 0;
+    const { calcAllStarTriggerDay } = await import('/baseball-manager/src/engine/scheduleGen.js');
+    const { SEASON_PARAMS, getDefaultParams } = await import('/baseball-manager/src/data/scheduleParams.js');
+    const params = SEASON_PARAMS[state.year] || getDefaultParams(state.year);
+    const allStarTrigger = calcAllStarTriggerDay(state.schedule, params.allStarSkipDates);
+    const played = kind === 'allstar' ? allStarTrigger - 2 : kind === 'draw-complete' ? SEASON_GAMES : kind === 'late' ? SEASON_GAMES - 1 : 0;
     const byId = new Map(state.teams.map(t => [t.id, t]));
     state.gameResultsMap = {}; state.allTeamResultsMap = {}; state.allTeamBoxScoresMap = {};
     for (const team of state.teams) {
@@ -111,10 +125,16 @@ export async function loadFixture(page, kind) {
         }
       }
     }
-    state.gameDay = played + 1; state.allStarDone = played > 0; state.recentResults = [];
+    state.gameDay = played + 1; state.allStarDone = played > 0 && kind !== 'allstar'; state.recentResults = [];
     state.offseasonPlan = kind === 'draw-complete' ? { version:1,year:state.year,myId:state.myId,stage:'postseason',resumeScreen:'playoff',playoff:encodePlayoff(initPlayoff(state.teams,{year:state.year})) } : null;
     if (kind === 'invalid-lineup') {
       const team = byId.get(state.myId); team.lineup = []; team.lineupNoDh = []; team.lineupDh = [];
+    }
+    if (kind === 'legacy') {
+      // Original inline version-4 fixture; no optional history marker or chunks.
+      localStorage.setItem('baseball_manager_v1', JSON.stringify(fixture));
+      localStorage.setItem('baseball_manager_v1_meta', JSON.stringify({ year: fixture.year, gameDay: 1 }));
+      return;
     }
     const result = await saveGame(state);
     if (!result.ok) throw new Error('fixture save failed');
