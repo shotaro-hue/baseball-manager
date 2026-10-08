@@ -40,8 +40,18 @@ export async function runSingle(page, mobile) {
   await expect(page.getByRole('button', { name: 'ホームに戻る', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'ホームに戻る', exact: true }).click();
 }
-export async function readSave(page) {
-  return page.evaluate(async () => (await import('/baseball-manager/src/engine/saveload.js')).loadGame());
+export async function readSave(page, options = {}) {
+  return page.evaluate(async options => {
+    const saved = await (await import('/baseball-manager/src/engine/saveload.js')).loadGame();
+    if (!options.progressOnly || !saved) return saved;
+    // The progression smoke compares one player's full stats. Returning unused
+    // rosters/history made WebKit traces expensive; the actual load stays real.
+    const team = saved.teams.find(t => t.id === saved.myId);
+    const player = [...team.players, ...team.farm].find(p => p.id === (options.playerId ?? team.players[0].id));
+    return { year: saved.year, gameDay: saved.gameDay, myId: saved.myId,
+      teams: [{ id: team.id, wins: team.wins, losses: team.losses, draws: team.draws,
+        players: [{ id: player.id, name: player.name, stats: player.stats }], farm: [] }] };
+  }, options);
 }
 export async function waitSaveIdle(page) {
   const idle = async () => page.evaluate(async () => {
@@ -50,11 +60,11 @@ export async function waitSaveIdle(page) {
   });
   await expect.poll(idle, { timeout: 15_000 }).toBe(true);
 }
-export async function saveHub(page) {
+export async function saveHub(page, options = {}) {
   await waitSaveIdle(page);
   await page.getByRole('button', { name: '保存', exact: true }).click();
   await waitSaveIdle(page);
-  const saved = await readSave(page);
+  const saved = await readSave(page, options);
   const signature = progressSignature(saved);
   await expect(page.locator('.topbar')).toContainText(`第${signature.gameDay}戦`);
   await expect(page.locator('.topbar')).toContainText(`${signature.wins}勝${signature.losses}敗`);

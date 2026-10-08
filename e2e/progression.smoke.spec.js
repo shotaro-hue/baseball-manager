@@ -10,20 +10,20 @@ test.afterEach(async () => { expect(errors, 'Unhandled page exceptions').toEqual
 test('E1 new game, five games, persisted reload, one more game', async ({ page }, testInfo) => {
   const mobile = testInfo.project.name === 'mobile-webkit';
   await startNewGame(page);
-  const initial = progressSignature(await saveHub(page));
+  const initial = progressSignature(await saveHub(page, { progressOnly: true }));
   await expect(page.locator('.topbar')).toContainText('残り143試合');
   if (mobile) await mainNavigation(page, true).getByRole('button', { name: '日程', exact: true }).click();
   if (mobile) await mainNavigation(page, true).getByRole('button', { name: 'ホーム', exact: true }).click();
   await runBatch(page, mobile);
-  const saved = await saveHub(page), before = progressSignature(saved);
+  const saved = await saveHub(page, { progressOnly: true }), before = progressSignature(saved);
   expect(before.played - initial.played).toBe(5);
   expect(before.gameDay).toBe(initial.gameDay + 5);
   await expect(page.locator('.topbar')).toContainText('残り138試合');
   await reloadAndLoad(page);
   await expect(page.locator('.topbar')).toContainText('残り138試合');
-  expect(progressSignature(await saveHub(page), before.player.id)).toEqual(before);
+  expect(progressSignature(await saveHub(page, { progressOnly: true, playerId: before.player.id }), before.player.id)).toEqual(before);
   await runSingle(page, mobile);
-  const after = progressSignature(await saveHub(page), before.player.id);
+  const after = progressSignature(await saveHub(page, { progressOnly: true, playerId: before.player.id }), before.player.id);
   expect(after.played).toBe(before.played + 1);
   expect(after.gameDay).toBe(before.gameDay + 1);
   await expect(page.locator('.topbar')).toContainText('残り137試合');

@@ -424,12 +424,8 @@ export function useGameState() {
   },[setRecentResults]);
 
   const pushGameResult = useCallback((gameNo, result)=>{
-    setGameResultsMap(prev=>{
-      const nextMap = {...prev,[gameNo]:result};
-      return nextMap;
-    });
-    markSaveDirty();
-  },[markSaveDirty, setGameResultsMap]);
+    setGameResultsMap(prev=>({...prev,[gameNo]:result}));
+  },[setGameResultsMap]);
 
   const addNews = useCallback((article)=>{
     setNews(prev=>{
