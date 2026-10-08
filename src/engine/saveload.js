@@ -1,3 +1,4 @@
+import { MATCH_HISTORY_FIELDS, matchHistorySnapshot, matchHistoryForSave } from './matchHistory';
 import LZString from 'lz-string';
 import { resolveInitialContractYears } from './realplayer';
 import {
@@ -41,7 +42,7 @@ const IDB_STORES = {
   chunks: BASEBALL_MANAGER_DB_STORES.chunks,
   careerLogs: BASEBALL_MANAGER_DB_STORES.careerLogs,
 };
-const INDEXED_DB_CHUNK_SCOPES = ['seasonHistory', 'news', 'mailbox'];
+const INDEXED_DB_CHUNK_SCOPES = ['seasonHistory', 'news', 'mailbox', 'matchHistory'];
 
 const MAX_RECENT_CAREER_LOG_YEARS = 3;
 
@@ -250,7 +251,7 @@ function validateAndMigrateSave(state) {
     revenueThisSeason:  t.revenueThisSeason  ?? 0,
     players: Array.isArray(t.players) ? t.players.map(migratePlayer).map(p => migrateInitialContractYears(p, t.name, state)) : [],
   }));
-  return { ok: true, state: { ...state, saveId: ensureSaveId(state.saveId), teams } };
+  return { ok: true, state: { ...state, ...matchHistorySnapshot(state), saveId: ensureSaveId(state.saveId), teams } };
 }
 
 function sanitizeSaveState(state) {
@@ -501,6 +502,11 @@ export function resolveIndexedDbChunkScopes(dirtyScopes) {
 
 async function persistLargeDataToIndexedDb(state, dirtyScopes) {
   const scopes = resolveIndexedDbChunkScopes(dirtyScopes);
+  // The first save of a legacy game must create the new optional history chunk,
+  // even when all previously-supported scopes are clean.
+  let current = null;
+  try { current = decompress(localStorage.getItem(SAVE_KEY)); } catch { /* a new save can repair an invalid primary */ }
+  if ((!current?.matchHistoryStored || current.saveId !== state.saveId) && !scopes.includes('matchHistory')) scopes.push('matchHistory');
   const writes = [];
   if (scopes.includes('seasonHistory')) {
     const seasonHistory = state?.seasonHistory ?? {};
@@ -514,6 +520,7 @@ async function persistLargeDataToIndexedDb(state, dirtyScopes) {
     const mailbox = Array.isArray(state?.mailbox) ? state.mailbox : [];
     writes.push(idbWrite(IDB_STORES.chunks, 'mailbox', mailbox));
   }
+  if (scopes.includes('matchHistory')) writes.push(idbWrite(IDB_STORES.chunks, 'matchHistory', matchHistoryForSave(state)));
   await Promise.all(writes);
   return scopes;
 }
@@ -623,6 +630,8 @@ export async function saveGame(state, options = {}) {
     console.error('Save failed: IndexedDB write error', e);
     return { ok: false, quota: false, reason: 'indexeddb_write_failed' };
   }
+  for (const key of MATCH_HISTORY_FIELDS) delete safeState[key];
+  safeState.matchHistoryStored = true;
   safeState.seasonHistory = null;
   safeState.news = [];
   safeState.mailbox = [];
@@ -819,8 +828,14 @@ export async function loadGame() {
           state.seasonHistory = (await idbRead(IDB_STORES.chunks, 'seasonHistory')) ?? state.seasonHistory;
           state.news = (await idbRead(IDB_STORES.chunks, 'news')) ?? state.news;
           state.mailbox = (await idbRead(IDB_STORES.chunks, 'mailbox')) ?? state.mailbox;
+          if (state.matchHistoryStored) {
+            const history = await idbRead(IDB_STORES.chunks, 'matchHistory');
+            if (!history) throw new Error('missing_match_history');
+            Object.assign(state, matchHistorySnapshot(history));
+          }
           state.saveRevision = sanitizeNumber(state.saveRevision, 0);
         } catch (e) {
+          if (state.matchHistoryStored) throw e;
           console.warn('IndexedDB load failed. Fallback to localStorage payload.', e);
         }
       }
