@@ -4,6 +4,8 @@ Thanks for considering a contribution to NPB Franchise Manager.
 
 The project prioritizes simulation correctness, reproducible behavior, and decisions that remain understandable over many in-game seasons.
 
+For AI-assisted work, read [AGENTS.md](./AGENTS.md) before making changes.
+
 ## Good contribution areas
 
 - reproducible simulation bugs
