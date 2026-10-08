@@ -432,10 +432,12 @@ export function useOffseason(gs) {
       const player=myTeam?.players.find(p=>p.id===mail.playerId);
       if(player){
         if(action==="accept"){
-          const bid=calcPostingBid(player);
-          const fee=Math.round(bid*POSTING_FEE_RATE);
+          const bidYen=calcPostingBid(player);
+          const feeYen=Math.round(bidYen*POSTING_FEE_RATE);
+          // 入札・移籍金は円、球団予算は万円。予算への加算境界で一度だけ換算する。
+          const feeManYen=feeYen/10000;
           upd(myId,t=>({...t,
-            budget:t.budget+fee,
+            budget:t.budget+feeManYen,
             players:t.players.filter(p=>p.id!==mail.playerId),
             lineup:(t.lineup||[]).filter(pid=>pid!==mail.playerId),
             lineupNoDh:(t.lineupNoDh||[]).filter(pid=>pid!==mail.playerId),
@@ -443,12 +445,12 @@ export function useOffseason(gs) {
             rotation:(t.rotation||[]).filter(pid=>pid!==mail.playerId),
           }));
           setMailbox(prev=>[...prev,{id:uid(),type:"posting_result",read:false,
-            title:`【ポスティング成立】${player.name} 入札額${fmtM(bid)}`,
+            title:`【ポスティング成立】${player.name} 入札額${fmtM(bidYen)}`,
             from:"MLB事務局",dateLabel:`${year}年`,timestamp:Date.now(),
-            body:`${player.name}のポスティングが成立しました。\n入札額: ${fmtM(bid)}\n球団受取移籍金: ${fmtM(fee)}（落札額の20%）`,
+            body:`${player.name}のポスティングが成立しました。\n入札額: ${fmtM(bidYen)}\n球団受取移籍金: ${fmtM(feeYen)}（落札額の20%）`,
           }]);
-          addNews({type:"season",headline:`【MLB移籍】${player.name}（${myTeam?.name}）がポスティングで渡米`,source:"野球速報",dateLabel:`${year}年`,body:`${player.name}選手がポスティングを通じてMLBへ移籍。入札額${fmtM(bid)}、球団移籍金収入${fmtM(fee)}。`});
-          notify(`${player.name} MLB移籍承認 — 移籍金+${fmtM(fee)}`,"ok");
+          addNews({type:"season",headline:`【MLB移籍】${player.name}（${myTeam?.name}）がポスティングで渡米`,source:"野球速報",dateLabel:`${year}年`,body:`${player.name}選手がポスティングを通じてMLBへ移籍。入札額${fmtM(bidYen)}、球団移籍金収入${fmtM(feeYen)}。`});
+          notify(`${player.name} MLB移籍承認 — 移籍金+${fmtM(feeYen)}`,"ok");
         } else {
           upd(myId,t=>({...t,players:t.players.map(p=>p.id===mail.playerId
             ?{...p,morale:Math.max(0,(p.morale??70)-10)}:p)}));

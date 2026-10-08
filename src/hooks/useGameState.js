@@ -298,6 +298,10 @@ export function useGameState() {
     const store = getPersistentStore();
     return store ? store.selectMailboxList(options) : sliceCollection(mailbox, options);
   }, [getPersistentStore, mailbox]);
+  const getMailboxItemById = useCallback((id) => {
+    const store = getPersistentStore();
+    return store ? store.getMailboxById(id) : mailbox.find(item => item.id === id);
+  }, [getPersistentStore, mailbox]);
   const getSeasonHistory = useCallback(() => {
     const store = getPersistentStore();
     return store ? store.getSeasonHistory() : seasonHistory;
@@ -986,6 +990,7 @@ export function useGameState() {
     getSeasonHistory,
     getNewsBySelector,
     getMailboxBySelector,
+    getMailboxItemById,
     getGameResultsMap,
     getScheduleArchive,
     getUnreadMailboxCount,
