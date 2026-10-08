@@ -3,11 +3,11 @@ import { test, expect } from '@playwright/test';
 async function mount(page) {
   await page.goto('/');
   await page.evaluate(async () => {
-    const React = await import('/node_modules/.vite/deps/react.js');
-    const { createRoot } = await import('/node_modules/.vite/deps/react-dom_client.js');
-    const { ContractRenewalPhaseScreen } = await import('/src/components/ContractRenewalPhaseScreen.jsx');
-    const { emptyStats } = await import('/src/engine/playerCore.js');
-    const { calcPlayerDemand } = await import('/src/engine/contract.js');
+    const { default: React } = await import('/baseball-manager/node_modules/.vite/deps/react.js');
+    const { createRoot } = (await import('/baseball-manager/node_modules/.vite/deps/react-dom_client.js')).default;
+    const { ContractRenewalPhaseScreen } = await import('/baseball-manager/src/components/ContractRenewalPhaseScreen.jsx');
+    const { emptyStats } = await import('/baseball-manager/src/engine/playerCore.js');
+    const { calcPlayerDemand } = await import('/baseball-manager/src/engine/contract.js');
     document.getElementById('root').style.display = 'none';
     const host = document.createElement('div'); document.body.append(host);
     const players = Array.from({ length: 20 }, (_, id) => ({ id, name: `選手${id}`, age: 25, pos: '外野', salary: 1000, contractYearsLeft: 1, stats: emptyStats() }));

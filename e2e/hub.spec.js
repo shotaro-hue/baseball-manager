@@ -1,35 +1,22 @@
 import { test, expect } from '@playwright/test';
-
-async function selectTeamAndGoToHub(page, teamName = '読売ジャイアンツ') {
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.evaluate(() => localStorage.clear());
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.getByRole('button', { name: teamName }).click();
-  await expect(page.getByRole('button', { name: /ホーム/ })).toBeVisible({ timeout: 8000 });
-}
+import { startNewGame, mainNavigation } from './helpers/progression';
 
 test.describe('HUB画面', () => {
-  test.beforeEach(async ({ page }) => {
-    await selectTeamAndGoToHub(page);
+  test.beforeEach(async ({page}) => startNewGame(page));
+  test('成績タブに切り替えると打者・投手ビューが表示される', async ({page}) => {
+    await mainNavigation(page,false).getByRole('button',{name:'成績',exact:true}).click();
+    await page.locator('.tabs-nav').getByRole('button',{name:'成績',exact:true}).click();
+    await expect(page.getByRole('tab',{name:'打者',exact:true})).toBeVisible();
+    await expect(page.getByRole('tab',{name:'投手',exact:true})).toBeVisible();
+    await expect(page.getByText('打者成績',{exact:true})).toBeVisible();
   });
-
-  test('成績タブに切り替えると打者・投手ビューが表示される', async ({ page }) => {
-    await page.getByRole('button', { name: /分析/ }).click();
-    await page.getByRole('button', { name: '成績' }).click();
-
-    await expect(page.getByRole('button', { name: '打者' })).toBeVisible({ timeout: 5000 });
-    await expect(page.getByRole('button', { name: '投手' })).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('打者成績')).toBeVisible({ timeout: 5000 });
+  test('ロスタータブに選手テーブルが表示される', async ({page}) => {
+    await mainNavigation(page,false).getByRole('button',{name:/編成/}).click();
+    await page.locator('.tabs-nav').getByRole('button',{name:'ロスター',exact:true}).click();
+    await page.locator('details.roster-full-settings > summary').click();
+    await expect(page.locator('details.roster-full-settings table tbody tr').nth(0)).toBeVisible();
   });
-
-  test('ロスタータブに選手テーブルが表示される', async ({ page }) => {
-    await page.getByRole('button', { name: /編成/ }).click();
-    await page.getByRole('button', { name: 'ロスター' }).click();
-
-    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 5000 });
-  });
-
-  test('HUBに1試合シムボタンが表示される', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /1試合/ })).toBeVisible();
+  test('HUBに1試合シムボタンが表示される', async ({page}) => {
+    await expect(page.locator('.desktop-dashboard').getByRole('button',{name:'試合へ進む',exact:true})).toBeVisible();
   });
 });
