@@ -142,7 +142,7 @@ const handleInterview = useCallback((newsId, opt)=>{
 
 ## 過去バグからの教訓
 
-- CLAUDE.md B6: ファイル参照の確認（今回は既存ファイルの修正のみ。新ファイル不要）
+- [AGENTS.md](../AGENTS.md): ファイル参照の確認（今回は既存ファイルの修正のみ。新ファイル不要）
 - `analyzeTeamNeeds` の戻り値型に依存するコードは他にもある可能性があるため、`trade.js` の `evalTradeForCpu` も念のため確認すること（既に `n.type.includes` で正しく使用済みのため変更不要）
 
 ## コーディング規約リマインダー

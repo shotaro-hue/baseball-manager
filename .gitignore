@@ -4,8 +4,9 @@ node_modules/
 # Build output
 dist/
 
-# Local Claude Code settings（個人設定・コミット対象外）
-.claude/settings.local.json
+# Unused tool-specific configuration (keep local)
+/.claude/
+/CLAUDE.md
 
 # Environment
 .env

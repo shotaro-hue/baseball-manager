@@ -139,7 +139,7 @@ describe("handleDraftComplete — _r1winner type match", () => {
 
 ## 過去バグからの教訓
 
-（CLAUDE.md の教訓テーブルから関連項目）
+（[AGENTS.md](../AGENTS.md) の回帰観点から関連項目）
 - B1 パターン: 両チームへの適用 — 今回の修正で全12球団のファームに選手が入るようになる
 
 ## コーディング規約リマインダー
