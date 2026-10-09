@@ -77,6 +77,16 @@ head924feddの[CI run275](https://github.com/shotaro-hue/baseball-manager/action
 
 この文書を含む最終headのCI結果と証拠へのリンクは[PR425](https://github.com/shotaro-hue/baseball-manager/pull/425)に確定して記録する。過去PR420の36成功/1失敗と、今回の39成功/0失敗は異なる実行である。前者を上書きしない。
 
+## CIの集約時間制約への対応
+
+head aa11ca4の[run276](https://github.com/shotaro-hue/baseball-manager/actions/runs/37877132708)はbuild-and-test成功、smokeジョブcancelled。ジョブログにはChromium20件の成功があり、最後のWebKitの完了前に10分上限へ達した。テスト失敗0、WebKit1件の完了未確認として扱い、21件成功とは数えない。artifact11592908614には処理中・履歴エラーの画像だけがあり、完走レポートは生成されていない。ログも保存した。
+
+同ジョブの初期化2件は18.1秒＋7.7秒。run275では14.6秒＋7.2秒だったが、既存の負傷準備ケースも32.9→52.0秒など、複数ケースに変動があった。ARIA配置だけが時間増加の原因とは断定できない。ブラウザ導入などのセットアップを含む単一ジョブの10分枠に21件を集約する構成には余裕が不足した。
+
+タイムアウト・再試行・skipを変えず、同じ21件を2つの並行CIジョブへ配分する。initialization.spec.js＋progression.smoke.spec.jsは8件（WebKit含む）、match-history.spec.js＋posting.spec.jsは13件。Playwrightの収集結果を比較し、和集合が元のsmoke21件と完全一致、重複0を確認した。各ジョブは10分上限・1 worker・再試行0、fail-fast=false、証拠はalwaysで別名artifactへ保存。元のprogression-e2eチェック名は集約gateとして維持し、どちらかの失敗・cancelled・skipをsuccess扱いにしない。
+
+CIが実行する2コマンドはnpm run test:e2e -- progression.smoke.spec.js initialization.spec.js --workers=1 --retries=0、およびnpm run test:e2e -- match-history.spec.js posting.spec.js --workers=1 --retries=0。ローカルのsmoke21件・全E2E39件は同じテスト実装で成功済みで、今回の追加変更はCI配分と文書のみ。最新の実行結果はPR本文に記録する。run276を無変更で再実行して成功を選ぶ運用は行わない。
+
 ## 残存範囲
 
 自動保存圧縮・保存形式・ゲームバランス・通常試合進行・全面UI変更は対象外。ホームの描画/モジュール読込にも主スレッド負荷が残る。球団単位の分割は全処理をWorker化する変更ではない。
