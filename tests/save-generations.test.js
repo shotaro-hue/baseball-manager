@@ -114,7 +114,7 @@ it('rotation due on a failed commit leaves both previous backup roots untouched'
  expect((await save(state(4))).ok).toBe(false);expect([rows.get(bk1),rows.get(bk2)]).toEqual(backups);
 });
 it('deleting a save allows a fresh save in the same tab', async () => {
- const {deleteSave}=await import('../src/engine/saveload');await save(state(1));deleteSave();
+ const {deleteSave}=await import('../src/engine/saveload');await save(state(1));await deleteSave();
  expect((await save(state(1,'new'))).ok).toBe(true);expect((await loadGame()).saveId).toBe('new');
 });
 it('A14: obsolete unreferenced generations are collected after successful commit', async () => {
@@ -156,4 +156,21 @@ it('failed in-flight dirty scopes are retained in the queued retry', async () =>
  const retry=enqueueSaveGame(b,{skipCompression:true,dirtyScopes:['mailbox']});
  expect((await first).ok).toBe(false);expect((await retry).ok).toBe(true);const loaded=await loadGame();
  expect(loaded.news).toEqual([{day:2}]);expect(loaded.mailbox).toEqual([{day:3}]);
+});
+it('deletion during chunk writing prevents active and queued saves from resurrecting roots', async () => {
+ const {deleteSave}=await import('../src/engine/saveload');await save(state(1));
+ const add=IDBObjectStore.prototype.add;let deletion,queued;
+ vi.spyOn(IDBObjectStore.prototype,'add').mockImplementation(function(...args){
+  const req=add.apply(this,args);
+  if(this.name==='save_chunks'&&!deletion){
+   queued=enqueueSaveGame(state(3),{skipCompression:true});
+   deletion=deleteSave();
+  }
+  return req;
+ });
+ const active=enqueueSaveGame(state(2),{skipCompression:true});
+ await active;await deletion;await queued;
+ expect(hasSave()).toBe(false);expect(rows.has(primary)).toBe(false);
+ expect(rows.has(bk1)).toBe(false);expect(rows.has(bk2)).toBe(false);
+ expect((await save(state(9,'new-game'))).ok).toBe(true);
 });

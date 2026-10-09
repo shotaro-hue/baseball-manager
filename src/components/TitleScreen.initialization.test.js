@@ -46,3 +46,20 @@ it('shows failure and restores team selection on retry',()=>{
   const button=view.root.findAllByType('button')[0];expect(button.props.disabled).toBe(false);
   act(()=>button.props.onClick());expect(select).toHaveBeenCalledTimes(1);
 });
+it('waits for deletion completion and blocks new game until then',async()=>{
+ let finish;deleteSave.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));
+ const onSaveDeleted=vi.fn(),select=vi.fn();vi.stubGlobal('window',{confirm:()=>true});
+ await act(async()=>{view=create(React.createElement(TitleScreen,{saveExists:true,onSaveDeleted,onSelectTeam:select}));});
+ const remove=view.root.findAllByType('button').find(b=>b.children.join('')==='削除');
+ let deleting;await act(async()=>{deleting=remove.props.onClick();await Promise.resolve();});
+ expect(onSaveDeleted).not.toHaveBeenCalled();
+ for(const button of view.root.findAllByType('button'))expect(button.props.disabled).toBe(true);
+ await act(async()=>{finish({ok:true});await deleting;});
+ expect(onSaveDeleted).toHaveBeenCalledTimes(1);
+});
+it('keeps the save visible and explains a failed deletion',async()=>{
+ deleteSave.mockResolvedValueOnce({ok:false});const onSaveDeleted=vi.fn();vi.stubGlobal('window',{confirm:()=>true});
+ await act(async()=>{view=create(React.createElement(TitleScreen,{saveExists:true,onSaveDeleted}));});
+ await act(async()=>{await view.root.findAllByType('button').find(b=>b.children.join('')==='削除').props.onClick();});
+ expect(onSaveDeleted).not.toHaveBeenCalled();expect(view.root.findByProps({role:'alert'}).children.join('')).toContain('削除に失敗');
+});

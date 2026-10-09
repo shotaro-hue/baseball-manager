@@ -8,18 +8,18 @@
       "mode": "baseline",
       "n": 10,
       "save": {
-        "median": 935.6500000059605,
-        "max": 2466.5
+        "median": 658.5,
+        "max": 915
       },
       "load": {
-        "median": 124.20000000298023,
-        "max": 580.4000000059605
+        "median": 118.80000000447035,
+        "max": 156.20000000298023
       },
       "bytes": {
         "chunks": 384,
         "local": 341568
       },
-      "originUsageBytes": 30335
+      "originUsageBytes": 30333
     },
     {
       "browser": "chromium",
@@ -27,18 +27,18 @@
       "mode": "current",
       "n": 10,
       "save": {
-        "median": 852.7500000074506,
-        "max": 1258.6000000089407
+        "median": 949.6499999985099,
+        "max": 1174.5
       },
       "load": {
-        "median": 91.39999999850988,
-        "max": 250.20000000298023
+        "median": 111.24999999254942,
+        "max": 157
       },
       "bytes": {
         "chunks": 820,
-        "local": 342226
+        "local": 342216
       },
-      "originUsageBytes": 34421
+      "originUsageBytes": 34445
     },
     {
       "browser": "chromium",
@@ -46,12 +46,12 @@
       "mode": "baseline",
       "n": 10,
       "save": {
-        "median": 868.9000000059605,
-        "max": 2532.2999999970198
+        "median": 764.5500000044703,
+        "max": 1561.7000000029802
       },
       "load": {
-        "median": 122.74999999254942,
-        "max": 234
+        "median": 107.19999999552965,
+        "max": 198.09999999403954
       },
       "bytes": {
         "chunks": 506,
@@ -65,18 +65,18 @@
       "mode": "current",
       "n": 10,
       "save": {
-        "median": 929,
-        "max": 1478
+        "median": 925.1000000014901,
+        "max": 1165.5999999940395
       },
       "load": {
-        "median": 102,
-        "max": 312.29999999701977
+        "median": 86.35000000149012,
+        "max": 299.79999999701977
       },
       "bytes": {
         "chunks": 1579,
-        "local": 684486
+        "local": 684468
       },
-      "originUsageBytes": 40123
+      "originUsageBytes": 40141
     },
     {
       "browser": "chromium",
@@ -84,18 +84,18 @@
       "mode": "baseline",
       "n": 10,
       "save": {
-        "median": 831.6999999955297,
-        "max": 1499
+        "median": 771.7999999970198,
+        "max": 1202.5
       },
       "load": {
-        "median": 101.75,
-        "max": 416.29999999701977
+        "median": 105.29999999701977,
+        "max": 234.59999999403954
       },
       "bytes": {
         "chunks": 998,
         "local": 683136
       },
-      "originUsageBytes": 36172
+      "originUsageBytes": 36171
     },
     {
       "browser": "chromium",
@@ -103,18 +103,18 @@
       "mode": "current",
       "n": 10,
       "save": {
-        "median": 849.6499999910593,
-        "max": 1002.5
+        "median": 756.6999999955297,
+        "max": 1015.4000000059605
       },
       "load": {
-        "median": 89.94999999552965,
-        "max": 131.59999999403954
+        "median": 80.29999999701977,
+        "max": 144.29999999701977
       },
       "bytes": {
         "chunks": 2563,
-        "local": 684492
+        "local": 684468
       },
-      "originUsageBytes": 41047
+      "originUsageBytes": 41039
     },
     {
       "browser": "chromium",
@@ -122,18 +122,18 @@
       "mode": "baseline",
       "n": 10,
       "save": {
-        "median": 725.3500000014901,
-        "max": 943.5
+        "median": 755.4500000029802,
+        "max": 1738.7000000029802
       },
       "load": {
-        "median": 92.85000000149012,
-        "max": 110.20000000298023
+        "median": 98.44999999552965,
+        "max": 293.5
       },
       "bytes": {
         "chunks": 18328,
         "local": 683224
       },
-      "originUsageBytes": 86706
+      "originUsageBytes": 86670
     },
     {
       "browser": "chromium",
@@ -141,18 +141,18 @@
       "mode": "current",
       "n": 10,
       "save": {
-        "median": 775.4000000059605,
-        "max": 931.5
+        "median": 867,
+        "max": 1187.2000000029802
       },
       "load": {
-        "median": 80,
-        "max": 104.29999999701977
+        "median": 89.25,
+        "max": 123.19999998807907
       },
       "bytes": {
         "chunks": 37527,
-        "local": 684520
+        "local": 684530
       },
-      "originUsageBytes": 74763
+      "originUsageBytes": 74773
     },
     {
       "browser": "chromium",
@@ -160,18 +160,18 @@
       "mode": "baseline",
       "n": 10,
       "save": {
-        "median": 672.8500000014901,
-        "max": 2153.7000000029802
+        "median": 714.1499999985099,
+        "max": 1086.2000000029802
       },
       "load": {
-        "median": 83.65000000596046,
-        "max": 277.79999999701977
+        "median": 135.10000000149012,
+        "max": 170.5
       },
       "bytes": {
         "chunks": 110876,
         "local": 1024706
       },
-      "originUsageBytes": 42174
+      "originUsageBytes": 42172
     },
     {
       "browser": "chromium",
@@ -179,18 +179,18 @@
       "mode": "current",
       "n": 10,
       "save": {
-        "median": 845.6500000059605,
-        "max": 955.1000000089407
+        "median": 929.7000000104308,
+        "max": 1242.0999999940395
       },
       "load": {
-        "median": 81.09999999403954,
-        "max": 110.5
+        "median": 90.14999999850988,
+        "max": 185.29999999701977
       },
       "bytes": {
         "chunks": 333934,
-        "local": 1026654
+        "local": 1026676
       },
-      "originUsageBytes": 28009
+      "originUsageBytes": 27992
     },
     {
       "browser": "chromium",
@@ -198,18 +198,18 @@
       "mode": "baseline",
       "n": 10,
       "save": {
-        "median": 695.9000000059605,
-        "max": 892.5
+        "median": 714.1000000014901,
+        "max": 1282
       },
       "load": {
-        "median": 96.54999999701977,
-        "max": 193.20000000298023
+        "median": 120.69999999552965,
+        "max": 242.5
       },
       "bytes": {
         "chunks": 384,
         "local": 683150
       },
-      "originUsageBytes": 41463
+      "originUsageBytes": 41464
     },
     {
       "browser": "chromium",
@@ -217,18 +217,18 @@
       "mode": "current",
       "n": 10,
       "save": {
-        "median": 963.9500000029802,
-        "max": 2225.7000000029802
+        "median": 989.4999999925494,
+        "max": 1413.800000011921
       },
       "load": {
-        "median": 95.85000000149012,
-        "max": 139.8999999910593
+        "median": 106.20000000298023,
+        "max": 140.5
       },
       "bytes": {
         "chunks": 2458,
-        "local": 684444
+        "local": 684452
       },
-      "originUsageBytes": 48395
+      "originUsageBytes": 48374
     }
   ]
 }

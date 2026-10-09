@@ -729,12 +729,15 @@ async function saveGameImpl(state, options = {}) {
 
 // Observations are per storage surface so tests and isolated browsing contexts do not leak state.
 const observations = new WeakMap();
+const backupObservations = new WeakMap();
 const validatedRoots = new WeakMap();
 const validatedRawRoots = new WeakMap();
+const deletionEpochs = new WeakMap();
 let localSaveTail = Promise.resolve();
 let lastLoadResult = { status: 'none' };
 function observePrimary() {
   observations.set(localStorage, localStorage.getItem(SAVE_KEY));
+  backupObservations.set(localStorage, [localStorage.getItem(BACKUP_KEY_1), localStorage.getItem(BACKUP_KEY_2)]);
 }
 async function cleanupSaveChunks() {
   const roots = [];
@@ -748,14 +751,16 @@ export function saveGame(state, options = {}) {
   try { return saveOwnedSnapshot(structuredClone(state), structuredClone(options)); }
   catch { return Promise.resolve({ ok: false, quota: false, reason: 'snapshot_failed' }); }
 }
-function saveOwnedSnapshot(snapshot, safeOptions) {
+function saveOwnedSnapshot(snapshot, safeOptions, deletionEpoch = deletionEpochs.get(localStorage) ?? 0) {
   try {
     if (!observations.has(localStorage)) observePrimary();
   } catch { return Promise.resolve({ ok: false, quota: false, reason: 'snapshot_failed' }); }
   const run = async () => {
     const locked = async () => {
       try {
-        if (observations.get(localStorage) !== localStorage.getItem(SAVE_KEY)) {
+        const currentPrimary = localStorage.getItem(SAVE_KEY);
+        const backupChanged = currentPrimary === null && (backupObservations.get(localStorage) ?? []).some((raw, index) => raw !== localStorage.getItem([BACKUP_KEY_1, BACKUP_KEY_2][index]));
+        if (deletionEpoch !== (deletionEpochs.get(localStorage) ?? 0) || observations.get(localStorage) !== currentPrimary || backupChanged) {
           return { ok: false, quota: false, reason: 'save_conflict' };
         }
         return await saveGameImpl(snapshot, safeOptions);
@@ -772,10 +777,10 @@ function saveOwnedSnapshot(snapshot, safeOptions) {
   localSaveTail = result.catch(() => {});
   return result;
 }
-const sharedSaveQueue = createSaveRequestQueue(({ state, options }) => saveOwnedSnapshot(state, options));
+const sharedSaveQueue = createSaveRequestQueue(({ state, options, deletionEpoch }) => saveOwnedSnapshot(state, options, deletionEpoch));
 
 export function enqueueSaveGame(state, options = {}) {
-  try { return sharedSaveQueue.enqueue({ state: structuredClone(state), options: structuredClone(options) }); }
+  try { return sharedSaveQueue.enqueue({ state: structuredClone(state), options: structuredClone(options), deletionEpoch: deletionEpochs.get(localStorage) ?? 0 }); }
   catch { return Promise.resolve({ ok: false, quota: false, reason: 'snapshot_failed' }); }
 }
 
@@ -848,7 +853,8 @@ export async function loadGame() {
   lastLoadResult = { status: 'none' };
   let foundCandidate = false;
   let primaryAtLoad;
-  try { primaryAtLoad = localStorage.getItem(SAVE_KEY); } catch { primaryAtLoad = null; }
+  let backupsAtLoad;
+  try { primaryAtLoad = localStorage.getItem(SAVE_KEY); backupsAtLoad = [localStorage.getItem(BACKUP_KEY_1), localStorage.getItem(BACKUP_KEY_2)]; } catch { primaryAtLoad = null; backupsAtLoad = []; }
   const candidates = [
     { key: SAVE_KEY,     label: 'primary' },
     { key: BACKUP_KEY_1, label: 'backup-1' },
@@ -905,6 +911,7 @@ export async function loadGame() {
         if (key !== SAVE_KEY) console.warn(`Loaded from ${label}`);
         logPerf('loadGame', loadGameStart);
         observations.set(localStorage, primaryAtLoad);
+        backupObservations.set(localStorage, backupsAtLoad);
         validatedRoots.set(localStorage, state);
         validatedRawRoots.set(localStorage, raw);
         lastLoadResult = { status: key === SAVE_KEY ? 'primary' : 'recovered', source: label, generation: state.saveManifest?.generation };
@@ -1006,8 +1013,9 @@ export function getSaveMeta() {
   }
 }
 
-export function deleteSave() {
+function deleteSaveImpl() {
   observations.set(localStorage, null);
+  backupObservations.set(localStorage, [null, null]);
   validatedRoots.delete(localStorage);
   validatedRawRoots.delete(localStorage);
   let saveId = null;
@@ -1026,4 +1034,20 @@ export function deleteSave() {
       .then((mod) => mod.deleteBattedBallArchiveBySaveId(saveId))
       .catch((error) => console.warn('打球アーカイブ削除に失敗しました', error));
   }
+  return { ok: true };
+}
+
+export function deleteSave() {
+  // Invalidate requests already waiting in the coalescing queue before taking the same lock.
+  deletionEpochs.set(localStorage, (deletionEpochs.get(localStorage) ?? 0) + 1);
+  const run = async () => {
+    try {
+      if (globalThis.navigator?.locks?.request) return await navigator.locks.request('baseball-manager-save', deleteSaveImpl);
+      if (typeof window !== 'undefined') return { ok: false, reason: 'save_lock_unavailable' };
+      return deleteSaveImpl();
+    } catch { return { ok: false, reason: 'delete_failed' }; }
+  };
+  const result = localSaveTail.then(run, run);
+  localSaveTail = result.catch(() => {});
+  return result;
 }

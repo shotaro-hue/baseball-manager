@@ -55,3 +55,45 @@ test('save generations reject stale writes from another tab', async ({page,conte
  const stale=await other.evaluate(async()=>await(await import('/baseball-manager/src/engine/saveload.js')).saveGame(window.oldSave));
  expect(stale).toMatchObject({ok:false,reason:'save_conflict'});
 });
+
+test('save generations: deleting from another tab waits for an active save and leaves no revived roots',async({page,context})=>{
+ await page.goto('/');const other=await context.newPage();await other.goto('/');
+ await page.evaluate(async()=>{
+  const m=await import('/baseball-manager/src/engine/saveload.js');
+  const state={teams:[{id:0,players:[]}],myId:0,year:2026,gameDay:1,saveId:'delete-race',news:[],mailbox:[],seasonHistory:{}};
+  await m.saveGame(state);
+  const original=IDBDatabase.prototype.transaction;let paused=false;
+  window.releaseChunks=new Promise(resolve=>{window.releaseChunkCompletion=resolve;});
+  IDBDatabase.prototype.transaction=function(stores,mode,...rest){
+   const tx=original.call(this,stores,mode,...rest);
+   if(stores==='save_chunks'&&mode==='readwrite'&&!paused){paused=true;
+    Object.defineProperty(tx,'oncomplete',{set(callback){tx.addEventListener('complete',async event=>{
+     window.chunksComplete=true;await window.releaseChunks;callback.call(tx,event);
+    });}});
+   }return tx;
+  };
+  window.saving=m.saveGame({...state,gameDay:2}).finally(()=>{IDBDatabase.prototype.transaction=original;});
+ });
+ await expect.poll(()=>page.evaluate(()=>!!window.chunksComplete)).toBe(true);
+ await other.evaluate(async()=>{const m=await import('/baseball-manager/src/engine/saveload.js');window.deleting=m.deleteSave().then(result=>{window.deleted=result;});});
+ expect(await other.evaluate(()=>window.deleted)).toBeUndefined();
+ await page.evaluate(()=>window.releaseChunkCompletion());
+ await other.evaluate(()=>window.deleting);
+ expect(await other.evaluate(()=>window.deleted)).toMatchObject({ok:true});
+ expect(await page.evaluate(async()=>{await window.saving;const m=await import('/baseball-manager/src/engine/saveload.js');return m.hasSave();})).toBe(false);
+ for(const key of ['baseball_manager_v1','baseball_manager_v1_bk1','baseball_manager_v1_bk2'])expect(await page.evaluate(k=>localStorage.getItem(k),key)).toBeNull();
+});
+
+test('save generations: deletion invalidates a stale backup-only recovery in another tab',async({page,context})=>{
+ await page.goto('/');
+ await page.evaluate(async()=>{
+  const m=await import('/baseball-manager/src/engine/saveload.js');
+  const s={teams:[{id:0,players:[]}],myId:0,year:2026,saveId:'delete-backup',news:[],mailbox:[],seasonHistory:{}};
+  await m.saveGame({...s,gameDay:1});await m.saveGame({...s,gameDay:2});localStorage.removeItem('baseball_manager_v1');
+ });
+ const other=await context.newPage();await other.goto('/');
+ await other.evaluate(async()=>{window.recovered=await(await import('/baseball-manager/src/engine/saveload.js')).loadGame();});
+ await page.evaluate(async()=>await(await import('/baseball-manager/src/engine/saveload.js')).deleteSave());
+ const result=await other.evaluate(async()=>await(await import('/baseball-manager/src/engine/saveload.js')).saveGame(window.recovered));
+ expect(result).toMatchObject({ok:false,reason:'save_conflict'});
+});
