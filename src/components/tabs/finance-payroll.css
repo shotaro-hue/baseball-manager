@@ -1,0 +1,21 @@
+/* Existing PC hub width includes padding; contain only this tab's shell. */
+.calm-shell .hub:has(.finance-tab) { box-sizing: border-box; }
+.finance-payroll.card { background: #fff; border-color: #dce6f2; }
+.finance-payroll { color: #17243a; font-size: 14px; line-height: 1.6; }
+.finance-payroll .card-h { color: #17243a; font-size: 18px; margin-top: 0; }
+.finance-payroll-note { color: #53657c; font-size: 13px; margin: 0 0 8px; }
+.finance-payroll-breakdown { margin: 0; }
+.finance-payroll-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 8px; align-items: center; padding: 9px 0; border-bottom: 1px solid #dce6f2; }
+.finance-payroll-row dt, .finance-payroll-row dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.finance-payroll-row dd { text-align: right; }
+.finance-payroll-row .mono { font-size: 14px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.finance-payroll-row small { display: block; font-size: 12px; color: #805700; }
+.finance-payroll-count { color: #53657c; font-size: 12px; white-space: nowrap; }
+.finance-payroll-row[data-payroll-category="total"] { font-weight: 700; border-bottom: 0; }
+.finance-payroll-warning { color: #805700; font-size: 13px; margin: 8px 0 0; }
+.finance-payroll-leader { grid-template-columns: minmax(0, 1fr) auto; }
+.finance-payroll-leader > div { min-width: 0; }
+.finance-payroll-leader > .mono { text-align: right; }
+.finance-payroll-leader .finance-payroll-note { display: block; margin: 0; }
+.finance-payroll-player { display: block; max-width: 100%; padding: 6px 0; min-height: 44px; border: 0; background: transparent; color: #095cc7; font: inherit; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+.finance-payroll-player:focus-visible { outline: 3px solid #377ccc; outline-offset: 2px; }

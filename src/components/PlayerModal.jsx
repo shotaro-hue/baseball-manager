@@ -6,6 +6,7 @@ import { BattedBallAnalysisPanel } from './BattedBallAnalysisPanel';
 import '../mobile-flow.css';
 import { playerCondition } from './DashboardTab';
 import { getFaProgress } from '../engine/contract';
+import { contractSalaryStatus } from '../engine/contractPayroll';
 
 /* ═══════════════════════════════════════════════
    PLAYER DETAIL MODAL
@@ -187,6 +188,7 @@ export function PlayerModal({
   },[onClose]);
 
   if(!p) return null;
+  const salaryStatus = contractSalaryStatus(p.salary);
 
   const sb=saberBatter(p.stats || {});
   const sp=p.isPitcher?saberPitcher(p.stats):null;
@@ -296,7 +298,7 @@ export function PlayerModal({
             {p.isPitcher?(<><AbilityBar label="球速" value={p.pitching.velocity}/><AbilityBar label="制球" value={p.pitching.control}/><AbilityBar label="スタミナ" value={p.pitching.stamina}/><AbilityBar label="変化球" value={p.pitching.breaking}/><AbilityBar label="球種" value={p.pitching.variety}/><AbilityBar label="ピンチ" value={p.pitching.clutchP}/></>):(<><AbilityBar label="ミート" value={p.batting.contact}/><AbilityBar label="長打" value={p.batting.power}/><AbilityBar label="走力" value={p.batting.speed}/><AbilityBar label="守備" value={p.batting.defense}/><AbilityBar label="選球眼" value={p.batting.eye}/><AbilityBar label="クラッチ" value={p.batting.clutch}/></>)}
             <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",justifyContent:"space-between"}}><span style={{fontSize:14,color:"#53657c"}}>潜在能力</span><span style={{fontSize:14,color:"#7050ad",fontFamily:"monospace",fontWeight:700}}>{p.potential}</span></div>
           </div>
-          <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:14,color:"#53657c",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>契約</div><StatRow label="年俸" value={fmtSal(p.salary)} color="#805700"/><StatRow label="残年数" value={`${p.contractYearsLeft}年`} color={p.contractYearsLeft===0?"#b42332":undefined}/><div style={{marginTop:6,paddingTop:6,borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",justifyContent:"space-between"}}><span style={{fontSize:14,color:"#53657c"}}>モラル</span><span style={{fontSize:14,fontFamily:"monospace",color:(p.morale??70)>=80?"#14714b":(p.morale??70)>=60?"#805700":"#b42332"}}>{p.morale??70}</span></div><div style={{marginTop:4,display:"flex",justifyContent:"space-between"}}><span style={{fontSize:14,color:"#53657c"}}>コンディション</span><span style={{fontSize:14,fontFamily:"monospace",color:(p.condition??70)>=80?"#14714b":(p.condition??70)>=60?"#805700":"#b42332"}}>{p.condition??70}</span></div></div>
+          <div style={{background:"rgba(255,255,255,.03)",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:14,color:"#53657c",fontWeight:700,marginBottom:8,letterSpacing:".05em"}}>契約</div><StatRow label="年俸" value={salaryStatus === "recorded" ? fmtSal(p.salary) : salaryStatus === "missing" ? "未記録" : "不正値"} color="#805700"/><StatRow label="残年数" value={`${p.contractYearsLeft}年`} color={p.contractYearsLeft===0?"#b42332":undefined}/><div style={{marginTop:6,paddingTop:6,borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",justifyContent:"space-between"}}><span style={{fontSize:14,color:"#53657c"}}>モラル</span><span style={{fontSize:14,fontFamily:"monospace",color:(p.morale??70)>=80?"#14714b":(p.morale??70)>=60?"#805700":"#b42332"}}>{p.morale??70}</span></div><div style={{marginTop:4,display:"flex",justifyContent:"space-between"}}><span style={{fontSize:14,color:"#53657c"}}>コンディション</span><span style={{fontSize:14,fontFamily:"monospace",color:(p.condition??70)>=80?"#14714b":(p.condition??70)>=60?"#805700":"#b42332"}}>{p.condition??70}</span></div></div>
         </div>)}
 
         {activeSection==="stats"&&(
