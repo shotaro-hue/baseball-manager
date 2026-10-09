@@ -29,7 +29,7 @@ for(const rate of [1,6]) for(let repeat=0;repeat<3;repeat++) {
     await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0))); observer.disconnect();
     if(!result.ok)throw Error('history save failed');
     window.initTasks=[];window.initObserver=new PerformanceObserver(list=>window.initTasks.push(...list.getEntries().map(e=>e.duration)));window.initObserver.observe({type:'longtask',buffered:false});
-    return {generation:generated-start,maxGenerationTask:Math.max(0,...taskEntries.filter(e=>e.startTime>=start && e.startTime<generated).map(e=>e.duration)),history:stored-generated,players:teams.flatMap(t=>[...t.players,...t.farm]).length,historyRows:entries.reduce((n,e)=>n+e.careerEntries.length,0)};
+    return {generation:generated-start,maxGenerationTask:Math.max(0,...taskEntries.filter(e=>e.startTime+e.duration>start && e.startTime<generated).map(e=>e.duration)),history:stored-generated,players:teams.flatMap(t=>[...t.players,...t.farm]).length,historyRows:entries.reduce((n,e)=>n+e.careerEntries.length,0)};
   });
   await page.close();
   const homePage=await browser.newPage();

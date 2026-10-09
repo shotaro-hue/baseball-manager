@@ -179,7 +179,7 @@ export default function TitleScreen({
 
         {initializing && (
           <div role="status" aria-live="polite"
-            style={{padding:'12px 0',marginBottom:10,color:'#17243a',fontSize:16,textAlign:'left'}}>
+            style={{background:'#eff6ff',border:'1px solid #365f92',borderRadius:7,padding:12,marginBottom:10,color:'#17243a',fontSize:16,textAlign:'left'}}>
             新規ゲームを初期化中です。完了までお待ちください。
           </div>
         )}

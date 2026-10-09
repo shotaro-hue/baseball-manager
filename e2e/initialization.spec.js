@@ -89,7 +89,7 @@ test('failed initial IndexedDB write stays on title and retry saves all history 
   expect(before.teamCount).toBe(12);expect(before.playerIds).toHaveLength(661);
   expect(new Set(before.playerIds).size).toBe(661);
   expect(before.rows).toBe(2009);expect(before.historyKeys).toHaveLength(376);
-  expect(before.historyIds.sort()).toEqual([...before.historyKeys].sort());
+  expect([...before.historyIds].sort()).toEqual([...before.historyKeys].sort());
   // schedule[0] is a sentinel; verify actual games instead of counting array keys.
   expect(before.regularMatchups).toBe(858);
   expect(before.scheduledTeamGames).toEqual(Array(12).fill(143));
