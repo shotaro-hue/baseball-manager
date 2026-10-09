@@ -1,3 +1,4 @@
+import { GENERATION_VERSION, prepareGeneration, readGeneration, collectUnusedChunks } from './saveGenerations';
 import { MATCH_HISTORY_FIELDS, matchHistorySnapshot, matchHistoryForSave } from './matchHistory';
 import LZString from 'lz-string';
 import { resolveInitialContractYears } from './realplayer';
@@ -36,7 +37,7 @@ const BACKUP_ROTATE_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_SAVE_INTERVAL_MS = 60 * 1000;
 const LAST_BACKUP_ROTATE_KEY = 'baseball_manager_v1_last_rotate_at';
 const SAVE_SIZE_DEBUG_KEY = 'baseball_manager_debug_save_size';
-const SAVE_DATA_VERSION = 4;
+const SAVE_DATA_VERSION = GENERATION_VERSION;
 const INDEXED_DB_LARGE_DATA_VERSION = 3;
 const IDB_STORES = {
   chunks: BASEBALL_MANAGER_DB_STORES.chunks,
@@ -53,8 +54,10 @@ export function createSaveRequestQueue(saveImpl) {
 
   const runSave = async (payload, listeners = []) => {
     isSaving = true;
+    let succeeded = false;
     try {
       const result = await saveImpl(payload);
+      succeeded = result?.ok !== false;
       listeners.forEach(({ resolve }) => resolve(result));
       return result;
     } catch (error) {
@@ -63,11 +66,16 @@ export function createSaveRequestQueue(saveImpl) {
     } finally {
       isSaving = false;
       if (queuedPayload !== null) {
-        const nextPayload = queuedPayload;
+        let nextPayload = queuedPayload;
+        if (!succeeded && payload?.options && nextPayload?.options) {
+          const a = payload.options.dirtyScopes, b = nextPayload.options.dirtyScopes;
+          nextPayload = { ...nextPayload, options: { ...nextPayload.options,
+            dirtyScopes: Array.isArray(a) && Array.isArray(b) ? [...new Set([...a, ...b])] : undefined } };
+        }
         const nextListeners = queuedListeners;
         queuedPayload = null;
         queuedListeners = [];
-        void runSave(nextPayload, nextListeners);
+        void runSave(nextPayload, nextListeners).catch(() => {});
       }
     }
   };
@@ -78,6 +86,11 @@ export function createSaveRequestQueue(saveImpl) {
         return runSave(payload);
       }
       return new Promise((resolve, reject) => {
+        if (queuedPayload?.options && payload?.options) {
+          const a = queuedPayload.options.dirtyScopes, b = payload.options.dirtyScopes;
+          payload = { ...payload, options: { ...payload.options,
+            dirtyScopes: Array.isArray(a) && Array.isArray(b) ? [...new Set([...a, ...b])] : undefined } };
+        }
         queuedPayload = payload;
         queuedListeners.push({ resolve, reject });
       });
@@ -139,15 +152,16 @@ function safeElapsedMs(startedAt) {
 
 // ── バックアップローテーション ──────────────────
 // 保存前に呼ぶ: bk1→bk2, 現在→bk1
-function rotateBk() {
+function rotateBk(cur) {
   try {
     const bk1 = localStorage.getItem(BACKUP_KEY_1);
     if (bk1) localStorage.setItem(BACKUP_KEY_2, bk1);
-    const cur = localStorage.getItem(SAVE_KEY);
     if (cur) localStorage.setItem(BACKUP_KEY_1, cur);
     localStorage.setItem(LAST_BACKUP_ROTATE_KEY, String(Date.now()));
+    return true;
   } catch (e) {
     console.warn('Backup rotation failed:', e);
+    return false;
   }
 }
 
@@ -500,31 +514,6 @@ export function resolveIndexedDbChunkScopes(dirtyScopes) {
   return INDEXED_DB_CHUNK_SCOPES.filter((scope) => requested.has(scope));
 }
 
-async function persistLargeDataToIndexedDb(state, dirtyScopes) {
-  const scopes = resolveIndexedDbChunkScopes(dirtyScopes);
-  // The first save of a legacy game must create the new optional history chunk,
-  // even when all previously-supported scopes are clean.
-  let current = null;
-  try { current = decompress(localStorage.getItem(SAVE_KEY)); } catch { /* a new save can repair an invalid primary */ }
-  if ((!current?.matchHistoryStored || current.saveId !== state.saveId) && !scopes.includes('matchHistory')) scopes.push('matchHistory');
-  const writes = [];
-  if (scopes.includes('seasonHistory')) {
-    const seasonHistory = state?.seasonHistory ?? {};
-    writes.push(idbWrite(IDB_STORES.chunks, 'seasonHistory', seasonHistory));
-  }
-  if (scopes.includes('news')) {
-    const news = Array.isArray(state?.news) ? state.news : [];
-    writes.push(idbWrite(IDB_STORES.chunks, 'news', news));
-  }
-  if (scopes.includes('mailbox')) {
-    const mailbox = Array.isArray(state?.mailbox) ? state.mailbox : [];
-    writes.push(idbWrite(IDB_STORES.chunks, 'mailbox', mailbox));
-  }
-  if (scopes.includes('matchHistory')) writes.push(idbWrite(IDB_STORES.chunks, 'matchHistory', matchHistoryForSave(state)));
-  await Promise.all(writes);
-  return scopes;
-}
-
 function normalizeRecentCareerLog(player) {
   const source = Array.isArray(player?.recentCareerLog)
     ? player.recentCareerLog
@@ -603,7 +592,7 @@ async function replaceCareerLogEntriesBatch(entriesByPlayer) {
   });
 }
 
-export async function saveGame(state, options = {}) {
+async function saveGameImpl(state, options = {}) {
   // ⚠️ 入力値検証: 想定外の形式を保存しない（破損セーブ防止）
   if (!state || typeof state !== 'object' || !Array.isArray(state.teams)) {
     console.error('Save failed: invalid state payload');
@@ -612,23 +601,37 @@ export async function saveGame(state, options = {}) {
   const saveGameStart = isDevEnv ? performance.now() : 0;
   const skipCompression = options?.skipCompression === true;
   const skipBackupRotation = options?.skipBackupRotation === true;
-  const preferMainSave = options?.preferMainSave !== false;
+
   const perfBreakdown = {};
   let safeState;
   try {
     safeState = sanitizeSaveState(state);
+    safeState.saveId = ensureSaveId(safeState.saveId);
   } catch (e) {
     console.error('Save failed: sanitize state error', e);
     return { ok: false, quota: false, reason: 'sanitize_state_failed' };
   }
   try {
     const indexedDbStart = isDevEnv ? performance.now() : 0;
-    const persistedScopes = await persistLargeDataToIndexedDb(safeState, options?.dirtyScopes);
+    let previous = null;
+    const currentRaw = localStorage.getItem(SAVE_KEY);
+    const known = validatedRoots.get(localStorage);
+    if (known?.saveId === safeState.saveId) previous = known;
+    else try { if (currentRaw) previous = decompress(currentRaw); } catch { /* recovery */ }
+    let prepared;
+    try { prepared = await prepareGeneration(safeState, previous, options?.dirtyScopes); }
+    catch (error) {
+      if (error?.name !== 'QuotaExceededError') throw error;
+      // Reclaim only rows proven unreferenced, then retry once. Never remove a backup root.
+      await cleanupSaveChunks();
+      prepared = await prepareGeneration(safeState, previous, options?.dirtyScopes);
+    }
+    safeState.saveManifest = prepared.manifest;
     perfBreakdown.indexedDbMs = safeElapsedMs(indexedDbStart);
-    perfBreakdown.indexedDbWriteCount = persistedScopes.length;
+    perfBreakdown.indexedDbWriteCount = prepared.writeCount;
   } catch (e) {
     console.error('Save failed: IndexedDB write error', e);
-    return { ok: false, quota: false, reason: 'indexeddb_write_failed' };
+    return { ok: false, quota: e?.name === 'QuotaExceededError', reason: 'indexeddb_write_failed' };
   }
   for (const key of MATCH_HISTORY_FIELDS) delete safeState[key];
   safeState.matchHistoryStored = true;
@@ -679,73 +682,104 @@ export async function saveGame(state, options = {}) {
     perfBreakdown.writeMetaMs = safeElapsedMs(metaStart);
   };
   try {
+    // Stage rotation without modifying roots. Failed primary writes leave both backups untouched.
+    let rotationRaw = null;
     if (!skipBackupRotation && shouldRotateBackupNow()) {
-      const rotateStart = isDevEnv ? performance.now() : 0;
-      rotateBk();
-      perfBreakdown.rotateBackupMs = safeElapsedMs(rotateStart);
-    } else {
-      perfBreakdown.rotateBackupMs = 0;
+      const raw = localStorage.getItem(SAVE_KEY);
+      try {
+        if (raw) {
+          const previous = validatedRawRoots.get(localStorage) === raw ? validatedRoots.get(localStorage) : decompress(raw);
+          if (Array.isArray(previous.teams) && hasSelectedTeam(previous.teams, previous.myId) && previous.year) {
+            if (previous.saveDataVersion >= GENERATION_VERSION) await readGeneration(previous);
+            rotationRaw = raw;
+          }
+        }
+      } catch { /* Never rotate a corrupt primary over a valid backup. */ }
     }
     const setItemStart = isDevEnv ? performance.now() : 0;
     localStorage.setItem(SAVE_KEY, compressed);
     perfBreakdown.writeMainSaveMs = safeElapsedMs(setItemStart);
     logPerf('saveGame.localStorage.setItem', setItemStart);
-    writeMeta();
+    observations.set(localStorage, compressed);
+    validatedRoots.set(localStorage, safeState);
+    validatedRawRoots.set(localStorage, compressed);
+    const warnings = [];
+    const rotateStart = isDevEnv ? performance.now() : 0;
+    if (rotationRaw && !rotateBk(rotationRaw)) warnings.push('backup_failed');
+    perfBreakdown.rotateBackupMs = safeElapsedMs(rotateStart);
+    try { writeMeta(); } catch (error) { warnings.push('metadata_failed'); console.warn('Save committed; metadata failed:', error); }
+    try { await cleanupSaveChunks(); } catch (error) { warnings.push('cleanup_failed'); console.warn('Save committed; cleanup failed:', error); }
     perfBreakdown.totalMs = safeElapsedMs(saveGameStart);
     perfBreakdown.jsonLength = jsonLength;
     perfBreakdown.compressedLength = compressedLength;
     appendSavePerfLog({ at: new Date().toISOString(), ...perfBreakdown });
     if (isDevEnv) console.table({ saveGame: perfBreakdown });
     logPerf('saveGame', saveGameStart);
-    return { ok: true };
+    return { ok: true, generation: safeState.saveManifest.generation, warnings };
   } catch (e) {
     const quota = e instanceof DOMException && e.name === 'QuotaExceededError';
     if (quota) {
-      // ⚠️ 容量超過時は古いバックアップから削除し、main save を優先する
-      const cleanupBackupKeys = [BACKUP_KEY_2, BACKUP_KEY_1];
-      for (const key of cleanupBackupKeys) {
-        try {
-          localStorage.removeItem(key);
-          if (preferMainSave) {
-            const retryStart = isDevEnv ? performance.now() : 0;
-            localStorage.setItem(SAVE_KEY, compressed);
-            logPerf('saveGame.localStorage.setItem', retryStart);
-            writeMeta();
-            return { ok: true, recoveredFromQuota: true };
-          }
-        } catch (cleanupErr) {
-          console.warn('Backup cleanup failed:', cleanupErr);
-        }
-      }
-      // バックアップ回転を諦めて直接上書き保存を試みる
-      try {
-        const setItemStart = isDevEnv ? performance.now() : 0;
-        localStorage.setItem(SAVE_KEY, compressed);
-        logPerf('saveGame.localStorage.setItem', setItemStart);
-        writeMeta();
-        perfBreakdown.writeMainSaveMs = safeElapsedMs(setItemStart);
-        perfBreakdown.totalMs = safeElapsedMs(saveGameStart);
-        perfBreakdown.jsonLength = jsonLength;
-        perfBreakdown.compressedLength = compressedLength;
-        appendSavePerfLog({ at: new Date().toISOString(), fallbackOverwrite: true, ...perfBreakdown });
-        if (isDevEnv) console.table({ saveGameFallback: perfBreakdown });
-        logPerf('saveGame', saveGameStart);
-        return { ok: true };
-      } catch {
-        console.error('Save failed: storage quota exceeded');
-        return { ok: false, quota: true };
-      }
+      console.error('Save failed: storage quota exceeded; committed generations retained');
+      return { ok: false, quota: true, reason: 'quota_exceeded' };
     }
     console.error('Save failed:', e);
     return { ok: false, quota: false };
   }
 }
 
-const sharedSaveQueue = createSaveRequestQueue(({ state, options }) => saveGame(state, options));
+// Observations are per storage surface so tests and isolated browsing contexts do not leak state.
+const observations = new WeakMap();
+const validatedRoots = new WeakMap();
+const validatedRawRoots = new WeakMap();
+let localSaveTail = Promise.resolve();
+let lastLoadResult = { status: 'none' };
+function observePrimary() {
+  observations.set(localStorage, localStorage.getItem(SAVE_KEY));
+}
+async function cleanupSaveChunks() {
+  const roots = [];
+  for (const key of [SAVE_KEY, BACKUP_KEY_1, BACKUP_KEY_2]) {
+    const raw = localStorage.getItem(key);
+    if (raw) roots.push(decompress(raw)); // If a root cannot be decoded, do not delete anything.
+  }
+  return collectUnusedChunks(roots);
+}
+export function saveGame(state, options = {}) {
+  try { return saveOwnedSnapshot(structuredClone(state), structuredClone(options)); }
+  catch { return Promise.resolve({ ok: false, quota: false, reason: 'snapshot_failed' }); }
+}
+function saveOwnedSnapshot(snapshot, safeOptions) {
+  try {
+    if (!observations.has(localStorage)) observePrimary();
+  } catch { return Promise.resolve({ ok: false, quota: false, reason: 'snapshot_failed' }); }
+  const run = async () => {
+    const locked = async () => {
+      try {
+        if (observations.get(localStorage) !== localStorage.getItem(SAVE_KEY)) {
+          return { ok: false, quota: false, reason: 'save_conflict' };
+        }
+        return await saveGameImpl(snapshot, safeOptions);
+      } catch (error) {
+        return { ok: false, quota: error?.name === 'QuotaExceededError', reason: 'save_failed' };
+      }
+    };
+    if (globalThis.navigator?.locks?.request) return navigator.locks.request('baseball-manager-save', locked);
+    // A browser without origin-wide locking must fail closed instead of silently racing tabs.
+    if (typeof window !== 'undefined') return { ok: false, quota: false, reason: 'save_lock_unavailable' };
+    return locked();
+  };
+  const result = localSaveTail.then(run, run);
+  localSaveTail = result.catch(() => {});
+  return result;
+}
+const sharedSaveQueue = createSaveRequestQueue(({ state, options }) => saveOwnedSnapshot(state, options));
 
 export function enqueueSaveGame(state, options = {}) {
-  return sharedSaveQueue.enqueue({ state, options });
+  try { return sharedSaveQueue.enqueue({ state: structuredClone(state), options: structuredClone(options) }); }
+  catch { return Promise.resolve({ ok: false, quota: false, reason: 'snapshot_failed' }); }
 }
+
+export function getLastLoadResult() { return { ...lastLoadResult }; }
 
 export function getSaveQueueSnapshot() {
   return sharedSaveQueue.getSnapshot();
@@ -811,6 +845,10 @@ export function getSavePerfSummary() {
 
 export async function loadGame() {
   const loadGameStart = isDevEnv ? performance.now() : 0;
+  lastLoadResult = { status: 'none' };
+  let foundCandidate = false;
+  let primaryAtLoad;
+  try { primaryAtLoad = localStorage.getItem(SAVE_KEY); } catch { primaryAtLoad = null; }
   const candidates = [
     { key: SAVE_KEY,     label: 'primary' },
     { key: BACKUP_KEY_1, label: 'backup-1' },
@@ -822,8 +860,11 @@ export async function loadGame() {
       const raw = localStorage.getItem(key);
       logPerf('loadGame.localStorage.getItem', getItemStart);
       if (!raw) continue;
+      foundCandidate = true;
       const state = decompress(raw);
-      if (state?.saveDataVersion >= INDEXED_DB_LARGE_DATA_VERSION) {
+      if (state?.saveDataVersion >= GENERATION_VERSION) {
+        Object.assign(state, await readGeneration(state));
+      } else if (state?.saveDataVersion >= INDEXED_DB_LARGE_DATA_VERSION) {
         try {
           state.seasonHistory = (await idbRead(IDB_STORES.chunks, 'seasonHistory')) ?? state.seasonHistory;
           state.news = (await idbRead(IDB_STORES.chunks, 'news')) ?? state.news;
@@ -863,6 +904,10 @@ export async function loadGame() {
       if (result.ok) {
         if (key !== SAVE_KEY) console.warn(`Loaded from ${label}`);
         logPerf('loadGame', loadGameStart);
+        observations.set(localStorage, primaryAtLoad);
+        validatedRoots.set(localStorage, state);
+        validatedRawRoots.set(localStorage, raw);
+        lastLoadResult = { status: key === SAVE_KEY ? 'primary' : 'recovered', source: label, generation: state.saveManifest?.generation };
         return result.state;
       }
       console.warn(`Validation failed for ${label}`);
@@ -870,6 +915,7 @@ export async function loadGame() {
       console.error(`Load from ${label} failed:`, e);
     }
   }
+  lastLoadResult = { status: foundCandidate ? 'unrecoverable' : 'none' };
   return null;
 }
 
@@ -943,7 +989,7 @@ export function getAutoSaveIntervalMs() {
 
 export function hasSave() {
   try {
-    return !!localStorage.getItem(SAVE_KEY);
+    return [SAVE_KEY, BACKUP_KEY_1, BACKUP_KEY_2].some(key => !!localStorage.getItem(key));
   } catch (error) {
     // ⚠️ セキュリティ: ブラウザ設定によりStorage API【＝ブラウザ内保存機能】が拒否される場合があるため、必ず例外を握りつぶして初期表示を継続する
     console.warn('hasSave failed. Falling back to no-save mode.', error);
@@ -961,6 +1007,9 @@ export function getSaveMeta() {
 }
 
 export function deleteSave() {
+  observations.set(localStorage, null);
+  validatedRoots.delete(localStorage);
+  validatedRawRoots.delete(localStorage);
   let saveId = null;
   try {
     const raw = localStorage.getItem(SAVE_KEY);

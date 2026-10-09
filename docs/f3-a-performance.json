@@ -1,0 +1,234 @@
+{
+  "base": "9efaf56a581d7fd2a79ae5f777516dc05ac21a62",
+  "fixture": "new-game fixture with deterministic history expansion, not multi-year gameplay",
+  "results": [
+    {
+      "browser": "chromium",
+      "scenario": "initial",
+      "mode": "baseline",
+      "n": 10,
+      "save": {
+        "median": 935.6500000059605,
+        "max": 2466.5
+      },
+      "load": {
+        "median": 124.20000000298023,
+        "max": 580.4000000059605
+      },
+      "bytes": {
+        "chunks": 384,
+        "local": 341568
+      },
+      "originUsageBytes": 30335
+    },
+    {
+      "browser": "chromium",
+      "scenario": "initial",
+      "mode": "current",
+      "n": 10,
+      "save": {
+        "median": 852.7500000074506,
+        "max": 1258.6000000089407
+      },
+      "load": {
+        "median": 91.39999999850988,
+        "max": 250.20000000298023
+      },
+      "bytes": {
+        "chunks": 820,
+        "local": 342226
+      },
+      "originUsageBytes": 34421
+    },
+    {
+      "browser": "chromium",
+      "scenario": "match",
+      "mode": "baseline",
+      "n": 10,
+      "save": {
+        "median": 868.9000000059605,
+        "max": 2532.2999999970198
+      },
+      "load": {
+        "median": 122.74999999254942,
+        "max": 234
+      },
+      "bytes": {
+        "chunks": 506,
+        "local": 683136
+      },
+      "originUsageBytes": 34809
+    },
+    {
+      "browser": "chromium",
+      "scenario": "match",
+      "mode": "current",
+      "n": 10,
+      "save": {
+        "median": 929,
+        "max": 1478
+      },
+      "load": {
+        "median": 102,
+        "max": 312.29999999701977
+      },
+      "bytes": {
+        "chunks": 1579,
+        "local": 684486
+      },
+      "originUsageBytes": 40123
+    },
+    {
+      "browser": "chromium",
+      "scenario": "batch5",
+      "mode": "baseline",
+      "n": 10,
+      "save": {
+        "median": 831.6999999955297,
+        "max": 1499
+      },
+      "load": {
+        "median": 101.75,
+        "max": 416.29999999701977
+      },
+      "bytes": {
+        "chunks": 998,
+        "local": 683136
+      },
+      "originUsageBytes": 36172
+    },
+    {
+      "browser": "chromium",
+      "scenario": "batch5",
+      "mode": "current",
+      "n": 10,
+      "save": {
+        "median": 849.6499999910593,
+        "max": 1002.5
+      },
+      "load": {
+        "median": 89.94999999552965,
+        "max": 131.59999999403954
+      },
+      "bytes": {
+        "chunks": 2563,
+        "local": 684492
+      },
+      "originUsageBytes": 41047
+    },
+    {
+      "browser": "chromium",
+      "scenario": "offseason",
+      "mode": "baseline",
+      "n": 10,
+      "save": {
+        "median": 725.3500000014901,
+        "max": 943.5
+      },
+      "load": {
+        "median": 92.85000000149012,
+        "max": 110.20000000298023
+      },
+      "bytes": {
+        "chunks": 18328,
+        "local": 683224
+      },
+      "originUsageBytes": 86706
+    },
+    {
+      "browser": "chromium",
+      "scenario": "offseason",
+      "mode": "current",
+      "n": 10,
+      "save": {
+        "median": 775.4000000059605,
+        "max": 931.5
+      },
+      "load": {
+        "median": 80,
+        "max": 104.29999999701977
+      },
+      "bytes": {
+        "chunks": 37527,
+        "local": 684520
+      },
+      "originUsageBytes": 74763
+    },
+    {
+      "browser": "chromium",
+      "scenario": "five-year",
+      "mode": "baseline",
+      "n": 10,
+      "save": {
+        "median": 672.8500000014901,
+        "max": 2153.7000000029802
+      },
+      "load": {
+        "median": 83.65000000596046,
+        "max": 277.79999999701977
+      },
+      "bytes": {
+        "chunks": 110876,
+        "local": 1024706
+      },
+      "originUsageBytes": 42174
+    },
+    {
+      "browser": "chromium",
+      "scenario": "five-year",
+      "mode": "current",
+      "n": 10,
+      "save": {
+        "median": 845.6500000059605,
+        "max": 955.1000000089407
+      },
+      "load": {
+        "median": 81.09999999403954,
+        "max": 110.5
+      },
+      "bytes": {
+        "chunks": 333934,
+        "local": 1026654
+      },
+      "originUsageBytes": 28009
+    },
+    {
+      "browser": "chromium",
+      "scenario": "backup",
+      "mode": "baseline",
+      "n": 10,
+      "save": {
+        "median": 695.9000000059605,
+        "max": 892.5
+      },
+      "load": {
+        "median": 96.54999999701977,
+        "max": 193.20000000298023
+      },
+      "bytes": {
+        "chunks": 384,
+        "local": 683150
+      },
+      "originUsageBytes": 41463
+    },
+    {
+      "browser": "chromium",
+      "scenario": "backup",
+      "mode": "current",
+      "n": 10,
+      "save": {
+        "median": 963.9500000029802,
+        "max": 2225.7000000029802
+      },
+      "load": {
+        "median": 95.85000000149012,
+        "max": 139.8999999910593
+      },
+      "bytes": {
+        "chunks": 2458,
+        "local": 684444
+      },
+      "originUsageBytes": 48395
+    }
+  ]
+}
