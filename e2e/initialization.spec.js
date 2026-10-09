@@ -39,7 +39,8 @@ test('slow CPU paints pending, blocks title actions and permits only one complet
     teams.find(b=>b.getAttribute('aria-label')!==teamName).click();
   },TEAM);
   await expect(page.getByRole('status')).toContainText('初期化中');
-  await expect(page.getByTestId('new-game-initialization')).toHaveAttribute('aria-busy','true');
+  await expect(page.locator('.tgrid').first()).toHaveAttribute('aria-busy','true');
+  expect(await page.getByRole('status').evaluate(el=>!!el.closest('[aria-busy="true"]'))).toBe(false);
   await expect(page.locator('.title button:enabled')).toHaveCount(0);
   await page.screenshot({path:test.info().outputPath('pending.png')});
   await waitForNewGameReady(page,TEAM);

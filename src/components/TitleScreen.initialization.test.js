@@ -10,8 +10,17 @@ it('announces pending and disables all title actions including resume and delete
   await act(async()=>{view=create(React.createElement(TitleScreen,{saveExists:true,initializationStatus:'initializing',isInitializationInProgress:()=>true}));});
   const root=view.root;
   expect(root.findByProps({role:'status'}).children.join('')).toMatch(/初期化中/);
-  expect(root.findByProps({'data-testid':'new-game-initialization'}).props['aria-busy']).toBe(true);
+  expect(root.findByProps({'data-testid':'new-game-initialization'}).props['aria-busy']).toBeUndefined();
+  for (const grid of root.findAllByProps({className:'tgrid'})) expect(grid.props['aria-busy']).toBe(true);
   for(const button of root.findAllByType('button'))expect(button.props.disabled).toBe(true);
+});
+it('updates an existing live region outside every busy ancestor',()=>{
+  act(()=>{view=create(React.createElement(TitleScreen,{saveExists:false,initializationStatus:'idle'}));});
+  const status=view.root.findByProps({role:'status'});
+  expect(status.children).toEqual([]);
+  act(()=>{view.update(React.createElement(TitleScreen,{saveExists:false,initializationStatus:'initializing'}));});
+  expect(view.root.findByProps({role:'status'})).toBe(status);
+  for(let parent=status.parent;parent;parent=parent.parent)expect(parent.props['aria-busy']).not.toBe(true);
 });
 it('invalidates a deletion begun before a completed initialization',async()=>{
   let attempt=0;const onSaveDeleted=vi.fn();vi.stubGlobal('window',{confirm:()=>true});

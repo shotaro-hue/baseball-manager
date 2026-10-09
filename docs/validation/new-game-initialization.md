@@ -45,6 +45,7 @@
 ### 画面・入力確認
 
 360×800、390×844、1440×900で変更前後のタイトル・処理中・実IndexedDB失敗表示を保存。日本語フォント未導入による初回画像の文字欠けを検証環境で解消し、再撮影した。Enterキーで球団を選択し、処理中role=status、全ボタン無効、横はみ出しなし、失敗時role=alertと再選択可能を確認。目視で見つけた処理中文言の低コントラストは、明るい背景付きのカードに修正した。既存球団の絵文字に未搭載フォント由来の欠けがあるが、今回追加した状態文言は読める。
+さらに[WAI-ARIAのaria-busy仕様](https://www.w3.org/TR/wai-aria/#aria-busy)では、支援技術がbusy要素内の更新を保留し得ることを確認した。処理中通知をbusy要素の外に置き、初期表示から存在する空のrole=status/aria-live領域へ文言を更新する。busyは球団操作領域へ限定する。単体RED（2失敗/3成功）→GREEN（5成功）と、ブラウザでbusy祖先がないことを検証する。音声読み上げ実機の確認とは区別する。
 
 ## 実行履歴の扱い
 
@@ -54,6 +55,27 @@
 この開発中smokeは17成功/4失敗/0skip。その後の固定状態smokeは20成功/1失敗/0skip（12.2分）。後者の失敗はhistoryIds.sort()が比較元を破壊し、再読込後の未ソート配列と比較した検証コードの問題。配列コピーをソートするよう修正した。成功になるまで無変更で再実行する運用ではなく、原因修正後の別検証として記録する。
 
 初回実装head893592bの[CI run274](https://github.com/shotaro-hue/baseball-manager/actions/runs/37872323994)はbuild-and-test成功、progression-e2e cancelled。取得したE2Eレポートは20成功/1失敗/0skip・全21件実行済み（538.23秒）で、同じhistoryIds比較が失敗した。ジョブは開始から約10分で終了。cancelledを成功扱いにせず、CIの10分上限も変更しない。レポートartifact11591715042を保存した。単体626成功/0失敗/既存2skip、build成功、physics1成功のローカル記録も保持する。最終修正後の全検証と最新headのCIは追記・PR本文に記録する。
+head924feddの[CI run275](https://github.com/shotaro-hue/baseball-manager/actions/runs/37874102832)は両ジョブ成功。同headのローカルsmokeは21成功/0失敗/0skip（10.7分）。この後に開始した全E2Eは、上記ARIA配置修正のため100試合バッチ1成功確認後にSIGINTで中断した。中断を失敗・skip・完走として数えず、ログとtraceを別保存する。ARIA修正後は変更を固定して全検証を実行し直す。開発中の各失敗がすべてHMRや並行負荷によるものと断定してはいない。
+
+ローカルNode v24.19.0、CI Node20。ブラウザはpackage-lockに従うPlaywright/Chromium/WebKit。npm ci成功、全体タイムアウト・CIの10分上限・再試行設定は無変更。テスト数は最終ログで成功/失敗/既存skipを分ける。
+
+## 最終ローカル検証（ARIA配置修正後、コードを固定）
+
+| コマンド | 成功 | 失敗 | skip | 結果 |
+| --- | ---: | ---: | ---: | --- |
+| npm ci | — | — | — | 終了0（依存関係変更なし） |
+| npm test | 627 | 0 | 2 | 95ファイル成功、既存2ファイルskip、28.43秒 |
+| npm run build | — | — | — | 終了0、14.47秒。既存のchunkサイズ警告あり |
+| npm run validate:physics-hr | 1 | 0 | 0 | 終了0、7.20秒 |
+| npm run test:e2e:smoke -- --workers=1 --trace=on | 21 | 0 | 0 | 再試行0、643.07秒 |
+| npm run test:e2e -- --workers=1 --retries=0 --trace=on | 39 | 0 | 0 | 740.55秒 |
+| git diff --check | — | — | — | 終了0 |
+
+—はテスト件数が適用されないコマンドであり、skipを意味しない。既存skipはscripts/fa-economy-benchmark.test.jsとscripts/salary-demand-benchmark.test.jsの各1件。追加した初期化・同値性テストにskipはない。E2EはChromiumと既存のmobile-webkit対象を含む。低速CPU、実IndexedDB失敗→再試行、5試合バッチ→保存→再読込、100試合バッチ、旧保存形式、采配・履歴の回帰が成功した。
+
+性能表は最終ARIA配置調整の前に採取した。生成・評価・保存・yieldの実装は最終検証と同一で、ARIA調整はこれらを変更していない。ARIA調整後の性能再計測は行っていない。ログ・全実行のtrace・画面比較・全12回の最終比較用CPUプロファイルを成果物に保持する。開発中・RED・検証コード不具合・中断と、上表の完走結果を区別する。
+
+この文書を含む最終headのCI結果と証拠へのリンクは[PR425](https://github.com/shotaro-hue/baseball-manager/pull/425)に確定して記録する。過去PR420の36成功/1失敗と、今回の39成功/0失敗は異なる実行である。前者を上書きしない。
 
 ## 残存範囲
 

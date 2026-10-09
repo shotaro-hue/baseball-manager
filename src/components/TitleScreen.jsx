@@ -77,7 +77,7 @@ export default function TitleScreen({
 
   return (
     <div className="app" data-testid="new-game-initialization"
-      data-initialization-state={initializationStatus} aria-busy={initializing}>
+      data-initialization-state={initializationStatus}>
       <div className="title">
         <div className="tlogo">
           BASEBALL
@@ -177,12 +177,10 @@ export default function TitleScreen({
           NEW GAME - チームを選択
         </div>
 
-        {initializing && (
-          <div role="status" aria-live="polite"
-            style={{background:'#eff6ff',border:'1px solid #365f92',borderRadius:7,padding:12,marginBottom:10,color:'#17243a',fontSize:16,textAlign:'left'}}>
-            新規ゲームを初期化中です。完了までお待ちください。
-          </div>
-        )}
+        <div role="status" aria-live="polite" aria-atomic="true"
+          style={initializing ? {background:'#eff6ff',border:'1px solid #365f92',borderRadius:7,padding:12,marginBottom:10,color:'#17243a',fontSize:16,textAlign:'left'} : undefined}>
+          {initializing ? '新規ゲームを初期化中です。完了までお待ちください。' : null}
+        </div>
         {initializationError && (
           <div role="alert" style={{background:'#fff0f1',border:'1px solid #b42332',borderRadius:7,padding:'12px',marginBottom:10,color:'#b42332',fontSize:14,textAlign:'left'}}>
             {initializationError}
@@ -201,7 +199,7 @@ export default function TitleScreen({
         >
           セントラルリーグ
         </div>
-        <div className="tgrid" style={{ marginBottom: 14 }}>
+        <div className="tgrid" aria-busy={initializing} style={{ marginBottom: 14 }}>
           {TEAM_DEFS.filter((team) => team.league === 'セ').map(renderTeamCard)}
         </div>
 
@@ -217,7 +215,7 @@ export default function TitleScreen({
         >
           パシフィックリーグ
         </div>
-        <div className="tgrid">
+        <div className="tgrid" aria-busy={initializing}>
           {TEAM_DEFS.filter((team) => team.league === 'パ').map(renderTeamCard)}
         </div>
 
