@@ -35,3 +35,12 @@ it('retains tie order and does not mutate frozen arrays or objects',()=>{
 it('does not collapse distinct objects without IDs',()=>{
   const a={salary:100},b={salary:200};const r=calcContractPayroll({players:[a,b],farm:[a]});expect(r.total).toBe(300);expect(r.entries).toHaveLength(2);
 });
+it('classifies duplicated IDs as development when either copy has the development flag',()=>{
+  const active=Object.freeze(p(0,300));
+  const development=Object.freeze(p(0,300,{育成:true}));
+  const t=Object.freeze({players:Object.freeze([active]),farm:Object.freeze([development])});
+  const r=calcContractPayroll(t);
+  expect(r.groups.map(g=>[g.count,g.amount])).toEqual([[0,0],[0,0],[1,300]]);
+  expect(r.entries[0]).toMatchObject({category:'development',categoryLabel:'育成',player:active});
+  expect(t.players[0]).toBe(active);expect(t.farm[0]).toBe(development);
+});

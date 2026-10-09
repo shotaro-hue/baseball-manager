@@ -2,6 +2,10 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { waitSaveIdle, reloadAndLoad } from './helpers/progression';
+test.beforeEach(async ({ page }) => {
+  // Offline/blocked remote fonts must not hold up game/save navigation.
+  await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, route => route.abort());
+});
 export function financeFixture() {
   const fixture=JSON.parse(gunzipSync(readFileSync(new URL('./fixtures/new-game.json.gz',import.meta.url))));
   const t=fixture.teams.find(t=>t.id===fixture.myId);
@@ -24,9 +28,8 @@ async function saveFinanceSignature(page) {
   return page.evaluate(async()=>{
     const saved=await (await import('/baseball-manager/src/engine/saveload.js')).loadGame();
     const t=saved.teams.find(t=>t.id===saved.myId);
-    const result=Object.fromEntries(['lineup','lineupDh','lineupNoDh','rotation','bullpen','closer','pitchingStaff','rotIdx','budget'].map(k=>[k,t[k]]));
-    for(const key of ['players','farm'])result[key]=t[key].map(p=>Object.fromEntries(['id','name','salary','育成','pos','subtype','isPitcher','contractYears','contractYearsLeft','stats'].map(k=>[k,p[k]])));
-    return result;
+    // Compare every persisted team/player field while transferring one team only.
+    return t;
   });
 }
 for(const width of [360,390,1440]) test(`finance ${width}: owned totals and unchanged roster through display/save/reload`,async({page},testInfo)=>{

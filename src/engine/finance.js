@@ -53,6 +53,9 @@ export function calcContractPayroll(team) {
     { key: 'farm', label: '二軍支配下', count: 0, amount: 0, missingCount: 0, invalidCount: 0 },
     { key: 'development', label: '育成', count: 0, amount: 0, missingCount: 0, invalidCount: 0 },
   ];
+  // Resolve development classification across legacy duplicate copies first.
+  const developmentIds = new Set([...(team?.players ?? []), ...(team?.farm ?? [])]
+    .filter(player => player.育成).map(player => player.id ?? player));
   const seen = new Set();
   const entries = [];
   for (const [roster, players] of [['active', team?.players ?? []], ['farm', team?.farm ?? []]]) {
@@ -60,7 +63,7 @@ export function calcContractPayroll(team) {
       const identity = player.id ?? player;
       if (seen.has(identity)) continue;
       seen.add(identity);
-      const group = groups.find(g => g.key === (player.育成 ? 'development' : roster));
+      const group = groups.find(g => g.key === (developmentIds.has(identity) ? 'development' : roster));
       const salaryStatus = player.salary == null ? 'missing'
         : Number.isFinite(player.salary) && player.salary >= 0 ? 'recorded' : 'invalid';
       group.count += 1;

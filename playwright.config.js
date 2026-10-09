@@ -45,7 +45,7 @@ export default defineConfig({
     {
       name: 'mobile-webkit',
       testMatch: ['**/progression.smoke.spec.js', '**/finance.spec.js'],
-      grep: /E1 new game|finance 390:/,
+      grep: /E1 new game|finance (360|390):/,
       use: { ...devices['iPhone 13'], viewport: { width: 390, height: 844 } },
     },
   ],
