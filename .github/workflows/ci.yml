@@ -44,6 +44,8 @@ jobs:
         suite:
           - name: initialization-and-progression
             files: progression.smoke.spec.js initialization.spec.js
+          - name: finance
+            files: finance.spec.js
           - name: history-and-posting
             files: match-history.spec.js posting.spec.js
     steps:

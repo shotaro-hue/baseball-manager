@@ -45,3 +45,40 @@ export function calcRevenue(team) {
     avgTicketPrice,
   };
 }
+
+// Read-only annual contract amounts (万円), independent of paid budget expenses.
+export function calcContractPayroll(team) {
+  const groups = [
+    { key: 'active', label: '一軍支配下', count: 0, amount: 0, missingCount: 0, invalidCount: 0 },
+    { key: 'farm', label: '二軍支配下', count: 0, amount: 0, missingCount: 0, invalidCount: 0 },
+    { key: 'development', label: '育成', count: 0, amount: 0, missingCount: 0, invalidCount: 0 },
+  ];
+  const seen = new Set();
+  const entries = [];
+  for (const [roster, players] of [['active', team?.players ?? []], ['farm', team?.farm ?? []]]) {
+    for (const player of players) {
+      const identity = player.id ?? player;
+      if (seen.has(identity)) continue;
+      seen.add(identity);
+      const group = groups.find(g => g.key === (player.育成 ? 'development' : roster));
+      const salaryStatus = player.salary == null ? 'missing'
+        : Number.isFinite(player.salary) && player.salary >= 0 ? 'recorded' : 'invalid';
+      group.count += 1;
+      if (salaryStatus === 'recorded') group.amount += player.salary;
+      else group[salaryStatus === 'missing' ? 'missingCount' : 'invalidCount'] += 1;
+      entries.push({ player, category: group.key, categoryLabel: group.label, salaryStatus });
+    }
+  }
+  // Sorting only the newly created entries preserves all source arrays/objects.
+  entries.sort((a, b) => {
+    if (a.salaryStatus !== 'recorded') return b.salaryStatus === 'recorded' ? 1 : 0;
+    if (b.salaryStatus !== 'recorded') return -1;
+    return b.player.salary - a.player.salary;
+  });
+  return {
+    groups, entries,
+    total: groups.reduce((sum, g) => sum + g.amount, 0),
+    missingCount: groups.reduce((sum, g) => sum + g.missingCount, 0),
+    invalidCount: groups.reduce((sum, g) => sum + g.invalidCount, 0),
+  };
+}

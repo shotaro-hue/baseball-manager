@@ -1,0 +1,19 @@
+.card.finance-payroll, .card.finance-budget { background: #fff; border-color: #dce6f2; }
+.finance-budget .card-h { color: #17243a; }
+.finance-payroll, .finance-ranking { color: #17243a; font-size: 14px; line-height: 1.6; }
+.finance-payroll .card-h { margin: 0 0 8px; font-size: 18px; color: #17243a; font-weight: 700; }
+.finance-note { color: #53657c; font-size: 12px; margin: 0 0 8px; }
+.finance-warning { color: #805700; background: #fff6df; padding: 8px; font-size: 14px; }
+.finance-amounts { margin: 0; }
+.finance-amounts > div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #dce6f2; flex-wrap: wrap; }
+.finance-amounts dt { margin: 0; }
+.finance-amounts dd { margin: 0 0 0 auto; text-align: right; font-variant-numeric: tabular-nums; }
+.finance-amounts small { display: block; font-size: 12px; color: #805700; }
+.finance-total { font-weight: 700; }
+.finance-rank-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid #dce6f2; padding: 6px 0; }
+.finance-rank-row > div { min-width: 0; }
+.finance-rank-row .finance-note { display: block; margin: 0; }
+.finance-rank-row button { display: block; padding: 0; min-height: 44px; border: 0; background: transparent; color: #095cc7; text-align: left; font: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.finance-rank-amount { flex-shrink: 0; color: #17243a; font-variant-numeric: tabular-nums; }
+
+.finance-rank-row button:focus-visible { outline: 3px solid #377ccc; outline-offset: 2px; }
