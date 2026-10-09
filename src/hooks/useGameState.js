@@ -1,5 +1,6 @@
 import { useState, useReducer, useMemo, useCallback, useEffect, useRef } from "react";
 import { contractReplyIsDue, resolveContractReplies } from '../engine/contractReplies';
+import { yieldToBrowser } from '../engine/yieldToBrowser';
 import { gameStateReducer, G } from './gameStateReducer';
 import { MATCH_HISTORY_FIELDS, matchHistorySnapshot, mergeMatchResultPatch } from '../engine/matchHistory';
 import { createSaveDirtyTracker } from '../state/saveDirtyTracker';
@@ -179,7 +180,19 @@ export function useGameState() {
   const [saveQueueState, setSaveQueueState] = useState({ isSaving: false });
   const [persistentEnabled, setPersistentEnabled] = useState(false);
   const [newGameInitializationError, setNewGameInitializationError] = useState(null);
+  const [newGameInitializationStatus, setNewGameInitializationStatus] = useState('idle');
   const newGameInitializationRef = useRef(false);
+  const newGameInitializationAttemptRef = useRef(0);
+  const titleLoadPromiseRef = useRef(null);
+  const isNewGameInitializing = useCallback(() => newGameInitializationRef.current, []);
+  const getNewGameInitializationAttempt = useCallback(() => newGameInitializationAttemptRef.current, []);
+  const runTitleLoad = useCallback(async operation => {
+    if (titleLoadPromiseRef.current) return titleLoadPromiseRef.current;
+    const task = Promise.resolve().then(operation);
+    titleLoadPromiseRef.current = task;
+    try { return await task; }
+    finally { if (titleLoadPromiseRef.current === task) titleLoadPromiseRef.current = null; }
+  }, []);
 
   const setAllTeamResultsMap = useCallback(value => { setAllTeamResultsMapState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
   const setAllTeamBoxScoresMap = useCallback(value => { setAllTeamBoxScoresMapState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
@@ -561,41 +574,51 @@ export function useGameState() {
 
   const ensureInitialTeams = useCallback(async () => {
     if (teams.length === TEAM_DEFS.length) return teams;
-    const { createInitialTeams } = await import('../engine/bootstrapTeams');
-    const initialTeams = createInitialTeams();
-    const saveMod = await loadSaveModule();
-    const initialCareerLogs = collectCareerLogsForIndexedDb(initialTeams);
-    const initialized = await saveMod.initializeCareerLogsInIndexedDb(initialCareerLogs);
-    if (!initialized?.ok) {
-      throw new Error('initial_career_log_persistence_failed');
-    }
-    setTeams(initialTeams);
-    return initialTeams;
-  }, [setTeams, teams]);
+    const { createInitialTeamsAsync } = await import('../engine/bootstrapTeams');
+    return createInitialTeamsAsync();
+  }, [teams]);
 
   const handleSelect = useCallback(async (id)=>{
     if (newGameInitializationRef.current) return;
     newGameInitializationRef.current = true;
+    newGameInitializationAttemptRef.current += 1;
+    setNewGameInitializationStatus('initializing');
     setNewGameInitializationError(null);
     try {
+      // Finish an already-running legacy load/migration before creating new data.
+      // Its App continuation is invalidated by the attempt counter above.
+      await titleLoadPromiseRef.current?.catch(() => {});
+      await yieldToBrowser();
       const nextTeams = await ensureInitialTeams();
       const [playerMod, scheduleMod] = await Promise.all([
         loadPlayerModule(),
         loadScheduleModule(),
       ]);
-      setFaPool(playerMod.generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX)));
-      setSaveId(createSaveId());
+      const nextFaPool = playerMod.generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX));
+      const nextSaveId = createSaveId();
+      const newSchedule = scheduleMod.generateSeasonSchedule(year,nextTeams);
+      const params = SEASON_PARAMS[year] || getDefaultParams(year);
+      const nextAllStarTriggerDay = scheduleMod.calcAllStarTriggerDay(newSchedule, params.allStarSkipDates);
+      // Prepare locally; only publish a complete game after required history writes succeed.
+      const saveMod = await loadSaveModule();
+      const initialized = await saveMod.initializeCareerLogsInIndexedDb(collectCareerLogsForIndexedDb(nextTeams));
+      if (!initialized?.ok) throw new Error('initial_career_log_persistence_failed');
+      setTeams(nextTeams);
+      setFaPool(nextFaPool);
+      setSaveId(nextSaveId);
       setOffseasonPlan(null);
       setMyId(id);
-      const newSchedule = scheduleMod.generateSeasonSchedule(year,nextTeams);
       setSchedule(newSchedule);
-      const params = SEASON_PARAMS[year] || getDefaultParams(year);
-      setAllStarTriggerDay(scheduleMod.calcAllStarTriggerDay(newSchedule, params.allStarSkipDates));
+      setAllStarTriggerDay(nextAllStarTriggerDay);
       setTab("dashboard");
+      setNewGameInitializationStatus('ready');
       setScreen("hub");
     } catch (error) {
       console.error('新規ゲーム初期化に失敗しました:', error);
-      setNewGameInitializationError('過去成績の保存領域を初期化できませんでした。ブラウザのストレージ設定を確認して再試行してください。');
+      setNewGameInitializationStatus('error');
+      setNewGameInitializationError(error?.message === 'initial_career_log_persistence_failed'
+        ? '過去成績を保存できませんでした。ブラウザのストレージ設定を確認し、球団を選択して再試行してください。'
+        : '新規ゲームの初期化に失敗しました。球団を選択して再試行してください。');
       notify('新規ゲームを開始できませんでした','warn');
     } finally {
       newGameInitializationRef.current = false;
@@ -987,6 +1010,10 @@ export function useGameState() {
     saveRevision, setSaveRevision,
     persistentSummaries,
     newGameInitializationError,
+    newGameInitializationStatus,
+    isNewGameInitializing,
+    getNewGameInitializationAttempt,
+    runTitleLoad,
     getSeasonHistory,
     getNewsBySelector,
     getMailboxBySelector,

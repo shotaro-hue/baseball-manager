@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForNewGameReady } from './helpers/progression';
 
 test.describe('タイトル画面', () => {
   test.beforeEach(async ({ page }) => {
@@ -29,6 +30,6 @@ test.describe('タイトル画面', () => {
     await page.getByRole('button', { name: '読売ジャイアンツ' }).click();
 
     // HUB画面のタブが表示されることを確認
-    await expect(page.getByRole('button', { name: /ホーム/ })).toBeVisible({ timeout: 8000 });
+    await waitForNewGameReady(page);
   });
 });

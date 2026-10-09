@@ -127,15 +127,13 @@ function createLeagueContext(team, options = {}) {
   ]);
 }
 
-function buildPositionAssignments(team, rosterDhMode, options = {}) {
+function buildPositionAssignments(team, rosterDhMode, options, leagueContext, evaluate) {
   const required = [...FIELDING_POSITIONS, ...(rosterDhMode ? ['DH'] : [])];
   const eligibleBatters = (team.players || []).filter(
     (player) => !player.isPitcher && isEligibleActivePlayer(player),
   );
-  const leagueContext = createLeagueContext(team, options);
   const sortedBatters = [...eligibleBatters].sort(
-    (a, b) => batterScore(b, leagueContext, team, options)
-      - batterScore(a, leagueContext, team, options),
+    (a, b) => evaluate(b).total - evaluate(a).total,
   );
   const eligibleByPosition = Object.fromEntries(
     required.map((pos) => [
@@ -176,14 +174,13 @@ function buildPositionAssignments(team, rosterDhMode, options = {}) {
   return { assignment, required, leagueContext };
 }
 
-function orderAssignedBatters(assignment, team, leagueContext, options = {}) {
+function orderAssignedBatters(assignment, evaluate) {
   const entries = [...assignment.entries()].map(([pos, player]) => ({
     id: player.id,
     pos,
     player,
   }));
-  const evaluation = (entry) =>
-    evaluateBatterForPolicy(entry.player, team, { ...options, leagueContext });
+  const evaluation = (entry) => evaluate(entry.player);
   const onBase = (entry) => {
     const stats = entry.player?.stats || {};
     const pa = Math.max(1, Number(stats.PA) || 0);
@@ -215,12 +212,24 @@ function orderAssignedBatters(assignment, team, leagueContext, options = {}) {
 
 export function buildAutoLineupEntries(team, options = {}) {
   const rosterDhMode = getRosterDhMode(team, options.rosterDhMode);
-  const { assignment, leagueContext } = buildPositionAssignments(
+  const leagueContext = createLeagueContext(team, options);
+  // This team, context and options stay unchanged for one lineup calculation.
+  // The map is discarded on return; later player/team changes always re-evaluate.
+  const evaluations = new Map();
+  const evaluate = player => {
+    if (!evaluations.has(player)) evaluations.set(
+      player, evaluateBatterForPolicy(player, team, { ...options, leagueContext }),
+    );
+    return evaluations.get(player);
+  };
+  const { assignment } = buildPositionAssignments(
     team,
     rosterDhMode,
     options,
+    leagueContext,
+    evaluate,
   );
-  return orderAssignedBatters(assignment, team, leagueContext, options);
+  return orderAssignedBatters(assignment, evaluate);
 }
 
 export function buildAutoPitchingStaff(team) {
@@ -295,16 +304,6 @@ export function buildAutoManagedRoster(team, options = {}) {
   };
 }
 
-function effectiveRosterScore(player, team, options, isFarm) {
-  const base = rosterRecScore(player, team, options);
-  const developmentBonus = isFarm
-    && (player.potential ?? 0) >= ROSTER_DEVREC_POTENTIAL_MIN
-    && (player.daysOnActiveRoster ?? 0) < ROSTER_DEVREC_DAYS_MAX
-    ? ROSTER_DEVREC_BONUS
-    : 0;
-  return base + developmentBonus;
-}
-
 export function buildRosterRecs(team, options = {}) {
   const recs = [];
   const targetBatters = MAX_ROSTER - OPTIMAL_PITCHER_COUNT;
@@ -312,8 +311,17 @@ export function buildRosterRecs(team, options = {}) {
   let projectedFarm = [...(team.farm || [])];
   const usedFarmIds = new Set();
   const usedActiveIds = new Set();
-  const score = (player, isFarm) =>
-    effectiveRosterScore(player, team, options, isFarm);
+  // Recommendation projections change membership, not the fixed scoring inputs.
+  // Keep the farm bonus outside the cached base evaluation.
+  const baseScores = new Map();
+  const score = (player, isFarm) => {
+    if (!baseScores.has(player)) baseScores.set(player, rosterRecScore(player, team, options));
+    const developmentBonus = isFarm
+      && (player.potential ?? 0) >= ROSTER_DEVREC_POTENTIAL_MIN
+      && (player.daysOnActiveRoster ?? 0) < ROSTER_DEVREC_DAYS_MAX
+      ? ROSTER_DEVREC_BONUS : 0;
+    return baseScores.get(player) + developmentBonus;
+  };
   const canPromote = (player) =>
     !usedFarmIds.has(player.id) && canAddToActiveRoster(player, projectedPlayers);
   const protectedLineupIds = new Set(

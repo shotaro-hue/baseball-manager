@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { openBatch } from './helpers/progression';
+import { openBatch, waitForNewGameReady } from './helpers/progression';
 
 test('100試合バッチが完走し、保存データから再開できる', async ({ page }) => {
   test.setTimeout(180_000);
@@ -8,7 +8,7 @@ test('100試合バッチが完走し、保存データから再開できる', as
   await page.reload({ waitUntil: 'domcontentloaded' });
 
   await page.getByRole('button', { name: '読売ジャイアンツ' }).click();
-  await expect(page.getByRole('button', { name: /ホーム/ })).toBeVisible({ timeout: 10_000 });
+  await waitForNewGameReady(page);
 
   const panel = await openBatch(page, false);
   const batchSelect = panel.locator('select').filter({

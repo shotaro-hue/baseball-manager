@@ -3,10 +3,30 @@ import { gunzipSync } from 'node:zlib';
 import { expect } from '@playwright/test';
 
 export const TEAM = '読売ジャイアンツ';
+// Initialization includes generation, history persistence and home rendering.
+// 15s is a finite phase budget, based on repeated normal/6x CPU measurements;
+// it does not change the test/global assertion timeout or retry count.
+export async function waitForNewGameReady(page, teamName = TEAM) {
+  const terminal = await page.waitForFunction(() => {
+    const failed = document.querySelector('[data-initialization-state="error"]');
+    if (failed) return { state:'error', message:failed.querySelector('[role="alert"]')?.textContent };
+    return document.querySelector('.calm-shell[data-initialization-state="ready"]')
+      ? { state:'ready' } : null;
+  }, null, {timeout:15_000});
+  const result = await terminal.jsonValue();
+  await terminal.dispose();
+  if (result.state === 'error') throw new Error('新規ゲームの初期化に失敗: '+result.message);
+  await expect(page.locator('.topbar')).toContainText(teamName);
+  await expect(page.getByRole('button',{name:'保存',exact:true})).toBeEnabled();
+  const mobile = await page.locator('main.mobile-home').isVisible();
+  await expect(mobile
+    ? page.locator('main.mobile-home').getByRole('button',{name:/1試合ずつ采配/})
+    : page.locator('.desktop-dashboard').getByRole('button',{name:'試合へ進む',exact:true})).toBeEnabled();
+}
 export async function startNewGame(page) {
   await page.goto('/');
   await page.getByRole('button', { name: TEAM, exact: true }).click();
-  await expect(page.locator('.topbar')).toContainText(TEAM);
+  await waitForNewGameReady(page, TEAM);
 }
 export function mainNavigation(page, mobile) {
   return mobile ? page.getByRole('navigation', { name: 'メインメニュー' })
