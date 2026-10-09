@@ -174,3 +174,32 @@ it('deletion during chunk writing prevents active and queued saves from resurrec
  expect(rows.has(bk1)).toBe(false);expect(rows.has(bk2)).toBe(false);
  expect((await save(state(9,'new-game'))).ok).toBe(true);
 });
+it('cleanup reuses immutable root metadata instead of decompressing unchanged committed roots', async () => {
+ const {default:LZString}=await import('lz-string');
+ await saveGame(state(1));
+ const read=vi.spyOn(LZString,'decompressFromUTF16');
+ expect((await saveGame(state(2))).ok).toBe(true);
+ expect(read).not.toHaveBeenCalled();
+ read.mockRestore();expect((await loadGame()).news).toEqual([{day:2}]);
+ rows.set(bk1,'corrupt');
+ const third=await saveGame(state(3));expect(third).toMatchObject({ok:true,warnings:['cleanup_failed']});
+});
+it('loaded state mutation cannot change the roots protected by cleanup',async()=>{
+ await saveGame(state(1));rows.set(bk1,rows.get(primary));
+ const loaded=await loadGame(),key=loaded.saveManifest.chunks.news.key;
+ loaded.saveManifest.chunks.news.generation='different';
+ loaded.saveManifest.chunks.news.key='generation:'+JSON.stringify(['game-a','different','news']);
+ expect((await saveGame(state(2,'game-b'),{skipBackupRotation:true})).ok).toBe(true);
+ expect((await chunks()).has(key)).toBe(true);
+ rows.set(primary,'corrupt');expect((await loadGame()).news).toEqual([{day:1}]);
+});
+it('an optional metadata cache clone error cannot undo a committed save',async()=>{
+ await save(state(1));
+ const loaded=await loadGame();
+ // JSON persistence omits extra functions, but a metadata structuredClone rejects them.
+ loaded.saveManifest.chunks.news.extra=()=>{};
+ const result=await save(state(2),{dirtyScopes:['mailbox']});
+ expect(result).toMatchObject({ok:true,warnings:['root_cache_failed']});
+ expect(parsed().gameDay).toBe(2);
+ expect((await loadGame()).news).toEqual([{day:1}]);
+});

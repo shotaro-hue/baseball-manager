@@ -704,11 +704,15 @@ async function saveGameImpl(state, options = {}) {
     validatedRoots.set(localStorage, safeState);
     validatedRawRoots.set(localStorage, compressed);
     const warnings = [];
+    try { rememberChunkRoot(compressed, safeState); }
+    catch (error) { warnings.push('root_cache_failed'); console.warn('Save committed; root cache failed:', error); }
     const rotateStart = isDevEnv ? performance.now() : 0;
     if (rotationRaw && !rotateBk(rotationRaw)) warnings.push('backup_failed');
     perfBreakdown.rotateBackupMs = safeElapsedMs(rotateStart);
     try { writeMeta(); } catch (error) { warnings.push('metadata_failed'); console.warn('Save committed; metadata failed:', error); }
+    const cleanupStart = isDevEnv ? performance.now() : 0;
     try { await cleanupSaveChunks(); } catch (error) { warnings.push('cleanup_failed'); console.warn('Save committed; cleanup failed:', error); }
+    perfBreakdown.cleanupMs = safeElapsedMs(cleanupStart);
     perfBreakdown.totalMs = safeElapsedMs(saveGameStart);
     perfBreakdown.jsonLength = jsonLength;
     perfBreakdown.compressedLength = compressedLength;
@@ -733,18 +737,34 @@ const backupObservations = new WeakMap();
 const validatedRoots = new WeakMap();
 const validatedRawRoots = new WeakMap();
 const deletionEpochs = new WeakMap();
+const chunkRootCache = new WeakMap();
 let localSaveTail = Promise.resolve();
 let lastLoadResult = { status: 'none' };
 function observePrimary() {
   observations.set(localStorage, localStorage.getItem(SAVE_KEY));
   backupObservations.set(localStorage, [localStorage.getItem(BACKUP_KEY_1), localStorage.getItem(BACKUP_KEY_2)]);
 }
+function rememberChunkRoot(raw, root) {
+  let cache = chunkRootCache.get(localStorage);
+  if (!cache) { cache = new Map(); chunkRootCache.set(localStorage, cache); }
+  // Own only the metadata: callers may subsequently mutate loaded game state.
+  const compact = structuredClone({ saveDataVersion: root.saveDataVersion,
+    saveId: root.saveId, saveManifest: root.saveManifest });
+  cache.set(raw, compact);
+  if (cache.size > 4) cache.delete(cache.keys().next().value);
+  return compact;
+}
 async function cleanupSaveChunks() {
-  const roots = [];
-  for (const key of [SAVE_KEY, BACKUP_KEY_1, BACKUP_KEY_2]) {
-    const raw = localStorage.getItem(key);
-    if (raw) roots.push(decompress(raw)); // If a root cannot be decoded, do not delete anything.
-  }
+  const raws = [SAVE_KEY, BACKUP_KEY_1, BACKUP_KEY_2].map(key => localStorage.getItem(key)).filter(raw => raw !== null);
+  const cache = chunkRootCache.get(localStorage);
+  // Prune even when a corrupt root later makes cleanup fail conservatively.
+  if (cache) for (const raw of cache.keys()) if (!raws.includes(raw)) cache.delete(raw);
+  const roots = raws.map(raw => {
+    if (cache?.has(raw)) return cache.get(raw);
+    const root = decompress(raw);
+    // A cache miss must still protect the decoded persistent root if caching fails.
+    try { return rememberChunkRoot(raw, root); } catch { return root; }
+  });
   return collectUnusedChunks(roots);
 }
 export function saveGame(state, options = {}) {
@@ -914,6 +934,8 @@ export async function loadGame() {
         backupObservations.set(localStorage, backupsAtLoad);
         validatedRoots.set(localStorage, state);
         validatedRawRoots.set(localStorage, raw);
+        try { rememberChunkRoot(raw, state); }
+        catch (error) { console.warn('Load succeeded; root cache failed:', error); }
         lastLoadResult = { status: key === SAVE_KEY ? 'primary' : 'recovered', source: label, generation: state.saveManifest?.generation };
         return result.state;
       }
@@ -1014,6 +1036,7 @@ export function getSaveMeta() {
 }
 
 function deleteSaveImpl() {
+  chunkRootCache.delete(localStorage);
   observations.set(localStorage, null);
   backupObservations.set(localStorage, [null, null]);
   validatedRoots.delete(localStorage);

@@ -58,6 +58,11 @@ for (const useDh of [false, true]) for (const isHome of [false, true]) {
     const readyForPinch = async () => (await pinch.isEnabled()) && (useDh || (await page.locator('.tg-section').nth(2).innerText()).includes(setup.pitcherName));
     for (let i = 0; !(await readyForPinch()) && i < 120; i++) await stepOnce();
     expect(await readyForPinch()).toBe(true);
+    // Observe the inning before substitution, independently of the persisted log.
+    // An away starter may be pinch-hit in the first top half before ever pitching.
+    const pinchInning = Number((await page.locator('.tg-score-divider').innerText()).match(/^\d+/)?.[0]);
+    expect(pinchInning).toBeGreaterThan(0);
+    const starterHadDefended = isHome || pinchInning > 1;
     await pinch.click();
     const phRow = page.locator('.gscreen .card2').filter({ has: page.getByRole('button', { name: '代打！', exact: true }) }).first();
     const phName = await phRow.locator('.fsb > div > span').first().innerText();
@@ -102,8 +107,7 @@ for (const useDh of [false, true]) for (const isHome of [false, true]) {
     const firstRound = [...setup.lineup]; firstRound[useDh ? 0 : 8] = ph.id;
     expect(batting.slice(0, 9).map(e => e.batId)).toEqual(firstRound);
     expect(pitching.some(e => e.pitcherId === rp.id)).toBe(true);
-    if (isHome || !useDh) expect(pitching[0].pitcherId).toBe(setup.starterId);
-    else expect(pitching[0].pitcherId).toBe(rp.id);
+    expect(pitching[0].pitcherId).toBe(starterHadDefended ? setup.starterId : rp.id);
     if (!useDh) {
       expect(batting[17].batId).toBe(rp.id);
       expect(batting.filter(e => e.batId === setup.starterId)).toHaveLength(0);
