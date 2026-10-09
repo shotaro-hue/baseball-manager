@@ -51,7 +51,7 @@ FinanceTabはteam.playersだけの年俸合計を「支出」として表示し�
 | npm run build | 成功 | 0 | 既存chunk-size警告 |
 | npm run validate:physics-hr | 1 | 0 | なし。生成report差分は除外 |
 | npm run test:e2e:smoke | 18 | 3 | 0skip、21件、16.3分、1worker/retry0 |
-| npm run test:e2e | 未完了 | — | 全49件、1worker/retry0 |
+| npm run test:e2e（780720d / role訂正前） | 44 | 5 | 0skip、0flaky、49件、26.9分、1worker/retry0 |
 
 ## レビュー・残存課題
 
@@ -64,4 +64,37 @@ FinanceTabはteam.playersだけの年俸合計を「支出」として表示し�
 
 旧inline v4拒否はfixture投入中のevaluateで30秒期限切れ、context終了/trace ZIP切断も発生。旧予算維持ケースは2回目の手動保存中に30秒期限切れ。引き分け含む完了fixtureは保存待機のevaluate中に60秒期限切れ。いずれも財務タブへの遷移なし、年俸期待値の不一致ではない。ログ/取得できたtraceを確認したが、原因は未確定。
 
-c398825をgit archiveした未修正mainで「旧予算維持」を同じローカル設定・1worker/retry0で単独比較し、1/1失敗（最初の続きから操作中の30秒期限切れ、context終了30秒超過）。mainでも失敗したが、変更後の失敗箇所と同一ではないため原因の同一性は断定しない。全E2Eで改めて検証する。テストの削除/skip、既存timeout・期待値の緩和、自動リトライで成功扱いにはしない。
+c398825をgit archiveした未修正mainで「旧予算維持」を同じローカル設定・1worker/retry0で単独比較し、1/1失敗（最初の続きから操作中の30秒期限切れ、context終了30秒超過）。mainでも失敗したが、変更後の失敗箇所と同一ではないため原因の同一性は断定しない。全E2Eでも検証し、以下に結果を分離して記録した。テストの削除/skip、既存timeout・期待値の緩和、自動リトライで成功扱いにはしない。
+
+## 全E2E失敗の内訳
+
+全49件を完走した。実行中の製品コード・E2Eを変更せず、tree `0a8127b5ddfe2d6f0795832eaf5ad01ae4a424b0`（remote head `780720d`）に固定。個別結果とエラーは [JSON記録](finance-contract-payroll-e2e.json)。
+
+- `chromium` / `finance.spec.js` / finance opens an unrecorded salary leader safely without mutating saved clubs：timedOut。
+- `mobile-webkit` / `finance.spec.js` / finance opens an unrecorded salary leader safely without mutating saved clubs：timedOut。
+- `chromium` / `match-history.spec.js` / confirmed tactical roster, substitutions and saved stats (DH=false, home=true)：failed。
+- `chromium` / `match-history.spec.js` / confirmed tactical roster, substitutions and saved stats (DH=true, home=false)：failed。
+- `chromium` / `posting.spec.js` / D01 approved posting survives real save/reload (legacy inline v4)：timedOut。
+
+未記録年俸の詳細テスト2件は「概要」をbuttonとして探す指定ミス。実際のtabへ訂正し、未記録テキストの確認をexactにした。製品コード・既存テスト・制限時間・retryは変更していない。訂正後単独ローカル検証はWebKit成功、Chromeは詳細操作前のfixture保存evaluateで30秒期限切れ。
+
+その他の全E2E失敗は財務タブを操作しない既存ケース。戦術試合の2件は試合終了を待つ60秒pollの期限切れをtraceで確認。環境のCPU/メモリ負荷も観測したが因果は未確定で、年俸修正による失敗とも既存問題とも断定しない。
+
+## CIと最新headの確認
+
+- 初回 `780720d` / [run 37918460352](https://github.com/shotaro-hue/baseball-manager/actions/runs/37918460352)：build-and-test、initialization-and-progression成功。history-and-postingは21成功/2失敗（上述の新規role指定ミス）。財務8成功、既存history/posting13成功。ゲートfailure。
+- role訂正後 `aeb781d` / [run 37919361112](https://github.com/shotaro-hue/baseball-manager/actions/runs/37919361112)：build-and-test、initialization-and-progression成功。history-and-posting22成功/1失敗。**財務10/10成功**、既存戦術試合DH=false/home=falseの先発投手IDが期待値と不一致（match-history.spec.js、先発ID比較）。ゲートfailure。fixtureや期待値は変更せず、原因は未確定。
+- 最終の文書記録コミットは同じ製品コード・訂正済みE2Eを保持する。最新head CI結果は [PR #428](https://github.com/shotaro-hue/baseball-manager/pull/428) に追記する。全ケースのskip追加・自動リトライ・既存検証の緩和なし。CIのcleanup step skipとテストskipは区別する。
+
+## 実行コマンド
+
+```sh
+npm ci
+npm test
+npm run build
+npm run validate:physics-hr
+npm run test:e2e:smoke -- --workers=1 --retries=0 --config=../finance-playwright.config.mjs
+npm run test:e2e -- --workers=1 --retries=0 --config=../finance-playwright.config.mjs
+```
+
+ローカル設定は本検証環境用。CIでは上記のconfig指定をせず、標準設定で両スイートを1worker/retry0で実行する。ローカル全E2Eと最新CIの失敗が残るため、完了・全件成功として扱わずドラフトPRを維持する。

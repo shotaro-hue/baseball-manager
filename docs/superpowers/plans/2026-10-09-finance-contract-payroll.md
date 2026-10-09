@@ -6,7 +6,7 @@
 **Spec:** docs/finance-contract-payroll.md（ユーザー要件を実装と併せて記録）。
 
 ## Constraints
-最新main c398825をbaseに#420–425を維持。金額は万円/既存fmtSal。保存形式、IndexedDB、予算控除、収入式、バランス、他画面の変更なし。
+最新main c398825をbaseに#420–425を維持。金額は万円/既存fmtSal。保存形式、IndexedDB、予算控除、収入式、バランス、他画面の集計の変更なし。財務から開く選手詳細の異常年俸表示のみ最小修正。
 合意済み要件に沿って本セッションで実装・検証・独立PR作成まで進める。
 
 ## Review Focus
@@ -26,8 +26,10 @@ Interfaces: contractPayroll(team) → groups、total、entries、leaders。各gr
 ### Task 2: 実画面・保存E2E
 Files: e2e/finance.spec.js、.github/workflows/ci.yml（追加回帰をCIに含める）、仕様・検証文書。
 - [x] 同一固定fixtureで360/390/1280pxの修正前スクリーンショットとE2E失敗を記録。
-- [ ] 3幅の内訳・上位・再表示・IndexedDB保存/再開で編成と予算の一致を確認。異常年俸を別ケースで表示確認。
-- [ ] npm ci/test/build/validate:physics-hr/smoke/全E2Eを実行。E2Eは1worker/retry0。
-- [ ] main/head/tree/差分確認、レビュー、独立PR、最新head CI結果を報告。
+- [x] 3幅の内訳・上位・再表示・IndexedDB保存/再開で編成と予算の一致を確認。異常年俸を別ケースで表示確認。
+- [x] npm ci/test/build/validate:physics-hr/smoke/全E2Eを実行。E2Eは1worker/retry0。
+- [x] main/head/tree/差分確認、レビュー、独立PR、最新head CI結果を報告。
 
 独立レビューで判明した選手詳細の未記録年俸クラッシュは、FinanceTab→PlayerModalの27件中5件の追加回帰で修正前4失敗/1成功を確認して修正。共有salaryStatusを用いた表示判定のみ変更。
+
+全検証コマンドを実行し、成功・失敗・既存skipを検証文書へ記録。最新head CIはPR本文で確定結果を報告。ローカル/CIの財務外残件のためドラフト維持。main push/merge/automergeなし。

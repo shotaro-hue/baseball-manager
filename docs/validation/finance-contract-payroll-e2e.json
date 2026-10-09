@@ -1,0 +1,470 @@
+{
+  "testedTree": "0a8127b5ddfe2d6f0795832eaf5ad01ae4a424b0",
+  "testedRemoteHead": "780720d60ead33215c0ed8aba7bc22522790092d",
+  "workers": 1,
+  "retries": 0,
+  "localGoogleFontImportRemoved": true,
+  "stats": {
+    "startTime": "2026-10-09T10:30:29.328Z",
+    "duration": 1612375.598,
+    "expected": 44,
+    "skipped": 0,
+    "unexpected": 5,
+    "flaky": 0
+  },
+  "cases": [
+    {
+      "file": "batch-100.spec.js",
+      "title": "100試合バッチが完走し、保存データから再開できる",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 107518,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "batch.spec.js",
+      "title": "5試合バッチシムが完了してHUBに戻れる",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 17800,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "batch.spec.js",
+      "title": "バッチシム後に勝敗表示が更新される",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 11319,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "club-comparison.spec.js",
+      "title": "mobile club keeps tables local and comparison optional",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 3165,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "club-comparison.spec.js",
+      "title": "comparison traps focus, closes with Escape and restores opener",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 2868,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "contract-renewal.spec.js",
+      "title": "mobile negotiation preserves drafts, list focus and scroll without page overflow",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 2952,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "contract-renewal.spec.js",
+      "title": "release dialog traps focus, closes with Escape and restores opener",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 3347,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "finance.spec.js",
+      "title": "finance 360px preserves roster and budget through display and IndexedDB reload",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 20002,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "finance.spec.js",
+      "title": "finance 390px preserves roster and budget through display and IndexedDB reload",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 17746,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "finance.spec.js",
+      "title": "finance 1280px preserves roster and budget through display and IndexedDB reload",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 20166,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "finance.spec.js",
+      "title": "finance warns about incomplete recorded salaries after real save/load",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 9290,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "finance.spec.js",
+      "title": "finance opens an unrecorded salary leader safely without mutating saved clubs",
+      "project": "chromium",
+      "status": "timedOut",
+      "durationMs": 31282,
+      "retry": 0,
+      "errors": [
+        "Test timeout of 30000ms exceeded.",
+        "Error: locator.click: Test timeout of 30000ms exceeded.\nCall log:\n  - waiting for getByRole('button', { name: '概要', exact: true })\n\n\n  106 |   await leaders.getByRole('button', { name: '一軍百万円', exact: true }).click();\n  107 |   await expect(page.getByRole('dialog')).toContainText('一軍百万円');\n> 108 |   await page.getByRole('button', { name: '概要', exact: true }).click();\n      |                                                               ^\n  109 |   await expect(page.getByRole('dialog')).toContainText('未記録');\n  110 |   await page.getByRole('button', { name: '選手詳細を閉じる', exact: true }).click();\n  111 |   await expect(page.getByRole('dialog')).toHaveCount(0);\n    at /workspace/scratch/ca19418ce003/baseball-manager/e2e/finance.spec.js:108:63"
+      ]
+    },
+    {
+      "file": "finance.spec.js",
+      "title": "finance 360px preserves roster and budget through display and IndexedDB reload",
+      "project": "mobile-webkit",
+      "status": "passed",
+      "durationMs": 34608,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "finance.spec.js",
+      "title": "finance 390px preserves roster and budget through display and IndexedDB reload",
+      "project": "mobile-webkit",
+      "status": "passed",
+      "durationMs": 27475,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "finance.spec.js",
+      "title": "finance 1280px preserves roster and budget through display and IndexedDB reload",
+      "project": "mobile-webkit",
+      "status": "passed",
+      "durationMs": 44375,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "finance.spec.js",
+      "title": "finance warns about incomplete recorded salaries after real save/load",
+      "project": "mobile-webkit",
+      "status": "passed",
+      "durationMs": 9652,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "finance.spec.js",
+      "title": "finance opens an unrecorded salary leader safely without mutating saved clubs",
+      "project": "mobile-webkit",
+      "status": "timedOut",
+      "durationMs": 31632,
+      "retry": 0,
+      "errors": [
+        "Test timeout of 30000ms exceeded.",
+        "Error: locator.click: Test timeout of 30000ms exceeded.\nCall log:\n  - waiting for getByRole('button', { name: '概要', exact: true })\n\n\n  106 |   await leaders.getByRole('button', { name: '一軍百万円', exact: true }).click();\n  107 |   await expect(page.getByRole('dialog')).toContainText('一軍百万円');\n> 108 |   await page.getByRole('button', { name: '概要', exact: true }).click();\n      |                                                               ^\n  109 |   await expect(page.getByRole('dialog')).toContainText('未記録');\n  110 |   await page.getByRole('button', { name: '選手詳細を閉じる', exact: true }).click();\n  111 |   await expect(page.getByRole('dialog')).toHaveCount(0);\n    at /workspace/scratch/ca19418ce003/baseball-manager/e2e/finance.spec.js:108:63"
+      ]
+    },
+    {
+      "file": "game.spec.js",
+      "title": "オートシムを実行すると結果画面が表示される",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 6484,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "game.spec.js",
+      "title": "試合後に成績タブで投手成績テーブルを表示できる",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 6630,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "hub.spec.js",
+      "title": "成績タブに切り替えると打者・投手ビューが表示される",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 3667,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "hub.spec.js",
+      "title": "ロスタータブに選手テーブルが表示される",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 5159,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "hub.spec.js",
+      "title": "HUBに1試合シムボタンが表示される",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 3916,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "initialization.spec.js",
+      "title": "slow CPU paints pending, blocks title actions and permits only one complete start",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 20607,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "initialization.spec.js",
+      "title": "failed initial IndexedDB write stays on title and retry saves all history without duplicate records",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 11995,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "match-history.spec.js",
+      "title": "confirmed tactical roster, substitutions and saved stats (DH=false, home=false)",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 53099,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "match-history.spec.js",
+      "title": "confirmed tactical roster, substitutions and saved stats (DH=false, home=true)",
+      "project": "chromium",
+      "status": "failed",
+      "durationMs": 119100,
+      "retry": 0,
+      "errors": [
+        "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: true\nReceived: false\n\nCall Log:\n- Timeout 60000ms exceeded while waiting on the predicate\n\n  69 |     await rpRow.getByRole('button', { name: 'この投手に交代', exact: true }).click();\n  70 |     const finish = page.getByRole('button', { name: /試合終了 → 結果へ/ });\n> 71 |     await expect.poll(async () => {\n     |     ^\n  72 |       if (await finish.count()) return true;\n  73 |       const resume = page.getByRole('button', { name: '▶ 続行', exact: true });\n  74 |       if (await resume.count()) {\n    at /workspace/scratch/ca19418ce003/baseball-manager/e2e/match-history.spec.js:71:5"
+      ]
+    },
+    {
+      "file": "match-history.spec.js",
+      "title": "confirmed tactical roster, substitutions and saved stats (DH=true, home=false)",
+      "project": "chromium",
+      "status": "failed",
+      "durationMs": 198471,
+      "retry": 0,
+      "errors": [
+        "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: true\nReceived: false\n\nCall Log:\n- Timeout 60000ms exceeded while waiting on the predicate\n\n  69 |     await rpRow.getByRole('button', { name: 'この投手に交代', exact: true }).click();\n  70 |     const finish = page.getByRole('button', { name: /試合終了 → 結果へ/ });\n> 71 |     await expect.poll(async () => {\n     |     ^\n  72 |       if (await finish.count()) return true;\n  73 |       const resume = page.getByRole('button', { name: '▶ 続行', exact: true });\n  74 |       if (await resume.count()) {\n    at /workspace/scratch/ca19418ce003/baseball-manager/e2e/match-history.spec.js:71:5"
+      ]
+    },
+    {
+      "file": "match-history.spec.js",
+      "title": "confirmed tactical roster, substitutions and saved stats (DH=true, home=true)",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 60549,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "match-history.spec.js",
+      "title": "T1/T2/T3/T4 normal, batch and tactical history survive real save/reload without gaps",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 100899,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "match-history.spec.js",
+      "title": "T5 actual All-Star event and answered press state survive reload",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 39805,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "match-history.spec.js",
+      "title": "T11 legacy version-4 fixture with no history remains playable and gains history on first save",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 125065,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "match-history.spec.js",
+      "title": "tactical CPU injury preparation commits every scheduled game and survives reload",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 54992,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "posting.spec.js",
+      "title": "D01 approved posting survives real save/reload (chunked v4)",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 29297,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "posting.spec.js",
+      "title": "D01 approved posting survives real save/reload (legacy inline v4)",
+      "project": "chromium",
+      "status": "timedOut",
+      "durationMs": 31268,
+      "retry": 0,
+      "errors": [
+        "Test timeout of 30000ms exceeded."
+      ]
+    },
+    {
+      "file": "posting.spec.js",
+      "title": "D01 rejection preserves the budget and roster through real save/reload (chunked v4)",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 29334,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "posting.spec.js",
+      "title": "D01 rejection preserves the budget and roster through real save/reload (legacy inline v4)",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 26022,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "posting.spec.js",
+      "title": "D01 leaves a legacy budget unchanged rather than guessing a historical correction",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 20907,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "progression.smoke.spec.js",
+      "title": "E1 new game, five games, persisted reload, one more game",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 20222,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "progression.smoke.spec.js",
+      "title": "E2 final regular game, postseason save/reload, offseason and next year",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 77870,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "progression.smoke.spec.js",
+      "title": "E2 draw-inclusive completed fixture cannot start regular games",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 21974,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "progression.smoke.spec.js",
+      "title": "E3 invalid lineup, useful guidance, UI repair, one game",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 23195,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "progression.smoke.spec.js",
+      "title": "E4 shortstop injury, emergency fielding moves, batch and persisted reload",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 34764,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "progression.smoke.spec.js",
+      "title": "E1 new game, five games, persisted reload, one more game",
+      "project": "mobile-webkit",
+      "status": "passed",
+      "durationMs": 32497,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "tactical-actions.spec.js",
+      "title": "opening dashboard uses the same game number and date as the sim button",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 4819,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "tactical-actions.spec.js",
+      "title": "manual pause exposes tactics, and an advisory stop can execute a command",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 8147,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "title.spec.js",
+      "title": "ゲームタイトルが表示される",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 3165,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "title.spec.js",
+      "title": "セントラルリーグの6チームが表示される",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 1569,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "title.spec.js",
+      "title": "パシフィックリーグの6チームが表示される",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 1576,
+      "retry": 0,
+      "errors": []
+    },
+    {
+      "file": "title.spec.js",
+      "title": "チームを選択するとHUB画面に遷移する",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 3464,
+      "retry": 0,
+      "errors": []
+    }
+  ]
+}
