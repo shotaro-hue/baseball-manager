@@ -181,7 +181,8 @@ export default function HubShell({ state, flows, app }) {
   }, [gs, handleTabChange]);
 
   return (
-    <div className={`app calm-shell ${tab === 'dashboard' ? 'calm-home' : ''}`}>
+    <div className={`app calm-shell ${tab === 'dashboard' ? 'calm-home' : ''}`}
+      data-initialization-state={gs.newGameInitializationStatus}>
       <div className="app-layout">
         <aside className="primary-sidebar" aria-label="監督メニュー">
           <div className="primary-sidebar-title"><strong>{myTeam?.name}</strong><span>{year}年 シーズン</span></div>

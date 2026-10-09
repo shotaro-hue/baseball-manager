@@ -141,6 +141,9 @@ export default function AppScreenRouter({ app }) {
       <TitleScreen
         saveExists={saveExists}
         initializationError={gs.newGameInitializationError}
+        initializationStatus={gs.newGameInitializationStatus}
+        isInitializationInProgress={gs.isNewGameInitializing}
+        getInitializationAttempt={gs.getNewGameInitializationAttempt}
         onLoad={handleLoad}
         onSelectTeam={gs.handleSelect}
         onSaveDeleted={() => setSaveExists(false)}

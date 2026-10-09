@@ -1,0 +1,22 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`preserves complete generated data and random/ID consumption (seed 7) 1`] = `
+{
+  "calls": 16910,
+  "digest": "b7cf2b6bb9a04c69801c3d7d57af05b53798e99eb66ef81daf7890e151e63618",
+}
+`;
+
+exports[`preserves complete generated data and random/ID consumption (seed 42) 1`] = `
+{
+  "calls": 16894,
+  "digest": "4fa34bd6a9994b6699e96f0febbe9531afd71b25a3a64a7c37e2a8aab068edff",
+}
+`;
+
+exports[`preserves complete generated data and random/ID consumption (seed 20261009) 1`] = `
+{
+  "calls": 16879,
+  "digest": "5d0ab5ec25bc3621d159a7d814ced050adc0ab16879808f8de4ef808b529b015",
+}
+`;

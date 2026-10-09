@@ -11,11 +11,16 @@ function loadTitleSaveModule() {
 export default function TitleScreen({
   saveExists,
   initializationError,
+  initializationStatus = 'idle',
+  isInitializationInProgress,
+  getInitializationAttempt = () => 0,
   onLoad,
   onSelectTeam,
   onSaveDeleted,
 }) {
   const [saveMeta, setSaveMeta] = useState(null);
+  const initializing = initializationStatus === 'initializing';
+  const actionsLocked = () => initializing || isInitializationInProgress?.();
 
   useEffect(() => {
     let alive = true;
@@ -45,7 +50,8 @@ export default function TitleScreen({
       type="button"
       className="tcard"
       style={{ '--c': team.color }}
-      onClick={() => onSelectTeam(team.id)}
+      disabled={initializing}
+      onClick={() => { if (!actionsLocked()) onSelectTeam(team.id); }}
       aria-label={team.name}
     >
       <span
@@ -59,15 +65,19 @@ export default function TitleScreen({
   );
 
   const handleDeleteSave = async () => {
+    if (actionsLocked()) return;
+    const attempt = getInitializationAttempt();
     if (!window.confirm('セーブデータを削除しますか？')) return;
     const mod = await loadTitleSaveModule();
+    if (actionsLocked() || attempt !== getInitializationAttempt()) return;
     mod.deleteSave();
     setSaveMeta(null);
     onSaveDeleted();
   };
 
   return (
-    <div className="app">
+    <div className="app" data-testid="new-game-initialization"
+      data-initialization-state={initializationStatus}>
       <div className="title">
         <div className="tlogo">
           BASEBALL
@@ -135,7 +145,8 @@ export default function TitleScreen({
                     borderColor: 'rgba(74,222,128,.6)',
                     color: '#4ade80',
                   }}
-                  onClick={onLoad}
+                  disabled={initializing}
+                  onClick={() => { if (!actionsLocked()) onLoad(); }}
                 >
                   続きから
                 </button>
@@ -143,6 +154,7 @@ export default function TitleScreen({
                   className="bsm bgr"
                   style={{ padding: '6px 10px' }}
                   onClick={handleDeleteSave}
+                  disabled={initializing}
                 >
                   削除
                 </button>
@@ -165,8 +177,12 @@ export default function TitleScreen({
           NEW GAME - チームを選択
         </div>
 
+        <div role="status" aria-live="polite" aria-atomic="true"
+          style={initializing ? {background:'#eff6ff',border:'1px solid #365f92',borderRadius:7,padding:12,marginBottom:10,color:'#17243a',fontSize:16,textAlign:'left'} : undefined}>
+          {initializing ? '新規ゲームを初期化中です。完了までお待ちください。' : null}
+        </div>
         {initializationError && (
-          <div role="alert" style={{background:'rgba(248,113,113,.1)',border:'1px solid rgba(248,113,113,.45)',borderRadius:7,padding:'8px 10px',marginBottom:10,color:'#f87171',fontSize:11,textAlign:'left'}}>
+          <div role="alert" style={{background:'#fff0f1',border:'1px solid #b42332',borderRadius:7,padding:'12px',marginBottom:10,color:'#b42332',fontSize:14,textAlign:'left'}}>
             {initializationError}
           </div>
         )}
@@ -183,7 +199,7 @@ export default function TitleScreen({
         >
           セントラルリーグ
         </div>
-        <div className="tgrid" style={{ marginBottom: 14 }}>
+        <div className="tgrid" aria-busy={initializing} style={{ marginBottom: 14 }}>
           {TEAM_DEFS.filter((team) => team.league === 'セ').map(renderTeamCard)}
         </div>
 
@@ -199,7 +215,7 @@ export default function TitleScreen({
         >
           パシフィックリーグ
         </div>
-        <div className="tgrid">
+        <div className="tgrid" aria-busy={initializing}>
           {TEAM_DEFS.filter((team) => team.league === 'パ').map(renderTeamCard)}
         </div>
 

@@ -34,9 +34,18 @@ jobs:
       - name: Validate physics HR
         run: npm run validate:physics-hr
 
-  progression-e2e:
+  progression-e2e-suites:
+    name: e2e-${{ matrix.suite.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - name: initialization-and-progression
+            files: progression.smoke.spec.js initialization.spec.js
+          - name: history-and-posting
+            files: match-history.spec.js posting.spec.js
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,14 +58,27 @@ jobs:
         run: npm ci
       - name: Install Chromium and WebKit
         run: npx playwright install --with-deps chromium webkit
-      - name: Progression smoke tests (no retries)
-        run: npm run test:e2e:smoke
+      - name: Smoke suite (one worker, no retries)
+        run: npm run test:e2e -- ${{ matrix.suite.files }} --workers=1 --retries=0
       - name: Upload E2E report and failure evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: progression-e2e-report
+          name: progression-e2e-${{ matrix.suite.name }}-report
           path: |
             playwright-report/
             test-results/
           retention-days: 14
+
+  # Preserve the existing required check name; failure/cancellation/skip in
+  # either suite must fail this gate rather than produce a partial green check.
+  progression-e2e:
+    if: ${{ always() }}
+    needs: [progression-e2e-suites]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require every smoke suite to succeed
+        env:
+          SMOKE_SUITE_RESULT: ${{ needs['progression-e2e-suites'].result }}
+        run: test "$SMOKE_SUITE_RESULT" = success

@@ -34,90 +34,103 @@ export default function App() {
   const os = useOffseason(gs);
 
   const handleLoad = async () => {
-    const [{ loadGame }, scheduleMod, playerMod] = await Promise.all([
-      loadAppSaveModule(),
-      loadAppScheduleModule(),
-      loadAppPlayerModule(),
-    ]);
-    const saved = await loadGame();
-    if (!saved) {
-      gs.notify('セーブデータが見つかりません', 'warn');
-      return;
-    }
+    if (gs.isNewGameInitializing()) return;
+    const attempt = gs.getNewGameInitializationAttempt();
+    const loadIsStale = () => gs.isNewGameInitializing() || attempt !== gs.getNewGameInitializationAttempt();
+    return gs.runTitleLoad(async () => {
+      try {
+        const [{ loadGame }, scheduleMod, playerMod] = await Promise.all([
+          loadAppSaveModule(),
+          loadAppScheduleModule(),
+          loadAppPlayerModule(),
+        ]);
+        if (loadIsStale()) return;
+        const saved = await loadGame();
+        if (loadIsStale()) return;
+        if (!saved) {
+          gs.notify('セーブデータが見つかりません', 'warn');
+          return;
+        }
 
-    const normalizedTeams = (saved.teams || []).map((team) => {
-      const nonPitcherIds = (team.players || [])
-        .filter((player) => !player.isPitcher)
-        .map((player) => player.id);
-      const fallback = (team.lineup || []).filter((id) =>
-        nonPitcherIds.includes(id),
-      );
-      const lineupNoDh = (team.lineupNoDh || fallback)
-        .filter((id) => nonPitcherIds.includes(id))
-        .slice(0, 8);
-      const lineupDh = (team.lineupDh || fallback)
-        .filter((id) => nonPitcherIds.includes(id))
-        .slice(0, 9);
-      const rosterDhMode = team.rosterDhMode ?? team.dhEnabled ?? false;
-      return {
-        ...team,
-        lineupNoDh,
-        lineupDh,
-        rosterDhMode,
-        lineup: (rosterDhMode ? lineupDh : lineupNoDh).slice(),
-      };
+        const normalizedTeams = (saved.teams || []).map((team) => {
+          const nonPitcherIds = (team.players || [])
+            .filter((player) => !player.isPitcher)
+            .map((player) => player.id);
+          const fallback = (team.lineup || []).filter((id) =>
+            nonPitcherIds.includes(id),
+          );
+          const lineupNoDh = (team.lineupNoDh || fallback)
+            .filter((id) => nonPitcherIds.includes(id))
+            .slice(0, 8);
+          const lineupDh = (team.lineupDh || fallback)
+            .filter((id) => nonPitcherIds.includes(id))
+            .slice(0, 9);
+          const rosterDhMode = team.rosterDhMode ?? team.dhEnabled ?? false;
+          return {
+            ...team,
+            lineupNoDh,
+            lineupDh,
+            rosterDhMode,
+            lineup: (rosterDhMode ? lineupDh : lineupNoDh).slice(),
+          };
+        });
+
+        const loadedSchedule = scheduleMod.generateSeasonSchedule(saved.year, normalizedTeams);
+
+        const loadedParams = SEASON_PARAMS[saved.year] || getDefaultParams(saved.year);
+        const loadedAllStarTriggerDay = scheduleMod.calcAllStarTriggerDay(loadedSchedule, loadedParams.allStarSkipDates);
+
+        const openingForeignPool = playerMod.generateForeignFaPool(
+          rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX),
+        );
+        const shouldBackfillForeignFa =
+          (saved.faPool?.length ?? 0) === 0 && saved.gameDay === 1;
+        gs.setTeams(normalizedTeams);
+        gs.setMyId(saved.myId);
+        gs.setSaveId(saved.saveId);
+        gs.setGameDay(saved.gameDay);
+        gs.setYear(saved.year);
+        gs.setOffseasonPlan(planningResumeScreen(saved.offseasonPlan, saved.year, saved.myId) === 'hub' ? null : saved.offseasonPlan);
+
+        gs.setSchedule(loadedSchedule);
+        gs.setAllStarTriggerDay(loadedAllStarTriggerDay);
+        gs.setFaPool(shouldBackfillForeignFa ? openingForeignPool : saved.faPool || []);
+        gs.setFaYears(saved.faYears || {});
+        gs.hydrateLargeSaveData({
+          seasonHistory: saved.seasonHistory || {
+            awards: [],
+            records: {
+              singleSeasonHR: null,
+              singleSeasonAVG: null,
+              singleSeasonK: null,
+              careerHR: {},
+              careerW: {},
+            },
+            hallOfFame: [],
+            championships: [],
+            standingsHistory: [],
+            transfers: [],
+          },
+          news: saved.news || [],
+          mailbox: saved.mailbox || [],
+        });
+        gs.hydrateMatchHistory(saved);
+        gs.setSaveRevision(Number(saved.saveRevision) || 0);
+        gs.resetSaveTracking();
+        gs.setCpuTradeOffers([]);
+
+        sf.setPlayoff(null);
+        os.resetTransientOffseason();
+
+        gs.setTab('dashboard');
+        gs.setScreen(planningResumeScreen(saved.offseasonPlan, saved.year, saved.myId));
+      } catch (error) {
+        if (!loadIsStale()) {
+          console.error('セーブデータの読み込みに失敗しました:', error);
+          gs.notify('セーブデータを読み込めませんでした。再試行してください', 'warn');
+        }
+      }
     });
-
-    gs.setTeams(normalizedTeams);
-    gs.setMyId(saved.myId);
-    gs.setSaveId(saved.saveId);
-    gs.setGameDay(saved.gameDay);
-    gs.setYear(saved.year);
-    gs.setOffseasonPlan(planningResumeScreen(saved.offseasonPlan, saved.year, saved.myId) === 'hub' ? null : saved.offseasonPlan);
-
-    const loadedSchedule = scheduleMod.generateSeasonSchedule(saved.year, normalizedTeams);
-    gs.setSchedule(loadedSchedule);
-
-    const loadedParams = SEASON_PARAMS[saved.year] || getDefaultParams(saved.year);
-    gs.setAllStarTriggerDay(
-      scheduleMod.calcAllStarTriggerDay(loadedSchedule, loadedParams.allStarSkipDates),
-    );
-
-    const openingForeignPool = playerMod.generateForeignFaPool(
-      rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX),
-    );
-    const shouldBackfillForeignFa =
-      (saved.faPool?.length ?? 0) === 0 && saved.gameDay === 1;
-    gs.setFaPool(shouldBackfillForeignFa ? openingForeignPool : saved.faPool || []);
-    gs.setFaYears(saved.faYears || {});
-    gs.hydrateLargeSaveData({
-      seasonHistory: saved.seasonHistory || {
-        awards: [],
-        records: {
-          singleSeasonHR: null,
-          singleSeasonAVG: null,
-          singleSeasonK: null,
-          careerHR: {},
-          careerW: {},
-        },
-        hallOfFame: [],
-        championships: [],
-        standingsHistory: [],
-        transfers: [],
-      },
-      news: saved.news || [],
-      mailbox: saved.mailbox || [],
-    });
-    gs.hydrateMatchHistory(saved);
-    gs.setSaveRevision(Number(saved.saveRevision) || 0);
-    gs.resetSaveTracking();
-    gs.setCpuTradeOffers([]);
-
-    sf.setPlayoff(null);
-    os.resetTransientOffseason();
-
-    gs.setTab('dashboard');
-    gs.setScreen(planningResumeScreen(saved.offseasonPlan, saved.year, saved.myId));
   };
 
   const app = { gs, sf, os, handleLoad };
