@@ -45,3 +45,38 @@ export function calcRevenue(team) {
     avgTicketPrice,
   };
 }
+
+// Display-only snapshot. IDs are unique across owned rosters; players wins if
+// a legacy save also contains the same ID in farm. Never mutate either roster.
+export function summarizeContractSalaries(team) {
+  const groups = [
+    { key: 'active', label: '一軍支配下', amount: 0, count: 0, missingCount: 0, invalidCount: 0 },
+    { key: 'farm', label: '二軍支配下', amount: 0, count: 0, missingCount: 0, invalidCount: 0 },
+    { key: 'development', label: '育成', amount: 0, count: 0, missingCount: 0, invalidCount: 0 },
+  ];
+  const seen = new Set();
+  const entries = [];
+  for (const [roster, groupIndex] of [[team.players ?? [], 0], [team.farm ?? [], 1]]) {
+    for (const player of roster) {
+      // Missing IDs must not collapse distinct players into one contract.
+      const identity = player.id ?? player;
+      if (seen.has(identity)) continue;
+      seen.add(identity);
+      const group = groups[player.育成 ? 2 : groupIndex];
+      const salary = player.salary;
+      const status = salary == null ? 'missing'
+        : typeof salary === 'number' && Number.isFinite(salary) && salary >= 0 ? 'valid' : 'invalid';
+      group.count++;
+      if (status === 'valid') group.amount += salary;
+      else group[status === 'missing' ? 'missingCount' : 'invalidCount']++;
+      entries.push({ player, group: group.key, label: group.label, status });
+    }
+  }
+  const missingCount = groups.reduce((sum, g) => sum + g.missingCount, 0);
+  const invalidCount = groups.reduce((sum, g) => sum + g.invalidCount, 0);
+  return { groups, entries,
+    total: groups.reduce((sum, g) => sum + g.amount, 0),
+    missingCount, invalidCount, complete: missingCount + invalidCount === 0,
+    ranked: entries.filter(e => e.status === 'valid').sort((a, b) => b.player.salary - a.player.salary),
+  };
+}

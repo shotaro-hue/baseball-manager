@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { fmtSal } from '../../utils';
-import { calcRevenue } from '../../engine/finance';
+import { calcRevenue, summarizeContractSalaries } from '../../engine/finance';
 import { SEASON_GAMES } from '../../constants';
+import './FinanceTab.css';
 
 export function FinanceTab({team,onStadiumUpgrade,onTicketPriceChange,gameDay,onPlayerClick}){
   const rev=calcRevenue(team);
+  const salaries=summarizeContractSalaries(team);
   const [ticketPriceInput,setTicketPriceInput]=useState(String(team.customAvgTicketPrice??rev.avgTicketPrice));
   useEffect(()=>{
     setTicketPriceInput(String(team.customAvgTicketPrice??rev.avgTicketPrice));
@@ -57,11 +59,23 @@ export function FinanceTab({team,onStadiumUpgrade,onTicketPriceChange,gameDay,on
         </div>
         <div style={{fontSize:11,color:"#4b5563",marginTop:6}}>設定範囲: 500〜5,000円</div>
       </div>
-      <div className="card">
-        <div className="card-h">支出</div>
-        {[["選手年俸",fmtSal(team.players.reduce((s,p)=>s+p.salary,0))],["コーチ",fmtSal(team.coaches.reduce((s,c)=>s+c.salary,0))]].map(([l,v])=>(
-          <div key={l} className="fsb" style={{padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,.03)"}}><span style={{fontSize:11,color:"#4b5563"}}>{l}</span><span className="mono" style={{color:"#f87171"}}>{v}</span></div>
+      <section className="card finance-salaries" aria-label="選手契約年俸（年額）">
+        <div className="card-h">選手契約年俸（年額）</div>
+        <p className="finance-note">現在所属する選手の契約年俸です。予算からの支払済み額ではありません。</p>
+        {salaries.groups.map(g=>(
+          <div key={g.key} className="finance-salary-row">
+            <span>{g.label} <small>（{g.count}人）</small></span>
+            <span className="mono">{fmtSal(g.amount)}{g.missingCount+g.invalidCount>0&&<small>（確認できた分）</small>}</span>
+          </div>
         ))}
+        <div className="finance-salary-row finance-salary-total">
+          <strong>合計</strong><strong className="mono">{fmtSal(salaries.total)}{!salaries.complete&&<small>（確認できた分）</small>}</strong>
+        </div>
+        {!salaries.complete&&<p className="finance-warning" role="status">合計は不完全です。年俸未記録 {salaries.missingCount}人・不正値 {salaries.invalidCount}人を含みません。内訳・年俸上位は確認できた金額のみです。</p>}
+      </section>
+      <div className="card">
+        <div className="card-h">コーチ契約給与</div>
+        <div className="fsb"><span>コーチ</span><span className="mono">{fmtSal(team.coaches.reduce((s,c)=>s+c.salary,0))}</span></div>
       </div>
       <div className="card">
         <div className="card-h">📊 ファン感情</div>
@@ -94,12 +108,23 @@ export function FinanceTab({team,onStadiumUpgrade,onTicketPriceChange,gameDay,on
           <div style={{fontSize:12,color:"#f5c842",textAlign:"center",padding:"8px 0"}}>✅ 球場は最高レベルです</div>
         )}
       </div>
-      <div className="card">
+      <div className="card finance-budget">
         <div className="card-h">予算 / 年俸上位</div>
         <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:24,color:"#60a5fa",marginBottom:12}}>{fmtSal(team.budget)}</div>
-        {team.players.sort((a,b)=>b.salary-a.salary).slice(0,6).map(p=>(
-          <div key={p.id} className="fsb" style={{padding:"5px 0",borderBottom:"1px solid rgba(255,255,255,.025)"}}><span style={{fontSize:12,cursor:"pointer"}} onClick={()=>onPlayerClick?.(p,team.name)}><span style={{color:"#60a5fa"}}>{p.name}</span> <span style={{fontSize:10,color:"#374151"}}>{p.pos}/{p.contractYearsLeft}年</span></span><span className="mono" style={{color:"#f5c842"}}>{fmtSal(p.salary)}</span></div>
-        ))}
+        <section className="finance-salaries" aria-label="契約年俸上位">
+          <p className="finance-note">所属選手の年額上位6人（一軍・二軍・育成）</p>
+          {!salaries.complete&&<p className="finance-warning">未記録・不正値の年俸は順位を判定できないため一覧から除外しています。</p>}
+          {salaries.ranked.slice(0,6).map(({player:p,label})=>(
+            <div key={p.id!=null?`id:${p.id}`:`entry:${salaries.entries.findIndex(e=>e.player===p)}`} className="finance-salary-row">
+              <span className="finance-player-info">
+                <button type="button" className="finance-player-name" onClick={()=>onPlayerClick?.(p,team.name)}>{p.name}</button>
+                <small>{label} / {p.pos} / {p.contractYearsLeft}年</small>
+              </span>
+              <span className="mono">{fmtSal(p.salary)}</span>
+            </div>
+          ))}
+          {salaries.ranked.length===0&&<p className="finance-note">{salaries.entries.length===0?'所属選手はいません。':'順位を判定できる年俸がありません。'}</p>}
+        </section>
       </div>
     </div>
   );

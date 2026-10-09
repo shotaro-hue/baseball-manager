@@ -1,0 +1,18 @@
+.finance-salaries { color: #17243a; font-size: 14px; line-height: 1.6; }
+.finance-salaries .card-h { font-size: 18px; }
+.finance-salary-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid #dce6f2; }
+.finance-salary-row > * { min-width: 0; }
+.finance-salary-row > .mono { text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.finance-salaries small { display: inline-block; font-size: 12px; color: #53657c; }
+.finance-salary-total { border-bottom: 0; }
+.finance-note { margin: 0 0 8px; font-size: 12px; color: #53657c; }
+.finance-warning { color: #805700; font-size: 12px; margin: 8px 0; }
+.finance-player-info { display: flex; flex-direction: column; overflow-wrap: anywhere; }
+.finance-player-name { background: transparent; border: 0; color: #1262d4; font: inherit; text-align: left; padding: 0; min-height: 44px; cursor: pointer; }
+.finance-player-name:focus-visible { outline: 3px solid #377ccc; outline-offset: 2px; }
+.finance-salary-row .mono small { display: block; }
+/* Finance uses the legacy dark cards on mobile; limit the light surface to
+   the contract sections rather than restyling unrelated revenue controls. */
+.card.finance-salaries, .card.finance-budget { background: #fff; border: 1px solid #dce6f2; color: #17243a; }
+.card.finance-salaries .card-h, .card.finance-budget .card-h { color: #17243a; }
+.finance-salaries .mono { font-size: 14px; }
