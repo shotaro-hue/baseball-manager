@@ -38,3 +38,21 @@ Node v24.19.0（CIはNode20）、npm ci終了0、依存関係変更なし。
 `npm run build` 成功（23.41秒、既存chunkサイズ警告あり）。
 財務E2E: `npm run test:e2e -- finance.spec.js --workers=1 --retries=0 --trace=on` 5成功／0失敗／0skip（2.2分）。実IndexedDB保存・再読込、ホームからの再訪、3幅の内訳合計／年俸上位、ページ横はみ出しなしを確認。360/390/1440の同一保存データでmain／修正後の比較画像を採取。
 CIに独立finance matrixを追加。既存の2suite、10分上限、1worker、retry0、集約progression-e2e gateを維持する。CI／smoke／全E2E／physics最終結果は完了後追記。
+
+## 全体検証とCI（2026-10-09）
+
+- physics HR: 1成功／0失敗／0skip、終了0。単体97ファイル成功＋既存2ファイルskip、639成功／0失敗／2skip。専用回帰12件はskipなし。
+- ローカルsmoke（1 worker、retry 0）: 17成功／4失敗／0skip、全21件実行、21.9分。失敗は下表。成功になるまで同じsuiteを無変更で繰り返す運用は行わず、別途要求された全44件E2Eを実行している。
+- 実装head `9740bdde400d91a1e2c36a78f0a8fd8d38d49857` の [CI run280](https://github.com/shotaro-hue/baseball-manager/actions/runs/37917672027) は build-and-test、e2e-finance、e2e-initialization-and-progression、e2e-history-and-posting、集約progression-e2eの全5ジョブ成功。CIは各1 worker／retry 0。
+- この文書の追記はゲーム・テスト実装を変えない。最新headのCIと全E2Eの完走結果、証拠ファイルへのリンクは [PR427](https://github.com/shotaro-hue/baseball-manager/pull/427) に記録する。過去smoke失敗は全E2Eが成功しても上書きしない。
+
+| ローカルsmoke失敗 | 確認できた段階／限界 |
+| --- | --- |
+| slow CPU paints pending… | CPU低速化／生成開始より前のpage.reloadが終了せず、その後context teardownも30秒超過。traceの外部Google Fonts要求も失敗しているが、それが唯一の原因とは未確定。 |
+| T1/T2/T3/T4 normal, batch and tactical history… | 戦術試合の終了ボタンを待つpollで60秒超過。財務への遷移なし。 |
+| E1 new game, five games, persisted reload… (Chromium) | ケース全体の制限内に完了しなかった。詳細traceと失敗ログを保持し、今回の財務変更起因かは未確定。 |
+| E2 final regular game, postseason… | ケース全体の制限内に完了しなかった。詳細traceと失敗ログを保持し、今回の財務変更起因かは未確定。 |
+
+このローカル失敗をCI成功だけで解決扱いにしない。テスト削除・skip・期待値変更・既存timeout/retryの変更はない。
+
+公開時に同目的の別Draft PR426が作業中と判明したため、既存ブランチを上書きせず独立PR427へ作成した。同じ修正の2本を重ねてマージしない。mainは開始時／PR作成時ともc398825で、PR420–425を保持している。
