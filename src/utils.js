@@ -23,6 +23,7 @@ export const fmtOBP = (n, d) =>
 
 export const fmtPct = (v) => (v * 100).toFixed(1) + "%";
 
+// 円単位の金額を表示する（万円単位の予算・年俸には fmtSal を使う）。
 export const fmtM = (v) =>
   v >= 100000000
     ? (v / 100000000).toFixed(1) + "億円"
@@ -30,6 +31,7 @@ export const fmtM = (v) =>
       ? (v / 10000).toFixed(0) + "万円"
       : v + "円";
 
+// 万円単位の予算・年俸を表示する。
 export const fmtSal = (v) => v >= 10000 ? (v / 10000).toFixed(2) + "億円" : v.toLocaleString() + "万円";
 
 export const fmtEra = (era) => {

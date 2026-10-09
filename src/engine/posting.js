@@ -6,7 +6,7 @@ import { tradeValue } from './trade';
  * @module posting
  */
 
-export const POSTING_FEE_RATE        = 0.20; // 移籍金: 落札額の20%
+export const POSTING_FEE_RATE        = 0.20; // 移籍金: 落札額（円）の20%。予算への加算時に万円へ換算する。
 export const POSTING_OVERSEAS_THRESHOLD = 60; // 申請可能最低 overseas 値
 
 /**
