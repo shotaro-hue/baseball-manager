@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { uid, clamp, rng, rngf, fmtM, gameDayToDate } from '../utils';
 import { calcSeasonAwards, updateRecords, checkHallOfFame } from '../engine/awards';
 import { evalOffer, cpuRenewContracts, processCpuFaBids, getFaThreshold, getFaProgress, calcPlayerDemand } from '../engine/contract';
+import { applyDraftAcquisitions } from '../engine/draftRules';
 import { initDraftPool } from '../engine/draft';
 import { calcPostingRequestProb, calcPostingBid, POSTING_FEE_RATE } from '../engine/posting';
 import { calcOffseasonPopDelta, driftPopularity } from '../engine/fanSentiment';
@@ -286,17 +287,17 @@ export function useOffseason(gs) {
     return { conditionDeltas, conditionChanges, campEvents, rosterBattles };
   };
 
+  const draftContextRef = useRef(gs);
+  draftContextRef.current = gs;
   const handleDraftComplete = (pl, dr) => {
-    if (draftAppliedRef.current === year || gs.offseasonPlan?.draftApplied || (gs.offseasonPlan && gs.screen !== 'draft_review')) return false;
+    const { teams, year, offseasonPlan, screen } = draftContextRef.current;
+    if (draftAppliedRef.current === year || offseasonPlan?.draftApplied || (offseasonPlan && screen !== 'draft_review')) return false;
+    const result = applyDraftAcquisitions(teams, pl, dr, year);
+    if (!result.ok) { gs.notify?.(result.error); return false; }
     const ownedIds = new Set(teams.flatMap(t => [...t.players, ...(t.farm || [])].map(p => p.id)));
     const picksFor=teamId=>draftPicksForTeam(pl, dr, teamId).filter(p => !ownedIds.has(p.id));
     const myPicks=picksFor(myId);
-    const updatedTeams = teams.map(t => {
-      const picks=picksFor(t.id);
-      if(!picks.length) return t;
-      const owned = new Set([...t.players, ...t.farm].map(p => p.id));
-      return{...t,farm:[...t.farm,...picks.filter(p => !owned.has(p.id)).map(p=>({...p,育成:false,salary:Math.max(MIN_SALARY_SHIHAKA,p.salary),contractYears:1,contractYearsLeft:1,contractSignedYear:year,ikuseiYears:0}))]};
-    });
+    const updatedTeams = result.teams;
     const stData = generateSpringTraining(updatedTeams);
     draftAppliedRef.current = year;
     setTeams(updatedTeams);

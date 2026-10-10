@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import React from "react";
 import { POSITIONS, DRAFT_ROUNDS, DRAFT_COMMENTS_MY, DRAFT_COMMENTS_CPU, DRAFT_LOTTERY_MAX_ROUNDS, MAX_SHIHAKA_TOTAL } from '../constants';
-import { rng, clamp, scoutedValue } from '../utils';
+import { rng, scoutedValue } from '../utils';
 import { analyzeTeamNeeds } from '../engine/trade';
+import { remainingDraftSlots, chooseDraftProspect, autoFirstRound, draftRefused, drawDraftWinner, registeredDraftCount } from '../engine/draftRules';
 import { draftOverallComment, recommendForTeam } from '../engine/draft';
 import { OV, HandBadge } from './ui';
 import { decodeLottery, encodeLottery, draftPicksForTeam } from '../engine/offseasonResume';
@@ -113,7 +114,7 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
   const [showPreview,setShowPreview]=React.useState(restored.showPreview ?? false);
   // ラウンド: 0=1位, 1=外れ1位, 2=外れ外れ1位...（重複あれば再指名ループ）
   const [hazureRound,setHazureRound]=React.useState(restored.hazureRound ?? 0);
-  const [activeTeams,setActiveTeams]=React.useState(()=>restored.activeTeams ?? [...teams].sort((a,b)=>a.wins-b.wins));
+  const [activeTeams,setActiveTeams]=React.useState(()=>restored.activeTeams ?? [...teams].sort((a,b)=>a.wins-b.wins).filter(t=>remainingDraftSlots(t)>0));
   const [confirmedPicks,setConfirmedPicks]=React.useState(restored.confirmedPicks ?? {});
   // 現ラウンド
   const [myPick,setMyPick]=React.useState(restored.myPick ?? null);
@@ -138,40 +139,23 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
   const finishLottery = (picks, auto) => { if (completed.current) return; completed.current = true; onDone(picks, auto); };
 
   const myTeam=teams.find(t=>t.id===myId);
-  const myShihaikaCount = ((myTeam?.players || []).length + (myTeam?.farm || []).filter(p => !p?.育成).length);
-  const myDraftedCount = Object.values(confirmedPicks).filter(p => Number(p?._r1winner ?? myId) === Number(myId)).length;
+  const myShihaikaCount = registeredDraftCount(myTeam);
+  const myDraftedCount = confirmedPicks[myId] ? 1 : 0;
   const myRemainingSlots = Math.max(0, MAX_SHIHAKA_TOTAL - myShihaikaCount - myDraftedCount);
   const canMyTeamDraft = myRemainingSlots > 0;
   const amIActive=activeTeams.some(t=>t.id===myId);
   const priorUsedIds=new Set(Object.values(confirmedPicks).filter(Boolean).map(p=>p.id));
   const roundPool=pool.filter(p=>!p._drafted&&!priorUsedIds.has(p.id));
   const roundLabel=hazureRound===0?"1位指名":"外れ".repeat(hazureRound)+"1位指名";
-  const scoreProspectForTeam=(team, player, rankIdx=0)=>{
-    const needs=analyzeTeamNeeds(team);
-    const topNeed=needs[0];
-    const wantsPitcher=needs.some(n=>n.type.includes("先発")||n.type.includes("中継ぎ")||n.type.includes("抑え")||n.type.includes("投手"));
-    const wantsYouth=needs.some(n=>n.type.includes("若手")||n.type.includes("将来"));
-    const urgent=topNeed?.horizon==="short";
-    let score=100-rankIdx*3;
-    if(wantsPitcher&&player.isPitcher) score+=26;
-    if(!wantsPitcher&&!player.isPitcher) score+=16;
-    if(needs.some(n=>n.type.includes("捕手"))&&!player.isPitcher&&player.pos==="捕手") score+=18;
-    if(urgent) score+=Math.round((player.readinessScore??50)*0.2);
-    else score+=Math.round((player.potential??50)*0.15);
-    if(wantsYouth&&(player.age||22)<=20) score+=10;
-    return score;
-  };
+
 
   // CPU指名（現ラウンドのactiveTeams・roundPoolを使用）
   const buildCpuPicks=()=>{
     const picks={};
     activeTeams.forEach(t=>{
       if(t.id===myId) return;
-      const already=new Set(Object.values(picks).filter(Boolean).map(p=>p.id));
-      const avail=roundPool.filter(p=>!already.has(p.id));
-      if(!avail.length) return;
-      const scored=avail.map((p,i)=>({p,s:scoreProspectForTeam(t,p,i)})).sort((a,b)=>b.s-a.s);
-      picks[t.id]=rng(0,9)<3&&scored.length>1?scored[rng(1,Math.min(3,scored.length-1))].p:scored[0].p;
+      if (remainingDraftSlots(t) <= 0) return;
+      picks[t.id]=chooseDraftProspect(t,roundPool);
     });
     return picks;
   };
@@ -179,8 +163,7 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
   // 一斉発表フェーズへ（自チームが外れていないラウンドではmyPick不要）
   const handleAnnounce=()=>{
     if (phaseRef.current !== 'select') return;
-    if(amIActive && !canMyTeamDraft) return;
-    if(!myPick&&amIActive) return;
+    if(!myPick&&amIActive&&canMyTeamDraft&&roundPool.length) return;
     const cpu=buildCpuPicks();
     phaseRef.current = 'announce';
     setCpuPicks(cpu);
@@ -202,7 +185,7 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
   // 現ラウンドの競合検出（重複OK → くじ引き、なければラウンド終了）
   const processConflicts=(cpu)=>{
     const allPicks={...cpu};
-    if(amIActive&&myPick) allPicks[myId]=myPick;
+    if(amIActive&&canMyTeamDraft&&myPick) allPicks[myId]=myPick;
     const byPlayer={};
     Object.entries(allPicks).forEach(([tid,p])=>{
       if(!p) return;
@@ -245,14 +228,14 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
     let autoResolved={...resolved};
     const allLosers=[...losers];
     pendingConflicts.slice(nextIdx).forEach(({pid,tids})=>{
-      const winner=tids[rng(0,tids.length-1)];
+      const winner=drawDraftWinner(tids);
       autoResolved[winner]=roundPool.find(p=>String(p.id)===pid);
       tids.filter(tid=>tid!==winner).forEach(tid=>{
         const t=teams.find(x=>String(x.id)===tid);if(t) allLosers.push(t);
       });
     });
     const cpu=cpuPicks||{};
-    const allPicks={...cpu};if(amIActive&&myPick) allPicks[myId]=myPick;
+    const allPicks={...cpu};if(amIActive&&canMyTeamDraft&&myPick) allPicks[myId]=myPick;
     const loserIds=new Set(allLosers.map(t=>String(t.id)));
     const finalRoundPicks={};
     Object.entries(allPicks).forEach(([tid,p])=>{
@@ -266,7 +249,7 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
     const key = `${hazureRound}:${currentConflictIdx}`;
     if (lotteryResult || !lotteryTeams.length || drawn.current.has(key)) return;
     drawn.current.add(key);
-    const winner=lotteryTeams[rng(0,lotteryTeams.length-1)];
+    const winner=drawDraftWinner(lotteryTeams);
     setLotteryResult(winner);
   };
   useEffect(() => {
@@ -303,17 +286,10 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
     }
   };
 
-  // 全ドラフト自動処理（全球団を順番に貪欲指名→DraftScreenもスキップ）
+  // Full-auto uses the same independent nominations and fair lottery.
   const handleAutoAll=()=>{
-    const used=new Set();
-    const picks={};
-    allSorted.forEach(t=>{
-      const avail=roundPool.filter(p=>!used.has(p.id));
-      if(!avail.length) return;
-      const scored=avail.map((p,i)=>({p,score:scoreProspectForTeam(t,p,i)})).sort((a,b)=>b.score-a.score);
-      picks[t.id]=scored[0].p;used.add(scored[0].p.id);
-    });
-    finishLottery(picks,true);
+    if (phaseRef.current !== 'select' || completed.current) return;
+    finishLottery(autoFirstRound(allSorted,roundPool),true);
   };
 
   if(showPreview) return(
@@ -362,7 +338,7 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
         </>
       ):(
         <div style={{textAlign:"center",padding:"40px 0"}}>
-          <div style={{fontSize:13,color:"#94a3b8",marginBottom:16}}>あなたの球団は前のラウンドで指名が確定しました</div>
+          <div style={{fontSize:13,color:"#94a3b8",marginBottom:16}}>{canMyTeamDraft?"あなたの球団は前のラウンドで指名が確定しました":"支配下登録人数が上限のため、あなたの球団は指名を見送ります"}</div>
           <div style={{fontSize:11,color:"#374151",marginBottom:24}}>{activeTeams.map(t=>`${t.emoji} ${t.name}`).join(" / ")} が{roundLabel}を選択中…</div>
           <button className="btn btn-gold" style={{padding:"10px 32px"}} onClick={handleAnnounce}>発表を見る →</button>
         </div>
@@ -500,21 +476,7 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoS
     done, scouted: [...scouted], scoutPt, localAutoSkip, showPreview }); },
     [pickIdx, drafted, log, done, scouted, scoutPt, localAutoSkip, showPreview, onStateChange]);
   const current=draftOrderFiltered[pickIdx];
-  const scoreProspectForTeam=(team, player, rankIdx=0)=>{
-    const needs=analyzeTeamNeeds(team);
-    const topNeed=needs[0];
-    const wantsPitcher=needs.some(n=>n.type.includes("先発")||n.type.includes("中継ぎ")||n.type.includes("抑え")||n.type.includes("投手"));
-    const wantsYouth=needs.some(n=>n.type.includes("若手")||n.type.includes("将来"));
-    const urgent=topNeed?.horizon==="short";
-    let score=100-rankIdx*2;
-    if(wantsPitcher&&player.isPitcher) score+=24;
-    if(!wantsPitcher&&!player.isPitcher) score+=14;
-    if(needs.some(n=>n.type.includes("捕手"))&&!player.isPitcher&&player.pos==="捕手") score+=16;
-    if(urgent) score+=Math.round((player.readinessScore??50)*0.2);
-    else score+=Math.round((player.potential??50)*0.15);
-    if(wantsYouth&&(player.age||22)<=20) score+=10;
-    return score;
-  };
+
   const isMyTurn=current&&current.team.id===myId&&!done;
   const isPickedAfterRound1=pid=>Object.prototype.hasOwnProperty.call(drafted,pid);
   // 1巡目で指名済みの選手を除外
@@ -522,7 +484,7 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoS
   const availPool=pool.filter(p=>!isPickedAfterRound1(p.id)&&!p._drafted);
   const myPicks=draftPicksForTeam(pool, drafted, myId);
   const myTeam = teams.find(t => Number(t.id) === Number(myId));
-  const myCurrentShihaikaCount = ((myTeam?.players || []).length + (myTeam?.farm || []).filter(p => !p?.育成).length);
+  const myCurrentShihaikaCount = registeredDraftCount(myTeam);
   const myTotalDrafted = myPicks.length;
   const myRemainingSlots = Math.max(0, MAX_SHIHAKA_TOTAL - myCurrentShihaikaCount - myTotalDrafted);
   const canMyTeamDraft = myRemainingSlots > 0;
@@ -531,7 +493,7 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoS
   useEffect(() => () => clearTimeout(announcementTimer.current), []);
   const announce=(msg,color="#f5c842")=>{setAnnouncement({msg,color});clearTimeout(announcementTimer.current);announcementTimer.current=setTimeout(()=>setAnnouncement(null),2200);};
   const doPick=(pick,isMe)=>{
-    if (done || nextPickRef.current !== pickIdx || isPickedAfterRound1(pick.id) || pick._drafted) return;
+    if (!current || done || nextPickRef.current !== pickIdx || isPickedAfterRound1(pick.id) || pick._drafted || remainingDraftSlots(current.team,pool,drafted) <= 0) return;
     nextPickRef.current = pickIdx + 1;
     const newDrafted={...drafted,[pick.id]:isMe?myId:current.team.id};
     const comment=isMe?DRAFT_COMMENTS_MY[rng(0,DRAFT_COMMENTS_MY.length-1)]:`${current.team.name}${DRAFT_COMMENTS_CPU[rng(0,DRAFT_COMMENTS_CPU.length-1)]}`;
@@ -540,8 +502,7 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoS
     // 入団拒否リスク（自チーム指名時のみ、高ポテンシャルほど拒否しやすい）
     let refused=false;
     if(isMe){
-      const refuseChance=clamp((pick.potential-70)/200,0,0.15); // 最大15%
-      if(Math.random()<refuseChance){
+      if(draftRefused(pick,true)){
         refused=true;
         setDrafted({ ...drafted, [pick.id]: 'refused' });
         setLog(prev => prev.map((entry, i) => i === 0 ? { ...entry, refused: true, comment: '入団拒否' } : entry));
@@ -561,18 +522,9 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoS
     if(!current||done) return;
     const avail=pool.filter(p=>!isPickedAfterRound1(p.id)&&!p._drafted);
     if(!avail.length){setDone(true);return;}
-    // CPU戦略：補強ニーズに合う選手を優先
-    const needs=analyzeTeamNeeds(current.team);
-    const scored=avail.map((p,i)=>{
-      let score=scoreProspectForTeam(current.team,p,i);
-      if(needs.some(n=>n.type.includes("ミート"))&&!p.isPitcher&&(p.batting?.contact||0)>=65) score+=8;
-      return {p,score};
-    }).sort((a,b)=>b.score-a.score);
-    // 8%でサプライズ指名
-    const surprise=Math.random()<0.08&&avail.length>6;
-    const pick=surprise?avail[rng(4,Math.min(8,avail.length-1))]:scored[0].p;
-    doPick(pick,false);
+    doPick(chooseDraftProspect(current.team,avail,current.round+1),current.team.id===myId);
   };
+
   const myPick=pid=>{
     if(!canMyTeamDraft){
       announce(`⚠️ 支配下登録人数が上限（${MAX_SHIHAKA_TOTAL}名）に到達しているため、指名できません。`,"#f87171");
@@ -585,24 +537,20 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoS
   // 通常CPU自動指名（autoSkip中は無効）
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(()=>{if(effectiveAutoSkip||isMyTurn||done||pickIdx>=draftOrderFiltered.length) return;const t=setTimeout(cpuPick,350);return()=>clearTimeout(t);},[pickIdx,isMyTurn,done,effectiveAutoSkip]);
-  // 全自動処理：自チーム含め全指名を自動実行
+  // Both modes skip a full club and then use the same guarded pick path.
+  useEffect(()=>{
+    if(done || !current) return;
+    if(availPool.length===0) { setDone(true); return; }
+    if(remainingDraftSlots(current.team,pool,drafted)>0) return;
+    if(nextPickRef.current!==pickIdx) return;
+    nextPickRef.current=pickIdx+1;
+    if(pickIdx+1>=draftOrderFiltered.length) setDone(true);
+    else setPickIdx(i=>i+1);
+  },[pickIdx,done,pool,drafted]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(()=>{
-    if(!effectiveAutoSkip||done||pickIdx>=draftOrderFiltered.length) return;
-    const t=setTimeout(()=>{
-      if (nextPickRef.current !== pickIdx) return;
-      if(!current) return;
-      const avail=pool.filter(p=>!isPickedAfterRound1(p.id)&&!p._drafted);
-      if(!avail.length){setDone(true);return;}
-      const scored=avail.map((p,i)=>({p,score:scoreProspectForTeam(current.team,p,i)})).sort((a,b)=>b.score-a.score);
-      const pick=scored[0].p;
-      nextPickRef.current = pickIdx + 1;
-      const isMe=current.team.id===myId;
-      setDrafted(prev=>({...prev,[pick.id]:isMe?myId:current.team.id}));
-      setLog(prev=>[{round:current.round+1,team:current.team,player:pick,isMe,comment:isMe?"(自動)":""},...prev]);
-      if(pickIdx+1>=draftOrderFiltered.length) setDone(true);
-      else setPickIdx(i=>i+1);
-    },30);
+    if(!effectiveAutoSkip||done||!current) return;
+    const t=setTimeout(cpuPick,30);
     return()=>clearTimeout(t);
   },[effectiveAutoSkip,pickIdx,done]);
   const getBudgetFactor=p=>1.0-(p.isPitcher?alloc.pitcher:alloc.batter)/100*0.5;
@@ -784,18 +732,3 @@ export function DraftReviewScreen({teams,myId,year,pool,drafted,onEnd,savedState
     </div></div>
   );
 }
-  const scoreProspectForTeam=(team, player, rankIdx=0)=>{
-    const needs=analyzeTeamNeeds(team);
-    const topNeed=needs[0];
-    const wantsPitcher=needs.some(n=>n.type.includes("先発")||n.type.includes("中継ぎ")||n.type.includes("抑え")||n.type.includes("投手"));
-    const wantsYouth=needs.some(n=>n.type.includes("若手")||n.type.includes("将来"));
-    const urgent=topNeed?.horizon==="short";
-    let score=100-rankIdx*3;
-    if(wantsPitcher&&player.isPitcher) score+=26;
-    if(!wantsPitcher&&!player.isPitcher) score+=16;
-    if(needs.some(n=>n.type.includes("捕手"))&&!player.isPitcher&&player.pos==="捕手") score+=18;
-    if(urgent) score+=Math.round((player.readinessScore??50)*0.2);
-    else score+=Math.round((player.potential??50)*0.15);
-    if(wantsYouth&&(player.age||22)<=20) score+=10;
-    return score;
-  };

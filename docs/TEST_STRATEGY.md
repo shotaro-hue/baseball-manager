@@ -54,7 +54,7 @@ HRサンプリングは実際に多数の打球を計算するが、現行テス
 ## FIX-Tで追加する回帰テスト
 
 `e2e/trade.spec.js`（Chromium・390px、2ケース）は手動の500万円取引と旧CPUメールの受諾を実操作し、両球団の金額・所属・保存・再開を検証する。通常CIの `posting-and-finance` グループへ追加する。既存WebKit対象や他specの実行範囲は変更しない。
-`src/hooks/useOffseason.trade.test.js`、`src/engine/__tests__/tradeTransaction.test.js`、TradeTab/MailboxTabの `.test.js` は通常Vitestで収集する。既存のCPU取引・トレード評価の回帰も維持する。以下の全件数・所要時間は#431時点の履歴で、FIX-T追加後の実行件数として扱わない。
+`src/hooks/useOffseason.trade.test.js`、`src/engine/__tests__/tradeTransaction.test.js`、TradeTab/MailboxTabの `.test.js` は通常Vitestで収集する。既存のCPU取引・トレード評価の回帰も維持する。以下の全件数・所要時間は#431時点の履歴で、FIX-T/D追加後の実行件数として扱わない。
 
 ## E2E 全15ファイル（#431時点の棚卸し）
 
@@ -230,3 +230,5 @@ HRサンプリングは実際に多数の打球を計算するが、現行テス
 3. `match-history` のfixture開始/終了を計測してボトルネックを絞る。DH×homeの4組合せは削らず、共通setupの最適化を検討。
 4. 手動フルE2EのGitHub Actions初回完走を確認してから週次実行の費用対効果を判断する。
 5. このテスト戦略PRのCIを確認し、テスト一覧とCI実行範囲が最新mainと一致しているか再比較する。
+
+FIX-D追加：`src/components/draftIntegrity.test.js`・`src/engine/__tests__/draftRules.test.js` は通常Vitest。`e2e/draft.spec.js`（Chromium390px）は69/70枠で全自動指名→途中保存→ロード→結果適用→キャンプ保存/ロードの所属整合性を検証し、通常CIのinitialization-and-progressionへ追加。既存の抽選結果復元・年度更新・取引の検証は維持。
