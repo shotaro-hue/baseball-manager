@@ -1,3 +1,4 @@
+import { saveFeedback } from '../engine/saveFeedback';
 import { useState, useReducer, useMemo, useCallback, useEffect, useRef } from "react";
 import { contractReplyIsDue, resolveContractReplies } from '../engine/contractReplies';
 import { yieldToBrowser } from '../engine/yieldToBrowser';
@@ -537,9 +538,13 @@ export function useGameState() {
         setSaveExists(true);
         completeTrackedSave(snapshot);
         setLastAutoSaveAt(now);
-        notify('💾 オートセーブ','ok');
+        const feedback = saveFeedback(result, '💾 オートセーブ');
+        notify(feedback.message, feedback.type);
+      } else if (!result.skipped) {
+        const feedback = saveFeedback(result); notify(feedback.message, feedback.type);
       }
     }).catch((error)=>{
+      notify(saveFeedback({ok:false}).message, 'warn');
       console.error('Auto save failed:', error);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -561,7 +566,9 @@ export function useGameState() {
       setSaveExists(true);
       completeTrackedSave(request.snapshot);
     }
-    if (!options.silent || !result.ok) notify(result.ok?'💾 セーブしました':result.quota?'💾 ストレージ容量が不足しています':'セーブに失敗しました',result.ok?'ok':'warn');
+    if (!options.silent || !result.ok || result.warnings?.length || result.archive?.ok === false) {
+      const feedback = saveFeedback(result); notify(feedback.message, feedback.type);
+    }
     return result;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[teams,myId,saveId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision,offseasonPlan,screen,isAutoSaveSuspended,notify,queueSave,beginTrackedSave,completeTrackedSave,getMatchHistorySnapshot]);

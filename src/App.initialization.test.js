@@ -5,7 +5,7 @@ import App from './App';
 import { TEAM_DEFS } from './constants';
 const mock=vi.hoisted(()=>({load:vi.fn(),generate:vi.fn(),schedule:vi.fn(),app:null}));
 const teams=()=>TEAM_DEFS.map(t=>({...t,players:[],farm:[],lineup:[],rotation:[]}));
-vi.mock('./engine/saveload',()=>({hasSave:()=>false,getSaveQueueSnapshot:()=>({isSaving:false}),getAutoSaveIntervalMs:()=>Infinity,enqueueSaveGame:async()=>({ok:true}),initializeCareerLogsInIndexedDb:async()=>({ok:true}),loadGame:()=>mock.load()}));
+vi.mock('./engine/saveload',()=>({hasSave:()=>false,getSaveQueueSnapshot:()=>({isSaving:false}),getAutoSaveIntervalMs:()=>Infinity,enqueueSaveGame:async()=>({ok:true}),initializeCareerLogsInIndexedDb:async()=>({ok:true}),loadGame:()=>mock.load(),getLastLoadResult:()=>({status:'primary'})}));
 vi.mock('./engine/bootstrapTeams',()=>({createInitialTeams:()=>teams(),createInitialTeamsAsync:async()=>{mock.generate();return teams();}}));
 vi.mock('./engine/player',()=>({generateForeignFaPool:()=>[]}));
 vi.mock('./engine/scheduleGen',()=>({generateSeasonSchedule:()=>mock.schedule(),calcAllStarTriggerDay:()=>72}));

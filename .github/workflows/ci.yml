@@ -46,6 +46,8 @@ jobs:
             files: progression.smoke.spec.js initialization.spec.js
           - name: history-and-posting
             files: match-history.spec.js posting.spec.js finance.spec.js
+          - name: save-integrity
+            files: save-generations.spec.js
     steps:
       - name: Checkout
         uses: actions/checkout@v4

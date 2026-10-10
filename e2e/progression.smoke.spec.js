@@ -159,7 +159,8 @@ test('E4 shortstop injury, emergency fielding moves, batch and persisted reload'
     if (!result.ok) throw new Error('injury fixture save failed');
     return { shortstop: shortstop.id, second: second.id,
       retainedOrder: team.lineupNoDh.filter(id => id !== shortstop.id), rotation: team.rotation,
-      starter: team.rotation[team.rotIdx % team.rotation.length] };
+      starter: team.rotation[team.rotIdx % team.rotation.length],
+      injuryHistories: Object.fromEntries([...team.players,...team.farm].map(p=>[p.id,JSON.stringify(p.injuryHistory || [])])) };
   }, fixture);
   await reloadAndLoad(page);
   await runBatch(page, false);
@@ -176,12 +177,27 @@ test('E4 shortstop injury, emergency fielding moves, batch and persisted reload'
   expect(batting.slice(0, 7).map(e => e.batId)).toEqual(expected.retainedOrder);
   expect(new Set(batting.slice(0, 8).map(e => e.batId)).size).toBe(8);
   expect(pitching[0].pitcherId).toBe(expected.starter);
+  // Further random injuries can legitimately reassign a healthy outfielder when
+  // covering an injured infielder. Preserve the exact single-injury expectation
+  // only while its premise holds; always validate the resulting active lineup.
+  const additionalInjuries = [...team.players,...team.farm].filter(p =>
+    JSON.stringify(p.injuryHistory || []) !== expected.injuryHistories[p.id]);
+  const validation = await page.evaluate(async team => {
+    const {validateLineup,validateTeamRoster}=await import('/baseball-manager/src/engine/rosterAutomation.js');
+    return {lineup:validateLineup(team,false),roster:validateTeamRoster(team)};
+  },team);
+  expect(validation.lineup.errors).toEqual([]);
+  expect(validation.roster.valid).toBe(true);
   const healthy = new Set(team.players.filter(p => !(p.injuryDaysLeft > 0)).map(p => p.id));
-  const retainedHealthy = expected.retainedOrder.filter(id => healthy.has(id));
-  expect(team.lineupNoDh.filter(id => retainedHealthy.includes(id))).toEqual(retainedHealthy);
-  if (healthy.has(expected.second)) expect(team.fieldingNoDh[expected.second]).toBe('遊撃手');
-  const healthyRotation = expected.rotation.filter(id => healthy.has(id));
-  expect(team.rotation.filter(id => healthyRotation.includes(id))).toEqual(healthyRotation);
+  if (!additionalInjuries.some(p => !p.isPitcher)) {
+    const retainedHealthy = expected.retainedOrder.filter(id => healthy.has(id));
+    expect(team.lineupNoDh.filter(id => retainedHealthy.includes(id))).toEqual(retainedHealthy);
+    if (healthy.has(expected.second)) expect(team.fieldingNoDh[expected.second]).toBe('遊撃手');
+  }
+  if (!additionalInjuries.some(p => p.isPitcher)) {
+    const healthyRotation = expected.rotation.filter(id => healthy.has(id));
+    expect(team.rotation.filter(id => healthyRotation.includes(id))).toEqual(healthyRotation);
+  }
   await reloadAndLoad(page);
   const reopened = await saveHub(page);
   expect(progressSignature(reopened)).toEqual(progressSignature(saved));

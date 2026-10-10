@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TEAM_DEFS } from '../constants';
 
 let titleSaveModulePromise = null;
@@ -19,8 +19,11 @@ export default function TitleScreen({
   onSaveDeleted,
 }) {
   const [saveMeta, setSaveMeta] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deletionError, setDeletionError] = useState(null);
+  const deletionInProgress = useRef(false);
   const initializing = initializationStatus === 'initializing';
-  const actionsLocked = () => initializing || isInitializationInProgress?.();
+  const actionsLocked = () => initializing || deletionInProgress.current || isInitializationInProgress?.();
 
   useEffect(() => {
     let alive = true;
@@ -50,7 +53,7 @@ export default function TitleScreen({
       type="button"
       className="tcard"
       style={{ '--c': team.color }}
-      disabled={initializing}
+      disabled={initializing || deleting}
       onClick={() => { if (!actionsLocked()) onSelectTeam(team.id); }}
       aria-label={team.name}
     >
@@ -70,9 +73,16 @@ export default function TitleScreen({
     if (!window.confirm('セーブデータを削除しますか？')) return;
     const mod = await loadTitleSaveModule();
     if (actionsLocked() || attempt !== getInitializationAttempt()) return;
-    mod.deleteSave();
-    setSaveMeta(null);
-    onSaveDeleted();
+    deletionInProgress.current = true;
+    setDeleting(true);
+    setDeletionError(null);
+    try {
+      const result = await mod.deleteSave();
+      if (result?.ok === false) { setDeletionError('セーブの削除に失敗しました。再試行してください。'); return; }
+      setSaveMeta(null);
+      onSaveDeleted();
+    } catch { setDeletionError('セーブの削除に失敗しました。再試行してください。'); }
+    finally { deletionInProgress.current = false; setDeleting(false); }
   };
 
   return (
@@ -145,7 +155,7 @@ export default function TitleScreen({
                     borderColor: 'rgba(74,222,128,.6)',
                     color: '#4ade80',
                   }}
-                  disabled={initializing}
+                  disabled={initializing || deleting}
                   onClick={() => { if (!actionsLocked()) onLoad(); }}
                 >
                   続きから
@@ -154,7 +164,7 @@ export default function TitleScreen({
                   className="bsm bgr"
                   style={{ padding: '6px 10px' }}
                   onClick={handleDeleteSave}
-                  disabled={initializing}
+                  disabled={initializing || deleting}
                 >
                   削除
                 </button>
@@ -179,11 +189,11 @@ export default function TitleScreen({
 
         <div role="status" aria-live="polite" aria-atomic="true"
           style={initializing ? {background:'#eff6ff',border:'1px solid #365f92',borderRadius:7,padding:12,marginBottom:10,color:'#17243a',fontSize:16,textAlign:'left'} : undefined}>
-          {initializing ? '新規ゲームを初期化中です。完了までお待ちください。' : null}
+          {initializing ? '新規ゲームを初期化中です。完了までお待ちください。' : deleting ? 'セーブを削除中です。完了までお待ちください。' : null}
         </div>
-        {initializationError && (
+        {(initializationError || deletionError) && (
           <div role="alert" style={{background:'#fff0f1',border:'1px solid #b42332',borderRadius:7,padding:'12px',marginBottom:10,color:'#b42332',fontSize:14,textAlign:'left'}}>
-            {initializationError}
+            {initializationError || deletionError}
           </div>
         )}
 

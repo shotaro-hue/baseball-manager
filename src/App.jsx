@@ -39,7 +39,7 @@ export default function App() {
     const loadIsStale = () => gs.isNewGameInitializing() || attempt !== gs.getNewGameInitializationAttempt();
     return gs.runTitleLoad(async () => {
       try {
-        const [{ loadGame }, scheduleMod, playerMod] = await Promise.all([
+        const [{ loadGame, getLastLoadResult }, scheduleMod, playerMod] = await Promise.all([
           loadAppSaveModule(),
           loadAppScheduleModule(),
           loadAppPlayerModule(),
@@ -48,7 +48,7 @@ export default function App() {
         const saved = await loadGame();
         if (loadIsStale()) return;
         if (!saved) {
-          gs.notify('セーブデータが見つかりません', 'warn');
+          gs.notify(getLastLoadResult?.().status === 'unrecoverable' ? 'セーブとバックアップを復旧できませんでした。必要な履歴が欠損・破損しています。' : 'セーブデータが見つかりません', 'warn');
           return;
         }
 
@@ -124,6 +124,7 @@ export default function App() {
 
         gs.setTab('dashboard');
         gs.setScreen(planningResumeScreen(saved.offseasonPlan, saved.year, saved.myId));
+        if (getLastLoadResult?.().status === 'recovered') gs.notify('バックアップから復旧しました。その後の未保存の変更は含まれません。', 'warn');
       } catch (error) {
         if (!loadIsStale()) {
           console.error('セーブデータの読み込みに失敗しました:', error);

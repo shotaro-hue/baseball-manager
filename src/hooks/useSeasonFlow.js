@@ -1,3 +1,4 @@
+import { saveFeedback } from '../engine/saveFeedback';
 import { regularSeasonRequest } from '../engine/seasonProgress';
 import { useState, useRef, useEffect } from "react";
 import SeasonBatchWorker from "../workers/seasonBatchWorker?worker";
@@ -924,13 +925,16 @@ export function useSeasonFlow(gs) {
         .then((saveResult) => {
           if (!saveResult?.ok) {
             console.warn("[BatchSave] saveGame failed after batch", saveResult);
+            const feedback = saveFeedback(saveResult); notify(feedback.message, feedback.type);
             return;
           }
           setSaveRevision((prev) => Math.max(prev, Number(nextState.saveRevision) || prev));
           setSaveExists(true);
+          if (saveResult.warnings?.length) { const feedback = saveFeedback(saveResult); notify(feedback.message, feedback.type); }
         })
         .catch((error) => {
           console.warn("[BatchSave] saveGame failed after batch", error);
+          notify(saveFeedback({ok:false}).message, "warn");
         });
     } catch (error) {
       console.error("runBatchGames failed", error);
