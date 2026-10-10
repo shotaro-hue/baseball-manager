@@ -1,0 +1,44 @@
+name: Full E2E Regression
+
+# The normal PR CI checks the critical 47 scenarios; keep all 65 in a separate
+# deterministic weekly/manual run instead of duplicating the full suite per edit.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: full-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-e2e:
+    name: full-e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium and WebKit
+        run: npx playwright install --with-deps chromium webkit
+      - name: Run every Playwright E2E
+        run: npm run test:e2e -- --workers=1 --retries=0
+      - name: Upload E2E report and failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-e2e-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
