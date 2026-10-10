@@ -1,5 +1,7 @@
 # Baseball Manager UI改善 要件定義書 v2
 
+> 履歴資料：旧UIの要件・提案・検証記録。現在の開発指示や現行ナビ、今回の検証結果として使わない。最新の方針は [UI/UX設計基準](./DESIGN_SYSTEM.md) を参照する。Calm Dugoutは最終デザインとして採用しない。
+
 最終更新: 2026-05-03  
 対象リポジトリ: `baseball-manager-main`  
 対象ファイル配置先: `docs/baseball_manager_ui_requirements.md`
