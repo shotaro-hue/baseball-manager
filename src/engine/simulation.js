@@ -7,9 +7,11 @@ import { getFenceDistanceBySpray, evaluateTrajectoryAgainstPark, evaluateAcrossP
 import { analyzeEnvironmentEffect } from './battedBallAnalysis';
 import { PITCHER_BATTING_DEFAULTS, withEffectiveBatting } from './battingProfile';
 
-const isDevEnv = import.meta.env?.DEV ?? false;
+// High-volume per-play timing is intentionally opt-in. In Vitest and ordinary
+// development this avoids hundreds of thousands of log lines per suite.
+const perfLoggingEnabled = import.meta.env?.DEV === true && import.meta.env?.VITE_PERF_LOG === 'true';
 function logPerf(label, startedAt) {
-  if (!isDevEnv || !Number.isFinite(startedAt)) return;
+  if (!perfLoggingEnabled || !Number.isFinite(startedAt)) return;
   const elapsedMs = performance.now() - startedAt;
   console.log(`[Perf] ${label}: ${elapsedMs.toFixed(1)}ms`);
 }
@@ -415,7 +417,7 @@ function checkHomeRunByTrajectory(points, fenceDistance, wallHeight = PHYSICS_BA
 }
 
 function resolveBattedBallOutcomeFromPhysicsForBalance(batter, pitcher, stadium, environment = {}, options = {}) {
-  const totalStart = isDevEnv ? performance.now() : 0;
+  const totalStart = perfLoggingEnabled ? performance.now() : 0;
   const effectiveBatter = withEffectiveBatting(batter);
   const rngProvider = typeof options?.rngProvider === 'function' ? options.rngProvider : rngf;
   const safeLeagueEnv = { ...DEFAULT_LEAGUE_ENV, ...(options?.leagueEnv || {}) };
@@ -424,7 +426,7 @@ function resolveBattedBallOutcomeFromPhysicsForBalance(batter, pitcher, stadium,
   const la = Number.isFinite(generatedLa) ? generatedLa : SAFE_LA;
   const safeEnvironment = sanitizeEnvironment(environment);
 
-  const physicsCalculationStart = isDevEnv ? performance.now() : 0;
+  const physicsCalculationStart = perfLoggingEnabled ? performance.now() : 0;
   const trajectory = simulateFlight(ev, la, {
     ...options,
     environment: safeEnvironment,
@@ -448,7 +450,7 @@ function resolveBattedBallOutcomeFromPhysicsForBalance(batter, pitcher, stadium,
 
   let result = 'out';
   const effectiveWallHeight = PHYSICS_BAT.HR.WALL_HEIGHT * safeLeagueEnv.wallHeightMod;
-  const homeRunJudgmentStart = isDevEnv ? performance.now() : 0;
+  const homeRunJudgmentStart = perfLoggingEnabled ? performance.now() : 0;
   const hrCheck = checkHomeRunByTrajectory(points, fenceDistance, effectiveWallHeight);
   logPerf('homeRunJudgmentByStadium', homeRunJudgmentStart);
   if (hrCheck.isHomeRun) {
@@ -489,7 +491,7 @@ function resolveBattedBallOutcomeFromPhysicsForBalance(batter, pitcher, stadium,
 
   const park = evaluateTrajectoryAgainstPark({ trajectory: points, sprayAngleDeg: sprayAngle, stadium: { ...stadium, id: stadium?.id, name: stadium?.name }, wallHeightM: effectiveWallHeight });
   const crossPark = evaluateAcrossParks({ trajectory: points, sprayAngleDeg: sprayAngle, stadiums: STADIUMS, currentStadiumId: stadium?.id });
-  const environmentAdjustmentStart = isDevEnv ? performance.now() : 0;
+  const environmentAdjustmentStart = perfLoggingEnabled ? performance.now() : 0;
   const environmentAnalysis = analyzeEnvironmentEffect({ ev, la, options, actualEnvironment: safeEnvironment });
   logPerf('environmentAdjustment', environmentAdjustmentStart);
 
@@ -724,7 +726,7 @@ function initGameState(myTeam, oppTeam, options = {}) {
  * @returns {Object} 更新後のゲーム状態
  */
 function processAtBat(gs, strategy = 'normal') {
-  const plateAppearanceStart = isDevEnv ? performance.now() : 0;
+  const plateAppearanceStart = perfLoggingEnabled ? performance.now() : 0;
   if (!gs.myLineup.length || !gs.opLineup.length) return gs; // STEP2安全弁: 空lineup guard
   const isMyAtBat  = isMyTeamBatting(gs);
   const batter     = isMyAtBat ? gs.myLineup[gs.myBatIdx % gs.myLineup.length] : gs.opLineup[gs.opBatIdx % gs.opLineup.length];
@@ -1152,7 +1154,7 @@ function buildQuickSimHighlights(gs, log = []) {
 }
 
 function quickSimGame(myTeam, oppTeam, options = {}) {
-  const simulateGameStart = isDevEnv ? performance.now() : 0;
+  const simulateGameStart = perfLoggingEnabled ? performance.now() : 0;
   const simulationMode = options?.simulationMode || 'detailed';
   const includeLog = options?.includeLog !== false;
   const includePhysics = options?.includePhysics !== false;
