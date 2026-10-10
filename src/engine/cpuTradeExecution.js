@@ -1,3 +1,4 @@
+import { applyTradeTransaction } from './tradeTransaction';
 import { applyManagementPolicy, ROSTER_AUTOMATION_MODES, validateTeamRoster } from './rosterAutomation';
 
 // CPU trades must update both ownership and executable rosters together.
@@ -7,16 +8,12 @@ export function executeCpuTrade(teams, trade, gameDay) {
   const buyer = teams.find(t => t.id === trade.buyerId);
   const seller = teams.find(t => t.id === trade.sellerId);
   if (!buyer || !seller) return false;
-  const owned = t => [...(t.players || []), ...(t.farm || [])];
-  const buyerGets = owned(seller).find(p => p.id === trade.buyerGets?.id);
-  const sellerGets = owned(buyer).find(p => p.id === trade.sellerGets?.id);
-  if (!buyerGets || !sellerGets || buyerGets.id === sellerGets.id) return false;
-  const exchange = (t, out, incoming) => ({ ...t,
-    players: [...t.players.filter(p => p.id !== out.id), incoming],
-    farm: (t.farm || []).filter(p => p.id !== out.id) });
-  const nextBuyer = exchange(buyer, sellerGets, buyerGets);
-  const nextSeller = exchange(seller, buyerGets, sellerGets);
-  const nextTeams = teams.map(t => t.id === buyer.id ? nextBuyer : t.id === seller.id ? nextSeller : t);
+  const result = applyTradeTransaction(teams, { fromId: trade.buyerId, toId: trade.sellerId,
+    outgoing: [trade.sellerGets], incoming: [trade.buyerGets], cash: 0 });
+  if (!result.ok) return false;
+  const nextTeams = result.teams;
+  const nextBuyer = nextTeams.find(t => t.id === buyer.id);
+  const nextSeller = nextTeams.find(t => t.id === seller.id);
   const prepare = t => applyManagementPolicy(t, { teams: nextTeams, gameDay,
     force: true, automationMode: ROSTER_AUTOMATION_MODES.FULL, includeRosterChanges: true });
   const readyBuyer = prepare(nextBuyer);

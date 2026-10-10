@@ -51,7 +51,12 @@ HRサンプリングは実際に多数の打球を計算するが、現行テス
 - Vitestのslow testは短縮候補だが、100試合のメモリ・保存信頼性は現在の品質上重要なため削除しない。
 - CIログ全量をWorkの会話へ流し込まず、まず `fail`, `passed`, `skipped`, `Test Files`, `Duration` と対象スタック、trace添付から調べる。
 
-## E2E 全15ファイル（最新main）
+## FIX-Tで追加する回帰テスト
+
+`e2e/trade.spec.js`（Chromium・390px、2ケース）は手動の500万円取引と旧CPUメールの受諾を実操作し、両球団の金額・所属・保存・再開を検証する。通常CIの `posting-and-finance` グループへ追加する。既存WebKit対象や他specの実行範囲は変更しない。
+`src/hooks/useOffseason.trade.test.js`、`src/engine/__tests__/tradeTransaction.test.js`、TradeTab/MailboxTabの `.test.js` は通常Vitestで収集する。既存のCPU取引・トレード評価の回帰も維持する。以下の全件数・所要時間は#431時点の履歴で、FIX-T追加後の実行件数として扱わない。
+
+## E2E 全15ファイル（#431時点の棚卸し）
 
 | ファイル | ケース数（ブラウザ展開後） | 通常CI | 使用場面 |
 |---|---:|---|---|

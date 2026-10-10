@@ -172,7 +172,7 @@ export function evalTradeForCpu(cpuTeam, give, receive, cashDiff) {
   const mode = plan.mode;
   const gv = give.reduce((s, p) => s + weightedPlayerValue(p, mode), 0);
   const rv = receive.reduce((s, p) => s + weightedPlayerValue(p, mode), 0);
-  let diff = gv - rv + (cashDiff || 0) / 100000;
+  let diff = gv - rv + (cashDiff || 0) / 10;
   const needs = analyzeTeamNeeds(cpuTeam);
   // ポジション緊急ニーズがある場合はトレード受け入れ閾値を引き上げ（より積極的に取引）
   const posUrgent = needs.some((n) => (n.type.includes('捕手') || n.type.includes('遊撃手') || n.type.includes('二塁手') || n.type.includes('三塁手')) && n.horizon === 'short');

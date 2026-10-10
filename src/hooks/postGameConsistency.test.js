@@ -67,29 +67,52 @@ describe('regular season post-game parity', () => {
   beforeEach(() => { vi.spyOn(Math, 'random').mockReturnValue(.99); playerRules.checkForInjuries.mockReturnValue([]); });
   afterEach(() => vi.restoreAllMocks());
   for (const mode of ['auto', 'tactical']) {
-    it(`keeps match updates when a deadline trade succeeds (${mode})`, async () => {
-      fixture.score = { my: 1, opp: 0 };
-      const state = snapshot(true);
-      state.teams = state.teams.map(optimizeTeamForGameStart);
-      state.schedule[1].date.month = 7;
-      const buyer = state.teams[1], seller = state.teams[2];
-      const sellerGets = buyer.players.find(p => !p.isPitcher);
-      const buyerGets = seller.players.find(p => !p.isPitcher && p.pos === sellerGets.pos);
-      generateCpuCpuTrade.mockReturnValueOnce({ buyerId: buyer.id, sellerId: seller.id, buyerName: buyer.name, sellerName: seller.name, buyerGets, sellerGets });
-      Math.random.mockReturnValue(0);
-      const before = structuredClone(state);
-      const updated = await runHook(state, true, mode);
-      expect(executeCpuTrade.mock.results.at(-1).value).toBe(true);
-      updated.forEach((team, index) => {
-        expect(team.wins + team.losses + team.draws).toBe(1);
-        expect(team.budget).toBeGreaterThan(before.teams[index].budget);
-        expect(team.rotIdx).toBe(before.teams[index].rotIdx + 1);
-        expect(team.players.every(p => p.daysOnActiveRoster === 120)).toBe(true);
+    for (const cooldown of [0, 2]) {
+      it(`keeps match updates and registration eligibility after a deadline trade (${mode}, cooldown ${cooldown})`, async () => {
+        fixture.score = { my: 1, opp: 0 };
+        const state = snapshot(true);
+        state.teams = state.teams.map(optimizeTeamForGameStart);
+        state.schedule[1].date.month = 7;
+        const buyer = state.teams[1], seller = state.teams[2];
+        const sellerGets = buyer.players.find(p => !p.isPitcher);
+        const buyerGets = seller.players.find(p => !p.isPitcher && p.pos === sellerGets.pos);
+        // snapshot sets active cooldowns to exercise the daily decrement.
+        // Transfer must preserve that restriction, rather than bypass it.
+        sellerGets.registrationCooldownDays = cooldown;
+        buyerGets.registrationCooldownDays = cooldown;
+        generateCpuCpuTrade.mockReturnValueOnce({ buyerId: buyer.id, sellerId: seller.id, buyerName: buyer.name, sellerName: seller.name, buyerGets, sellerGets });
+        Math.random.mockReturnValue(0);
+        const before = structuredClone(state);
+        const expectedPlayer = (team, selected) => applyRegularSeasonTeamUpdate(team,
+          { score: { my: 1, opp: 0 }, log: [], inningSummary: [] },
+          { isFirstTeam: team.id === buyer.id, isHomeTeam: team.id !== buyer.id, gameDay: 1, year: 2026 },
+          playerRules).team.players.find(p => p.id === selected.id);
+        const expectedBuyerGets = expectedPlayer(seller, buyerGets);
+        const expectedSellerGets = expectedPlayer(buyer, sellerGets);
+        const updated = await runHook(state, true, mode);
+        expect(executeCpuTrade.mock.results.at(-1).value).toBe(true);
+        updated.forEach((team, index) => {
+          expect(team.wins + team.losses + team.draws).toBe(1);
+          expect(team.budget).toBeGreaterThan(before.teams[index].budget);
+          expect(team.rotIdx).toBe(before.teams[index].rotIdx + 1);
+          expect(team.players.every(p => p.daysOnActiveRoster === 120)).toBe(true);
+        });
+        const roster = cooldown > 1 ? 'farm' : 'players';
+        expect(updated[1][roster].find(p => p.id === buyerGets.id)).toEqual(expectedBuyerGets);
+        expect(updated[2][roster].find(p => p.id === sellerGets.id)).toEqual(expectedSellerGets);
+        expect(expectedBuyerGets.registrationCooldownDays).toBe(Math.max(0, cooldown - 1));
+        expect(expectedBuyerGets.daysOnActiveRoster).toBe(120);
+        expect(expectedSellerGets.registrationCooldownDays).toBe(Math.max(0, cooldown - 1));
+        expect(expectedSellerGets.daysOnActiveRoster).toBe(120);
+        const ownedIds = teams => teams.flatMap(t => [...t.players, ...t.farm].map(p => p.id));
+        const ids = ownedIds(updated);
+        expect(new Set(ids).size).toBe(ids.length);
+        expect([...ids].sort()).toEqual(ownedIds(before.teams).sort());
+        expect([...updated[1].players, ...updated[1].farm].some(p => p.id === sellerGets.id)).toBe(false);
+        expect([...updated[2].players, ...updated[2].farm].some(p => p.id === buyerGets.id)).toBe(false);
+        expect(state).toEqual(before);
       });
-      expect(updated[1].players.some(p => p.id === buyerGets.id)).toBe(true);
-      expect(updated[2].players.some(p => p.id === sellerGets.id)).toBe(true);
-      expect(state).toEqual(before);
-    });
+    }
   }
   for (const isHome of [true, false]) {
     for (const score of [{ my: 1, opp: 0 }, { my: 0, opp: 0 }]) {

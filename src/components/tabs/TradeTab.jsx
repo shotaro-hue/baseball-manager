@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { fmtM, scoutNoise } from '../../utils';
+import { fmtM, scoutNoise, rngf } from '../../utils';
 import { tradeValue, evalTradeForCpu, analyzeTeamNeeds } from '../../engine/trade';
 
 export function TradeTab({myTeam,teams,onTrade,cpuOffers,onAcceptOffer,onDeclineOffer,deadlinePassed=false,onPlayerClick}){
@@ -23,25 +23,29 @@ export function TradeTab({myTeam,teams,onTrade,cpuOffers,onAcceptOffer,onDecline
   const toggleMyOut=p=>setMyOut(prev=>prev.find(x=>x.id===p.id)?prev.filter(x=>x.id!==p.id):[...prev,p]);
   const toggleTheirIn=p=>setTheirIn(prev=>prev.find(x=>x.id===p.id)?prev.filter(x=>x.id!==p.id):[...prev,p]);
 
+  const executeTrade = (outgoing, incoming, cash) => {
+    setTradeResult(onTrade(outgoing, incoming, targetTeam, cash) === true ? 'accept' : 'invalid');
+  };
   const proposeTrade=()=>{
     if(!canPropose||!targetTeam) return;
     const ev=evalTradeForCpu(targetTeam,myOut,theirIn,myCash);
     setCpuReasons(ev.reasons||[]);
     if(counterRound>=2){
-      if(ev.favorable||(ev.fair&&Math.random()<0.5)){onTrade(myOut,theirIn,targetTeam,myCash);setTradeResult("accept");}
+      if(ev.favorable||(ev.fair&&rngf(0,1)<0.5)){executeTrade(myOut,theirIn,myCash);}
       else{setTradeResult("reject");}
       return;
     }
     const acceptThreshold=counterRound===0?0.55:0.30;
     if(ev.favorable){
-      onTrade(myOut,theirIn,targetTeam,myCash);setTradeResult("accept");
+      executeTrade(myOut,theirIn,myCash);
     } else if(ev.fair){
-      if(Math.random()<acceptThreshold){onTrade(myOut,theirIn,targetTeam,myCash);setTradeResult("accept");}
+      if(rngf(0,1)<acceptThreshold){executeTrade(myOut,theirIn,myCash);}
       else{
-        const extra=targetTeam.players.filter(p=>!theirIn.find(x=>x.id===p.id)).sort((a,b)=>tradeValue(a)-tradeValue(b))[0];
+        const extra=myTeam.players.filter(p=>!myOut.find(x=>x.id===p.id)).sort((a,b)=>tradeValue(a)-tradeValue(b))[0];
         const needCash=Math.max(0,Math.round((theirInVal-myOutVal-cashVal)*10));
         const cashMult=counterRound===1?1.5:1;
-        setCounter({extraPlayer:Math.random()<0.5&&extra?extra:null,extraCash:Math.random()<0.5&&extra?0:Math.round(needCash*cashMult)});
+        const askPlayer = extra && rngf(0,1) < 0.5;
+        setCounter({extraPlayer:askPlayer?extra:null,extraCash:askPlayer?0:Math.round(needCash*cashMult)});
         setCounterRound(r=>r+1);
         setTradeResult("counter");
       }
@@ -49,9 +53,8 @@ export function TradeTab({myTeam,teams,onTrade,cpuOffers,onAcceptOffer,onDecline
   };
 
   const acceptCounter=()=>{
-    const newIn=counter?.extraPlayer?[...theirIn,counter.extraPlayer]:theirIn;
-    onTrade(myOut,newIn,targetTeam,myCash+(counter?.extraCash||0));
-    setTradeResult("accept");
+    const newOut=counter?.extraPlayer?[...myOut,counter.extraPlayer]:myOut;
+    executeTrade(newOut,theirIn,myCash+(counter?.extraCash||0));
   };
   const reset=()=>{setPhase("top");setTargetTeam(null);setMyOut([]);setTheirIn([]);setMyCash(0);setTradeResult(null);setCounter(null);setCounterRound(0);setCpuReasons([]);};
   const fmtV=v=>{const c=v>=80?"#ffd700":v>=65?"#34d399":v>=50?"#60a5fa":"#94a3b8";return <span style={{fontWeight:700,color:c,fontFamily:"monospace"}}>{v}</span>;};
@@ -156,6 +159,7 @@ export function TradeTab({myTeam,teams,onTrade,cpuOffers,onAcceptOffer,onDecline
       )}
       {tradeResult&&(<div className="card" style={{textAlign:"center",padding:"24px 16px"}}>
         {tradeResult==="accept"&&<><div style={{fontSize:40,marginBottom:8}}>🎉</div><div style={{fontFamily:"'Bebas Neue',cursive",fontSize:28,color:"#34d399",marginBottom:8}}>トレード成立！</div><p style={{fontSize:12,color:"#374151",marginBottom:16}}>{targetTeam?.name}との交渉が成立しました</p></>}
+        {tradeResult==="invalid"&&<p role="alert">取引を確定できませんでした。通知を確認し、予算・所属・条件を選び直してください。</p>}
         {tradeResult==="reject"&&<><div style={{fontSize:40,marginBottom:8}}>❌</div><div style={{fontFamily:"'Bebas Neue',cursive",fontSize:28,color:"#f87171",marginBottom:8}}>拒否されました</div><p style={{fontSize:12,color:"#374151",marginBottom:16}}>金銭を上乗せするか、条件を変えて再提案しましょう。</p></>}
         {tradeResult==="counter"&&counter&&<><div style={{fontSize:40,marginBottom:8}}>🔄</div>
           <div style={{fontSize:10,color:"#f5c842",marginBottom:6}}>交渉 {counterRound}/{3} ラウンド目</div>
@@ -171,7 +175,7 @@ export function TradeTab({myTeam,teams,onTrade,cpuOffers,onAcceptOffer,onDecline
             <button className="bsm bgr" style={{flex:1,padding:"10px 0"}} onClick={reset}>❌ 断る</button>
           </div>
         </>}
-        {(tradeResult==="reject"||tradeResult==="accept")&&<button className="bsm bga" style={{marginTop:12}} onClick={reset}>続けて交渉する</button>}
+        {(tradeResult==="reject"||tradeResult==="accept"||tradeResult==="invalid")&&<button className="bsm bga" style={{marginTop:12}} onClick={reset}>続けて交渉する</button>}
       </div>)}
     </div>
   );

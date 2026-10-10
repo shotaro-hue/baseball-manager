@@ -89,3 +89,9 @@ describe('evalTradeForCpu by mode', () => {
     expect(rebuildResult.diff).toBeLessThan(contendResult.diff);
   });
 });
+
+it('values 500万円 as the same 50-point consideration previously expressed as 5000000円', () => {
+  const team = { players: [] };
+  const base = evalTradeForCpu(team, [], [], 0);
+  expect(evalTradeForCpu(team, [], [], 500).diff - base.diff).toBe(50);
+});
