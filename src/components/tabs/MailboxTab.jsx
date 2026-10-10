@@ -63,8 +63,8 @@ export function MailboxTab({ mailbox, unreadCount = 0, onRead, onAction, teams, 
                 </div>
               </div>
               <div style={{display:"flex",gap:8}}>
-                <button className="bsm bga" style={{flex:1}} onClick={()=>{onAction(selected.id,"accept");setSelected({...selected,resolved:true});}}>✅ 承諾する</button>
-                <button className="bsm bgr" style={{flex:1}} onClick={()=>{onAction(selected.id,"decline");setSelected({...selected,resolved:true});}}>❌ 断る</button>
+                <button className="bsm bga" style={{flex:1}} onClick={()=>{if(onAction(selected.id,"accept")===true)setSelected({...selected,resolved:true});}}>✅ 承諾する</button>
+                <button className="bsm bgr" style={{flex:1}} onClick={()=>{if(onAction(selected.id,"decline")===true)setSelected({...selected,resolved:true});}}>❌ 断る</button>
               </div>
             </div>
           )}

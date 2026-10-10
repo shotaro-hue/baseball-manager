@@ -38,7 +38,7 @@ jobs:
           - name: match-history
             files: match-history.spec.js
           - name: posting-and-finance
-            files: posting.spec.js finance.spec.js
+            files: posting.spec.js finance.spec.js trade.spec.js
           - name: save-integrity
             files: save-generations.spec.js career-generations.spec.js
     steps:

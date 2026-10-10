@@ -1,6 +1,7 @@
+import { applyTradeTransaction } from '../engine/tradeTransaction';
 import { nextSeasonMatchHistory } from '../engine/matchHistory';
 import { useCallback, useRef, useState } from "react";
-import { uid, clamp, rng, rngf, fmtM } from '../utils';
+import { uid, clamp, rng, rngf, fmtM, gameDayToDate } from '../utils';
 import { calcSeasonAwards, updateRecords, checkHallOfFame } from '../engine/awards';
 import { evalOffer, cpuRenewContracts, processCpuFaBids, getFaThreshold, getFaProgress, calcPlayerDemand } from '../engine/contract';
 import { initDraftPool } from '../engine/draft';
@@ -8,7 +9,7 @@ import { calcPostingRequestProb, calcPostingBid, POSTING_FEE_RATE } from '../eng
 import { calcOffseasonPopDelta, driftPopularity } from '../engine/fanSentiment';
 import { SEASON_PARAMS, getDefaultParams } from '../data/scheduleParams.js';
 import {
-  TEAM_DEFS, OWNER_TRUST_BUDGET_LOW, OWNER_TRUST_BUDGET_HIGH,
+  TRADE_DEADLINE_MONTH, TEAM_DEFS, OWNER_TRUST_BUDGET_LOW, OWNER_TRUST_BUDGET_HIGH,
   OWNER_TRUST_FACTOR_LOW, OWNER_TRUST_FACTOR_HIGH, POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD,
   FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX, MIN_SALARY_SHIHAKA, MIN_SALARY_IKUSEI, ACCEPT_THRESHOLD,
   CAMP_COND_VARIATION, CAMP_BREAKOUT_COUNT, CAMP_BREAKOUT_COND_BOOST,
@@ -371,20 +372,27 @@ export function useOffseason(gs) {
     return true;
   };
 
-  const handleTrade = (myOut, theirIn, tgtTeam, cash) => {
-    myOut.forEach(function(p){addToHistory(myId,p,"トレード");});
-    setTeams(prev=>prev.map(t=>{
-      if(t.id===myId){
-        const np=[...t.players.filter(p=>!myOut.find(x=>x.id===p.id)),...theirIn];
-        let nl=t.lineup.filter(id=>!myOut.find(x=>x.id===id));
-        let nr=t.rotation.filter(id=>!myOut.find(x=>x.id===id));
-        theirIn.filter(p=>!p.isPitcher).forEach(p=>{if(nl.length<9)nl=[...nl,p.id];});
-        theirIn.filter(p=>p.isPitcher&&p.subtype==="先発").forEach(p=>{if(nr.length<6)nr=[...nr,p.id];});
-        return{...t,players:np,lineup:nl,lineupNoDh:nl.slice(0,8),lineupDh:nl.slice(0,9),rotation:nr,budget:t.budget-(cash||0)*10000};
-      }
-      if(t.id===tgtTeam.id) return{...t,players:[...t.players.filter(p=>!theirIn.find(x=>x.id===p.id)),...myOut],budget:t.budget+(cash||0)*10000};
-      return t;
-    }));
+  const handledTradeMails = useRef(new Set());
+  const tradeContextRef = useRef(null);
+  tradeContextRef.current = { teams, gameDay, schedule };
+  const handleTrade = (myOut, theirIn, tgtTeam, cash = 0) => {
+    const current = tradeContextRef.current;
+    if (current.pending) { notify('取引の反映中です', 'warn'); return false; }
+    const date = gameDayToDate(current.gameDay, current.schedule);
+    if (date ? date.month > TRADE_DEADLINE_MONTH : current.gameDay > 95) {
+      notify('トレード期限を過ぎています', 'warn');
+      return false;
+    }
+    const result = applyTradeTransaction(current.teams, { fromId: myId, toId: tgtTeam?.id,
+      outgoing: myOut, incoming: theirIn, cash });
+    if (!result.ok) { notify(result.error, 'warn'); return false; }
+    // Update the command snapshot immediately, before React renders. Repeated
+    // clicks/stale offer callbacks then fail current ownership validation.
+    tradeContextRef.current = { ...current, teams: result.teams, pending: true };
+    setTeams(result.teams);
+    myOut = result.outgoing;
+    theirIn = result.incoming;
+    myOut.forEach(p => addToHistory(myId, p, 'トレード'));
     gs.setCpuTradeOffers([]);
     notify("🔄 トレード成立！","ok");
     addNews({type:"trade",headline:"【移籍】"+(theirIn.map(p=>p.name).join("、")||"選手")+"が"+(myTeam?.name||"")+"へ",source:"Baseball Times",dateLabel:year+"年 "+gameDay+"日目",body:(myTeam?.name||"自チーム")+"と"+(tgtTeam?.name||"相手")+"の間でトレードが成立。"+(myTeam?.name||"")+"は"+(theirIn.map(p=>p.name).join("、")||"選手")+"を獲得し、"+(myOut.map(p=>p.name).join("、")||"選手")+"を放出した。"+(cash&&cash>0?"\nなお"+Math.abs(cash).toLocaleString()+"万円の金銭も含まれる。":"")});
@@ -400,11 +408,12 @@ export function useOffseason(gs) {
       cash,
       detail: `${myTeam?.name||"自チーム"}が${theirIn.map(p=>p.name).join("、")||"なし"}を獲得 / ${myOut.map(p=>p.name).join("、")||"なし"}を放出`,
     });
+    return true;
   };
 
   const acceptCpuOffer = (idx) => {
     const o=gs.cpuTradeOffers[idx];if(!o)return;
-    handleTrade(o.want,o.offer,o.from,-(o.cash||0)/10000);
+    return handleTrade(o.want,o.offer,o.from,-(o.cash ?? 0)/10000);
   };
   const declineCpuOffer = (idx) => {
     gs.setCpuTradeOffers(prev=>prev.filter((_,i)=>i!==idx));
@@ -416,7 +425,7 @@ export function useOffseason(gs) {
   };
   const handleMailAction = (id, action) => {
     const mail = getMailboxItemById(id);
-    if(!mail) return;
+    if(!mail || mail.resolved) return;
 
     // ポスティング申請の承諾/拒否
     if(mail.type==="posting_request"){
@@ -455,13 +464,15 @@ export function useOffseason(gs) {
       return;
     }
 
-    if(!mail.offer) return;
+    if(!mail.offer || handledTradeMails.current.has(id)) return;
     if(action==="accept"){
-      handleTrade(mail.offer.want,mail.offer.offer,mail.offer.from,-(mail.offer.cash||0)/10000);
+      if (!handleTrade(mail.offer.want,mail.offer.offer,mail.offer.from,-(mail.offer.cash ?? 0)/10000)) return false;
     } else {
       notify('オファーを断りました','warn');
     }
+    handledTradeMails.current.add(id);
     setMailbox(prev=>prev.map(m=>m.id===id?{...m,resolved:true,read:true}:m));
+    return true;
   };
 
   // 引退モーダル：引き留め
