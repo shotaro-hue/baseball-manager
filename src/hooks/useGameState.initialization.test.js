@@ -6,7 +6,7 @@ import { TEAM_DEFS } from '../constants';
 
 const mocks=vi.hoisted(()=>({persist:vi.fn(),generate:vi.fn(),foreign:vi.fn(),schedule:vi.fn(),trigger:vi.fn()}));
 vi.mock('../engine/bootstrapTeams',()=>({createInitialTeams:()=>mocks.generate(),createInitialTeamsAsync:async()=>mocks.generate()}));
-vi.mock('../engine/saveload',()=>({hasSave:()=>false,getSaveQueueSnapshot:()=>({isSaving:false}),getAutoSaveIntervalMs:()=>Infinity,enqueueSaveGame:async()=>({ok:true}),initializeCareerLogsInIndexedDb:(rows)=>mocks.persist(rows)}));
+vi.mock('../engine/saveload',()=>({hasSave:()=>false,getSaveQueueSnapshot:()=>({isSaving:false}),getAutoSaveIntervalMs:()=>Infinity,enqueueSaveGame:async(state,options)=>options?.initialCareerLogs ? mocks.persist(options.initialCareerLogs) : {ok:true}}));
 vi.mock('../engine/player',()=>({generateForeignFaPool:()=>mocks.foreign()}));
 vi.mock('../engine/scheduleGen',()=>({generateSeasonSchedule:()=>mocks.schedule(),calcAllStarTriggerDay:()=>mocks.trigger()}));
 vi.mock('../engine/battedBallArchive',()=>({getBattedBallQueueStatus:()=>({failedRecords:0}),flushBattedBallQueue:async()=>({ok:true})}));

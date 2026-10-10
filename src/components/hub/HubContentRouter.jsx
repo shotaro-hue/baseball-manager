@@ -326,7 +326,7 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
   }
 
   if (tab === 'alumni') {
-    return <AlumniTab myTeam={myTeam} year={year} />;
+    return <AlumniTab myTeam={myTeam} year={year} saveId={gs.saveId} />;
   }
 
   if (tab === 'fa') {

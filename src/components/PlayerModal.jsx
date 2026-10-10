@@ -351,7 +351,7 @@ export function PlayerModal({
 
         {activeSection === "career" && (
           <div className="calm-detail detail-analysis">
-          <CareerTable player={p} year={year} teamId={careerTeamId} teamName={teamName}/>
+          <CareerTable player={p} year={year} teamId={careerTeamId} teamName={teamName} saveId={saveId}/>
           </div>
         )}
 

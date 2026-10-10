@@ -2,18 +2,16 @@ import React, { useState } from 'react';
 import { act, create } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useOffseason } from './useOffseason';
-import { appendCareerEntriesToIndexedDb } from '../engine/saveload';
 import { generateSeasonSchedule } from '../engine/scheduleGen';
 import { emptyStats } from '../engine/playerCore';
 vi.mock('../engine/player', () => ({ generateForeignFaPool: () => [], developPlayers: players => ({ players, summary: {} }) }));
-vi.mock('../engine/saveload', () => ({ appendCareerEntriesToIndexedDb: vi.fn(async () => ({ ok: true })) }));
 vi.mock('../engine/scheduleGen', () => ({ generateSeasonSchedule: vi.fn(() => ({})), calcAllStarTriggerDay: () => 50 }));
 const p = (id, extra = {}) => ({ id, name: `選手${id}`, age: 26, pos: '捕手', condition: 0, salary: 1000, contractYearsLeft: 3,
   serviceYears: 5, stats: { ...emptyStats(), PA: 600, HR: 0 }, playoffStats: emptyStats(), ...extra });
 const team = players => ({ id: 0, name: '自球団', budget: 10000, players, farm: [], lineup: players.map(p => p.id), rotation: [] });
 const views = []; let current;
 afterEach(() => views.splice(0).forEach(v => act(() => v.unmount())));
-beforeEach(() => { vi.clearAllMocks(); appendCareerEntriesToIndexedDb.mockResolvedValue({ ok: true }); generateSeasonSchedule.mockReturnValue({}); });
+beforeEach(() => { vi.clearAllMocks(); generateSeasonSchedule.mockReturnValue({}); });
 function setup(options = {}) {
   const save = options.save || vi.fn(async () => ({ ok: true }));
   const history = { awards: [{ year: 2026, titles: { hr: [{ id: 0 }] } }], championships: [{ year: 2026, teamId: 0 }] };
@@ -40,15 +38,16 @@ it('keeps the completed season and camp unchanged when the new-year save fails; 
   await act(async () => { const first = next(); expect(await next()).toBe(false); expect(await first).toBe(true); });
   expect(h.current.gs.year).toBe(2027); expect(save).toHaveBeenCalledTimes(2);
   expect(h.current.gs.teams[0].players[0]).toMatchObject({ age: 27, contractYearsLeft: 2, serviceYears: 6, stats: { PA: 0 }, recentCareerLog: [{ year: 2026, teamId: 0, stats: { PA: 600, HR: 0 } }] });
-  expect(appendCareerEntriesToIndexedDb.mock.calls[0][0][0].playerId).toBe('0');
+  expect(save.mock.calls[0][0].careerEntries[0].playerId).toBe('0');
   expect(h.current.gs.screen).toBe('new_season'); expect(h.current.gs.offseasonPlan).toMatchObject({ year: 2027, resumeScreen: 'new_season', seasonInfo: { draftCount: 1 } });
   expect(save.mock.lastCall[0].payload).toMatchObject({ year: 2027, gameDay: 1, faYears: {}, offseasonPlan: { year: 2027 } });
   await act(async () => expect(await h.current.os.handleNextYear()).toBe(false));
 });
 it('does not commit a year when career persistence or schedule preparation fails', async () => {
-  const h = setup(); appendCareerEntriesToIndexedDb.mockResolvedValueOnce({ ok: false });
+  const h = setup({save:vi.fn().mockResolvedValueOnce({ok:false,reason:'indexeddb_write_failed'}).mockResolvedValue({ok:true})});
   await act(async () => expect(await h.current.os.handleNextYear()).toBe(false));
-  expect(h.save).not.toHaveBeenCalled(); expect(h.current.gs.year).toBe(2026);
+  expect(h.save).toHaveBeenCalledTimes(1); expect(h.current.gs.year).toBe(2026);
+  h.save.mockClear();
   generateSeasonSchedule.mockImplementationOnce(() => { throw new Error('schedule unavailable'); });
   await act(async () => expect(await h.current.os.handleNextYear()).toBe(false));
   expect(h.save).not.toHaveBeenCalled(); expect(h.current.gs.year).toBe(2026);
@@ -58,7 +57,7 @@ it('does not invent a zero-stat season at the new club for an offseason FA trans
     stats: emptyStats(), recentCareerLog: [{ year: 2026, teamId: 1, teamName: '旧球団', stats: { PA: 600, HR: 0 } }] });
   const h = setup({ teams: [team([moved])] });
   await act(async () => expect(await h.current.os.handleNextYear()).toBe(true));
-  expect(appendCareerEntriesToIndexedDb.mock.lastCall[0]).toEqual([]);
+  expect(h.save.mock.lastCall[0].careerEntries).toEqual([]);
   expect(h.current.gs.teams[0].players[0].recentCareerLog).toHaveLength(1);
   expect(h.current.gs.teams[0].players[0].recentCareerLog[0]).toMatchObject({ teamId: 1, stats: { PA: 600 } });
   expect(h.history.awards).toHaveLength(1); expect(h.history.championships).toHaveLength(1);

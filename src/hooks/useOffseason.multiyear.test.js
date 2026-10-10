@@ -3,13 +3,11 @@ import { act, create } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useOffseason } from './useOffseason';
 import { calcSeasonAwards, updateRecords } from '../engine/awards';
-import { appendCareerEntriesToIndexedDb } from '../engine/saveload';
 import { emptyStats } from '../engine/playerCore';
 import { getCareerEntryKey } from '../engine/careerStats';
 import { TEAM_DEFS } from '../constants';
 vi.mock('../engine/player', () => ({ generateForeignFaPool: () => [], rollRetire: () => false,
   developPlayers: players => ({ players, summary: {} }) }));
-vi.mock('../engine/saveload', () => ({ appendCareerEntriesToIndexedDb: vi.fn(async () => ({ ok: true })) }));
 vi.mock('../engine/scheduleGen', () => ({ generateSeasonSchedule: () => ({}), calcAllStarTriggerDay: () => 50 }));
 vi.mock('../engine/contract', async original => ({ ...await original(), cpuRenewContracts: teams => ({ updatedTeams: teams, newFaPlayers: [], news: [] }) }));
 const player = (id, stats = {}, extra = {}) => ({ id, name: `選手${id}`, age: 26, pos: '捕手', salary: 1000,
@@ -17,19 +15,20 @@ const player = (id, stats = {}, extra = {}) => ({ id, name: `選手${id}`, age: 
 const team = (players, farm = [], id = 0) => ({ ...TEAM_DEFS[id], players, farm, wins: 80, losses: 63, draws: 0,
   budget: 100000, rf: 500, ra: 400, history: [], lineup: players.map(p => p.id), lineupNoDh: players.map(p => p.id), rotation: [] });
 let current, view; const archived = new Map();
-beforeEach(() => { vi.clearAllMocks(); archived.clear(); appendCareerEntriesToIndexedDb.mockImplementation(async entries => {
+beforeEach(() => { vi.clearAllMocks(); archived.clear(); });
+function recordCommittedEntries(entries=[]) {
   for (const { playerId, careerEntry } of entries) archived.set(`${playerId}:${getCareerEntryKey(careerEntry)}`, careerEntry);
-  return { ok: true };
-}); });
+}
+
 afterEach(() => { if (view) act(() => view.unmount()); view = null; });
 function setup(teams, options = {}) {
-  const save = vi.fn(async () => ({ ok: true }));
+  const save = vi.fn(async options => {recordCommittedEntries(options.careerEntries);return {ok:true};});
   function Harness() {
     const [owned, setTeams] = useState(teams), [year, setYear] = useState(options.year || 2026), [screen, setScreen] = useState('spring_training');
     const [offseasonPlan, setOffseasonPlan] = useState({ version: 1, year: options.year || 2026, myId: 0, stage: 'results', spring: { conditionDeltas: {} } });
     const [faPool, setFaPool] = useState([]), [history, setSeasonHistory] = useState(options.history || { awards: [], records: {}, hallOfFame: [], standingsHistory: [], championships: [{ year: 2026, teamId: 0 }] });
     const gs = { teams: owned, setTeams, year, setYear, screen, setScreen, offseasonPlan, setOffseasonPlan, myId: 0, myTeam: owned[0],
-      faPool, setFaPool, getSeasonHistory: () => history, setSeasonHistory, getGameResultsMap: () => ({}), handleSave: save,
+      faPool, setFaPool, getSeasonHistory: () => history, setSeasonHistory, getGameResultsMap: () => ({}), handleSave: save, stageCareerEntries:recordCommittedEntries,
       ...Object.fromEntries(['setGameDay','setFaYears','setAllStarDone','setAllStarResult','setSchedule','setGameResultsMap','setAllTeamResultsMap','setAllStarTriggerDay','notify','setMailbox','addNews'].map(k => [k, vi.fn()])) };
     current = { gs, os: useOffseason(gs) }; return null;
   }

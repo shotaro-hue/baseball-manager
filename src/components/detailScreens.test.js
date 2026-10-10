@@ -46,7 +46,7 @@ describe('detail screens', () => {
     let view;
     await act(async () => { view = create(React.createElement(CareerTable, { player: p, year: 2026, teamId: 0, teamName: '自チーム' })); });
     const { loadPlayerCareerLogById } = await import('../engine/saveload');
-    expect(loadPlayerCareerLogById).toHaveBeenCalledWith('0');
+    expect(loadPlayerCareerLogById).toHaveBeenCalledWith('0',undefined);
     const totals = view.root.findAllByType('tr').find(n => text(n).startsWith('通算'));
     expect(text(totals).match(/0\.00/g)).toHaveLength(2);
     act(() => view.unmount());

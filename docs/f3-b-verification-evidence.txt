@@ -1,0 +1,498 @@
+red
+SHA256 1d43cf912d1e899a50072b1fc74ddb6e9b049ca5b861d926539d055426d7b6a7
+ FAIL  tests/career-generations.test.js > B01: failed new-year commit exposes no future career and retry commits once
+AssertionError: expected [] to deeply equal [ { year: 2025, teamId: +0, …(2) } ]
+
+- Expected
++ Received
+AssertionError: expected [] to deeply equal [ { year: 2025, teamId: +0, …(2) } ]
+
+- Expected
++ Received
+
+ FAIL  tests/career-generations.test.js > B02: aborted career chunk transaction cannot commit a partial new year
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+ FAIL  tests/career-generations.test.js > B03: colliding player IDs and failed first game preserve old-game history
+AssertionError: expected [] to deeply equal [ { year: 2024, teamId: +0, …(2) } ]
+
+- Expected
++ Received
+AssertionError: expected [] to deeply equal [ { year: 2024, teamId: +0, …(2) } ]
+
+- Expected
++ Received
+
+ FAIL  tests/career-generations.test.js > B04: repeated years, retries and reopen have no missing or duplicate seasons
+AssertionError: expected [] to deeply equal [ …(5) ]
+
+- Expected
++ Received
+AssertionError: expected [] to deeply equal [ …(5) ]
+
+- Expected
++ Received
+
+ FAIL  tests/career-generations.test.js > ordinary partial saves reuse career reference and missing career rejects generation
+AssertionError: expected undefined to be defined
+ ❯ tests/career-generations.test.js:47:14
+     45| it('ordinary partial saves reuse career reference and missing career r…
+     46|  await save(state());const ref=JSON.parse(rows.get(primary)).saveManif…
+AssertionError: expected undefined to be defined
+ ❯ tests/career-generations.test.js:47:14
+     45| it('ordinary partial saves reuse career reference and missing career r…
+     46|  await save(state());const ref=JSON.parse(rows.get(primary)).saveManif…
+     47|  expect(ref).toBeDefined();await save({...state(),gameDay:2},{dirtySco…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+ Test Files  1 failed (1)
+      Tests  5 failed (5)
+   Start at  08:31:57
+   Duration  776ms (transform 336ms, setup 0ms, collect 455ms, tests 65ms, environment 0ms, prepare 69ms)
+
+
+queue-red
+SHA256 719881eee54cd612c9609ef1c65e251fa4020e93a69b1f9a8955dabfb96d90fa
+ FAIL  tests/career-generations.test.js > queued requests preserve career entries from a failed in-flight save
+AssertionError: expected [ …(2) ] to deeply equal [ …(3) ]
+
+- Expected
++ Received
+AssertionError: expected [ …(2) ] to deeply equal [ …(3) ]
+
+- Expected
++ Received
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 passed (7)
+   Start at  08:34:07
+   Duration  779ms (transform 309ms, setup 0ms, collect 448ms, tests 76ms, environment 0ms, prepare 73ms)
+
+
+inline-red
+SHA256 487b33d8cd9014a81a34636c46cd6335204775cd02c591b1ab097f17bcb44176
+ FAIL  tests/career-generations.test.js > legacy inline full career survives read-only load and migration beyond the recent three years
+AssertionError: expected [ …(3) ] to deeply equal [ …(8) ]
+
+- Expected
++ Received
+AssertionError: expected [ …(3) ] to deeply equal [ …(8) ]
+
+- Expected
++ Received
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 passed (8)
+   Start at  08:36:47
+   Duration  787ms (transform 310ms, setup 0ms, collect 451ms, tests 107ms, environment 0ms, prepare 61ms)
+
+
+old-inline-red
+SHA256 e518cf34a8df095e25f63313cd540741fce2069ff9e670eb5366cdd7b9db4b28
+ FAIL  tests/career-generations.test.js > unversioned old inline career migrates read-only without losing older seasons
+AssertionError: expected [ …(3) ] to deeply equal [ …(8) ]
+
+- Expected
++ Received
+AssertionError: expected [ …(3) ] to deeply equal [ …(8) ]
+
+- Expected
++ Received
+
+ FAIL  tests/career-generations.test.js > first save preserves full supplied inline career before sanitizing the main body
+AssertionError: expected [ …(3) ] to deeply equal [ …(8) ]
+
+- Expected
++ Received
+AssertionError: expected [ …(3) ] to deeply equal [ …(8) ]
+
+- Expected
++ Received
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 10 passed (12)
+   Start at  08:44:13
+   Duration  985ms (transform 393ms, setup 0ms, collect 538ms, tests 134ms, environment 0ms, prepare 77ms)
+
+
+legacy-id-red
+SHA256 348a426b966008cbed43caec33fdd235b01c0027d11e4fdf3ebc97cf3c6fbfdb
+ FAIL  tests/career-generations.test.js > a legacy save without saveId keeps fixed history through scoped read and first migration
+Error: career_save_mismatch
+ ❯ Module.loadPlayerCareerLogById src/engine/saveload.js:959:37
+    957|     let root=validatedRoots.get(localStorage);
+    958|     if(root?.saveId!==saveId) root=await loadGame();
+ FAIL  tests/career-generations.test.js > numeric legacy playerId zero keeps its fixed history during migration
+AssertionError: expected [ { year: 2025, teamId: +0, …(2) } ] to deeply equal [ …(2) ]
+
+- Expected
++ Received
+AssertionError: expected [ { year: 2025, teamId: +0, …(2) } ] to deeply equal [ …(2) ]
+
+- Expected
++ Received
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 12 passed (14)
+   Start at  08:45:42
+   Duration  789ms (transform 316ms, setup 0ms, collect 453ms, tests 122ms, environment 0ms, prepare 73ms)
+
+
+success-stale-red
+SHA256 d94828485177e874b6bf24c8e4be19dd4ff2ff6615a2a348aed9f717700662a2
+ FAIL  tests/career-generations.test.js > a legacy save without saveId keeps fixed history through scoped read and first migration
+Error: career_save_mismatch
+ ❯ Module.loadPlayerCareerLogById src/engine/saveload.js:959:37
+    957|     let root=validatedRoots.get(localStorage);
+    958|     if(root?.saveId!==saveId) root=await loadGame();
+ FAIL  tests/career-generations.test.js > numeric legacy playerId zero keeps its fixed history during migration
+AssertionError: expected [ { year: 2025, teamId: +0, …(2) } ] to deeply equal [ …(2) ]
+
+- Expected
++ Received
+AssertionError: expected [ { year: 2025, teamId: +0, …(2) } ] to deeply equal [ …(2) ]
+
+- Expected
++ Received
+
+ FAIL  tests/career-generations.test.js > successful next-year commit rejects a queued stale old-year body
+AssertionError: expected { ok: true, …(2) } to match object { ok: false, reason: 'save_conflict' }
+(2 matching properties omitted from actual)
+
+- Expected
+AssertionError: expected { ok: true, …(2) } to match object { ok: false, reason: 'save_conflict' }
+(2 matching properties omitted from actual)
+
+- Expected
++ Received
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 12 passed (15)
+   Start at  08:46:14
+   Duration  708ms (transform 279ms, setup 0ms, collect 393ms, tests 109ms, environment 0ms, prepare 51ms)
+
+
+feedback-red
+SHA256 3bd0c3035f52a502ef80f05a00e0b3ed2cfefe4f62ed009d589619d9d22e76df
+ FAIL  tests/save-feedback.test.js > reports an older annual request without attributing it to another tab
+AssertionError: expected 'セーブに失敗しました。前回の正常セーブは保持しています。保存ボタンで再試行…' to contain 'より新しい年度'
+
+Expected: "より新しい年度"
+Received: "セーブに失敗しました。前回の正常セーブは保持しています。保存ボタンで再試行してください。"
+AssertionError: expected 'セーブに失敗しました。前回の正常セーブは保持しています。保存ボタンで再試行…' to contain 'より新しい年度'
+
+Expected: "より新しい年度"
+Received: "セーブに失敗しました。前回の正常セーブは保持しています。保存ボタンで再試行してください。"
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  08:53:59
+   Duration  356ms (transform 24ms, setup 0ms, collect 18ms, tests 12ms, environment 0ms, prepare 69ms)
+
+
+capacity-red
+SHA256 9a2830f3175818da44efbe8e90f4694f441815381c891e7e75c09db2e48b604e
+ FAIL  tests/career-generations.test.js > full history roundtrips within a compact immutable-row storage budget
+AssertionError: expected 15165 to be less than 7495.5
+ ❯ tests/career-generations.test.js:136:66
+
+
+AssertionError: expected 15165 to be less than 7495.5
+ ❯ tests/career-generations.test.js:136:66
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 15 passed (16)
+   Start at  08:58:36
+   Duration  927ms (transform 348ms, setup 0ms, collect 526ms, tests 150ms, environment 0ms, prepare 62ms)
+
+
+final-unit
+SHA256 9957b1d3a1b910904af76b1395f4a6f50329b7a5d5bbb1238b1b9fd3b72c5b14
+[season-batch-100] {
+  payloadJsonMiB: 16.73,
+  batchResultCount: 100,
+  battedBallEventCount: 16598,
+  batchLogEntryCount: 7708,
+  maxBattedBallEventsPerPlayer: 80
+}
+
+ ✓ src/workers/__tests__/seasonBatchPayload.test.js (3 tests) 15282ms
+   ✓ 100-game season batch payload > stays compact enough to transfer without retaining physics trajectories (seed 1) 6649ms
+   ✓ 100-game season batch payload > stays compact enough to transfer without retaining physics trajectories (seed 42) 4558ms
+   ✓ 100-game season batch payload > stays compact enough to transfer without retaining physics trajectories (seed 20260911) 4073ms
+
+ Test Files  103 passed | 2 skipped (105)
+      Tests  706 passed | 2 skipped (708)
+   Start at  09:00:31
+   Duration  20.25s (transform 3.79s, setup 0ms, collect 29.80s, tests 35.77s, environment 22ms, prepare 7.79s)
+
+
+target-e2e
+SHA256 047050c2935fac180b90b3f4ddfe059b9283056cab4d1667ff57643f3079d872
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../tmp/f3-b-target-results/career-generations-career--d31fa-nd-games-with-colliding-IDs-mobile-webkit/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../tmp/f3-b-target-results/career-generations-career--d31fa-nd-games-with-colliding-IDs-mobile-webkit/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2 failed
+    [chromium] › e2e/career-generations.spec.js:6:1 › career generations isolate partial IDB failures, failed year commits and games with colliding IDs 
+    [mobile-webkit] › e2e/career-generations.spec.js:6:1 › career generations isolate partial IDB failures, failed year commits and games with colliding IDs 
+  4 passed (1.8m)
+
+To open last HTML report run:
+
+  npx playwright show-report
+
+
+target-final-e2e
+SHA256 92a6a69e6710105c93d4cc788380ad670bcd439304cd137246bc0df80cb446a4
+  ✓  2 [chromium] › e2e/career-generations.spec.js:116:1 › career generations repeat real annual UI commits and reload without future records after a failed commit (24.9s)
+  ✓  3 [chromium] › e2e/career-generations.spec.js:205:1 › career generations detail failure explains incomplete history at mobile and desktop widths (13.3s)
+  ✓  4 [chromium] › e2e/initialization.spec.js:36:1 › slow CPU paints pending, blocks title actions and permits only one complete start (19.2s)
+  ✓  5 [chromium] › e2e/initialization.spec.js:80:1 › failed initial IndexedDB write stays on title and retry saves all history without duplicate records (5.8s)
+(node:529) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:529) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  6 [mobile-webkit] › e2e/career-generations.spec.js:6:1 › career generations isolate partial IDB failures, failed year commits and games with colliding IDs (6.8s)
+  ✓  7 [mobile-webkit] › e2e/career-generations.spec.js:116:1 › career generations repeat real annual UI commits and reload without future records after a failed commit (35.4s)
+  ✓  8 [mobile-webkit] › e2e/career-generations.spec.js:205:1 › career generations detail failure explains incomplete history at mobile and desktop widths (22.8s)
+
+  8 passed (2.2m)
+
+To open last HTML report run:
+
+  npx playwright show-report
+
+
+Final notification/source gates (log excerpts, not entire logs)
+
+f3-b-ui-result-red.log
+SHA256 6f9ecb4237a3110c6f97134cf6ac79121ed338f212f56a6d3b9a1955a8d48e74
+     88|  expect(current.screen).toBe('title');expect(current.newGameInitializa…
+       |                                                                                  ^
+     89|  expect(rows.get(primary)).toBe(before);expect((await loadGame()).save…
+     90|  expect((await loadPlayerCareerLogById('same','old')).map(e=>e.year)).…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/hooks/careerPersistence.integration.test.js > initial auxiliary metadata failure publishes the committed game and explains the warning
+AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string
+ ❯ src/hooks/careerPersistence.integration.test.js:99:29
+     97|  await act(async()=>{await current.handleSelect(0);});
+     98|  expect(current.screen).toBe('hub');expect(current.newGameInitializati…
+     99|  expect(current.notif?.msg).toContain('球団データは保存しました');
+       |                             ^
+    100|  const saved=await loadGame();expect(saved.saveId).not.toBe('old');
+    101|  expect((await loadPlayerCareerLogById('same',saved.saveId)).map(e=>e.…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 3 passed (6)
+   Start at  09:26:31
+   Duration  949ms (transform 394ms, setup 0ms, collect 594ms, tests 141ms, environment 0ms, prepare 54ms)
+
+
+f3-b-ui-result-green.log
+SHA256 038790d688184b8f7d41a15967f7a6acf5f768c6392e2187d3a679b555e94ba0
+[Perf] loadGame: 1.6ms
+┌──────────┬────────────────────┬─────────────────────┬──────────────────────┬────────────────────────┬────────────────────┬────────────────────┬────────────┬──────────────────┐
+│ (index)  │ indexedDbMs        │ indexedDbWriteCount │ writeMainSaveMs      │ rotateBackupMs         │ cleanupMs          │ totalMs            │ jsonLength │ compressedLength │
+├──────────┼────────────────────┼─────────────────────┼──────────────────────┼────────────────────────┼────────────────────┼────────────────────┼────────────┼──────────────────┤
+│ saveGame │ 0.7119619999999713 │ 0                   │ 0.008091999999919608 │ 0.00027000000000043656 │ 0.7772310000000289 │ 2.3858040000000074 │ 2769       │ 759              │
+└──────────┴────────────────────┴─────────────────────┴──────────────────────┴────────────────────────┴────────────────────┴────────────────────┴────────────┴──────────────────┘
+[Perf] saveGame: 2.5ms
+
+stderr | src/hooks/careerPersistence.integration.test.js > initial auxiliary metadata failure publishes the committed game and explains the warning
+Save committed; metadata failed: Error: meta
+    at Object.<anonymous> (/workspace/scratch/4fb52f515ed3/f3-b/src/hooks/careerPersistence.integration.test.js:94:102)
+    at Object.mockCall (file:///workspace/scratch/4fb52f515ed3/f3-b/node_modules/@vitest/spy/dist/index.js:61:17)
+    at Object.setItem (file:///workspace/scratch/4fb52f515ed3/f3-b/node_modules/tinyspy/dist/index.js:45:80)
+    at writeMeta (/workspace/scratch/4fb52f515ed3/f3-b/src/engine/saveload.js:683:18)
+    at saveGameImpl (/workspace/scratch/4fb52f515ed3/f3-b/src/engine/saveload.js:722:11)
+    at locked (/workspace/scratch/4fb52f515ed3/f3-b/src/engine/saveload.js:797:16)
+
+ ✓ src/hooks/careerPersistence.integration.test.js (6 tests) 162ms
+
+ Test Files  3 passed (3)
+      Tests  16 passed (16)
+   Start at  09:26:57
+   Duration  961ms (transform 553ms, setup 0ms, collect 1.11s, tests 279ms, environment 0ms, prepare 176ms)
+
+
+f3-b-accepted-unit.log
+SHA256 87abf567e75fc7bfaef6aa9ef0d6204d218a74382d1d4489c3ad3b441f31d305
+  battedBallEventCount: 16438,
+  batchLogEntryCount: 7673,
+  maxBattedBallEventsPerPlayer: 80
+}
+
+stdout | src/workers/__tests__/seasonBatchPayload.test.js > 100-game season batch payload > stays compact enough to transfer without retaining physics trajectories (seed 20260911)
+[season-batch-100] {
+  payloadJsonMiB: 16.73,
+  batchResultCount: 100,
+  battedBallEventCount: 16598,
+  batchLogEntryCount: 7708,
+  maxBattedBallEventsPerPlayer: 80
+}
+
+ ✓ src/workers/__tests__/seasonBatchPayload.test.js (3 tests) 16295ms
+   ✓ 100-game season batch payload > stays compact enough to transfer without retaining physics trajectories (seed 1) 7405ms
+   ✓ 100-game season batch payload > stays compact enough to transfer without retaining physics trajectories (seed 42) 4734ms
+   ✓ 100-game season batch payload > stays compact enough to transfer without retaining physics trajectories (seed 20260911) 4155ms
+
+ Test Files  103 passed | 2 skipped (105)
+      Tests  710 passed | 2 skipped (712)
+   Start at  09:27:32
+   Duration  21.31s (transform 3.90s, setup 0ms, collect 28.44s, tests 37.89s, environment 21ms, prepare 8.03s)
+
+
+f3-b-accepted-build.log
+SHA256 eb2746fa185f85757c4e10387113ccbd8b4b7d115135521cf314dedefff356a6
+dist/assets/OffseasonPlanningScreen-BVtZLu4k.js     9.00 kB │ gzip:   4.34 kB
+dist/assets/player-CxM7qeNb.js                      9.06 kB │ gzip:   4.19 kB
+dist/assets/LeaderboardTab-Dg1wA7jz.js              9.89 kB │ gzip:   3.73 kB
+dist/assets/StatsTab-lf0CQ883.js                   10.19 kB │ gzip:   3.21 kB
+dist/assets/BalanceTab-C6z1UfMD.js                 10.35 kB │ gzip:   3.93 kB
+dist/assets/RecordsTab-D08YbamY.js                 10.41 kB │ gzip:   3.53 kB
+dist/assets/battedBallArchive-CkOARGdZ.js          12.56 kB │ gzip:   4.20 kB
+dist/assets/ResultScreen-Dyt9A5Vc.js               15.88 kB │ gzip:   5.18 kB
+dist/assets/TeamDetailScreen-CO3tRKpX.js           20.58 kB │ gzip:   6.43 kB
+dist/assets/TacticalGame-Bho9Zpx7.js               27.69 kB │ gzip:   8.72 kB
+dist/assets/Screens-DJQZDF-V.js                    28.36 kB │ gzip:   8.34 kB
+dist/assets/OffseasonReviewScreens-Bw80SkDO.js     32.93 kB │ gzip:  12.71 kB
+dist/assets/saveload-D9Y59X1v.js                   35.97 kB │ gzip:  11.28 kB
+dist/assets/Draft-CAxt9ddw.js                      41.21 kB │ gzip:  12.01 kB
+dist/assets/realplayer-BC5t4_Lo.js                363.69 kB │ gzip:  90.85 kB
+dist/assets/react-three-CEOooVtD.js               433.78 kB │ gzip: 144.72 kB
+dist/assets/three-core-CP7jeRIU.js                695.42 kB │ gzip: 178.77 kB
+dist/assets/index-DTY4CnRE.js                     881.10 kB │ gzip: 276.65 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 15.09s
+
+f3-b-accepted-smoke.log
+SHA256 8dd26d9b170aedb67f92a99490c3a316e594b7b85b4052424ccd8ccf5d8236bb
+  ✓   9 [chromium] › e2e/match-history.spec.js:322:1 › T11 legacy version-4 fixture with no history remains playable and gains history on first save (12.3s)
+  ✓  10 [chromium] › e2e/match-history.spec.js:332:1 › tactical CPU injury preparation commits every scheduled game and survives reload (29.7s)
+  ✓  11 [chromium] › e2e/posting.spec.js:72:3 › D01 approved posting survives real save/reload (chunked v4) (12.4s)
+  ✓  12 [chromium] › e2e/posting.spec.js:72:3 › D01 approved posting survives real save/reload (legacy inline v4) (11.8s)
+  ✓  13 [chromium] › e2e/posting.spec.js:144:3 › D01 rejection preserves the budget and roster through real save/reload (chunked v4) (11.7s)
+  ✓  14 [chromium] › e2e/posting.spec.js:144:3 › D01 rejection preserves the budget and roster through real save/reload (legacy inline v4) (11.3s)
+  ✓  15 [chromium] › e2e/posting.spec.js:190:1 › D01 leaves a legacy budget unchanged rather than guessing a historical correction (8.4s)
+  ✓  16 [chromium] › e2e/progression.smoke.spec.js:19:1 › E1 new game, five games, persisted reload, one more game (11.6s)
+  ✓  17 [chromium] › e2e/progression.smoke.spec.js:59:1 › E2 final regular game, postseason save/reload, offseason and next year (34.5s)
+  ✓  18 [chromium] › e2e/progression.smoke.spec.js:226:1 › E2 draw-inclusive completed fixture cannot start regular games (8.2s)
+  ✓  19 [chromium] › e2e/progression.smoke.spec.js:252:1 › E3 invalid lineup, useful guidance, UI repair, one game (11.0s)
+  ✓  20 [chromium] › e2e/progression.smoke.spec.js:282:1 › E4 shortstop injury, emergency fielding moves, batch and persisted reload (17.5s)
+(node:638) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:638) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  21 [mobile-webkit] › e2e/progression.smoke.spec.js:19:1 › E1 new game, five games, persisted reload, one more game (22.8s)
+
+  21 passed (7.0m)
+
+To open last HTML report run:
+[36m[39m
+[36m  npx playwright show-report[39m
+[36m[39m
+
+f3-b-ci.log
+SHA256 1b4cd11414e9e64330a199a8fe1e69916706dbd972484cd0b4f4321ddcc236b8
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+npm warn deprecated three-mesh-bvh@0.7.8: Deprecated due to three.js version incompatibility. Please use v0.8.0, instead.
+
+added 234 packages in 4s
+
+f3-b-accepted-e2e.log
+SHA256 ed5f61ac309567ab96f0971d23d36561cda29cb5605034821a9c2fa8420f5635
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2142) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  52 [mobile-webkit] › e2e/career-generations.spec.js:6:1 › career generations isolate partial IDB failures, failed year commits and games with colliding IDs (6.0s)
+  ✓  53 [mobile-webkit] › e2e/career-generations.spec.js:116:1 › career generations repeat real annual UI commits and reload without future records after a failed commit (33.9s)
+  ✓  54 [mobile-webkit] › e2e/career-generations.spec.js:206:1 › career generations detail failure explains incomplete history at mobile and desktop widths (22.4s)
+  ✓  55 [mobile-webkit] › e2e/finance.spec.js:102:3 › finance 360px preserves roster and budget through display and IndexedDB reload (20.7s)
+  ✓  56 [mobile-webkit] › e2e/finance.spec.js:102:3 › finance 390px preserves roster and budget through display and IndexedDB reload (19.3s)
+  ✓  57 [mobile-webkit] › e2e/finance.spec.js:102:3 › finance 1280px preserves roster and budget through display and IndexedDB reload (23.4s)
+  ✓  58 [mobile-webkit] › e2e/finance.spec.js:158:1 › finance warns about incomplete recorded salaries after real save/load (14.0s)
+  ✓  59 [mobile-webkit] › e2e/finance.spec.js:182:1 › finance opens an unrecorded salary leader safely without mutating saved clubs (15.1s)
+  ✓  60 [mobile-webkit] › e2e/progression.smoke.spec.js:19:1 › E1 new game, five games, persisted reload, one more game (26.3s)
+  ✓  61 [mobile-webkit] › e2e/save-generations.spec.js:5:1 › save generations recover their histories after primary corruption and disappearance (17.5s)
+  ✓  62 [mobile-webkit] › e2e/save-generations.spec.js:61:1 › save generations isolate IDB abort, quota and auxiliary metadata failure (7.0s)
+  ✓  63 [mobile-webkit] › e2e/save-generations.spec.js:138:1 › save generations reject stale writes from another tab (14.0s)
+  ✓  64 [mobile-webkit] › e2e/save-generations.spec.js:176:1 › save generations: deleting from another tab waits for an active save and leaves no revived roots (15.2s)
+  ✓  65 [mobile-webkit] › e2e/save-generations.spec.js:247:1 › save generations: deletion invalidates a stale backup-only recovery in another tab (14.4s)
+
+  65 passed (13.5m)
+
+To open last HTML report run:
+[36m[39m
+[36m  npx playwright show-report[39m
+[36m[39m
+
+f3-b-accepted-physics.log
+SHA256 5f768509cf8032b5bc04c24bd7b6328d90e316a6fc8cfdca897ea4bdef45a1c2
+    "hrPerBip": 0.03375,
+    "hrPerPa": 0.03375,
+    "teamHrPerGame": 1.2825000000000002,
+    "avgEv": 116.4581399999999,
+    "avgLa": 14.750279999999952,
+    "avgDistance": 49.53655,
+    "qualityRate": {
+      "weak": 0.34705,
+      "normal": 0.2059,
+      "solid": 0.253,
+      "hard": 0.15565,
+      "barrel": 0.0384
+    }
+  }
+]
+
+ ✓ scripts/validate-physics-hr.test.js (1 test) 3324ms
+   ✓ Monte Carlo HR Validation > power別HR/BIPとquality分布を集計する 3323ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  09:49:04
+   Duration  4.54s (transform 115ms, setup 0ms, collect 137ms, tests 3.32s, environment 0ms, prepare 58ms)
+

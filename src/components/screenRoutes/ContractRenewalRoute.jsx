@@ -17,6 +17,7 @@ export default function ContractRenewalRoute({
       teams={gs.teams}
       myId={myId}
       year={year}
+      saveId={gs.saveId}
       demands={os.contractRenewalDemands || {}}
       renewalPlayerIds={os.contractRenewalDemands == null ? undefined : Object.keys(os.contractRenewalDemands)}
       onSign={os.handleContractRenewalSign}

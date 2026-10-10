@@ -143,6 +143,7 @@ export function useGameState() {
   const [lastAutoSaveAt, setLastAutoSaveAt] = useState(0);
   const [saveRevision, setSaveRevision] = useState(0);
   const saveDirtyTrackerRef = useRef(null);
+  const pendingCareerEntriesRef = useRef([]);
   if (saveDirtyTrackerRef.current === null) {
     saveDirtyTrackerRef.current = createSaveDirtyTracker();
   }
@@ -151,11 +152,15 @@ export function useGameState() {
     setSaveRevision(prev=>prev+1);
     setSaveDirty(true);
   },[]);
+  const stageCareerEntries = useCallback(entries => {
+    pendingCareerEntriesRef.current.push(...structuredClone(entries));
+    markSaveDirty();
+  },[markSaveDirty]);
   const setTeams   = useCallback((n) => { dispatch({ type: G.SET_TEAMS, teams: (prev) => slimTeamsForState(typeof n === 'function' ? n(prev) : n) }); markSaveDirty(); },    [markSaveDirty]);
   const setGameDay = useCallback((n) => { dispatch({ type: G.SET_GAME_DAY, day: n }); markSaveDirty(); }, [markSaveDirty]);
   const setYear    = useCallback((n) => { dispatch({ type: G.SET_YEAR, year: n }); markSaveDirty(); }, [markSaveDirty]);
   const setMyId    = useCallback((id) => { dispatch({ type: G.SET_MY_ID, myId: id }); markSaveDirty(); }, [markSaveDirty]);
-  const setSaveId  = useCallback((id) => { dispatch({ type: G.SET_SAVE_ID, saveId: ensureSaveId(id) }); }, []);
+  const setSaveId  = useCallback((id) => { pendingCareerEntriesRef.current=[];dispatch({ type: G.SET_SAVE_ID, saveId: ensureSaveId(id) }); }, []);
   const [tab, setTab] = useState("dashboard");
   const [faPool, setFaPool] = useState([]);
   const [faYears, setFaYearsState] = useState({});
@@ -348,11 +353,15 @@ export function useGameState() {
       });
   }, []);
   const queueSave = useCallback((state, options = {}) => {
+    const pending=[...pendingCareerEntriesRef.current];
+    const saveOptions={...options,careerEntries:[...pending,...(options.careerEntries || [])]};
     refreshSaveQueueState();
     return loadSaveModule()
-      .then((mod) => mod.enqueueSaveGame(state, options))
+      .then((mod) => mod.enqueueSaveGame(state, saveOptions))
       .then(async (result) => {
         if (!result?.ok) return result;
+        const committed=new Set(pending);
+        pendingCareerEntriesRef.current=pendingCareerEntriesRef.current.filter(entry=>!committed.has(entry));
         try {
           const archive = await import('../engine/battedBallArchive');
           const status = archive.getBattedBallQueueStatus();
@@ -553,6 +562,7 @@ export function useGameState() {
   const handleSave = useCallback(async (options = {})=>{
     if (offseasonPlan && isAutoSaveSuspended && !options.payload) return { ok: false, reason: 'transition_in_progress' };
     const request = beginTrackedSave();
+    if(options.careerEntries) request.options.careerEntries=options.careerEntries;
     if (options.payload && MATCH_HISTORY_FIELDS.some(key => key in options.payload)) {
       request.options.dirtyScopes = [...new Set([...(request.options.dirtyScopes ?? ['seasonHistory', 'news', 'mailbox']), 'matchHistory'])];
     }
@@ -608,22 +618,35 @@ export function useGameState() {
       const nextAllStarTriggerDay = scheduleMod.calcAllStarTriggerDay(newSchedule, params.allStarSkipDates);
       // Prepare locally; only publish a complete game after required history writes succeed.
       const saveMod = await loadSaveModule();
-      const initialized = await saveMod.initializeCareerLogsInIndexedDb(collectCareerLogsForIndexedDb(nextTeams));
-      if (!initialized?.ok) throw new Error('initial_career_log_persistence_failed');
+      const initialHistory={awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[],transfers:[]};
+      const initialized = await saveMod.enqueueSaveGame({teams:nextTeams,myId:id,saveId:nextSaveId,year,gameDay:1,
+        faPool:nextFaPool,faYears:{},seasonHistory:initialHistory,news:[],mailbox:[],offseasonPlan:null,...matchHistorySnapshot({})},
+        {initialCareerLogs:collectCareerLogsForIndexedDb(nextTeams)});
+      if (!initialized?.ok) {
+        const error=new Error('initial_career_log_persistence_failed');
+        error.saveResult=initialized;throw error;
+      }
+      pendingCareerEntriesRef.current=[];
       setTeams(nextTeams);
       setFaPool(nextFaPool);
       setSaveId(nextSaveId);
       setOffseasonPlan(null);
+      setSeasonHistoryState(initialHistory);setNewsState([]);setMailboxState([]);setFaYearsState({});setGameDay(1);
+      hydrateMatchHistory(matchHistorySnapshot({}));
+      setSaveExists(true);
       setMyId(id);
       setSchedule(newSchedule);
       setAllStarTriggerDay(nextAllStarTriggerDay);
       setTab("dashboard");
       setNewGameInitializationStatus('ready');
       setScreen("hub");
+      if(initialized.warnings?.length) notify(saveFeedback(initialized).message,'warn');
     } catch (error) {
       console.error('新規ゲーム初期化に失敗しました:', error);
       setNewGameInitializationStatus('error');
-      setNewGameInitializationError(error?.message === 'initial_career_log_persistence_failed'
+      setNewGameInitializationError(error?.saveResult?.quota
+        ? '保存容量が不足しています。新規ゲームは未保存です。既存の保存データは保持しています。球団を選択して再試行してください。'
+        : error?.message === 'initial_career_log_persistence_failed'
         ? '過去成績を保存できませんでした。ブラウザのストレージ設定を確認し、球団を選択して再試行してください。'
         : '新規ゲームの初期化に失敗しました。球団を選択して再試行してください。');
       notify('新規ゲームを開始できませんでした','warn');
@@ -1044,6 +1067,7 @@ export function useGameState() {
     addToHistory,
     addTransferLog,
     handleSave,
+    stageCareerEntries,
     handleSelect,
     handlePlayerClick,
     handleTeamClick,
