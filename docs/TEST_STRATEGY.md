@@ -26,7 +26,7 @@
 | HRサンプリング | `scripts/validate-physics-hr.test.js` 1ケース／約8.6秒 | 同上、品質検証の強化余地 |
 | PR #430のCI最遅ジョブ | finance + match-history + posting 23ケース／約9分10秒（E2E本体約8分） | historyを分割 |
 
-**留意**: `src/components/tacticalGame.test.jsx` は `@vitest-environment jsdom` を指定する一方、現行packageの明示的なjsdom依存が見当たらない。Vitestに現れない理由は未確定であり、原因を確認せず有効化してCIを破壊しない。通常CI実行で未確認の3テストと明記する。
+**確定した未収集原因**: `vitest.config.js` の `test.include` は `src/**/*.test.js` 等の `.js` のみを指定しており、`src/components/tacticalGame.test.jsx` を収集しない。このため3ケースは実行されていなかった。同ファイルは `@vitest-environment jsdom` を要求するが、`package.json` にjsdomが明示されていないため、収集パターンだけ直しても依存不足で失敗する可能性がある。別修正でDOM環境の依存を整えるかNode環境で動くテストへ書き換え、RED→GREENを確認してからCIに組み込む。
 
 2件のskipは `scripts/fa-economy-benchmark.test.js`（`RUN_FA_ECONOMY_BENCHMARK`）と `scripts/salary-demand-benchmark.test.js`（`RUN_SALARY_BENCHMARK`）の意図的な条件付きベンチマーク。これらを通常CIの回帰パス件数に含めない。
 
@@ -220,7 +220,7 @@ HRサンプリングは実際に多数の打球を計算するが、現行テス
 
 ## 次に検討する改善（今PRには含めない）
 
-1. `tacticalGame.test.jsx` の未実行原因を復元（Vitestの発見・jsdomの依存・モックとDOM環境を確認し、本当に動く3ケースとして追加）。
+1. `tacticalGame.test.jsx` をVitestに収集させる（現行includeが `.js` のみ）。jsdomの依存整備またはNode環境に移行し、3ケースを実際に通す。
 2. `scripts/validate-physics-hr.test.js` の結果チェックを分布・再現性が担保できる条件へ強化。現状の長いMonte Carloを不要と言い切れないが、件数assertionだけでは品質を保証しない。
 3. `match-history` のfixture開始/終了を計測してボトルネックを絞る。DH×homeの4組合せは削らず、共通setupの最適化を検討。
 4. 手動フルE2EのGitHub Actions初回完走を確認してから週次実行の費用対効果を判断する。
