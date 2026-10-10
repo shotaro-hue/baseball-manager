@@ -33,21 +33,25 @@ npm run dev
 
 ## Validation
 
-Run at least:
+Test execution is tiered so fast, focused iteration does not repeat long regressions
+already enforced by PR CI. See [the test inventory and strategy](./docs/TEST_STRATEGY.md).
+
+During development, run the tests relevant to the change:
 
 ```bash
-npm test
-npm run build
+npx vitest run src/engine/__tests__/simulation.test.js
+npm run test:fast
+npm run test:e2e -- save-generations.spec.js --workers=1 --retries=0
 ```
 
-For browser-flow changes, also run:
+Before merging, require the GitHub CI for the exact PR commit to pass. It runs
+`npm run build`, `npm test` (including the heavier tests), and core browser E2E.
+For a release, broad UI redesign, or other changes whose risk exceeds core CI,
+run the entire browser suite using `npm run test:e2e -- --workers=1 --retries=0`
+or the manual `Extended Browser E2E` GitHub Actions workflow.
 
-```bash
-npx playwright install
-npm run test:e2e
-```
-
-Simulation or progression changes should include a regression test where practical.
+Never delete, skip, or weaken a failing test merely to obtain a green check.
+When CI hasn't run, don't claim that it passed.
 
 ## Pull request description
 
