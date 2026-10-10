@@ -31,3 +31,11 @@
 - 初回ブラウザ試験の失敗はテスト側の球団名完全一致（絵文字込み）と「その他」の通知件数込みアクセシブル名を待っていたため。trace確認後にセレクタを修正した。アプリの待機時間や期待値は緩和していない。
 
 最終ローカル実行：関連Vitest 9ファイル57ケース成功、`npm run build` 成功、`npm run test:e2e -- trade.spec.js --project=chromium --workers=1 --retries=0` 2ケース成功（21.0秒）。独立レビューでブロッカーなし。PR CIは対象コミットで別途確認する。
+
+### CI #301の失敗調査と追補
+
+head `943d0f2` のCIは単体739件成功・2件失敗、ビルドと全E2Eジョブ成功。失敗は `postGameConsistency.test.js` の自動/戦術モード2件で、取引自体は成立していた。テストが全一軍選手へ設定した `registrationCooldownDays: 2` は試合後に1となり、獲得選手が二軍へ配置された。再登録待ちの選手を一軍へ追加できない既存ルール（SPEC.md、rosterAutomationのcanAddToActiveRoster）と共通取引処理の契約に一致する。
+
+アプリ実装は変更せず、同テストを両モード×待機0/2日の4ケースへ拡張。待機0は一軍、試合後も待機1が残る選手は二軍であることを明示し、両選手のオブジェクトが試合後更新結果と一致すること、登録日数120、待機日数の減算、全球団の所有ID保存・重複なし・旧所属からの除去を検証する。既存の球団成績・予算・ローテ更新・元state不変の検証も維持する。テスト削除・skip・所属確認の省略による成功扱いではない。
+
+追補ローカル検証：`npx vitest run src/hooks/postGameConsistency.test.js src/workers/__tests__/cpuTradeRoster.test.js src/engine/__tests__/tradeTransaction.test.js` は3ファイル24件成功。元の失敗2件はローカルでもREDを確認した。追補はテストと原因記録だけで、アプリ実装・ビルド入力に変更はないため、ローカル全件・ビルド・ブラウザの重複実行は行わず、新headのPR CIで確認する。
