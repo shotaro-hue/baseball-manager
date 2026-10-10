@@ -33,21 +33,25 @@ npm run dev
 
 ## Validation
 
-Run at least:
+Use the [tiered test strategy](./docs/testing/EXECUTION_STRATEGY.md) and the [test inventory](./docs/testing/TEST_INVENTORY_2026-10-10.md). During development run the narrowest relevant tests; do not rerun the entire suite for every edit.
+
+Before requesting a merge, ensure the **latest PR commit** has a successful build and complete Vitest check, either locally or in GitHub CI:
 
 ```bash
-npm test
 npm run build
+npm test
 ```
 
-For browser-flow changes, also run:
+For browser-flow changes, run the relevant Playwright scenario(s); for save-format, season-progression, or match-engine changes, consider the final complete E2E suite:
 
 ```bash
-npx playwright install
-npm run test:e2e
+npx playwright install chromium webkit
+npm run test:e2e -- --workers=1 --retries=0
 ```
 
-Simulation or progression changes should include a regression test where practical.
+The smoke suite is a subset of the full suite; do not run both against the same unchanged commit unless there is a specific diagnostic reason. Ordinary pull requests run the critical E2E gate in CI, and the complete E2E suite runs separately on a weekly/manual workflow.
+
+Simulation or progression changes should include a regression test where practical. Record the tested commit, commands, results, and any untested scenarios in the PR.
 
 ## Pull request description
 
