@@ -67,7 +67,7 @@ export default function OffseasonPlanningScreen({ gs, os, myTeam, myId, year }) 
         return <article className="planning-player" key={p.id}><h3>{p.name}</h3><p>{p.pos} · {p.age ?? '未記録'}歳 · 年俸 {money(p.salary)} · {p.育成 ? '育成・ファーム' : active ? '登録選手' : '二軍・支配下'}</p><button onClick={() => setProfile(p)}>選手詳細・年度別成績</button>
           {eligible ? <><label>編成方針<select aria-label={`${p.name}の編成方針`} value={intent} onChange={event => setIntent(p.id, event.target.value)}>{Object.entries(intentLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>{open && intent === 'release' && <button className="planning-danger" onClick={() => { setFailure(''); setModal({ type: 'release', id: p.id }); }}>放出の影響を確認する</button>}</> : <p>{p.contractSignedYear === year ? '今オフ契約済み' : active ? '複数年契約など・今回の更改対象外' : 'ファーム・今回の更改対象外'}</p>}</article>;
       })}</div></details>
-      {open && <ContractRenewalPhaseScreen teams={gs.teams} myId={myId} year={year} embedded demands={plan.demands}
+      {open && <ContractRenewalPhaseScreen teams={gs.teams} myId={myId} year={year} saveId={gs.saveId} embedded demands={plan.demands}
         renewalPlayerIds={Object.keys(plan.demands || {})} savedSession={plan.session} onSessionChange={saveSession}
         savedView={plan.renewalView} onViewChange={saveView} onSign={os.handleContractRenewalSign}
         onRelease={os.handlePlanningRelease} onDeclare={id => os.handlePlanningRelease(id, 'fa')} onNext={() => chooseTab('review')} />}

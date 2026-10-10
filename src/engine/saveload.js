@@ -1,4 +1,5 @@
-import { GENERATION_VERSION, prepareGeneration, readGeneration, collectUnusedChunks } from './saveGenerations';
+import { GENERATION_VERSION, LEGACY_GENERATION_VERSION, prepareGeneration, readGeneration, readCareerGeneration, collectUnusedChunks } from './saveGenerations';
+import { prepareCareerData, captureInlineCareerLogs } from './careerGenerations';
 import { MATCH_HISTORY_FIELDS, matchHistorySnapshot, matchHistoryForSave } from './matchHistory';
 import LZString from 'lz-string';
 import { resolveInitialContractYears } from './realplayer';
@@ -51,6 +52,15 @@ export function createSaveRequestQueue(saveImpl) {
   let isSaving = false;
   let queuedPayload = null;
   let queuedListeners = [];
+  const inheritOptions = (older, newer) => {
+    const a=older.options.dirtyScopes,b=newer.options.dirtyScopes;
+    const options={...newer.options,dirtyScopes:Array.isArray(a)&&Array.isArray(b)?[...new Set([...a,...b])]:undefined};
+    if(older.state?.saveId===newer.state?.saveId && !(Number(newer.state?.year)<Number(older.state?.year))) {
+      options.careerEntries=[...(older.options.careerEntries || []),...(newer.options.careerEntries || [])];
+      if(options.initialCareerLogs===undefined && older.options.initialCareerLogs!==undefined) options.initialCareerLogs=older.options.initialCareerLogs;
+    }
+    return {...newer,options};
+  };
 
   const runSave = async (payload, listeners = []) => {
     isSaving = true;
@@ -68,9 +78,7 @@ export function createSaveRequestQueue(saveImpl) {
       if (queuedPayload !== null) {
         let nextPayload = queuedPayload;
         if (!succeeded && payload?.options && nextPayload?.options) {
-          const a = payload.options.dirtyScopes, b = nextPayload.options.dirtyScopes;
-          nextPayload = { ...nextPayload, options: { ...nextPayload.options,
-            dirtyScopes: Array.isArray(a) && Array.isArray(b) ? [...new Set([...a, ...b])] : undefined } };
+          nextPayload = inheritOptions(payload,nextPayload);
         }
         const nextListeners = queuedListeners;
         queuedPayload = null;
@@ -87,9 +95,7 @@ export function createSaveRequestQueue(saveImpl) {
       }
       return new Promise((resolve, reject) => {
         if (queuedPayload?.options && payload?.options) {
-          const a = queuedPayload.options.dirtyScopes, b = payload.options.dirtyScopes;
-          payload = { ...payload, options: { ...payload.options,
-            dirtyScopes: Array.isArray(a) && Array.isArray(b) ? [...new Set([...a, ...b])] : undefined } };
+          payload = inheritOptions(queuedPayload,payload);
         }
         queuedPayload = payload;
         queuedListeners.push({ resolve, reject });
@@ -618,13 +624,17 @@ async function saveGameImpl(state, options = {}) {
     const known = validatedRoots.get(localStorage);
     if (known?.saveId === safeState.saveId) previous = known;
     else try { if (currentRaw) previous = decompress(currentRaw); } catch { /* recovery */ }
+    if(previous?.saveId===safeState.saveId && Number(previous.year)>Number(safeState.year)) {
+      return {ok:false,quota:false,reason:'stale_save'};
+    }
+    const careerData = await prepareCareerData(safeState, previous, options, legacyCareerSeeds.get(previous),state);
     let prepared;
-    try { prepared = await prepareGeneration(safeState, previous, options?.dirtyScopes); }
+    try { prepared = await prepareGeneration(safeState, previous, options?.dirtyScopes, careerData); }
     catch (error) {
       if (error?.name !== 'QuotaExceededError') throw error;
       // Reclaim only rows proven unreferenced, then retry once. Never remove a backup root.
       await cleanupSaveChunks();
-      prepared = await prepareGeneration(safeState, previous, options?.dirtyScopes);
+      prepared = await prepareGeneration(safeState, previous, options?.dirtyScopes, careerData);
     }
     safeState.saveManifest = prepared.manifest;
     perfBreakdown.indexedDbMs = safeElapsedMs(indexedDbStart);
@@ -690,7 +700,7 @@ async function saveGameImpl(state, options = {}) {
         if (raw) {
           const previous = validatedRawRoots.get(localStorage) === raw ? validatedRoots.get(localStorage) : decompress(raw);
           if (Array.isArray(previous.teams) && hasSelectedTeam(previous.teams, previous.myId) && previous.year) {
-            if (previous.saveDataVersion >= GENERATION_VERSION) await readGeneration(previous);
+            if (previous.saveDataVersion >= LEGACY_GENERATION_VERSION) await readGeneration(previous);
             rotationRaw = raw;
           }
         }
@@ -738,6 +748,7 @@ const validatedRoots = new WeakMap();
 const validatedRawRoots = new WeakMap();
 const deletionEpochs = new WeakMap();
 const chunkRootCache = new WeakMap();
+const legacyCareerSeeds = new WeakMap();
 let localSaveTail = Promise.resolve();
 let lastLoadResult = { status: 'none' };
 function observePrimary() {
@@ -888,7 +899,7 @@ export async function loadGame() {
       if (!raw) continue;
       foundCandidate = true;
       const state = decompress(raw);
-      if (state?.saveDataVersion >= GENERATION_VERSION) {
+      if (state?.saveDataVersion >= LEGACY_GENERATION_VERSION) {
         Object.assign(state, await readGeneration(state));
       } else if (state?.saveDataVersion >= INDEXED_DB_LARGE_DATA_VERSION) {
         try {
@@ -906,16 +917,11 @@ export async function loadGame() {
           console.warn('IndexedDB load failed. Fallback to localStorage payload.', e);
         }
       }
+      if(!(state?.saveDataVersion >= GENERATION_VERSION)) legacyCareerSeeds.set(state,captureInlineCareerLogs(state));
       for (const team of (state?.teams || [])) {
         for (const bucket of ['players', 'farm']) {
           for (const player of (team?.[bucket] || [])) {
             const legacyCareerLog = Array.isArray(player?.careerLog) ? player.careerLog : [];
-            if (player?.id && legacyCareerLog.length > 0) {
-              const existing = await idbRead(IDB_STORES.careerLogs, player.id);
-              if (!Array.isArray(existing) || existing.length === 0) {
-                await idbWrite(IDB_STORES.careerLogs, player.id, legacyCareerLog);
-              }
-            }
             const recentCareerLog = Array.isArray(player?.recentCareerLog)
               ? getRecentCareerLog(player.recentCareerLog, MAX_RECENT_CAREER_LOG_YEARS)
               : getRecentCareerLog(legacyCareerLog, MAX_RECENT_CAREER_LOG_YEARS);
@@ -932,9 +938,10 @@ export async function loadGame() {
         logPerf('loadGame', loadGameStart);
         observations.set(localStorage, primaryAtLoad);
         backupObservations.set(localStorage, backupsAtLoad);
-        validatedRoots.set(localStorage, state);
+        validatedRoots.set(localStorage, result.state);
+        if(legacyCareerSeeds.has(state)) legacyCareerSeeds.set(result.state,legacyCareerSeeds.get(state));
         validatedRawRoots.set(localStorage, raw);
-        try { rememberChunkRoot(raw, state); }
+        try { rememberChunkRoot(raw, result.state); }
         catch (error) { console.warn('Load succeeded; root cache failed:', error); }
         lastLoadResult = { status: key === SAVE_KEY ? 'primary' : 'recovered', source: label, generation: state.saveManifest?.generation };
         return result.state;
@@ -948,8 +955,18 @@ export async function loadGame() {
   return null;
 }
 
-export async function loadPlayerCareerLogById(playerId) {
+export async function loadPlayerCareerLogById(playerId, saveId) {
   if (typeof playerId !== 'string' || playerId.trim() === '') return [];
+  if (saveId) {
+    let root=validatedRoots.get(localStorage);
+    if(root?.saveId!==saveId) root=await loadGame();
+    if(root?.saveId!==saveId) throw new Error('career_save_mismatch');
+    if(root.saveDataVersion===GENERATION_VERSION) {
+      const data=await readCareerGeneration(root);return new Map(data.players).get(playerId) || [];
+    }
+    const data=await prepareCareerData(root,root,{},legacyCareerSeeds.get(root));
+    return new Map(data.players).get(playerId) || [];
+  }
   try {
     const loaded = await idbRead(IDB_STORES.careerLogs, playerId);
     return Array.isArray(loaded) ? loaded : [];

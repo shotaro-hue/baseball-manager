@@ -61,7 +61,7 @@ function Confirmation({ title, children, onClose, onConfirm, confirmLabel }) {
   </section></div>;
 }
 
-export function ContractRenewalPhaseScreen({ teams, myId, year, demands, renewalPlayerIds, onSign, onRelease, onNext,
+export function ContractRenewalPhaseScreen({ teams, myId, year, saveId, demands, renewalPlayerIds, onSign, onRelease, onNext,
   embedded = false, savedSession, onSessionChange, savedView, onViewChange, onDeclare }) {
   const myTeam = teams?.find(t => t.id === myId);
   const [session, setSession] = useState(() => includeMissingFarmEntries(savedSession || createSession(myTeam, demands, renewalPlayerIds, year), myTeam, demands, renewalPlayerIds, year));
@@ -237,7 +237,7 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, demands, renewal
             {selected.status === 'cooldown' && <button className="renewal-primary" onClick={() => update(selectedId, { status: 'pending', round: 0, retries: selected.retries + 1, salary: String(Math.max(selected.demand.minAcceptSalary ?? selected.player.salary * .6, Math.round((selected.demand.demandSalary ?? selected.player.salary) * .95))), logs: [...selected.logs, '再交渉を開始しました。'] })}>再交渉する</button>}
           </div>
           <div className="renewal-card"><h3>最新の返答</h3><p role="status">{selected.logs.at(-1) ?? 'まだ提示していません。'}</p><details><summary>交渉履歴（再交渉 {selected.retries}回）</summary><ol>{selected.logs.map((log, i) => <li key={i}>{log}</li>)}</ol>{!selected.logs.length && <p>交渉履歴はありません。</p>}</details></div>
-          <details className="renewal-card calm-detail" key={selectedId} onToggle={event => setCareerOpen(event.currentTarget.open)}><summary>選手の詳細・年度別成績</summary><div className="renewal-stats">{Object.entries(selected.player.isPitcher ? selected.player.pitching || {} : selected.player.batting || {}).map(([key, value]) => <span key={key}>{abilityNames[key] || key} {stat(value)}</span>)}<span>士気 {stat(selected.player.morale)}</span><span>信頼 {stat(selected.player.trust)}</span></div>{careerOpen && <Suspense fallback={<p>年度別成績を読み込み中です。</p>}><CareerTable player={selected.player} year={year} teamId={myId} teamName={myTeam?.name} /></Suspense>}</details>
+          <details className="renewal-card calm-detail" key={selectedId} onToggle={event => setCareerOpen(event.currentTarget.open)}><summary>選手の詳細・年度別成績</summary><div className="renewal-stats">{Object.entries(selected.player.isPitcher ? selected.player.pitching || {} : selected.player.batting || {}).map(([key, value]) => <span key={key}>{abilityNames[key] || key} {stat(value)}</span>)}<span>士気 {stat(selected.player.morale)}</span><span>信頼 {stat(selected.player.trust)}</span></div>{careerOpen && <Suspense fallback={<p>年度別成績を読み込み中です。</p>}><CareerTable player={selected.player} year={year} teamId={myId} teamName={myTeam?.name} saveId={saveId} /></Suspense>}</details>
           {!finished(selected.status) && selected.status !== 'free_requested' && <button className="renewal-danger" onClick={() => setModal({ type: 'release', id: selectedId })}>戦力外を検討する</button>}
         </>}
       </section>

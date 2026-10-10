@@ -85,7 +85,7 @@ test('E2 final regular game, postseason save/reload, offseason and next year', a
   const next = await saveHub(page), nextProgress = progressSignature(next);
   expect(nextProgress).toMatchObject({year:before.year+1,gameDay:1,wins:0,losses:0,draws:0});
   expect(next.seasonHistory.championships.some(c => c.year === before.year)).toBe(true);
-  const career = await page.evaluate(async ({id,saveId}) => (await import('/baseball-manager/src/engine/saveload.js')).loadPlayerCareerLogById(id), {id:before.player.id,saveId:next.saveId});
+  const career = await page.evaluate(async ({id,saveId}) => (await import('/baseball-manager/src/engine/saveload.js')).loadPlayerCareerLogById(id,saveId), {id:before.player.id,saveId:next.saveId});
   const previousCareer = career.find(entry => entry.year === before.year && entry.teamId === before.myId);
   expect(previousCareer).toBeDefined();
   const regularStats = progressSignature(during, before.player.id).player.stats;

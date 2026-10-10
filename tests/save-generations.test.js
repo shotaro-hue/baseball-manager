@@ -119,7 +119,8 @@ it('deleting a save allows a fresh save in the same tab', async () => {
 });
 it('A14: obsolete unreferenced generations are collected after successful commit', async () => {
  await save(state(1));await save(state(2));const obsolete=parsed().saveManifest;
- await save(state(3));const stored=await chunks();for(const ref of Object.values(obsolete.chunks))expect(stored.has(ref.key)).toBe(false);
+ await save(state(3));const stored=await chunks(),currentKeys=new Set(Object.values(parsed().saveManifest.chunks).map(ref=>ref.key));
+ for(const ref of Object.values(obsolete.chunks))expect(stored.has(ref.key)).toBe(currentKeys.has(ref.key));
  expect((await loadGame()).gameDay).toBe(3);
 });
 it('legacy backup fixed chunks remain protected after migration', async () => {

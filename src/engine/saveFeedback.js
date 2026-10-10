@@ -1,5 +1,6 @@
 export function saveFeedback(result, success = '💾 セーブしました') {
   if (!result?.ok) {
+    if (result?.reason === 'stale_save') return { type: 'warn', message: 'より新しい年度の保存があるため上書きしませんでした。続きから読み直してください。今回の変更は未保存です。' };
     if (result?.reason === 'save_conflict') return { type: 'warn', message: '別タブで保存が更新されました。上書きせず、続きから読み直してください。未保存の変更は失われる可能性があります。' };
     if (result?.reason === 'save_lock_unavailable') return { type: 'warn', message: 'このブラウザでは安全な保存ロックを利用できません。対応ブラウザで再試行してください。' };
     return { type: 'warn', message: result?.quota

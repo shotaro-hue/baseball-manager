@@ -5,13 +5,10 @@ async function initialContents(page) {
   return page.evaluate(async () => {
     const { loadGame } = await import('/baseball-manager/src/engine/saveload.js');
     const saved = await loadGame();
-    const { openBaseballManagerDb } = await import('/baseball-manager/src/engine/baseballManagerDb.js');
-    const db = await openBaseballManagerDb();
-    const rows = await new Promise((resolve,reject) => {
-      const tx = db.transaction('career_logs','readonly'), store = tx.objectStore('career_logs');
-      const all = store.getAll(), keys = store.getAllKeys();
-      tx.oncomplete = () => resolve({ keys: keys.result, rows: all.result }); tx.onerror = () => reject(tx.error);
-    }); db.close();
+    const { readCareerGeneration } = await import('/baseball-manager/src/engine/saveGenerations.js');
+    const data = await readCareerGeneration(saved);
+    const populated = data.players.filter(([, entries]) => entries.length > 0);
+    const rows = { keys: populated.map(([id]) => id), rows: populated.map(([, entries]) => entries) };
     const players = saved.teams.flatMap(t => [...t.players,...t.farm]);
     const historyIds = players.filter(p => p.careerLogSummary?.trimmedEntries > 0).map(p => p.id);
     const { generateSeasonSchedule } = await import('/baseball-manager/src/engine/scheduleGen.js');
@@ -52,19 +49,17 @@ test('slow CPU paints pending, blocks title actions and permits only one complet
 test('failed initial IndexedDB write stays on title and retry saves all history without duplicate records',async({page})=>{
   await page.addInitScript(()=>{
     window.failInitialHistory=true;window.initialHistoryAttempts=0;
-    const original=IDBDatabase.prototype.transaction;
-    IDBDatabase.prototype.transaction=function(stores,mode,...rest){
-      const names=typeof stores==='string'?[stores]:Array.from(stores);
-      if(mode==='readwrite' && names.includes('career_logs')){
+    const original=IDBObjectStore.prototype.add;
+    IDBObjectStore.prototype.add=function(value,...rest){
+      const request=original.call(this,value,...rest);
+      if(this.name==='save_chunks' && value.scope==='careerLogs'){
         window.initialHistoryAttempts++;
         if(window.failInitialHistory){
-          const tx=original.call(this,stores,mode,...rest);
-          // Abort after the initialization code has queued its writes; verify rollback.
+          const tx=this.transaction;
           queueMicrotask(()=>tx.abort());
-          return tx;
         }
       }
-      return original.call(this,stores,mode,...rest);
+      return request;
     };
   });
   await page.goto('/');
@@ -76,7 +71,7 @@ test('failed initial IndexedDB write stays on title and retry saves all history 
     const {openBaseballManagerDb}=await import('/baseball-manager/src/engine/baseballManagerDb.js');
     const db=await openBaseballManagerDb();
     const keys=await new Promise((resolve,reject)=>{
-      const request=db.transaction('career_logs','readonly').objectStore('career_logs').getAllKeys();
+      const request=db.transaction('save_chunks','readonly').objectStore('save_chunks').getAllKeys();
       request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);
     });db.close();return keys;
   });

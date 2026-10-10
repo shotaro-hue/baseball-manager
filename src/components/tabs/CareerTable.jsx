@@ -12,33 +12,35 @@ function loadCareerSaveModule() {
   return careerSaveModulePromise;
 }
 
-export function CareerTable({player,year,teamId,teamName,includeCurrentSeason=true}){
+export function CareerTable({player,year,teamId,teamName,saveId,includeCurrentSeason=true}){
   const [mode,setMode]=useState("regular");
   const [metricKey,setMetricKey]=useState(player.isPitcher?"ERA":"HR");
   const [log,setLog]=useState([]);
   const [isLoading,setIsLoading]=useState(true);
+  const [detailUnavailable,setDetailUnavailable]=useState(false);
 
   useEffect(()=>{
     let alive=true;
     const load=async()=>{
       setIsLoading(true);
+      setDetailUnavailable(false);
       try{
         const mod = await loadCareerSaveModule();
-        const detailLog=await mod.loadPlayerCareerLogById(String(player?.id??""));
+        const detailLog=await mod.loadPlayerCareerLogById(String(player?.id??""),saveId);
         const fallbackRecentLog = Array.isArray(player?.recentCareerLog) ? player.recentCareerLog : [];
         const nextLog = Array.isArray(detailLog) && detailLog.length > 0 ? detailLog : fallbackRecentLog;
-        if(alive) setLog(nextLog);
+        if(alive) { setLog(nextLog);setDetailUnavailable(Number(player.careerLogSummary?.trimmedEntries || 0)>detailLog.length); }
       }catch(e){
         console.warn("careerLog詳細の読み込みに失敗しました:",e);
         const fallbackRecentLog = Array.isArray(player?.recentCareerLog) ? player.recentCareerLog : [];
-        if(alive) setLog(fallbackRecentLog);
+        if(alive) { setLog(fallbackRecentLog);setDetailUnavailable(true); }
       }finally{
         if(alive) setIsLoading(false);
       }
     };
     load();
     return()=>{alive=false;};
-  },[player?.id,player?.recentCareerLog]);
+  },[player?.id,player?.recentCareerLog,player?.careerLogSummary,saveId]);
 
   if(isLoading) return <div style={{marginTop:8,fontSize:14,color:"#53657c"}}>成績を読み込み中...</div>;
   const displayLog=mergeCareerLogWithCurrentSeason(log,{
@@ -49,7 +51,8 @@ export function CareerTable({player,year,teamId,teamName,includeCurrentSeason=tr
     stats:player?.stats,
     playoffStats:player?.playoffStats,
   });
-  if(displayLog.length===0) return <p className="flow-muted" role="status">保存された年度別成績はありません。</p>;
+  const detailNotice=detailUnavailable && <p className="flow-muted" role="status">過去の詳細成績を読み込めませんでした。保存本体に残る履歴のみ表示しています。</p>;
+  if(displayLog.length===0) return <>{detailNotice}<p className="flow-muted" role="status">保存された年度別成績はありません。</p></>;
   const hasPlayoff=displayLog.some(r=>{const ps=r.playoffStats||emptyStats();return ps.PA>0||ps.BF>0||ps.IP>0;});
   const ip=player.isPitcher;
 
@@ -99,6 +102,7 @@ export function CareerTable({player,year,teamId,teamName,includeCurrentSeason=tr
 
   return(
     <div className="calm-detail career-detail" style={{marginTop:8,background:"#f6f9fd",borderRadius:6,padding:"8px 10px"}}>
+      {detailNotice}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:6}}>
         <div style={{fontSize:14,color:"#805700",fontWeight:700}}>📅 年度別成績</div>
         {hasPlayoff&&(

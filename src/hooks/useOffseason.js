@@ -29,7 +29,6 @@ import { hasRecordedFirstTeamSeason } from '../engine/seasonParticipants';
 
 let offseasonPlayerModulePromise = null;
 let offseasonScheduleModulePromise = null;
-let offseasonSaveModulePromise = null;
 
 function loadOffseasonPlayerModule() {
   if (!offseasonPlayerModulePromise) offseasonPlayerModulePromise = import('../engine/player');
@@ -39,11 +38,6 @@ function loadOffseasonPlayerModule() {
 function loadOffseasonScheduleModule() {
   if (!offseasonScheduleModulePromise) offseasonScheduleModulePromise = import('../engine/scheduleGen');
   return offseasonScheduleModulePromise;
-}
-
-function loadOffseasonSaveModule() {
-  if (!offseasonSaveModulePromise) offseasonSaveModulePromise = import('../engine/saveload');
-  return offseasonSaveModulePromise;
 }
 
 function createEmptyStats() {
@@ -139,10 +133,9 @@ export function useOffseason(gs) {
     gs.setIsAutoSaveSuspended?.(true);
     setCareerPersistenceError(null);
     try {
-    const [playerMod, scheduleMod, saveMod] = await Promise.all([
+    const [playerMod, scheduleMod] = await Promise.all([
       loadOffseasonPlayerModule(),
       loadOffseasonScheduleModule(),
-      loadOffseasonSaveModule(),
     ]);
     const currentGameResultsMap = getGameResultsMap();
     const foreignPool = playerMod.generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX));
@@ -181,14 +174,6 @@ export function useOffseason(gs) {
       if (shouldArchiveFreeAgentSeason(p, year) && p.faArchivedYear !== year) indexedDbEntries.push({ playerId: String(p.id), careerEntry: mkCareerEntry(p.stats, p.playoffStats, year, p.faOriginTeamId, p.faOriginTeamName) });
       return { ...prepareOffseasonFreeAgent(p, year), age: Number.isFinite(p.age) ? p.age + 1 : p.age };
     });
-    const persisted = await saveMod.appendCareerEntriesToIndexedDb(indexedDbEntries);
-    if (!persisted?.ok) {
-      const message = '年度成績の保存に失敗しました。次年度へは進んでいません。再試行してください。';
-      setCareerPersistenceError(message);
-      notify(message,'warn');
-      return false;
-    }
-
     const nextYear=year+1;
     const newSchedule=scheduleMod.generateSeasonSchedule(nextYear, nextTeams);
     const params=SEASON_PARAMS[nextYear]||getDefaultParams(nextYear);
@@ -199,9 +184,13 @@ export function useOffseason(gs) {
       seasonInfo: newSeasonInfo, growth: developmentSummary } : null;
     const nextMatchHistory = nextSeasonMatchHistory({ ...gs, gameResultsMap: currentGameResultsMap }, year, schedule, myId);
     if (gs.handleSave && nextPlan) {
-      const saved = await gs.handleSave({ silent: true, payload: { teams: nextTeams, year: nextYear,
+      const saved = await gs.handleSave({ silent: true, careerEntries: indexedDbEntries, payload: { teams: nextTeams, year: nextYear,
         gameDay: 1, faPool: nextPool, faYears: {}, offseasonPlan: nextPlan, ...nextMatchHistory } });
-      if (!saved?.ok) { setCareerPersistenceError('新年度の保存に失敗しました。年度は進めていません。再試行してください。'); return false; }
+      if (!saved?.ok) {
+        setCareerPersistenceError('新年度の保存に失敗しました。年度は進めていません。再試行してください。'
+          + (saved?.quota ? '保存容量が不足しています。前回の正常セーブは保持しています。' : ''));
+        return false;
+      }
     }
     setTeams(nextTeams);
     // Unsigned domestic players remain available. Archive their saved season before
@@ -518,10 +507,7 @@ export function useOffseason(gs) {
     retireTransitionRef.current = true;
     setCareerPersistenceError(null);
     try {
-    const [playerMod, saveMod] = await Promise.all([
-      loadOffseasonPlayerModule(),
-      loadOffseasonSaveModule(),
-    ]);
+    const playerMod = await loadOffseasonPlayerModule();
     const safeDecisions = decisions && typeof decisions === 'object' ? decisions : {};
     const userRetiredIds = new Set(
       Object.entries(safeDecisions)
@@ -557,14 +543,6 @@ export function useOffseason(gs) {
         ids: new Set(retiringPlayers.map((player) => player.id)),
         alumni,
       });
-    }
-
-    const persisted = await saveMod.appendCareerEntriesToIndexedDb(retirementCareerEntries);
-    if (!persisted?.ok) {
-      const message = '引退選手の最終年成績を保存できませんでした。処理を中断しました。再試行してください。';
-      setCareerPersistenceError(message);
-      notify(message,'warn');
-      return false;
     }
 
     for (const team of teams) {
@@ -705,6 +683,7 @@ export function useOffseason(gs) {
         seasonInfo: { retiredNames: retiredMyNames, year: year + 1, draftCount: 0, draftNames: [] }, releasedIds: [] });
       setScreen('offseason_planning');
     } else setScreen("offseason_fa_phase");
+    gs.stageCareerEntries?.(retirementCareerEntries);
     return true;
     } catch (error) {
       console.error('引退フェーズ処理に失敗しました:', error);

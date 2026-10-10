@@ -1,0 +1,196 @@
+{
+  "sourceCommit": "6b59654c140780cac5ffcb03980cc27a624f6850",
+  "body": {
+    "saveId": "legacy-five",
+    "year": 2026,
+    "gameDay": 1,
+    "myId": 0,
+    "teams": [
+      {
+        "id": 0,
+        "name": "球団",
+        "players": [
+          {
+            "id": "same",
+            "recentCareerLog": [
+              {
+                "year": 2025,
+                "teamId": 0,
+                "teamName": "球団",
+                "stats": {
+                  "HR": 2
+                }
+              }
+            ],
+            "careerLog": [],
+            "stats": {
+              "sprayPoints": [],
+              "battedBallEvents": []
+            },
+            "careerLogSummary": {
+              "totalGames": 0,
+              "totalPlateAppearances": 0,
+              "totalAtBats": 0,
+              "totalHits": 0,
+              "totalDoubles": 0,
+              "totalTriples": 0,
+              "totalHomeRuns": 2,
+              "totalRbi": 0,
+              "totalWalks": 0,
+              "totalBattingStrikeouts": 0,
+              "totalStolenBases": 0,
+              "totalInningsPitched": 0,
+              "totalEarnedRuns": 0,
+              "totalPitchingStrikeouts": 0,
+              "totalWins": 0,
+              "totalLosses": 0,
+              "totalSaves": 0,
+              "totalHolds": 0,
+              "firstYear": 2025,
+              "lastYear": 2025,
+              "trimmedEntries": 1
+            },
+            "trimmedCareerLogSummary": {
+              "totalGames": 0,
+              "totalPlateAppearances": 0,
+              "totalAtBats": 0,
+              "totalHits": 0,
+              "totalDoubles": 0,
+              "totalTriples": 0,
+              "totalHomeRuns": 2,
+              "totalRbi": 0,
+              "totalWalks": 0,
+              "totalBattingStrikeouts": 0,
+              "totalStolenBases": 0,
+              "totalInningsPitched": 0,
+              "totalEarnedRuns": 0,
+              "totalPitchingStrikeouts": 0,
+              "totalWins": 0,
+              "totalLosses": 0,
+              "totalSaves": 0,
+              "totalHolds": 0,
+              "firstYear": 2025,
+              "lastYear": 2025,
+              "trimmedEntries": 1
+            }
+          }
+        ],
+        "farm": []
+      }
+    ],
+    "seasonHistory": null,
+    "news": [],
+    "mailbox": [],
+    "saveRevision": 0,
+    "saveManifest": {
+      "version": 5,
+      "saveId": "legacy-five",
+      "generation": "017bf024-c9f0-4ab0-8eda-e35d07f67d53",
+      "chunks": {
+        "seasonHistory": {
+          "key": "generation:[\"legacy-five\",\"017bf024-c9f0-4ab0-8eda-e35d07f67d53\",\"seasonHistory\"]",
+          "saveId": "legacy-five",
+          "generation": "017bf024-c9f0-4ab0-8eda-e35d07f67d53",
+          "version": 5,
+          "signature": "9:512968832"
+        },
+        "news": {
+          "key": "generation:[\"legacy-five\",\"017bf024-c9f0-4ab0-8eda-e35d07f67d53\",\"news\"]",
+          "saveId": "legacy-five",
+          "generation": "017bf024-c9f0-4ab0-8eda-e35d07f67d53",
+          "version": 5,
+          "signature": "11:946400096"
+        },
+        "mailbox": {
+          "key": "generation:[\"legacy-five\",\"017bf024-c9f0-4ab0-8eda-e35d07f67d53\",\"mailbox\"]",
+          "saveId": "legacy-five",
+          "generation": "017bf024-c9f0-4ab0-8eda-e35d07f67d53",
+          "version": 5,
+          "signature": "2:1947613349"
+        },
+        "matchHistory": {
+          "key": "generation:[\"legacy-five\",\"017bf024-c9f0-4ab0-8eda-e35d07f67d53\",\"matchHistory\"]",
+          "saveId": "legacy-five",
+          "generation": "017bf024-c9f0-4ab0-8eda-e35d07f67d53",
+          "version": 5,
+          "signature": "185:1518999547"
+        }
+      }
+    },
+    "matchHistoryStored": true,
+    "saveDataVersion": 5
+  },
+  "chunks": [
+    [
+      "generation:[\"legacy-five\",\"017bf024-c9f0-4ab0-8eda-e35d07f67d53\",\"mailbox\"]",
+      {
+        "saveId": "legacy-five",
+        "generation": "017bf024-c9f0-4ab0-8eda-e35d07f67d53",
+        "version": 5,
+        "scope": "mailbox",
+        "data": []
+      }
+    ],
+    [
+      "generation:[\"legacy-five\",\"017bf024-c9f0-4ab0-8eda-e35d07f67d53\",\"matchHistory\"]",
+      {
+        "saveId": "legacy-five",
+        "generation": "017bf024-c9f0-4ab0-8eda-e35d07f67d53",
+        "version": 5,
+        "scope": "matchHistory",
+        "data": {
+          "gameResultsMap": {},
+          "allTeamResultsMap": {},
+          "allTeamBoxScoresMap": {},
+          "scheduleArchive": [],
+          "recentResults": [],
+          "allStarDone": false,
+          "allStarResult": null,
+          "lastPressDay": 0,
+          "pressEvent": null
+        }
+      }
+    ],
+    [
+      "generation:[\"legacy-five\",\"017bf024-c9f0-4ab0-8eda-e35d07f67d53\",\"news\"]",
+      {
+        "saveId": "legacy-five",
+        "generation": "017bf024-c9f0-4ab0-8eda-e35d07f67d53",
+        "version": 5,
+        "scope": "news",
+        "data": [
+          {
+            "day": 1
+          }
+        ]
+      }
+    ],
+    [
+      "generation:[\"legacy-five\",\"017bf024-c9f0-4ab0-8eda-e35d07f67d53\",\"seasonHistory\"]",
+      {
+        "saveId": "legacy-five",
+        "generation": "017bf024-c9f0-4ab0-8eda-e35d07f67d53",
+        "version": 5,
+        "scope": "seasonHistory",
+        "data": {
+          "day": 1
+        }
+      }
+    ]
+  ],
+  "careerRows": [
+    [
+      "same",
+      [
+        {
+          "year": 2020,
+          "teamId": 0,
+          "teamName": "球団",
+          "stats": {
+            "HR": 7
+          }
+        }
+      ]
+    ]
+  ]
+}
