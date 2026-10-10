@@ -1,0 +1,37 @@
+import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
+import { readSave, reloadAndLoad, waitSaveIdle } from './helpers/progression';
+
+test('draft automatic picks respect 69/70 capacity and survive real save/reload without duplicate signings',async({page})=>{
+ test.setTimeout(60000);await page.setViewportSize({width:390,height:844});
+ const fixture=JSON.parse(gunzipSync(readFileSync(new URL('./fixtures/new-game.json.gz',import.meta.url))));
+ const mine=fixture.teams.find(t=>t.id===fixture.myId),other=fixture.teams.find(t=>t.id!==fixture.myId);
+ const fill=(team,total)=>{const template=team.farm[0]||team.players[0];team.farm=Array.from({length:total-team.players.length},(_,i)=>({...template,id:`draft-owned-${team.id}-${i}`,育成:false,isIkusei:false}));};
+ fill(mine,69);fill(other,70);
+ const pool=Array.from({length:8},(_,i)=>({...mine.players.find(p=>!p.isPitcher),id:`draft-candidate-${i}`,name:`ドラフト検証${i}`,potential:70,育成:false,isIkusei:false}));
+ fixture.offseasonPlan={version:1,year:fixture.year,myId:fixture.myId,stage:'results',resumeScreen:'draft_lottery',draftPool:pool};
+ await page.goto('/');
+ await page.evaluate(async s=>{const m=await import('/baseball-manager/src/engine/saveload.js');if(!(await m.saveGame(s)).ok)throw new Error('fixture save failed');},fixture);
+ await reloadAndLoad(page);
+ await page.getByRole('button',{name:/全ドラフト自動処理/}).click();
+ await expect(page.getByText('ドラフト終了！',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'途中保存',exact:true}).click();await waitSaveIdle(page);
+ const draft=await readSave(page);expect(draft.offseasonPlan.draftAutoSkip).toBe(true);
+ await reloadAndLoad(page);await expect(page.getByText('ドラフト終了！',{exact:true})).toBeVisible();
+ const resumed=await readSave(page);expect(resumed.offseasonPlan.draftViews.draft).toEqual(draft.offseasonPlan.draftViews.draft);
+ await page.getByRole('button',{name:/結果レビューへ/}).click();
+ await page.getByRole('button',{name:/シーズン開幕！/}).click();
+ await expect(page.getByRole('button',{name:/キャンプ終了・開幕へ/})).toBeVisible();
+ await page.getByRole('button',{name:'途中保存',exact:true}).click();await waitSaveIdle(page);
+ const signed=await readSave(page);
+ const result=s=>s.teams.map(t=>({id:t.id,owned:[...t.players,...t.farm].map(p=>p.id)}));
+ const all=signed.teams.flatMap(t=>[...t.players,...t.farm]);
+ expect(new Set(all.map(p=>p.id)).size).toBe(all.length);
+ const mySigned=signed.teams.find(t=>t.id===mine.id),otherSigned=signed.teams.find(t=>t.id===other.id);
+ expect([...mySigned.players,...mySigned.farm].filter(p=>p.id.startsWith('draft-candidate-'))).toHaveLength(1);
+ expect([...otherSigned.players,...otherSigned.farm].filter(p=>p.id.startsWith('draft-candidate-'))).toHaveLength(0);
+ expect(signed.offseasonPlan).toMatchObject({draftApplied:true,seasonInfo:{draftCount:1}});
+ await reloadAndLoad(page);await expect(page.getByRole('button',{name:/キャンプ終了・開幕へ/})).toBeVisible();
+ expect(result(await readSave(page))).toEqual(result(signed));
+});

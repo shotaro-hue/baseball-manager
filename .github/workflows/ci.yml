@@ -34,7 +34,7 @@ jobs:
       matrix:
         suite:
           - name: initialization-and-progression
-            files: progression.smoke.spec.js initialization.spec.js
+            files: progression.smoke.spec.js initialization.spec.js draft.spec.js
           - name: match-history
             files: match-history.spec.js
           - name: posting-and-finance

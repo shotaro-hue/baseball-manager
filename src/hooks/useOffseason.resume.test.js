@@ -83,3 +83,27 @@ it('permits next years draft in the same mounted game while preserving previous 
   }
   expect(h.current.gs.teams[0].farm.map(p => p.id)).toEqual([2026, 2027, 2028]);
 });
+it('rejects final draft acquisitions exceeding the latest registered capacity without advancing', () => {
+  const t = team([]); t.farm = Array.from({length:70},(_,i)=>p(`owned-${i}`));
+  const h = setup({ teams:[t],screen:'draft_review',plan:{version:1,year:2026,myId:0,stage:'results'} });
+  const before = structuredClone(h.current.gs.teams);
+  act(()=>expect(h.current.os.handleDraftComplete([p(1)],{1:0})).toBe(false));
+  expect(h.current.gs.teams).toEqual(before);expect(h.current.gs.screen).toBe('draft_review');expect(h.current.gs.offseasonPlan.draftApplied).toBeUndefined();
+});
+it('rejects conflicting first and later round owners before applying any acquisition', () => {
+  const other={...team([]),id:1};const h=setup({teams:[team([]),other],screen:'draft_review',plan:{version:1,year:2026,myId:0,stage:'results'}});
+  act(()=>expect(h.current.os.handleDraftComplete([p(1,{_drafted:true,_r1winner:0})],{1:1})).toBe(false));
+  expect(h.current.gs.teams.every(t=>t.farm.length===0)).toBe(true);
+});
+it('rechecks current capacity even through a callback captured before a roster change', () => {
+  const h=setup({teams:[team([])],screen:'draft_review',plan:{version:1,year:2026,myId:0,stage:'results'}});
+  const stale=h.current.os.handleDraftComplete;
+  act(()=>h.current.gs.setTeams([{...team([]),farm:Array.from({length:70},(_,i)=>p(`owned-${i}`))}]));
+  act(()=>expect(stale([p(1)],{1:0})).toBe(false));
+  expect(h.current.gs.teams[0].farm).toHaveLength(70);
+});
+it('rejects a missing draft result without throwing or advancing the review', () => {
+ const h=setup({screen:'draft_review',plan:{version:1,year:2026,myId:0,stage:'results'}});
+ act(()=>expect(h.current.os.handleDraftComplete(null,{})).toBe(false));
+ expect(h.current.gs.screen).toBe('draft_review');
+});
