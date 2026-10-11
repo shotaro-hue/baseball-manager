@@ -4,6 +4,19 @@ import {FarmRecordSummary,FARM_STAT_LABELS} from './FarmRecordSummary';
 import {fmtAvg} from '../utils';
 const labels={...FARM_STAT_LABELS,AVG:'打率',ERA:'防御率',outs:'投球回'};
 const valueFor=(r,metric)=>metric==='AVG'?(r.value===null?'—':fmtAvg(r.stats.H,r.stats.AB)):metric==='ERA'?(r.value===null?'—':r.value.toFixed(2)):metric==='outs'?r.IP:r.value;
+function FarmUnplayedReasons({record,league,teamId}) {
+ if(!record.cards)return <p className="flow-muted">過年度の未実施理由は未記録です。</p>;
+ const counts=new Map(),labels={'insufficient-catcher':'捕手不足','insufficient-batters':'健康な野手不足','insufficient-pitchers':'健康な投手不足'};
+ for(const card of record.cards.filter(c=>c.status==='unplayed'&&c.league===league&&(teamId===undefined||c.homeId===teamId||c.awayId===teamId))) {
+  for(const r of card.reasons) {
+   const key=JSON.stringify([r.teamId,r.code,r.available,r.required]),entry=counts.get(key)||{...r,count:0};
+   entry.count++;counts.set(key,entry);
+  }
+ }
+ return <details><summary>未実施理由</summary>{counts.size>0?<ul>{[...counts].map(([key,r])=><li key={key}>
+  {record.teams.find(t=>t.teamId===r.teamId)?.name??String(r.teamId)}：{labels[r.code]??r.code}（{r.available}/{r.required}）・{r.count}カード
+ </li>)}</ul>:<p>選択範囲の未実施はありません。</p>}</details>;
+}
 
 export function FarmRankings({state={}}) {
  const years=selectFarmYears(state),[selectedYear,setYear]=useState(null),[league,setLeague]=useState('セ'),[club,setClub]=useState('all');
@@ -34,6 +47,7 @@ export function FarmRankings({state={}}) {
     <tbody>{ranking.standings.filter(t=>teamId===undefined||t.teamId===teamId).map(t=><tr key={t.teamId}><td>{t.name}</td>{['scheduled','played','unplayed','W','L','T'].map(k=><td key={k}>{t[k]}</td>)}</tr>)}</tbody>
    </table>
   </div>
+  <FarmUnplayedReasons record={record} league={league} teamId={teamId}/>
   <div className="stats-table-wrap" role="region" tabIndex={0} aria-label="二軍選手ランキング。横にスクロールできます">
    <table className="tbl stats-table"><thead><tr><th>順位</th><th>選手</th><th>{labels[metric]}</th><th>{kind==='batting'?'打席':'登板'}</th><th>実績球団</th>{kind==='batting'&&<th>規定</th>}</tr></thead>
     <tbody>{ranking.rows.length===0?<tr><td colSpan={kind==='batting'?6:5}>対象の選手はいません。</td></tr>:ranking.rows.map(r=><tr key={r.playerId}>

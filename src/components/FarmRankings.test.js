@@ -8,6 +8,14 @@ import { StatsTab } from "./tabs/StatsTab";
 const state = () => ({ year: 2027, teams: [], farmCompetition: { ...record(), year: 2027, nextRound: 5, startRound: 4, legacy: { entries: [{playerId:0,stats:{PA:100},year:null}] } }, seasonHistory: { farmArchives: [record()] } });
 const flatten = n => n==null?'':typeof n==='object'?(Array.isArray(n)?n:n.children||[]).map(flatten).join(''):String(n);
 const text = v => flatten(v.toJSON());
+it('shows stored shortage causes, including opponent shortage for a selected club, and does not invent historical reasons',()=>{
+ const s=state();s.farmCompetition.cards=[{league:'セ',homeId:0,awayId:1,status:'unplayed',reasons:[{teamId:0,code:'insufficient-catcher',available:0,required:1}]}];
+ let v;act(()=>v=create(React.createElement(FarmRankings,{state:s})));
+ act(()=>v.root.findByProps({'aria-label':'二軍球団'}).props.onChange({target:{value:'1'}}));
+ expect(text(v)).toContain('東A：捕手不足（0/1）・1カード');
+ act(()=>v.root.findByProps({'aria-label':'二軍年度'}).props.onChange({target:{value:'2026'}}));
+ expect(text(v)).toContain('過年度の未実施理由は未記録');expect(text(v)).not.toContain('捕手不足（0/1）');act(()=>v.unmount());
+});
 it("switches year, league and club, and opens read-only retired record detail without invented player abilities", () => {
   let v;
   act(() => v = create(/* @__PURE__ */ React.createElement(FarmRankings, { state: state() })));
