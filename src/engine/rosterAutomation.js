@@ -127,6 +127,11 @@ function createLeagueContext(team, options = {}) {
   ]);
 }
 
+const isHealthyFarmCatcher = player => !player.isPitcher && isHealthy(player)
+  && proficiencyAt(player, POS_CATCHER) > 0;
+const activeCatcherCount = players => (players || []).filter(player => !player.isPitcher
+  && player.pos === POS_CATCHER && isEligibleActivePlayer(player)).length;
+
 function buildPositionAssignments(team, rosterDhMode, options, leagueContext, evaluate) {
   const required = [...FIELDING_POSITIONS, ...(rosterDhMode ? ['DH'] : [])];
   const eligibleBatters = (team.players || []).filter(
@@ -322,8 +327,16 @@ export function buildRosterRecs(team, options = {}) {
       ? ROSTER_DEVREC_BONUS : 0;
     return baseScores.get(player) + developmentBonus;
   };
-  const canPromote = (player) =>
-    !usedFarmIds.has(player.id) && canAddToActiveRoster(player, projectedPlayers);
+  const canPromote = (player, downPlayer) => {
+    if (usedFarmIds.has(player.id) || !canAddToActiveRoster(player, projectedPlayers)) return false;
+    // Farm participation permits healthy developmental/cooldown catchers too.
+    // Keep the last one unless the active minimum needs it or a catcher returns.
+    return options.preserveFarmCatcher !== true
+      || !isHealthyFarmCatcher(player)
+      || activeCatcherCount(projectedPlayers) < MIN_ACTIVE_CATCHERS
+      || projectedFarm.filter(isHealthyFarmCatcher).length > 1
+      || (downPlayer && isHealthyFarmCatcher(downPlayer));
+  };
   const protectedLineupIds = new Set(
     buildAutoLineupEntries(
       { ...team, players: projectedPlayers },
@@ -438,13 +451,13 @@ export function buildRosterRecs(team, options = {}) {
 
   while (projectedPlayers.length < MAX_ROSTER) {
     const candidate = projectedFarm
-      .filter(canPromote)
+      .filter(player => canPromote(player))
       .sort((a, b) => score(b, true) - score(a, true))[0];
     if (!addPromotion(candidate, ['一軍枠を充足', '方針評価上位'])) break;
   }
 
   const addSwap = (upPlayer, downPlayer, reasons) => {
-    if (!upPlayer || !downPlayer || !canPromote(upPlayer)) return false;
+    if (!upPlayer || !downPlayer || !canPromote(upPlayer, downPlayer)) return false;
     recs.push({
       type: 'swap',
       upPlayer,
@@ -496,15 +509,15 @@ export function buildRosterRecs(team, options = {}) {
     if (!addSwap(upPlayer, downPlayer, ['投手人数を充足'])) break;
   }
 
-  const remainingFarm = () => projectedFarm
-    .filter(canPromote)
+  const remainingFarm = downPlayer => projectedFarm
+    .filter(player => canPromote(player, downPlayer))
     .sort((a, b) => score(b, true) - score(a, true));
   [...projectedPlayers]
     .sort((a, b) => score(a, false) - score(b, false))
     .forEach((activePlayer) => {
       if (usedActiveIds.has(activePlayer.id)) return;
       if (!canDemoteWithoutBreakingCoverage(activePlayer)) return;
-      const best = remainingFarm().find(
+      const best = remainingFarm(activePlayer).find(
         (farmPlayer) => farmPlayer.isPitcher === activePlayer.isPitcher,
       );
       if (!best) return;
@@ -663,9 +676,16 @@ function ensureMinimumCatcherCount(team, options = {}) {
 function ensureRequiredFieldingCoverage(team, options = {}) {
   let nextTeam = team;
   const changes = [];
+  const reserveFarmCatcher = options.preserveFarmCatcher === true
+    && activeCatcherCount(nextTeam.players) >= MIN_ACTIVE_CATCHERS
+    && (nextTeam.farm || []).filter(isHealthyFarmCatcher).length === 1
+    && [false, true].every(rosterDhMode => buildAutoLineupEntries(nextTeam, {
+      ...options, rosterDhMode,
+    }).length === (rosterDhMode ? 9 : 8));
   const eligibleFarm = (nextTeam.farm || []).filter(
     (player) =>
       !player.isPitcher
+      && !(reserveFarmCatcher && isHealthyFarmCatcher(player))
       && isEligibleActivePlayer(player)
       && (
         (Number(player.registrationCooldownDays) || 0) === 0
@@ -1267,6 +1287,7 @@ export function prepareTeamForGame(team, useDh, options = {}) {
 }
 
 export function buildFullRosterPlan(team, options = {}) {
+  options = { ...options, preserveFarmCatcher: options.preserveFarmCatcher !== false };
   const originalCooldownIds = new Set(
     (team.farm || [])
       .filter((player) => (Number(player.registrationCooldownDays) || 0) > 0)
@@ -1314,6 +1335,25 @@ export function buildFullRosterPlan(team, options = {}) {
     });
     validation = validateTeamRoster(nextTeam);
   }
+  if (options.preserveFarmCatcher && validation.valid
+    && !(nextTeam.farm || []).some(isHealthyFarmCatcher)
+    && activeCatcherCount(nextTeam.players) >= MIN_ACTIVE_CATCHERS) {
+    const candidates = nextTeam.players.filter(player => isHealthyFarmCatcher(player)
+      && isEligibleActivePlayer(player)
+      && (player.pos !== POS_CATCHER || activeCatcherCount(nextTeam.players) > MIN_ACTIVE_CATCHERS))
+      .sort((a, b) => rosterRecScore(a, nextTeam, options) - rosterRecScore(b, nextTeam, options));
+    for (const downPlayer of candidates) {
+      const rec = { type: 'demote', downPlayer, upPlayer: null, scoreDiff: 0,
+        reasons: ['一軍捕手2人を維持し二軍の捕手を確保'] };
+      const candidate = buildAutoManagedRoster(applyRosterRecs(nextTeam, [rec]), options);
+      const candidateValidation = validateTeamRoster(candidate);
+      if (activeCatcherCount(candidate.players) < MIN_ACTIVE_CATCHERS || !candidateValidation.valid) continue;
+      nextTeam = candidate;
+      validation = candidateValidation;
+      changes.push(rec);
+      break;
+    }
+  }
   return { team: nextTeam, changes, validation };
 }
 
@@ -1321,6 +1361,7 @@ export function optimizeTeamForGameStart(team, options = {}) {
   const initialMode = getRosterAutomationMode(team, options.defaultAutomationMode);
   const plan = buildFullRosterPlan(team, {
     ...options,
+    preserveFarmCatcher: false,
     automationMode: ROSTER_AUTOMATION_MODES.FULL,
   });
   // Initial optimization can demote a catcher while trimming the roster. Recall
@@ -1353,10 +1394,15 @@ export function applyManagementPolicy(team, options = {}) {
   if (mode !== ROSTER_AUTOMATION_MODES.FULL) return nextTeam;
 
   const needsConstraintRepair = !validateTeamRoster(nextTeam).valid;
+  const needsFarmCatcherRepair = options.includeRosterChanges !== false
+    && !(nextTeam.farm || []).some(isHealthyFarmCatcher)
+    && activeCatcherCount(nextTeam.players) >= MIN_ACTIVE_CATCHERS
+    && nextTeam.players.filter(p => isEligibleActivePlayer(p) && isHealthyFarmCatcher(p)).length > MIN_ACTIVE_CATCHERS;
   const runRoster = options.includeRosterChanges !== false
     && (
       force
       || needsConstraintRepair
+      || needsFarmCatcherRepair
       || (
         nextTeam.rosterMaintenance?.changed
         && nextTeam.rosterMaintenance?.validation?.valid === false
@@ -1365,6 +1411,7 @@ export function applyManagementPolicy(team, options = {}) {
     );
   const runLineup = force
     || needsConstraintRepair
+    || needsFarmCatcherRepair
     || nextTeam.rosterMaintenance?.changed
     || shouldRunLineupManagement(nextTeam, gameDay);
   let recs = [];
