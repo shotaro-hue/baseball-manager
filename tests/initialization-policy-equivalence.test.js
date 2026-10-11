@@ -9,8 +9,6 @@ it('matches uncached baseline values and plans across all policies, DH modes and
   let seed=42;
   vi.spyOn(Math,'random').mockImplementation(()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;});
   vi.spyOn(Date,'now').mockReturnValue(1791508062000);
-  // The initial-generation catcher guarantee changes this seeded input; preserve
-  // the complete policy/lineup/recommendation regression snapshot for that input.
   const source=buildTeam(TEAM_DEFS[0]);
   const outputs=[];
   for(const policyId of MANAGEMENT_POLICY_ORDER)for(const rosterDhMode of [false,true]){
