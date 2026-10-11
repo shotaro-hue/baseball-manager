@@ -164,3 +164,21 @@ it.each(['runs','null'])('rejects an inning line inconsistent with events: %s', 
   else {bad.teams[0].innings[8]=bad.teams[0].innings[0];bad.teams[0].innings[0]=null;}
   expect(()=>validateFarmGame(bad)).toThrow();
 });
+
+it.each(['OUT','BB','HR'])('already rejects coherent extra %s after a walkoff', outcome => {
+  const g=playFarmGame({...selections(),rng:scripted([...Array(51).fill(.9),.30])});
+  const previous=g.events.at(-1),batterId=g.teams[0].records.find(r=>r.batting&&r.playerId!==previous.batterId).playerId;
+  const advance=advanceFarmBases({bases:previous.runnersAfter,outcome,batterId,pitcherId:previous.pitcherId});
+  const event={...previous,batterId,outcome,runnersBefore:previous.runnersAfter,runnersAfter:advance.bases,
+    scorers:advance.scorers,rbi:advance.rbi,outsAdded:advance.outsAdded};
+  const bat=g.teams[0].records.find(r=>r.playerId===batterId).batting;
+  const pitch=g.teams[1].records.find(r=>r.playerId===previous.pitcherId).pitching;
+  bat.PA++;pitch.BF++;g.teams[0].outsMade+=advance.outsAdded;pitch.outs+=advance.outsAdded;
+  if(outcome==='BB'){bat.BB++;pitch.BBp++;}
+  else {bat.AB++;if(outcome==='HR') {
+    bat.H++;bat.HR++;bat.R++;bat.RBI++;pitch.Hp++;pitch.HRp++;pitch.ER++;pitch.Rallowed++;
+    g.teams[0].score++;g.teams[0].innings[8]++;
+  }}
+  g.events.push(event);
+  expect(()=>validateFarmGame(g)).toThrow();
+});

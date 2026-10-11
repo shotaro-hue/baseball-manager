@@ -1,3 +1,4 @@
+import { validateFarmSaveState } from './farmMigration';
 import { GENERATION_VERSION, LEGACY_GENERATION_VERSION, prepareGeneration, readGeneration, readCareerGeneration, collectUnusedChunks } from './saveGenerations';
 import { prepareCareerData, captureInlineCareerLogs } from './careerGenerations';
 import { MATCH_HISTORY_FIELDS, matchHistorySnapshot, matchHistoryForSave } from './matchHistory';
@@ -261,6 +262,8 @@ function validateAndMigrateSave(state) {
   if (!state || !hasSelectedTeam(state.teams, state.myId) || !state.year) {
     return { ok: false };
   }
+  // Introduced data is validated as-is; a corrupt ledger must reach backup recovery.
+  validateFarmSaveState(state);
   const teams = state.teams.map(t => ({
     ...t,
     wins:               t.wins               ?? 0,
@@ -613,6 +616,7 @@ async function saveGameImpl(state, options = {}) {
   try {
     safeState = sanitizeSaveState(state);
     safeState.saveId = ensureSaveId(safeState.saveId);
+    validateFarmSaveState(safeState);
   } catch (e) {
     console.error('Save failed: sanitize state error', e);
     return { ok: false, quota: false, reason: 'sanitize_state_failed' };
@@ -627,14 +631,22 @@ async function saveGameImpl(state, options = {}) {
     if(previous?.saveId===safeState.saveId && Number(previous.year)>Number(safeState.year)) {
       return {ok:false,quota:false,reason:'stale_save'};
     }
+    if(previous?.saveId===safeState.saveId && previous.farmCompetitionVersion===1 && safeState.farmCompetitionVersion!==1) {
+      return {ok:false,quota:false,reason:'farm_payload_missing'};
+    }
+    let generationDirtyScopes=options?.dirtyScopes;
+    if(safeState.farmCompetition && previous?.farmCompetition?.archiveSignature!==safeState.farmCompetition.archiveSignature
+      && Array.isArray(generationDirtyScopes)) {
+      generationDirtyScopes=[...new Set([...generationDirtyScopes,'seasonHistory','matchHistory'])];
+    }
     const careerData = await prepareCareerData(safeState, previous, options, legacyCareerSeeds.get(previous),state);
     let prepared;
-    try { prepared = await prepareGeneration(safeState, previous, options?.dirtyScopes, careerData); }
+    try { prepared = await prepareGeneration(safeState, previous, generationDirtyScopes, careerData); }
     catch (error) {
       if (error?.name !== 'QuotaExceededError') throw error;
       // Reclaim only rows proven unreferenced, then retry once. Never remove a backup root.
       await cleanupSaveChunks();
-      prepared = await prepareGeneration(safeState, previous, options?.dirtyScopes, careerData);
+      prepared = await prepareGeneration(safeState, previous, generationDirtyScopes, careerData);
     }
     safeState.saveManifest = prepared.manifest;
     perfBreakdown.indexedDbMs = safeElapsedMs(indexedDbStart);
@@ -700,7 +712,9 @@ async function saveGameImpl(state, options = {}) {
         if (raw) {
           const previous = validatedRawRoots.get(localStorage) === raw ? validatedRoots.get(localStorage) : decompress(raw);
           if (Array.isArray(previous.teams) && hasSelectedTeam(previous.teams, previous.myId) && previous.year) {
-            if (previous.saveDataVersion >= LEGACY_GENERATION_VERSION) await readGeneration(previous);
+            const hydratedPrevious = previous.saveDataVersion >= LEGACY_GENERATION_VERSION
+              ? { ...previous, ...await readGeneration(previous) } : previous;
+            validateFarmSaveState(hydratedPrevious);
             rotationRaw = raw;
           }
         }

@@ -304,3 +304,6 @@ export function validateFarmGame(game) {
   }
   return true;
 }
+
+// Shared record schema for the independent F-02 ledger; no game behavior change.
+export { BAT_KEYS, PITCH_KEYS };
