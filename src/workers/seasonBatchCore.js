@@ -1,3 +1,4 @@
+import {prepareFarmProgress,finishFarmProgress} from '../engine/farmProgression';
 import { regularSeasonRequest } from '../engine/seasonProgress';
 import { uid, rng, rngf, gameDayToDate } from '../utils';
 import * as playerRules from '../engine/player';
@@ -584,6 +585,7 @@ export function simulateSeasonBatch({
       });
     });
 
+    const farmProgress = prepareFarmProgress(state,newTeams,newDay);
     let teamMap = buildTeamMap(newTeams);
 
     const scheduleMatchup = getMyMatchup(state.schedule, newDay, state.myId);
@@ -719,6 +721,10 @@ export function simulateSeasonBatch({
       }
     }
 
+    if(farmProgress) {
+      newTeams=finishFarmProgress(newTeams,farmProgress,newDay);
+      state.farmCompetition=farmProgress.competition;state.farmCompetitionVersion=1;
+    }
     // Finish every scheduled game before changing CPU ownership. Otherwise an
     // opponent can lose a starter between morning roster checks and its game,
     // or a transferred player can appear for two teams on the same day.

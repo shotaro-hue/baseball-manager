@@ -1,4 +1,6 @@
 export const G = {
+  APPLY_PROGRESS: 'APPLY_PROGRESS',
+  SET_FARM_COMPETITION: 'SET_FARM_COMPETITION',
   SET_TEAMS:    'SET_TEAMS',
   UPD_TEAM:     'UPD_TEAM',
   SET_GAME_DAY: 'SET_GAME_DAY',
@@ -13,6 +15,10 @@ export const G = {
  */
 export function gameStateReducer(state, action) {
   switch (action.type) {
+    case G.APPLY_PROGRESS:
+      return {...state,...Object.fromEntries(['teams','gameDay','year','myId','saveId','farmCompetition'].filter(k=>k in action.candidate).map(k=>[k,action.candidate[k]]))};
+    case G.SET_FARM_COMPETITION:
+      return {...state,farmCompetition:action.competition};
     case G.SET_TEAMS:
       return { ...state, teams: typeof action.teams === 'function' ? action.teams(state.teams) : action.teams };
     case G.UPD_TEAM:

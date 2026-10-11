@@ -1,3 +1,7 @@
+import {readFileSync} from 'node:fs';
+import {gunzipSync} from 'node:zlib';
+import {migrateFarmCompetition,validateFarmSaveState} from '../engine/farmMigration';
+import {generateSeasonSchedule,getMyMatchup} from '../engine/scheduleGen';
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
@@ -46,21 +50,23 @@ function snapshot(isHome) {
 
 async function runHook(state, isHome, mode) {
   let api, updated;
-  const gs = { ...state, myTeam: state.teams[0], setTeams: next => { updated = typeof next === 'function' ? next(updated || state.teams) : next; },
+  let candidate;
+  const mine=state.teams.find(t=>t.id===state.myId), match=getMyMatchup(state.schedule,1,state.myId);
+  const gs = { ...state, myTeam: mine, ...(state.farmCompetition?{applyProgressCandidate:next=>{validateFarmSaveState(next);candidate=next;updated=next.teams;return true;}}:{}), setTeams: next => { updated = typeof next === 'function' ? next(updated || state.teams) : next; },
     getGameResultsMap: () => state.gameResultsMap, setGameDay: vi.fn(), setScreen: vi.fn(), notify: vi.fn(), addNews: vi.fn(), addTransferLog: vi.fn(), pushResult: vi.fn(), pushGameResult: vi.fn(),
     setMailbox: vi.fn(), setRetireModal: vi.fn(), setAllTeamResultsMap: vi.fn(), cpuTradeOffers: [],
   };
   function Harness() { api = useSeasonFlow(gs); return null; }
   let renderer;
   act(() => { renderer = TestRenderer.create(React.createElement(Harness)); });
-  act(() => { api.setCurrentOpp(state.teams[1]); api.setCurrentGameTeams({ isHome }); });
+  act(() => { api.setCurrentOpp(state.teams.find(t=>t.id===match.oppId)); api.setCurrentGameTeams({ isHome }); });
   await act(async () => {
     const result = { score: { ...fixture.score }, log: [], inningSummary: [] };
     await (mode === 'auto' ? api.handleAutoSimEnd(result) : api.handleTacticalGameEnd(result));
   });
   expect(gs.notify).not.toHaveBeenCalled();
   act(() => renderer.unmount());
-  return updated;
+  return candidate || updated;
 }
 
 describe('regular season post-game parity', () => {
@@ -163,4 +169,43 @@ describe('regular season post-game parity', () => {
     expect(update.team.players[0].injuryHistory.at(-1)).toEqual({ part: 'leg', year: 2026 });
     expect(team.players[0].injuryDaysLeft).toBeFalsy();
   });
+});
+
+it.each(['auto','tactical'])('keeps real farm records and pregame workload equal across single, batch and %s',async mode=>{
+ fixture.score={my:0,opp:0};vi.spyOn(Math,'random').mockReturnValue(.99);
+ try {
+ const raw=JSON.parse(gunzipSync(readFileSync(new URL('../../e2e/fixtures/new-game.json.gz',import.meta.url))));
+ raw.schedule=generateSeasonSchedule(raw.year,raw.teams);raw.allStarDone=true;
+ const state=migrateFarmCompetition(raw),before=structuredClone(state),match=getMyMatchup(state.schedule,1,state.myId);
+ const single=simulateSingleDay({snapshot:state,gameContext:{selectedOpponentId:match.oppId,isHome:match.isHome}}).nextState;
+ const batch=simulateSeasonBatch({snapshot:state,count:1}).nextState;
+ const tactical=await runHook(state,match.isHome,mode);
+ expect(tactical.gameDay).toBe(2);expect(tactical.farmCompetition).toEqual(single.farmCompetition);expect(batch.farmCompetition).toEqual(single.farmCompetition);
+ const ids=new Set(state.teams.flatMap(t=>t.farm.map(p=>p.id)));
+ const loads=next=>next.teams.flatMap(t=>[...t.players,...t.farm]).filter(p=>ids.has(p.id)).map(p=>[p.id,p.condition,p.recentPitchingDays,p.injuryDaysLeft,p.registrationCooldownDays]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+ expect(loads(tactical)).toEqual(loads(single));expect(loads(batch)).toEqual(loads(single));expect(state).toEqual(before);
+ } finally {vi.restoreAllMocks();}
+});
+it('permits a new save identity at the same year and round after finishing a tactical game',async()=>{
+ const state=snapshot(true);let api,gs,updates=0;
+ const createGs=saveId=>({...state,saveId,myTeam:state.teams[0],setTeams:()=>updates++,getGameResultsMap:()=>({}),setGameDay:vi.fn(),setScreen:vi.fn(),notify:vi.fn(),addNews:vi.fn(),addTransferLog:vi.fn(),pushResult:vi.fn(),pushGameResult:vi.fn(),setMailbox:vi.fn(),setRetireModal:vi.fn(),setAllTeamResultsMap:vi.fn(),cpuTradeOffers:[]});
+ gs=createGs('first');function Harness(){api=useSeasonFlow(gs);return null;}let renderer;
+ act(()=>{renderer=TestRenderer.create(React.createElement(Harness));});
+ act(()=>{api.setCurrentOpp(state.teams[1]);api.setCurrentGameTeams({isHome:true});});
+ const result={score:{my:0,opp:0},log:[],inningSummary:[]};
+ await act(async()=>{await api.handleTacticalGameEnd(result);});expect(updates).toBe(1);
+ gs=createGs('loaded-other');act(()=>renderer.update(React.createElement(Harness)));
+ await act(async()=>{await api.handleTacticalGameEnd(result);});expect(updates).toBe(2);
+ act(()=>renderer.unmount());
+});
+it('permits same-save rollback/reload while rejecting duplicate tactical completion within one load session',async()=>{
+ const state=snapshot(true);let api,updates=0,session=0;
+ const gs={...state,saveId:'same',getProgressSessionToken:()=>session,myTeam:state.teams[0],setTeams:()=>updates++,getGameResultsMap:()=>({}),setGameDay:vi.fn(),setScreen:vi.fn(),notify:vi.fn(),addNews:vi.fn(),addTransferLog:vi.fn(),pushResult:vi.fn(),pushGameResult:vi.fn(),setMailbox:vi.fn(),setRetireModal:vi.fn(),setAllTeamResultsMap:vi.fn(),cpuTradeOffers:[]};
+ function Harness(){api=useSeasonFlow(gs);return null;}let renderer;
+ act(()=>{renderer=TestRenderer.create(React.createElement(Harness));});act(()=>{api.setCurrentOpp(state.teams[1]);api.setCurrentGameTeams({isHome:true});});
+ const result={score:{my:0,opp:0},log:[],inningSummary:[]};
+ await act(async()=>{await api.handleTacticalGameEnd(result);await api.handleTacticalGameEnd(result);});expect(updates).toBe(1);
+ session++;act(()=>renderer.update(React.createElement(Harness)));
+ await act(async()=>{await api.handleTacticalGameEnd(result);await api.handleTacticalGameEnd(result);});expect(updates).toBe(2);
+ act(()=>renderer.unmount());
 });

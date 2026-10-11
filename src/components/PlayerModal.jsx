@@ -1,3 +1,4 @@
+import {FarmRecordScope,FarmRecordSummary} from './FarmRecordSummary';
 import { useEffect, useState } from "react";
 import { fmtSal, fmtAvg, fmtIP } from '../utils';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
@@ -159,6 +160,7 @@ function resolveInitialSection(player, requestedSection) {
 }
 
 export function PlayerModal({
+  farmState,
   player:p,
   teamName,
   isMyTeam,
@@ -340,6 +342,11 @@ export function PlayerModal({
               )}
             </div>
             </details>
+            <section aria-label="二軍成績" style={{marginTop:16,borderTop:"1px solid #c5d8ed",paddingTop:12}}>
+              <h3 style={{fontSize:16,margin:"0 0 8px"}}>二軍成績</h3>
+              <FarmRecordScope state={farmState} teamId={(teams||[]).find(t=>[...(t.players||[]),...(t.farm||[])].some(x=>x.id===p.id))?.id}/>
+              <FarmRecordSummary state={farmState} player={p}/>
+            </section>
           </div>
         )}
 

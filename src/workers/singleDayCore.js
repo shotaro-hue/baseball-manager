@@ -1,3 +1,4 @@
+import {prepareFarmProgress,finishFarmProgress} from '../engine/farmProgression';
 import { regularSeasonRequest } from '../engine/seasonProgress';
 import { getMyMatchup } from '../engine/scheduleGen';
 import { uid, rng, rngf, gameDayToDate } from '../utils';
@@ -295,6 +296,7 @@ export function simulateSingleDay({
 
   const useDh = !!gameContext?.useDh;
   const isHome = gameContext?.isHome !== false;
+  const farmProgress = prepareFarmProgress(safeSnapshot,teams,safeSnapshot.gameDay);
   const userGameResult = quickSimGame(
     applyDhToTeam(myTeam, useDh),
     applyDhToTeam(currentOpp, useDh),
@@ -433,12 +435,12 @@ export function simulateSingleDay({
   let allStarPayload = null;
   let nextAllStarDone = !!safeSnapshot.allStarDone;
   let screenDirective = safeSnapshot.gameDay >= SEASON_GAMES ? 'playoff' : 'result';
-  let finalizedTeams = nextTeams;
+  let finalizedTeams = finishFarmProgress(nextTeams,farmProgress,safeSnapshot.gameDay);
 
   if (!nextAllStarDone && safeSnapshot.gameDay + 1 === safeSnapshot.allStarTriggerDay) {
     const rosters = selectAllStars(nextTeams);
     const asResult = runAllStarGame(rosters, safeSnapshot.year);
-    finalizedTeams = applyAllStarSelections(nextTeams, rosters);
+    finalizedTeams = applyAllStarSelections(finalizedTeams, rosters);
     allStarPayload = { rosters, gameResult: asResult };
     nextAllStarDone = true;
     screenDirective = 'allstar';
@@ -453,6 +455,7 @@ export function simulateSingleDay({
   const nextState = {
     ...safeSnapshot,
     teams: finalizedTeams,
+    ...(farmProgress ? {farmCompetition:farmProgress.competition,farmCompetitionVersion:1} : {}),
     seasonHistory: nextSeasonHistory,
     news: nextNews.slice(0, 1000),
     mailbox: nextMailbox.slice(0, 1000),

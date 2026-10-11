@@ -329,6 +329,7 @@ export default function HubShell({ state, flows, app }) {
             {gs.playerModal && (
               <PlayerModal
                 key={`${gs.playerModal.player?.id}:${gs.playerModal.initialSection || 'profile'}`}
+                farmState={{farmCompetition:gs.farmCompetition,year:gs.year,teams:gs.teams,seasonHistory:gs.getSeasonHistory?.()??gs.seasonHistory}}
                 player={gs.playerModal.player}
                 teamName={gs.playerModal.teamName}
                 isMyTeam={gs.playerModal.teamName === myTeam?.name}

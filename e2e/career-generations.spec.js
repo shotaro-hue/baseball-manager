@@ -45,7 +45,14 @@ test('career generations repeat real annual UI commits and reload without future
   // Seed a camp boundary through the actual save API, then run the application's real annual transition.
   await page.evaluate(async({year,id,n})=>{
    const m=await import('/baseball-manager/src/engine/saveload.js');const s=await m.loadGame();
-   s.year=year;s.offseasonPlan={version:1,year,myId:s.myId,stage:'results',resumeScreen:'spring_training',draftApplied:true,spring:{conditionDeltas:{},improvements:[]}};
+   // This imported camp fixture represents a completed official season, not round 1.
+   s.year=year;s.gameDay=144;s.teams=s.teams.map(t=>({...t,wins:0,losses:0,draws:143}));
+   s.schedule=(await import('/baseball-manager/src/engine/scheduleGen.js')).generateSeasonSchedule(year,s.teams);
+   if(s.farmCompetition){
+    const {createFarmCompetition}=await import('/baseball-manager/src/engine/farmRecords.js');
+    s.farmCompetition=createFarmCompetition({saveId:s.saveId,year,teams:s.teams,startRound:144,source:'migrated',legacy:s.farmCompetition.legacy,archiveSignature:s.farmCompetition.archiveSignature});
+   }
+   s.offseasonPlan={version:1,year,myId:s.myId,stage:'results',resumeScreen:'spring_training',draftApplied:true,spring:{conditionDeltas:{},improvements:[]}};
    const p=s.teams.flatMap(t=>[...t.players,...t.farm]).find(p=>p.id===id);p.stats={...p.stats,PA:600,HR:n+1};
    if(!(await m.saveGame(s)).ok)throw new Error('camp seed failed');
   },{year,id,n});
@@ -60,6 +67,7 @@ test('career generations repeat real annual UI commits and reload without future
   await complete.click();await page.getByRole('button',{name:/開幕！/}).click();await expect(page.locator('.topbar')).toContainText(`${year+1}年`);
   await waitSaveIdle(page);await reloadAndLoad(page);await expect(page.locator('.topbar')).toContainText(`${year+1}年`);
   const saved=await readSave(page);expect(saved.year).toBe(year+1);
+  expect(saved.farmCompetition.nextRound).toBe(1);expect(saved.seasonHistory.farmArchives.map(a=>a.year)).toEqual(closing);
   const log=await readCareer();const fresh=log.filter(e=>closing.includes(e.year));expect(fresh.map(e=>e.year)).toEqual(closing);expect(fresh.map(e=>e.stats.HR)).toEqual(closing.map((_,i)=>i+1));
   expect(log.filter(e=>e.year<seed.year)).toEqual(before.filter(e=>e.year<seed.year));
  }

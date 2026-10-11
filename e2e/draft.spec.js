@@ -10,6 +10,8 @@ test('draft automatic picks respect 69/70 capacity and survive real save/reload 
  const fill=(team,total)=>{const template=team.farm[0]||team.players[0];team.farm=Array.from({length:total-team.players.length},(_,i)=>({...template,id:`draft-owned-${team.id}-${i}`,育成:false,isIkusei:false}));};
  fill(mine,69);fill(other,70);
  const pool=Array.from({length:8},(_,i)=>({...mine.players.find(p=>!p.isPitcher),id:`draft-candidate-${i}`,name:`ドラフト検証${i}`,potential:70,育成:false,isIkusei:false}));
+ // The draft is a completed-season fixture; farm migration must not infer completion from its screen.
+ fixture.gameDay=144;fixture.teams=fixture.teams.map(t=>({...t,wins:0,losses:0,draws:143}));
  fixture.offseasonPlan={version:1,year:fixture.year,myId:fixture.myId,stage:'results',resumeScreen:'draft_lottery',draftPool:pool};
  await page.goto('/');
  await page.evaluate(async s=>{const m=await import('/baseball-manager/src/engine/saveload.js');if(!(await m.saveGame(s)).ok)throw new Error('fixture save failed');},fixture);

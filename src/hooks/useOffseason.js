@@ -1,3 +1,4 @@
+import {advanceFarmYear} from '../engine/farmMigration';
 import { applyTradeTransaction } from '../engine/tradeTransaction';
 import { nextSeasonMatchHistory } from '../engine/matchHistory';
 import { useCallback, useRef, useState } from "react";
@@ -153,7 +154,7 @@ export function useOffseason(gs) {
     const nextTeams = (Array.isArray(sourceTeams) ? sourceTeams : teams).map(t=>{
       const nextPlayers=t.players.filter(p=>!p._retireNow).map(p=>{
         const compactPlayer = archiveSeason(p, t);
-        return {...compactPlayer,age:p.age+1,stats:createEmptyStats(),playoffStats:createEmptyStats(),injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:remainingContractAfterSeason(p, year),postingRequested:false,growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlyDecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0};
+        return {...compactPlayer,age:p.age+1,stats:createEmptyStats(),playoffStats:createEmptyStats(),recentPitchingDays:[],lastPitched:false,injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:remainingContractAfterSeason(p, year),postingRequested:false,growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlyDecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0};
       });
       const nextIds=new Set(nextPlayers.map(p=>p.id));
       const baseBudget=TEAM_DEFS.find(d=>d.id===t.id)?.budget??t.budget;
@@ -166,7 +167,7 @@ export function useOffseason(gs) {
         const played = hasRecordedFirstTeamSeason(p) || hasRecordedFirstTeamSeason({ stats: p.playoffStats });
         const archived = played ? archiveSeason(p, t) : p;
         return { ...archived, age: p.age + 1, stats: createEmptyStats(), playoffStats: createEmptyStats(),
-          injury: null, injuryDaysLeft: 0, contractYearsLeft: remainingContractAfterSeason(p, year),
+          injury: null, injuryDaysLeft: 0, recentPitchingDays: [], lastPitched: false, contractYearsLeft: remainingContractAfterSeason(p, year),
           serviceYears: p.育成 ? (p.serviceYears || 0) : (p.serviceYears || 0) + 1,
           ikuseiYears: p.育成 ? (p.ikuseiYears || 0) + 1 : 0 };
       });
@@ -185,8 +186,9 @@ export function useOffseason(gs) {
       stage: 'new_season', resumeScreen: 'new_season', completedYear: year,
       seasonInfo: newSeasonInfo, growth: developmentSummary } : null;
     const nextMatchHistory = nextSeasonMatchHistory({ ...gs, gameResultsMap: currentGameResultsMap }, year, schedule, myId);
-    if (gs.handleSave && nextPlan) {
-      const saved = await gs.handleSave({ silent: true, careerEntries: indexedDbEntries, payload: { teams: nextTeams, year: nextYear,
+    const farmYearCandidate = gs.farmCompetition ? advanceFarmYear({teams,myId,saveId:gs.saveId,year,gameDay,schedule,farmCompetition:gs.farmCompetition,farmCompetitionVersion:1,offseasonPlan:gs.offseasonPlan,seasonHistory:getSeasonHistory(),...gs.getMatchHistorySnapshot?.(),gameResultsMap:currentGameResultsMap},{year:nextYear,teams:nextTeams,nextSchedule:newSchedule}) : null;
+    if (gs.handleSave && (nextPlan || farmYearCandidate)) {
+      const saved = await gs.handleSave({ silent: true, careerEntries: indexedDbEntries, payload: { ...(farmYearCandidate || {}), teams: nextTeams, year: nextYear,
         gameDay: 1, faPool: nextPool, faYears: {}, offseasonPlan: nextPlan, ...nextMatchHistory } });
       if (!saved?.ok) {
         setCareerPersistenceError('新年度の保存に失敗しました。年度は進めていません。再試行してください。'
@@ -194,7 +196,8 @@ export function useOffseason(gs) {
         return false;
       }
     }
-    setTeams(nextTeams);
+    if(farmYearCandidate)gs.applyProgressCandidate(farmYearCandidate);else setTeams(nextTeams);
+    if(farmYearCandidate)setSeasonHistory(farmYearCandidate.seasonHistory);
     // Unsigned domestic players remain available. Archive their saved season before
     // resetting current stats, just as for rostered players; do not invent a team.
     setYear(nextYear);setGameDay(1);setFaPool(nextPool);setDraftAllocationState(null);
@@ -654,7 +657,7 @@ export function useOffseason(gs) {
     // Other clubs settle renewals before the user's market phase so candidates
     // are available before the user's own renewals. Never renew CPU clubs twice.
     // 自チーム満了選手の要求額を事前計算して state に保持
-    const awards=calcSeasonAwards(teams,year);
+    const awards=calcSeasonAwards(teams,year,{farmCompetition:gs.farmCompetition});
     const currentSeasonHistory = getSeasonHistory();
     const sharedSalaryContext = { year, awards, championship: currentSeasonHistory.championships?.find(c => c.year === year) };
     const declarations = resolveOffseasonFaDeclarations(developedTeams, year, sharedSalaryContext);

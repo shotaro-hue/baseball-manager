@@ -6,8 +6,9 @@ import { TEAM_DEFS } from '../constants';
 import { buildTeam } from '../engine/player';
 import { generateSeasonSchedule } from '../engine/scheduleGen';
 
-const { start } = vi.hoisted(() => ({ start: vi.fn() }));
+const { start,workers } = vi.hoisted(() => ({ start: vi.fn(),workers:[] }));
 vi.mock('../workers/seasonBatchWorker?worker', () => ({ default: class {
+  constructor(){workers.push(this);}
   postMessage(message) { start(message); } terminate() {}
 } }));
 let view;
@@ -37,4 +38,14 @@ it('blocks invalid requests, completed seasons and offseason before starting a W
     const h=setup(options); await act(async () => {h.api.handleBatchSim(5);h.api.handleSeasonSim();await h.api.handleStartGame();}); act(() => view.unmount());
   }
   expect(start).not.toHaveBeenCalled();
+});
+
+it.each(['batch','single'])('rejects a stale %s Worker before archives or state adoption after a load/edit',async mode=>{
+ const h=setup({played:0});let token=1;h.gs.getProgressToken=()=>token;h.gs.applyProgressCandidate=vi.fn();
+ if(mode==='single') {await act(async()=>{await h.api.handleStartGame();});act(()=>{h.api.handleModeSelect('auto');});}
+ else act(()=>{h.api.handleBatchSim(1);});
+ await vi.waitFor(()=>expect(start).toHaveBeenCalledTimes(1));
+ const taskId=start.mock.calls[0][0].payload.taskId;token++;
+ await act(async()=>{workers.at(-1).onmessage({data:{type:'DONE',payload:{taskId,result:{nextState:{teams:[],gameDay:2}}}}});});
+ expect(h.gs.applyProgressCandidate).not.toHaveBeenCalled();expect(h.gs.setScreen).not.toHaveBeenCalledWith('batch_result');expect(h.gs.setScreen).not.toHaveBeenCalledWith('result');
 });

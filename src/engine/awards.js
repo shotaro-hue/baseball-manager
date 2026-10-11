@@ -18,7 +18,7 @@ function getCareerSummary(player) {
    シーズン表彰・歴代記録・殿堂システム
 ═══════════════════════════════════════════════ */
 
-export function calcSeasonAwards(teams, year) {
+export function calcSeasonAwards(teams, year, {farmCompetition} = {}) {
   const allPlayers = teams.flatMap(t => seasonParticipants(t).map(p => ({ ...p, _teamId: t.id, _teamName: t.name, _teamWins: t.wins || 0, _league: t.league })));
   const batters  = allPlayers.filter(p => !p.isPitcher && (p.stats?.PA  || 0) >= 80);
   const pitchers = allPlayers.filter(p =>  p.isPitcher && (p.stats?.IP  || 0) >= 40);
@@ -38,7 +38,7 @@ export function calcSeasonAwards(teams, year) {
     rookie:     { central: pickRookie(allPlayers.filter(p => p._league === 'セ')), pacific: pickRookie(allPlayers.filter(p => p._league === 'パ')) },
     bestNine:   { central: pickBestNine(seBatters, sePitchers), pacific: pickBestNine(paBatters, paPitchers) },
     titles:     { central: calcTitles(seTeams), pacific: calcTitles(paTeams) },
-    farmAwards: calcFarmAwards(teams),
+    farmAwards: farmCompetition ? {status:'pending',reason:'二軍年間表彰は規定確定後に対応',eastern:{league:'イースタン',batting:null,hr:null,wins:null},western:{league:'ウエスタン',batting:null,hr:null,wins:null}} : calcFarmAwards(teams),
   };
 }
 
