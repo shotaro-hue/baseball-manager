@@ -2,8 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createInitialTeams } from './bootstrapTeams';
 import { selectFarmTeam } from './farmSelection';
 import { isIkuseiPlayer, optimizeTeamForGameStart, validateTeamRoster } from './rosterAutomation';
-import { buildTeam } from './playerCore';
-import { TEAM_DEFS } from '../constants';
+import { buildTeam, makePlayer, makeInitialFarmBatters } from './playerCore';
+import { rng } from '../utils';
+import { FIELDING_POSITIONS, TEAM_DEFS } from '../constants';
 import { NPB2025_ROSTERS } from '../data/npb2025';
 
 function seedRandom(seed) {
@@ -32,6 +33,21 @@ function checkTeams(teams, real) {
 }
 
 describe('initial catcher coverage', () => {
+  it('preserves generated abilities and RNG consumption when reserving catcher slots', () => {
+    for (const seed of [1, 3, 42]) {
+      seedRandom(seed);
+      const reference = Array.from({ length: 12 }, () =>
+        makePlayer(FIELDING_POSITIONS[rng(0, 7)], 50, false, rng(18, 25)));
+      const nextRandom = Math.random();
+      vi.restoreAllMocks();
+      seedRandom(seed);
+      const farm = makeInitialFarmBatters(12, 50, []);
+      expect(Math.random()).toBe(nextRandom);
+      expect(farm).toEqual(reference.map((p, i) => i < 3 && p.pos !== '捕手'
+        ? { ...p, pos: '捕手', positions: { 捕手: 100 } } : p));
+      vi.restoreAllMocks();
+    }
+  });
   it('does not bypass a cooldown already present before initial optimization', () => {
     seedRandom(3);
     const raw = buildTeam(TEAM_DEFS[0]);

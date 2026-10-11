@@ -110,7 +110,14 @@ export function makeInitialFarmBatters(count, quality, activePlayers) {
   const requiredCatchers = Math.max(1, MIN_ACTIVE_CATCHERS + 1 - activeCatchers);
   return Array.from({ length: count }, (_, i) => {
     const randomPosition = FIELDING_POSITIONS[rng(0, FIELDING_POSITIONS.length - 1)];
-    return makePlayer(i < requiredCatchers ? '捕手' : randomPosition, quality, false, rng(18, 25));
+    const player = makePlayer(randomPosition, quality, false, rng(18, 25));
+    if (i < requiredCatchers && player.pos !== '捕手') {
+      // Keep generation's RNG consumption and abilities intact. Replacing only
+      // this generated slot must not change the later real-player rosters.
+      player.pos = '捕手';
+      player.positions = { 捕手: 100 };
+    }
+    return player;
   });
 }
 

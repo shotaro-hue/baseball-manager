@@ -2,21 +2,21 @@
 
 exports[`preserves complete generated data and random/ID consumption (seed 7) 1`] = `
 {
-  "calls": 16870,
-  "digest": "158817cb9bce44415ca395722ad51ccaba3d0b174caf597d4e6e091db78742b0",
+  "calls": 16910,
+  "digest": "5447005d9754797fca55938db99ee71ce3c71b2f0c5721180776810911c5c385",
 }
 `;
 
 exports[`preserves complete generated data and random/ID consumption (seed 42) 1`] = `
 {
-  "calls": 16868,
-  "digest": "f0709023d9f669601006b8bcbf7293001c979e5dc262e79f731247ccb2b7d446",
+  "calls": 16894,
+  "digest": "2d417555edd22127662db3da8d571fe2d02390c3d1e2ba1dbcf90cf3dcef1a47",
 }
 `;
 
 exports[`preserves complete generated data and random/ID consumption (seed 20261009) 1`] = `
 {
-  "calls": 16872,
-  "digest": "4a80726529ec2e8703926b44fbc11851b226eef3decdb2352c35c92e5ead7f73",
+  "calls": 16879,
+  "digest": "ffa088a7e1808feababcad5e2f918778ed88c15a44fb1b054ee7808e59d953c1",
 }
 `;
