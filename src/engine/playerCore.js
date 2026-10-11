@@ -108,17 +108,21 @@ export function makeInitialFarmBatters(count, quality, activePlayers) {
   const activeCatchers = activePlayers.filter(p => !p.isPitcher && p.pos === '捕手'
     && !p.育成 && !p.isIkusei && Number(p.injuryDaysLeft || 0) <= 0).length;
   const requiredCatchers = Math.max(1, MIN_ACTIVE_CATCHERS + 1 - activeCatchers);
-  return Array.from({ length: count }, (_, i) => {
-    const randomPosition = FIELDING_POSITIONS[rng(0, FIELDING_POSITIONS.length - 1)];
-    const player = makePlayer(randomPosition, quality, false, rng(18, 25));
-    if (i < requiredCatchers && player.pos !== '捕手') {
-      // Keep generation's RNG consumption and abilities intact. Replacing only
-      // this generated slot must not change the later real-player rosters.
-      player.pos = '捕手';
-      player.positions = { 捕手: 100 };
-    }
-    return player;
-  });
+  const farm = Array.from({ length: count }, () =>
+    makePlayer(FIELDING_POSITIONS[rng(0, FIELDING_POSITIONS.length - 1)], quality, false, rng(18, 25)));
+  const counts = new Map(FIELDING_POSITIONS.map(pos => [pos, farm.filter(p => p.pos === pos).length]));
+  while (counts.get('捕手') < requiredCatchers) {
+    // Use a redundant position so catcher coverage doesn't remove another
+    // position's last generated player. Retain abilities and RNG consumption.
+    const candidate = farm.filter(p => p.pos !== '捕手')
+      .sort((a, b) => counts.get(b.pos) - counts.get(a.pos))[0];
+    if (!candidate) break;
+    counts.set(candidate.pos, counts.get(candidate.pos) - 1);
+    candidate.pos = '捕手';
+    candidate.positions = { 捕手: 100 };
+    counts.set('捕手', counts.get('捕手') + 1);
+  }
+  return farm;
 }
 
 export function buildTeam(def) {

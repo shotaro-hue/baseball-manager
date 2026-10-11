@@ -43,8 +43,13 @@ describe('initial catcher coverage', () => {
       seedRandom(seed);
       const farm = makeInitialFarmBatters(12, 50, []);
       expect(Math.random()).toBe(nextRandom);
-      expect(farm).toEqual(reference.map((p, i) => i < 3 && p.pos !== '捕手'
+      const changed = reference.filter((p, i) => farm[i].pos !== p.pos);
+      expect(changed.length).toBe(Math.max(0, 3 - reference.filter(p => p.pos === '捕手').length));
+      expect(farm).toEqual(reference.map((p, i) => farm[i].pos !== p.pos
         ? { ...p, pos: '捕手', positions: { 捕手: 100 } } : p));
+      for (const pos of FIELDING_POSITIONS) {
+        if (reference.some(p => p.pos === pos)) expect(farm.some(p => p.pos === pos)).toBe(true);
+      }
       vi.restoreAllMocks();
     }
   });
