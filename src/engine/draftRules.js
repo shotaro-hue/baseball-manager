@@ -23,7 +23,7 @@ export function chooseDraftProspect(team, pool, round = 1, acceptedPicks = []) {
   // here so later rounds evaluate the needs they have already filled.
   const needs = analyzeTeamNeeds(additions.length
     ? { ...team, farm: [...(team.farm || []), ...additions] }
-    : team);
+    : team, { includeFarmPitchers: true });
   const wantsPitcher = needs.some(n => /先発|中継ぎ|抑え|投手/.test(n.type));
   const first = round === 1;
   const scored = pool.map((p, i) => ({ p, score: 100 - i * (first ? 3 : 2)

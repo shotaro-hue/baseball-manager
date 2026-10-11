@@ -67,12 +67,16 @@ function weightedPlayerValue(p, mode = 'neutral') {
   return getPlayerCurrentValue(p) * w.current + getPlayerFutureValue(p) * w.future + getPlayerContractValue(p) * w.contract;
 }
 
-export function analyzeTeamNeeds(team) {
+export function analyzeTeamNeeds(team, options = {}) {
   const allPlayers = [...(team.players || []), ...(team.farm || [])];
   const pitchers = team.players.filter((p) => p.isPitcher);
-  const starters = pitchers.filter((p) => p.subtype === '先発');
-  const relievers = pitchers.filter((p) => p.subtype === '中継ぎ');
-  const closers = pitchers.filter((p) => p.subtype === '抑え');
+  // Drafting plans organizational depth; ordinary callers still assess the
+  // active staff. Velocity below remains an assessment of active players.
+  const depthPitchers = options.includeFarmPitchers
+    ? allPlayers.filter((p) => p.isPitcher) : pitchers;
+  const starters = depthPitchers.filter((p) => p.subtype === '先発');
+  const relievers = depthPitchers.filter((p) => p.subtype === '中継ぎ');
+  const closers = depthPitchers.filter((p) => p.subtype === '抑え');
   const batters = team.players.filter((p) => !p.isPitcher);
 
   // ポジション別の合計人数（一軍+二軍）
