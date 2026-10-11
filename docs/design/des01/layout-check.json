@@ -1,0 +1,520 @@
+[
+  {
+    "screen": "home",
+    "width": 360,
+    "height": 800,
+    "bodyWidth": 360,
+    "viewWidth": 360,
+    "tableScroll": [
+      {
+        "client": 0,
+        "scroll": 0
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "result",
+    "width": 360,
+    "height": 800,
+    "bodyWidth": 360,
+    "viewWidth": 360,
+    "tableScroll": [
+      {
+        "client": 326,
+        "scroll": 610
+      },
+      {
+        "client": 326,
+        "scroll": 326
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "offseason",
+    "width": 360,
+    "height": 800,
+    "bodyWidth": 360,
+    "viewWidth": 360,
+    "tableScroll": [],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "contract",
+    "width": 360,
+    "height": 800,
+    "bodyWidth": 360,
+    "viewWidth": 360,
+    "tableScroll": [],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "states",
+    "width": 360,
+    "height": 800,
+    "bodyWidth": 360,
+    "viewWidth": 360,
+    "tableScroll": [
+      {
+        "client": 326,
+        "scroll": 326
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "home",
+    "width": 390,
+    "height": 844,
+    "bodyWidth": 390,
+    "viewWidth": 390,
+    "tableScroll": [
+      {
+        "client": 0,
+        "scroll": 0
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "result",
+    "width": 390,
+    "height": 844,
+    "bodyWidth": 390,
+    "viewWidth": 390,
+    "tableScroll": [
+      {
+        "client": 356,
+        "scroll": 610
+      },
+      {
+        "client": 356,
+        "scroll": 356
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "offseason",
+    "width": 390,
+    "height": 844,
+    "bodyWidth": 390,
+    "viewWidth": 390,
+    "tableScroll": [],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "contract",
+    "width": 390,
+    "height": 844,
+    "bodyWidth": 390,
+    "viewWidth": 390,
+    "tableScroll": [],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "states",
+    "width": 390,
+    "height": 844,
+    "bodyWidth": 390,
+    "viewWidth": 390,
+    "tableScroll": [
+      {
+        "client": 356,
+        "scroll": 356
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "home",
+    "width": 1440,
+    "height": 900,
+    "bodyWidth": 1440,
+    "viewWidth": 1440,
+    "tableScroll": [
+      {
+        "client": 403,
+        "scroll": 403
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "result",
+    "width": 1440,
+    "height": 900,
+    "bodyWidth": 1440,
+    "viewWidth": 1440,
+    "tableScroll": [
+      {
+        "client": 742,
+        "scroll": 742
+      },
+      {
+        "client": 478,
+        "scroll": 478
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "offseason",
+    "width": 1440,
+    "height": 900,
+    "bodyWidth": 1440,
+    "viewWidth": 1440,
+    "tableScroll": [],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "contract",
+    "width": 1440,
+    "height": 900,
+    "bodyWidth": 1440,
+    "viewWidth": 1440,
+    "tableScroll": [],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "states",
+    "width": 1440,
+    "height": 900,
+    "bodyWidth": 1440,
+    "viewWidth": 1440,
+    "tableScroll": [
+      {
+        "client": 1254,
+        "scroll": 1254
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "home",
+    "width": 760,
+    "height": 900,
+    "bodyWidth": 760,
+    "viewWidth": 760,
+    "tableScroll": [
+      {
+        "client": 0,
+        "scroll": 0
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "result",
+    "width": 760,
+    "height": 900,
+    "bodyWidth": 760,
+    "viewWidth": 760,
+    "tableScroll": [
+      {
+        "client": 726,
+        "scroll": 726
+      },
+      {
+        "client": 726,
+        "scroll": 726
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "offseason",
+    "width": 760,
+    "height": 900,
+    "bodyWidth": 760,
+    "viewWidth": 760,
+    "tableScroll": [],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "contract",
+    "width": 760,
+    "height": 900,
+    "bodyWidth": 760,
+    "viewWidth": 760,
+    "tableScroll": [],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "states",
+    "width": 760,
+    "height": 900,
+    "bodyWidth": 760,
+    "viewWidth": 760,
+    "tableScroll": [
+      {
+        "client": 726,
+        "scroll": 726
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "home",
+    "width": 761,
+    "height": 900,
+    "bodyWidth": 761,
+    "viewWidth": 761,
+    "tableScroll": [
+      {
+        "client": 268,
+        "scroll": 268
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "result",
+    "width": 761,
+    "height": 900,
+    "bodyWidth": 761,
+    "viewWidth": 761,
+    "tableScroll": [
+      {
+        "client": 417,
+        "scroll": 610
+      },
+      {
+        "client": 268,
+        "scroll": 303
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "offseason",
+    "width": 761,
+    "height": 900,
+    "bodyWidth": 761,
+    "viewWidth": 761,
+    "tableScroll": [],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "contract",
+    "width": 761,
+    "height": 900,
+    "bodyWidth": 761,
+    "viewWidth": 761,
+    "tableScroll": [],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "states",
+    "width": 761,
+    "height": 900,
+    "bodyWidth": 761,
+    "viewWidth": 761,
+    "tableScroll": [
+      {
+        "client": 711,
+        "scroll": 711
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "home",
+    "width": 1023,
+    "height": 900,
+    "bodyWidth": 1023,
+    "viewWidth": 1023,
+    "tableScroll": [
+      {
+        "client": 371,
+        "scroll": 371
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "result",
+    "width": 1023,
+    "height": 900,
+    "bodyWidth": 1023,
+    "viewWidth": 1023,
+    "tableScroll": [
+      {
+        "client": 576,
+        "scroll": 610
+      },
+      {
+        "client": 371,
+        "scroll": 371
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "offseason",
+    "width": 1023,
+    "height": 900,
+    "bodyWidth": 1023,
+    "viewWidth": 1023,
+    "tableScroll": [],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "contract",
+    "width": 1023,
+    "height": 900,
+    "bodyWidth": 1023,
+    "viewWidth": 1023,
+    "tableScroll": [],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "states",
+    "width": 1023,
+    "height": 900,
+    "bodyWidth": 1023,
+    "viewWidth": 1023,
+    "tableScroll": [
+      {
+        "client": 973,
+        "scroll": 973
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "home",
+    "width": 1024,
+    "height": 900,
+    "bodyWidth": 1024,
+    "viewWidth": 1024,
+    "tableScroll": [
+      {
+        "client": 287,
+        "scroll": 287
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "result",
+    "width": 1024,
+    "height": 900,
+    "bodyWidth": 1024,
+    "viewWidth": 1024,
+    "tableScroll": [
+      {
+        "client": 562,
+        "scroll": 610
+      },
+      {
+        "client": 362,
+        "scroll": 362
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "offseason",
+    "width": 1024,
+    "height": 900,
+    "bodyWidth": 1024,
+    "viewWidth": 1024,
+    "tableScroll": [],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "contract",
+    "width": 1024,
+    "height": 900,
+    "bodyWidth": 1024,
+    "viewWidth": 1024,
+    "tableScroll": [],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  },
+  {
+    "screen": "states",
+    "width": 1024,
+    "height": 900,
+    "bodyWidth": 1024,
+    "viewWidth": 1024,
+    "tableScroll": [
+      {
+        "client": 958,
+        "scroll": 958
+      }
+    ],
+    "tinyText": 0,
+    "smallControls": [],
+    "fontLoaded": true
+  }
+]

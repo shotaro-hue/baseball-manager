@@ -1,0 +1,387 @@
+[
+  {
+    "screen": "offseason",
+    "width": 360,
+    "height": 800,
+    "pageWidth": 360,
+    "viewport": 360,
+    "smallControls": [],
+    "firstRow": {
+      "x": 17,
+      "y": 673.140625,
+      "width": 326,
+      "height": 72.1875,
+      "top": 673.140625,
+      "right": 343,
+      "bottom": 745.328125,
+      "left": 17
+    },
+    "rows": [
+      72.1875,
+      72.1875,
+      72.1875,
+      72.1875,
+      72.1875,
+      71.1875
+    ]
+  },
+  {
+    "screen": "contract",
+    "width": 360,
+    "height": 800,
+    "pageWidth": 360,
+    "viewport": 360,
+    "smallControls": [],
+    "offer": {
+      "x": 16,
+      "y": 636.65625,
+      "width": 328,
+      "height": 44,
+      "top": 636.65625,
+      "right": 344,
+      "bottom": 680.65625,
+      "left": 16
+    },
+    "salaryLimit": {
+      "x": 16,
+      "y": 561.46875,
+      "width": 187.1875,
+      "height": 36,
+      "top": 561.46875,
+      "right": 203.1875,
+      "bottom": 597.46875,
+      "left": 16
+    },
+    "rows": []
+  },
+  {
+    "screen": "offseason",
+    "width": 390,
+    "height": 844,
+    "pageWidth": 390,
+    "viewport": 390,
+    "smallControls": [],
+    "firstRow": {
+      "x": 17,
+      "y": 673.140625,
+      "width": 356,
+      "height": 72.1875,
+      "top": 673.140625,
+      "right": 373,
+      "bottom": 745.328125,
+      "left": 17
+    },
+    "rows": [
+      72.1875,
+      72.1875,
+      72.1875,
+      72.1875,
+      72.1875,
+      71.1875
+    ]
+  },
+  {
+    "screen": "contract",
+    "width": 390,
+    "height": 844,
+    "pageWidth": 390,
+    "viewport": 390,
+    "smallControls": [],
+    "offer": {
+      "x": 16,
+      "y": 636.65625,
+      "width": 358,
+      "height": 44,
+      "top": 636.65625,
+      "right": 374,
+      "bottom": 680.65625,
+      "left": 16
+    },
+    "salaryLimit": {
+      "x": 16,
+      "y": 561.46875,
+      "width": 205.1875,
+      "height": 36,
+      "top": 561.46875,
+      "right": 221.1875,
+      "bottom": 597.46875,
+      "left": 16
+    },
+    "rows": []
+  },
+  {
+    "screen": "offseason",
+    "width": 1440,
+    "height": 900,
+    "pageWidth": 1440,
+    "viewport": 1440,
+    "smallControls": [],
+    "firstRow": {
+      "x": 93,
+      "y": 787.84375,
+      "width": 742,
+      "height": 72.1875,
+      "top": 787.84375,
+      "right": 835,
+      "bottom": 860.03125,
+      "left": 93
+    },
+    "rows": [
+      72.1875,
+      72.1875,
+      72.1875,
+      72.1875,
+      72.1875,
+      71.1875
+    ]
+  },
+  {
+    "screen": "contract",
+    "width": 1440,
+    "height": 900,
+    "pageWidth": 1440,
+    "viewport": 1440,
+    "smallControls": [],
+    "offer": {
+      "x": 668,
+      "y": 665.25,
+      "width": 680,
+      "height": 44,
+      "top": 665.25,
+      "right": 1348,
+      "bottom": 709.25,
+      "left": 668
+    },
+    "salaryLimit": {
+      "x": 668,
+      "y": 590.0625,
+      "width": 398.390625,
+      "height": 36,
+      "top": 590.0625,
+      "right": 1066.390625,
+      "bottom": 626.0625,
+      "left": 668
+    },
+    "rows": []
+  },
+  {
+    "screen": "offseason",
+    "width": 760,
+    "height": 900,
+    "pageWidth": 760,
+    "viewport": 760,
+    "smallControls": [],
+    "firstRow": {
+      "x": 17,
+      "y": 673.140625,
+      "width": 726,
+      "height": 72.1875,
+      "top": 673.140625,
+      "right": 743,
+      "bottom": 745.328125,
+      "left": 17
+    },
+    "rows": [
+      72.1875,
+      72.1875,
+      72.1875,
+      72.1875,
+      72.1875,
+      71.1875
+    ]
+  },
+  {
+    "screen": "contract",
+    "width": 760,
+    "height": 900,
+    "pageWidth": 760,
+    "viewport": 760,
+    "smallControls": [],
+    "offer": {
+      "x": 16,
+      "y": 636.65625,
+      "width": 728,
+      "height": 44,
+      "top": 636.65625,
+      "right": 744,
+      "bottom": 680.65625,
+      "left": 16
+    },
+    "salaryLimit": {
+      "x": 16,
+      "y": 561.46875,
+      "width": 427.1875,
+      "height": 36,
+      "top": 561.46875,
+      "right": 443.1875,
+      "bottom": 597.46875,
+      "left": 16
+    },
+    "rows": []
+  },
+  {
+    "screen": "offseason",
+    "width": 761,
+    "height": 900,
+    "pageWidth": 761,
+    "viewport": 761,
+    "smallControls": [],
+    "firstRow": {
+      "x": 25,
+      "y": 783.84375,
+      "width": 416.796875,
+      "height": 72.1875,
+      "top": 783.84375,
+      "right": 441.796875,
+      "bottom": 856.03125,
+      "left": 25
+    },
+    "rows": [
+      72.1875,
+      72.1875,
+      72.1875,
+      72.1875,
+      72.1875,
+      71.1875
+    ]
+  },
+  {
+    "screen": "contract",
+    "width": 761,
+    "height": 900,
+    "pageWidth": 761,
+    "viewport": 761,
+    "smallControls": [],
+    "offer": {
+      "x": 354.21875,
+      "y": 661.25,
+      "width": 382.78125,
+      "height": 44,
+      "top": 661.25,
+      "right": 737,
+      "bottom": 705.25,
+      "left": 354.21875
+    },
+    "salaryLimit": {
+      "x": 354.21875,
+      "y": 586.0625,
+      "width": 220.0625,
+      "height": 36,
+      "top": 586.0625,
+      "right": 574.28125,
+      "bottom": 622.0625,
+      "left": 354.21875
+    },
+    "rows": []
+  },
+  {
+    "screen": "offseason",
+    "width": 1023,
+    "height": 900,
+    "pageWidth": 1023,
+    "viewport": 1023,
+    "smallControls": [],
+    "firstRow": {
+      "x": 25,
+      "y": 783.84375,
+      "width": 576.046875,
+      "height": 72.1875,
+      "top": 783.84375,
+      "right": 601.046875,
+      "bottom": 856.03125,
+      "left": 25
+    },
+    "rows": [
+      72.1875,
+      72.1875,
+      72.1875,
+      72.1875,
+      72.1875,
+      71.1875
+    ]
+  },
+  {
+    "screen": "contract",
+    "width": 1023,
+    "height": 900,
+    "pageWidth": 1023,
+    "viewport": 1023,
+    "smallControls": [],
+    "offer": {
+      "x": 470.65625,
+      "y": 661.25,
+      "width": 528.34375,
+      "height": 44,
+      "top": 661.25,
+      "right": 999,
+      "bottom": 705.25,
+      "left": 470.65625
+    },
+    "salaryLimit": {
+      "x": 470.65625,
+      "y": 586.0625,
+      "width": 307.40625,
+      "height": 36,
+      "top": 586.0625,
+      "right": 778.0625,
+      "bottom": 622.0625,
+      "left": 470.65625
+    },
+    "rows": []
+  },
+  {
+    "screen": "offseason",
+    "width": 1024,
+    "height": 900,
+    "pageWidth": 1024,
+    "viewport": 1024,
+    "smallControls": [],
+    "firstRow": {
+      "x": 33,
+      "y": 787.84375,
+      "width": 562.078125,
+      "height": 72.1875,
+      "top": 787.84375,
+      "right": 595.078125,
+      "bottom": 860.03125,
+      "left": 33
+    },
+    "rows": [
+      72.1875,
+      72.1875,
+      72.1875,
+      72.1875,
+      72.1875,
+      71.1875
+    ]
+  },
+  {
+    "screen": "contract",
+    "width": 1024,
+    "height": 900,
+    "pageWidth": 1024,
+    "viewport": 1024,
+    "smallControls": [],
+    "offer": {
+      "x": 476.4375,
+      "y": 665.25,
+      "width": 515.5625,
+      "height": 44,
+      "top": 665.25,
+      "right": 992,
+      "bottom": 709.25,
+      "left": 476.4375
+    },
+    "salaryLimit": {
+      "x": 476.4375,
+      "y": 590.0625,
+      "width": 299.734375,
+      "height": 36,
+      "top": 590.0625,
+      "right": 776.171875,
+      "bottom": 626.0625,
+      "left": 476.4375
+    },
+    "rows": []
+  }
+]

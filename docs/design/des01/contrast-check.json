@@ -1,0 +1,74 @@
+[
+  {
+    "label": "本文/白",
+    "foreground": "#162b3d",
+    "background": "#ffffff",
+    "ratio": 14.51,
+    "threshold": 4.5,
+    "pass_": true
+  },
+  {
+    "label": "補助/ページ",
+    "foreground": "#526778",
+    "background": "#f4f6f9",
+    "ratio": 5.43,
+    "threshold": 4.5,
+    "pass_": true
+  },
+  {
+    "label": "青/白",
+    "foreground": "#1766da",
+    "background": "#ffffff",
+    "ratio": 5.32,
+    "threshold": 4.5,
+    "pass_": true
+  },
+  {
+    "label": "白/ネイビー",
+    "foreground": "#ffffff",
+    "background": "#0e263b",
+    "ratio": 15.45,
+    "threshold": 4.5,
+    "pass_": true
+  },
+  {
+    "label": "補助/ネイビー",
+    "foreground": "#c9d8e3",
+    "background": "#0e263b",
+    "ratio": 10.61,
+    "threshold": 4.5,
+    "pass_": true
+  },
+  {
+    "label": "成功",
+    "foreground": "#17634a",
+    "background": "#e7f3ec",
+    "ratio": 6.31,
+    "threshold": 4.5,
+    "pass_": true
+  },
+  {
+    "label": "警告",
+    "foreground": "#855200",
+    "background": "#fff1d6",
+    "ratio": 5.87,
+    "threshold": 4.5,
+    "pass_": true
+  },
+  {
+    "label": "危険",
+    "foreground": "#b12c38",
+    "background": "#fae9eb",
+    "ratio": 5.45,
+    "threshold": 4.5,
+    "pass_": true
+  },
+  {
+    "label": "入力輪郭",
+    "foreground": "#70889b",
+    "background": "#ffffff",
+    "ratio": 3.69,
+    "threshold": 3,
+    "pass_": true
+  }
+]
