@@ -183,6 +183,42 @@ test('E3 invalid lineup, useful guidance, UI repair, one game', async ({ page })
   expect(after.played).toBe(before.played+1); expect(after.gameDay).toBe(before.gameDay+1);
 });
 
+test('E6 scheduled CPU catcher allocation, farm records and persisted reload', async ({ page }) => {
+  await loadFixture(page, 'new');
+  const state = await readSave(page);
+  await page.evaluate(async state => {
+    const { createInitialTeams } = await import('/baseball-manager/src/engine/bootstrapTeams.js');
+    const { saveGame } = await import('/baseball-manager/src/engine/saveload.js');
+    const random = Math.random;
+    let seed = 4;
+    try {
+      Math.random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+      state.teams = createInitialTeams();
+    } finally { Math.random = random; }
+    state.myId = 4;
+    // Exercise the real scheduled CPU roster pass on the next day.
+    state.teams.forEach(t => { t.managementMeta = { ...t.managementMeta, lastRosterDay: -14 }; });
+    if (!(await saveGame(state)).ok) throw new Error('daily catcher fixture save failed');
+  }, state);
+  await reloadAndLoad(page);
+  await runBatch(page, false);
+  const saved = await saveHub(page);
+  const cpu = saved.teams.find(t => t.id === 0);
+  expect(cpu.managementMeta.lastRosterDay).toBeGreaterThanOrEqual(1);
+  const firstCard = saved.farmCompetition.cards.find(c => c.round === 1 && (c.homeId === 0 || c.awayId === 0));
+  expect(firstCard.status).toBe('played');
+  const allHealthy = [...cpu.players, ...cpu.farm].filter(p => !p.isPitcher && p.pos === '捕手'
+    && !p.育成 && !p.isIkusei && !(p.injuryDaysLeft > 0));
+  if (allHealthy.length >= 3) {
+    expect(cpu.players.filter(p => allHealthy.some(c => c.id === p.id)).length).toBeGreaterThanOrEqual(2);
+    expect(cpu.farm.some(p => allHealthy.some(c => c.id === p.id))).toBe(true);
+  }
+  await reloadAndLoad(page);
+  const reopened = await saveHub(page);
+  expect(reopened.teams.find(t => t.id === 0)).toEqual(cpu);
+  expect(reopened.farmCompetition).toEqual(saved.farmCompetition);
+});
+
 test('E5 multiple short injuries, farm coverage, persisted reload and next game', async ({ page }) => {
   await loadFixture(page, 'new');
   const state = await readSave(page);
