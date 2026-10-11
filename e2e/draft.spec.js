@@ -38,3 +38,42 @@ test('draft automatic picks respect 69/70 capacity and survive real save/reload 
  await reloadAndLoad(page);await expect(page.getByRole('button',{name:/キャンプ終了・開幕へ/})).toBeVisible();
  expect(result(await readSave(page))).toEqual(result(signed));
 });
+
+test('CPU next-round needs include a saved first-round catcher without acquiring the pick early', async ({ page }) => {
+ test.setTimeout(60000);
+ const fixture=JSON.parse(gunzipSync(readFileSync(new URL('./fixtures/new-game.json.gz',import.meta.url))));
+ await page.goto('/');
+ await page.evaluate(async state => {
+  const { createInitialTeams }=await import('/baseball-manager/src/engine/bootstrapTeams.js');
+  const { saveGame }=await import('/baseball-manager/src/engine/saveload.js');
+  const original=Math.random;let seed=4;
+  try {Math.random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};state.teams=createInitialTeams();}
+  finally {Math.random=original;}
+  const cpu=state.teams.find(t=>t.id===0);
+  const keep=new Set(cpu.players.filter(p=>p.pos==='捕手').slice(0,2).map(p=>p.id));
+  cpu.players=cpu.players.filter(p=>p.pos!=='捕手'||keep.has(p.id));
+  cpu.farm=cpu.farm.filter(p=>p.pos!=='捕手');
+  state.teams.forEach(t=>{t.wins=t.id===0?0:t.id===1?10:20;t.losses=0;t.draws=143-t.wins;});
+  state.myId=1;state.gameDay=144;
+  const template=cpu.players.find(p=>p.pos==='捕手');
+  const p=(id,pos,extra={})=>({...template,id,name:id,pos,potential:70,readinessScore:50,age:22,
+    batting:{contact:60,power:60,eye:60,speed:60},...extra});
+  const pool=[p('confirmed-C','捕手',{_drafted:true,_r1winner:0}),p('best-DH','DH'),p('another-C','捕手')];
+  state.offseasonPlan={version:1,year:state.year,myId:1,stage:'results',resumeScreen:'draft',draftPool:pool,
+    draftViews:{draft:{pickIdx:0,drafted:{},log:[],scouted:[],scoutPt:0}}};
+  if(!(await saveGame(state)).ok)throw new Error('draft needs fixture save failed');
+ },fixture);
+ // Only suppress the existing optional random departure from the scored choice.
+ await page.addInitScript(()=>{Math.random=()=>.5;});
+ await reloadAndLoad(page);
+ await expect(page.getByRole('button',{name:'another-Cを指名',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'途中保存',exact:true}).click();await waitSaveIdle(page);
+ const saved=await readSave(page);
+ expect(saved.offseasonPlan.draftViews.draft.drafted['best-DH']).toBe(0);
+ expect(saved.offseasonPlan.draftViews.draft.drafted['another-C']).toBeUndefined();
+ expect(saved.teams.flatMap(t=>[...t.players,...t.farm]).some(p=>['confirmed-C','best-DH'].includes(p.id))).toBe(false);
+ await reloadAndLoad(page);
+ const reopened=await readSave(page);
+ expect(reopened.offseasonPlan.draftViews.draft).toEqual(saved.offseasonPlan.draftViews.draft);
+ expect(reopened.teams).toEqual(saved.teams);
+});
