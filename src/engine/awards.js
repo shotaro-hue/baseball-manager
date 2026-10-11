@@ -1,6 +1,7 @@
 import { saberBatter, saberPitcher } from './sabermetrics';
 import { normalizeCareerLogSummary } from './careerStats';
 import { seasonParticipants } from './seasonParticipants';
+import { calcMeasuredFarmAwards } from './farmRankings';
 
 function getCareerSummary(player) {
   const summary = normalizeCareerLogSummary(player?.careerLogSummary);
@@ -38,7 +39,7 @@ export function calcSeasonAwards(teams, year, {farmCompetition} = {}) {
     rookie:     { central: pickRookie(allPlayers.filter(p => p._league === 'セ')), pacific: pickRookie(allPlayers.filter(p => p._league === 'パ')) },
     bestNine:   { central: pickBestNine(seBatters, sePitchers), pacific: pickBestNine(paBatters, paPitchers) },
     titles:     { central: calcTitles(seTeams), pacific: calcTitles(paTeams) },
-    farmAwards: farmCompetition ? {status:'pending',reason:'二軍年間表彰は規定確定後に対応',eastern:{league:'イースタン',batting:null,hr:null,wins:null},western:{league:'ウエスタン',batting:null,hr:null,wins:null}} : calcFarmAwards(teams),
+    farmAwards: farmCompetition ? calcMeasuredFarmAwards(farmCompetition,year) : calcFarmAwards(teams),
   };
 }
 
