@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FIELDING_POSITIONS } from '../../constants';
+import { FIELDING_POSITIONS, MAX_ROSTER } from '../../constants';
 import { applyEmergencyRosterMaintenance, prepareTeamForGame, validateLineup } from '../rosterAutomation';
 
 function injuredShortstopTeam(days) {
@@ -23,6 +23,80 @@ function injuredShortstopTeam(days) {
 }
 
 describe('emergency fielding coverage', () => {
+  function farmReplacementTeam() {
+    const team = injuredShortstopTeam(5);
+    const second = team.players.find(p => p.pos === '二塁手');
+    second.injuryDaysLeft = 6;
+    team.farm = [{ ...structuredClone(second), id: 'farm-ss', name: '二軍遊撃手',
+      pos: '遊撃手', positions: { 遊撃手: 100 }, injuryDaysLeft: 0 }];
+    return team;
+  }
+  for (const full of [false, true]) {
+    it(`promotes only necessary farm coverage after multiple short injuries (${full ? 'full' : 'open'} roster)`, () => {
+      const team = farmReplacementTeam();
+      if (full) while (team.players.length < MAX_ROSTER) {
+        team.players.push({ ...team.players.find(p => p.isPitcher), id: `reserve-${team.players.length}` });
+      }
+      if (full) team.rotation = team.players.filter(p => p.isPitcher).slice(0, 6).map(p => p.id);
+      const before = structuredClone(team);
+      const repaired = applyEmergencyRosterMaintenance(team);
+      for (const useDh of [false, true]) {
+        expect(validateLineup(repaired, useDh).errors).toEqual([]);
+        expect(prepareTeamForGame(repaired, useDh).lineup).toHaveLength(9);
+      }
+      expect(repaired.players.some(p => p.id === 'farm-ss')).toBe(true);
+      expect(repaired.players.length).toBeLessThanOrEqual(MAX_ROSTER);
+      expect([...repaired.players, ...repaired.farm].map(p => p.id).sort())
+        .toEqual([...team.players, ...team.farm].map(p => p.id).sort());
+      expect(repaired.rotation).toEqual(team.rotation);
+      expect(repaired.lineupNoDh.filter(id => team.lineupNoDh.includes(id)))
+        .toEqual(team.lineupNoDh.filter(id => !(team.players.find(p => p.id === id).injuryDaysLeft > 0)));
+      if (full) expect(repaired.farm.find(p => p.id.startsWith('starter-')).registrationCooldownDays).toBe(10);
+      else expect(repaired.players.some(p => p.id === team.players.find(p => p.pos === '遊撃手').id)).toBe(true);
+      expect(team).toEqual(before);
+    });
+  }
+  it('repairs a saved incomplete lineup even after injured players were removed from its assignments', () => {
+    const team = farmReplacementTeam();
+    const incomplete = applyEmergencyRosterMaintenance({ ...team, farm: [] });
+    const reloaded = JSON.parse(JSON.stringify({ ...incomplete, farm: team.farm }));
+    const repaired = applyEmergencyRosterMaintenance(reloaded);
+    expect(validateLineup(repaired, false).errors).toEqual([]);
+    expect(validateLineup(repaired, true).errors).toEqual([]);
+    expect(applyEmergencyRosterMaintenance(repaired).rosterMaintenance.changed).toBe(false);
+  });
+  for (const blocked of [{ registrationCooldownDays: 1 }, { injuryDaysLeft: 1 }, { 育成: true }, { isIkusei: true }]) {
+    it(`does not bypass farm eligibility ${JSON.stringify(blocked)}`, () => {
+      const team = farmReplacementTeam();
+      Object.assign(team.farm[0], blocked);
+      const repaired = applyEmergencyRosterMaintenance(team);
+      expect(repaired.players.some(p => p.id === 'farm-ss')).toBe(false);
+      expect(validateLineup(repaired, false).errors.length).toBeGreaterThan(0);
+      expect(repaired.farm[0]).toEqual(team.farm[0]);
+    });
+  }
+  it('does not promote a foreign replacement above the registration limit', () => {
+    const team = farmReplacementTeam();
+    team.players.filter(p => !p.isPitcher && !(p.injuryDaysLeft > 0)).slice(0, 4)
+      .forEach(p => { p.isForeign = true; });
+    team.farm[0].isForeign = true;
+    const repaired = applyEmergencyRosterMaintenance(team);
+    expect(repaired.players.some(p => p.id === 'farm-ss')).toBe(false);
+    expect(repaired.players.filter(p => p.isForeign)).toHaveLength(4);
+  });
+  it('does not promote farm players when active coverage already works', () => {
+    const team = injuredShortstopTeam(5);
+    team.farm = [{ ...team.players.find(p => p.pos === '遊撃手'), id: 'farm-ss', injuryDaysLeft: 0 }];
+    const repaired = applyEmergencyRosterMaintenance(team);
+    expect(repaired.players.map(p => p.id)).toEqual(team.players.map(p => p.id));
+    expect(repaired.farm).toEqual(team.farm);
+  });
+  it('retains validation errors rather than throwing when an old team has no farm array', () => {
+    const team = farmReplacementTeam();
+    delete team.farm;
+    const repaired = applyEmergencyRosterMaintenance(team);
+    expect(validateLineup(repaired, false).errors.length).toBeGreaterThan(0);
+  });
   for (const days of [5, 15]) {
     for (const useDh of [false, true]) {
       it(`keeps a playable ${useDh ? 'DH' : 'no-DH'} lineup after a ${days}-day shortstop injury`, () => {

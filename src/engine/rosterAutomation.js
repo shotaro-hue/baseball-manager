@@ -969,7 +969,10 @@ export function applyEmergencyRosterMaintenance(team, options = {}) {
       && (Number(player.injuryDaysLeft) || 0) > 0
       && (Number(player.injuryDaysLeft) || 0) <= INJURY_AUTO_DEMOTE_DAYS,
   );
-  if (injuredToDemote.length === 0 && shortInjuriesInAssignment.length === 0) {
+  const incompleteAfterInjury = (team.players || []).some(
+    player => !player.isPitcher && !isHealthy(player),
+  ) && [false, true].some(useDh => validateLineup(team, useDh).errors.length > 0);
+  if (injuredToDemote.length === 0 && shortInjuriesInAssignment.length === 0 && !incompleteAfterInjury) {
     return {
       ...team,
       rosterAutomationMode: mode,
@@ -1059,8 +1062,44 @@ export function applyEmergencyRosterMaintenance(team, options = {}) {
     });
   }
 
-  const noDh = repairLineupPreservingOrder(nextTeam, false, options);
-  const dh = repairLineupPreservingOrder(nextTeam, true, options);
+  let noDh = repairLineupPreservingOrder(nextTeam, false, options);
+  let dh = repairLineupPreservingOrder(nextTeam, true, options);
+  // Short injuries normally keep their registration. Only use farm players if
+  // healthy active players cannot cover the lineup, preserving healthy choices.
+  while (noDh.lineup.length < 8 || dh.lineup.length < 9) {
+    const retainedIds = new Set([...noDh.lineup, ...dh.lineup]);
+    const downCandidates = nextTeam.players.length < MAX_ROSTER ? [null]
+      : nextTeam.players.filter(player => !player.isPitcher && !retainedIds.has(player.id)
+        && (!isHealthy(player) || player.pos !== POS_CATCHER))
+        .sort((a, b) => Number(isHealthy(a)) - Number(isHealthy(b))
+          || rosterRecScore(a, nextTeam, options) - rosterRecScore(b, nextTeam, options));
+    let replacement = null;
+    const candidates = (nextTeam.farm || []).filter(player => !player.isPitcher)
+      .slice().sort((a, b) => rosterRecScore(b, nextTeam, options) - rosterRecScore(a, nextTeam, options));
+    for (const upPlayer of candidates) {
+      for (const downPlayer of downCandidates) {
+        const remaining = nextTeam.players.filter(player => player.id !== downPlayer?.id);
+        if (!canAddToActiveRoster(upPlayer, remaining)) continue;
+        const rec = { type: downPlayer ? 'swap' : 'promote', upPlayer, downPlayer,
+          scoreDiff: 0, reasons: ['故障後の打順・守備不足を補充'] };
+        const candidateTeam = applyRosterRecs(nextTeam, [rec]);
+        const candidateNoDh = repairLineupPreservingOrder(candidateTeam, false, options);
+        const candidateDh = repairLineupPreservingOrder(candidateTeam, true, options);
+        if (candidateNoDh.lineup.length >= noDh.lineup.length
+          && candidateDh.lineup.length >= dh.lineup.length
+          && candidateNoDh.lineup.length + candidateDh.lineup.length > noDh.lineup.length + dh.lineup.length) {
+          replacement = { team: candidateTeam, noDh: candidateNoDh, dh: candidateDh, rec };
+          break;
+        }
+      }
+      if (replacement) break;
+    }
+    if (!replacement) break;
+    nextTeam = replacement.team;
+    noDh = replacement.noDh;
+    dh = replacement.dh;
+    changes.push(replacement.rec);
+  }
   const pitching = repairPitchingPreservingRoles(nextTeam);
   nextTeam = {
     ...nextTeam,
