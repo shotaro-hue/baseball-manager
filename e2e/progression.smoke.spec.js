@@ -183,6 +183,43 @@ test('E3 invalid lineup, useful guidance, UI repair, one game', async ({ page })
   expect(after.played).toBe(before.played+1); expect(after.gameDay).toBe(before.gameDay+1);
 });
 
+test('E5 multiple short injuries, farm coverage, persisted reload and next game', async ({ page }) => {
+  await loadFixture(page, 'new');
+  const state = await readSave(page);
+  const expected = await page.evaluate(async state => {
+    const { createInitialTeams } = await import('/baseball-manager/src/engine/bootstrapTeams.js');
+    const { saveGame } = await import('/baseball-manager/src/engine/saveload.js');
+    const random = Math.random;
+    let seed = 1;
+    try {
+      Math.random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+      state.teams = createInitialTeams();
+    } finally { Math.random = random; }
+    state.myId = 4;
+    const team = state.teams.find(t => t.id === state.myId);
+    const injured = team.players.filter(p => ['遊撃手', '二塁手'].includes(team.fieldingNoDh[p.id]));
+    injured.forEach(p => { p.injuryDaysLeft = 10; p.injury = '軽微'; });
+    if (!(await saveGame(state)).ok) throw new Error('multiple injury fixture save failed');
+    return { injured: injured.map(p => p.id), farmIds: team.farm.map(p => p.id) };
+  }, state);
+  await reloadAndLoad(page);
+  await runBatch(page, false);
+  const saved = await saveHub(page);
+  const team = saved.teams.find(t => t.id === saved.myId);
+  expect(progressSignature(saved).played).toBe(5);
+  expect(team.lineupNoDh).toHaveLength(8);
+  expect(team.lineupNoDh.some(id => expected.farmIds.includes(id))).toBe(true);
+  expect(team.lineupNoDh.some(id => expected.injured.includes(id))).toBe(false);
+  await reloadAndLoad(page);
+  const reopened = await saveHub(page);
+  const resumed = reopened.teams.find(t => t.id === reopened.myId);
+  expect(resumed.lineupNoDh).toEqual(team.lineupNoDh);
+  expect(resumed.fieldingNoDh).toEqual(team.fieldingNoDh);
+  await runSingle(page, false);
+  const next = await saveHub(page);
+  expect(progressSignature(next).played).toBe(6);
+});
+
 test('E4 shortstop injury, emergency fielding moves, batch and persisted reload', async ({ page }) => {
   await loadFixture(page, 'new');
   const fixture = await readSave(page);
