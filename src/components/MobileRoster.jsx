@@ -1,8 +1,9 @@
+import {FarmRecordScope,FarmRecordSummary} from './FarmRecordSummary';
 import React, { useState } from 'react';
 import { CaretRight, ArrowLeft } from '@phosphor-icons/react';
 import { playerCondition, getDashboardLineup } from './DashboardTab';
 
-export function MobileRoster({ team, onPlayerClick, onReplaceLineup, onSetLineupOrder, onSetRosterDhMode }) {
+export function MobileRoster({ farmState,team, onPlayerClick, onReplaceLineup, onSetLineupOrder, onSetRosterDhMode }) {
   const [view,setView]=useState('batters');
   const [metric,setMetric]=useState('condition');
   const [replaceId,setReplaceId]=useState(null);
@@ -19,8 +20,9 @@ export function MobileRoster({ team, onPlayerClick, onReplaceLineup, onSetLineup
     setReplaceId(null);
   };
   return <section className="mobile-roster flow-screen"><h1>編成</h1>
-    <div className="flow-tabs" aria-label="編成対象">{[['batters','野手'],['pitchers','投手']].map(([id,label])=><button key={id} aria-pressed={view===id} onClick={()=>{setView(id);setReplaceId(null);}}>{label}</button>)}</div>
+    <div className="flow-tabs" aria-label="編成対象">{[['batters','野手'],['pitchers','投手'],['farm','二軍']].map(([id,label])=><button key={id} aria-pressed={view===id} onClick={()=>{setView(id);setReplaceId(null);}}>{label}</button>)}</div>
     {target ? <section><button className="flow-link" onClick={()=>setReplaceId(null)}><ArrowLeft/>打線に戻る</button><h2>{target.player.name}の入替候補</h2><p className="flow-muted">{target.order}番・{target.position}の守備を引き継ぎます。選手詳細で適性を確認してください。</p>{candidates.map(p=><div className="flow-roster-row" key={p.id}><button className="flow-player" onClick={()=>onPlayerClick?.(p,team.name)}><strong>{p.name}</strong><small>{p.pos} · {rowInfo(p)}</small></button><button className="calm-secondary" disabled={(p.injuryDaysLeft || 0)>0} onClick={()=>choose(p)}>起用</button></div>)}{!candidates.length && <p>控え野手はいません</p>}</section>
+    : view==='farm' ? <><h2>二軍（{team.farm?.length ?? 0}人）</h2><FarmRecordScope state={farmState} teamId={team.id}/>{(team.farm||[]).map(p=><div className="flow-roster-row" key={p.id}><div style={{minWidth:0}}><button className="flow-player" onClick={()=>onPlayerClick?.(p,team.name)}><strong>{p.name}<CaretRight size={16}/></strong><small>{p.pos} · {playerCondition(p).label} · {p.condition ?? 70}</small></button><FarmRecordSummary state={farmState} player={p} compact/></div></div>)}{!team.farm?.length&&<p>二軍選手はいません。</p>}</>
     : view==='batters' ? <>
       <div className="flow-toolbar"><h2>スタメン</h2><div className="flow-tabs">{[['ability','能力'],['stats','成績'],['condition','状態']].map(([id,label])=><button key={id} aria-pressed={metric===id} onClick={()=>setMetric(id)}>{label}</button>)}</div></div>
       <label className="flow-check"><input type="checkbox" checked={Boolean(team.rosterDhMode ?? team.dhEnabled)} onChange={e=>onSetRosterDhMode?.(e.target.checked)}/>DHあり</label>

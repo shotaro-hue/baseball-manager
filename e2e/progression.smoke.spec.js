@@ -205,3 +205,26 @@ test('E4 shortstop injury, emergency fielding moves, batch and persisted reload'
   expect(resumed.lineupNoDh).toEqual(team.lineupNoDh);
   expect(resumed.fieldingNoDh).toEqual(team.fieldingNoDh);
 });
+
+for (const width of [360,390,1440]) test(`F03 farm records survive progress/reload and render at ${width}px`,async({page},testInfo)=>{
+ await page.setViewportSize({width,height:900});const mobile=width<768;
+ await loadFixture(page,'legacy');
+ await runBatch(page,mobile,5);const after=await saveHub(page);
+ expect(after.farmCompetition.nextRound).toBe(6);expect(after.farmCompetition.cards).toHaveLength(30);
+ expect(after.farmCompetition.source).toBe('migrated');
+ await reloadAndLoad(page);const restored=await saveHub(page);expect(restored.farmCompetition).toEqual(after.farmCompetition);
+ await runSingle(page,mobile);const next=await saveHub(page);expect(next.farmCompetition.nextRound).toBe(7);expect(next.farmCompetition.cards).toHaveLength(36);
+ await mainNavigation(page,mobile).getByRole('button',{name:/編成/}).click();
+ if(!mobile)await page.locator('.roster-full-settings > summary').click();
+ await (mobile?page.locator('.mobile-roster'):page.locator('.roster-full-settings')).getByRole('button',{name:/二軍/}).click();
+ await expect(page.getByText(/二軍実測（簡易試合モデル）/)).toBeVisible();
+ const team=next.teams.find(t=>t.id===next.myId),p=team.farm[0];
+ await page.getByText(p.name,{exact:true}).first().click();
+ const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();
+ await dialog.getByRole('tab',{name:'今季成績',exact:true}).click();
+ await expect(dialog.getByRole('region',{name:'二軍成績'})).toContainText('二軍実測');
+ await expect(dialog.getByRole('region',{name:'二軍成績'})).toContainText('球団間合計');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+ await page.screenshot({path:testInfo.outputPath(`farm-${width}.png`),fullPage:true});
+ await dialog.getByRole('button',{name:'選手詳細を閉じる'}).click();
+});

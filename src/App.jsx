@@ -1,3 +1,4 @@
+import {migrateFarmCompetition} from './engine/farmMigration';
 import './styles.css';
 import { SEASON_PARAMS, getDefaultParams } from './data/scheduleParams.js';
 import { FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX } from './constants';
@@ -75,7 +76,8 @@ export default function App() {
           };
         });
 
-        const loadedSchedule = scheduleMod.generateSeasonSchedule(saved.year, normalizedTeams);
+        const loadedSchedule = saved.schedule ?? scheduleMod.generateSeasonSchedule(saved.year, normalizedTeams);
+        const migrated = migrateFarmCompetition({...saved,teams:normalizedTeams,schedule:loadedSchedule});
 
         const loadedParams = SEASON_PARAMS[saved.year] || getDefaultParams(saved.year);
         const loadedAllStarTriggerDay = scheduleMod.calcAllStarTriggerDay(loadedSchedule, loadedParams.allStarSkipDates);
@@ -85,7 +87,7 @@ export default function App() {
         );
         const shouldBackfillForeignFa =
           (saved.faPool?.length ?? 0) === 0 && saved.gameDay === 1;
-        gs.setTeams(normalizedTeams);
+        gs.applyProgressCandidate(migrated);
         gs.setMyId(saved.myId);
         gs.setSaveId(saved.saveId);
         gs.setGameDay(saved.gameDay);

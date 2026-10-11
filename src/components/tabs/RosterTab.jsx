@@ -1,3 +1,4 @@
+import {FarmRecordScope,FarmRecordSummary} from '../FarmRecordSummary';
 import React, { useState } from "react";
 import { MobileRoster } from '../MobileRoster';
 import { MAX_ROSTER, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL, DEV_GOALS_BATTER, DEV_GOALS_PITCHER, TALK_COOLDOWN_DAYS, POSITIONS, FIELDING_POSITIONS } from '../../constants';
@@ -36,7 +37,7 @@ const TRAINING_OPTIONS=[["","バランス"],["contact","ミート"],["power","�
 
 const MoralBadge=({v})=>{const m=v||70;const icon=m>=75?"😊":m>=50?"😐":"😟";const col=m>=75?"#14714b":m>=50?"#805700":"#b42332";return <span style={{fontSize:14,color:col}}>{icon}{m}</span>;};
 
-export function RosterTab({team,allTeams,onReplaceLineup,onSetLineupOrder,onSetRosterDhMode,onSetPlayerPosition,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onReplaceRotation,onApplyRosterPlan,onPlayerClick,onSetDevGoal,onPlayerTalk,onSetConvertTarget,onSetManagementPolicy,onSetRosterAutomationMode,gameDay}){
+export function RosterTab({farmState,team,allTeams,onReplaceLineup,onSetLineupOrder,onSetRosterDhMode,onSetPlayerPosition,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onReplaceRotation,onApplyRosterPlan,onPlayerClick,onSetDevGoal,onPlayerTalk,onSetConvertTarget,onSetManagementPolicy,onSetRosterAutomationMode,gameDay}){
   const [view,setView]=useState("batters");
   const [justConverted,setJustConverted]=useState(new Set());
   const [talkingPid,setTalkingPid]=useState(null);
@@ -134,7 +135,7 @@ export function RosterTab({team,allTeams,onReplaceLineup,onSetLineupOrder,onSetR
   };
   return(
     <div>
-      <MobileRoster team={team} onPlayerClick={onPlayerClick} onReplaceLineup={onReplaceLineup} onSetLineupOrder={onSetLineupOrder} onSetRosterDhMode={onSetRosterDhMode}/>
+      <MobileRoster farmState={farmState} team={team} onPlayerClick={onPlayerClick} onReplaceLineup={onReplaceLineup} onSetLineupOrder={onSetLineupOrder} onSetRosterDhMode={onSetRosterDhMode}/>
       <details className="roster-full-settings calm-detail">
       <summary>詳細な編成・育成設定</summary>
       <div className="card" style={{marginBottom:10,borderColor:"rgba(96,165,250,.28)",background:"rgba(30,64,175,.06)"}}>
@@ -536,17 +537,12 @@ export function RosterTab({team,allTeams,onReplaceLineup,onSetLineupOrder,onSetR
           })()}
           <div className="card">
             <div className="card-h">二軍 ({team.farm.length}人)</div>
+            <FarmRecordScope state={farmState} teamId={team.id}/>
             <div className="detail-table-scroll" tabIndex={0} role="region" aria-label="成績一覧。横にスクロールできます">
               <table className="tbl">
                 <thead><tr><th>選手名</th><th>守備</th><th>年齢</th><th>育成年</th><th>潜在</th><th>主要能力</th><th>育成目標</th><th>状態</th><th>二軍成績</th><th></th></tr></thead>
                 <tbody>
                   {team.farm.map(p=>{
-                    const s2=p.stats2;
-                    const farmStat=s2&&!p.isPitcher&&s2.PA>0
-                      ?`${fmtAvg(s2.H,s2.PA)} ${s2.HR}HR`
-                      :s2&&p.isPitcher&&s2.IP>0
-                      ?`${s2.W}W ${s2.IP>0?(s2.ER*9/s2.IP).toFixed(2):"--"}`
-                      :"—";
                     const cd=p.registrationCooldownDays??0;
                     const isInj=(p.injuryDaysLeft??0)>0;
                     const canPromote=!p.育成&&!isInj&&cd===0;
@@ -568,7 +564,7 @@ export function RosterTab({team,allTeams,onReplaceLineup,onSetLineupOrder,onSetR
                         </select>
                       </td>
                       <td><CondBadge p={p}/></td>
-                      <td className="mono" style={{fontSize:14,color:"#53657c"}}>{farmStat}</td>
+                      <td className="mono" style={{fontSize:14,color:"#53657c"}}><FarmRecordSummary state={farmState} player={p} compact/></td>
                       <td style={{display:"flex",gap:4}}>
                         {p.育成
                           ?<button className="bsm" style={{background:"rgba(167,139,250,.15)",border:"1px solid rgba(167,139,250,.4)",color:"#7050ad",fontSize:14,padding:"2px 6px",borderRadius:4,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>handleConvertIkusei(p.id)}>支配下登録</button>

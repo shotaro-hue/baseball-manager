@@ -1,9 +1,10 @@
+import {prepareFarmProgress,finishFarmProgress} from '../engine/farmProgression';
 import { saveFeedback } from '../engine/saveFeedback';
 import { regularSeasonRequest } from '../engine/seasonProgress';
 import { useState, useRef, useEffect } from "react";
 import SeasonBatchWorker from "../workers/seasonBatchWorker?worker";
 import { uid, rng, rngf, gameDayToDate } from '../utils';
-import { quickSimGame, runFarmSeason } from '../engine/simulation';
+import { quickSimGame } from '../engine/simulation';
 import { computeBoxScore } from '../engine/postGame';
 import { applyRegularSeasonTeamUpdate } from '../engine/regularGameUpdates';
 import { generateCpuOffer, generateCpuCpuTrade, classifyTeam, evaluateFrontOfficePlan } from '../engine/trade';
@@ -160,9 +161,7 @@ export function useSeasonFlow(gs) {
   useEffect(()=>{
     if(pendingPlayoffRef.current){
       pendingPlayoffRef.current=false;
-      const withFarm=runFarmSeason(teams);
-      setTeams(withFarm);
-      setPlayoff(startPlayoff(withFarm));
+      setPlayoff(startPlayoff(teams));
       setScreen('playoff');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -371,7 +370,9 @@ export function useSeasonFlow(gs) {
 
     const startedAt = Date.now();
     const taskId = uid();
+    const baseToken = gs.getProgressToken?.();
     const snapshot = {
+      ...(gs.farmCompetition ? {farmCompetition:gs.farmCompetition,farmCompetitionVersion:1} : {}),
       teams,
       saveId,
       schedule,
@@ -427,6 +428,7 @@ export function useSeasonFlow(gs) {
           const payload = message.payload || {};
           if (payload.taskId !== seasonProgressTaskIdRef.current) return;
 
+          if(baseToken!=null&&baseToken!==gs.getProgressToken?.()) { resolve(null); return; }
           if (message.type === "ARCHIVE_CHUNK") {
             loadSeasonBattedBallArchiveModule()
               .then((mod) => mod.enqueueBattedBallBatches(payload.chunk?.records))
@@ -492,11 +494,12 @@ export function useSeasonFlow(gs) {
         retireAnnouncement,
       } = result;
 
+      if(baseToken!=null&&baseToken!==gs.getProgressToken?.()) {notify("編成またはロードが変更されたため古い試合結果を破棄しました", "warn");return;}
+      if(gs.applyProgressCandidate && !gs.applyProgressCandidate(nextState,{baseToken}))return;
       setNews(nextState.news);
       setMailbox(nextState.mailbox);
       setSeasonHistory(nextState.seasonHistory);
-      setTeams(nextState.teams);
-      setGameDay(nextState.gameDay);
+      if(!gs.applyProgressCandidate) {setTeams(nextState.teams);setGameDay(nextState.gameDay);}
       setGameResult(userGameResult);
       gs.applyMatchResultPatch(result);
 
@@ -508,9 +511,7 @@ export function useSeasonFlow(gs) {
       }
 
       if (screenDirective === "playoff") {
-        const withFarm = runFarmSeason(nextState.teams);
-        setTeams(withFarm);
-        setPlayoff(startPlayoff(withFarm));
+        setPlayoff(startPlayoff(nextState.teams));
         setScreen("playoff");
         return;
       }
@@ -611,8 +612,9 @@ export function useSeasonFlow(gs) {
 
   // Auto sim result handler
   const handleAutoSimEnd = async (r) => {
-    if (appliedGameRef.current === `${year}:${gameDay}` || !allowRegularGames(1)) return;
-    appliedGameRef.current = `${year}:${gameDay}`;
+    if (appliedGameRef.current === `${saveId}:${year}:${gameDay}:${gs.getProgressSessionToken?.()??0}` || !allowRegularGames(1)) return;
+    appliedGameRef.current = `${saveId}:${year}:${gameDay}:${gs.getProgressSessionToken?.()??0}`;
+    const baseToken = gs.getProgressToken?.();
     const myT=teams.find(t=>t.id===myId);
     if(!myT) return;
     const isHome = currentGameTeams?.isHome ?? true;
@@ -623,6 +625,8 @@ export function useSeasonFlow(gs) {
     ]);
     const won=r.score.my>r.score.opp;
     archiveNormalGame(r.log || [], myT, currentOpp);
+    if(baseToken!=null&&baseToken!==gs.getProgressToken?.())return;
+    const farmProgress = prepareFarmProgress(gs,teams,gameDay);
     const myUpdate = applyRegularSeasonTeamUpdate(myT, r, { isFirstTeam: true, isHomeTeam: isHome, gameDay, year }, playerMod);
     myUpdate.injuries.filter(i => i.days >= 7).forEach(i => {
       const p = myUpdate.team.players.find(p => p.id === i.id);
@@ -655,6 +659,7 @@ export function useSeasonFlow(gs) {
       Object.assign(a, applyRegularSeasonTeamUpdate(a, cr, { isFirstTeam: true, isHomeTeam: true, gameDay, year }, playerMod).team);
       Object.assign(b, applyRegularSeasonTeamUpdate(b, cr, { isFirstTeam: false, isHomeTeam: false, gameDay, year }, playerMod).team);
     }
+    updatedTeams = finishFarmProgress(updatedTeams,farmProgress,gameDay);
     updatedTeams = applyScheduledCpuManagement(updatedTeams, gameDay, myId);
     setAllTeamResultsMap(prev=>{
       const next={...prev};
@@ -691,7 +696,11 @@ export function useSeasonFlow(gs) {
       }
     }
     tryGenerateCpuOffer(updatedTeams);
-    setTeams(updatedTeams);
+    if(gs.applyProgressCandidate) {
+      const candidate={teams:updatedTeams,myId,saveId:gs.saveId,year,gameDay:gameDay+1,schedule,seasonHistory:getSeasonHistory?.()??gs.seasonHistory,
+        ...(farmProgress?{farmCompetition:farmProgress.competition,farmCompetitionVersion:1}:{})};
+      if(!gs.applyProgressCandidate(candidate,{baseToken}))return;
+    } else setTeams(updatedTeams);
     if(Math.random()<0.04&&myTeam){
       const cands=myTeam.players.filter(p=>p.age>=35&&!p._retireNow&&playerMod.calcRetireWill(p)>=40);
       if(cands.length>0){
@@ -712,7 +721,7 @@ export function useSeasonFlow(gs) {
     const _adrew=r.score.my===r.score.opp;
     pushResult(won,_adrew,currentOpp?.name||"",r.score.my,r.score.opp,gameDay);
     gs.pushGameResult(gameDay,{won,drew:_adrew,isHome,oppName:currentOpp?.name||"",myScore:r.score.my,oppScore:r.score.opp,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:currentOpp});
-    setGameDay(d=>d+1);
+    if(!gs.applyProgressCandidate)setGameDay(d=>d+1);
     if(!allStarDone && gameDay+1===allStarTriggerDay){
       const rosters=allStarMod.selectAllStars(updatedTeams);
       const asResult=allStarMod.runAllStarGame(rosters, year);
@@ -771,12 +780,14 @@ export function useSeasonFlow(gs) {
 
     const startedAt = Date.now();
     const taskId = uid();
+    const baseToken = gs.getProgressToken?.();
     const currentSeasonHistory = getSeasonHistory();
     const currentNews = getNewsBySelector({ limit: 1000 });
     const currentMailbox = getMailboxBySelector({ limit: 1000 });
     const currentGameResultsMap = getGameResultsMap();
     const currentScheduleArchive = getScheduleArchive();
     const snapshot = {
+      ...(gs.farmCompetition ? {farmCompetition:gs.farmCompetition,farmCompetitionVersion:1} : {}),
       teams,
       saveId,
       schedule,
@@ -836,6 +847,7 @@ export function useSeasonFlow(gs) {
           const payload = message.payload || {};
           if (payload.taskId !== seasonProgressTaskIdRef.current) return;
 
+          if(baseToken!=null&&baseToken!==gs.getProgressToken?.()) { resolve(null); return; }
           if (message.type === "ARCHIVE_CHUNK") {
             loadSeasonBattedBallArchiveModule()
               .then((mod) => mod.enqueueBattedBallBatches(payload.chunk?.records))
@@ -894,12 +906,13 @@ export function useSeasonFlow(gs) {
         shouldEnterPlayoff,
       } = result;
 
+      if(baseToken!=null&&baseToken!==gs.getProgressToken?.()) {notify("編成またはロードが変更されたため古い試合結果を破棄しました", "warn");return;}
+      if(gs.applyProgressCandidate && !gs.applyProgressCandidate(nextState,{baseToken}))return;
       setNews(nextState.news);
       setMailbox(nextState.mailbox);
       setSeasonHistory(nextState.seasonHistory);
       setFaPool(nextState.faPool);
-      setTeams(nextState.teams);
-      setGameDay(nextState.gameDay);
+      if(!gs.applyProgressCandidate) {setTeams(nextState.teams);setGameDay(nextState.gameDay);}
       setBatchMeta(batchMeta);
       setBatchResults(batchResults);
       const nextMatchHistory = gs.applyMatchResultPatch(result);
@@ -912,9 +925,7 @@ export function useSeasonFlow(gs) {
       }
 
       if (shouldEnterPlayoff) {
-        const withFarm = runFarmSeason(nextState.teams);
-        setTeams(withFarm);
-        setPlayoff(startPlayoff(withFarm));
+        setPlayoff(startPlayoff(nextState.teams));
         setScreen("playoff");
       } else {
         setScreen("batch_result");
@@ -946,8 +957,9 @@ export function useSeasonFlow(gs) {
 
   // Game over callback from TacticalGameScreen
   const handleTacticalGameEnd = async rawGameResult => {
-    if (appliedGameRef.current === `${year}:${gameDay}` || !allowRegularGames(1)) return;
-    appliedGameRef.current = `${year}:${gameDay}`;
+    if (appliedGameRef.current === `${saveId}:${year}:${gameDay}:${gs.getProgressSessionToken?.()??0}` || !allowRegularGames(1)) return;
+    appliedGameRef.current = `${saveId}:${year}:${gameDay}:${gs.getProgressSessionToken?.()??0}`;
+    const baseToken = gs.getProgressToken?.();
     if (!myTeam || !currentOpp) {
       notify("試合結果を保存できませんでした。対戦データを再読み込みしてください。", "error");
       setScreen("hub");
@@ -977,6 +989,8 @@ export function useSeasonFlow(gs) {
           teams, gameDay, includeRosterChanges: true,
           automationMode: ROSTER_AUTOMATION_MODES.FULL,
         }));
+    if(baseToken!=null&&baseToken!==gs.getProgressToken?.())return;
+    const farmProgress = prepareFarmProgress(gs,gameTeams,gameDay);
     const playedOpponent = gameTeams.find(team => team.id === currentOpp.id);
     archiveNormalGame(gsResult.log || [], myTeam, playedOpponent);
     const myUpdate = applyRegularSeasonTeamUpdate(myTeam, gsResult, { isFirstTeam: true, isHomeTeam: isHome, gameDay, year }, playerMod);
@@ -1008,6 +1022,7 @@ export function useSeasonFlow(gs) {
       Object.assign(a, applyRegularSeasonTeamUpdate(a, cr, { isFirstTeam: true, isHomeTeam: true, gameDay, year }, playerMod).team);
       Object.assign(b, applyRegularSeasonTeamUpdate(b, cr, { isFirstTeam: false, isHomeTeam: false, gameDay, year }, playerMod).team);
     }
+    updatedTeams = finishFarmProgress(updatedTeams,farmProgress,gameDay);
     updatedTeams = applyScheduledCpuManagement(updatedTeams, gameDay, myId);
     setAllTeamResultsMap(prev=>{
       try {
@@ -1075,10 +1090,14 @@ export function useSeasonFlow(gs) {
       }
     }
     tryGenerateCpuOffer(updatedTeams);
-    setTeams(updatedTeams);
+    if(gs.applyProgressCandidate) {
+      const candidate={teams:updatedTeams,myId,saveId:gs.saveId,year,gameDay:gameDay+1,schedule,seasonHistory:getSeasonHistory?.()??gs.seasonHistory,
+        ...(farmProgress?{farmCompetition:farmProgress.competition,farmCompetitionVersion:1}:{})};
+      if(!gs.applyProgressCandidate(candidate,{baseToken}))return;
+    } else setTeams(updatedTeams);
     pushResult(won,drew,currentOpp?.name||"",gsResult.score.my,gsResult.score.opp,gameDay);
     gs.pushGameResult(gameDay,{won,drew,isHome,oppName:currentOpp?.name||"",myScore:gsResult.score.my,oppScore:gsResult.score.opp,log:gsResult.log,inningSummary:gsResult.inningSummary,oppTeam:currentOpp});
-    setGameDay(d=>d+1);
+    if(!gs.applyProgressCandidate)setGameDay(d=>d+1);
     if(!allStarDone && gameDay+1===allStarTriggerDay){
       const rosters=allStarMod.selectAllStars(updatedTeams);
       const asResult=allStarMod.runAllStarGame(rosters, year);

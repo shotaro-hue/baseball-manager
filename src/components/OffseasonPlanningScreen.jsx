@@ -56,7 +56,7 @@ export default function OffseasonPlanningScreen({ gs, os, myTeam, myId, year }) 
       <details><summary>ポジション別人数・不足の目安</summary><div className="planning-counts">{overview.positions.map(r => <span key={r.pos}>{r.pos} {r.count}人</span>)}</div><p>登録とファームの主なポジションによる人数です。複数ポジションの適性は選手詳細で確認できます。</p>{overview.needs.length ? <ul>{overview.needs.map(n => <li key={n}>{n}</li>)}</ul> : <p>先発・救援・捕手の人数目安を満たしています。能力や起用の適否を保証するものではありません。</p>}</details>
       <div className="planning-actions"><span role="status">{gs.saveDirty ? '変更あり・自動保存待ち' : '保存済み'}</span><button onClick={() => gs.handleSave()} disabled={gs.saveQueueState?.isSaving}>編成内容を保存する</button></div>
     </section>
-    <details className="planning-growth"><summary>成長結果を確認する</summary><GrowthSummaryScreen summary={plan.growth} year={year} teams={gs.teams} myId={myId} saveId={gs.saveId} faPool={gs.faPool} embedded /></details>
+    <details className="planning-growth"><summary>成長結果を確認する</summary><GrowthSummaryScreen farmState={{farmCompetition:gs.farmCompetition,year:gs.year,teams:gs.teams,seasonHistory:gs.getSeasonHistory?.()??gs.seasonHistory}} summary={plan.growth} year={year} teams={gs.teams} myId={myId} saveId={gs.saveId} faPool={gs.faPool} embedded /></details>
     {!open && <p>残留予定・放出候補は下書きです。補強市場を開いてから契約更改へ進み、必要に応じて方針を見直せます。</p>}
     <nav className="planning-tabs" aria-label="オフシーズン編成の切り替え"><div className="planning-compact"><span>人数見込み {overview.projectedCount}人</span><span>年俸見込み {money(overview.projectedPayroll)}</span><span>残予算 {money(overview.budget)}</span><span>対応待ち {pending.length}人</span></div>{open && <div className="planning-tab-buttons">{[['roster', '自球団'], ['market', '補強市場'], ['review', '結果確認']].map(([id, label]) => <button key={id} aria-pressed={tab === id} onClick={() => chooseTab(id)}>{label}</button>)}</div>}</nav>
     <section hidden={open && tab !== 'roster'} aria-label="自球団の編成方針">
@@ -86,6 +86,6 @@ export default function OffseasonPlanningScreen({ gs, os, myTeam, myId, year }) 
       {failure && <p role="alert">{failure}</p>}
       {overview.needs.length > 0 && <p>人数の不足目安：{overview.needs.join('、')}。補強やドラフト後の編成で確認してください。</p>}
     </Confirm>}
-    {profile && <Suspense fallback={<p>選手詳細を読み込み中です。</p>}><PlayerModal player={profile} teamName={myTeam.name} teams={gs.teams} saveId={gs.saveId} year={year} isMyTeam onClose={() => setProfile(null)} /></Suspense>}
+    {profile && <Suspense fallback={<p>選手詳細を読み込み中です。</p>}><PlayerModal farmState={{farmCompetition:gs.farmCompetition,year:gs.year,teams:gs.teams,seasonHistory:gs.getSeasonHistory?.()??gs.seasonHistory}} player={profile} teamName={myTeam.name} teams={gs.teams} saveId={gs.saveId} year={year} isMyTeam onClose={() => setProfile(null)} /></Suspense>}
   </main>;
 }

@@ -257,6 +257,7 @@ export default function AppScreenRouter({ app }) {
       <DeferredScreenFrame screen={screen}>
         <ErrorBoundary onReset={() => setScreen('hub')}>
           <RetirePhaseScreen
+            farmState={{farmCompetition:gs.farmCompetition,year:gs.year,teams:gs.teams,seasonHistory:gs.getSeasonHistory?.()??gs.seasonHistory}}
             teams={teams}
             myId={myId}
             year={year}
@@ -303,6 +304,7 @@ export default function AppScreenRouter({ app }) {
       <DeferredScreenFrame screen={screen}>
         <ErrorBoundary onReset={() => setScreen('hub')}>
           <GrowthSummaryScreen
+            farmState={{farmCompetition:gs.farmCompetition,year:gs.year,teams:gs.teams,seasonHistory:gs.getSeasonHistory?.()??gs.seasonHistory}}
             summary={os.developmentSummary}
             year={year}
             teams={teams}
@@ -320,6 +322,7 @@ export default function AppScreenRouter({ app }) {
       <DeferredScreenFrame screen={screen}>
         <ErrorBoundary onReset={() => setScreen('hub')}>
           <WaiverPhaseScreen
+            farmState={{farmCompetition:gs.farmCompetition,year:gs.year,teams:gs.teams,seasonHistory:gs.getSeasonHistory?.()??gs.seasonHistory}}
             teams={teams}
             myId={myId}
             year={year}
@@ -336,6 +339,7 @@ export default function AppScreenRouter({ app }) {
       <DeferredScreenFrame screen={screen}>
         <ErrorBoundary onReset={() => setScreen('hub')}>
           <WaiverResultScreen
+            farmState={{farmCompetition:gs.farmCompetition,year:gs.year,teams:gs.teams,seasonHistory:gs.getSeasonHistory?.()??gs.seasonHistory}}
             results={os.waiverClaimResults}
             year={year}
             teams={teams}

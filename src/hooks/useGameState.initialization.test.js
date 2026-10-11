@@ -8,12 +8,13 @@ const mocks=vi.hoisted(()=>({persist:vi.fn(),generate:vi.fn(),foreign:vi.fn(),sc
 vi.mock('../engine/bootstrapTeams',()=>({createInitialTeams:()=>mocks.generate(),createInitialTeamsAsync:async()=>mocks.generate()}));
 vi.mock('../engine/saveload',()=>({hasSave:()=>false,getSaveQueueSnapshot:()=>({isSaving:false}),getAutoSaveIntervalMs:()=>Infinity,enqueueSaveGame:async(state,options)=>options?.initialCareerLogs ? mocks.persist(options.initialCareerLogs) : {ok:true}}));
 vi.mock('../engine/player',()=>({generateForeignFaPool:()=>mocks.foreign()}));
-vi.mock('../engine/scheduleGen',()=>({generateSeasonSchedule:()=>mocks.schedule(),calcAllStarTriggerDay:()=>mocks.trigger()}));
+vi.mock('../engine/scheduleGen',async original=>({...await original(),generateSeasonSchedule:(...args)=>mocks.schedule(...args),calcAllStarTriggerDay:()=>mocks.trigger()}));
 vi.mock('../engine/battedBallArchive',()=>({getBattedBallQueueStatus:()=>({failedRecords:0}),flushBattedBallQueue:async()=>({ok:true})}));
+const scheduleActual=await vi.importActual('../engine/scheduleGen');
 let view,gs;
-const initial=()=>TEAM_DEFS.map(t=>({...t,players:[{id:'p'+t.id,name:t.name,stats:{},careerLog:[{year:2024,stats:{HR:1}}]}],farm:[],lineup:[],rotation:[]}));
+const initial=()=>TEAM_DEFS.map(t=>({...t,wins:0,losses:0,draws:0,players:[{id:'p'+t.id,name:t.name,isPitcher:false,stats:{},careerLog:[{year:2024,stats:{HR:1}}]}],farm:[],lineup:[],rotation:[]}));
 beforeEach(async()=>{
-  vi.clearAllMocks();mocks.generate.mockImplementation(initial);mocks.persist.mockResolvedValue({ok:true});mocks.foreign.mockReturnValue([]);mocks.schedule.mockReturnValue({1:{matchups:[]}});mocks.trigger.mockReturnValue(72);
+  vi.clearAllMocks();mocks.generate.mockImplementation(initial);mocks.persist.mockResolvedValue({ok:true});mocks.foreign.mockReturnValue([]);mocks.schedule.mockImplementation((year,teams)=>scheduleActual.generateSeasonSchedule(year,teams));mocks.trigger.mockReturnValue(72);
   function Harness(){gs=useGameState();return null;}
   await act(async()=>{view=create(React.createElement(Harness));});
 });
@@ -53,7 +54,7 @@ it('reports an initial history write failure without partial state and permits a
   await act(async()=>{await gs.handleSelect(TEAM_DEFS[1].id);});
   expect(gs.newGameInitializationError).toBeNull();expect(gs.newGameInitializationStatus).toBe('ready');
   expect(gs.teams).toHaveLength(12);expect(gs.myId).toBe(TEAM_DEFS[1].id);expect(gs.screen).toBe('hub');
-  expect(gs.schedule).toEqual({1:{matchups:[]}});
+  expect(gs.schedule).toEqual(scheduleActual.generateSeasonSchedule(gs.year,gs.teams));
   const ids=gs.teams.flatMap(t=>t.players.map(p=>p.id));expect(new Set(ids).size).toBe(ids.length);
 });
 it('does not publish teams or enter home when final schedule preparation fails',async()=>{

@@ -102,6 +102,7 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
     return (
       <>
         <RosterTab
+          farmState={{farmCompetition:gs.farmCompetition,year:gs.year,teams:gs.teams,seasonHistory:gs.getSeasonHistory?.()??gs.seasonHistory}}
           team={myTeam}
           allTeams={teams}
           onToggle={gs.toggleLineup}

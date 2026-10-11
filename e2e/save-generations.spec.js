@@ -8,7 +8,9 @@ test('save generations recover their histories after primary corruption and disa
   const result = await page.evaluate(async fixture => {
     const mod = await import('/baseball-manager/src/engine/saveload.js');
     const make = day => ({ ...fixture, year:2026, gameDay:day, saveId:'recovery',
-      news:[{day}],mailbox:[{day}],seasonHistory:{day},gameResultsMap:{[day]:{day}} });
+      teams:fixture.teams.map(t=>({...t,wins:0,losses:0,draws:day-1})),
+      news:[{day}],mailbox:[{day}],seasonHistory:{day},
+      gameResultsMap:Object.fromEntries(Array.from({length:day-1},(_,i)=>[i+1,{day:i+1}])) });
     const first = await mod.saveGame(make(1)), second = await mod.saveGame(make(2));
     localStorage.setItem('baseball_manager_v1', 'broken');
     const restored = await mod.loadGame(), corruptStatus = mod.getLastLoadResult();

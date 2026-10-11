@@ -1,3 +1,5 @@
+import {createFarmCompetition} from '../engine/farmRecords';
+import {validateFarmSaveState} from '../engine/farmMigration';
 import { saveFeedback } from '../engine/saveFeedback';
 import { useState, useReducer, useMemo, useCallback, useEffect, useRef } from "react";
 import { contractReplyIsDue, resolveContractReplies } from '../engine/contractReplies';
@@ -138,7 +140,13 @@ export function useGameState() {
     undefined,
     () => ({ teams: [], gameDay: 1, year: 2026, myId: null, saveId: createSaveId() }),
   );
-  const { teams, gameDay, year, myId, saveId } = gameState;
+  const { teams, gameDay, year, myId, saveId, farmCompetition } = gameState;
+  const farmFields = farmCompetition ? {farmCompetition,farmCompetitionVersion:1} : {};
+  const progressTokenRef = useRef(0);
+  const progressSessionRef = useRef(0);
+  const getProgressSessionToken = useCallback(()=>progressSessionRef.current,[]);
+  const progressDispatch = useCallback(action => {progressTokenRef.current++;dispatch(action);},[]);
+  const getProgressToken = useCallback(()=>progressTokenRef.current,[]);
   const [saveDirty, setSaveDirty] = useState(false);
   const [lastAutoSaveAt, setLastAutoSaveAt] = useState(0);
   const [saveRevision, setSaveRevision] = useState(0);
@@ -156,11 +164,18 @@ export function useGameState() {
     pendingCareerEntriesRef.current.push(...structuredClone(entries));
     markSaveDirty();
   },[markSaveDirty]);
-  const setTeams   = useCallback((n) => { dispatch({ type: G.SET_TEAMS, teams: (prev) => slimTeamsForState(typeof n === 'function' ? n(prev) : n) }); markSaveDirty(); },    [markSaveDirty]);
-  const setGameDay = useCallback((n) => { dispatch({ type: G.SET_GAME_DAY, day: n }); markSaveDirty(); }, [markSaveDirty]);
-  const setYear    = useCallback((n) => { dispatch({ type: G.SET_YEAR, year: n }); markSaveDirty(); }, [markSaveDirty]);
-  const setMyId    = useCallback((id) => { dispatch({ type: G.SET_MY_ID, myId: id }); markSaveDirty(); }, [markSaveDirty]);
-  const setSaveId  = useCallback((id) => { pendingCareerEntriesRef.current=[];dispatch({ type: G.SET_SAVE_ID, saveId: ensureSaveId(id) }); }, []);
+  const setFarmCompetition = useCallback(competition => {progressDispatch({type:G.SET_FARM_COMPETITION,competition});markSaveDirty();},[progressDispatch,markSaveDirty]);
+  const applyProgressCandidate = useCallback((candidate,{baseToken}={}) => {
+    if(baseToken!=null&&baseToken!==progressTokenRef.current)return false;
+    validateFarmSaveState(candidate);
+    progressDispatch({type:G.APPLY_PROGRESS,candidate:{...candidate,teams:slimTeamsForState(candidate.teams)}});
+    markSaveDirty();return true;
+  },[progressDispatch,markSaveDirty]);
+  const setTeams   = useCallback((n) => { progressDispatch({ type: G.SET_TEAMS, teams: (prev) => slimTeamsForState(typeof n === 'function' ? n(prev) : n) }); markSaveDirty(); },    [markSaveDirty]);
+  const setGameDay = useCallback((n) => { progressDispatch({ type: G.SET_GAME_DAY, day: n }); markSaveDirty(); }, [markSaveDirty]);
+  const setYear    = useCallback((n) => { progressDispatch({ type: G.SET_YEAR, year: n }); markSaveDirty(); }, [markSaveDirty]);
+  const setMyId    = useCallback((id) => { progressDispatch({ type: G.SET_MY_ID, myId: id }); markSaveDirty(); }, [markSaveDirty]);
+  const setSaveId  = useCallback((id) => { pendingCareerEntriesRef.current=[];progressSessionRef.current++;progressDispatch({ type: G.SET_SAVE_ID, saveId: ensureSaveId(id) }); }, []);
   const [tab, setTab] = useState("dashboard");
   const [faPool, setFaPool] = useState([]);
   const [faYears, setFaYearsState] = useState({});
@@ -444,7 +459,7 @@ export function useGameState() {
   },[myTeam,mailbox,faPool,news,gameDay]);
 
   const notify = useCallback((msg,type="ok")=>{setNotif({msg,type});setTimeout(()=>setNotif(null),3500);},[]);
-  const upd = useCallback((id, fn) => { dispatch({ type: G.UPD_TEAM, id, fn: (team) => slimTeamForState(fn(team)) }); markSaveDirty(); }, [markSaveDirty]);
+  const upd = useCallback((id, fn) => { progressDispatch({ type: G.UPD_TEAM, id, fn: (team) => slimTeamForState(fn(team)) }); markSaveDirty(); }, [markSaveDirty]);
 
   const pushResult = useCallback((won,drew,oppName,myScore,oppScore,gameNo)=>{
     setRecentResults(prev=>[{won,drew,oppName,myScore,oppScore,gameNo},...prev.filter(r=>r.gameNo!==gameNo)].slice(0,5));
@@ -539,7 +554,7 @@ export function useGameState() {
       }
       const request = beginTrackedSave();
       return queueSave(
-        {teams,myId,gameDay,year,saveId,faPool,faYears,seasonHistory,news,mailbox,saveRevision,offseasonPlan,...getMatchHistorySnapshot()},
+        {teams,myId,gameDay,year,saveId,schedule,...farmFields,faPool,faYears,seasonHistory,news,mailbox,saveRevision,offseasonPlan,...getMatchHistorySnapshot()},
         request.options,
       ).then((result) => ({ result, snapshot: request.snapshot }));
     }).then(({ result, snapshot })=>{
@@ -567,7 +582,7 @@ export function useGameState() {
       request.options.dirtyScopes = [...new Set([...(request.options.dirtyScopes ?? ['seasonHistory', 'news', 'mailbox']), 'matchHistory'])];
     }
     const result=await queueSave(
-      {teams,myId,gameDay,year,saveId,faPool,faYears,seasonHistory,news,mailbox,saveRevision,...getMatchHistorySnapshot(),
+      {teams,myId,gameDay,year,saveId,schedule,...farmFields,faPool,faYears,seasonHistory,news,mailbox,saveRevision,...getMatchHistorySnapshot(),
         offseasonPlan: offseasonPlan && { ...offseasonPlan, resumeScreen:
           offseasonPlan.stage === 'postseason' && screen === 'hub' ? offseasonPlan.resumeScreen : screen }, ...options.payload},
       request.options,
@@ -581,7 +596,7 @@ export function useGameState() {
     }
     return result;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[teams,myId,saveId,gameDay,year,faPool,faYears,seasonHistory,news,mailbox,saveRevision,offseasonPlan,screen,isAutoSaveSuspended,notify,queueSave,beginTrackedSave,completeTrackedSave,getMatchHistorySnapshot]);
+  },[teams,myId,saveId,gameDay,year,farmCompetition,schedule,faPool,faYears,seasonHistory,news,mailbox,saveRevision,offseasonPlan,screen,isAutoSaveSuspended,notify,queueSave,beginTrackedSave,completeTrackedSave,getMatchHistorySnapshot]);
 
   useEffect(() => {
     if (!offseasonPlan || !OFFSEASON_SAVE_SCREENS.has(screen) || !saveDirty || isAutoSaveSuspended) return;
@@ -619,7 +634,8 @@ export function useGameState() {
       // Prepare locally; only publish a complete game after required history writes succeed.
       const saveMod = await loadSaveModule();
       const initialHistory={awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[],transfers:[]};
-      const initialized = await saveMod.enqueueSaveGame({teams:nextTeams,myId:id,saveId:nextSaveId,year,gameDay:1,
+      const initialFarm = createFarmCompetition({teams:nextTeams,saveId:nextSaveId,year});
+      const initialized = await saveMod.enqueueSaveGame({schedule:newSchedule,farmCompetition:initialFarm,farmCompetitionVersion:1,teams:nextTeams,myId:id,saveId:nextSaveId,year,gameDay:1,
         faPool:nextFaPool,faYears:{},seasonHistory:initialHistory,news:[],mailbox:[],offseasonPlan:null,...matchHistorySnapshot({})},
         {initialCareerLogs:collectCareerLogsForIndexedDb(nextTeams)});
       if (!initialized?.ok) {
@@ -627,7 +643,7 @@ export function useGameState() {
         error.saveResult=initialized;throw error;
       }
       pendingCareerEntriesRef.current=[];
-      setTeams(nextTeams);
+      applyProgressCandidate({teams:nextTeams,myId:id,saveId:nextSaveId,year,gameDay:1,farmCompetition:initialFarm,farmCompetitionVersion:1,seasonHistory:initialHistory});
       setFaPool(nextFaPool);
       setSaveId(nextSaveId);
       setOffseasonPlan(null);
@@ -1012,7 +1028,7 @@ export function useGameState() {
     retireRole, setRetireRole,
     teams, setTeams,
     myId, setMyId,
-    saveId, setSaveId,
+    saveId, setSaveId, farmCompetition, farmCompetitionVersion: farmCompetition ? 1 : undefined, setFarmCompetition, applyProgressCandidate, getProgressToken, getProgressSessionToken,
     tab, setTab,
     gameDay, setGameDay,
     year, setYear,
