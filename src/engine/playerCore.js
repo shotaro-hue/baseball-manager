@@ -1,7 +1,7 @@
 import { rng, clamp, uid, pname, CITIES } from '../utils';
 import {
   FIELDING_POSITIONS, PLAYER_TYPES_B, PLAYER_TYPES_P, PLAYER_COMMENTS_B, PLAYER_COMMENTS_P, MIN_SALARY_IKUSEI,
-  SECONDARY_POSITION_RULES,
+  SECONDARY_POSITION_RULES, MIN_ACTIVE_CATCHERS,
 } from '../constants';
 import { createEmptyBattedBallProfile } from './battedBallProfile';
 
@@ -102,6 +102,18 @@ export function applyPositionFields(player) {
   return player;
 }
 
+// Initial generation needs two active primary catchers and one farm catcher.
+// Reserve existing generated slots rather than adding players or changing real players.
+export function makeInitialFarmBatters(count, quality, activePlayers) {
+  const activeCatchers = activePlayers.filter(p => !p.isPitcher && p.pos === '捕手'
+    && !p.育成 && !p.isIkusei && Number(p.injuryDaysLeft || 0) <= 0).length;
+  const requiredCatchers = Math.max(1, MIN_ACTIVE_CATCHERS + 1 - activeCatchers);
+  return Array.from({ length: count }, (_, i) => {
+    const randomPosition = FIELDING_POSITIONS[rng(0, FIELDING_POSITIONS.length - 1)];
+    return makePlayer(i < requiredCatchers ? '捕手' : randomPosition, quality, false, rng(18, 25));
+  });
+}
+
 export function buildTeam(def) {
   const q = rng(56, 76);
   const dhEnabled = def.league === 'パ';
@@ -112,12 +124,11 @@ export function buildTeam(def) {
   for (let i = 0; i < 4; i++) players.push(makePlayer('中継ぎ', q - 4, true, rng(23, 31)));
   players.push(makePlayer('抑え', q + 4, true, rng(24, 32)));
 
-  const farm = [];
-  for (let i = 0; i < 15; i++) farm.push(makePlayer(FIELDING_POSITIONS[rng(0, FIELDING_POSITIONS.length - 1)], q - 20, false, rng(18, 25)));
-  for (let i = 0; i < 8; i++) farm.push(makePlayer('先発', q - 15, true, rng(18, 24)));
-
   const nonPitchers = players.filter((p) => !p.isPitcher);
   if (nonPitchers[8]) nonPitchers[8].pos = 'DH';
+  const farm = makeInitialFarmBatters(15, q - 20, players);
+  for (let i = 0; i < 8; i++) farm.push(makePlayer('先発', q - 15, true, rng(18, 24)));
+
   const lineupNoDh = nonPitchers.slice(0, 8).map((p) => p.id);
   const lineupDh = nonPitchers.slice(0, 9).map((p) => p.id);
 

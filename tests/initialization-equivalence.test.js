@@ -18,7 +18,8 @@ for (const seed of [7,42,20261009]) it('preserves complete generated data and ra
   const teams=bootstrap.createInitialTeams();
   const baselineCalls=calls();
   const digest=createHash('sha256').update(JSON.stringify(teams)).digest('hex');
-  // Committed before optimization; full team/player/history/order/roles payload.
+  // Initial catcher coverage intentionally changes generated positions and initial membership.
+  // Pin the full payload and RNG consumption; sync/async must still match exactly.
   expect({digest,calls:baselineCalls}).toMatchSnapshot();
   vi.restoreAllMocks();const asyncCalls=seedRandom(seed);
   expect(typeof bootstrap.createInitialTeamsAsync).toBe('function');

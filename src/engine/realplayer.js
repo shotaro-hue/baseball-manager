@@ -1,6 +1,5 @@
 import { clamp, rng, uid } from '../utils';
-import { POSITIONS } from '../constants';
-import { emptyStats, makePlayer, applyPositionFields } from './playerCore';
+import { emptyStats, makePlayer, makeInitialFarmBatters, applyPositionFields } from './playerCore';
 import { DEFAULT_CONTRACT_END_YEAR } from '../data/npb2025';
 import { buildCareerLogSummary, compactCareerStats, getRecentCareerLog } from './careerStats';
 
@@ -318,14 +317,13 @@ export function buildRealTeam(def, rosterData) {
 
   // ファームはランダム生成（ドラフト候補など）
   const q = rng(42, 58);
-  const farm = [];
-  for (let i = 0; i < 12; i++) farm.push(makePlayer(POSITIONS[rng(0, 7)], q, false, rng(18, 25)));
+  const nonPitchers = players.filter(p => !p.isPitcher);
+  if (nonPitchers[8]) nonPitchers[8].pos = 'DH';
+  const farm = makeInitialFarmBatters(12, q, players);
   for (let i = 0; i < 6;  i++) farm.push(makePlayer('先発', q - 5, true, rng(18, 24)));
 
-  const nonPitchers = players.filter(p => !p.isPitcher);
   const starters    = players.filter(p => p.isPitcher && p.subtype === '先発');
   const dhEnabled = def.league === 'パ';
-  if (nonPitchers[8]) nonPitchers[8].pos = 'DH';
   const lineupNoDh = nonPitchers.slice(0, 8).map(p => p.id);
   const lineupDh = nonPitchers.slice(0, 9).map(p => p.id);
 

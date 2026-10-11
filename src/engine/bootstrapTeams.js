@@ -22,7 +22,14 @@ function createInitialTeam(def) {
   const rawTeam = NPB2025_ROSTERS[def.id]
     ? buildRealTeam(def, NPB2025_ROSTERS[def.id])
     : buildTeam(def);
-  const team = optimizeTeamForGameStart(rawTeam);
+  // Keep one generated catcher in the farm during the initial roster optimization.
+  // Daily automation uses its existing rules; this reservation applies only at game start.
+  const farmCatcher = rawTeam.farm.find(p => !p.isPitcher && p.pos === '捕手');
+  const team = optimizeTeamForGameStart({
+    ...rawTeam,
+    farm: rawTeam.farm.filter(p => p !== farmCatcher),
+  });
+  if (farmCatcher) team.farm = [...team.farm, farmCatcher];
   const nonPitcherIds = (team.players || [])
     .filter((player) => !player.isPitcher)
     .map((player) => player.id);

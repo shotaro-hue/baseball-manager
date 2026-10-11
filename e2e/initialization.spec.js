@@ -9,11 +9,17 @@ async function initialContents(page) {
     const data = await readCareerGeneration(saved);
     const populated = data.players.filter(([, entries]) => entries.length > 0);
     const rows = { keys: populated.map(([id]) => id), rows: populated.map(([, entries]) => entries) };
+    const { selectFarmTeam } = await import('/baseball-manager/src/engine/farmSelection.js');
+    const catcherCoverage = saved.teams.map(t => ({
+      active: t.players.filter(p => !p.isPitcher && p.pos === '捕手'
+        && !p.育成 && !p.isIkusei && Number(p.injuryDaysLeft || 0) === 0).length,
+      farmStatus: selectFarmTeam(t, { round: 1 }).status,
+    }));
     const players = saved.teams.flatMap(t => [...t.players,...t.farm]);
     const historyIds = players.filter(p => p.careerLogSummary?.trimmedEntries > 0).map(p => p.id);
     const { generateSeasonSchedule } = await import('/baseball-manager/src/engine/scheduleGen.js');
     const schedule = generateSeasonSchedule(saved.year,saved.teams);
-    return { myId:saved.myId, teamCount:saved.teams.length, playerIds:players.map(p=>p.id),
+    return { myId:saved.myId, teamCount:saved.teams.length, catcherCoverage, playerIds:players.map(p=>p.id),
       rows:rows.rows.reduce((n,r)=>n+r.length,0), historyKeys:rows.keys, historyIds,
       regularMatchups:schedule.slice(1,144).reduce((n,day)=>n+day.matchups.length,0),
       scheduledTeamGames:saved.teams.map(t=>schedule.slice(1,144).reduce((n,day)=>n+day.matchups.filter(m=>m.homeId===t.id||m.awayId===t.id).length,0)) };
@@ -82,6 +88,7 @@ test('failed initial IndexedDB write stays on title and retry saves all history 
   await page.getByRole('button',{name:TEAM,exact:true}).click();
   await waitForNewGameReady(page,TEAM);
   await saveHub(page);const before=await initialContents(page);
+  expect(before.catcherCoverage.every(t => t.active >= 2 && t.farmStatus === 'ready')).toBe(true);
   expect(before.teamCount).toBe(12);expect(before.playerIds).toHaveLength(661);
   expect(new Set(before.playerIds).size).toBe(661);
   expect(before.rows).toBe(2009);expect(before.historyKeys).toHaveLength(376);
