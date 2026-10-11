@@ -7,6 +7,7 @@ import {useGameState} from './useGameState';import {useOffseason} from './useOff
 import {saveGame,loadGame} from '../engine/saveload';
 import {generateSeasonSchedule} from '../engine/scheduleGen';import {migrateFarmCompetition} from '../engine/farmMigration';
 import {prepareFarmProgress,finishFarmProgress} from '../engine/farmProgression';
+import {FarmRankings} from '../components/FarmRankings';
 vi.mock('../engine/battedBallArchive',()=>({getBattedBallQueueStatus:()=>({failedRecords:0}),flushBattedBallQueue:async()=>({ok:true})}));
 let rows,view,gs,os;
 const state=(day=1)=>{const s=JSON.parse(gunzipSync(readFileSync(new URL('../../e2e/fixtures/new-game.json.gz',import.meta.url))));
@@ -16,6 +17,34 @@ beforeEach(()=>{rows=new Map();vi.stubGlobal('indexedDB',new IDBFactory());vi.st
 afterEach(()=>{if(view)act(()=>view.unmount());view=null;vi.restoreAllMocks();vi.unstubAllGlobals();});
 function mount(s){function Harness(){gs=useGameState();os=useOffseason(gs);return null;}
  act(()=>{view=create(React.createElement(Harness));});act(()=>{gs.applyProgressCandidate(s);gs.setSchedule(s.schedule);gs.hydrateLargeSaveData({seasonHistory:s.seasonHistory});gs.hydrateMatchHistory(s);gs.setScreen('spring_training');});}
+it('actual offseason awards survive save, annual archive and reload, and viewing writes nothing',async()=>{
+ let completed=state();
+ for(let round=1;round<=143;round++) {
+  const progress=prepareFarmProgress(completed,completed.teams,round);
+  completed={...completed,gameDay:round+1,farmCompetition:progress.competition,
+   teams:finishFarmProgress(completed.teams,progress,round).map(t=>({...t,wins:round}))};
+ }
+ mount(completed);act(()=>gs.setScreen('retire_phase'));
+ await act(async()=>expect(await os.handleRetirePhaseNext({})).toBe(true));
+ const awarded=structuredClone(gs.getSeasonHistory().awards.find(a=>a.year===completed.year));
+ expect(awarded.farmAwards).toMatchObject({status:'complete',year:completed.year,source:'measured'});
+ expect(awarded.farmAwards.eastern.hr.winners.length).toBeGreaterThan(0);
+ await act(async()=>expect((await gs.handleSave({silent:true})).ok).toBe(true));
+ expect((await loadGame()).seasonHistory.awards.find(a=>a.year===completed.year)).toEqual(awarded);
+ // Intervening market/spring choices are outside this regression; use the real annual transition.
+ act(()=>gs.setScreen('spring_training'));
+ await act(async()=>expect(await os.handleNextYear()).toBe(true));
+ const loaded=await loadGame();expect(loaded.year).toBe(completed.year+1);
+ expect(loaded.seasonHistory.awards.find(a=>a.year===completed.year)).toEqual(awarded);
+ expect(loaded.seasonHistory.farmArchives.find(a=>a.year===completed.year)).toMatchObject({startRound:1,nextRound:144});
+ const before=JSON.stringify(loaded),stored=[...rows];let rankings;
+ act(()=>rankings=create(React.createElement(FarmRankings,{state:loaded})));
+ act(()=>rankings.root.findByProps({'aria-label':'二軍年度'}).props.onChange({target:{value:String(completed.year)}}));
+ const hr=awarded.farmAwards.eastern.hr.winners.map(p=>`${p.name}（${p.teamName}）`).join('／');
+ expect(rankings.root.findAllByType('dd')[1].children.join('')).toBe(hr);
+ act(()=>rankings.unmount());expect(JSON.stringify(loaded)).toBe(before);expect([...rows]).toEqual(stored);
+ expect((await loadGame()).seasonHistory.awards.find(a=>a.year===completed.year)).toEqual(awarded);
+},60000);
 it('manual save retains an adopted farm round after failure, and retries without re-simulation',async()=>{
  const old=state();await saveGame(old);mount(old);
  const p=prepareFarmProgress(old,old.teams,1),next={...old,gameDay:2,farmCompetition:p.competition,teams:finishFarmProgress(old.teams,p,1).map(t=>({...t,draws:1}))};

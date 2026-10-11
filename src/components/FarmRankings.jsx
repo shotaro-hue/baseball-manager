@@ -26,7 +26,9 @@ export function FarmRankings({state={}}) {
  const ranking=useMemo(()=>selectFarmRanking(state,{year,league,teamId,kind,metric,qualifiedOnly}),[state,year,league,teamId,kind,metric,qualifiedOnly]);
  const change=(setter,value)=>{setter(value);setSelected(null);};
  if(!record)return <section aria-label="二軍ランキング"><h2>二軍成績</h2><p>二軍実測：未記録。旧推定はランキングに含めません。</p></section>;
- const awards=state.seasonHistory?.awards?.find(a=>a.year===year)?.farmAwards??calcMeasuredFarmAwards(record,year);
+ const savedAwards=state.seasonHistory?.awards?.find(a=>a.year===year)?.farmAwards;
+ // Old pending snapshots are placeholders; resolve them for display only.
+ const awards=savedAwards?.status==='pending'||savedAwards==null?calcMeasuredFarmAwards(record,year):savedAwards;
  const leagueAwards=league==='セ'?awards.eastern:awards.western;
  return <section aria-label="二軍ランキング">
   <h2>二軍成績・ランキング</h2>

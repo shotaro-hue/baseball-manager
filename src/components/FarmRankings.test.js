@@ -5,9 +5,44 @@ import { FarmRankings } from "./FarmRankings";
 import { FarmPlayerHistory } from "./FarmRecordSummary";
 import { record } from "../engine/__tests__/farmRankingFixtures";
 import { StatsTab } from "./tabs/StatsTab";
+import { calcMeasuredFarmAwards } from "../engine/farmRankings";
 const state = () => ({ year: 2027, teams: [], farmCompetition: { ...record(), year: 2027, nextRound: 5, startRound: 4, legacy: { entries: [{playerId:0,stats:{PA:100},year:null}] } }, seasonHistory: { farmArchives: [record()] } });
 const flatten = n => n==null?'':typeof n==='object'?(Array.isArray(n)?n:n.children||[]).map(flatten).join(''):String(n);
 const text = v => flatten(v.toJSON());
+const freeze = value => { if(value && typeof value === 'object') { Object.values(value).forEach(freeze); Object.freeze(value); } return value; };
+it.each(['current','archive'])('displays measured annual winners over old pending awards from %s without mutating saved data', location => {
+ const measured=record(), pending={status:'pending',reason:'旧未確定',eastern:{hr:null},western:{hr:null}};
+ const s=freeze({year:location==='current'?2026:2027,teams:[],
+  ...(location==='current'?{farmCompetition:measured}:{}),
+  seasonHistory:{farmArchives:location==='archive'?[measured]:[],awards:[{year:2026,titles:{central:{hr:{name:'一軍受賞者'}}},farmAwards:pending}]}});
+ const before=JSON.stringify(s);let v;
+ act(()=>v=create(React.createElement(FarmRankings,{state:s})));
+ // 10/31 and 20/62 are exactly tied, so both batting winners must remain visible.
+ expect(v.root.findAllByType('dd').map(n=>n.children.join(''))).toEqual(['退団打者（東A／東B）／同率打者（東B）','退団打者（東A／東B）／同率打者（東B）','短回投手（東A）／同率投手（東B）']);
+ act(()=>v.root.findByProps({'aria-label':'二軍リーグ'}).props.onChange({target:{value:'パ'}}));
+ expect(v.root.findAllByType('dd').map(n=>n.children.join(''))).toEqual(['退団打者（西A）','退団打者（西A）','該当なし']);
+ act(()=>v.unmount());expect(JSON.stringify(s)).toBe(before);expect(pending.status).toBe('pending');
+});
+it.each([{startRound:4,nextRound:144},{startRound:1,nextRound:143}])('does not award an incomplete measured year over old pending: %j', progress => {
+ const s=freeze({year:2026,farmCompetition:{...record(),...progress},seasonHistory:{awards:[{year:2026,farmAwards:{status:'pending',reason:'旧未確定'}}]}});
+ const before=JSON.stringify(s);let v;act(()=>v=create(React.createElement(FarmRankings,{state:s})));
+ expect(v.root.findAllByType('dd')).toHaveLength(0);act(()=>v.unmount());expect(JSON.stringify(s)).toBe(before);
+});
+it.each(['complete','legacy'])('preserves saved %s awards even when measured winners differ', format => {
+ const awards=calcMeasuredFarmAwards(record(),2026);awards.eastern.hr={name:'保存済み受賞者',teamName:'保存球団'};
+ if(format==='legacy')delete awards.status;
+ const s=freeze({year:2026,farmCompetition:record(),seasonHistory:{awards:[{year:2026,farmAwards:awards}]}});
+ const before=JSON.stringify(s);let v;act(()=>v=create(React.createElement(FarmRankings,{state:s})));
+ if(format==='complete')expect(v.root.findAllByType('dd')[1].children.join('')).toBe('保存済み受賞者（保存球団）');
+ else expect(v.root.findAllByType('dd')).toHaveLength(0);
+ act(()=>v.unmount());expect(JSON.stringify(s)).toBe(before);
+});
+it('does not turn legacy estimates and pending awards into measured annual winners',()=>{
+ const s=freeze({year:2026,teams:[{farm:[{id:0,stats2:{PA:600,AB:500,H:400,HR:90}}]}],seasonHistory:{awards:[{year:2026,farmAwards:{status:'pending'}}]}});
+ const before=JSON.stringify(s);let v;act(()=>v=create(React.createElement(FarmRankings,{state:s})));
+ expect(text(v)).toContain('未記録');expect(v.root.findAllByType('dd')).toHaveLength(0);
+ act(()=>v.unmount());expect(JSON.stringify(s)).toBe(before);
+});
 it('shows stored shortage causes, including opponent shortage for a selected club, and does not invent historical reasons',()=>{
  const s=state();s.farmCompetition.cards=[{league:'セ',homeId:0,awayId:1,status:'unplayed',reasons:[{teamId:0,code:'insufficient-catcher',available:0,required:1}]}];
  let v;act(()=>v=create(React.createElement(FarmRankings,{state:s})));
