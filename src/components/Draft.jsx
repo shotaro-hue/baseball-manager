@@ -522,7 +522,8 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoS
     if(!current||done) return;
     const avail=pool.filter(p=>!isPickedAfterRound1(p.id)&&!p._drafted);
     if(!avail.length){setDone(true);return;}
-    doPick(chooseDraftProspect(current.team,avail,current.round+1),current.team.id===myId);
+    const acceptedPicks=draftPicksForTeam(pool,drafted,current.team.id);
+    doPick(chooseDraftProspect(current.team,avail,current.round+1,acceptedPicks),current.team.id===myId);
   };
 
   const myPick=pid=>{
