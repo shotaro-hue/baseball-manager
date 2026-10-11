@@ -91,6 +91,12 @@ describe('emergency fielding coverage', () => {
     expect(repaired.players.map(p => p.id)).toEqual(team.players.map(p => p.id));
     expect(repaired.farm).toEqual(team.farm);
   });
+  it('retains validation errors rather than throwing when an old team has no farm array', () => {
+    const team = farmReplacementTeam();
+    delete team.farm;
+    const repaired = applyEmergencyRosterMaintenance(team);
+    expect(validateLineup(repaired, false).errors.length).toBeGreaterThan(0);
+  });
   for (const days of [5, 15]) {
     for (const useDh of [false, true]) {
       it(`keeps a playable ${useDh ? 'DH' : 'no-DH'} lineup after a ${days}-day shortstop injury`, () => {

@@ -1074,7 +1074,7 @@ export function applyEmergencyRosterMaintenance(team, options = {}) {
         .sort((a, b) => Number(isHealthy(a)) - Number(isHealthy(b))
           || rosterRecScore(a, nextTeam, options) - rosterRecScore(b, nextTeam, options));
     let replacement = null;
-    const candidates = nextTeam.farm.filter(player => !player.isPitcher)
+    const candidates = (nextTeam.farm || []).filter(player => !player.isPitcher)
       .slice().sort((a, b) => rosterRecScore(b, nextTeam, options) - rosterRecScore(a, nextTeam, options));
     for (const upPlayer of candidates) {
       for (const downPlayer of downCandidates) {
