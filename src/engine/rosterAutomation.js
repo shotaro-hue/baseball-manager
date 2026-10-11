@@ -610,6 +610,10 @@ function ensureMinimumCatcherCount(team, options = {}) {
     ).length < MIN_ACTIVE_CATCHERS
   ) {
     const catcher = (nextTeam.farm || [])
+      .map(player => options.allowSamePlanRecall === true
+        && (Number(player.registrationCooldownDays) || 0) > 0
+        && !options.originalCooldownIds?.has(player.id)
+        ? { ...player, registrationCooldownDays: 0 } : player)
       .filter(
         (player) =>
           !player.isPitcher
@@ -646,6 +650,10 @@ function ensureMinimumCatcherCount(team, options = {}) {
         scoreDiff: 0,
         reasons: ['捕手2人制を充足'],
       };
+    }
+    // applyRosterRecs reads the farm snapshot, so use the recalled copy there too.
+    if (options.allowSamePlanRecall === true) {
+      nextTeam = { ...nextTeam, farm: nextTeam.farm.map(p => p.id === catcher.id ? catcher : p) };
     }
     nextTeam = applyRosterRecs(nextTeam, [rec]);
   }
@@ -1276,7 +1284,16 @@ export function optimizeTeamForGameStart(team, options = {}) {
     ...options,
     automationMode: ROSTER_AUTOMATION_MODES.FULL,
   });
-  return { ...plan.team, rosterAutomationMode: initialMode };
+  // Initial optimization can demote a catcher while trimming the roster. Recall
+  // that same-plan demotion when necessary; pre-existing cooldowns remain binding.
+  const repaired = ensureMinimumCatcherCount(plan.team, {
+    ...options,
+    allowSamePlanRecall: true,
+    originalCooldownIds: new Set((team.farm || [])
+      .filter(p => (Number(p.registrationCooldownDays) || 0) > 0).map(p => p.id)),
+  });
+  const initialTeam = repaired === plan.team ? repaired : buildAutoManagedRoster(repaired, options);
+  return { ...initialTeam, rosterAutomationMode: initialMode };
 }
 
 export function applyManagementPolicy(team, options = {}) {
