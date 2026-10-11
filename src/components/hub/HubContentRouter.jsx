@@ -400,6 +400,7 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
       <DeferredHubTab label="Loading stats...">
         <StatsTab
           teams={teams}
+          farmState={{farmCompetition:gs.farmCompetition,year:gs.year,teams:gs.teams,seasonHistory:gs.getSeasonHistory?.()??gs.seasonHistory}}
           myId={myId}
           saveId={gs.saveId}
           year={year}

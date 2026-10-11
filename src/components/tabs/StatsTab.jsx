@@ -3,6 +3,7 @@ import { fmtAvg, fmtPct, fmtIP } from '../../utils';
 import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
 import { inningsToOuts, stableSort } from '../../engine/analysisComparison';
 import { HandBadge, ThCell } from '../ui';
+import { FarmRankings } from '../FarmRankings';
 
 const BATTER_COLUMNS = [
   { key: 'PA', label: '打席', value: (p) => Number(p.stats?.PA) || 0, render: (p) => p.stats.PA },
@@ -239,6 +240,7 @@ export function StatsTab({
   onPlayerClick,
   onToggleCompare,
   comparePlayerIds = [],
+  farmState,
 }) {
   const [view, setView] = useState('batter');
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -277,11 +279,11 @@ export function StatsTab({
 
   return (
     <section className="calm-detail detail-stats" aria-label="自チーム成績">
-      <h1>自チーム成績</h1>
+      <h1>{view==='farm'?'二軍成績':'自チーム成績'}</h1>
       <p className="flow-muted">選手をタップして詳細へ。表は横にスクロールできます。</p>
       <div className="stats-toolbar">
         <div className="tabs" role="tablist" aria-label="成績種別">
-          {[['batter', '打者'], ['pitcher', '投手']].map(([key, label]) => (
+          {[['batter', '打者'], ['pitcher', '投手'], ['farm', '二軍']].map(([key, label]) => (
             <button
               key={key}
               role="tab"
@@ -293,13 +295,13 @@ export function StatsTab({
             </button>
           ))}
         </div>
-        <div className="stats-column-toggle" aria-label="表示する指標">
+        {view!=='farm'&&<div className="stats-column-toggle" aria-label="表示する指標">
           <button aria-pressed={!showAdvanced} className={!showAdvanced ? 'on' : ''} onClick={() => setShowAdvanced(false)}>主要指標</button>
           <button aria-pressed={showAdvanced} className={showAdvanced ? 'on' : ''} onClick={() => setShowAdvanced(true)}>詳細指標</button>
-        </div>
+        </div>}
       </div>
 
-      {view === 'batter' ? (
+      {view==='farm'?<FarmRankings state={farmState}/>:view === 'batter' ? (
         <StatsTable
           title="打者成績"
           defaultSortLabel="OPS降順"

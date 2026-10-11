@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import {readFileSync} from 'node:fs';
+import {gunzipSync} from 'node:zlib';
 import { startNewGame, mainNavigation, runBatch, runSingle, startSingle, saveHub, waitSaveIdle, readSave, reloadAndLoad, progressSignature, loadFixture } from './helpers/progression';
 
 // Measured E1 includes real detailed Worker simulation and multiple IDB loads.
@@ -6,6 +8,51 @@ test.setTimeout(60_000);
 let errors = [];
 test.beforeEach(async ({ page }) => { errors = []; page.on('pageerror', e => errors.push(e.message)); page.on('console', msg => { if (msg.type() === 'error' && /runSingleDaySimulation failed|runBatchGames failed|Save failed|Auto save failed|年度更新処理に失敗/.test(msg.text())) errors.push(msg.text()); }); });
 test.afterEach(async () => { expect(errors, 'Unhandled page exceptions').toEqual([]); });
+
+for(const width of [360,390,1440])test(`F04 farm historical rankings, retired detail and persisted awards at ${width}px`,async({page},testInfo)=>{
+ await page.setViewportSize({width,height:width===360?800:width===390?844:900});await page.goto('/');
+ const fixture=JSON.parse(gunzipSync(readFileSync(new URL('./fixtures/new-game.json.gz',import.meta.url))));
+ const expected=await page.evaluate(async s=>{
+  const {createFarmCompetition,applyFarmRound}=await import('/baseball-manager/src/engine/farmRecords.js');
+  const {simulateFarmRound}=await import('/baseball-manager/src/engine/farmGame.js');
+  const {selectFarmUsage}=await import('/baseball-manager/src/engine/farmSelectors.js');
+  const {advanceFarmYear}=await import('/baseball-manager/src/engine/farmMigration.js');
+  const {generateSeasonSchedule}=await import('/baseball-manager/src/engine/scheduleGen.js');
+  const {calcMeasuredFarmAwards,selectFarmRanking}=await import('/baseball-manager/src/engine/farmRankings.js');
+  const {saveGame}=await import('/baseball-manager/src/engine/saveload.js');
+  let c=createFarmCompetition({teams:s.teams,saveId:s.saveId,year:s.year});
+  for(let round=1;round<=143;round++)c=applyFarmRound(c,simulateFarmRound({teams:s.teams,saveId:s.saveId,year:s.year,round,usage:selectFarmUsage(c)}),s.teams);
+  s.teams=s.teams.map(t=>({...t,wins:0,losses:0,draws:143}));s.gameDay=144;s.farmCompetition=c;s.farmCompetitionVersion=1;s.schedule=generateSeasonSchedule(s.year,s.teams);
+  const awards=calcMeasuredFarmAwards(c,s.year);s.seasonHistory={...s.seasonHistory,awards:[{year:s.year,farmAwards:awards}]};
+  const row=selectFarmRanking(s,{league:'セ',metric:'PA'}).rows[0];
+  const nextTeams=s.teams.map(t=>({...t,wins:0,losses:0,draws:0,players:t.players.filter(p=>p.id!==row.playerId),farm:t.farm.filter(p=>p.id!==row.playerId)}));
+  const next=advanceFarmYear(s,{year:s.year+1,teams:nextTeams,nextSchedule:generateSeasonSchedule(s.year+1,nextTeams)});
+  next.farmCompetition=applyFarmRound(next.farmCompetition,simulateFarmRound({teams:nextTeams,saveId:next.saveId,year:next.year,round:1}),nextTeams);
+  next.teams=nextTeams.map(t=>({...t,draws:1}));next.gameDay=2;
+  if(!(await saveGame(next)).ok)throw new Error('farm historical fixture save failed');
+  return {year:s.year,retiredName:row.name,playerId:row.playerId,PA:row.stats.PA,awards};
+ },fixture);
+ await reloadAndLoad(page);await mainNavigation(page,width<768).getByRole('button',{name:'成績',exact:true}).click();
+ await page.getByRole('tab',{name:'二軍',exact:true}).click();
+ await page.getByLabel('二軍リーグ').selectOption('パ');
+ await page.locator('section[aria-label="二軍ランキング"] summary').filter({hasText:'未実施理由'}).click();
+ await expect(page.getByRole('region',{name:'二軍ランキング',exact:true})).toContainText('捕手不足');
+ await page.getByLabel('二軍リーグ').selectOption('セ');
+ await page.getByLabel('二軍年度').selectOption(String(expected.year));
+ await page.getByLabel('二軍順位指標').selectOption('PA');
+ const region=page.getByRole('region',{name:'二軍ランキング',exact:true});
+ await expect(region).toContainText('過年度の未実施理由は未記録');
+ await region.getByRole('button',{name:expected.retiredName,exact:true}).first().click();
+ const detail=page.getByRole('region',{name:'二軍記録詳細'});await expect(detail).toContainText(`${expected.PA}打席`);
+ await expect(region).toContainText('年間表彰');await expect(region).not.toContainText('規定確定後');
+ await detail.getByRole('button',{name:'記録詳細を閉じる'}).click();
+ await page.getByLabel('二軍リーグ').selectOption('パ');await page.getByLabel('二軍成績種別').selectOption('pitching');
+ await expect(region).toContainText('投球回');
+ const restored=await saveHub(page);expect(restored.seasonHistory.awards[0].farmAwards).toEqual(expected.awards);
+ expect(restored.seasonHistory.farmArchives[0].players.some(p=>p.playerId===expected.playerId)).toBe(true);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:testInfo.outputPath(`farm-f04-${width}.png`),fullPage:true});
+});
 
 test('E1 new game, five games, persisted reload, one more game', async ({ page }, testInfo) => {
   const mobile = testInfo.project.name === 'mobile-webkit';
