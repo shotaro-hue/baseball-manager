@@ -1,3 +1,4 @@
+import { generateSeasonSchedule } from '../scheduleGen';
 import { it, expect } from 'vitest';
 import { migrateFarmCompetition,advanceFarmYear,validateFarmSaveState } from '../farmMigration';
 import { selectFarmPlayer,selectFarmTeams,selectFarmUsage } from '../farmSelectors';
@@ -53,7 +54,7 @@ it('exposes independent aggregate/team/league stats, zero versus missing, and un
 });
 it('freezes year records and retains all archives; new year/records/archives are one unpublished candidate',()=>{
   let s=farmState(144);s=migrateFarmCompetition(s);
-  const old=freeze(s),next=advanceFarmYear(old,{year:2027,teams:s.teams.map(t=>({...t,wins:0}))});
+  const old=freeze(s),next=advanceFarmYear(old,{year:2027,nextSchedule:generateSeasonSchedule(2027,old.teams),teams:s.teams.map(t=>({...t,wins:0}))});
   expect(old.year).toBe(2026);expect(next.year).toBe(2027);expect(next.gameDay).toBe(1);
   expect(next.seasonHistory.farmArchives[0]).toMatchObject({year:2026,startRound:144,fullYearEligible:false});
   expect(next.seasonHistory.farmArchives[0].cards).toBeUndefined();expect(next.farmCompetition.nextRound).toBe(1);
@@ -64,7 +65,7 @@ it('freezes year records and retains all archives; new year/records/archives are
     cursor={...cursor,gameDay:144,teams:cursor.teams.map(t=>({...t,wins:143})),
       farmCompetition:createFarmCompetition({saveId:cursor.saveId,year:cursor.year,teams:cursor.teams,startRound:144,
         archiveSignature:cursor.farmCompetition.archiveSignature})};
-    cursor=advanceFarmYear(cursor,{year,teams:cursor.teams.map(t=>({...t,wins:0}))});
+    cursor=advanceFarmYear(cursor,{year,nextSchedule:generateSeasonSchedule(year,cursor.teams),teams:cursor.teams.map(t=>({...t,wins:0}))});
   }
   expect(cursor.seasonHistory.farmArchives).toHaveLength(21);
 });
@@ -80,7 +81,7 @@ it('builds an annual candidate with consistent cleared main match-history fields
   const old=migrateFarmCompetition(farmState(144));
   old.allTeamBoxScoresMap={0:{143:{old:true}}};old.allStarDone=true;old.pressEvent={old:true};
   old.scheduleArchive=[{year:2025}];
-  const next=advanceFarmYear(old,{year:2027,teams:old.teams.map(t=>({...t,wins:0}))});
+  const next=advanceFarmYear(old,{year:2027,nextSchedule:generateSeasonSchedule(2027,old.teams),teams:old.teams.map(t=>({...t,wins:0}))});
   expect(next.allTeamBoxScoresMap).toEqual({});expect(next.allStarDone).toBe(false);expect(next.pressEvent).toBeNull();
   expect(next.scheduleArchive).toEqual(old.scheduleArchive);
 });
@@ -88,4 +89,24 @@ it('builds an annual candidate with consistent cleared main match-history fields
 it('refuses unrelated team topology at the same saveId and official position',()=>{
   const s=migrateFarmCompetition(farmState()),changed=structuredClone(s);changed.teams[1].id='different-team';
   expect(()=>validateFarmSaveState(changed)).toThrow();
+});
+
+it('archives the finished-year schedule while installing a distinct new-year schedule',()=>{
+  const old=migrateFarmCompetition(farmState(144));
+  old.schedule=generateSeasonSchedule(2026,old.teams);
+  old.gameResultsMap={143:{win:true}};
+  const nextSchedule=generateSeasonSchedule(2027,old.teams);
+  const next=advanceFarmYear(freeze(old),{year:2027,teams:old.teams.map(t=>({...t,wins:0})),nextSchedule});
+  expect(next.scheduleArchive.at(-1)).toMatchObject({year:2026,schedule:old.schedule,gameResultsMap:old.gameResultsMap});
+  expect(next.schedule).toEqual(nextSchedule);expect(next.schedule).not.toEqual(old.schedule);
+  expect(old.scheduleArchive).toBeUndefined();expect(old.year).toBe(2026);
+});
+it.each([undefined,null,[],[null],{},Array(144).fill(null)])('rejects absent or incomplete new-year schedule: %j',nextSchedule=>{
+  const old=migrateFarmCompetition(farmState(144));
+  expect(()=>advanceFarmYear(old,{year:2027,teams:old.teams.map(t=>({...t,wins:0})),nextSchedule})).toThrow(/schedule/);
+});
+it('rejects a new-year schedule with missing or duplicate club participation',()=>{
+  const old=migrateFarmCompetition(farmState(144)),nextSchedule=generateSeasonSchedule(2027,old.teams);
+  nextSchedule[143].matchups[0].homeId=nextSchedule[143].matchups[0].awayId;
+  expect(()=>advanceFarmYear(old,{year:2027,teams:old.teams.map(t=>({...t,wins:0})),nextSchedule})).toThrow(/schedule/);
 });

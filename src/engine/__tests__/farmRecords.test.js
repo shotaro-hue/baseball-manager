@@ -1,3 +1,4 @@
+import { generateSeasonSchedule } from '../scheduleGen';
 import { it, expect } from 'vitest';
 import { createFarmCompetition, applyFarmRound } from '../farmRecords';
 import { validateFarmCompetition } from '../farmRecordValidation';
@@ -92,7 +93,7 @@ it('validates 143 fixture rounds with explicit catcher shortage and compact annu
   const {advanceFarmYear}=await import('../farmMigration'),{selectFarmPlayer}=await import('../farmSelectors');
   const state={...fixture,gameDay:144,farmCompetitionVersion:1,farmCompetition:c,seasonHistory:{},
     teams:ts.map(t=>({...t,wins:143,losses:0,draws:0}))};
-  const next=advanceFarmYear(state,{year:fixture.year+1,teams:ts.map(t=>({...t,wins:0,losses:0,draws:0,farm:[]}))});
+  const next=advanceFarmYear(state,{year:fixture.year+1,nextSchedule:generateSeasonSchedule(fixture.year+1,state.teams),teams:ts.map(t=>({...t,wins:0,losses:0,draws:0,farm:[]}))});
   const archived=next.seasonHistory.farmArchives[0],retired=c.players[0];
   expect(archived.fullYearEligible).toBe(true);
   expect(selectFarmPlayer(next,retired.playerId,{year:fixture.year}).status).toBe('measured');

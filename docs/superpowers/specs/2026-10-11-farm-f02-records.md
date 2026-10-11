@@ -17,7 +17,7 @@ selectorは年度/球団/リーグ指定で選手成績・球団戦績を返す�
 
 `migrateFarmCompetition(state)` は明示的な純粋API。loadだけで自動起動/上書きしない。通常dayは次roundであることを現行seasonProgressで確認し、球団のwins/losses/draws、当年結果map、offseasonPlan、任意の日程と照合。途中戦術試合は未完了roundから、球宴は公式roundを追加しない。矛盾は推測修復せず拒否。143試合終了ならstartRound=144の当年空記録を保持し次年度開始を待つ。
 旧値はteams.players/farm/history、faPool、offseasonPlan内のstats2を所在付きで複製し、year=null/由来legacy-estimatedとする。欠落AB/outsや年度を補完せず、旧値は足さない。元の各容器/選手を変更しない。startRound>1の年は途中記録で年間表彰不可。
-`advanceFarmYear(state,{year,teams})` はnextRound=144の旧年度を集計archiveし、新年root・state.year/gameDay=1・所属を同じ候補に含める。archiveは選手球団別実績/球団戦績/由来のみ、カード/使用負荷を除く。年数制限なし、同年度重複禁止。返った候補は保存成功後だけ公開する（実hook接続はF-03）。
+`advanceFarmYear(state,{year,teams,nextSchedule})` はnextRound=144の旧年度を集計archiveし、新年root・state.year/gameDay=1・所属を同じ候補に含める。archiveは選手球団別実績/球団戦績/由来のみ、カード/使用負荷を除く。年数制限なし、同年度重複禁止。返った候補は保存成功後だけ公開する（実hook接続はF-03）。
 
 ## 保存確定境界
 
@@ -32,7 +32,7 @@ chunk transaction→root setItemの既存境界を維持。root保存失敗/IDB 
 ## 実装時の確認結果
 
 サヨナラ後のOUT/BB/HRを整合した追加イベントとして作り、現行validateFarmGameが既に拒否することを3件で確認。runLimit<=0をadvanceFarmBasesが拒否する既存経路を維持し、二重の修正は追加しない。
-rootのcompetitionには内容checksumも付け、構造上もっともらしい出場負荷・個人帰属の破損を検出する。これはセキュリティ署名ではない。年度候補は既存nextSeasonMatchHistoryを再利用して当年map/球宴/会見を初期化し、日程archiveの既存方針を維持する。通常進行への呼出しは足さない。新年度scheduleの生成はF-03の呼出し側が担い、advanceFarmYearへ渡すstateのscheduleを新年度日程に差し替えたうえで、保存成功後に候補を公開する。
+rootのcompetitionには内容checksumも付け、構造上もっともらしい出場負荷・個人帰属の破損を検出する。これはセキュリティ署名ではない。年度候補は既存nextSeasonMatchHistoryを再利用して当年map/球宴/会見を初期化し、日程archiveの既存方針を維持する。通常進行への呼出しは足さない。新年度scheduleの生成はF-03の呼出し側が担い、nextSchedule引数として渡す。state.scheduleは終了年度の日程を維持し、nextSeasonMatchHistoryへ旧年度と組にして渡す。返却候補のscheduleにはnextScheduleを設定する。nextScheduleは必須で、1-indexedの公式戦143round（末尾の既存オールスター日程も維持）・各roundのgameNoと6対戦・12球団の重複なし参加を検証し、不足や不正を拒否する。日程には年度フィールドがないため、暦日が指定年度に属することは生成側の責務。保存成功後だけ候補を公開する。
 既存fixtureによる独立記録の限定測定：5round約104ms、143round約4.32s、当年JSON719,966bytes、圧縮集計archive59,768bytes、同じ規模を20年度並べる代理容量約1.20MB。Vitest並列実行下での1回、能力/condition固定、登板間隔はusageで選考へ渡した。実プレイ20年・ネイティブDB容量・メモリ測定・F-04最終性能合格ではない。
 
 独立レビューで、空dirtyScopesの年度更新と破損主データからの復旧後保存を再現。年度更新でmatchHistoryも強制更新し、バックアップ回転前に旧root+復元chunkの二軍整合性を検証する。双方の失敗テストを確認して修正。

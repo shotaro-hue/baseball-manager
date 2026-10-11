@@ -1,3 +1,4 @@
+import { generateSeasonSchedule } from '../src/engine/scheduleGen';
 import { beforeEach,afterEach,it,expect,vi } from 'vitest';
 import { IDBFactory,IDBObjectStore } from 'fake-indexeddb';
 import { saveGame,loadGame,enqueueSaveGame,getLastLoadResult } from '../src/engine/saveload';
@@ -52,21 +53,21 @@ it('corrupt/missing farm root field restores old root rather than accepting zero
   expect((await loadGame()).farmCompetition.nextRound).toBe(1);expect(getLastLoadResult().status).toBe('recovered');
 });
 it('year archive is forced dirty even with empty scopes; failed year save preserves old root and GC references',async()=>{
-  const old=migrateFarmCompetition({...source(144),gameResultsMap:{143:{win:true}}});await save(old);
-  const next=advanceFarmYear(old,{year:2027,teams:old.teams.map(t=>({...t,wins:0}))});
+  const old=migrateFarmCompetition({...source(144),schedule:generateSeasonSchedule(2026,teams()),gameResultsMap:{143:{win:true}}});await save(old);
+  const next=advanceFarmYear(old,{year:2027,nextSchedule:generateSeasonSchedule(2027,old.teams),teams:old.teams.map(t=>({...t,wins:0}))});
   const raw=rows.get(key),set=localStorage.setItem;
   vi.spyOn(localStorage,'setItem').mockImplementation((k,v)=>{if(k===key)throw Error('year-root');set(k,v);});
   expect((await save(next,{dirtyScopes:[]})).ok).toBe(false);expect(rows.get(key)).toBe(raw);
-  expect((await loadGame()).year).toBe(2026);expect((await loadGame()).seasonHistory.farmArchives).toBeUndefined();
+  const retained=await loadGame();expect(retained.year).toBe(2026);expect(retained.schedule).toEqual(old.schedule);expect(retained.scheduleArchive).toEqual([]);expect(retained.seasonHistory.farmArchives).toBeUndefined();
   vi.restoreAllMocks();expect((await save(next,{dirtyScopes:[]})).ok).toBe(true);
-  const loaded=await loadGame();expect(loaded.year).toBe(2027);expect(loaded.seasonHistory.farmArchives).toHaveLength(1);
+  const loaded=await loadGame();expect(loaded.year).toBe(2027);expect(loaded.seasonHistory.farmArchives).toHaveLength(1);expect(loaded.schedule).toEqual(generateSeasonSchedule(2027,old.teams));expect(loaded.scheduleArchive.at(-1)).toMatchObject({year:2026,schedule:old.schedule,gameResultsMap:old.gameResultsMap});
   const ref=JSON.parse(rows.get(key)).saveManifest.chunks.seasonHistory;
   const db=await openBaseballManagerDb();await new Promise(res=>{const tx=db.transaction('save_chunks','readwrite');tx.objectStore('save_chunks').delete(ref.key);tx.oncomplete=res;});db.close();
   const backup=await loadGame();expect(backup.year).toBe(2026);expect(backup.farmCompetition.year).toBe(2026);
 });
 it('IDB abort of archive generation protects prior root and retries safely',async()=>{
   const old=migrateFarmCompetition(source(144));await save(old);
-  const next=advanceFarmYear(old,{year:2027,teams:old.teams.map(t=>({...t,wins:0}))});
+  const next=advanceFarmYear(old,{year:2027,nextSchedule:generateSeasonSchedule(2027,old.teams),teams:old.teams.map(t=>({...t,wins:0}))});
   let aborted=false;const add=IDBObjectStore.prototype.add;
   vi.spyOn(IDBObjectStore.prototype,'add').mockImplementation(function(...args){const req=add.apply(this,args);
     if(!aborted&&this.name==='save_chunks'){aborted=true;this.transaction.abort();}return req;});
@@ -98,7 +99,7 @@ it('rejects a corrupted independent ledger and archive even if the raw JSON stil
   rows.set(key,JSON.stringify(raw));expect((await loadGame()).farmCompetition.nextRound).toBe(1);
   const old=migrateFarmCompetition(source(144));
   expect((await save(old,{skipBackupRotation:true})).ok).toBe(true);
-  const next=advanceFarmYear(old,{year:2027,teams:old.teams.map(t=>({...t,wins:0}))});
+  const next=advanceFarmYear(old,{year:2027,nextSchedule:generateSeasonSchedule(2027,old.teams),teams:old.teams.map(t=>({...t,wins:0}))});
   await save(next);
   const header=JSON.parse(rows.get(key));header.farmCompetition.archiveSignature='incorrect';
   rows.set(key,JSON.stringify(header));expect((await loadGame()).year).toBe(2026);

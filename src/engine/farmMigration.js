@@ -87,15 +87,30 @@ export function validateFarmSaveState(state) {
   for(const a of archives) {validateFarmArchive(a,state.saveId);if(a.year>=state.year||years.has(a.year))fail('archive year');years.add(a.year);}
   return true;
 }
-export function advanceFarmYear(state,{year,teams}) {
+// The finished schedule stays on state; the caller supplies the next season separately.
+function validateNextSchedule(schedule,teams) {
+  if(!Array.isArray(schedule)||schedule.length<144||schedule[0]!==null)fail('missing or incomplete next schedule');
+  const teamIds=new Set(teams.map(t=>t.id));
+  for(let round=1;round<=143;round++) {
+    const day=schedule[round],seen=new Set();
+    if(day?.gameNo!==round||day.isAllStar||!Array.isArray(day.matchups)||day.matchups.length!==6)fail('invalid next schedule round');
+    for(const match of day.matchups)for(const id of [match?.homeId,match?.awayId]) {
+      if(!teamIds.has(id)||seen.has(id))fail('invalid next schedule club');
+      seen.add(id);
+    }
+    if(seen.size!==teamIds.size)fail('incomplete next schedule clubs');
+  }
+}
+export function advanceFarmYear(state,{year,teams,nextSchedule}) {
   validateFarmSaveState(state);
   const c=state.farmCompetition;
   if(!c||c.nextRound!==144||year!==state.year+1)fail('unfinished farm year');
+  validateFarmTeams(teams);validateNextSchedule(nextSchedule,teams);
   const archive={version:1,saveId:c.saveId,modelVersion:c.modelVersion,year:c.year,startRound:c.startRound,nextRound:144,
     source:c.source,fullYearEligible:c.startRound===1,teams:structuredClone(c.teams),players:structuredClone(c.players),standings:farmStandings(c)};
   validateFarmArchive(archive,c.saveId);
   const archives=[...(state.seasonHistory?.farmArchives||[]),archive];
-  const next={...state,...nextSeasonMatchHistory(state,state.year,state.schedule,state.myId),year,gameDay:1,teams,farmCompetitionVersion:1,offseasonPlan:null,gameResultsMap:{},allTeamResultsMap:{},
+  const next={...state,...nextSeasonMatchHistory(state,state.year,state.schedule,state.myId),year,gameDay:1,teams,schedule:nextSchedule,farmCompetitionVersion:1,offseasonPlan:null,gameResultsMap:{},allTeamResultsMap:{},
     seasonHistory:{...state.seasonHistory,farmArchives:archives},
     farmCompetition:createFarmCompetition({saveId:c.saveId,year,teams,legacy:c.legacy,archiveSignature:farmChecksum(archives)})};
   validateFarmSaveState(next);return next;
