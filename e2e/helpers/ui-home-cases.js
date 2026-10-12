@@ -4,6 +4,76 @@ import { loadFixture, saveHub, reloadAndLoad, readSave, runSingle, runBatch, pro
 
 // Registered once by the existing CI progression spec.
 export function registerHomeCases({ consumeExpectedError } = {}) {
+for (const width of [390,760,761,1440]) test(`UI-01B shared progress controls stay visible and clickable ${width}`,async({page},testInfo)=>{
+ test.setTimeout(90_000);await page.setViewportSize({width,height:900});await loadFixture(page,'opening');
+ const mobile=width<=760,home=page.locator(mobile?'.mobile-home':'.calm-dashboard');
+ await home.getByRole('button',{name:'まとめて進める',exact:true}).click();
+ const homeSingle=home.locator('.home-settings').getByRole('button',{name:'1試合',exact:true});
+ await expect(homeSingle).toBeHidden();
+ await expect(home.getByRole('button',{name:mobile?'1試合ずつ采配':'試合へ進む',exact:true})).toBeVisible();
+ for(const tab of ['日程','編成']){
+  await mainNavigation(page,width<1024).getByRole('button',{name:new RegExp('^'+tab+'(?: \\d+)?$')}).click();
+  const panel=page.locator('.flow-sim-settings');await panel.locator('summary').click();
+  const single=panel.getByRole('button',{name:'1試合',exact:true});
+  await expect(single).toBeVisible();await expect(single).toBeEnabled();
+  await expect(panel.getByRole('button',{name:'まとめてシム',exact:true})).toBeVisible();
+  await expect(panel.getByRole('button',{name:/^残り全\d+試合$/})).toBeVisible();
+  const checks=panel.getByRole('checkbox');await checks.nth(0).check();await expect(checks.nth(1)).not.toBeChecked();
+  await checks.nth(0).uncheck();await checks.nth(1).check();await expect(checks.nth(0)).not.toBeChecked();
+  await page.screenshot({path:testInfo.outputPath(`shared-${tab}-${width}.png`),fullPage:true});
+  await single.click();await page.getByRole('button',{name:/オートシムモード/}).click();
+  await page.getByRole('button',{name:'ホームに戻る',exact:true}).click();
+  await mainNavigation(page,width<1024).getByRole('button',{name:'ホーム',exact:true}).click();
+  await expect(home.getByRole('heading',{name:'ホーム',exact:true})).toBeVisible();
+ }
+ const saved=await saveHub(page);expect(progressSignature(saved).played).toBe(2);
+});
+
+for(const width of [390,1440]) test(`UI-01B corrupt saves cannot start regular games ${width}`,async({page})=>{
+ test.setTimeout(60_000);await page.setViewportSize({width,height:900});
+ for(const kind of ['missing','duplicate','cursor']){
+  await loadFixture(page,'opening');
+  await page.evaluate(async kind=>{
+   const {loadGame,saveGame}=await import('/baseball-manager/src/engine/saveload.js');const s=await loadGame();
+   if(kind==='missing')delete s.schedule[s.gameDay];
+   if(kind==='duplicate')s.gameResultsMap[s.gameDay]={won:true,myScore:1,oppScore:0};
+   if(kind==='cursor')s.gameDay+=1;
+   if(!(await saveGame(s)).ok)throw new Error('corrupt fixture save failed');
+  },kind);
+  const before=progressSignature(await readSave(page));
+  // Farm migration validates the official position before publishing a hub.
+  // A corrupt save is rejected at load; do not bypass that safety gate in E2E.
+  await page.reload();
+  const rejected=page.waitForEvent('console',{predicate:message=>message.type()==='error'&&message.text().startsWith('セーブデータの読み込みに失敗しました:')});
+  await page.getByRole('button',{name:'続きから',exact:true}).click();await rejected;
+  await expect(page.getByRole('button',{name:'続きから',exact:true})).toBeVisible();
+  await expect(page.locator('.calm-shell')).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'まとめてシム',exact:true})).toHaveCount(0);
+  expect(progressSignature(await readSave(page))).toEqual(before);
+ }
+});
+
+test('UI-01B non-home batch action uses the native flow',async({page})=>{
+ test.setTimeout(90_000);await page.setViewportSize({width:1440,height:900});await loadFixture(page,'opening');
+ await mainNavigation(page,false).getByRole('button',{name:'日程',exact:true}).click();
+ const panel=page.locator('.flow-sim-settings');await panel.locator('summary').click();
+ await panel.getByLabel('まとめて進める試合数').selectOption('5');
+ await panel.getByRole('button',{name:'まとめてシム',exact:true}).click();
+ await page.getByRole('button',{name:'ホームへ戻る',exact:true}).click();
+ expect(progressSignature(await saveHub(page)).played).toBe(5);
+});
+
+test('UI-01B non-home remaining season action uses the native flow',async({page})=>{
+ test.setTimeout(60_000);await page.setViewportSize({width:1440,height:900});await loadFixture(page,'late');
+ const press=page.getByRole('dialog',{name:'記者会見',exact:true});await expect(press).toBeVisible();
+ await press.getByRole('button').filter({hasNotText:'回答する'}).nth(0).click();await press.getByRole('button',{name:'回答する',exact:true}).click();
+ await mainNavigation(page,false).getByRole('button',{name:'日程',exact:true}).click();
+ const panel=page.locator('.flow-sim-settings');await panel.locator('summary').click();await panel.getByRole('button',{name:'残り全1試合',exact:true}).click();
+ await expect(page.getByRole('heading',{name:/2026年 ポストシーズン/})).toBeVisible({timeout:30_000});
+ await page.getByRole('button',{name:'進行を保存',exact:true}).click();
+ await expect.poll(async()=>progressSignature(await readSave(page)).played).toBe(143);
+});
+
 for(const [width,height] of [[360,800],[390,844],[1440,900]]) {
  test(`UI-01B real game, batch, saved resume and home actions ${width}`,async({page},testInfo)=>{
   test.setTimeout(90_000);await page.setViewportSize({width,height});const mobile=width<=760;

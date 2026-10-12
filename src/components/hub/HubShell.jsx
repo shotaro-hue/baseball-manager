@@ -152,7 +152,7 @@ export default function HubShell({ state, flows, app }) {
 
   const progress = regularSeasonProgress(myTeam);
   const remain = progress.remainingGames;
-  const canSim = regularSeasonRequest({ teams: gs.teams, myId: gs.myId, year: gs.year, gameDay, schedule, offseasonPlan: gs.offseasonPlan }, 1).count > 0;
+  const canSim = regularSeasonRequest({ teams: gs.teams, myId: gs.myId, year: gs.year, gameDay, schedule, offseasonPlan: gs.offseasonPlan, gameResultsMap: gs.gameResultsMap }, 1).count > 0;
   const toggleCompare = useCallback((player, teamName) => {
     if (player?.id == null) return;
     if (comparePlayers.some((entry) => entry.id === player.id)) {
