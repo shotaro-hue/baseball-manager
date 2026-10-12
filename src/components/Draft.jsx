@@ -155,7 +155,7 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
     activeTeams.forEach(t=>{
       if(t.id===myId) return;
       if (remainingDraftSlots(t) <= 0) return;
-      picks[t.id]=chooseDraftProspect(t,roundPool);
+      picks[t.id]=chooseDraftProspect(t,roundPool,1,[],{teams});
     });
     return picks;
   };
@@ -523,7 +523,7 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoS
     const avail=pool.filter(p=>!isPickedAfterRound1(p.id)&&!p._drafted);
     if(!avail.length){setDone(true);return;}
     const acceptedPicks=draftPicksForTeam(pool,drafted,current.team.id);
-    doPick(chooseDraftProspect(current.team,avail,current.round+1,acceptedPicks),current.team.id===myId);
+    doPick(chooseDraftProspect(current.team,avail,current.round+1,acceptedPicks,{teams,draftPool:pool,drafted}),current.team.id===myId);
   };
 
   const myPick=pid=>{
