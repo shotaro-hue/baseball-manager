@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import HubFaTab from './hub/HubFaTab';
 import { PlayerComparisonDialog, PlayerComparisonTray } from './PlayerComparisonTray';
 import { useResultDialog } from './useResultDialog';
@@ -21,6 +21,7 @@ export default function OffseasonFaPhaseScreen({ gs, os, myTeam, myId, year, emb
   const [profile, setProfile] = useState(null);
   const [compared, setCompared] = useState([]);
   const [compareOpen, setCompareOpen] = useState(false);
+  useEffect(() => { setCompared([]); setCompareOpen(false); }, [year]);
   const [finishOpen, setFinishOpen] = useState(false);
   const advanced = useRef(false);
   const saveMarketView = useCallback(marketView => gs.setOffseasonPlan?.(prev => ({ ...prev, marketView })), [gs.setOffseasonPlan]);
@@ -53,7 +54,7 @@ export default function OffseasonFaPhaseScreen({ gs, os, myTeam, myId, year, emb
     <details><summary>自チームの選手を比較に追加</summary><div className="fa-actions">{owned.map(p => <button key={p.id} aria-pressed={compared.some(entry => entry.id === p.id)} onClick={() => toggle(p, myTeam?.name)}>{p.name}を比較{compared.some(entry => entry.id === p.id) ? 'から外す' : 'に追加'}</button>)}</div></details>
     {!embedded && <footer><p>補強後も既存選手の更改が残っています。予算と年俸を確認して進んでください。</p><button className="fa-primary" onClick={() => setFinishOpen(true)}>補強を終了して契約更改へ</button></footer>}
     <PlayerComparisonTray players={compared} onRemove={remove} onClear={() => { setCompared([]); setCompareOpen(false); }} onOpen={() => setCompareOpen(true)} />
-    {compareOpen && <PlayerComparisonDialog players={compared} onRemove={remove} onClose={closeCompare} />}
+    {compareOpen && <PlayerComparisonDialog year={year} teams={gs.teams} faPool={gs.faPool} players={compared} onRemove={remove} onClose={closeCompare} />}
     {profile && <Suspense fallback={<p role="status">選手詳細を読み込み中です。</p>}><PlayerModal farmState={{farmCompetition:gs.farmCompetition,year:gs.year,teams:gs.teams,seasonHistory:gs.getSeasonHistory?.()??gs.seasonHistory}} player={profile.player} teamName={profile.teamName} isMyTeam={profile.teamName === myTeam?.name} saveId={gs.saveId} year={year} teams={gs.teams} onClose={() => setProfile(null)} onToggleCompare={toggle} isCompared={compared.some(p => p.id === profile.player.id)} /></Suspense>}
     {finishOpen && <FinishDialog acquired={acquired} onClose={closeFinish} onConfirm={next} />}
   </Frame>;
