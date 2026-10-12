@@ -12,10 +12,10 @@ const mount = (teams, extra = {}) => {
   act(() => { view = create(React.createElement(LeaderboardTab, { teams, myId: 0, ...extra })); });
   return view;
 };
-const click = (view, label) => act(() => view.root.findAllByType('button').find(n => n.props['aria-label'] === label || text(n) === label).props.onClick());
+const click = (view, label) => act(() => view.root.findAllByType('button').find(n => n.props['aria-label'] === label || text(n) === label).props.onClick({stopPropagation(){}}));
 const rows = view => view.root.findByType('tbody').findAllByType('tr');
 const names = view => rows(view).map(n => n.props['aria-label']);
-const topNames = view => view.root.findAllByType('button').filter(n => n.props['aria-label']?.endsWith('の詳細を開く')).map(n => n.props['aria-label']);
+const topNames = view => view.root.findByProps({'aria-label':'並び順の先頭3選手'}).findAllByType('button').filter(n => n.props['aria-label']?.endsWith('の詳細を開く')).map(n => n.props['aria-label']);
 const cell = (view, key, id) => {
   const index = view.root.findByType('thead').findAllByType('th').findIndex(n => n.findAllByType('button').some(b => b.props['aria-label'] === `${key}で並び替え`));
   return text(rows(view).find(n => n.props['aria-label'] === `選手${id}の詳細を開く`).findAllByType('td')[index]);
@@ -35,9 +35,9 @@ describe('first-team season leaderboard', () => {
     expect(cell(view, '本塁打', 0)).toBe('7');
     click(view, '選手0の詳細を開く');
     expect(open).toHaveBeenCalledWith(expect.objectContaining({ id: 0, stats: batter.stats }), '球団ゼロ', 'battedBall');
-    act(() => rows(view)[0].findAllByType('button')[0].props.onClick({ stopPropagation() {} }));
+    act(() => rows(view)[0].findAllByType('button').find(n=>n.props['aria-label']==='選手0を比較から外す').props.onClick({ stopPropagation() {} }));
     expect(compare).toHaveBeenCalledWith(expect.objectContaining({ id: 0 }), '球団ゼロ');
-    click(view, '⚾ 投手');
+    click(view, '投手');
     expect(names(view)).toEqual(['選手1の詳細を開く']);
     click(view, '選手1の詳細を開く');
     expect(open).toHaveBeenLastCalledWith(expect.objectContaining({ id: 1 }), '球団ゼロ', 'stats');
@@ -55,7 +55,7 @@ describe('first-team season leaderboard', () => {
     click(view, '本塁打で並び替え');
     expect(view.root.findByType('input').props.disabled).toBe(true);
     expect(names(view)).toEqual(['選手1の詳細を開く', '選手2の詳細を開く']);
-    click(view, '⚾ 投手');
+    click(view, '投手');
     expect(names(view)).toEqual(['選手5の詳細を開く']);
     click(view, '勝で並び替え');
     expect(names(view)).toEqual(['選手4の詳細を開く', '選手5の詳細を開く']);
@@ -67,11 +67,12 @@ describe('first-team season leaderboard', () => {
       const missing = player(0, {}, isPitcher); delete missing.stats[key];
       const players = [missing, player(1, { [key]: 0 }, isPitcher), player(2, { [key]: 2 }, isPitcher), player(3, { [key]: null }, isPitcher), player(4, { [key]: NaN }, isPitcher), player(5, { [key]: Infinity }, isPitcher)];
       const view = mount([team(players)]);
-      if (isPitcher) click(view, '⚾ 投手');
+      if (isPitcher) click(view, '投手');
+      click(view, '詳細指標');
       click(view, `${label}で並び替え`);
       expect(names(view)).toEqual([2, 1, 0, 3, 4, 5].map(id => `選手${id}の詳細を開く`));
       expect(cell(view, label, 1)).toBe('0');
-      for (const id of [0, 3, 4, 5]) expect(cell(view, label, id)).toBe('-');
+      for (const id of [0, 3, 4, 5]) expect(cell(view, label, id)).toBe('— 未記録');
       expect(topNames(view)).toEqual(['選手2の詳細を開く', '選手1の詳細を開く']);
       click(view, `${label}で並び替え`);
       expect(names(view)).toEqual([1, 2, 0, 3, 4, 5].map(id => `選手${id}の詳細を開く`));

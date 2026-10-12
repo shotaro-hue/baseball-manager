@@ -58,7 +58,7 @@ describe('schedule and league flow', () => {
     const open = vi.fn(); let view;
     const p = (id, er) => ({ id, name: `投手${id}`, isPitcher: true, stats: { ...emptyStats(), IP: 9, BF: 27, ER: er } });
     act(() => { view = create(React.createElement(LeaderboardTab, { teams: [{ ...team, players: [p(1, 1), p(0, 0)] }], myId: 0, onPlayerClick: open })); });
-    click(view, '⚾ 投手');
+    click(view, '投手');
     const rows = view.root.findAllByProps({ className: 'interactive-player-row' });
     expect(text(rows[0])).toContain('投手0');
     expect(text(rows[0])).toContain('0.00');
