@@ -1,6 +1,6 @@
 # ROADMAP — NPB Franchise Manager
 
-> 最終更新: 2026-10-12（PR #453反映後の進捗照合）
+> 最終更新: 2026-10-12（PR #454反映後の進捗照合）
 > 目的: **OOTP / Football Manager のように「何年も遊べる、意思決定が積み重なる経営シミュレーション」**を作る。
 
 > 現在の進捗は第1節を参照。第2・3・5節の旧チェックリストと期日は2026-05-01時点の履歴であり、現在の完了認定ではない。UI/UX改革の一次監査・推奨PR分割は [全体改革の青写真 v1](./docs/REFORM_BLUEPRINT_V1.md)、現行の設計方針は [UI/UX設計基準](./docs/DESIGN_SYSTEM.md) を参照。着手時には最新mainと再照合する。
@@ -26,7 +26,7 @@
 
 ## 1. 現在地サマリ
 
-照合日：2026-10-12（日本時間）。基準main：`c03c58b10ca758bbc29dae313872c7c92b42cfd1`（PR #453マージ）。PRのマージ状態、現行文書・対象コード、既存の検証記録を照合した更新であり、全機能を再監査・再テストした結果ではない。
+照合日：2026-10-12（日本時間）。基準main：`0cd1977cedda9960c29174ea4aa33b13a69aadb8`（PR #454マージ）。PRのマージ状態、現行文書・対象コード、既存の検証記録を照合した更新であり、全機能を再監査・再テストした結果ではない。
 
 **二軍の実測基盤は実装・マージ済み。CPUの編成判断は段階的に改善中。新デザインの全画面移行と長期バランスの完了には至っていない。**
 
@@ -48,7 +48,7 @@
 | DES-01 | 正式デザインシステムと承認代表画面を確定。全画面移行は別工程 | [#436](https://github.com/shotaro-hue/baseball-manager/pull/436) |
 | AI-01／AI-02 | 一軍運用・組織層・確定指名の読取専用評価、CPUドラフトの投手役割別判断 | [#447](https://github.com/shotaro-hue/baseball-manager/pull/447)、[#451](https://github.com/shotaro-hue/baseball-manager/pull/451) |
 | FIX-S1／S2 | 降格選手の一軍ランキング・実測0、球団比較の成績・全所属契約年俸を整合 | [#448](https://github.com/shotaro-hue/baseball-manager/pull/448)、[#450](https://github.com/shotaro-hue/baseball-manager/pull/450) |
-| UI-01A／B | 最小共通部品、スマホ・PCホーム、保存表示・共通進行設定を実装 | [#449](https://github.com/shotaro-hue/baseball-manager/pull/449)、[#452](https://github.com/shotaro-hue/baseball-manager/pull/452) |
+| UI-01A／B／C | 最小共通部品、スマホ・PCホーム、保存表示・共通進行設定、1試合結果を実装 | [#449](https://github.com/shotaro-hue/baseball-manager/pull/449)、[#452](https://github.com/shotaro-hue/baseball-manager/pull/452)、[#454](https://github.com/shotaro-hue/baseball-manager/pull/454) |
 | FIX-S4 | 結果画面のW/L/Sを既存ボックススコア判定へ接続。公式成績と表示を照合 | [#453](https://github.com/shotaro-hue/baseball-manager/pull/453) |
 
 PR #432は未マージでクローズ。テスト運用の成果は#431として記録し、重複して数えない。
@@ -63,18 +63,18 @@ PR #432は未マージでクローズ。テスト運用の成果は#431として
 | FIX-S | 残課題の再調査待ち | S1/S2/S4は上記範囲で完了。S3の丸め精度・selector間の一致等は未認定。旧監査の疑義を確定バグと扱わず再照合 |
 | FIX-V/Mほか | 残課題の再調査待ち | 保存状態表示、財務・球場投資・収入予測等の疑義を再確認。既対応の契約年俸表示を再実装しない |
 | DES-01 | 正式仕様はマージ済み | #436の確定と、各画面への移行完了を区別する |
-| UI-01〜03／QA-01 | 新方針での移行完了は未確認 | UI-01A/Bは上記範囲で完了。次はUI-01Cの1試合結果。まとめ結果・試合詳細、UI-02/03、総合QAは未完了 |
+| UI-01〜03／QA-01 | 新方針での移行完了は未確認 | UI-01A/BとCの1試合結果は上記範囲で完了。次はUI-02Aの編成概要。まとめ結果・試合詳細、詳細編成・選手分析、UI-03、総合QAは未完了 |
 
 健康な捕手が球団全体で2人だけのケースは、一軍2人を優先すると二軍カードが未実施となり得る。#443の実143round観測では69カードが該当した。この1ケースや、合成長期履歴の保存成功を「全試合成立・実20年プレイ・バランス完成」の証明にしない。詳細は [F-04検証記録](./docs/farm-f04-validation.md) と [日次捕手配置の検証](./docs/daily-farm-catcher-coverage.md) を参照。
 
 ### 次の作業順（候補。実装許可や確定仕様ではない）
 
-1. UI-01C: 1試合結果をDES-01へ移行。#453のW/L/Sを維持し、スマホ概要・PC並置・戻る操作を実検証する。
-2. UI-02: 編成・成績・選手詳細・二軍の移行前に、各対象の記録・selectorを再照合する。まとめ結果・試合詳細の移行は影響を確認して別途分割する。
+1. UI-02A: 共通の編成概要（打線・入替候補・投手・二軍）をDES-01へ移行。既存の打順・DH・入替・詳細・昇降格と保存／再開を維持する。
+2. UI-02の後続: 詳細編成・選手詳細・比較・成績の移行前に対象の記録・selectorを再照合する。成績の丸め精度等はFIX-S3と分けて確認。まとめ結果・試合詳細の移行も別途分割する。
 3. CPUのFA・契約更改・戦力外、ドラフト予想／推薦との評価目的差を調査し、必要な範囲を独立PRで改善する。
 4. FIX-S3・FIX-V/Mの残疑義、実複数年・複数seedの二軍運用を検証する。再現前に確定バグや完了として扱わない。
 
-直近の検証済み基準はPR #453のhead `635ef700b92a2faf8e21df3299d4bddbea3f32bd`：[CI #353](https://github.com/shotaro-hue/baseball-manager/actions/runs/38206789639)全6ジョブ成功、unit 1031成功・既存条件付きskip 2、E2E 93件成功。これは当該commitの結果であり、本ロードマップ更新で新しく全ゲーム検証を行ったという意味ではない。
+直近の検証済み基準はPR #454のhead `b961fbbc01108ac45c990ce4a40f0995d70ed406`：[CI #355](https://github.com/shotaro-hue/baseball-manager/actions/runs/38210787109)全6ジョブ成功、unit 1038成功・既存条件付きskip 2、E2E 103件成功。これは当該commitの結果であり、本ロードマップ更新で新しく全ゲーム検証を行ったという意味ではない。
 
 **現時点の方針**: 大型機能の前に、プレイ体験の信頼性と「考える楽しさ」を優先する。
 

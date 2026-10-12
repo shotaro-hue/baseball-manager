@@ -2,9 +2,11 @@ import { test, expect } from '@playwright/test';
 import { startNewGame, runSingle, runBatch, startSingle, saveHub, reloadAndLoad, loadFixture, readSave } from './helpers/progression';
 import { registerResultDecisionCases, resultDecisionRows, savedDecisionRows } from './helpers/result-decision-cases';
 import { registerResultDesignCases } from './helpers/result-design-cases';
+import { registerRosterDesignCases } from './helpers/roster-design-cases';
 
 registerResultDecisionCases();
 registerResultDesignCases();
+registerRosterDesignCases();
 
 for (const useDh of [false, true]) for (const isHome of [false, true]) {
   test(`confirmed tactical roster, substitutions and saved stats (DH=${useDh}, home=${isHome})`, async ({ page }) => {
