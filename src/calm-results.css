@@ -23,8 +23,8 @@
 .app.detail-result { min-height: 100dvh; padding-bottom: env(safe-area-inset-bottom); background: #fff; color: #17243a; }
 .detail-result .btn-gold { background: #1262d4; color: #fff; border: 1px solid #1262d4; }
 .detail-result .fsb, .detail-records .fsb { gap: 12px; flex-wrap: wrap; }
-.detail-result .tbl { min-width: 440px !important; }
-.detail-result .tbl :is(th,td):first-child { min-width: 100px; max-width: 160px; white-space: normal !important; overflow-wrap: anywhere; }
+.detail-result:not(.result-screen) .tbl { min-width: 440px !important; }
+.detail-result:not(.result-screen) .tbl :is(th,td):first-child { min-width: 100px; max-width: 160px; white-space: normal !important; overflow-wrap: anywhere; }
 .detail-score-dialog { box-sizing: border-box; overflow-wrap: anywhere; }
 .detail-score-dialog button { min-width: 44px; }
 .detail-score-dialog .tbl { min-width: 440px; }
