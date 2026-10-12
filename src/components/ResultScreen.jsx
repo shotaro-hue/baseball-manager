@@ -1,4 +1,5 @@
 import '../mobile-flow.css';
+import './result-screen.css';
 import { Button, StateLabel, DataTableFrame } from './design-system/primitives';
 import React, { useEffect, useMemo, useState } from 'react';
 import { cancelDeferredPostGameWork, scheduleDeferredPostGameWork } from '../engine/postGameProcessing';
@@ -266,230 +267,142 @@ export function ResultScreen({ gsResult, myTeam, oppTeam, teams = [], gameDay, o
     return ab === 0 ? '.---' : `.${String(Math.round((h / ab) * 1000)).padStart(3, '0')}`;
   };
 
-  const cellSt = { textAlign: 'center', padding: '5px 3px', fontFamily: "'Share Tech Mono', monospace" };
-  const thSt = { ...cellSt, fontSize: 14, color: 'var(--dim)', fontWeight: 400, padding: '3px 3px' };
-  const inningCellSt = { textAlign: 'right', padding: '8px', fontFamily: "'Noto Sans JP', sans-serif" };
-  const inningThSt = { ...inningCellSt, color: 'var(--ds-muted)', fontWeight: 400 };
   const detailReady = !!detailData;
   const detailCardTitle = activeTab === 'bat' ? '打者成績' : '投手成績';
 
   return (
-    <div className="app calm-detail detail-result">
-      <div style={{ maxWidth: 520, margin: '0 auto', paddingBottom: 60 }}>
-        <div style={{ background: '#f0f7ff', padding: '20px 16px 16px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontSize: 14, color: '#53657c', letterSpacing: '.2em', marginBottom: 10 }}>第{gameDay ?? safeResult.gameNo ?? '-'}戦</div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
-            <div style={{ textAlign: 'center', flex: 1 }}>
-              <div style={{ fontSize: 30 }}>{safeMyTeam.emoji}</div>
-              <div style={{ fontSize: 14, color: 'var(--text)', marginTop: 3, fontWeight: 700 }}>{safeMyTeam.short}</div>
-            </div>
-            <div style={{ textAlign: 'center', minWidth: 120 }}>
-              <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: 52, lineHeight: 1, letterSpacing: '.05em', color: summary.resultColor }}>
-                {safeResult.score.my}<span style={{ fontSize: 32, color: 'var(--dim)', margin: '0 4px' }}>-</span>{safeResult.score.opp}
-              </div>
-              <div style={{ fontSize: 14, letterSpacing: '.25em', color: summary.resultColor, marginTop: 3 }}>{summary.resultLabel}</div>
-            </div>
-            <div style={{ textAlign: 'center', flex: 1 }}>
-              <div style={{ fontSize: 30 }}>{safeOppTeam.emoji}</div>
-              <div style={{ fontSize: 14, color: 'var(--text)', marginTop: 3, fontWeight: 700 }}>{safeOppTeam.short}</div>
-            </div>
+    <main className="app calm-detail detail-result result-screen" data-ds="result-shell">
+      <div className="result-container">
+        <header className="result-heading">
+          <p className="result-context">{safeMyTeam.name}{safeMyTeam.league && ` / ${safeMyTeam.league}・リーグ`}</p>
+          <h1>試合結果</h1>
+          <p>スコアと個人成績から試合を振り返る。</p>
+        </header>
+        <section className="result-summary" aria-label="試合の概要">
+          <div className="result-summary-meta">
+            <span>第{gameDay ?? safeResult.gameNo ?? '—'}戦 · {safeResult.isHome === false ? 'ビジター' : 'ホーム'}</span>
+            <span>{gsResult?.score ? `試合終了 / ${summary.won ? '勝利' : summary.drew ? '引き分け' : '敗北'}` : '結果未確認'}</span>
           </div>
-          <div style={{ fontSize: 14, color: '#53657c' }}>
-            vs {safeOppTeam.name}
-            <span style={{ color: 'var(--green)', marginLeft: 5 }}>{safeMyTeam.wins}勝</span>
-            <span style={{ color: '#53657c', margin: '0 2px' }}>/</span>
-            <span style={{ color: 'var(--red)' }}>{safeMyTeam.losses}敗</span>
-            {(safeMyTeam.draws || 0) > 0 && <><span style={{ color: '#53657c', margin: '0 2px' }}>/</span><span style={{ color: 'var(--dim)' }}>{safeMyTeam.draws}分</span></>}
+          <div className="result-scoreline">
+            <strong>{safeMyTeam.short}</strong>
+            <div className="result-score" aria-label={gsResult?.score ? `${safeMyTeam.name} ${safeResult.score.my} 対 ${safeResult.score.opp} ${safeOppTeam.name}` : 'スコア未確認'}>
+              {gsResult?.score ? <>{safeResult.score.my}<span>–</span>{safeResult.score.opp}</> : '—'}
+            </div>
+            <strong>{safeOppTeam.short}</strong>
+          </div>
+          <div className="result-summary-meta">
+            <span>この試合の記録{gsResult?.score && ` · ${summary.resultLabel}`}</span>
+            <span>{safeMyTeam.wins}勝{safeMyTeam.losses}敗{safeMyTeam.draws}分</span>
+          </div>
+        </section>
+        {!gsResult?.score && <p className="result-notice">試合結果データが不足しています。ゲームデータは保持されています。</p>}
+        {detailError && <p className="result-notice" role="alert">{detailError}</p>}
+        <div className="result-grid">
+          <div className="result-overview">
+            <div className="card">
+              <h2 className="card-h">イニングスコア</h2>
+              <p className="result-table-caption">先攻 {safeResult.isHome === false ? safeMyTeam.short : safeOppTeam.short} / 後攻 {safeResult.isHome === false ? safeOppTeam.short : safeMyTeam.short} <span>横にスクロール →</span></p>
+              <DataTableFrame label="イニング別スコア"><table className="tbl result-innings">
+                <thead><tr>
+                  <th scope="col">球団</th>
+                  {summary.innings.map(inning => <th scope="col" data-number key={inning}>{inning}</th>)}
+                  <th scope="col" data-number>R</th><th scope="col" data-number>H</th>
+                </tr></thead>
+                <tbody>
+                  {(safeResult.isHome === false ? [true, false] : [false, true]).map(isMy => {
+                    const team = isMy ? safeMyTeam : safeOppTeam;
+                    const byInn = isMy ? summary.myRunsByInn : summary.oppRunsByInn;
+                    const otherInn = isMy ? summary.oppRunsByInn : summary.myRunsByInn;
+                    const score = isMy ? safeResult.score.my : safeResult.score.opp;
+                    const against = isMy ? safeResult.score.opp : safeResult.score.my;
+                    const isHomeTeam = isMy === (safeResult.isHome !== false);
+                    return <tr key={isMy ? 'my' : 'opp'}>
+                      <th scope="row">{team.short}</th>
+                      {summary.innings.map(inning => {
+                        const runs = byInn[inning];
+                        const isX = gsResult?.score && isHomeTeam && score > against && runs === undefined && inning === summary.maxInning && otherInn[inning] !== undefined;
+                        return <td data-number key={inning}>{runs !== undefined ? runs : isX ? 'X' : '—'}</td>;
+                      })}
+                      <td data-number className="result-total">{gsResult?.score ? score : '—'}</td>
+                      <td data-number>{summary.log.length === 0 || detailError ? '—' : detailReady ? (isMy ? detailData.myHitsTotal : detailData.oppHitsTotal) : '…'}</td>
+                    </tr>;
+                  })}
+                </tbody>
+              </table></DataTableFrame>
+            </div>
+            {detailReady && (detailData.myWinnerId || detailData.myLoserId || detailData.mySaverId || detailData.oppWinnerId || detailData.oppLoserId || detailData.oppSaverId) && (
+              <div className="card">
+                <h2 className="card-h">勝敗投手</h2>
+                {[
+                  detailData.myWinnerId && { label: 'W', player: detailData.findPlayer(safeMyTeam, detailData.myWinnerId), team: safeMyTeam.short },
+                  detailData.oppWinnerId && { label: 'W', player: detailData.findPlayer(safeOppTeam, detailData.oppWinnerId), team: safeOppTeam.short },
+                  detailData.myLoserId && { label: 'L', player: detailData.findPlayer(safeMyTeam, detailData.myLoserId), team: safeMyTeam.short },
+                  detailData.oppLoserId && { label: 'L', player: detailData.findPlayer(safeOppTeam, detailData.oppLoserId), team: safeOppTeam.short },
+                  detailData.mySaverId && { label: 'S', player: detailData.findPlayer(safeMyTeam, detailData.mySaverId), team: safeMyTeam.short },
+                  detailData.oppSaverId && { label: 'S', player: detailData.findPlayer(safeOppTeam, detailData.oppSaverId), team: safeOppTeam.short },
+                ].filter(Boolean).map((row, index) => <div key={index} className="fsb">
+                  <div className="result-pitcher-name"><span className="result-role" data-role={row.label} aria-label={{ W: '勝利', L: '敗戦', S: 'セーブ' }[row.label]}>{row.label}</span><span>{row.player?.name || '不明選手'}</span></div>
+                  <span>{row.team}</span>
+                </div>)}
+              </div>
+            )}
+            {detailReady && (detailData.myHREvts.length > 0 || detailData.oppHREvts.length > 0) && (
+              <div className="card">
+                <h2 className="card-h">本塁打</h2>
+                {[
+                  ...detailData.myHREvts.map(event => ({ ...event, teamShort: safeMyTeam.short })),
+                  ...detailData.oppHREvts.map(event => ({ ...event, teamShort: safeOppTeam.short })),
+                ].sort((a, b) => (Number(a.inning) || 0) - (Number(b.inning) || 0) || (a.isTop ? 0 : 1) - (b.isTop ? 0 : 1)).map((event, index) => <div className="fsb" key={index}>
+                  <strong>{event.batter} <span className="result-muted">HR</span></strong>
+                  <span>{event.inning ?? '—'}回{event.isTop ? '表' : '裏'} · {hrLabel(event.rbi)} · {event.teamShort}</span>
+                </div>)}
+              </div>
+            )}
+          </div>
+          <div className="result-details">
+            <div className="card">
+              <h2 className="card-h">ボックススコア</h2>
+              {summary.log.length === 0 ? <p className="result-notice">この試合の個人成績は未記録です。</p> : <>
+                <div className="result-tabs" role="group" aria-label="表示する個人成績">
+                  {[['bat', '打者成績'], ['pitch', '投手成績']].map(([tab, label]) => <button key={tab} type="button" aria-pressed={activeTab === tab} onClick={() => setActiveTab(tab)}>{label}</button>)}
+                </div>
+                {!detailReady && !detailError && <p className="result-notice">{detailCardTitle}を読み込み中...</p>}
+                {detailReady && activeTab === 'bat' && [{ team: safeMyTeam, batters: detailData.myBatStats }, { team: safeOppTeam, batters: detailData.oppBatStats }].map(({ team, batters }) => <div key={team.id} className="result-team-stats">
+                  <p className="result-table-caption">{team.short} / この試合の記録（AVGは今季）</p>
+                  <DataTableFrame label={`${team.name}の試合成績`}><table className="tbl result-player-table">
+                    <thead><tr>{['選手', 'AVG', 'AB', 'H', 'RBI', 'HR'].map((header, index) => <th scope="col" data-number={index > 0 || undefined} key={header}>{header}</th>)}</tr></thead>
+                    <tbody>{batters.map(batter => <tr key={batter.id}>
+                      <th scope="row">{batter.name}</th>
+                      <td data-number>{fmtSeasonAvg(detailData.findPlayer(team, batter.id))}</td>
+                      <td data-number>{batter.AB}</td><td data-number>{batter.H}</td><td data-number>{batter.RBI || 0}</td><td data-number>{batter.HR || 0}</td>
+                    </tr>)}</tbody>
+                  </table></DataTableFrame>
+                  {batters.length === 0 && <p className="result-notice">打者成績は未記録です。</p>}
+                </div>)}
+                {detailReady && activeTab === 'pitch' && [{ team: safeMyTeam, pstats: detailData.myPStats, roleF: detailData.myPRole }, { team: safeOppTeam, pstats: detailData.oppPStats, roleF: detailData.oppPRole }].map(({ team, pstats, roleF }) => <div key={team.id} className="result-team-stats">
+                  <p className="result-table-caption">{team.short} / この試合の記録</p>
+                  <DataTableFrame label={`${team.name}の試合成績`}><table className="tbl result-player-table">
+                    <thead><tr>{['投手', 'IP', 'PC', 'H', 'K', 'BB', 'ER'].map((header, index) => <th scope="col" data-number={index > 0 || undefined} key={header}>{header}</th>)}</tr></thead>
+                    <tbody>{pstats.map(pitcherStats => {
+                      const player = detailData.findPlayer(team, pitcherStats.id), role = roleF(pitcherStats.id);
+                      return <tr key={pitcherStats.id}>
+                        <th scope="row">{role && <span className="result-role" data-role={role}>{role}</span>}{player?.name || '不明選手'}</th>
+                        <td data-number>{fmtIPlocal(pitcherStats.outs)}</td><td data-number>{pitcherStats.PC || 0}</td>
+                        <td data-number>{pitcherStats.H}</td><td data-number>{pitcherStats.K}</td><td data-number>{pitcherStats.BB}</td><td data-number>{pitcherStats.ER}</td>
+                      </tr>;
+                    })}</tbody>
+                  </table></DataTableFrame>
+                  {pstats.length === 0 && <p className="result-notice">投手成績は未記録です。</p>}
+                </div>)}
+              </>}
+            </div>
           </div>
         </div>
-
-        <div style={{ padding: '12px 12px 0' }}>
-          <div className="card" style={{ padding: '10px 8px', overflowX: 'auto' }}>
-            <div style={{ fontSize: 14, color: 'var(--dim)', letterSpacing: '.2em', marginBottom: 8 }}>SCORE BY INNING</div>
-            <DataTableFrame label="イニング別スコア"><table className="tbl" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 280 }}>
-              <thead>
-                <tr>
-                  <th style={{ ...inningThSt, textAlign: 'left', width: 28 }}></th>
-                  {summary.innings.map((inning) => <th key={inning} style={{ ...inningThSt, minWidth: 20 }}>{inning}</th>)}
-                  <th style={{ ...inningThSt, borderLeft: '1px solid var(--ds-divider)', paddingLeft: 6, fontWeight: 700 }}>R</th>
-                  <th style={{ ...inningThSt }}>H</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style={{ padding: '5px 2px', fontSize: 14, fontWeight: 700, color: safeOppTeam.color || 'var(--ds-text)', fontFamily: "'Noto Sans JP', sans-serif" }}>{safeOppTeam.short}</td>
-                  {summary.innings.map((inning) => {
-                    const runs = summary.oppRunsByInn[inning];
-                    return <td data-number key={inning} style={{ ...inningCellSt, fontSize: 14, color: runs > 0 ? 'var(--ds-text)' : 'var(--ds-muted)', fontWeight: runs > 0 ? 700 : 400 }}>{runs !== undefined ? runs : ''}</td>;
-                  })}
-                  <td data-number style={{ ...inningCellSt, fontSize: 14, fontWeight: 700, color: 'var(--ds-text)', borderLeft: '1px solid var(--ds-divider)', paddingLeft: 6 }}>{safeResult.score.opp}</td>
-                  <td data-number style={{ ...inningCellSt, fontSize: 14, color: 'var(--ds-muted)' }}>{detailReady ? detailData.oppHitsTotal : '...'}</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '5px 2px', fontSize: 14, fontWeight: 700, color: safeMyTeam.color || 'var(--ds-text)', fontFamily: "'Noto Sans JP', sans-serif" }}>{safeMyTeam.short}</td>
-                  {summary.innings.map((inning) => {
-                    const runs = summary.myRunsByInn[inning];
-                    const isX = runs === undefined && summary.won && inning === summary.maxInning && summary.oppRunsByInn[inning] !== undefined;
-                    return <td data-number key={inning} style={{ ...inningCellSt, fontSize: 14, color: runs > 0 ? 'var(--ds-text)' : 'var(--ds-muted)', fontWeight: runs > 0 ? 700 : 400 }}>{runs !== undefined ? runs : isX ? 'X' : ''}</td>;
-                  })}
-                  <td data-number style={{ ...inningCellSt, fontSize: 14, fontWeight: 700, color: 'var(--ds-text)', borderLeft: '1px solid var(--ds-divider)', paddingLeft: 6 }}>{safeResult.score.my}</td>
-                  <td data-number style={{ ...inningCellSt, fontSize: 14, color: 'var(--ds-muted)' }}>{detailReady ? detailData.myHitsTotal : '...'}</td>
-                </tr>
-              </tbody>
-            </table></DataTableFrame>
-          </div>
-
-          {!gsResult?.score && (
-            <div className="card" style={{ marginTop: 10, padding: '12px', color: 'var(--dim)', fontSize: 14 }}>
-              試合結果データが不足しています。ゲームデータは保持されています。
-            </div>
-          )}
-          {detailError && (
-            <div className="card" style={{ marginTop: 10, padding: '12px', color: 'var(--red)', fontSize: 14 }}>
-              {detailError}
-            </div>
-          )}
-
-          {detailReady && (detailData.myWinnerId || detailData.myLoserId || detailData.mySaverId || detailData.oppWinnerId || detailData.oppLoserId || detailData.oppSaverId) && (
-            <div className="card">
-              <div className="card-h">勝敗投手</div>
-              {[
-                detailData.myWinnerId && { label: 'W', color: 'var(--green)', player: detailData.findPlayer(safeMyTeam, detailData.myWinnerId), team: safeMyTeam.short },
-                detailData.oppWinnerId && { label: 'W', color: 'var(--green)', player: detailData.findPlayer(safeOppTeam, detailData.oppWinnerId), team: safeOppTeam.short },
-                detailData.myLoserId && { label: 'L', color: 'var(--red)', player: detailData.findPlayer(safeMyTeam, detailData.myLoserId), team: safeMyTeam.short },
-                detailData.oppLoserId && { label: 'L', color: 'var(--red)', player: detailData.findPlayer(safeOppTeam, detailData.oppLoserId), team: safeOppTeam.short },
-                detailData.mySaverId && { label: 'S', color: 'var(--blue)', player: detailData.findPlayer(safeMyTeam, detailData.mySaverId), team: safeMyTeam.short },
-                detailData.oppSaverId && { label: 'S', color: 'var(--blue)', player: detailData.findPlayer(safeOppTeam, detailData.oppSaverId), team: safeOppTeam.short },
-              ].filter(Boolean).map((row, index) => (
-                <div key={index} className="fsb" style={{ padding: '6px 0', borderBottom: '1px solid #dce6f2' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ width: 12, fontWeight: 700, color: row.color, fontSize: 14 }}>{row.label}</span>
-                    <span style={{ fontSize: 14, color: 'var(--text)' }}>{row.player?.name || '不明選手'}</span>
-                  </div>
-                  <span style={{ fontSize: 14, color: 'var(--dim)' }}>{row.team}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {detailReady && (detailData.myHREvts.length > 0 || detailData.oppHREvts.length > 0) && (
-            <div className="card">
-              <div className="card-h">本塁打</div>
-              {[
-                ...detailData.myHREvts.map((event) => ({ ...event, teamShort: safeMyTeam.short, teamColor: safeMyTeam.color || 'var(--gold)' })),
-                ...detailData.oppHREvts.map((event) => ({ ...event, teamShort: safeOppTeam.short, teamColor: safeOppTeam.color || 'var(--text)' })),
-              ].sort((a, b) => (Number(a.inning) || 0) - (Number(b.inning) || 0) || (a.isTop ? 0 : 1) - (b.isTop ? 0 : 1)).map((event, index) => (
-                <div key={index} className="fsb" style={{ padding: '5px 0', borderBottom: '1px solid #dce6f2' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 14, color: 'var(--text)', fontWeight: 700 }}>{event.batter}</span>
-                    <span style={{ fontSize: 14, color: 'var(--red)' }}>HR</span>
-                  </div>
-                  <span style={{ fontSize: 14, color: 'var(--dim)' }}>{event.inning}回{event.isTop ? '表' : '裏'} {hrLabel(event.rbi)} <span style={{ color: event.teamColor }}>{event.teamShort}</span></span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {summary.log.length > 0 && (
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
-                {[['bat', '打者成績'], ['pitch', '投手成績']].map(([tab, label]) => (
-                  <button key={tab} aria-pressed={activeTab === tab} onClick={() => setActiveTab(tab)} style={{ flex: 1, padding: '10px 0', border: 'none', background: activeTab === tab ? 'rgba(245,200,66,.07)' : 'transparent', color: activeTab === tab ? 'var(--gold)' : 'var(--dim)', fontSize: 14, cursor: 'pointer', borderBottom: activeTab === tab ? '2px solid var(--gold)' : '2px solid transparent', transition: '.15s', fontFamily: "'Noto Sans JP',sans-serif" }}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <div style={{ padding: '10px 8px' }}>
-                {!detailReady && (
-                  <div style={{ padding: '18px 8px', textAlign: 'center', color: 'var(--dim)', fontSize: 14 }}>
-                    {detailCardTitle}を読み込み中...
-                  </div>
-                )}
-                {detailReady && activeTab === 'bat' && (
-                  <>
-                    {[{ team: safeMyTeam, batters: detailData.myBatStats }, { team: safeOppTeam, batters: detailData.oppBatStats }].map(({ team, batters }, teamIndex) => (
-                      <div className="detail-table-scroll" tabIndex={0} role="region" aria-label={`${team.name}の試合成績`} key={teamIndex} style={{ marginBottom: teamIndex === 0 ? 14 : 0 }}>
-                        {teamIndex > 0 && <div style={{ borderTop: '1px solid var(--border)', marginBottom: 10 }} />}
-                        <div style={{ fontSize: 14, fontWeight: 700, color: team.color || 'var(--text)', marginBottom: 6 }}>{team.short}</div>
-                        <table className="tbl" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-                          <thead>
-                            <tr>
-                              {['選手', 'AVG', 'AB', 'H', 'RBI', 'HR'].map((header) => <th key={header} style={{ ...thSt, textAlign: header === '選手' ? 'left' : 'center' }}>{header}</th>)}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {batters.map((batter) => {
-                              const player = detailData.findPlayer(team, batter.id);
-                              return (
-                                <tr key={batter.id} style={{ borderBottom: '1px solid #dce6f2' }}>
-                                  <td style={{ padding: '4px 2px', color: batter.H > 0 ? 'var(--text)' : 'var(--dim)', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{batter.name}</td>
-                                  <td style={{ ...cellSt, fontSize: 14, color: '#53657c' }}>{fmtSeasonAvg(player)}</td>
-                                  <td style={{ ...cellSt }}>{batter.AB}</td>
-                                  <td style={{ ...cellSt, color: batter.H > 0 ? 'var(--green)' : 'var(--dim)', fontWeight: batter.H > 0 ? 700 : 400 }}>{batter.H}</td>
-                                  <td style={{ ...cellSt, color: batter.RBI > 0 ? 'var(--gold)' : 'var(--dim)' }}>{batter.RBI || 0}</td>
-                                  <td style={{ ...cellSt, color: batter.HR > 0 ? 'var(--red)' : 'var(--dim)' }}>{batter.HR || 0}</td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    ))}
-                  </>
-                )}
-                {detailReady && activeTab === 'pitch' && (
-                  <>
-                    {[{ team: safeMyTeam, pstats: detailData.myPStats, roleF: detailData.myPRole }, { team: safeOppTeam, pstats: detailData.oppPStats, roleF: detailData.oppPRole }].map(({ team, pstats, roleF }, teamIndex) => (
-                      <div className="detail-table-scroll" tabIndex={0} role="region" aria-label={`${team.name}の試合成績`} key={teamIndex} style={{ marginBottom: teamIndex === 0 ? 14 : 0 }}>
-                        {teamIndex > 0 && <div style={{ borderTop: '1px solid var(--border)', marginBottom: 10 }} />}
-                        <div style={{ fontSize: 14, fontWeight: 700, color: team.color || 'var(--text)', marginBottom: 6 }}>{team.short}</div>
-                        <table className="tbl" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-                          <thead>
-                            <tr>
-                              {['投手', 'IP', 'PC', 'H', 'K', 'BB', 'ER'].map((header) => <th key={header} style={{ ...thSt, textAlign: header === '投手' ? 'left' : 'center' }}>{header}</th>)}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {pstats.map((pitcherStats) => {
-                              const player = detailData.findPlayer(team, pitcherStats.id);
-                              const role = roleF(pitcherStats.id);
-                              return (
-                                <tr key={pitcherStats.id} style={{ borderBottom: '1px solid #dce6f2' }}>
-                                  <td style={{ padding: '4px 2px', color: 'var(--text)' }}>
-                                    {role && <span style={{ fontSize: 14, fontWeight: 700, marginRight: 4, color: role === 'W' ? 'var(--green)' : role === 'L' ? 'var(--red)' : 'var(--blue)' }}>{role}</span>}
-                                    {player?.name || '不明選手'}
-                                  </td>
-                                  <td style={{ ...cellSt, fontSize: 14 }}>{fmtIPlocal(pitcherStats.outs)}</td>
-                                  <td style={{ ...cellSt, color: 'var(--dim)' }}>{pitcherStats.PC || 0}</td>
-                                  <td style={{ ...cellSt, color: 'var(--dim)' }}>{pitcherStats.H}</td>
-                                  <td style={{ ...cellSt, color: 'var(--dim)' }}>{pitcherStats.K}</td>
-                                  <td style={{ ...cellSt, color: 'var(--dim)' }}>{pitcherStats.BB}</td>
-                                  <td style={{ ...cellSt, color: pitcherStats.ER > 0 ? 'var(--red)' : 'var(--dim)' }}>{pitcherStats.ER}</td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-
-          {isPostGameProcessing && (
-            <div className="card" style={{ marginTop: 10, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-              <StateLabel tone="processing">試合詳細を整理中...</StateLabel>
-              <span style={{ fontSize: 14, color: 'var(--dim)' }}>戻る操作は先に行えます</span>
-            </div>
-          )}
-
-          <Button style={{ width: '100%', marginTop: 12 }} onClick={onNext}>
-            {nextLabel}
-          </Button>
-        </div>
+        {isPostGameProcessing && <div className="result-processing">
+          <StateLabel tone="processing">試合詳細を整理中...</StateLabel><span>戻る操作は先に行えます</span>
+        </div>}
+        <Button className="result-return" onClick={onNext}>{nextLabel}</Button>
       </div>
-    </div>
+    </main>
   );
 }
