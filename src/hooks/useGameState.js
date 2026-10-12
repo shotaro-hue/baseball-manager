@@ -650,6 +650,8 @@ export function useGameState() {
         const error=new Error('initial_career_log_persistence_failed');
         error.saveResult=initialized;throw error;
       }
+      // The initial write already succeeded; avoid an immediate redundant autosave.
+      setLastAutoSaveAt(Date.now());
       pendingCareerEntriesRef.current=[];
       applyProgressCandidate({teams:nextTeams,myId:id,saveId:nextSaveId,year,gameDay:1,farmCompetition:initialFarm,farmCompetitionVersion:1,seasonHistory:initialHistory});
       setFaPool(nextFaPool);
@@ -676,9 +678,12 @@ export function useGameState() {
       notify('新規ゲームを開始できませんでした','warn');
     } finally {
       newGameInitializationRef.current = false;
+      // The mount-time read may have captured this direct initial save in flight.
+      // Refresh the real queue after it settles; never infer a saved outcome.
+      refreshSaveQueueState();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[ensureInitialTeams, notify, setSaveId, year]);
+  },[ensureInitialTeams, notify, refreshSaveQueueState, setSaveId, year]);
 
   const handlePlayerClick = useCallback(
     (player, teamName, initialSection = 'profile') => setPlayerModal({
