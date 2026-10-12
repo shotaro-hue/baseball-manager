@@ -3,6 +3,7 @@ import { Button, StateLabel, DataTableFrame } from './design-system/primitives';
 import React, { useEffect, useMemo, useState } from 'react';
 import { cancelDeferredPostGameWork, scheduleDeferredPostGameWork } from '../engine/postGameProcessing';
 import { resolvePlayerById } from '../engine/playerIdentity';
+import { computeBoxScore } from '../engine/postGame';
 
 const UNKNOWN_TEAM = {
   name: '対戦相手',
@@ -160,17 +161,27 @@ function buildResultScreenDetails(gsResult, myTeam, oppTeam, teams = []) {
 
   const myPStats = myPitcherIds.map((id) => ({ id, ...(myPitcherStats[id] || { outs: 0, H: 0, ER: 0, K: 0, BB: 0, PC: 0 }) }));
   const oppPStats = oppPitcherIds.map((id) => ({ id, ...(oppPitcherStats[id] || { outs: 0, H: 0, ER: 0, K: 0, BB: 0, PC: 0 }) }));
-  const won = safeResult.score.my > safeResult.score.opp;
-  const drew = safeResult.score.my === safeResult.score.opp;
-  const finalLead = safeResult.score.my - safeResult.score.opp;
-  const myStarterOuts = myPStats[0]?.outs || 0;
-  const oppStarterOuts = oppPStats[0]?.outs || 0;
-  const myWinnerId = won ? (myStarterOuts >= 15 ? myPitcherIds[0] : (myPitcherIds[1] || myPitcherIds[0])) : null;
-  const myLoserId = (!won && !drew) ? myPitcherIds[0] : null;
-  const mySaverId = won && finalLead >= 1 && finalLead <= 3 && myPitcherIds.length >= 2 && myPitcherIds.at(-1) !== myWinnerId ? myPitcherIds.at(-1) : null;
-  const oppWinnerId = (!won && !drew) ? (oppStarterOuts >= 15 ? oppPitcherIds[0] : (oppPitcherIds[1] || oppPitcherIds[0])) : null;
-  const oppLoserId = (won && !drew) ? oppPitcherIds[0] : null;
-  const oppSaverId = !won && !drew && Math.abs(finalLead) <= 3 && oppPitcherIds.length >= 2 && oppPitcherIds.at(-1) !== oppWinnerId ? oppPitcherIds.at(-1) : null;
+  const isHome = safeResult.isHome !== false;
+  // 保存履歴と同じW/L/S判定を使う。旧ログのscorerは表示用にだけ表裏へ変換する。
+  const decisionLog = log.filter(Boolean).map((event) => (
+    typeof event.isTop === 'boolean' ? event : { ...event, isTop: isHome ? !event.scorer : !!event.scorer }
+  ));
+  const boxScore = computeBoxScore(
+    decisionLog, [],
+    isHome ? safeMyTeam.players : safeOppTeam.players,
+    isHome ? safeOppTeam.players : safeMyTeam.players,
+    isHome ? safeResult.score.my : safeResult.score.opp,
+    isHome ? safeResult.score.opp : safeResult.score.my,
+  );
+  const myPitching = (isHome ? boxScore?.homePitching : boxScore?.awayPitching) || [];
+  const oppPitching = (isHome ? boxScore?.awayPitching : boxScore?.homePitching) || [];
+  const decisionId = (pitching, role) => pitching.find((pitcher) => pitcher.result === role)?.id ?? null;
+  const myWinnerId = decisionId(myPitching, 'W');
+  const myLoserId = decisionId(myPitching, 'L');
+  const mySaverId = decisionId(myPitching, 'S');
+  const oppWinnerId = decisionId(oppPitching, 'W');
+  const oppLoserId = decisionId(oppPitching, 'L');
+  const oppSaverId = decisionId(oppPitching, 'S');
   const findPlayer = (team, id) => resolvePlayerById(team, teams, id);
 
   return {
