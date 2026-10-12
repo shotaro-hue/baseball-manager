@@ -4,6 +4,7 @@ import { analyzeTeamNeeds } from './trade';
 import { ownedPlayers } from './renewalRules';
 import { isIkuseiPlayer } from './rosterAutomation';
 import { draftPicksForTeam } from './offseasonResume';
+import { evaluateOrganizationNeeds } from './organizationNeeds';
 
 export const registeredDraftCount = team => ownedPlayers(team).filter(p => !isIkuseiPlayer(p)).length;
 export const remainingDraftSlots = (team, pool = [], drafted = {}) => Math.max(0,
@@ -11,11 +12,45 @@ export const remainingDraftSlots = (team, pool = [], drafted = {}) => Math.max(0
 export const draftRefused = (player, isMyTeam) => isMyTeam
   && rngf(0, 1) < clamp((player.potential - 70) / 200, 0, .15);
 export const drawDraftWinner = teams => teams[rng(0, teams.length - 1)];
-export function chooseDraftProspect(team, pool, round = 1, acceptedPicks = []) {
+const pitcherRole = { '先発': 'starter', '中継ぎ': 'reliever', '抑え': 'closer' };
+
+function uncoveredActiveShortage(role) {
+  // Picks reserve future depth, not operating players. Suppress repeat drafting
+  // for the part already planned; healthy farm depth can require a roster swap.
+  return Math.max(0, role.activeShortage - role.availableFarmCount - role.acceptedPickCount);
+}
+
+function pitcherNeedBonus(player, report, amount) {
+  const role = report.roles[pitcherRole[player.subtype]];
+  if (!role) return 0;
+  if (role.organizationShortage > 0) return amount;
+  const age = player.age || 25;
+  if (role.futureDepth && ((role.futureDepth.youngShortage > 0 && age <= 24)
+    || (role.futureDepth.primeShortage > 0 && age <= 30))) return amount;
+  // Owned but currently unavailable depth is weaker evidence for another draft
+  // acquisition than an organization-wide gap. Eligibility is not readiness.
+  return uncoveredActiveShortage(role) > 0 ? amount / 2 : 0;
+}
+
+export function chooseDraftProspect(team, pool, round = 1, acceptedPicks = [], draftContext = {}) {
   if (!pool.length) return null;
+  // Preserve the accepted-array API. Real draft callers provide the canonical
+  // pool/assignments so the evaluator can reject refusal and ownership conflict.
+  const draftPool = draftContext.draftPool ?? acceptedPicks;
+  const drafted = draftContext.drafted ?? Object.fromEntries(acceptedPicks
+    .filter(p => p?.id != null && (!p._drafted || String(p._r1winner) === String(team.id)))
+    .map(p => [p.id, team.id]));
+  const organization = evaluateOrganizationNeeds(team, { ...draftContext, draftPool, drafted });
+  const validatedIds = organization.ok ? new Set(organization.acceptedPickIds) : null;
   const ownedIds = new Set(ownedPlayers(team).map(p => p.id));
-  const additions = acceptedPicks.filter(p => {
-    if (ownedIds.has(p.id)) return false;
+  const additions = draftPool.filter(p => {
+    if (p?.id == null || ownedIds.has(p.id) || (validatedIds && !validatedIds.has(p.id))) return false;
+    // An accepted ID may also occur on an earlier rejected record with another
+    // role. Validate the record before deduplication, just as the report does.
+    if (!draftPicksForTeam([p], drafted, team.id).length || drafted[p.id] === 'refused') return false;
+    const firstOwner = p._drafted ? p._r1winner : null;
+    const laterOwner = drafted[p.id];
+    if (firstOwner != null && laterOwner != null && String(firstOwner) !== String(laterOwner)) return false;
     ownedIds.add(p.id);
     return true;
   });
@@ -24,10 +59,19 @@ export function chooseDraftProspect(team, pool, round = 1, acceptedPicks = []) {
   const needs = analyzeTeamNeeds(additions.length
     ? { ...team, farm: [...(team.farm || []), ...additions] }
     : team, { includeFarmPitchers: true });
-  const wantsPitcher = needs.some(n => /先発|中継ぎ|抑え|投手/.test(n.type));
+  const velocityNeed = needs.some(n => n.type === '投手陣の球威強化');
+  const wantsPitcher = organization.ok ? velocityNeed || Object.values(organization.roles)
+    .filter(r => ['starter', 'reliever', 'closer'].includes(r.role))
+    .some(r => r.organizationShortage > 0 || uncoveredActiveShortage(r) > 0
+      || (r.futureDepth && (r.futureDepth.youngShortage > 0 || r.futureDepth.primeShortage > 0)))
+    : needs.some(n => /先発|中継ぎ|抑え|投手/.test(n.type));
   const first = round === 1;
+  const pitchingBonus = first ? 26 : 24;
   const scored = pool.map((p, i) => ({ p, score: 100 - i * (first ? 3 : 2)
-    + (wantsPitcher && p.isPitcher ? (first ? 26 : 24) : !wantsPitcher && !p.isPitcher ? (first ? 16 : 14) : 0)
+    + (p.isPitcher ? organization.ok
+      ? Math.max(velocityNeed ? pitchingBonus : 0, pitcherNeedBonus(p, organization, pitchingBonus))
+      : wantsPitcher ? pitchingBonus : 0
+      : !wantsPitcher ? (first ? 16 : 14) : 0)
     + (needs.some(n => n.type.includes('捕手')) && !p.isPitcher && p.pos === '捕手' ? (first ? 18 : 16) : 0)
     + Math.round(needs[0]?.horizon === 'short' ? (p.readinessScore ?? 50) * .2 : (p.potential ?? 50) * .15)
     + (needs.some(n => /若手|将来/.test(n.type)) && (p.age || 22) <= 20 ? 10 : 0)
@@ -48,7 +92,7 @@ export function autoFirstRound(teams, pool) {
     if (!available.length) break;
     const groups = new Map();
     for (const team of active) {
-      const player = chooseDraftProspect(team, available);
+      const player = chooseDraftProspect(team, available, 1, [], { teams });
       if (!groups.has(player.id)) groups.set(player.id, { player, teams: [] });
       groups.get(player.id).teams.push(team);
     }
