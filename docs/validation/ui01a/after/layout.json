@@ -1,0 +1,246 @@
+[
+  {
+    "screen": "home",
+    "width": 360,
+    "height": 800,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "まとめて進める",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      }
+    ]
+  },
+  {
+    "screen": "home",
+    "width": 390,
+    "height": 844,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "まとめて進める",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      }
+    ]
+  },
+  {
+    "screen": "home",
+    "width": 760,
+    "height": 900,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "まとめて進める",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      }
+    ]
+  },
+  {
+    "screen": "home",
+    "width": 761,
+    "height": 900,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "選手詳細を開く",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "オーダーを確認",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "試合へ進む",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      }
+    ]
+  },
+  {
+    "screen": "home",
+    "width": 1023,
+    "height": 900,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "選手詳細を開く",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "オーダーを確認",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "試合へ進む",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      }
+    ]
+  },
+  {
+    "screen": "home",
+    "width": 1024,
+    "height": 900,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "選手詳細を開く",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "オーダーを確認",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "試合へ進む",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      }
+    ]
+  },
+  {
+    "screen": "home",
+    "width": 1440,
+    "height": 900,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "選手詳細を開く",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "オーダーを確認",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "試合へ進む",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      }
+    ]
+  },
+  {
+    "screen": "result-fixture",
+    "width": 360,
+    "height": 800,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "ハブに戻る",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      }
+    ]
+  },
+  {
+    "screen": "result-fixture",
+    "width": 390,
+    "height": 844,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "ハブに戻る",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      }
+    ]
+  },
+  {
+    "screen": "result-fixture",
+    "width": 760,
+    "height": 900,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "ハブに戻る",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      }
+    ]
+  },
+  {
+    "screen": "result-fixture",
+    "width": 761,
+    "height": 900,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "ハブに戻る",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      }
+    ]
+  },
+  {
+    "screen": "result-fixture",
+    "width": 1023,
+    "height": 900,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "ハブに戻る",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      }
+    ]
+  },
+  {
+    "screen": "result-fixture",
+    "width": 1024,
+    "height": 900,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "ハブに戻る",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      }
+    ]
+  },
+  {
+    "screen": "result-fixture",
+    "width": 1440,
+    "height": 900,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "ハブに戻る",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      }
+    ]
+  }
+]
