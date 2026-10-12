@@ -1,18 +1,19 @@
 import React, { useState, useMemo } from "react";
 import { fmtAvg, fmtIP, fmtPct } from "../../utils";
 import { saberBatter, saberPitcher } from "../../engine/sabermetrics";
-import { SEASON_GAMES } from "../../constants";
+import { seasonParticipants } from "../../engine/seasonParticipants";
 
 const MEDAL = ["🥇", "🥈", "🥉"];
 const LEAGUES = ["全体", "セ", "パ"];
+const countOf = (p, key) => Number.isFinite(p.stats?.[key]) ? p.stats[key] : "-";
 
 // isRate: true の列は「規定のみ」トグルの対象
 const BATTER_COLS = [
-  { key: "PA",    label: "打席",   fmt: p => p.stats.PA,                                                                 asc: false },
+  { key: "PA",    label: "打席",   fmt: p => countOf(p, "PA"),                                                                 asc: false },
   { key: "AVG",   label: "打率",   fmt: p => fmtAvg(p.stats.H, p.stats.AB),  num: p => { const ab=p.stats.AB||0; return ab>0?p.stats.H/ab:0; }, asc: false, isRate: true },
-  { key: "HR",    label: "本塁打", fmt: p => p.stats.HR,                                                                 asc: false },
-  { key: "RBI",   label: "打点",   fmt: p => p.stats.RBI,                                                                asc: false },
-  { key: "SB",    label: "盗塁",   fmt: p => p.stats.SB,                                                                 asc: false },
+  { key: "HR",    label: "本塁打", fmt: p => countOf(p, "HR"),                                                                 asc: false },
+  { key: "RBI",   label: "打点",   fmt: p => countOf(p, "RBI"),                                                                asc: false },
+  { key: "SB",    label: "盗塁",   fmt: p => countOf(p, "SB"),                                                                 asc: false },
   { key: "OPS",   label: "OPS",   fmt: p => { const v=saberBatter(p.stats).OPS; return v.toFixed(3); },        asc: false, isRate: true, num: p => saberBatter(p.stats).OPS },
   { key: "wOBA",  label: "wOBA",  fmt: p => { const v=saberBatter(p.stats).wOBA; return v.toFixed(3); },       asc: false, isRate: true, num: p => saberBatter(p.stats).wOBA },
   { key: "wRCp",  label: "wRC+",  fmt: p => saberBatter(p.stats).wRCp ?? "---",                                          asc: false, isRate: true, num: p => saberBatter(p.stats).wRCp ?? 0 },
@@ -23,13 +24,13 @@ const BATTER_COLS = [
 ];
 
 const PITCHER_COLS = [
-  { key: "W",     label: "勝",     fmt: p => p.stats.W,                                                                  asc: false },
-  { key: "SV",    label: "S",      fmt: p => p.stats.SV || "-",                                                          asc: false },
-  { key: "HLD",   label: "H",      fmt: p => p.stats.HLD || "-",                                                         asc: false },
-  { key: "QS",    label: "QS",    fmt: p => p.stats.QS || "-",                                                           asc: false },
+  { key: "W",     label: "勝",     fmt: p => countOf(p, "W"),                                                                  asc: false },
+  { key: "SV",    label: "S",      fmt: p => countOf(p, "SV"),                                                          asc: false },
+  { key: "HLD",   label: "H",      fmt: p => countOf(p, "HLD"),                                                         asc: false },
+  { key: "QS",    label: "QS",    fmt: p => countOf(p, "QS"),                                                           asc: false },
   { key: "IP",    label: "投球回", fmt: p => p.stats.IP>0?fmtIP(p.stats.IP):"---",                                       asc: false, num: p => p.stats.IP },
   { key: "ERA",   label: "防御率", fmt: p => { const v=saberPitcher(p.stats).ERA; return v.toFixed(2); },                  asc: true,  isRate: true, num: p => saberPitcher(p.stats).ERA },
-  { key: "Kp",    label: "奪三振", fmt: p => p.stats.Kp || "-",                                                          asc: false },
+  { key: "Kp",    label: "奪三振", fmt: p => countOf(p, "Kp"),                                                          asc: false },
   { key: "WHIP",  label: "WHIP",  fmt: p => { const v=saberPitcher(p.stats).WHIP; return v; },                 asc: true,  isRate: true, num: p => saberPitcher(p.stats).WHIP },
   { key: "FIP",   label: "FIP",   fmt: p => { const v=saberPitcher(p.stats).FIP; return v; },                  asc: true,  isRate: true, num: p => saberPitcher(p.stats).FIP },
   { key: "Kpct",  label: "三振率", fmt: p => { const v=saberPitcher(p.stats).Kpct; return fmtPct(v); },        asc: false, isRate: true, num: p => saberPitcher(p.stats).Kpct },
@@ -38,9 +39,9 @@ const PITCHER_COLS = [
 ];
 
 function numOf(col, p) {
-  if (col.num) return col.num(p);
-  const v = col.fmt(p);
-  return typeof v === "number" ? v : (parseFloat(v) || 0);
+  const v = col.num ? col.num(p) : col.fmt(p);
+  const number = typeof v === "number" ? v : parseFloat(v);
+  return Number.isFinite(number) ? number : null;
 }
 
 // 規定打席 / 規定投球回をゲーム進行度に合わせてスケール
@@ -84,7 +85,7 @@ export function LeaderboardTab({
   const allPlayers = useMemo(() => {
     const arr = [];
     for (const t of teams) {
-      for (const p of t.players) {
+      for (const p of seasonParticipants(t)) {
         arr.push({ ...p, _teamName: t.name, _teamShort: t.short, _teamColor: t.color, _teamEmoji: t.emoji, _league: t.league, _isMyTeam: t.id === myId });
       }
     }
@@ -115,6 +116,8 @@ export function LeaderboardTab({
     return [...filtered].sort((a, b) => {
       const va = numOf(sortCol, a);
       const vb = numOf(sortCol, b);
+      if (va == null) return vb == null ? 0 : 1;
+      if (vb == null) return -1;
       return sortAsc ? va - vb : vb - va;
     });
   }, [filtered, sortCol, sortAsc]);
@@ -123,7 +126,7 @@ export function LeaderboardTab({
   const top3 = useMemo(() => {
     return sorted.filter(p => {
       const v = sortCol.fmt(p);
-      return v !== "---" && v !== "-" && String(v) !== "999";
+      return numOf(sortCol, p) != null && v !== "---" && v !== "-" && String(v) !== "999";
     }).slice(0, 3);
   }, [sorted, sortCol]);
 
@@ -287,7 +290,7 @@ export function LeaderboardTab({
             </thead>
             <tbody>
               {sorted.map((p, idx) => {
-                const isTop3 = idx < 3;
+                const isTop3 = idx < 3 && top3.includes(p);
                 const rowBg = isTop3
                   ? idx === 0 ? "rgba(245,200,66,.06)" : idx === 1 ? "rgba(148,163,184,.04)" : "rgba(180,120,60,.04)"
                   : undefined;
