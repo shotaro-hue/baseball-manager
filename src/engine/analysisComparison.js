@@ -1,4 +1,6 @@
 import { saberBatter, saberPitcher } from './sabermetrics';
+import { hasRecordedFirstTeamSeason, seasonParticipants } from './seasonParticipants';
+import { contractPayroll } from './contractPayroll';
 
 export const MIN_REFERENCE_BATTED_BALLS = 10;
 export const MIN_OFFICIAL_BATTED_BALLS = 30;
@@ -148,52 +150,69 @@ export function buildBattedBallSummary(comparisons) {
   return parts.join(' / ');
 }
 
-function aggregateBattingStats(team) {
-  const stats = (team?.players || [])
-    .filter((player) => !player.isPitcher)
-    .map((player) => player.stats || {});
-  const total = stats.reduce((acc, current) => {
-    for (const key of ['AB', 'H', 'D', 'T', 'HR', 'BB', 'HBP', 'SF', 'PA']) {
-      acc[key] += Number(current[key]) || 0;
-    }
-    return acc;
-  }, { AB: 0, H: 0, D: 0, T: 0, HR: 0, BB: 0, HBP: 0, SF: 0, PA: 0 });
-  return saberBatter({ ...total, K: 0, RBI: 0, SB: 0 });
+// Match payroll ownership precedence without changing the shared leaderboard selector.
+function comparisonParticipants(team) {
+  const seenIds = new Set(), seenObjects = new Set();
+  return seasonParticipants(team || {}).filter(player => {
+    if (seenObjects.has(player) || (player.id != null && seenIds.has(player.id))) return false;
+    seenObjects.add(player);
+    if (player.id != null) seenIds.add(player.id);
+    return true;
+  });
 }
 
-function aggregatePitching(players) {
-  const total = (Array.isArray(players) ? players : []).reduce((acc, player) => {
-    const stats = player?.stats || {};
-    for (const key of ['IP', 'ER', 'BBp', 'HBPp', 'BF', 'Kp', 'HRp', 'Hp']) {
-      acc[key] += Number(stats[key]) || 0;
+// Never turn an incomplete recorded numerator into an actual zero.
+function sumRecordedStats(players, keys) {
+  const total = Object.fromEntries(keys.map(key => [key, 0]));
+  for (const player of players.filter(hasRecordedFirstTeamSeason)) {
+    for (const key of keys) {
+      const value = player.stats?.[key];
+      if (!Number.isFinite(value) || value < 0) return null;
+      total[key] += value;
     }
-    return acc;
-  }, { IP: 0, ER: 0, BBp: 0, HBPp: 0, BF: 0, Kp: 0, HRp: 0, Hp: 0 });
-  return saberPitcher(total);
+  }
+  return total;
 }
 
-function aggregateBattedBallProfile(team) {
-  return (team?.players || [])
-    .filter((player) => !player.isPitcher)
-    .reduce((acc, player) => {
-      const profile = player?.stats?.battedBallProfile || {};
-      acc.bip += Number(profile.bip) || 0;
-      acc.hardHit += Number(profile.hardHit) || 0;
-      return acc;
-    }, { bip: 0, hardHit: 0 });
+function aggregateBattingOps(players) {
+  const total = sumRecordedStats(players, ['AB', 'H', 'D', 'T', 'HR', 'BB', 'HBP', 'SF']);
+  if (!total || total.AB <= 0 || total.AB + total.BB + total.HBP + total.SF <= 0) return null;
+  // Keep saberBatter's existing rounding; OPS precision belongs to FIX-S3.
+  return saberBatter({ ...total, PA: 0, K: 0, RBI: 0, SB: 0 }).OPS;
+}
+
+function aggregatePitchingEra(players) {
+  const total = sumRecordedStats(players, ['IP', 'ER']);
+  return total && total.IP > 0
+    ? saberPitcher({ ...total, BBp: 0, HBPp: 0, BF: 0, Kp: 0, HRp: 0, Hp: 0 }).ERA
+    : null;
+}
+
+function aggregateBattedBallProfile(players) {
+  const total = { bip: 0, hardHit: 0 };
+  for (const player of players) {
+    const profile = player.stats?.battedBallProfile;
+    if (!profile) continue;
+    if (!Number.isFinite(profile.bip) || profile.bip < 0) return null;
+    if (profile.bip === 0) continue;
+    if (!Number.isFinite(profile.hardHit) || profile.hardHit < 0) return null;
+    total.bip += profile.bip;
+    total.hardHit += profile.hardHit;
+  }
+  return total;
 }
 
 export function buildTeamMetrics(team) {
   const batters = (team?.players || []).filter((player) => !player.isPitcher);
-  const pitchers = (team?.players || []).filter((player) => player.isPitcher);
+  const participants = comparisonParticipants(team);
+  const seasonBatters = participants.filter(player => !player.isPitcher);
+  const pitchers = participants.filter(player => player.isPitcher);
   const rotationIds = new Set(team?.rotation || []);
   const starters = pitchers.filter((player) =>
     rotationIds.has(player.id) || String(player.subtype || '').includes('先発'));
   const bullpen = pitchers.filter((player) => !starters.includes(player));
-  const batting = aggregateBattingStats(team);
-  const starterPitching = aggregatePitching(starters);
-  const bullpenPitching = aggregatePitching(bullpen);
-  const battedBall = aggregateBattedBallProfile(team);
+  const battedBall = aggregateBattedBallProfile(seasonBatters);
+  const payrollSummary = contractPayroll(team).total;
   const lineup = (team?.lineup || [])
     .map((id) => batters.find((player) => player.id === id))
     .filter(Boolean);
@@ -201,15 +220,16 @@ export function buildTeamMetrics(team) {
   return {
     teamId: team?.id,
     teamName: team?.name,
-    ops: batting.OPS || null,
+    ops: aggregateBattingOps(seasonBatters),
     runsPerGame: Number(team?.rf || 0) / games,
-    hardHitRate: battedBall.bip > 0 ? battedBall.hardHit / battedBall.bip : null,
-    starterEra: starterPitching.ERA || null,
-    bullpenEra: bullpenPitching.ERA || null,
+    hardHitRate: battedBall?.bip > 0 ? battedBall.hardHit / battedBall.bip : null,
+    starterEra: aggregatePitchingEra(starters),
+    bullpenEra: aggregatePitchingEra(bullpen),
     defense: lineup.length
       ? lineup.reduce((sum, player) => sum + Number(player?.batting?.defense || 0), 0) / lineup.length
       : null,
-    payroll: (team?.players || []).reduce((sum, player) => sum + Number(player?.salary || 0), 0),
+    payroll: payrollSummary.missing || payrollSummary.invalid ? null : payrollSummary.amount,
+    payrollSummary,
     budget: Number(team?.budget || 0),
   };
 }
@@ -246,6 +266,8 @@ export function buildTeamComparisonRows({ myTeam, opponent, allTeams }) {
     };
     return {
       ...metric,
+      myPayrollSummary: metric.key === 'payroll' ? myMetrics.payrollSummary : null,
+      opponentPayrollSummary: metric.key === 'payroll' ? opponentMetrics.payrollSummary : null,
       myValue: myMetrics[metric.key],
       opponentValue: opponentMetrics[metric.key],
       myRank: rankOf(myTeam?.id),

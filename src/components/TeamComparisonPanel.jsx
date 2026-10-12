@@ -1,5 +1,10 @@
 import { buildTeamComparisonRows } from '../engine/analysisComparison';
 
+function PayrollStatus({ summary }) {
+  if (!summary || (!summary.missing && !summary.invalid)) return null;
+  return <span>確認済み {Math.round(summary.amount).toLocaleString()}万円（集計不完全・未記録{summary.missing}人・不正値{summary.invalid}人）</span>;
+}
+
 export function TeamComparisonPanel({ myTeam, opponent, allTeams }) {
   const rows = buildTeamComparisonRows({ myTeam, opponent, allTeams });
   if (!myTeam || !opponent) return null;
@@ -8,7 +13,7 @@ export function TeamComparisonPanel({ myTeam, opponent, allTeams }) {
       <div className="team-comparison-heading">
         <div>
           <h3 id="team-comparison-title">自球団との戦力比較</h3>
-          <p>実成績・登録選手・契約情報から算出。独自の総合点は使いません。</p>
+          <p>今季一軍成績は降格選手を含み、二軍成績は含みません。守備は現一軍の先発打線、総年俸は一軍・二軍・育成の年間契約年俸（年額・万円）です。支払済み額ではありません。--- は未記録・算出不可です。</p>
         </div>
         <span>{opponent.league}リーグ基準</span>
       </div>
@@ -38,10 +43,12 @@ export function TeamComparisonPanel({ myTeam, opponent, allTeams }) {
                   <td>{row.label}</td>
                   <td className={myBetter ? 'comparison-better' : ''}>
                     <strong>{row.format(row.myValue)}</strong>
+                    <PayrollStatus summary={row.myPayrollSummary} />
                     {row.myRank && <span>{row.myRank}/{row.population}位</span>}
                   </td>
                   <td className={opponentBetter ? 'comparison-better' : ''}>
                     <strong>{row.format(row.opponentValue)}</strong>
+                    <PayrollStatus summary={row.opponentPayrollSummary} />
                     {row.opponentRank && <span>{row.opponentRank}/{row.population}位</span>}
                   </td>
                 </tr>
