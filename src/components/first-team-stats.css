@@ -1,0 +1,56 @@
+/* UI-02D opt-in: first-team list only. Farm and global leaderboard remain separate. */
+.first-team-stats[data-ds] { color: var(--ds-text); background: var(--ds-canvas); padding: 16px; border-radius: 4px; --detail-surface: var(--ds-surface); --detail-muted: var(--ds-muted); }
+.first-team-stats .first-team-heading { background: var(--ds-navy); color: var(--ds-inverse); padding: 16px; border-radius: 4px; }
+.first-team-stats .first-team-heading h1 { margin: 0; font-size: 26px; line-height: 1.3; }
+.first-team-stats .first-team-heading p { margin: 8px 0 0; color: var(--ds-inverse-muted); font-size: 14px; }
+.first-team-stats :is(.flow-muted,.stats-scope-note,.stats-value-note) { color: var(--ds-muted); font-size: 14px; line-height: 1.6; margin: 12px 0; }
+.first-team-stats .stats-toolbar { gap: 16px; margin: 16px 0; align-items: center; }
+.first-team-stats .tabs { background: transparent; gap: 0; border: 0; border-bottom: 1px solid var(--ds-divider); border-radius: 0; }
+.first-team-stats .tabs .tab { min-height: 48px; border: 0; border-bottom: 3px solid transparent; border-radius: 0; color: var(--ds-muted); background: transparent; padding: 12px 16px; }
+.first-team-stats .tabs .tab.on { color: var(--ds-accent); border-bottom-color: var(--ds-accent); }
+.first-team-stats .stats-column-toggle { background: transparent; border: 0; border-radius: 0; gap: 8px; }
+.first-team-stats .stats-column-toggle button { min-height: 44px; border: 1px solid var(--ds-control-border); border-radius: 4px; padding: 10px 12px; color: var(--ds-muted); background: var(--ds-surface); }
+.first-team-stats .stats-column-toggle button.on { background: var(--ds-selected); color: var(--ds-accent); border-color: var(--ds-accent); }
+.first-team-stats .stats-filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.first-team-stats .stats-filter-disclosure { margin: 12px 0; color: var(--ds-accent); font-size: 14px; }
+.first-team-stats .stats-filter-disclosure summary { min-height: 44px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.first-team-stats :is(.stats-filter-disclosure,.stats-help) summary::before { content: '＋'; }
+.first-team-stats :is(.stats-filter-disclosure,.stats-help)[open] summary::before { content: '−'; }
+.first-team-stats .stats-filter-disclosure[open] summary { margin-bottom: 12px; }
+.first-team-stats .stats-filters label { display: flex; flex-direction: column; flex: 1 1 180px; gap: 4px; color: var(--ds-muted); font-size: 12px; min-width: 0; }
+.first-team-stats .stats-filters :is(input,select) { width: 100%; min-width: 0; max-width: 100%; height: 44px; padding: 8px; border: 1px solid var(--ds-control-border); border-radius: 4px; background: var(--ds-surface); color: var(--ds-text); font: inherit; font-size: 16px; }
+.first-team-stats .card { background: var(--ds-surface); border: 1px solid var(--ds-divider); padding: 12px; border-radius: 6px; box-shadow: none; }
+.first-team-stats .stats-table-heading .card-h { color: var(--ds-text); font-size: 18px; margin: 0 0 4px; }
+.first-team-stats .stats-sort-label { color: var(--ds-muted); font-size: 12px; }
+.first-team-stats .stats-help { margin: 12px 0; color: var(--ds-muted); font-size: 14px; }
+.first-team-stats .stats-help summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+.first-team-stats .stats-table-wrap[data-ds] { max-height: 65vh; border-radius: 0; overflow: auto; overscroll-behavior: contain; }
+.first-team-stats [data-ds="table"] .stats-table { min-width: 800px; table-layout: auto; }
+.first-team-stats [data-ds="table"] .stats-table :is(th,td) { padding: 8px; font-size: 14px; color: var(--ds-text); border-bottom: 1px solid var(--ds-divider); white-space: nowrap; vertical-align: middle; }
+.first-team-stats [data-ds="table"] .stats-table th { background: var(--ds-canvas); color: var(--ds-muted); }
+.first-team-stats [data-ds="table"] .stats-table th:first-child { z-index: 4; }
+.first-team-stats [data-ds="table"] .stats-table td:first-child { width: 160px; min-width: 140px; max-width: 180px; background: var(--ds-surface); white-space: normal; }
+.first-team-stats .stats-player-button { display: flex; flex-direction: column; text-align: left; width: 100%; min-height: 44px; padding: 4px 0; background: transparent; color: var(--ds-accent); border: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.5; font: inherit; font-size: 14px; }
+.first-team-stats .stats-player-button span { font-size: 12px; color: var(--ds-muted); }
+.first-team-stats .stats-header-actions { display: flex; align-items: center; }
+.first-team-stats .stats-header-actions button { min-width: 44px; min-height: 44px; color: inherit; }
+.first-team-stats .table-sort-button { font-size: 12px; padding: 8px 4px; }
+.first-team-stats .table-tip-button { font-size: 16px; padding: 8px; }
+.first-team-stats .compare-add-button { min-width: 68px; font-size: 14px; }
+.first-team-stats .compare-add-button.on { background: var(--ds-selected); color: var(--ds-accent); border-color: var(--ds-accent); }
+.first-team-stats [data-ds="table"] .stats-table tr[data-compared] td { background: var(--ds-selected); }
+.first-team-stats [data-ds="table"] .stats-table tr:hover td { background: var(--ds-selected); }
+.first-team-stats .stats-metric-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px; margin-bottom: 12px; background: var(--ds-canvas); color: var(--ds-muted); font-size: 14px; }
+.first-team-stats .stats-metric-note strong { color: var(--ds-text); }
+.first-team-stats :is(button,input,select,summary,[tabindex]):focus-visible { outline: 3px solid var(--ds-focus); outline-offset: 3px; }
+@media (max-width: 760px) {
+  .first-team-stats[data-ds] { padding: 12px; }
+  .first-team-stats .stats-filters label { flex-basis: calc(50% - 12px); }
+  .first-team-stats .stats-filters label:first-child { flex-basis: 100%; }
+  .first-team-stats .stats-filters > button { width: 100%; }
+  .first-team-stats .stats-toolbar > div { width: 100%; }
+}
+@media (min-width: 1024px) {
+  .first-team-stats[data-ds] { padding: 24px 32px; }
+  .first-team-stats .first-team-heading h1 { font-size: 28px; }
+}

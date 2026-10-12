@@ -40,7 +40,7 @@ jobs:
           - name: match-history
             files: match-history.spec.js
           - name: roster-settings
-            files: roster-settings.spec.js player-detail.spec.js
+            files: roster-settings.spec.js player-detail.spec.js first-team-stats.spec.js
           - name: posting-and-finance
             files: posting.spec.js finance.spec.js trade.spec.js club-comparison.spec.js
           - name: save-integrity
