@@ -18,16 +18,19 @@
 ## 検証
 
 - RED: 新規コンポーネントテスト4件で戻り導線・名前付き操作・実測0・未記録の不足を修正前に確認。レビュー後、スマホ固定列の配置テストのREDと守備selectの実測遮蔽を確認して修正。
-- Vitest: `npx vitest run src/components/rosterSettingsDesign.test.js src/components/mobileRosterDesign.test.js src/components/mobileFlow.test.js src/components/tacticalRosterRoute.test.js src/engine/__tests__/rosterAutomation.test.js src/hooks/useSeasonFlow.cpuRoster.test.js` — 33件成功。
+- Vitest: `npx vitest run src/components/rosterSettingsDesign.test.js src/components/mobileRosterDesign.test.js src/components/mobileFlow.test.js src/components/tacticalRosterRoute.test.js src/engine/__tests__/rosterAutomation.test.js src/hooks/useSeasonFlow.cpuRoster.test.js` — 33件成功。追加の`npm test`でも1049件成功・既存条件付きskip 2件。
 - Playwright: `npm run test:e2e -- match-history.spec.js --grep 'UI-02[AB]' --workers=1 --retries=0` — 21件成功（UI-02A 10件＋UI-02B 11件）。
 - UI-02Bの7幅（360/390/760/761/1023/1024/1440px）×6状態（通常・長い名前・未記録・実測0・空・負傷）。各移行済みパネルを表示している間にページ横溢れと44px操作を計測。固定列・守備selectの全体露出と実クリック、スクロール領域のキーボードフォーカス、概要へ戻るフォーカスを確認。二軍・会話の到達も確認。
 - 実Appの360/390/1440px: 方針と編成モード、DHあり/なし、自動打線、打順、守備重複警告と復元、先発順変更・削除・追加、抑え変更・重複役割の禁止、中継ぎ優先順の追加・移動・解除、自動投手、一括プレビューが未反映であることと適用を確認。変更→実1試合→保存→ロードでteams一致→実もう1試合で第3戦・二軍第3roundまで再開。UI-02A実昇降格テストで負傷候補・登録クールダウンを回帰確認。
 - 空の組織で一括プランの反映不可理由・無効button・キャンセルを確認。
+- 初回CIでは旧F03テストが「二軍へ」の操作ラベルを二軍タブと同時に拾い、PCでstrict mode違反になった。ローカルでもREDを再現し、タブ選択の範囲を既存toolbarへ限定した。二軍記録・保存再開・選手詳細のassertionは変更していない。`npm run test:e2e -- progression.smoke.spec.js --grep 'F03 farm records' --workers=1 --retries=0`の360/390/1440px 3件が成功。
 - build成功（既存の500kB超チャンク警告）。全Vitest・中核E2Eは同一headのCIで確認する。CI設定・依存・旧assertion・retriesは維持。UI-02Aの降格操作の照合は新しい選手名付きラベルに更新した。
 
 初回の表示検証でUI-02Aの省略fixtureを流用したところ、旧二軍画面に必要なpitchingが欠けて画面が停止した。新規fixtureは既存new-game保存fixtureの自球団を全項目そのまま抜粋し、ゲーム側の処理は変更しなかった。並行したローカルPlaywright実行でartifact競合も発生したため、その結果は成功認定せず、最終の単独実行結果を使用する。
 
 独立レビューで固定列の遮蔽、パネル別レイアウト計測漏れ、投手操作ラベルを指摘・修正。継投優先順の実操作と方針の読み上げ値を追加した。
+
+初回CIの他2系統はUbuntu依存パッケージの取得遅延により15分で中断し、1系統はテスト開始前に停止した。成功済みジョブと中断・失敗を分けて扱い、最終CIはPRの最新headで照合する。
 
 ## 変更前後の画像
 
