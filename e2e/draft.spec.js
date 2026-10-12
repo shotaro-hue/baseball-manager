@@ -116,3 +116,58 @@ for (const role of ['先発', '中継ぎ', '抑え']) test(`CPU draft includes s
  expect(reopened.offseasonPlan.draftViews.draft).toEqual(saved.offseasonPlan.draftViews.draft);
  expect(reopened.teams).toEqual(saved.teams);
 });
+
+// Fixed candidate order/ability makes the old wantsPitcher bonus select the
+// covered closer. After save/reload, the next CPU turn must use its accepted SP.
+test('role-specific CPU picks fill SP then relief across actual save/load and next round', async ({ page }) => {
+ test.setTimeout(60000); await page.setViewportSize({width:390,height:844});
+ const fixture=JSON.parse(gunzipSync(readFileSync(new URL('./fixtures/new-game.json.gz',import.meta.url))));
+ await page.goto('/');
+ await page.evaluate(async state => {
+  const cpu=state.teams.find(t=>t.id===0);
+  const pit=cpu.players.find(p=>p.isPitcher),bat=cpu.players.find(p=>!p.isPitcher);
+  const pitcher=(id,subtype)=>({...pit,id,name:id,pos:subtype,subtype,isPitcher:true,age:22,
+    potential:70,readinessScore:50,pitching:{...pit.pitching,velocity:70},育成:false,isIkusei:false});
+  const batter=(id,pos)=>({...bat,id,name:id,pos,isPitcher:false,age:22,potential:70,
+    readinessScore:50,batting:{...bat.batting,contact:70},育成:false,isIkusei:false});
+  cpu.players=[...Array.from({length:3},(_,i)=>pitcher(`role-sp-${i}`,'先発')),
+    ...Array.from({length:2},(_,i)=>pitcher(`role-rp-${i}`,'中継ぎ')),pitcher('role-cl','抑え'),
+    ...Array.from({length:3},(_,i)=>batter(`role-c-${i}`,'捕手')),
+    ...['遊撃手','二塁手','三塁手'].flatMap(pos=>[batter(`role-${pos}-1`,pos),batter(`role-${pos}-2`,pos)])];
+  cpu.farm=[];
+  state.teams.forEach(t=>{
+    t.wins=t.id===0?0:t.id===1?10:20;t.losses=0;t.draws=143-t.wins;
+    if(t.id!==0&&t.id!==1) t.farm=Array.from({length:70-t.players.length},(_,i)=>batter(`full-${t.id}-${i}`,'DH'));
+  });
+  state.myId=1;state.gameDay=144;
+  state.offseasonPlan={version:1,year:state.year,myId:1,stage:'results',resumeScreen:'draft',
+    draftPool:[pitcher('role-covered-closer','抑え'),pitcher('role-needed-SP','先発'),
+      pitcher('role-needed-relief','中継ぎ'),pitcher('role-spare-SP','先発')],
+    draftViews:{draft:{pickIdx:0,drafted:{},log:[],scouted:[],scoutPt:0}}};
+  const {saveGame}=await import('/baseball-manager/src/engine/saveload.js');
+  if(!(await saveGame(state)).ok)throw new Error('role draft fixture save failed');
+ },fixture);
+ await page.addInitScript(()=>{Math.random=()=>.5;});
+ await reloadAndLoad(page);
+ await expect(page.getByRole('button',{name:'role-covered-closerを指名',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'途中保存',exact:true}).click(); await waitSaveIdle(page);
+ const second=await readSave(page);
+ expect(second.offseasonPlan.draftViews.draft.drafted['role-needed-SP']).toBe(0);
+ expect(second.offseasonPlan.draftViews.draft.drafted['role-covered-closer']).toBeUndefined();
+ expect(second.teams.find(t=>t.id===0).farm).toEqual([]);
+ await reloadAndLoad(page);
+ await expect(page.getByRole('button',{name:'role-covered-closerを指名',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'role-covered-closerを指名',exact:true}).click();
+ await expect(page.getByRole('button',{name:'role-spare-SPを指名',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'途中保存',exact:true}).click(); await waitSaveIdle(page);
+ const third=await readSave(page);
+ expect(third.offseasonPlan.draftViews.draft.drafted['role-needed-SP']).toBe(0);
+ expect(third.offseasonPlan.draftViews.draft.drafted['role-needed-relief']).toBe(0);
+ expect(third.offseasonPlan.draftViews.draft.drafted['role-spare-SP']).toBeUndefined();
+ expect(third.teams.find(t=>t.id===0).farm).toEqual([]);
+ await reloadAndLoad(page);
+ await expect(page.getByRole('button',{name:'role-spare-SPを指名',exact:true})).toBeVisible();
+ const reopened=await readSave(page);
+ expect(reopened.offseasonPlan.draftViews.draft).toEqual(third.offseasonPlan.draftViews.draft);
+ expect(reopened.teams).toEqual(third.teams);
+});
