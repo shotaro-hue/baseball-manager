@@ -1,0 +1,162 @@
+[
+  {
+    "screen": "home",
+    "width": 360,
+    "detailsToggle": "pass",
+    "tables": [],
+    "keyboardFirstFocus": {
+      "tag": "BUTTON",
+      "outline": "solid"
+    }
+  },
+  {
+    "screen": "result",
+    "width": 360,
+    "detailsToggle": "pass",
+    "tables": [
+      {
+        "scrolled": true,
+        "firstColumnFixed": true
+      }
+    ],
+    "keyboardFirstFocus": {
+      "tag": "DIV",
+      "outline": "auto"
+    }
+  },
+  {
+    "screen": "offseason",
+    "width": 360,
+    "detailsToggle": "pass",
+    "tables": [],
+    "keyboardFirstFocus": {
+      "tag": "SUMMARY",
+      "outline": "solid"
+    }
+  },
+  {
+    "screen": "contract",
+    "width": 360,
+    "detailsToggle": "pass",
+    "tables": [],
+    "keyboardFirstFocus": {
+      "tag": "A",
+      "outline": "solid"
+    }
+  },
+  {
+    "screen": "states",
+    "width": 360,
+    "detailsToggle": "pass",
+    "tables": [],
+    "keyboardFirstFocus": {
+      "tag": "BUTTON",
+      "outline": "solid"
+    }
+  },
+  {
+    "screen": "home",
+    "width": 390,
+    "detailsToggle": "pass",
+    "tables": [],
+    "keyboardFirstFocus": {
+      "tag": "BUTTON",
+      "outline": "solid"
+    }
+  },
+  {
+    "screen": "result",
+    "width": 390,
+    "detailsToggle": "pass",
+    "tables": [
+      {
+        "scrolled": true,
+        "firstColumnFixed": true
+      }
+    ],
+    "keyboardFirstFocus": {
+      "tag": "DIV",
+      "outline": "auto"
+    }
+  },
+  {
+    "screen": "offseason",
+    "width": 390,
+    "detailsToggle": "pass",
+    "tables": [],
+    "keyboardFirstFocus": {
+      "tag": "SUMMARY",
+      "outline": "solid"
+    }
+  },
+  {
+    "screen": "contract",
+    "width": 390,
+    "detailsToggle": "pass",
+    "tables": [],
+    "keyboardFirstFocus": {
+      "tag": "A",
+      "outline": "solid"
+    }
+  },
+  {
+    "screen": "states",
+    "width": 390,
+    "detailsToggle": "pass",
+    "tables": [],
+    "keyboardFirstFocus": {
+      "tag": "BUTTON",
+      "outline": "solid"
+    }
+  },
+  {
+    "screen": "home",
+    "width": 1440,
+    "detailsToggle": "pass",
+    "tables": [],
+    "keyboardFirstFocus": {
+      "tag": "A",
+      "outline": "solid"
+    }
+  },
+  {
+    "screen": "result",
+    "width": 1440,
+    "detailsToggle": "pass",
+    "tables": [],
+    "keyboardFirstFocus": {
+      "tag": "DIV",
+      "outline": "auto"
+    }
+  },
+  {
+    "screen": "offseason",
+    "width": 1440,
+    "detailsToggle": "pass",
+    "tables": [],
+    "keyboardFirstFocus": {
+      "tag": "SUMMARY",
+      "outline": "solid"
+    }
+  },
+  {
+    "screen": "contract",
+    "width": 1440,
+    "detailsToggle": "pass",
+    "tables": [],
+    "keyboardFirstFocus": {
+      "tag": "BUTTON",
+      "outline": "solid"
+    }
+  },
+  {
+    "screen": "states",
+    "width": 1440,
+    "detailsToggle": "pass",
+    "tables": [],
+    "keyboardFirstFocus": {
+      "tag": "BUTTON",
+      "outline": "solid"
+    }
+  }
+]
