@@ -1,0 +1,57 @@
+/* UI-02A shared overview; advanced roster settings keep their existing theme. */
+.roster-overview[data-ds="roster-overview"] { color: var(--ds-text); background: var(--ds-canvas); padding: 20px 16px 24px; border-radius: 4px; min-width: 0; }
+.roster-overview .roster-heading h1 { margin: 0; font-size: 26px; line-height: 1.3; }
+.roster-overview .roster-heading p { margin: 8px 0 0; color: var(--ds-muted); font-size: 16px; line-height: 1.6; }
+.roster-overview .roster-heading p:first-child { margin: 0 0 12px; font-size: 12px; }
+.roster-overview .roster-summary { margin: 24px 0; border-radius: 4px; }
+.roster-overview .roster-summary dt { line-height: 1.6; }
+.roster-overview h2 { font-size: 18px; margin: 24px 0 16px; line-height: 1.4; }
+.roster-overview .roster-tabs { display: flex; flex-wrap: wrap; gap: 20px; border-bottom: 1px solid var(--ds-divider); }
+.roster-overview .roster-tabs button { background: transparent; color: var(--ds-muted); border: 0; border-bottom: 3px solid transparent; border-radius: 0; min-height: 48px; padding: 12px 4px; font: inherit; font-size: 14px; font-weight: 700; box-shadow: none; cursor: pointer; }
+.roster-overview .roster-tabs button[aria-pressed="true"] { color: var(--ds-accent); border-bottom-color: var(--ds-accent); }
+.roster-overview .roster-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 24px 0 12px; }
+.roster-overview .roster-toolbar h2 { margin: 0; }
+.roster-overview .roster-metrics { gap: 8px; border-bottom: 0; }
+.roster-overview .roster-metrics button { min-height: 44px; padding: 10px 8px; border: 1px solid transparent; border-radius: 3px; }
+.roster-overview .roster-metrics button[aria-pressed="true"] { border-color: var(--ds-accent); background: var(--ds-selected); }
+.roster-overview .roster-check { display: flex; align-items: center; gap: 8px; min-height: 44px; margin-bottom: 12px; font-size: 16px; cursor: pointer; }
+.roster-overview .roster-check input { width: 20px; height: 20px; accent-color: var(--ds-accent); }
+.roster-overview .roster-note { color: var(--ds-muted); font-size: 14px; line-height: 1.6; margin: 12px 0; }
+.roster-overview [data-ds="table"] { border: 1px solid var(--ds-divider); border-radius: 3px; }
+.roster-overview [data-ds="table"] table { min-width: 560px; }
+.roster-overview [data-ds="table"] :is(th,td) { text-align: left; min-width: 70px; vertical-align: middle; font-size: 14px; }
+.roster-overview [data-ds="table"] :is(th,td):nth-child(2) { min-width: 120px; }
+.roster-overview [data-ds="table"][data-sticky-column="2"] :is(th,td):nth-child(2) { min-width: 140px; max-width: 220px; }
+.roster-overview [data-ds="table"] small { display: block; font-size: 12px; color: var(--ds-muted); margin-top: 4px; }
+.roster-overview [data-ds="table"] [data-number] { text-align: right; }
+.roster-overview [data-ds="table"] .roster-mobile-info { display: none; }
+.roster-overview .roster-player { display: flex; flex-direction: column; justify-content: center; width: 100%; min-height: 44px; padding: 6px 0; background: transparent; color: var(--ds-accent); border: 0; font: inherit; font-size: 14px; text-align: left; white-space: normal; overflow-wrap: anywhere; cursor: pointer; }
+.roster-overview .roster-player > span { display: flex; align-items: center; gap: 4px; font-weight: 700; }
+.roster-overview .roster-player svg { flex-shrink: 0; }
+.roster-overview [data-ds="table"] select { min-height: 44px; min-width: 64px; max-width: 100%; padding: 8px 4px; color: var(--ds-text); background: var(--ds-surface); border: 1px solid var(--ds-control-border); border-radius: 3px; font: inherit; font-size: 16px; }
+.roster-overview .roster-back { display: flex; align-items: center; gap: 8px; min-height: 44px; margin: 16px 0; padding: 0; border: 0; background: transparent; color: var(--ds-accent); font: inherit; font-size: 16px; cursor: pointer; }
+.roster-overview :is(button,select,input):focus-visible { outline: 3px solid var(--ds-focus); outline-offset: 3px; }
+@media (max-width: 760px) {
+  .roster-overview[data-ds="roster-overview"] { padding: 16px 12px 20px; }
+  .roster-overview [data-ds="table"] table { min-width: 0; table-layout: fixed; }
+  .roster-overview [data-ds="table"] :is(th,td) { min-width: 0; padding: 8px 4px; }
+  .roster-overview [data-ds="table"] :is(th,td):first-child,
+  .roster-overview [data-ds="table"] :is(th,td):nth-child(2) { min-width: 0; max-width: none; }
+  .roster-overview [data-ds="table"][data-sticky-column="2"] :is(th,td):nth-child(2) { min-width: 0; max-width: none; position: static; }
+  .roster-overview [data-ds="table"] .roster-lineup-table :is(th,td):is(:nth-child(3),:nth-child(4)),
+  .roster-overview [data-ds="table"] .roster-candidates-table :is(th,td):nth-child(2),
+  .roster-overview [data-ds="table"] .roster-farm-table :is(th,td):is(:nth-child(2),:nth-child(3)) { display: none; }
+  .roster-overview [data-ds="table"] .roster-mobile-info { display: block; font-size: 14px; line-height: 1.6; }
+  .roster-overview [data-ds="table"] .roster-lineup-table :is(th,td):first-child { width: 64px; }
+  .roster-overview [data-ds="table"] .roster-lineup-table :is(th,td):last-child,
+  .roster-overview [data-ds="table"] .roster-candidates-table :is(th,td):last-child { width: 66px; }
+  .roster-overview [data-ds="table"] .roster-farm-table :is(th,td):first-child { width: 48%; }
+  .roster-overview [data-ds="table"] .roster-pitcher-table :is(th,td):first-child { width: 44%; }
+  .roster-overview [data-ds="table"] [data-ds="button"] { width: 100%; padding: 10px 6px; white-space: nowrap; }
+  .roster-overview [data-ds="table"] select { width: 100%; min-width: 0; padding: 8px 2px; }
+  .roster-overview .roster-summary dt { font-size: 12px; }
+}
+@media (min-width: 1024px) {
+  .roster-overview[data-ds="roster-overview"] { padding: 24px; }
+  .roster-overview .roster-heading h1 { font-size: 28px; }
+}
