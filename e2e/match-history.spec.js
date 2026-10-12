@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { startNewGame, runSingle, runBatch, startSingle, saveHub, reloadAndLoad, loadFixture, readSave } from './helpers/progression';
+import { registerResultDecisionCases, resultDecisionRows, savedDecisionRows } from './helpers/result-decision-cases';
+
+registerResultDecisionCases();
 
 for (const useDh of [false, true]) for (const isHome of [false, true]) {
   test(`confirmed tactical roster, substitutions and saved stats (DH=${useDh}, home=${isHome})`, async ({ page }) => {
@@ -89,8 +92,10 @@ for (const useDh of [false, true]) for (const isHome of [false, true]) {
       return false;
     }, { timeout: 60_000, intervals: [200] }).toBe(true);
     await finish.click();
+    const displayedDecisions = await resultDecisionRows(page);
     await page.getByRole('button', { name: 'ホームに戻る', exact: true }).click();
     const after = await roundTrip(page, 1);
+    expect(displayedDecisions).toEqual(savedDecisionRows(after.allTeamResultsMap[setup.myId][1], setup.myId));
     const my = after.teams.find(t => t.id === setup.myId);
     const old = before.teams.find(t => t.id === setup.myId);
     for (const k of Object.keys(setup.ordinary)) expect(my[k]).toEqual(old[k]);
