@@ -1,0 +1,139 @@
+{
+  "color": "rgb(23, 36, 58)",
+  "background": "rgb(255, 255, 255)",
+  "font": "16px",
+  "button": [
+    {
+      "label": "野手",
+      "color": "rgb(9, 92, 199)",
+      "background": "rgb(237, 246, 255)",
+      "height": 44.59375
+    },
+    {
+      "label": "投手",
+      "color": "rgb(83, 101, 124)",
+      "background": "rgba(0, 0, 0, 0)",
+      "height": 44.59375
+    },
+    {
+      "label": "二軍",
+      "color": "rgb(83, 101, 124)",
+      "background": "rgba(0, 0, 0, 0)",
+      "height": 44.59375
+    },
+    {
+      "label": "能力",
+      "color": "rgb(83, 101, 124)",
+      "background": "rgba(0, 0, 0, 0)",
+      "height": 44
+    },
+    {
+      "label": "成績",
+      "color": "rgb(83, 101, 124)",
+      "background": "rgba(0, 0, 0, 0)",
+      "height": 44
+    },
+    {
+      "label": "状態",
+      "color": "rgb(9, 92, 199)",
+      "background": "rgb(237, 246, 255)",
+      "height": 44
+    },
+    {
+      "label": "大城　卓三捕手 · 良好 · 94",
+      "color": "rgb(23, 36, 58)",
+      "background": "rgba(0, 0, 0, 0)",
+      "height": 56.78125
+    },
+    {
+      "label": "入替",
+      "color": "rgb(36, 89, 149)",
+      "background": "rgb(255, 255, 255)",
+      "height": 44
+    },
+    {
+      "label": "清水　陸斗二塁手 · 良好 · 86",
+      "color": "rgb(23, 36, 58)",
+      "background": "rgba(0, 0, 0, 0)",
+      "height": 56.78125
+    },
+    {
+      "label": "入替",
+      "color": "rgb(36, 89, 149)",
+      "background": "rgb(255, 255, 255)",
+      "height": 44
+    },
+    {
+      "label": "山瀬　慎之助一塁手 · 良好 · 95",
+      "color": "rgb(23, 36, 58)",
+      "background": "rgba(0, 0, 0, 0)",
+      "height": 56.78125
+    },
+    {
+      "label": "入替",
+      "color": "rgb(36, 89, 149)",
+      "background": "rgb(255, 255, 255)",
+      "height": 44
+    },
+    {
+      "label": "泉口　友汰遊撃手 · 良好 · 89",
+      "color": "rgb(23, 36, 58)",
+      "background": "rgba(0, 0, 0, 0)",
+      "height": 56.78125
+    },
+    {
+      "label": "入替",
+      "color": "rgb(36, 89, 149)",
+      "background": "rgb(255, 255, 255)",
+      "height": 44
+    },
+    {
+      "label": "斎藤　悠真左翼手 · 良好 · 94",
+      "color": "rgb(23, 36, 58)",
+      "background": "rgba(0, 0, 0, 0)",
+      "height": 56.78125
+    },
+    {
+      "label": "入替",
+      "color": "rgb(36, 89, 149)",
+      "background": "rgb(255, 255, 255)",
+      "height": 44
+    },
+    {
+      "label": "宇都宮　葵星三塁手 · 良好 · 92",
+      "color": "rgb(23, 36, 58)",
+      "background": "rgba(0, 0, 0, 0)",
+      "height": 56.78125
+    },
+    {
+      "label": "入替",
+      "color": "rgb(36, 89, 149)",
+      "background": "rgb(255, 255, 255)",
+      "height": 44
+    },
+    {
+      "label": "今永　宏右翼手 · 良好 · 93",
+      "color": "rgb(23, 36, 58)",
+      "background": "rgba(0, 0, 0, 0)",
+      "height": 56.78125
+    },
+    {
+      "label": "入替",
+      "color": "rgb(36, 89, 149)",
+      "background": "rgb(255, 255, 255)",
+      "height": 44
+    },
+    {
+      "label": "中山　礼都中堅手 · 良好 · 93",
+      "color": "rgb(23, 36, 58)",
+      "background": "rgba(0, 0, 0, 0)",
+      "height": 56.78125
+    },
+    {
+      "label": "入替",
+      "color": "rgb(36, 89, 149)",
+      "background": "rgb(255, 255, 255)",
+      "height": 44
+    }
+  ]
+}

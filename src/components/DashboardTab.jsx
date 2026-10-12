@@ -3,6 +3,7 @@ import { Play, ListChecks, Smiley, SmileyMeh, FirstAid } from '@phosphor-icons/r
 import { gameDayToDate } from '../utils';
 import { getMyMatchup } from '../engine/scheduleLookup';
 import { buildTeamConditions } from '../engine/analysisComparison';
+import { Button, DataTableFrame } from './design-system/primitives';
 import { DashboardOverview } from './DashboardOverview';
 
 export function playerCondition(player) {
@@ -54,13 +55,13 @@ export function DashboardTab({ myTeam, teams = [], schedule, gameDay, year,
       <section className="calm-lineup" aria-labelledby="lineup-heading">
         <h2 id="lineup-heading">現在の打線設定</h2>
         <p className="calm-note">試合開始時の自動編成・DH設定により変更される場合があります。</p>
-        <div className="calm-table-scroll"><table>
+        <DataTableFrame className="calm-table-scroll" label="現在の打線設定" stickyColumn={2}><table>
           <thead><tr><th scope="col">打順</th><th scope="col">選手</th><th scope="col">守備</th><th scope="col">体調</th></tr></thead>
           <tbody>{lineup.map(({ player, order, position }) => <tr key={player.id} className={selected?.id === player.id ? 'selected' : ''}>
-            <td>{order}</td><td><button type="button" aria-pressed={selected?.id === player.id} onClick={() => setSelectedId(player.id)}>{player.name}</button></td>
+            <td data-number>{order}</td><td><button type="button" aria-pressed={selected?.id === player.id} onClick={() => setSelectedId(player.id)}>{player.name}</button></td>
             <td>{position}</td><td><Condition player={player} /></td>
           </tr>)}</tbody>
-        </table></div>
+        </table></DataTableFrame>
         {!lineup.length && <p className="calm-empty">打線が未設定です。「オーダーを確認」から設定してください。</p>}
         <div className="calm-bench"><h3>ベンチ野手</h3><div>{bench.map(p => <button type="button" key={p.id} aria-pressed={selected?.id === p.id} onClick={() => setSelectedId(p.id)}>{p.name} <small>{p.pos}</small></button>)}{!bench.length && <p>控え野手はいません</p>}</div></div>
       </section>
@@ -73,13 +74,13 @@ export function DashboardTab({ myTeam, teams = [], schedule, gameDay, year,
             return <div key={key}><span>{label}</span><strong>{value == null ? '—' : Math.round(value)}</strong>{value != null && <meter aria-label={label} min="0" max="100" value={value} />}</div>;
           })}</div> : <dl className="calm-stats"><div><dt>打率</dt><dd>{avg}</dd></div><div><dt>本塁打</dt><dd>{stats.HR ?? 0}</dd></div><div><dt>打点</dt><dd>{stats.RBI ?? 0}</dd></div></dl>}
           <div className="calm-player-condition"><span>体調</span><Condition player={selected} /><p>体調 {selected.condition ?? 70}/100 · 調子 {Math.round(selected.form ?? 50)}/100</p></div>
-          <button type="button" className="calm-secondary calm-wide" onClick={() => onPlayerClick?.(selected, myTeam.name)}>選手詳細を開く</button>
+          <Button variant="secondary" type="button" className="calm-secondary calm-wide" onClick={() => onPlayerClick?.(selected, myTeam.name)}>選手詳細を開く</Button>
         </> : <p className="calm-empty">表示できる野手がいません</p>}
       </section>
     </div>
     <div className="calm-actions">
-      <button type="button" className="calm-secondary" onClick={() => onTabSwitch('roster')}><ListChecks size={22} aria-hidden="true" />オーダーを確認</button>
-      <button type="button" className="calm-primary" disabled={!opponent || !date || disableStart} onClick={() => onStartGame ? onStartGame() : onTabSwitch('game_action')}><Play size={22} weight="fill" aria-hidden="true" />試合へ進む</button>
+      <Button variant="secondary" type="button" className="calm-secondary" onClick={() => onTabSwitch('roster')}><ListChecks size={22} aria-hidden="true" />オーダーを確認</Button>
+      <Button type="button" className="calm-primary" disabled={!opponent || !date || disableStart} onClick={() => onStartGame ? onStartGame() : onTabSwitch('game_action')}><Play size={22} weight="fill" aria-hidden="true" />試合へ進む</Button>
     </div>
     <section className="calm-notices" aria-label="チームの状況とお知らせ"><h2>チームの状況</h2><p>{conditions.map(c => c.label ?? c.text ?? '').filter(Boolean).join(' / ')}</p>
       {expiring > 0 && <button type="button" onClick={() => onTabSwitch('contract')}>契約満了予定 {expiring}人 — 契約を確認</button>}

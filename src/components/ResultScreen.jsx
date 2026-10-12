@@ -1,4 +1,5 @@
 import '../mobile-flow.css';
+import { Button, StateLabel, DataTableFrame } from './design-system/primitives';
 import React, { useEffect, useMemo, useState } from 'react';
 import { cancelDeferredPostGameWork, scheduleDeferredPostGameWork } from '../engine/postGameProcessing';
 import { resolvePlayerById } from '../engine/playerIdentity';
@@ -256,6 +257,8 @@ export function ResultScreen({ gsResult, myTeam, oppTeam, teams = [], gameDay, o
 
   const cellSt = { textAlign: 'center', padding: '5px 3px', fontFamily: "'Share Tech Mono', monospace" };
   const thSt = { ...cellSt, fontSize: 14, color: 'var(--dim)', fontWeight: 400, padding: '3px 3px' };
+  const inningCellSt = { textAlign: 'right', padding: '8px', fontFamily: "'Noto Sans JP', sans-serif" };
+  const inningThSt = { ...inningCellSt, color: 'var(--ds-muted)', fontWeight: 400 };
   const detailReady = !!detailData;
   const detailCardTitle = activeTab === 'bat' ? '打者成績' : '投手成績';
 
@@ -292,37 +295,37 @@ export function ResultScreen({ gsResult, myTeam, oppTeam, teams = [], gameDay, o
         <div style={{ padding: '12px 12px 0' }}>
           <div className="card" style={{ padding: '10px 8px', overflowX: 'auto' }}>
             <div style={{ fontSize: 14, color: 'var(--dim)', letterSpacing: '.2em', marginBottom: 8 }}>SCORE BY INNING</div>
-            <table className="tbl" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 280 }}>
+            <DataTableFrame label="イニング別スコア"><table className="tbl" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 280 }}>
               <thead>
                 <tr>
-                  <th style={{ ...thSt, textAlign: 'left', width: 28 }}></th>
-                  {summary.innings.map((inning) => <th key={inning} style={{ ...thSt, minWidth: 20 }}>{inning}</th>)}
-                  <th style={{ ...thSt, borderLeft: '1px solid var(--border)', paddingLeft: 6, fontWeight: 700 }}>R</th>
-                  <th style={{ ...thSt }}>H</th>
+                  <th style={{ ...inningThSt, textAlign: 'left', width: 28 }}></th>
+                  {summary.innings.map((inning) => <th key={inning} style={{ ...inningThSt, minWidth: 20 }}>{inning}</th>)}
+                  <th style={{ ...inningThSt, borderLeft: '1px solid var(--ds-divider)', paddingLeft: 6, fontWeight: 700 }}>R</th>
+                  <th style={{ ...inningThSt }}>H</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td style={{ padding: '5px 2px', fontSize: 14, fontWeight: 700, color: safeOppTeam.color || 'var(--text)', fontFamily: "'Share Tech Mono',monospace" }}>{safeOppTeam.short}</td>
+                  <td style={{ padding: '5px 2px', fontSize: 14, fontWeight: 700, color: safeOppTeam.color || 'var(--ds-text)', fontFamily: "'Noto Sans JP', sans-serif" }}>{safeOppTeam.short}</td>
                   {summary.innings.map((inning) => {
                     const runs = summary.oppRunsByInn[inning];
-                    return <td key={inning} style={{ ...cellSt, fontSize: 14, color: runs > 0 ? 'var(--text)' : 'var(--dim)', fontWeight: runs > 0 ? 700 : 400 }}>{runs !== undefined ? runs : ''}</td>;
+                    return <td data-number key={inning} style={{ ...inningCellSt, fontSize: 14, color: runs > 0 ? 'var(--ds-text)' : 'var(--ds-muted)', fontWeight: runs > 0 ? 700 : 400 }}>{runs !== undefined ? runs : ''}</td>;
                   })}
-                  <td style={{ ...cellSt, fontSize: 14, fontWeight: 700, color: 'var(--text)', borderLeft: '1px solid var(--border)', paddingLeft: 6 }}>{safeResult.score.opp}</td>
-                  <td style={{ ...cellSt, fontSize: 14, color: 'var(--dim)' }}>{detailReady ? detailData.oppHitsTotal : '...'}</td>
+                  <td data-number style={{ ...inningCellSt, fontSize: 14, fontWeight: 700, color: 'var(--ds-text)', borderLeft: '1px solid var(--ds-divider)', paddingLeft: 6 }}>{safeResult.score.opp}</td>
+                  <td data-number style={{ ...inningCellSt, fontSize: 14, color: 'var(--ds-muted)' }}>{detailReady ? detailData.oppHitsTotal : '...'}</td>
                 </tr>
                 <tr>
-                  <td style={{ padding: '5px 2px', fontSize: 14, fontWeight: 700, color: safeMyTeam.color || 'var(--gold)', fontFamily: "'Share Tech Mono',monospace" }}>{safeMyTeam.short}</td>
+                  <td style={{ padding: '5px 2px', fontSize: 14, fontWeight: 700, color: safeMyTeam.color || 'var(--ds-text)', fontFamily: "'Noto Sans JP', sans-serif" }}>{safeMyTeam.short}</td>
                   {summary.innings.map((inning) => {
                     const runs = summary.myRunsByInn[inning];
                     const isX = runs === undefined && summary.won && inning === summary.maxInning && summary.oppRunsByInn[inning] !== undefined;
-                    return <td key={inning} style={{ ...cellSt, fontSize: 14, color: runs > 0 ? 'var(--gold)' : 'var(--dim)', fontWeight: runs > 0 ? 700 : 400 }}>{runs !== undefined ? runs : isX ? 'X' : ''}</td>;
+                    return <td data-number key={inning} style={{ ...inningCellSt, fontSize: 14, color: runs > 0 ? 'var(--ds-text)' : 'var(--ds-muted)', fontWeight: runs > 0 ? 700 : 400 }}>{runs !== undefined ? runs : isX ? 'X' : ''}</td>;
                   })}
-                  <td style={{ ...cellSt, fontSize: 14, fontWeight: 700, color: 'var(--gold)', borderLeft: '1px solid var(--border)', paddingLeft: 6 }}>{safeResult.score.my}</td>
-                  <td style={{ ...cellSt, fontSize: 14, color: 'var(--dim)' }}>{detailReady ? detailData.myHitsTotal : '...'}</td>
+                  <td data-number style={{ ...inningCellSt, fontSize: 14, fontWeight: 700, color: 'var(--ds-text)', borderLeft: '1px solid var(--ds-divider)', paddingLeft: 6 }}>{safeResult.score.my}</td>
+                  <td data-number style={{ ...inningCellSt, fontSize: 14, color: 'var(--ds-muted)' }}>{detailReady ? detailData.myHitsTotal : '...'}</td>
                 </tr>
               </tbody>
-            </table>
+            </table></DataTableFrame>
           </div>
 
           {!gsResult?.score && (
@@ -466,14 +469,14 @@ export function ResultScreen({ gsResult, myTeam, oppTeam, teams = [], gameDay, o
 
           {isPostGameProcessing && (
             <div className="card" style={{ marginTop: 10, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 14, color: 'var(--text)' }}>試合詳細を整理中...</span>
+              <StateLabel tone="processing">試合詳細を整理中...</StateLabel>
               <span style={{ fontSize: 14, color: 'var(--dim)' }}>戻る操作は先に行えます</span>
             </div>
           )}
 
-          <button className="btn btn-gold" style={{ width: '100%', padding: '14px 0', fontSize: 14, marginTop: 10 }} onClick={onNext}>
+          <Button style={{ width: '100%', marginTop: 12 }} onClick={onNext}>
             {nextLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
