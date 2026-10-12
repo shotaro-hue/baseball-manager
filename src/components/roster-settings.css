@@ -1,4 +1,4 @@
-/* UI-02B: only the migrated settings panels. Farm/training and talk keep legacy CSS. */
+/* UI-02B settings; farm/training and talk use scoped UI-02E styles. */
 .roster-settings.calm-detail[open] { padding: 16px 0; background: var(--ds-canvas); color: var(--ds-text); }
 .roster-settings.calm-detail > summary { padding: 16px; min-height: 48px; color: var(--ds-accent); font-size: 16px; background: var(--ds-surface); border: 1px solid var(--ds-control-border); border-radius: 4px; }
 .roster-settings.calm-detail > summary small { display: block; color: var(--ds-muted); font-size: 12px; margin: 4px 0 0 20px; }

@@ -1,0 +1,45 @@
+/* UI-02E: opt-in farm/talk scopes only; legacy settings elsewhere stay intact. */
+.roster-settings :is(.farm-development,.player-talk).roster-settings-ui.card { padding:16px; }
+.farm-development-heading { background:var(--ds-navy); padding:16px; margin:0 0 16px; }
+.roster-settings .farm-development-heading h2 { color:var(--ds-inverse); }
+.roster-settings .farm-development-heading p { color:var(--ds-inverse-muted); font-size:14px; margin:8px 0 0; }
+:is(.farm-development,.player-talk) p { overflow-wrap:anywhere; }
+.farm-capacity { font-weight:700; }
+.farm-recommendation { padding:12px; background:var(--ds-success-surface); color:var(--ds-success); }
+.farm-recommendation small { display:block; margin-top:4px; }
+.roster-settings .farm-development-table[data-ds] { max-height:70vh; scroll-padding-left:144px; border:1px solid var(--ds-divider); border-radius:4px; }
+.roster-settings .farm-development-table[data-ds] table { table-layout:fixed; min-width:280px; text-align:left; }
+.roster-settings .farm-development-table[data-ds] :is(th,td) { padding:8px; white-space:normal; overflow-wrap:anywhere; vertical-align:top; font-size:14px; color:var(--ds-text); }
+.roster-settings .farm-development-table[data-ds] :is(th,td):first-child { width:40%; min-width:112px; max-width:none; }
+.roster-settings .farm-development-table[data-ds] p { font-size:14px; line-height:1.5; margin:8px 0; }
+.roster-settings .farm-development-table[data-ds] th { color:var(--ds-muted); }
+.farm-goal-label { display:grid; gap:8px; width:100%; max-width:360px; font-size:14px; }
+.farm-goal-label select { width:100%; }
+.farm-current-goal { color:var(--ds-muted); }
+.farm-row-actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.roster-settings :is(.farm-development,.player-talk) .farm-warning { color:var(--ds-warning); }
+.farm-row-record { margin-top:12px; padding-top:8px; border-top:1px solid var(--ds-divider); }
+.farm-row-record .farm-record-summary { font-size:14px; line-height:1.6; }
+:is(.farm-help,.farm-development) summary { min-height:44px; display:flex; align-items:center; cursor:pointer; color:var(--ds-accent); }
+.farm-help { margin-top:16px; }
+.farm-empty { padding:16px; background:var(--ds-canvas); }
+.talk-morale { font-weight:700; }
+.talk-options { display:grid; gap:8px; max-width:540px; margin-top:12px; }
+.talk-options small { display:block; margin-top:4px; font-size:12px; font-weight:400; }
+.roster-settings .talk-options [data-ds=button] { justify-content:flex-start; text-align:left; }
+.farm-talk-note { font-size:14px; color:var(--ds-muted); }
+.farm-confirm-overlay { position:fixed; inset:0; z-index:1100; background:rgba(14,38,59,.48); display:grid; place-items:center; padding:16px; }
+.farm-registration-dialog { width:min(100%,560px); max-height:calc(100dvh - 32px); overflow:auto; overscroll-behavior:contain; background:var(--ds-surface); color:var(--ds-text); border-radius:6px; padding:20px; font-size:16px; }
+.farm-registration-dialog h2 { margin:0; font-size:18px; }
+.farm-registration-dialog dl { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; margin:16px 0; }
+.farm-registration-dialog :is(dt,dd) { margin:0; overflow-wrap:anywhere; }
+.farm-registration-dialog dt { color:var(--ds-muted); font-size:14px; }
+.farm-registration-dialog dd { text-align:right; }
+.farm-registration-dialog p { font-size:14px; line-height:1.65; }
+.farm-dialog-actions { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:12px; margin-top:16px; }
+.roster-settings .farm-registration-dialog [data-ds=button][data-variant=primary] { background:var(--ds-accent); color:var(--ds-inverse); }
+:is(.farm-development,.player-talk,.farm-registration-dialog) :is(button,select,summary,[tabindex]):focus-visible { outline:3px solid var(--ds-focus); outline-offset:3px; }
+@media(min-width:761px) {
+ .roster-settings .farm-development-table[data-ds] :is(th,td) { padding:12px 16px; }
+ .roster-settings .farm-development-table[data-ds] :is(th,td):first-child { width:32%; }
+}
