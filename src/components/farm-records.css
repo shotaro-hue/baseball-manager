@@ -1,0 +1,67 @@
+/* UI-02D3: opt-in farm ranking and annual records, including PlayerModal history. */
+.farm-rankings[data-ds] { padding:16px; border-radius:4px; background:var(--ds-canvas); color:var(--ds-text); min-width:0; }
+.first-team-stats .farm-rankings[data-ds] { padding:0; }
+.farm-rankings .farm-heading { padding:16px; border-radius:4px; background:var(--ds-navy); color:var(--ds-inverse); }
+.farm-heading h2 { margin:0; font-size:26px; line-height:1.3; }
+.farm-heading p { margin:8px 0 0; font-size:14px; color:var(--ds-inverse-muted); }
+:is(.farm-rankings,.farm-record-summary,.farm-player-history) { font-size:14px; line-height:1.6; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+:is(.farm-rankings,.farm-record-summary,.farm-player-history) .farm-note { color:var(--ds-muted); margin:8px 0; font-size:14px; }
+.farm-filters { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:16px 0; }
+:is(.farm-filters,.farm-controls,.farm-player-history) label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--ds-muted); min-width:0; }
+:is(.farm-filters,.farm-controls,.farm-player-history) select { min-height:44px; width:100%; max-width:100%; min-width:0; padding:8px; border:1px solid var(--ds-control-border); border-radius:4px; background:var(--ds-surface); color:var(--ds-text); font:inherit; font-size:16px; }
+.farm-player-history > label { max-width:240px; }
+.farm-toolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin:12px 0; }
+.farm-tabs { display:flex; border-bottom:1px solid var(--ds-divider); }
+.farm-tabs button { min-height:48px; min-width:72px; border:0; border-bottom:3px solid transparent; background:transparent; color:var(--ds-muted); padding:12px; font:inherit; cursor:pointer; }
+.farm-tabs button[aria-selected=true] { border-bottom-color:var(--ds-accent); color:var(--ds-accent); font-weight:700; }
+.farm-column-toggle { display:flex; gap:8px; }
+.farm-column-toggle button[data-ds] { font-size:14px; padding:10px 12px; }
+.farm-column-toggle button[data-ds][aria-pressed=true] { background:var(--ds-selected); border-color:var(--ds-accent); }
+.farm-controls { display:flex; align-items:end; gap:12px; flex-wrap:wrap; }
+.farm-controls > label:first-child { flex:1 1 120px; }
+.farm-controls .farm-qualified { flex-direction:row; align-items:center; min-height:44px; gap:8px; color:var(--ds-text); font-size:14px; }
+.farm-qualified input { width:20px; height:20px; margin:0; accent-color:var(--ds-accent); }
+.farm-criteria { color:var(--ds-muted); font-size:12px; margin:12px 0; }
+:is(.farm-rankings,.farm-record-summary) .farm-table-wrap[data-ds] { border:1px solid var(--ds-divider); border-radius:4px; max-height:65vh; overflow:auto; scroll-padding-left:124px; }
+:is(.farm-rankings,.farm-record-summary) [data-ds=table] .farm-table { min-width:600px; }
+:is(.farm-rankings,.farm-record-summary) [data-ds=table] .farm-table :is(th,td) { padding:8px; white-space:nowrap; color:var(--ds-text); border-bottom:1px solid var(--ds-divider); }
+:is(.farm-rankings,.farm-record-summary) [data-ds=table] .farm-table th { color:var(--ds-muted); }
+.farm-rankings [data-ds=table] .farm-ranking-table { table-layout:fixed; min-width:560px; }
+.farm-ranking-table :is(th,td):first-child { width:40px; text-align:center; }
+.farm-rankings [data-ds=table] .farm-ranking-table :is(th,td):nth-child(2) { width:116px; min-width:116px; max-width:116px; white-space:normal; }
+.farm-ranking-table :is(th,td):nth-child(3) { width:100px; }
+.farm-rankings [data-ds=table] .farm-ranking-table :is(th,td):nth-child(5) { white-space:normal; overflow-wrap:anywhere; }
+.farm-primary-value { font-weight:700; font-variant-numeric:tabular-nums; }
+.farm-player-button { width:100%; min-height:44px; text-align:left; padding:4px 0; border:0; background:transparent; color:var(--ds-accent); font:inherit; font-weight:700; white-space:normal; overflow-wrap:anywhere; cursor:pointer; }
+.farm-ranking-table tr[data-selected] > td { background:var(--ds-selected); }
+.farm-selected-record { margin:16px 0; padding:16px; border:1px solid var(--ds-divider); border-radius:4px; background:var(--ds-surface); }
+.farm-selected-record h3 { margin:0 0 12px; font-size:18px; }
+.farm-current-link { border-top:1px solid var(--ds-divider); margin-top:16px; padding-top:12px; }
+.farm-record-summary[data-ds] { color:var(--ds-text); }
+.farm-stat-list { display:grid; grid-template-columns:minmax(0,1fr) minmax(60px,1fr); gap:4px 16px; margin:12px 0; max-width:600px; }
+.farm-stat-list :is(dt,dd) { margin:0; padding:4px 0; border-bottom:1px solid var(--ds-divider); }
+.farm-stat-list dt { color:var(--ds-muted); }
+.farm-stat-list dd { text-align:right; }
+:is(.farm-rankings,.farm-record-summary,.farm-player-history) details { margin:8px 0; }
+:is(.farm-rankings,.farm-record-summary,.farm-player-history) summary { min-height:44px; display:flex; align-items:center; gap:8px; color:var(--ds-muted); cursor:pointer; }
+:is(.farm-rankings,.farm-record-summary,.farm-player-history) summary::before { content:'＋'; }
+:is(.farm-rankings,.farm-record-summary,.farm-player-history) details[open] > summary::before { content:'−'; }
+.farm-awards { margin-top:16px; border-top:1px solid var(--ds-divider); }
+.farm-awards h3 { font-size:18px; margin:16px 0 12px; }
+.farm-awards dl { display:grid; grid-template-columns:80px minmax(0,1fr); gap:8px 12px; }
+.farm-awards dt { color:var(--ds-muted); }
+.farm-awards dd { margin:0; }
+.farm-empty { padding:16px; background:var(--ds-surface); border:1px solid var(--ds-divider); }
+:is(.farm-rankings,.farm-record-summary,.farm-player-history) :is(button,select,input,summary,[tabindex]):focus-visible { outline:3px solid var(--ds-focus); outline-offset:3px; }
+@media(max-width:760px) {
+ .farm-rankings[data-ds] { padding:12px; }
+ .farm-filters { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .farm-filters > label:last-child { grid-column:1/-1; }
+ .farm-toolbar > div { width:100%; }
+ .farm-tabs button,.farm-column-toggle button { flex:1; }
+ .farm-selected-record { padding:12px; }
+}
+@media(min-width:1024px) {
+ .farm-rankings[data-ds] { padding:24px 32px; }
+ .farm-heading h2 { font-size:28px; }
+}

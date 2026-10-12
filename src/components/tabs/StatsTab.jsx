@@ -205,11 +205,11 @@ export function StatsTab({
   };
 
   return (
-    <section className={`calm-detail detail-stats ${view === 'farm' ? '' : 'first-team-stats'}`} data-ds={view === 'farm' ? undefined : 'first-team-stats'} aria-label="球団成績" onKeyDown={event => { if (event.key === 'Escape' && openTip) handleTip(null); }}>
-      <header className="first-team-heading">
+    <section className="calm-detail detail-stats first-team-stats" data-ds="first-team-stats" aria-label="球団成績" onKeyDown={event => { if (event.key === 'Escape' && openTip) handleTip(null); }}>
+      {view!=='farm'&&<header className="first-team-heading">
         <h1>{view === 'farm' ? '二軍成績' : '一軍成績'}</h1>
         <p>{view === 'farm' ? '二軍実測ランキング・年度別記録' : `${firstTeamScope(year ?? farmState?.year)} · ${myTeam.name}`}</p>
-      </header>
+      </header>}
       {view !== 'farm' && <p className="stats-scope-note">二軍所属の一軍出場者も含みます。二軍実測・旧推定は合算しません。</p>}
       <div className="stats-toolbar">
         <div className="tabs" role="tablist" aria-label="成績種別">
@@ -243,7 +243,7 @@ export function StatsTab({
       </div></details>}
       {view !== 'farm' && <details className="stats-help"><summary>記録・操作の見方</summary><p className="stats-value-note">実測0は数値、未記録・分母0の算出不可は理由を表示。未記録値はどちらの並び順でも末尾です。選手名から詳細・過年度へ。表は横にスクロールできます。絞り込みや閲覧で編成は変更されません。</p></details>}
       <div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${view}`}>
-      {view==='farm'?<FarmRankings state={farmState}/>:view === 'batter' ? (
+      {view==='farm'?<FarmRankings state={farmState} onPlayerClick={onPlayerClick}/>:view === 'batter' ? (
         <StatsTable
           title="打者成績"
           defaultSortLabel="OPS降順"

@@ -35,6 +35,7 @@ for(const width of [360,390,1440])test(`F04 farm historical rankings, retired de
  await reloadAndLoad(page);await mainNavigation(page,width<768).getByRole('button',{name:'成績',exact:true}).click();
  await page.getByRole('tab',{name:'二軍',exact:true}).click();
  await page.getByLabel('二軍リーグ').selectOption('パ');
+ await page.locator('section[aria-label="二軍ランキング"] summary').filter({hasText:'球団別の実施状況'}).click();
  await page.locator('section[aria-label="二軍ランキング"] summary').filter({hasText:'未実施理由'}).click();
  await expect(page.getByRole('region',{name:'二軍ランキング',exact:true})).toContainText('捕手不足');
  await page.getByLabel('二軍リーグ').selectOption('セ');
@@ -46,7 +47,7 @@ for(const width of [360,390,1440])test(`F04 farm historical rankings, retired de
  const detail=page.getByRole('region',{name:'二軍記録詳細'});await expect(detail).toContainText(`${expected.PA}打席`);
  await expect(region).toContainText('年間表彰');await expect(region).not.toContainText('規定確定後');
  await detail.getByRole('button',{name:'記録詳細を閉じる'}).click();
- await page.getByLabel('二軍リーグ').selectOption('パ');await page.getByLabel('二軍成績種別').selectOption('pitching');
+ await page.getByLabel('二軍リーグ').selectOption('パ');await region.getByRole('tab',{name:'投球',exact:true}).click();
  await expect(region).toContainText('投球回');
  const restored=await saveHub(page);expect(restored.seasonHistory.awards[0].farmAwards).toEqual(expected.awards);
  expect(restored.seasonHistory.farmArchives[0].players.some(p=>p.playerId===expected.playerId)).toBe(true);
