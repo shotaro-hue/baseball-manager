@@ -1,0 +1,63 @@
+/* UI-02B: only the migrated settings panels. Farm/training and talk keep legacy CSS. */
+.roster-settings.calm-detail[open] { padding: 16px 0; background: var(--ds-canvas); color: var(--ds-text); }
+.roster-settings.calm-detail > summary { padding: 16px; min-height: 48px; color: var(--ds-accent); font-size: 16px; background: var(--ds-surface); border: 1px solid var(--ds-control-border); border-radius: 4px; }
+.roster-settings.calm-detail > summary small { display: block; color: var(--ds-muted); font-size: 12px; margin: 4px 0 0 20px; }
+.roster-settings-ui { --detail-text: var(--ds-text); --detail-muted: var(--ds-muted); --detail-blue: var(--ds-accent); --detail-good: var(--ds-success); --detail-warn: var(--ds-warning); --detail-bad: var(--ds-danger); color: var(--ds-text); min-width: 0; font-variant-numeric: tabular-nums; }
+.roster-settings .roster-settings-ui :is(button,select,input) { font-family: 'Noto Sans JP', sans-serif; min-height: 44px; max-width: 100%; border-radius: 4px; font-size: 16px !important; box-shadow: none; }
+.roster-settings .roster-settings-ui select { padding: 8px !important; color: var(--ds-text) !important; background: var(--ds-surface) !important; border: 1px solid var(--ds-control-border) !important; }
+.roster-settings-ui button { color: var(--ds-accent); background: var(--ds-surface); border: 1px solid var(--ds-control-border); padding: 8px 12px; min-width: 44px; }
+.roster-settings .roster-settings-ui button.bgb { color: var(--ds-inverse); background: var(--ds-accent); border-color: var(--ds-accent); }
+.roster-settings .roster-settings-ui button.bgr { color: var(--ds-danger); background: var(--ds-surface); border-color: var(--ds-control-border); }
+.roster-settings .roster-settings-ui button.bga { color: var(--ds-accent); background: var(--ds-surface); border-color: var(--ds-control-border); }
+.roster-settings .roster-settings-ui :is(button,select,input,[tabindex]):focus-visible,
+.roster-settings > summary:focus-visible { outline: 3px solid var(--ds-focus); outline-offset: 3px; }
+.roster-settings-ui h2 { font-size: 18px; line-height: 1.4; margin: 0; }
+.roster-settings-ui p { margin: 8px 0; line-height: 1.65; }
+.roster-settings-ui .settings-note { color: var(--ds-muted); font-size: 14px; }
+.settings-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px; background: var(--ds-navy); }
+.roster-settings .settings-heading h2 { color: var(--ds-inverse); }
+.settings-heading p { color: var(--ds-inverse-muted); font-size: 14px; }
+.settings-policy { padding: 20px 16px; border-bottom: 1px solid var(--ds-divider); background: var(--ds-surface); }
+.settings-section-heading { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.settings-section-heading > span { font-size: 14px; color: var(--ds-muted); }
+.settings-section-heading .settings-policy-current { color: var(--ds-accent); font-weight: 700; }
+.settings-policy input[type=range] { width: 100%; accent-color: var(--ds-accent); }
+.settings-policy-scale { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 4px; font-size: 14px; text-align: center; color: var(--ds-muted); }
+.settings-policy-scale [data-selected=true] { color: var(--ds-accent); font-weight: 700; }
+.settings-mode { display: grid; gap: 8px; font-size: 16px; padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--ds-divider); }
+.settings-mode select { width: 100%; }
+.roster-settings .detail-roster-toolbar { margin: 16px; gap: 8px; }
+.roster-settings .detail-roster-toolbar button.tab { min-height: 48px; font-size: 14px !important; background: var(--ds-surface); border: 0; border-bottom: 3px solid transparent; border-radius: 0; color: var(--ds-muted); }
+.roster-settings .detail-roster-toolbar button.tab.on { color: var(--ds-accent); border-bottom-color: var(--ds-accent); }
+.roster-settings .detail-roster-toolbar .chip { color: var(--ds-text); background: var(--ds-surface); border-color: var(--ds-divider); }
+.roster-settings .roster-settings-ui.card, .roster-settings .settings-pitchers .card { padding: 16px; background: var(--ds-surface); border: 0; border-top: 1px solid var(--ds-divider); border-radius: 0; box-shadow: none; }
+.roster-settings .roster-settings-ui .card-h { color: var(--ds-text); font-size: 18px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.roster-settings-ui .settings-missing { color: var(--ds-muted); }
+.roster-settings-ui .settings-missing small { font-size: 12px; display: block; }
+.roster-settings-ui .settings-injury { color: var(--ds-danger); font-size: 12px; display: block; }
+.roster-settings .roster-settings-ui .settings-player { color: var(--ds-accent); background: transparent; border: 0; padding: 4px 0; text-align: left; white-space: normal; overflow-wrap: anywhere; font-size: 14px !important; font-weight: 700; line-height: 1.5; width: 100%; }
+.settings-pitcher-name { flex: 1; min-width: 120px !important; width: auto !important; }
+.roster-settings .settings-lineup-scroll { max-height: 65vh; overscroll-behavior: contain; }
+.roster-settings .settings-lineup-scroll .detail-lineup-table { table-layout: fixed; width: 2050px; border-collapse: separate; border-spacing: 0; }
+.roster-settings .settings-lineup-scroll .detail-lineup-table :is(th,td) { font-family: 'Noto Sans JP',sans-serif !important; font-variant-numeric: tabular-nums; font-size: 14px !important; padding: 8px; color: var(--ds-text); border-bottom: 1px solid var(--ds-divider); text-align: right; }
+.roster-settings .settings-lineup-scroll .detail-lineup-table th { background: var(--ds-canvas); color: var(--ds-muted); }
+.roster-settings .settings-lineup-scroll .detail-lineup-table :is(th,td):first-child { position: sticky !important; left: 0; width: 104px; min-width: 104px; z-index: 3; background: var(--ds-surface); text-align: left; }
+.roster-settings .settings-lineup-scroll .detail-lineup-table :is(th,td):nth-child(2) { position: sticky !important; left: 104px; width: 144px; min-width: 144px; max-width: none; z-index: 3; background: var(--ds-surface); white-space: normal; text-align: left; border-right: 1px solid var(--ds-divider); }
+.roster-settings .settings-lineup-scroll .detail-lineup-table th:is(:first-child,:nth-child(2)) { z-index: 5; background: var(--ds-canvas); }
+.roster-settings .settings-lineup-scroll .detail-lineup-table tr.selected td { background: var(--ds-selected); }
+.roster-settings .settings-lineup-scroll .detail-lineup-table th:nth-child(3) { width: 120px; }
+.roster-settings .settings-lineup-scroll .detail-lineup-table th:nth-last-child(2) { width: 120px; }
+.roster-settings .settings-lineup-scroll .detail-lineup-table select { width: 100% !important; }
+.roster-settings .settings-lineup-scroll .detail-lineup-table td:first-child .bsm { padding: 4px !important; width: 44px; }
+.roster-settings-ui .mono, .roster-settings-ui td > span { font-family: 'Noto Sans JP',sans-serif !important; font-size: 14px !important; }
+.roster-settings .settings-footer { padding: 16px; background: var(--ds-surface); border-top: 1px solid var(--ds-divider); }
+.settings-footer p { font-size: 14px; color: var(--ds-muted); }
+@media(min-width:761px) { .settings-mode { grid-template-columns: 120px minmax(0,420px); align-items: center; } }
+@media(max-width:760px) {
+  .roster-settings .settings-lineup-scroll .detail-lineup-table :is(th,td):first-child { position: static !important; }
+  .roster-settings .settings-lineup-scroll .detail-lineup-table :is(th,td):nth-child(2) { left: 0; }
+  .roster-settings .settings-heading { display: block; }
+  .settings-heading button { margin-top: 8px; }
+  .roster-settings .roster-settings-ui.card, .roster-settings .settings-pitchers .card { padding: 16px; }
+  .roster-settings .settings-pitcher-name { flex-basis: calc(100% - 28px); }
+}
