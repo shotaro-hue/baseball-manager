@@ -336,7 +336,7 @@ for (const width of [360,390,1440]) test(`F03 farm records survive progress/relo
  await runSingle(page,mobile);const next=await saveHub(page);expect(next.farmCompetition.nextRound).toBe(7);expect(next.farmCompetition.cards).toHaveLength(36);
  await mainNavigation(page,mobile).getByRole('button',{name:/編成/}).click();
  if(!mobile)await page.locator('.roster-full-settings > summary').click();
- await (mobile?page.locator('.mobile-roster'):page.locator('.roster-full-settings')).getByRole('button',{name:/二軍/}).click();
+ await (mobile?page.locator('.mobile-roster'):page.locator('.roster-full-settings .detail-roster-toolbar')).getByRole('button',{name:/二軍/}).click();
  await expect(page.getByText(/二軍実測（簡易試合モデル）/)).toBeVisible();
  const team=next.teams.find(t=>t.id===next.myId),p=team.farm[0];
  await page.getByText(p.name,{exact:true}).first().click();

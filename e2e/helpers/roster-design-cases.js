@@ -40,7 +40,7 @@ export function registerRosterDesignCases() {
       const full = page.locator('.roster-full-settings');
       await full.locator('summary').click();
       const demoteRow = full.locator('.detail-lineup-table tbody tr').filter({ hasText: demoted.name });
-      await demoteRow.getByRole('button', { name: '↓', exact: true }).click();
+      await demoteRow.getByRole('button', { name: `${demoted.name}を二軍へ`, exact: true }).click();
       await full.locator('.detail-roster-toolbar').getByRole('button', { name: /二軍/ }).click();
       const forbiddenRow = full.locator('tr').filter({ hasText: demoted.name });
       await expect(forbiddenRow.getByRole('button')).toBeDisabled();

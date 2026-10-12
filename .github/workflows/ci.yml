@@ -28,7 +28,9 @@ jobs:
   progression-e2e-suites:
     name: e2e-${{ matrix.suite.name }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Includes browser/OS dependency setup. Observed apt mirror delays consumed
+    # the former 15-minute budget before otherwise passing tests could finish.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -37,6 +39,8 @@ jobs:
             files: progression.smoke.spec.js initialization.spec.js draft.spec.js
           - name: match-history
             files: match-history.spec.js
+          - name: roster-settings
+            files: roster-settings.spec.js
           - name: posting-and-finance
             files: posting.spec.js finance.spec.js trade.spec.js club-comparison.spec.js
           - name: save-integrity
