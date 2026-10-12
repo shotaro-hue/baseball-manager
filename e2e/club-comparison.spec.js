@@ -50,8 +50,10 @@ test('comparison traps focus, closes with Escape and restores opener', async ({ 
   await expect(close).toBeFocused();
   expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden');
   await page.keyboard.press('Shift+Tab');
-  await expect(page.getByRole('region', { name: '選手比較表' })).toBeFocused();
+  await expect(dialog.getByRole('button', { name: '元の画面に戻る', exact: true })).toBeFocused();
   await page.keyboard.press('Tab'); await expect(close).toBeFocused();
+  const table = page.getByRole('region', { name: '選手比較表' });
+  await table.focus(); await expect(table).toBeFocused();
   expect(await dialog.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0); await expect(open).toBeFocused();

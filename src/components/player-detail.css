@@ -1,0 +1,84 @@
+/* UI-02C opt-in surfaces; loaded after legacy detail/club rules. */
+.player-detail-ui[data-ds], .player-comparison-ui[data-ds] {
+  color: var(--ds-text); font-size: 16px; line-height: 1.6;
+  font-family: 'Noto Sans JP', sans-serif;
+}
+.player-detail-ui[data-ds] .player-modal-card, .player-comparison-ui[data-ds].player-compare-dialog {
+  background: var(--ds-surface); color: var(--ds-text); border: 1px solid var(--ds-divider);
+  padding: 20px; border-radius: 4px; width: min(100%, 820px); max-width: 820px;
+  max-height: 92dvh; overflow-y: auto; overscroll-behavior: contain;
+  box-shadow: none; min-width: 0;
+}
+.player-detail-ui[data-ds] .player-modal-card.wide { max-width: 980px; width: min(100%, 980px); }
+.player-detail-return { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.player-identity-heading, .player-comparison-ui[data-ds] .player-compare-header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 16px; background: var(--ds-navy); color: var(--ds-inverse); margin-bottom: 12px;
+}
+.player-identity-heading > div { min-width: 0; }
+.player-identity-heading h2, .player-comparison-ui[data-ds] .player-compare-header h2 { color: var(--ds-inverse); margin: 0 0 4px; font-size: 22px; overflow-wrap: anywhere; }
+.player-identity-heading p, .player-comparison-ui[data-ds] .player-compare-header p { color: var(--ds-inverse-muted); font-size: 14px; margin: 0; overflow-wrap: anywhere; }
+.player-state-summary { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 14px; margin: 12px 0; }
+.player-injury { color: var(--ds-danger); }
+.player-detail-ui[data-ds] .player-detail-tabs {
+  display: flex; flex-wrap: wrap; gap: 0; margin: 16px 0 0;
+  position: static; background: var(--ds-surface); border-bottom: 1px solid var(--ds-divider); padding: 0;
+}
+.player-detail-ui[data-ds] .player-detail-tabs button {
+  flex: 1 0 auto; min-height: 48px; font-size: 14px; padding: 8px;
+  border: 0; border-bottom: 3px solid transparent; border-radius: 0;
+  color: var(--ds-muted); background: var(--ds-surface); cursor: pointer;
+}
+.player-detail-ui[data-ds] .player-detail-tabs button.on { color: var(--ds-accent); border-bottom-color: var(--ds-accent); background: var(--ds-surface); font-weight: 700; }
+.player-detail-panel { min-width: 0; }
+.player-profile-grid, .player-stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 24px; }
+.player-profile-grid [data-ds="section"] { margin-top: 16px; }
+.player-stat-grid h3 { font-size: 16px; margin-bottom: 8px; }
+.player-ability { margin-bottom: 12px; font-size: 14px; }
+.player-ability > div:first-child { display: flex; justify-content: space-between; gap: 12px; }
+.player-ability strong { color: var(--ds-text); text-align: right; }
+.player-ability-track { height: 4px; background: var(--ds-divider); margin-top: 4px; }
+.player-ability-track span { display: block; height: 100%; background: var(--ds-accent); }
+.player-stat-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--ds-divider); font-size: 14px; }
+.player-stat-row > span { color: var(--ds-muted); }
+.player-stat-row strong { font-weight: 500; text-align: right; overflow-wrap: anywhere; }
+.player-record-note { font-size: 14px; color: var(--ds-muted); line-height: 1.6; margin: 8px 0 12px; }
+.player-detail-ui[data-ds] .player-decision-actions { display: flex; flex-wrap: wrap; gap: 8px; position: static; bottom: auto; z-index: auto; background: var(--ds-surface); margin: 24px 0 0; padding: 16px 0 0; border-top: 1px solid var(--ds-divider); }
+.player-detail-ui[data-ds] .player-decision-actions > span { flex: 1 0 100%; color: var(--ds-muted); font-size: 14px; }
+.player-detail-ui[data-ds] :is(button,select,summary) { min-height: 44px; min-width: 44px; }
+.player-detail-ui[data-ds] select { color: var(--ds-text); border: 1px solid var(--ds-control-border); background: var(--ds-surface); font-size: 16px; max-width: 100%; padding: 8px; }
+.player-detail-ui[data-ds] summary { display: flex; align-items: center; cursor: pointer; font-size: 14px; }
+.player-detail-ui[data-ds] summary::before { content: '▸'; margin-right: 8px; }
+.player-detail-ui[data-ds] details[open] > summary::before { content: '▾'; }
+.player-detail-ui[data-ds] :is(button,select,summary,[tabindex]):focus-visible, .player-comparison-ui[data-ds] :is(button,[tabindex]):focus-visible { outline: 3px solid var(--ds-focus); outline-offset: 2px; }
+/* Child analysis/career surfaces keep their data/loading paths, with scoped DES-01 styling. */
+.player-detail-ui[data-ds] .calm-detail { color: var(--ds-text); background: var(--ds-surface); }
+.player-detail-ui[data-ds] .career-detail { border: 1px solid var(--ds-divider); border-radius: 0 !important; padding: 12px !important; background: var(--ds-surface) !important; }
+.player-detail-ui[data-ds] .calm-detail :is(button,select) { border-color: var(--ds-control-border); }
+.player-detail-ui[data-ds] .calm-detail button[aria-pressed=true] { color: var(--ds-accent) !important; background: var(--ds-selected) !important; box-shadow: inset 0 -3px var(--ds-accent); }
+.player-detail-ui[data-ds] .calm-detail .tbl th { color: var(--ds-muted); background: var(--ds-canvas); }
+.player-detail-ui[data-ds] .calm-detail .tbl td { color: var(--ds-text); }
+.player-detail-ui[data-ds] .calm-detail .tbl .mono { font-family: inherit; }
+.player-comparison-ui[data-ds] .player-compare-header { position: static; }
+.player-comparison-ui[data-ds] .player-compare-names { margin: 0 0 12px; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.player-comparison-ui[data-ds] .player-compare-names > div { background: var(--ds-canvas); border-radius: 0; padding: 12px; display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+.player-comparison-ui[data-ds] .player-compare-names strong { color: var(--ds-text); font-size: 16px; overflow-wrap: anywhere; }
+.player-comparison-ui[data-ds] .player-compare-names span { color: var(--ds-muted); font-size: 14px; }
+.player-comparison-ui[data-ds] .player-compare-table { table-layout: fixed; min-width: 0; }
+.player-comparison-ui[data-ds] .player-compare-table :is(th,td) { width: 33.333%; font-size: 14px; white-space: normal; overflow-wrap: anywhere; font-family: inherit; }
+.player-comparison-ui[data-ds] .player-compare-table tbody th { color: var(--ds-muted); font-weight: 500; top: auto; left: 0; z-index: 1; background: var(--ds-surface); }
+.player-compare-return { margin-top: 16px; }
+.player-comparison-ui[data-ds].player-compare-tray { padding: 12px; border: 1px solid var(--ds-control-border); border-radius: 4px; background: var(--ds-surface); box-shadow: none; }
+.player-comparison-ui[data-ds] .player-compare-tray-title { color: var(--ds-accent); font-size: 14px; display: flex; flex-direction: column; white-space: normal; }
+.player-comparison-ui[data-ds] .player-compare-tray-title span { font-size: 14px; font-weight: 400; color: var(--ds-muted); }
+.player-comparison-ui[data-ds] .player-compare-tray-list { flex-wrap: wrap; }
+.player-comparison-ui[data-ds] .player-compare-tray-list > span { background: var(--ds-selected); color: var(--ds-text); border: 0; border-radius: 0; min-width: 0; max-width: none; font-size: 14px; white-space: normal; overflow-wrap: anywhere; }
+.player-comparison-ui[data-ds] .player-compare-tray-list button { flex-shrink: 0; padding: 8px; }
+@media (max-width:760px) {
+  .player-detail-ui[data-ds] .player-modal-card, .player-detail-ui[data-ds] .player-modal-card.wide { padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); width: 100%; height: 100dvh; max-height: 100dvh; max-width: none; border-radius: 0; }
+  .player-identity-heading { flex-wrap: wrap; }
+  .player-profile-grid, .player-stat-grid { grid-template-columns: minmax(0,1fr); gap: 0; }
+  .player-detail-ui[data-ds] .player-detail-tabs button { flex: 1 0 45%; }
+  .player-comparison-ui[data-ds].player-compare-dialog { padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); border-radius: 0; width: 100%; max-width: none; max-height: 100dvh; }
+  .player-comparison-ui[data-ds].player-compare-tray { max-height: 40dvh; overflow-y: auto; }
+}

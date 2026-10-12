@@ -15,24 +15,24 @@ const opponent = { ...team, id: 1, name: '相手球団', players: [] };
 describe('club and comparison flow', () => {
   it('distinguishes recorded zero, absent stats and absent condition', () => {
     const rows = Object.fromEntries(compareRows(pitcher, { id: 1, isPitcher: true }).map(([key, ...values]) => [key, values]));
-    expect(rows['防御率']).toEqual(['0.00', '---']);
-    expect(rows.WHIP).toEqual(['0.00', '---']);
-    expect(rows['コンディション']).toEqual([0, '---']);
-    expect(rows['モラル']).toEqual([0, '---']);
-    expect(rows['今季 WAR'][1]).toBe('---');
+    expect(rows['防御率']).toEqual(['0.00', '— 未記録']);
+    expect(rows.WHIP).toEqual(['0.00', '— 未記録']);
+    expect(rows['コンディション']).toEqual([0, '— 未記録']);
+    expect(rows['モラル']).toEqual([0, '— 未記録']);
+    expect(rows['今季 WAR'][1]).toBe('— 未記録');
   });
   it('shows measured zero OPS and does not invent missing batted-ball numerators', () => {
     const player = { stats: { ...emptyStats(), AB: 4, PA: 4, battedBallProfile: { bip: 4, evN: 4 } } };
     const rows = Object.fromEntries(compareRows(player, { stats: {} }).map(([k, ...v]) => [k, v]));
-    expect(rows.OPS).toEqual(['0.000', '---']);
-    expect(rows['本塁打']).toEqual([0, '---']);
-    expect(rows['平均打球速度']).toEqual(['---', '---']);
-    expect(rows['強打球率']).toEqual(['---', '---']);
+    expect(rows.OPS).toEqual(['0.000', '— 未記録']);
+    expect(rows['本塁打']).toEqual([0, '— 未記録']);
+    expect(rows['平均打球速度']).toEqual(['— 未記録', '— 未記録']);
+    expect(rows['強打球率']).toEqual(['— 未記録', '— 未記録']);
   });
   it('keeps mixed-role metrics labeled with their units and marks inapplicable values', () => {
     const rows = Object.fromEntries(compareRows({ ...pitcher, pitching: { velocity: 150 } }, { batting: { contact: 70 } }).map(([k, ...v]) => [k, v]));
-    expect(rows['球速']).toEqual(['150 km/h', '---']);
-    expect(rows['ミート']).toEqual(['---', 70]);
+    expect(rows['球速']).toEqual([150, '— 対象外']);
+    expect(rows['ミート']).toEqual(['— 対象外', 70]);
   });
   it('keeps roster navigation, history, schedule and trade accessible with comparison collapsed', () => {
     const open = vi.fn(), trade = vi.fn(), back = vi.fn(); let v;

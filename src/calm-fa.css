@@ -36,6 +36,6 @@
   .fa-layout { display:block; }
   .fa-list { max-height:none; overflow:visible; }
   .fa-selected .fa-list { display:none; }
-  .fa-market:not(.fa-selected) .fa-detail { display:none; }
+  .fa-market:not(.fa-selected) > .fa-layout > .fa-detail { display:none; }
   .fa-dialog { padding:18px; }
 }

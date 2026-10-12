@@ -105,6 +105,7 @@ export default function HubShell({ state, flows, app }) {
   const [currentPrimarySection, setCurrentPrimarySection] = useState('home');
   const [comparePlayers, setComparePlayers] = useState([]);
   const [compareOpen, setCompareOpen] = useState(false);
+  useEffect(() => { setComparePlayers([]); setCompareOpen(false); }, [year]);
   const [decisionTarget, setDecisionTarget] = useState(null);
 
   useEffect(() => {
@@ -438,6 +439,9 @@ export default function HubShell({ state, flows, app }) {
           />
           {compareOpen && comparePlayers.length === 2 && (
             <PlayerComparisonDialog
+              year={year}
+              teams={gs.teams}
+              faPool={gs.faPool}
               players={comparePlayers}
               onRemove={removeComparePlayer}
               onClose={() => setCompareOpen(false)}
