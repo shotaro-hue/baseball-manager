@@ -1,0 +1,2156 @@
+[
+  {
+    "screen": "home",
+    "width": 360,
+    "height": 800,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "保存",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "まとめて進める",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      },
+      {
+        "text": "1試合ずつ采配",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "進行設定",
+        "height": 46.390625,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "5試合 (4/1)10試合 (4/7)15試合 (4/12)20試合 (4/18)25試合 (4/24)30試合 (4/30)35試合 (5/6)40試合 (5/12)45試合 (5/17)50試合 (5/23)55試合 (5/29)60試合 (6/4)65試合 (6/10)70試合 (6/16)75試合 (6/21)80試合 (6/27)85試合 (7/3)90試合 (7/9)95試合 (7/19)100試合 (7/25)105試合 (7/31)110試合 (8/6)115試合 (8/12)120試合 (8/18)125試合 (8/23)130試合 (8/29)135試合 (9/4)140試合 (9/10)143試合 (9/13)",
+        "height": 44,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "13.3333px"
+      },
+      {
+        "text": "まとめてシム",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "13.3333px"
+      },
+      {
+        "text": "残り全143試合",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "契約満了予定26人",
+        "height": 48,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "編成を見直す",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "日程・結果をすべて見る",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "ホーム",
+        "height": 56,
+        "background": "rgb(233, 241, 253)",
+        "font": "11px"
+      },
+      {
+        "text": "編成",
+        "height": 56,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "11px"
+      },
+      {
+        "text": "日程",
+        "height": 56,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "11px"
+      },
+      {
+        "text": "成績",
+        "height": 56,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "11px"
+      },
+      {
+        "text": "その他",
+        "height": 56,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "11px"
+      }
+    ]
+  },
+  {
+    "screen": "home",
+    "width": 390,
+    "height": 844,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "保存",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "まとめて進める",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      },
+      {
+        "text": "1試合ずつ采配",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "進行設定",
+        "height": 46.390625,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "5試合 (4/1)10試合 (4/7)15試合 (4/12)20試合 (4/18)25試合 (4/24)30試合 (4/30)35試合 (5/6)40試合 (5/12)45試合 (5/17)50試合 (5/23)55試合 (5/29)60試合 (6/4)65試合 (6/10)70試合 (6/16)75試合 (6/21)80試合 (6/27)85試合 (7/3)90試合 (7/9)95試合 (7/19)100試合 (7/25)105試合 (7/31)110試合 (8/6)115試合 (8/12)120試合 (8/18)125試合 (8/23)130試合 (8/29)135試合 (9/4)140試合 (9/10)143試合 (9/13)",
+        "height": 44,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "13.3333px"
+      },
+      {
+        "text": "まとめてシム",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "13.3333px"
+      },
+      {
+        "text": "残り全143試合",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "契約満了予定26人",
+        "height": 48,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "編成を見直す",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "日程・結果をすべて見る",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "ホーム",
+        "height": 56,
+        "background": "rgb(233, 241, 253)",
+        "font": "11px"
+      },
+      {
+        "text": "編成",
+        "height": 56,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "11px"
+      },
+      {
+        "text": "日程",
+        "height": 56,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "11px"
+      },
+      {
+        "text": "成績",
+        "height": 56,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "11px"
+      },
+      {
+        "text": "その他",
+        "height": 56,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "11px"
+      }
+    ]
+  },
+  {
+    "screen": "home",
+    "width": 760,
+    "height": 900,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "保存",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "まとめて進める",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      },
+      {
+        "text": "1試合ずつ采配",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "進行設定",
+        "height": 46.390625,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "5試合 (4/1)10試合 (4/7)15試合 (4/12)20試合 (4/18)25試合 (4/24)30試合 (4/30)35試合 (5/6)40試合 (5/12)45試合 (5/17)50試合 (5/23)55試合 (5/29)60試合 (6/4)65試合 (6/10)70試合 (6/16)75試合 (6/21)80試合 (6/27)85試合 (7/3)90試合 (7/9)95試合 (7/19)100試合 (7/25)105試合 (7/31)110試合 (8/6)115試合 (8/12)120試合 (8/18)125試合 (8/23)130試合 (8/29)135試合 (9/4)140試合 (9/10)143試合 (9/13)",
+        "height": 44,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "13.3333px"
+      },
+      {
+        "text": "まとめてシム",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "13.3333px"
+      },
+      {
+        "text": "残り全143試合",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "契約満了予定26人",
+        "height": 48,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "編成を見直す",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "日程・結果をすべて見る",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "ホーム",
+        "height": 56,
+        "background": "rgb(233, 241, 253)",
+        "font": "11px"
+      },
+      {
+        "text": "編成",
+        "height": 56,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "11px"
+      },
+      {
+        "text": "日程",
+        "height": 56,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "11px"
+      },
+      {
+        "text": "成績",
+        "height": 56,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "11px"
+      },
+      {
+        "text": "その他",
+        "height": 56,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "11px"
+      }
+    ]
+  },
+  {
+    "screen": "home",
+    "width": 761,
+    "height": 900,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "保存",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "まとめて進める",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      },
+      {
+        "text": "試合へ進む",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "進行設定",
+        "height": 46.390625,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "1試合",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "5試合 (4/1)10試合 (4/7)15試合 (4/12)20試合 (4/18)25試合 (4/24)30試合 (4/30)35試合 (5/6)40試合 (5/12)45試合 (5/17)50試合 (5/23)55試合 (5/29)60試合 (6/4)65試合 (6/10)70試合 (6/16)75試合 (6/21)80試合 (6/27)85試合 (7/3)90試合 (7/9)95試合 (7/19)100試合 (7/25)105試合 (7/31)110試合 (8/6)115試合 (8/12)120試合 (8/18)125試合 (8/23)130試合 (8/29)135試合 (9/4)140試合 (9/10)143試合 (9/13)",
+        "height": 44,
+        "background": "rgb(255, 255, 255)",
+        "font": "14px"
+      },
+      {
+        "text": "",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "13.3333px"
+      },
+      {
+        "text": "まとめてシム",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      },
+      {
+        "text": "",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "13.3333px"
+      },
+      {
+        "text": "残り全143試合",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "契約満了予定26人",
+        "height": 48,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "編成を見直す",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "日程・結果をすべて見る",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "大城　卓三",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "清水　陸斗",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "山瀬　慎之助",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "泉口　友汰",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "斎藤　悠真",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "宇都宮　葵星",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "今永　宏",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "中山　礼都",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "増田　陸 一塁手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "佐々木　俊輔 中堅手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "浦田　俊輔 二塁手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "門脇　誠 遊撃手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "平山　功太 二塁手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "皆川　岳飛 中堅手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "加藤　仁 三塁手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "能力",
+        "height": 48,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "16px"
+      },
+      {
+        "text": "成績",
+        "height": 48,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "16px"
+      },
+      {
+        "text": "選手詳細を開く",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "オーダーを確認",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "球団概況・おすすめ・注目選手",
+        "height": 46.390625,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "ホーム",
+        "height": 58,
+        "background": "rgb(233, 241, 253)",
+        "font": "10px"
+      },
+      {
+        "text": "編成",
+        "height": 58,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "10px"
+      },
+      {
+        "text": "日程",
+        "height": 58,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "10px"
+      },
+      {
+        "text": "成績",
+        "height": 58,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "10px"
+      },
+      {
+        "text": "その他",
+        "height": 58,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "10px"
+      }
+    ]
+  },
+  {
+    "screen": "home",
+    "width": 1023,
+    "height": 900,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "保存",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "まとめて進める",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      },
+      {
+        "text": "試合へ進む",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "進行設定",
+        "height": 46.390625,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "1試合",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "5試合 (4/1)10試合 (4/7)15試合 (4/12)20試合 (4/18)25試合 (4/24)30試合 (4/30)35試合 (5/6)40試合 (5/12)45試合 (5/17)50試合 (5/23)55試合 (5/29)60試合 (6/4)65試合 (6/10)70試合 (6/16)75試合 (6/21)80試合 (6/27)85試合 (7/3)90試合 (7/9)95試合 (7/19)100試合 (7/25)105試合 (7/31)110試合 (8/6)115試合 (8/12)120試合 (8/18)125試合 (8/23)130試合 (8/29)135試合 (9/4)140試合 (9/10)143試合 (9/13)",
+        "height": 44,
+        "background": "rgb(255, 255, 255)",
+        "font": "14px"
+      },
+      {
+        "text": "",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "13.3333px"
+      },
+      {
+        "text": "まとめてシム",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      },
+      {
+        "text": "",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "13.3333px"
+      },
+      {
+        "text": "残り全143試合",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "契約満了予定26人",
+        "height": 48,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "編成を見直す",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "日程・結果をすべて見る",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "大城　卓三",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "清水　陸斗",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "山瀬　慎之助",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "泉口　友汰",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "斎藤　悠真",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "宇都宮　葵星",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "今永　宏",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "中山　礼都",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "増田　陸 一塁手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "佐々木　俊輔 中堅手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "浦田　俊輔 二塁手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "門脇　誠 遊撃手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "平山　功太 二塁手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "皆川　岳飛 中堅手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "加藤　仁 三塁手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "能力",
+        "height": 48,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "16px"
+      },
+      {
+        "text": "成績",
+        "height": 48,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "16px"
+      },
+      {
+        "text": "選手詳細を開く",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "オーダーを確認",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "球団概況・おすすめ・注目選手",
+        "height": 46.390625,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "ホーム",
+        "height": 58,
+        "background": "rgb(233, 241, 253)",
+        "font": "10px"
+      },
+      {
+        "text": "編成",
+        "height": 58,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "10px"
+      },
+      {
+        "text": "日程",
+        "height": 58,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "10px"
+      },
+      {
+        "text": "成績",
+        "height": 58,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "10px"
+      },
+      {
+        "text": "その他",
+        "height": 58,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "10px"
+      }
+    ]
+  },
+  {
+    "screen": "home",
+    "width": 1024,
+    "height": 900,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "ホーム",
+        "height": 57,
+        "background": "rgb(233, 241, 253)",
+        "font": "16px"
+      },
+      {
+        "text": "編成26",
+        "height": 57,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "16px"
+      },
+      {
+        "text": "日程",
+        "height": 57,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "16px"
+      },
+      {
+        "text": "成績",
+        "height": 57,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "16px"
+      },
+      {
+        "text": "その他",
+        "height": 57,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "16px"
+      },
+      {
+        "text": "保存",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "まとめて進める",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      },
+      {
+        "text": "試合へ進む",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "進行設定",
+        "height": 46.390625,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "1試合",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "5試合 (4/1)10試合 (4/7)15試合 (4/12)20試合 (4/18)25試合 (4/24)30試合 (4/30)35試合 (5/6)40試合 (5/12)45試合 (5/17)50試合 (5/23)55試合 (5/29)60試合 (6/4)65試合 (6/10)70試合 (6/16)75試合 (6/21)80試合 (6/27)85試合 (7/3)90試合 (7/9)95試合 (7/19)100試合 (7/25)105試合 (7/31)110試合 (8/6)115試合 (8/12)120試合 (8/18)125試合 (8/23)130試合 (8/29)135試合 (9/4)140試合 (9/10)143試合 (9/13)",
+        "height": 44,
+        "background": "rgb(255, 255, 255)",
+        "font": "14px"
+      },
+      {
+        "text": "",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "13.3333px"
+      },
+      {
+        "text": "まとめてシム",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      },
+      {
+        "text": "",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "13.3333px"
+      },
+      {
+        "text": "残り全143試合",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "契約満了予定26人",
+        "height": 48,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "編成を見直す",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "日程・結果をすべて見る",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "大城　卓三",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "清水　陸斗",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "山瀬　慎之助",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "泉口　友汰",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "斎藤　悠真",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "宇都宮　葵星",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "今永　宏",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "中山　礼都",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "増田　陸 一塁手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "佐々木　俊輔 中堅手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "浦田　俊輔 二塁手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "門脇　誠 遊撃手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "平山　功太 二塁手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "皆川　岳飛 中堅手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "加藤　仁 三塁手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "能力",
+        "height": 48,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "16px"
+      },
+      {
+        "text": "成績",
+        "height": 48,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "16px"
+      },
+      {
+        "text": "選手詳細を開く",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "オーダーを確認",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "球団概況・おすすめ・注目選手",
+        "height": 46.390625,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      }
+    ]
+  },
+  {
+    "screen": "home",
+    "width": 1440,
+    "height": 900,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "ホーム",
+        "height": 57,
+        "background": "rgb(233, 241, 253)",
+        "font": "16px"
+      },
+      {
+        "text": "編成26",
+        "height": 57,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "16px"
+      },
+      {
+        "text": "日程",
+        "height": 57,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "16px"
+      },
+      {
+        "text": "成績",
+        "height": 57,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "16px"
+      },
+      {
+        "text": "その他",
+        "height": 57,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "16px"
+      },
+      {
+        "text": "保存",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "まとめて進める",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      },
+      {
+        "text": "試合へ進む",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "進行設定",
+        "height": 46.390625,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "1試合",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "5試合 (4/1)10試合 (4/7)15試合 (4/12)20試合 (4/18)25試合 (4/24)30試合 (4/30)35試合 (5/6)40試合 (5/12)45試合 (5/17)50試合 (5/23)55試合 (5/29)60試合 (6/4)65試合 (6/10)70試合 (6/16)75試合 (6/21)80試合 (6/27)85試合 (7/3)90試合 (7/9)95試合 (7/19)100試合 (7/25)105試合 (7/31)110試合 (8/6)115試合 (8/12)120試合 (8/18)125試合 (8/23)130試合 (8/29)135試合 (9/4)140試合 (9/10)143試合 (9/13)",
+        "height": 44,
+        "background": "rgb(255, 255, 255)",
+        "font": "14px"
+      },
+      {
+        "text": "",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "13.3333px"
+      },
+      {
+        "text": "まとめてシム",
+        "height": 48.390625,
+        "background": "rgb(23, 102, 218)",
+        "font": "16px"
+      },
+      {
+        "text": "",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "13.3333px"
+      },
+      {
+        "text": "残り全143試合",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "契約満了予定26人",
+        "height": 48,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "編成を見直す",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "日程・結果をすべて見る",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "大城　卓三",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "清水　陸斗",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "山瀬　慎之助",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "泉口　友汰",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "斎藤　悠真",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "宇都宮　葵星",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "今永　宏",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "中山　礼都",
+        "height": 44,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      },
+      {
+        "text": "増田　陸 一塁手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "佐々木　俊輔 中堅手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "浦田　俊輔 二塁手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "門脇　誠 遊撃手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "平山　功太 二塁手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "皆川　岳飛 中堅手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "加藤　仁 三塁手",
+        "height": 44,
+        "background": "rgb(248, 251, 255)",
+        "font": "13px"
+      },
+      {
+        "text": "能力",
+        "height": 48,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "16px"
+      },
+      {
+        "text": "成績",
+        "height": 48,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "16px"
+      },
+      {
+        "text": "選手詳細を開く",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "オーダーを確認",
+        "height": 48.390625,
+        "background": "rgb(255, 255, 255)",
+        "font": "16px"
+      },
+      {
+        "text": "球団概況・おすすめ・注目選手",
+        "height": 46.390625,
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "14px"
+      }
+    ]
+  },
+  {
+    "screen": "component-fixture-no-schedule",
+    "width": 360,
+    "height": 800,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "日程なし進行位置不一致処理中通常シーズン終了",
+        "height": 44
+      },
+      {
+        "text": "保存",
+        "height": 48.390625
+      },
+      {
+        "text": "まとめて進める",
+        "height": 48.390625
+      },
+      {
+        "text": "1試合ずつ采配",
+        "height": 44
+      },
+      {
+        "text": "進行設定",
+        "height": 46.390625
+      },
+      {
+        "text": "5試合10試合15試合20試合25試合30試合35試合40試合45試合50試合55試合60試合65試合70試合75試合80試合85試合90試合95試合100試合105試合110試合115試合120試合125試合130試合135試合139試合",
+        "height": 44
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "まとめてシム",
+        "height": 48.390625
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "残り全139試合",
+        "height": 48.390625
+      },
+      {
+        "text": "疲労・負傷のある選手1人",
+        "height": 48
+      },
+      {
+        "text": "契約満了予定1人",
+        "height": 48
+      },
+      {
+        "text": "編成を見直す",
+        "height": 48.390625
+      },
+      {
+        "text": "日程・結果をすべて見る",
+        "height": 44
+      }
+    ]
+  },
+  {
+    "screen": "component-fixture-blocked",
+    "width": 360,
+    "height": 800,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "日程なし進行位置不一致処理中通常シーズン終了",
+        "height": 44
+      },
+      {
+        "text": "保存",
+        "height": 48.390625
+      },
+      {
+        "text": "まとめて進める",
+        "height": 48.390625
+      },
+      {
+        "text": "1試合ずつ采配",
+        "height": 44
+      },
+      {
+        "text": "進行設定",
+        "height": 46.390625
+      },
+      {
+        "text": "5試合10試合15試合20試合25試合30試合35試合40試合45試合50試合55試合60試合65試合70試合75試合80試合85試合90試合95試合100試合105試合110試合115試合120試合125試合130試合135試合139試合",
+        "height": 44
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "まとめてシム",
+        "height": 48.390625
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "残り全139試合",
+        "height": 48.390625
+      },
+      {
+        "text": "疲労・負傷のある選手1人",
+        "height": 48
+      },
+      {
+        "text": "契約満了予定1人",
+        "height": 48
+      },
+      {
+        "text": "編成を見直す",
+        "height": 48.390625
+      },
+      {
+        "text": "日程・結果をすべて見る",
+        "height": 44
+      }
+    ]
+  },
+  {
+    "screen": "component-fixture-processing",
+    "width": 360,
+    "height": 800,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "日程なし進行位置不一致処理中通常シーズン終了",
+        "height": 44
+      },
+      {
+        "text": "保存",
+        "height": 48.390625
+      },
+      {
+        "text": "まとめて進める",
+        "height": 48.390625
+      },
+      {
+        "text": "1試合ずつ采配",
+        "height": 44
+      },
+      {
+        "text": "進行設定",
+        "height": 46.390625
+      },
+      {
+        "text": "5試合10試合15試合20試合25試合30試合35試合40試合45試合50試合55試合60試合65試合70試合75試合80試合85試合90試合95試合100試合105試合110試合115試合120試合125試合130試合135試合139試合",
+        "height": 44
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "まとめてシム",
+        "height": 48.390625
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "残り全139試合",
+        "height": 48.390625
+      },
+      {
+        "text": "疲労・負傷のある選手1人",
+        "height": 48
+      },
+      {
+        "text": "契約満了予定1人",
+        "height": 48
+      },
+      {
+        "text": "編成を見直す",
+        "height": 48.390625
+      },
+      {
+        "text": "日程・結果をすべて見る",
+        "height": 44
+      }
+    ]
+  },
+  {
+    "screen": "component-fixture-complete",
+    "width": 360,
+    "height": 800,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "日程なし進行位置不一致処理中通常シーズン終了",
+        "height": 44
+      },
+      {
+        "text": "保存",
+        "height": 48.390625
+      },
+      {
+        "text": "まとめて進める",
+        "height": 48.390625
+      },
+      {
+        "text": "1試合ずつ采配",
+        "height": 44
+      },
+      {
+        "text": "進行設定",
+        "height": 46.390625
+      },
+      {
+        "text": "実行可能な試合なし",
+        "height": 44
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "まとめてシム",
+        "height": 48.390625
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "残り全0試合",
+        "height": 48.390625
+      },
+      {
+        "text": "疲労・負傷のある選手1人",
+        "height": 48
+      },
+      {
+        "text": "契約満了予定1人",
+        "height": 48
+      },
+      {
+        "text": "編成を見直す",
+        "height": 48.390625
+      },
+      {
+        "text": "日程・結果をすべて見る",
+        "height": 44
+      }
+    ]
+  },
+  {
+    "screen": "component-fixture-no-schedule",
+    "width": 390,
+    "height": 844,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "日程なし進行位置不一致処理中通常シーズン終了",
+        "height": 44
+      },
+      {
+        "text": "保存",
+        "height": 48.390625
+      },
+      {
+        "text": "まとめて進める",
+        "height": 48.390625
+      },
+      {
+        "text": "1試合ずつ采配",
+        "height": 44
+      },
+      {
+        "text": "進行設定",
+        "height": 46.390625
+      },
+      {
+        "text": "5試合10試合15試合20試合25試合30試合35試合40試合45試合50試合55試合60試合65試合70試合75試合80試合85試合90試合95試合100試合105試合110試合115試合120試合125試合130試合135試合139試合",
+        "height": 44
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "まとめてシム",
+        "height": 48.390625
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "残り全139試合",
+        "height": 48.390625
+      },
+      {
+        "text": "疲労・負傷のある選手1人",
+        "height": 48
+      },
+      {
+        "text": "契約満了予定1人",
+        "height": 48
+      },
+      {
+        "text": "編成を見直す",
+        "height": 48.390625
+      },
+      {
+        "text": "日程・結果をすべて見る",
+        "height": 44
+      }
+    ]
+  },
+  {
+    "screen": "component-fixture-blocked",
+    "width": 390,
+    "height": 844,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "日程なし進行位置不一致処理中通常シーズン終了",
+        "height": 44
+      },
+      {
+        "text": "保存",
+        "height": 48.390625
+      },
+      {
+        "text": "まとめて進める",
+        "height": 48.390625
+      },
+      {
+        "text": "1試合ずつ采配",
+        "height": 44
+      },
+      {
+        "text": "進行設定",
+        "height": 46.390625
+      },
+      {
+        "text": "5試合10試合15試合20試合25試合30試合35試合40試合45試合50試合55試合60試合65試合70試合75試合80試合85試合90試合95試合100試合105試合110試合115試合120試合125試合130試合135試合139試合",
+        "height": 44
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "まとめてシム",
+        "height": 48.390625
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "残り全139試合",
+        "height": 48.390625
+      },
+      {
+        "text": "疲労・負傷のある選手1人",
+        "height": 48
+      },
+      {
+        "text": "契約満了予定1人",
+        "height": 48
+      },
+      {
+        "text": "編成を見直す",
+        "height": 48.390625
+      },
+      {
+        "text": "日程・結果をすべて見る",
+        "height": 44
+      }
+    ]
+  },
+  {
+    "screen": "component-fixture-processing",
+    "width": 390,
+    "height": 844,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "日程なし進行位置不一致処理中通常シーズン終了",
+        "height": 44
+      },
+      {
+        "text": "保存",
+        "height": 48.390625
+      },
+      {
+        "text": "まとめて進める",
+        "height": 48.390625
+      },
+      {
+        "text": "1試合ずつ采配",
+        "height": 44
+      },
+      {
+        "text": "進行設定",
+        "height": 46.390625
+      },
+      {
+        "text": "5試合10試合15試合20試合25試合30試合35試合40試合45試合50試合55試合60試合65試合70試合75試合80試合85試合90試合95試合100試合105試合110試合115試合120試合125試合130試合135試合139試合",
+        "height": 44
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "まとめてシム",
+        "height": 48.390625
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "残り全139試合",
+        "height": 48.390625
+      },
+      {
+        "text": "疲労・負傷のある選手1人",
+        "height": 48
+      },
+      {
+        "text": "契約満了予定1人",
+        "height": 48
+      },
+      {
+        "text": "編成を見直す",
+        "height": 48.390625
+      },
+      {
+        "text": "日程・結果をすべて見る",
+        "height": 44
+      }
+    ]
+  },
+  {
+    "screen": "component-fixture-complete",
+    "width": 390,
+    "height": 844,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "日程なし進行位置不一致処理中通常シーズン終了",
+        "height": 44
+      },
+      {
+        "text": "保存",
+        "height": 48.390625
+      },
+      {
+        "text": "まとめて進める",
+        "height": 48.390625
+      },
+      {
+        "text": "1試合ずつ采配",
+        "height": 44
+      },
+      {
+        "text": "進行設定",
+        "height": 46.390625
+      },
+      {
+        "text": "実行可能な試合なし",
+        "height": 44
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "まとめてシム",
+        "height": 48.390625
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "残り全0試合",
+        "height": 48.390625
+      },
+      {
+        "text": "疲労・負傷のある選手1人",
+        "height": 48
+      },
+      {
+        "text": "契約満了予定1人",
+        "height": 48
+      },
+      {
+        "text": "編成を見直す",
+        "height": 48.390625
+      },
+      {
+        "text": "日程・結果をすべて見る",
+        "height": 44
+      }
+    ]
+  },
+  {
+    "screen": "component-fixture-no-schedule",
+    "width": 1440,
+    "height": 900,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "日程なし進行位置不一致処理中通常シーズン終了",
+        "height": 44
+      },
+      {
+        "text": "保存",
+        "height": 48.390625
+      },
+      {
+        "text": "まとめて進める",
+        "height": 48.390625
+      },
+      {
+        "text": "試合へ進む",
+        "height": 44
+      },
+      {
+        "text": "進行設定",
+        "height": 46.390625
+      },
+      {
+        "text": "1試合",
+        "height": 48.390625
+      },
+      {
+        "text": "5試合10試合15試合20試合25試合30試合35試合40試合45試合50試合55試合60試合65試合70試合75試合80試合85試合90試合95試合100試合105試合110試合115試合120試合125試合130試合135試合139試合",
+        "height": 44
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "まとめてシム",
+        "height": 48.390625
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "残り全139試合",
+        "height": 48.390625
+      },
+      {
+        "text": "疲労・負傷のある選手1人",
+        "height": 48
+      },
+      {
+        "text": "契約満了予定1人",
+        "height": 48
+      },
+      {
+        "text": "編成を見直す",
+        "height": 48.390625
+      },
+      {
+        "text": "日程・結果をすべて見る",
+        "height": 44
+      },
+      {
+        "text": "状態確認選手",
+        "height": 44
+      },
+      {
+        "text": "能力",
+        "height": 48
+      },
+      {
+        "text": "成績",
+        "height": 48
+      },
+      {
+        "text": "選手詳細を開く",
+        "height": 48.390625
+      },
+      {
+        "text": "オーダーを確認",
+        "height": 48.390625
+      },
+      {
+        "text": "球団概況・おすすめ・注目選手",
+        "height": 46.390625
+      }
+    ]
+  },
+  {
+    "screen": "component-fixture-blocked",
+    "width": 1440,
+    "height": 900,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "日程なし進行位置不一致処理中通常シーズン終了",
+        "height": 44
+      },
+      {
+        "text": "保存",
+        "height": 48.390625
+      },
+      {
+        "text": "まとめて進める",
+        "height": 48.390625
+      },
+      {
+        "text": "試合へ進む",
+        "height": 44
+      },
+      {
+        "text": "進行設定",
+        "height": 46.390625
+      },
+      {
+        "text": "1試合",
+        "height": 48.390625
+      },
+      {
+        "text": "5試合10試合15試合20試合25試合30試合35試合40試合45試合50試合55試合60試合65試合70試合75試合80試合85試合90試合95試合100試合105試合110試合115試合120試合125試合130試合135試合139試合",
+        "height": 44
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "まとめてシム",
+        "height": 48.390625
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "残り全139試合",
+        "height": 48.390625
+      },
+      {
+        "text": "疲労・負傷のある選手1人",
+        "height": 48
+      },
+      {
+        "text": "契約満了予定1人",
+        "height": 48
+      },
+      {
+        "text": "編成を見直す",
+        "height": 48.390625
+      },
+      {
+        "text": "日程・結果をすべて見る",
+        "height": 44
+      },
+      {
+        "text": "状態確認選手",
+        "height": 44
+      },
+      {
+        "text": "能力",
+        "height": 48
+      },
+      {
+        "text": "成績",
+        "height": 48
+      },
+      {
+        "text": "選手詳細を開く",
+        "height": 48.390625
+      },
+      {
+        "text": "オーダーを確認",
+        "height": 48.390625
+      },
+      {
+        "text": "球団概況・おすすめ・注目選手",
+        "height": 46.390625
+      }
+    ]
+  },
+  {
+    "screen": "component-fixture-processing",
+    "width": 1440,
+    "height": 900,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "日程なし進行位置不一致処理中通常シーズン終了",
+        "height": 44
+      },
+      {
+        "text": "保存",
+        "height": 48.390625
+      },
+      {
+        "text": "まとめて進める",
+        "height": 48.390625
+      },
+      {
+        "text": "試合へ進む",
+        "height": 44
+      },
+      {
+        "text": "進行設定",
+        "height": 46.390625
+      },
+      {
+        "text": "1試合",
+        "height": 48.390625
+      },
+      {
+        "text": "5試合10試合15試合20試合25試合30試合35試合40試合45試合50試合55試合60試合65試合70試合75試合80試合85試合90試合95試合100試合105試合110試合115試合120試合125試合130試合135試合139試合",
+        "height": 44
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "まとめてシム",
+        "height": 48.390625
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "残り全139試合",
+        "height": 48.390625
+      },
+      {
+        "text": "疲労・負傷のある選手1人",
+        "height": 48
+      },
+      {
+        "text": "契約満了予定1人",
+        "height": 48
+      },
+      {
+        "text": "編成を見直す",
+        "height": 48.390625
+      },
+      {
+        "text": "日程・結果をすべて見る",
+        "height": 44
+      },
+      {
+        "text": "状態確認選手",
+        "height": 44
+      },
+      {
+        "text": "能力",
+        "height": 48
+      },
+      {
+        "text": "成績",
+        "height": 48
+      },
+      {
+        "text": "選手詳細を開く",
+        "height": 48.390625
+      },
+      {
+        "text": "オーダーを確認",
+        "height": 48.390625
+      },
+      {
+        "text": "球団概況・おすすめ・注目選手",
+        "height": 46.390625
+      }
+    ]
+  },
+  {
+    "screen": "component-fixture-complete",
+    "width": 1440,
+    "height": 900,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "日程なし進行位置不一致処理中通常シーズン終了",
+        "height": 44
+      },
+      {
+        "text": "保存",
+        "height": 48.390625
+      },
+      {
+        "text": "まとめて進める",
+        "height": 48.390625
+      },
+      {
+        "text": "試合へ進む",
+        "height": 44
+      },
+      {
+        "text": "進行設定",
+        "height": 46.390625
+      },
+      {
+        "text": "1試合",
+        "height": 48.390625
+      },
+      {
+        "text": "実行可能な試合なし",
+        "height": 44
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "まとめてシム",
+        "height": 48.390625
+      },
+      {
+        "text": "",
+        "height": 44
+      },
+      {
+        "text": "残り全0試合",
+        "height": 48.390625
+      },
+      {
+        "text": "疲労・負傷のある選手1人",
+        "height": 48
+      },
+      {
+        "text": "契約満了予定1人",
+        "height": 48
+      },
+      {
+        "text": "編成を見直す",
+        "height": 48.390625
+      },
+      {
+        "text": "日程・結果をすべて見る",
+        "height": 44
+      },
+      {
+        "text": "状態確認選手",
+        "height": 44
+      },
+      {
+        "text": "能力",
+        "height": 48
+      },
+      {
+        "text": "成績",
+        "height": 48
+      },
+      {
+        "text": "選手詳細を開く",
+        "height": 48.390625
+      },
+      {
+        "text": "オーダーを確認",
+        "height": 48.390625
+      },
+      {
+        "text": "球団概況・おすすめ・注目選手",
+        "height": 46.390625
+      }
+    ]
+  }
+]

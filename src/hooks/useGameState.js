@@ -199,6 +199,8 @@ export function useGameState() {
   const [allStarTriggerDay, setAllStarTriggerDay] = useState(72);
   const [isAutoSaveSuspended, setIsAutoSaveSuspended] = useState(false);
   const [saveQueueState, setSaveQueueState] = useState({ isSaving: false });
+  // Display-only outcome from the actual save request; never persisted.
+  const [saveResult, setSaveResult] = useState(null);
   const [persistentEnabled, setPersistentEnabled] = useState(false);
   const [newGameInitializationError, setNewGameInitializationError] = useState(null);
   const [newGameInitializationStatus, setNewGameInitializationStatus] = useState('idle');
@@ -270,6 +272,7 @@ export function useGameState() {
   const resetSaveTracking = useCallback(() => {
     saveDirtyTrackerRef.current.reset();
     setSaveDirty(false);
+    setSaveResult(null);
   }, []);
 
   useEffect(() => {
@@ -370,9 +373,12 @@ export function useGameState() {
   const queueSave = useCallback((state, options = {}) => {
     const pending=[...pendingCareerEntriesRef.current];
     const saveOptions={...options,careerEntries:[...pending,...(options.careerEntries || [])]};
-    refreshSaveQueueState();
     return loadSaveModule()
-      .then((mod) => mod.enqueueSaveGame(state, saveOptions))
+      .then((mod) => {
+        const task = mod.enqueueSaveGame(state, saveOptions);
+        setSaveQueueState(mod.getSaveQueueSnapshot());
+        return task;
+      })
       .then(async (result) => {
         if (!result?.ok) return result;
         const committed=new Set(pending);
@@ -389,6 +395,8 @@ export function useGameState() {
           return { ...result, archive: { ok: false } };
         }
       })
+      .then((result) => { setSaveResult(result ?? { ok: false }); return result; })
+      .catch((error) => { setSaveResult({ ok: false }); throw error; })
       .finally(() => {
         refreshSaveQueueState();
       });
@@ -1052,7 +1060,7 @@ export function useGameState() {
     allStarTriggerDay, setAllStarTriggerDay,
     isAutoSaveSuspended, setIsAutoSaveSuspended,
     saveDirty, setSaveDirty,
-    saveQueueState,
+    saveQueueState, saveResult,
     saveRevision, setSaveRevision,
     persistentSummaries,
     newGameInitializationError,

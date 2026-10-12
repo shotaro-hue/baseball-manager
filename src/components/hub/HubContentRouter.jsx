@@ -71,17 +71,21 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
   const foreignActiveCount =
     myTeam?.players?.filter((player) => player.isForeign).length || 0;
 
-  const canSim = regularSeasonRequest({ teams, myId, year, gameDay, schedule, offseasonPlan: gs.offseasonPlan }, 1).count > 0;
+  const request = regularSeasonRequest({ teams, myId, year, gameDay, schedule, offseasonPlan: gs.offseasonPlan, gameResultsMap: gs.gameResultsMap }, 1);
+  const canSim = request.count > 0;
+  const rankingContext = standingsContext(gs.getSeasonHistory(), gs.allTeamResultsMap, year);
   if (tab === 'dashboard') {
     return (
       <>
       <MobileHome myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year}
         recentResults={gs.recentResults} onTabSwitch={onTabChange} onStartGame={sf.handleStartGame}
-        onBatchSim={sf.handleBatchSim} onSeasonSim={sf.handleSeasonSim} batchProgress={sf.batchProgress} canSim={canSim}/>
+        onBatchSim={sf.handleBatchSim} onSeasonSim={sf.handleSeasonSim} batchProgress={sf.batchProgress} canSim={canSim} simReason={request.reason} rankingContext={rankingContext}/>
       <div className="desktop-dashboard"><DashboardTab
         myTeam={myTeam}
         onStartGame={sf.handleStartGame}
         disableStart={!canSim || Boolean(sf.batchProgress)}
+        canSim={canSim} simReason={request.reason} rankingContext={rankingContext}
+        onBatchSim={sf.handleBatchSim} onSeasonSim={sf.handleSeasonSim} batchProgress={sf.batchProgress}
         teams={teams}
         schedule={schedule}
         gameDay={gameDay}

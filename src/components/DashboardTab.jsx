@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
-import { Play, ListChecks, Smiley, SmileyMeh, FirstAid } from '@phosphor-icons/react';
-import { gameDayToDate } from '../utils';
-import { getMyMatchup } from '../engine/scheduleLookup';
-import { buildTeamConditions } from '../engine/analysisComparison';
+import { ListChecks, Smiley, SmileyMeh, FirstAid } from '@phosphor-icons/react';
 import { Button, DataTableFrame } from './design-system/primitives';
+import { HomeSummary, HomeFixture, HomeAlerts, HomeResults } from './homeSections';
 import { DashboardOverview } from './DashboardOverview';
 
 export function playerCondition(player) {
@@ -28,7 +26,7 @@ function Condition({ player }) {
 }
 
 export function DashboardTab({ myTeam, teams = [], schedule, gameDay, year,
-  onTabSwitch, onPlayerClick, onStartGame, disableStart = false, recentResults = [], pendingTradeCount = 0, faPool }) {
+  onTabSwitch, onPlayerClick, onStartGame, disableStart = false, recentResults = [], pendingTradeCount = 0, faPool, canSim = !disableStart, simReason, batchProgress, onBatchSim, onSeasonSim, rankingContext }) {
   const [selectedId, setSelectedId] = useState(null);
   const [detailView, setDetailView] = useState('ability');
   if (!myTeam) return null;
@@ -36,21 +34,12 @@ export function DashboardTab({ myTeam, teams = [], schedule, gameDay, year,
   const batters = (myTeam.players ?? []).filter(p => !p.isPitcher);
   const selected = batters.find(p => p.id === selectedId) ?? lineup[0]?.player ?? batters[0];
   const bench = batters.filter(p => !(myTeam.lineup ?? []).includes(p.id));
-  const matchup = schedule ? getMyMatchup(schedule, gameDay, myTeam.id) : null;
-  const opponent = teams.find(t => t.id === matchup?.oppId);
-  const date = gameDayToDate(gameDay, schedule);
-  const conditions = buildTeamConditions(myTeam);
-  const expiring = (myTeam.players ?? []).filter(p => !p.isIkusei && (p.contractYearsLeft ?? 99) <= 1).length;
   const stats = selected?.stats ?? {};
   const avg = stats.AB > 0 ? ((stats.H ?? 0) / stats.AB).toFixed(3).replace(/^0/, '') : '—';
-  return <main className="calm-dashboard">
-    <h1>コンディションを見て、今日のオーダーを。</h1>
-    <section className="calm-fixture" aria-label="本日の試合">
-      {opponent && date ? <>
-        <div className="calm-matchup"><strong>{myTeam.name}</strong><span>VS</span><strong>{opponent.name}</strong></div>
-        <p>{matchup.isHome ? 'ホーム' : 'アウェー'} / {year ? `${year}年 ` : ''}{`${date.month}/${date.day} Game ${gameDay}`}</p>
-      </> : <p>本日の対戦予定はありません <span lang="en">(No scheduled game)</span></p>}
-    </section>
+  const homeProps = { myTeam, teams, schedule, gameDay, year, recentResults, onTabSwitch, onStartGame, onBatchSim, onSeasonSim, batchProgress, canSim: canSim && !disableStart, simReason, rankingContext };
+  return <main className="calm-dashboard home-surface" data-ds="home">
+    <HomeSummary {...homeProps}/>
+    <div className="home-columns"><div><HomeFixture {...homeProps} desktop/><HomeAlerts {...homeProps}/></div><HomeResults {...homeProps}/></div>
     <div className="calm-workspace">
       <section className="calm-lineup" aria-labelledby="lineup-heading">
         <h2 id="lineup-heading">現在の打線設定</h2>
@@ -80,11 +69,7 @@ export function DashboardTab({ myTeam, teams = [], schedule, gameDay, year,
     </div>
     <div className="calm-actions">
       <Button variant="secondary" type="button" className="calm-secondary" onClick={() => onTabSwitch('roster')}><ListChecks size={22} aria-hidden="true" />オーダーを確認</Button>
-      <Button type="button" className="calm-primary" disabled={!opponent || !date || disableStart} onClick={() => onStartGame ? onStartGame() : onTabSwitch('game_action')}><Play size={22} weight="fill" aria-hidden="true" />試合へ進む</Button>
     </div>
-    <section className="calm-notices" aria-label="チームの状況とお知らせ"><h2>チームの状況</h2><p>{conditions.map(c => c.label ?? c.text ?? '').filter(Boolean).join(' / ')}</p>
-      {expiring > 0 && <button type="button" onClick={() => onTabSwitch('contract')}>契約満了予定 {expiring}人 — 契約を確認</button>}
-    </section>
     <details className="calm-overview"><summary>球団概況・おすすめ・注目選手</summary><div className="calm-legacy"><DashboardOverview myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} recentResults={recentResults} pendingTradeCount={pendingTradeCount} faPool={faPool} onTabSwitch={onTabSwitch} onPlayerClick={onPlayerClick} onStartGame={onStartGame} /></div></details>
   </main>;
 }

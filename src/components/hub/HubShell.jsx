@@ -14,6 +14,7 @@ import HubBottomNav from './HubBottomNav';
 import { House, CalendarBlank, Users, ChartBar, DotsThree } from '@phosphor-icons/react';
 import '../../calm-ui.css';
 import '../../mobile-flow.css';
+import '../../home-ui.css';
 import {
   PlayerComparisonDialog,
   PlayerComparisonTray,
@@ -182,6 +183,7 @@ export default function HubShell({ state, flows, app }) {
 
   return (
     <div className={`app calm-shell ${tab === 'dashboard' ? 'calm-home' : ''}`}
+      data-ds={tab === 'dashboard' ? 'home-shell' : undefined}
       data-initialization-state={gs.newGameInitializationStatus}>
       <div className="app-layout">
         <aside className="primary-sidebar" aria-label="監督メニュー">
@@ -234,6 +236,7 @@ export default function HubShell({ state, flows, app }) {
             schedule={schedule}
             remain={remain}
             onSave={gs.handleSave}
+            home={tab === 'dashboard'} saveDirty={gs.saveDirty} saveQueueState={gs.saveQueueState} saveResult={gs.saveResult}
           />
 
           {(!progress.valid || (!canSim && remain > 0)) && <p role="status">成績・日程・進行フェーズを確認できないため試合を開始できません。保存データを読み直してください。</p>}
@@ -262,15 +265,6 @@ export default function HubShell({ state, flows, app }) {
               onBatchSim={sf.handleBatchSim}
               onSeasonSim={sf.handleSeasonSim}
             /></details>
-          )}
-
-          {tab === 'dashboard' && gameDay <= SEASON_GAMES && (
-            <details className="calm-batch desktop-dashboard" open={sf.batchProgress ? true : undefined}>
-              <summary>まとめて進行・自動編成</summary>
-              <HubSimPanel gameDay={gameDay} schedule={schedule} remain={remain} canSim={canSim}
-                batchProgress={sf.batchProgress} onStartGame={sf.handleStartGame}
-                onBatchSim={sf.handleBatchSim} onSeasonSim={sf.handleSeasonSim} />
-            </details>
           )}
 
           {tab !== 'dashboard' && <HubTabsNav
