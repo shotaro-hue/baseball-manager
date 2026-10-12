@@ -210,7 +210,7 @@ export function PlayerModal({
                 : <div>{rate('打率','AVG')}{stat('本塁打','HR')}{stat('打点','RBI')}{rate('OPS','OPS')}{stat('打席','PA')}{stat('打数','AB')}{stat('盗塁','SB')}{rate('出塁率','OBP')}{rate('強打球率','hardHitPct')}</div>}
             </div><p className="player-record-note">— 未記録：必要な値なし。— 算出不可：分母0。0は記録済みの値です。</p>
           </Section>
-          <Section title="二軍実測・年度別記録"><FarmPlayerHistory state={farmState} player={p} /></Section>
+          <Section title="二軍成績"><p className="player-record-note">二軍実測・年度別記録。年度と記録開始時点は以下の表示を確認してください。</p><FarmPlayerHistory state={farmState} player={p} /></Section>
         </>}
         {activeSection === 'battedBall' && !p.isPitcher && <Section title="一軍・打球分析"><p className="player-record-note">{scope}。期間・対象打球の条件は下の表示を確認してください。</p><div className="calm-detail detail-analysis"><BattedBallAnalysisPanel player={p} saveId={saveId} year={year} teams={teams} teamName={teamName} /></div></Section>}
         {activeSection === 'career' && <Section title="一軍・年度別／通算"><p className="player-record-note">保存された一軍年度別成績と、{Number.isInteger(year) ? `${year}年` : '今季'}の記録。二軍実測・旧推定は合算しません。</p><div className="calm-detail detail-analysis"><CareerTable player={p} year={year} teamId={careerTeamId} teamName={teamName} saveId={saveId} /></div></Section>}

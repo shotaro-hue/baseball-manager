@@ -50,3 +50,17 @@
 iPhone実機・スクリーンリーダー・200%拡大は未検証。ローカルWebKitはブラウザ取得後もOSライブラリが欠け、実行を成功認定しない。既存CIのWebKit保存・進行は維持し、UI-02C専用Safari検証の完了とは扱わない。通算の既存率算出やFIX-S3の精度は今回の改修・完了認定に含めない。
 
 `player-detail.spec.js`を既存roster-settings CI群に追加。他のCI/E2E対象、timeout、workers=1、retries=0、全成功を要求する集約ゲートは保持する。
+
+## 最終検証の補足
+
+- 全Vitest: `npm test -- --maxWorkers=2 --minWorkers=1`、1056成功・既存条件付きskip 2。build成功（既存の500kB超チャンク警告）。
+- Chromiumの関連E2E: `npm run test:e2e -- player-detail.spec.js roster-settings.spec.js contract-renewal.spec.js club-comparison.spec.js --workers=1 --retries=0`、35件成功（UI-02C 16、UI-02B 11、比較6、更改2）。ローカルは既存サーバーとの衝突を避けるため、コード／testDirは同じでポート5187だけを変えた一時configを使用。
+- 画像比較後、比較表の固定480pxがスマホで片方の数値を隠すことを座標assertのREDで確認。3列を画面内に収め、両選手の数値が同時に見えることを7幅で再検証し、UI-02C＋既存比較の22件が成功（単独実行、2.6分）。局所スクロール枠・キーボードフォーカスは維持。
+- 通常のGit pushはCLI認証がなく失敗したため、GitHub連携で各blobを保存。local git blob SHA・全tree SHAとの完全一致を確認してPR #457を作成。PRのコミットSHAはGitHub生成のためlocalとは異なるが、内容のtreeが一致する。
+- 初回35件の実行は旧比較テストが追加した「戻る」buttonを末尾操作として認識しない失敗を含み、中断したため成功認定しない。既存テストは末尾→先頭の循環と表へのfocusの両方を確認する形へ更新し、単独の最終35件実行で成功した。別の共有呼出元実行・RED試験のログを合算して35件と数えていない。
+
+- 初回CI #363の財務系では、欠測年俸の旧完全一致`未記録`がChromium/WebKitの2件で失敗した。新表記の年俸行`— 未記録`を直接検証するように修正し、可視性・選手名・保存データ非変更のassertionを維持した。次のCIは最新headで照合する。
+
+- 既存F03閲覧テストの`二軍成績`region名との互換性不足を360pxでRED再現。見出し／regionを既存名に維持し、年度別実測の説明を本文へ置く修正を実施。既存F03の二軍記録・保存再開assertionは変更しない。
+
+- 最終補足: 既存F03 360/390/1440px＋二軍実測年度切替2件の計5件が成功。財務の欠測年俸→詳細→保存非変更1件もChromiumで成功。最新の関連Vitest 19件成功。初回CI #363は欠測年俸2件・F03 region名3件で失敗し、他のジョブは成功。これらを修正後の同一PRへ反映し、最新headのCI結果をPR本文で報告する。

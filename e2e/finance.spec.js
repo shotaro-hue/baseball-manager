@@ -106,7 +106,10 @@ test('finance opens an unrecorded salary leader safely without mutating saved cl
   await leaders.getByRole('button', { name: '一軍百万円', exact: true }).click();
   await expect(page.getByRole('dialog')).toContainText('一軍百万円');
   await page.getByRole('tab', { name: '概要', exact: true }).click();
-  await expect(page.getByRole('dialog').getByText('未記録', { exact: true })).toBeVisible();
+  const salary = page.getByRole('dialog').locator('.player-stat-row').filter({ hasText: /^年俸/ });
+  await salary.scrollIntoViewIfNeeded();
+  await expect(salary).toContainText('— 未記録');
+  await expect(salary).toBeVisible();
   await page.getByRole('button', { name: '選手詳細を閉じる', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(await saveSnapshot(page)).toEqual(before);

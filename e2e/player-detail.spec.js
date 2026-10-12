@@ -54,7 +54,7 @@ for (const width of [360,390,760,761,1023,1024,1440]) {
       await layout(page, comparison);
       const frame = comparison.getByRole('region',{name:'選手比較表',exact:true});
       await frame.focus(); await expect(frame).toBeFocused();
-      if (width < 500) { await frame.evaluate(n => { n.scrollLeft = 100; }); expect(await frame.evaluate(n => n.scrollLeft > 0)).toBe(true); }
+      expect(await frame.evaluate(n => { const frame=n.getBoundingClientRect(), cells=n.querySelectorAll('tbody tr:first-child td'); return [...cells].every(cell => { const r=cell.getBoundingClientRect(); return r.left>=frame.left-1 && r.right<=frame.right+1; }); }), 'both players must be visible together').toBe(true);
       if (state === 'normal' && [360,390,1440].includes(width)) {
         await frame.evaluate(n => { n.scrollLeft = 0; });
         await comparison.evaluate(n => { n.scrollTop = 0; });
@@ -173,7 +173,7 @@ for (const width of [390,1440]) {
     await page.locator('[data-player-index="2"]').click();
     const dialog = page.locator('.player-modal-card');
     await dialog.getByRole('tab',{name:'今季成績',exact:true}).click();
-    const section = dialog.getByRole('heading',{name:'二軍実測・年度別記録',exact:true}).locator('..');
+    const section = dialog.getByRole('heading',{name:'二軍成績',exact:true}).locator('..');
     await expect(section).toContainText('2026年 二軍実測');
     await expect(section).toContainText('球団間合計');
     await section.getByLabel('選手二軍年度',{exact:true}).selectOption('2025');
