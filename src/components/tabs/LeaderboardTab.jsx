@@ -1,364 +1,81 @@
-import React, { useState, useMemo } from "react";
-import { fmtAvg, fmtIP, fmtPct } from "../../utils";
-import { saberBatter, saberPitcher } from "../../engine/sabermetrics";
-import { seasonParticipants } from "../../engine/seasonParticipants";
+import React, {useId,useMemo,useState} from 'react';
+import {fmtIP} from '../../utils';
+import {seasonParticipants} from '../../engine/seasonParticipants';
+import {stableSort} from '../../engine/analysisComparison';
+import {firstTeamMetric} from '../firstTeamStatsMetrics';
+import {detailNumber,firstTeamScope} from '../playerDetailMetrics';
+import {Button,DataTableFrame} from '../design-system/primitives';
+import '../league-rankings.css';
 
-const MEDAL = ["🥇", "🥈", "🥉"];
-const LEAGUES = ["全体", "セ", "パ"];
-const countOf = (p, key) => Number.isFinite(p.stats?.[key]) ? p.stats[key] : "-";
-
-// isRate: true の列は「規定のみ」トグルの対象
-const BATTER_COLS = [
-  { key: "PA",    label: "打席",   fmt: p => countOf(p, "PA"),                                                                 asc: false },
-  { key: "AVG",   label: "打率",   fmt: p => fmtAvg(p.stats.H, p.stats.AB),  num: p => { const ab=p.stats.AB||0; return ab>0?p.stats.H/ab:0; }, asc: false, isRate: true },
-  { key: "HR",    label: "本塁打", fmt: p => countOf(p, "HR"),                                                                 asc: false },
-  { key: "RBI",   label: "打点",   fmt: p => countOf(p, "RBI"),                                                                asc: false },
-  { key: "SB",    label: "盗塁",   fmt: p => countOf(p, "SB"),                                                                 asc: false },
-  { key: "OPS",   label: "OPS",   fmt: p => { const v=saberBatter(p.stats).OPS; return v.toFixed(3); },        asc: false, isRate: true, num: p => saberBatter(p.stats).OPS },
-  { key: "wOBA",  label: "wOBA",  fmt: p => { const v=saberBatter(p.stats).wOBA; return v.toFixed(3); },       asc: false, isRate: true, num: p => saberBatter(p.stats).wOBA },
-  { key: "wRCp",  label: "wRC+",  fmt: p => saberBatter(p.stats).wRCp ?? "---",                                          asc: false, isRate: true, num: p => saberBatter(p.stats).wRCp ?? 0 },
-  { key: "ISO",   label: "ISO",   fmt: p => { const v=saberBatter(p.stats).ISO; return v.toFixed(3); },        asc: false, isRate: true, num: p => saberBatter(p.stats).ISO },
-  { key: "BBpct", label: "四球率", fmt: p => { const v=saberBatter(p.stats).BBpct; return fmtPct(v); },        asc: false, isRate: true, num: p => saberBatter(p.stats).BBpct },
-  { key: "Kpct",  label: "三振率", fmt: p => { const v=saberBatter(p.stats).Kpct; return fmtPct(v); },         asc: true,  isRate: true, num: p => saberBatter(p.stats).Kpct },
-  { key: "WAR",   label: "WAR",   fmt: p => saberBatter(p.stats).WAR ?? "---",                                           asc: false, isRate: true, num: p => saberBatter(p.stats).WAR ?? 0 },
+const LEAGUES=['全体','セ','パ'];
+const column=(key,label,{asc=false,isRate=false,advanced=false}={})=>({key,label,asc,isRate,advanced});
+const BATTER_COLS=[
+  column('OPS','OPS',{isRate:true}),column('AVG','打率',{isRate:true}),column('HR','本塁打'),column('RBI','打点'),column('PA','打席'),column('WAR','WAR',{isRate:true}),
+  column('SB','盗塁',{advanced:true}),column('wOBA','wOBA',{isRate:true,advanced:true}),column('wRCp','wRC+',{isRate:true,advanced:true}),column('ISO','ISO',{isRate:true,advanced:true}),column('BBpct','四球率',{isRate:true,advanced:true}),column('Kpct','三振率',{asc:true,isRate:true,advanced:true}),
 ];
-
-const PITCHER_COLS = [
-  { key: "W",     label: "勝",     fmt: p => countOf(p, "W"),                                                                  asc: false },
-  { key: "SV",    label: "S",      fmt: p => countOf(p, "SV"),                                                          asc: false },
-  { key: "HLD",   label: "H",      fmt: p => countOf(p, "HLD"),                                                         asc: false },
-  { key: "QS",    label: "QS",    fmt: p => countOf(p, "QS"),                                                           asc: false },
-  { key: "IP",    label: "投球回", fmt: p => p.stats.IP>0?fmtIP(p.stats.IP):"---",                                       asc: false, num: p => p.stats.IP },
-  { key: "ERA",   label: "防御率", fmt: p => { const v=saberPitcher(p.stats).ERA; return v.toFixed(2); },                  asc: true,  isRate: true, num: p => saberPitcher(p.stats).ERA },
-  { key: "Kp",    label: "奪三振", fmt: p => countOf(p, "Kp"),                                                          asc: false },
-  { key: "WHIP",  label: "WHIP",  fmt: p => { const v=saberPitcher(p.stats).WHIP; return v; },                 asc: true,  isRate: true, num: p => saberPitcher(p.stats).WHIP },
-  { key: "FIP",   label: "FIP",   fmt: p => { const v=saberPitcher(p.stats).FIP; return v; },                  asc: true,  isRate: true, num: p => saberPitcher(p.stats).FIP },
-  { key: "Kpct",  label: "三振率", fmt: p => { const v=saberPitcher(p.stats).Kpct; return fmtPct(v); },        asc: false, isRate: true, num: p => saberPitcher(p.stats).Kpct },
-  { key: "BBpct", label: "四球率", fmt: p => { const v=saberPitcher(p.stats).BBpct; return fmtPct(v); },       asc: true,  isRate: true, num: p => saberPitcher(p.stats).BBpct },
-  { key: "WAR",   label: "WAR",   fmt: p => { const v=saberPitcher(p.stats).WAR; return v; },                asc: false, isRate: true, num: p => saberPitcher(p.stats).WAR ?? 0 },
+const PITCHER_COLS=[
+  column('ERA','防御率',{asc:true,isRate:true}),column('IP','投球回'),column('WHIP','WHIP',{asc:true,isRate:true}),column('Kp','奪三振'),column('W','勝'),column('WAR','WAR',{isRate:true}),
+  column('SV','S',{advanced:true}),column('HLD','H',{advanced:true}),column('QS','QS',{advanced:true}),column('FIP','FIP',{asc:true,isRate:true,advanced:true}),column('Kpct','三振率',{isRate:true,advanced:true}),column('BBpct','四球率',{asc:true,isRate:true,advanced:true}),
 ];
-
-function numOf(col, p) {
-  const v = col.num ? col.num(p) : col.fmt(p);
-  const number = typeof v === "number" ? v : parseFloat(v);
-  return Number.isFinite(number) ? number : null;
-}
-
-// 規定打席 / 規定投球回をゲーム進行度に合わせてスケール
+// Preserve the existing list's progressive qualification rules; award rules are separate.
 function calcQualified(gameDay) {
-  const played = Math.max(1, gameDay - 1);
-  return {
-    pa: Math.max(10, Math.floor(played * 3.1)),
-    ip: Math.max(5, played),
-  };
+  const played=Math.max(1,gameDay-1);
+  return {pa:Math.max(10,Math.floor(played*3.1)),ip:Math.max(5,played)};
 }
 
-export function LeaderboardTab({
-  teams,
-  myId,
-  gameDay = 1,
-  onPlayerClick,
-  onToggleCompare,
-  comparePlayerIds = [],
-}) {
-  const [view, setView]           = useState("batter");
-  const [league, setLeague]       = useState("全体");
-  const [sortKey, setSortKey]     = useState("OPS");
-  const [sortAsc, setSortAsc]     = useState(false);
-  const [qualifiedOnly, setQualifiedOnly] = useState(false);
-
-  const cols = view === "batter" ? BATTER_COLS : PITCHER_COLS;
-  const qualified = useMemo(() => calcQualified(gameDay), [gameDay]);
-
-  const handleViewChange = (v) => {
-    setView(v);
-    setSortKey(v === "batter" ? "OPS" : "ERA");
-    setSortAsc(v === "batter" ? false : true);
-  };
-
-  const handleSort = (col) => {
-    if (sortKey === col.key) setSortAsc(a => !a);
-    else { setSortKey(col.key); setSortAsc(col.asc); }
-  };
-
-  // 全選手にチーム情報を付与
-  const allPlayers = useMemo(() => {
-    const arr = [];
-    for (const t of teams) {
-      for (const p of seasonParticipants(t)) {
-        arr.push({ ...p, _teamName: t.name, _teamShort: t.short, _teamColor: t.color, _teamEmoji: t.emoji, _league: t.league, _isMyTeam: t.id === myId });
-      }
-    }
-    return arr;
-  }, [teams, myId]);
-
-  const sortCol = cols.find(c => c.key === sortKey) ?? cols[0];
-  const isRateSort = !!sortCol.isRate;
-
-  // フィルタリング（リーグ → 最低出場 → 規定）
-  const filtered = useMemo(() => {
-    let base = view === "batter"
-      ? allPlayers.filter(p => !p.isPitcher && (p.stats?.PA || 0) >= 10)
-      : allPlayers.filter(p => p.isPitcher && (p.stats?.IP || 0) >= 5);
-
-    if (league !== "全体") base = base.filter(p => p._league === league);
-
-    if (qualifiedOnly && isRateSort) {
-      base = view === "batter"
-        ? base.filter(p => (p.stats?.PA || 0) >= qualified.pa)
-        : base.filter(p => (p.stats?.IP || 0) >= qualified.ip);
-    }
-
-    return base;
-  }, [allPlayers, view, league, qualifiedOnly, isRateSort, qualified]);
-
-  const sorted = useMemo(() => {
-    return [...filtered].sort((a, b) => {
-      const va = numOf(sortCol, a);
-      const vb = numOf(sortCol, b);
-      if (va == null) return vb == null ? 0 : 1;
-      if (vb == null) return -1;
-      return sortAsc ? va - vb : vb - va;
-    });
-  }, [filtered, sortCol, sortAsc]);
-
-  // 上位3名（"---" / "999" は除外）
-  const top3 = useMemo(() => {
-    return sorted.filter(p => {
-      const v = sortCol.fmt(p);
-      return numOf(sortCol, p) != null && v !== "---" && v !== "-" && String(v) !== "999";
-    }).slice(0, 3);
-  }, [sorted, sortCol]);
-
-  const leagueLabel = league === "全体" ? "全球団" : league + "リーグ";
-  const qualThreshLabel = view === "batter"
-    ? `規定打席: ${qualified.pa}`
-    : `規定投球回: ${fmtIP(qualified.ip)}`;
-  const openPlayer = (player) => {
-    onPlayerClick?.(
-      player,
-      player._teamName,
-      player.isPitcher ? "stats" : "battedBall",
-    );
-  };
-
-  return (
-    <div className="calm-detail detail-leaders">
-      <h1>リーグ成績</h1>
-      {/* 打者/投手 切替 */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-        <div className="tabs" style={{ margin: 0 }}>
-          {[["batter", "🏏 打者"], ["pitcher", "⚾ 投手"]].map(([k, l]) => (
-            <button key={k} aria-pressed={view === k} onClick={() => handleViewChange(k)} className={`tab ${view === k ? "on" : ""}`}>{l}</button>
-          ))}
-        </div>
-
-        {/* リーグ切替 */}
-        <div style={{ display: "flex", gap: 4 }}>
-          {LEAGUES.map(lg => (
-            <button
-              key={lg}
-              aria-pressed={league === lg} onClick={() => setLeague(lg)}
-              style={{
-                padding: "3px 10px",
-                fontSize: 14,
-                fontWeight: 700,
-                borderRadius: 6,
-                border: `1px solid ${league === lg ? (lg==="セ"?"rgba(96,165,250,.8)":lg==="パ"?"rgba(167,139,250,.8)":"rgba(255,255,255,.3)") : "rgba(255,255,255,.1)"}`,
-                background: league === lg ? (lg==="セ"?"rgba(96,165,250,.2)":lg==="パ"?"rgba(167,139,250,.2)":"#edf4fc") : "transparent",
-                color: league === lg ? (lg==="セ"?"#095cc7":lg==="パ"?"#7050ad":"#17243a") : "#53657c",
-                cursor: "pointer",
-              }}
-            >
-              {lg === "全体" ? "全体" : lg + "リーグ"}
-            </button>
-          ))}
-        </div>
-
-        {/* 規定のみトグル（レート指標の時だけ活性） */}
-        <label style={{
-          display: "flex", alignItems: "center", gap: 5, fontSize: 14, cursor: "pointer",
-          color: qualifiedOnly ? "#14714b" : "#53657c",
-          opacity: isRateSort ? 1 : 0.4,
-          userSelect: "none",
-        }}>
-          <input
-            type="checkbox"
-            checked={qualifiedOnly}
-            onChange={e => setQualifiedOnly(e.target.checked)}
-            disabled={!isRateSort}
-            style={{ accentColor: "#14714b", cursor: isRateSort ? "pointer" : "not-allowed" }}
-          />
-          規定達成のみ
-          {isRateSort && (
-            <span style={{ fontSize: 14, color: "#53657c", marginLeft: 2 }}>({qualThreshLabel})</span>
-          )}
-        </label>
-      </div>
-
-      {/* 上位3名カード */}
-      {top3.length > 0 && (
-        <div className="card" style={{ marginBottom: 10 }}>
-          <div className="card-h" style={{ marginBottom: 8 }}>
-            {leagueLabel} {sortCol.label} 上位3選手
-            {qualifiedOnly && isRateSort && (
-              <span style={{ fontSize: 14, color: "#14714b", marginLeft: 8, fontWeight: 400 }}>規定達成者のみ</span>
-            )}
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
-            {top3.map((p, i) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => openPlayer(p)}
-                aria-label={`${p.name}の詳細を開く`}
-                style={{
-                background: '#f0f7ff',
-                border: `1px solid ${i===0?"rgba(245,200,66,.4)":i===1?"rgba(148,163,184,.4)":"rgba(180,120,60,.4)"}`,
-                borderRadius: 8,
-                padding: "8px 10px",
-                color: "inherit",
-                cursor: "pointer",
-                textAlign: "left",
-                width: "100%",
-              }}>
-                <div style={{ fontSize: 18, lineHeight: 1 }}>{MEDAL[i]}</div>
-                <div style={{ fontWeight: 700, fontSize: 13, marginTop: 4, color: p._isMyTeam ? "#095cc7" : "#17243a" }}>
-                  {p.name}
-                </div>
-                <div style={{ fontSize: 14, color: "#53657c", marginTop: 2 }}>
-                  <span style={{ color: p._teamColor || "#53657c" }}>{p._teamEmoji} {p._teamShort}</span>
-                  <span style={{ marginLeft: 4, color: p._league === "セ" ? "#095cc7" : "#7050ad" }}>{p._league}</span>
-                  <span style={{ marginLeft: 4 }}>{p.pos} / {p.age}歳</span>
-                </div>
-                <div style={{ fontSize: 20, fontWeight: 900, fontFamily: "'Share Tech Mono',monospace", color: "#805700", marginTop: 4 }}>
-                  {sortCol.fmt(p)}
-                </div>
-                <div style={{ fontSize: 14, color: "#53657c", marginTop: 2 }}>
-                  {view === "batter" ? `打席: ${p.stats?.PA ?? 0}` : `投球回: ${p.stats?.IP > 0 ? fmtIP(p.stats.IP) : "0"}`}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ランキングテーブル */}
-      <div className="card">
-        <div className="card-h" style={{ marginBottom: 6 }}>
-          {leagueLabel} {view === "batter" ? "打者" : "投手"} ランキング
-          <span style={{ fontSize: 14, color: "#53657c", marginLeft: 8, fontWeight: 400 }}>
-            {filtered.length}名 / 列ヘッダーでソート
-          </span>
-          {qualifiedOnly && isRateSort && (
-            <span style={{ fontSize: 14, color: "#14714b", marginLeft: 8, fontWeight: 400 }}>
-              {qualThreshLabel}以上のみ表示
-            </span>
-          )}
-        </div>
-        <div className="detail-table-scroll" tabIndex={0} role="region" aria-label="成績表。横にスクロールできます">
-          <table className="tbl identity-second-table">
-            <thead>
-              <tr>
-                <th style={{ width: 30, textAlign: "center" }}>#</th>
-                <th>選手</th>
-                {onToggleCompare && <th>比較</th>}
-                <th>球団</th>
-                {league === "全体" && <th style={{ fontSize: 14, color: "#53657c" }}>L</th>}
-                {view === "pitcher" && <th style={{ fontSize: 14 }}>役割</th>}
-                {cols.map(col => (
-                  <th
-                    key={col.key}
-                    aria-sort={sortKey === col.key ? (sortAsc ? "ascending" : "descending") : undefined}
-                    style={{
-                      cursor: "pointer",
-                      color: sortKey === col.key ? "#805700" : undefined,
-                      whiteSpace: "nowrap",
-                      userSelect: "none",
-                    }}
-                    title={col.isRate ? `${col.label}でソート（レート指標）` : `${col.label}でソート`}
-                  >
-                    <button className="table-sort-button" onClick={() => handleSort(col)} aria-label={`${col.label}で並び替え`}>{col.label}
-                    {col.isRate && <span style={{ fontSize: 14, color: "#53657c", marginLeft: 1 }}>*</span>}
-                    {sortKey === col.key && (
-                      <span style={{ marginLeft: 3, fontSize: 14 }}>{sortAsc ? "▲" : "▼"}</span>
-                    )}
-                    </button>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((p, idx) => {
-                const isTop3 = idx < 3 && top3.includes(p);
-                const rowBg = isTop3
-                  ? idx === 0 ? "rgba(245,200,66,.06)" : idx === 1 ? "rgba(148,163,184,.04)" : "rgba(180,120,60,.04)"
-                  : undefined;
-                return (
-                  <tr
-                    key={p.id}
-                    className="interactive-player-row"
-                    tabIndex={0}
-                    aria-label={`${p.name}の詳細を開く`}
-                    onClick={() => openPlayer(p)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        openPlayer(p);
-                      }
-                    }}
-                    style={{ background: rowBg }}
-                  >
-                    <td style={{ textAlign: "center", fontWeight: isTop3 ? 700 : 400, color: isTop3 ? "#805700" : "#53657c", fontSize: 14 }}>
-                      {isTop3 ? MEDAL[idx] : idx + 1}
-                    </td>
-                    <td style={{ fontWeight: 700, fontSize: 14, color: p._isMyTeam ? "#095cc7" : "#17243a", whiteSpace: "nowrap" }}>
-                      {p.name}
-                      {p._isMyTeam && <span style={{ fontSize: 14, color: "#095cc7", marginLeft: 4, background: "rgba(96,165,250,.15)", padding: "1px 3px", borderRadius: 3 }}>自</span>}
-                    </td>
-                    {onToggleCompare && (
-                      <td>
-                        <button
-                          type="button"
-                          className={comparePlayerIds.includes(p.id) ? "compare-add-button on" : "compare-add-button"}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onToggleCompare(p, p._teamName);
-                          }}
-                        >
-                          {comparePlayerIds.includes(p.id) ? "比較中" : "＋比較"}
-                        </button>
-                      </td>
-                    )}
-                    <td style={{ fontSize: 14, whiteSpace: "nowrap" }}>
-                      <span style={{ color: p._teamColor || "#53657c" }}>{p._teamEmoji}</span>
-                      <span style={{ color: "#53657c", marginLeft: 3 }}>{p._teamShort}</span>
-                    </td>
-                    {league === "全体" && (
-                      <td style={{ fontSize: 14, color: p._league === "セ" ? "#095cc7" : "#7050ad" }}>{p._league}</td>
-                    )}
-                    {view === "pitcher" && <td style={{ fontSize: 14, color: "#53657c" }}>{p.subtype}</td>}
-                    {cols.map(col => {
-                      const val = col.fmt(p);
-                      const isSort = col.key === sortKey;
-                      return (
-                        <td key={col.key} className="mono" style={{ color: isSort ? "#805700" : undefined, fontWeight: isSort && isTop3 ? 700 : undefined }}>
-                          {val}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        {isRateSort && (
-          <div style={{ fontSize: 14, color: "#53657c", marginTop: 6, paddingTop: 6, borderTop: "1px solid #dce6f2" }}>
-            * レート指標。「規定達成のみ」チェックで{qualThreshLabel}以上に絞り込み可能。
-          </div>
-        )}
-      </div>
+export function LeaderboardTab({teams,myId,gameDay=1,year,onPlayerClick,onToggleCompare,comparePlayerIds=[]}) {
+  const id=useId();
+  const [view,setView]=useState('batter'),[league,setLeague]=useState('全体'),[sortKey,setSortKey]=useState('OPS'),[sortAsc,setSortAsc]=useState(false),[qualifiedOnly,setQualifiedOnly]=useState(false),[advanced,setAdvanced]=useState(false);
+  const cols=view==='batter'?BATTER_COLS:PITCHER_COLS;
+  const sortCol=cols.find(c=>c.key===sortKey)||cols[0];
+  const qualified=useMemo(()=>calcQualified(gameDay),[gameDay]);
+  const allPlayers=useMemo(()=>teams.flatMap(t=>seasonParticipants(t).map(p=>({...p,_teamName:t.name,_teamShort:t.short||t.name,_league:t.league,_isMyTeam:t.id===myId,_membership:t.farm?.some(f=>f.id===p.id)?'二軍所属':'一軍所属'}))),[teams,myId]);
+  const filtered=useMemo(()=>allPlayers.filter(p=>{
+    const counter=view==='batter'?'PA':'IP',minimum=view==='batter'?10:5;
+    return Boolean(p.isPitcher)===(view==='pitcher')&&Number.isFinite(p.stats?.[counter])&&p.stats[counter]>=minimum&&(league==='全体'||p._league===league)&&(!qualifiedOnly||!sortCol.isRate||p.stats[counter]>=(view==='batter'?qualified.pa:qualified.ip));
+  }),[allPlayers,view,league,qualifiedOnly,sortCol.isRate,qualified]);
+  const sorted=useMemo(()=>stableSort(filtered,p=>{
+    const value=firstTeamMetric(p,sortCol.key).value;
+    // Keep this list's original raw-IP ordering; display still uses fmtIP.
+    return sortCol.key==='IP'&&value!=null?p.stats.IP:value;
+  },sortAsc?'asc':'desc'),[filtered,sortCol,sortAsc]);
+  const top3=sorted.filter(p=>firstTeamMetric(p,sortCol.key).value!=null).slice(0,3);
+  const displayed=[sortCol,...cols.filter(c=>c.key!==sortCol.key&&(advanced||!c.advanced))];
+  const leagueLabel=league==='全体'?'全球団':`${league}リーグ`;
+  const sortLabel=`${sortCol.label} ${sortAsc?'昇順':'降順'}`;
+  const qualifiedLabel=view==='batter'?`規定打席: ${qualified.pa}`:`規定投球回: ${fmtIP(qualified.ip)}`;
+  const openPlayer=p=>onPlayerClick?.(p,p._teamName,p.isPitcher?'stats':'battedBall');
+  const changeView=v=>{setView(v);setSortKey(v==='batter'?'OPS':'ERA');setSortAsc(v==='pitcher');};
+  const chooseSort=key=>{const c=cols.find(c=>c.key===key);if(c){setSortKey(key);setSortAsc(c.asc);}};
+  const handleSort=c=>{if(sortKey===c.key)setSortAsc(a=>!a);else chooseSort(c.key);};
+  const tabKey=(event,v)=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const next=event.key==='Home'?'batter':event.key==='End'?'pitcher':v==='batter'?'pitcher':'batter';changeView(next);document.getElementById(`${id}-${next}`)?.focus();}};
+  const reset=()=>{setLeague('全体');setQualifiedOnly(false);changeView('batter');};
+  return <section className="calm-detail detail-leaders league-rankings" data-ds="league-rankings" aria-label="一軍リーグランキング">
+    <header className="league-heading"><h1>リーグ成績</h1><p>{firstTeamScope(year)} · {leagueLabel}</p></header>
+    <p className="league-note">球団は現在所属。二軍所属の一軍出場者も含み、二軍実測・旧推定は合算しません。</p>
+    <div className="league-toolbar">
+      <div className="league-tabs" role="tablist" aria-label="成績種別">{[['batter','打者'],['pitcher','投手']].map(([key,label])=><button type="button" key={key} id={`${id}-${key}`} role="tab" aria-label={key==='batter'?'打者':'投手'} aria-selected={view===key} aria-controls={`${id}-panel`} tabIndex={view===key?0:-1} onKeyDown={e=>tabKey(e,key)} onClick={()=>changeView(key)}>{label}</button>)}</div>
+      <div className="league-filters" role="group" aria-label="リーグ">{LEAGUES.map(l=><Button key={l} variant="secondary" aria-pressed={league===l} onClick={()=>setLeague(l)}>{l==='全体'?'全体':`${l}リーグ`}</Button>)}</div>
     </div>
-  );
+    <div className="league-controls">
+      <label className="league-sort-select">順位指標<select aria-label="順位指標" value={sortKey} onChange={e=>chooseSort(e.target.value)}>{cols.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}</select></label>
+      <Button variant="secondary" aria-label="並び順を反転" onClick={()=>setSortAsc(a=>!a)}>{sortAsc?'昇順 ▲':'降順 ▼'}</Button>
+      <div className="league-column-toggle" role="group" aria-label="表示する指標"><Button variant="secondary" aria-pressed={!advanced} onClick={()=>setAdvanced(false)}>主要指標</Button><Button variant="secondary" aria-pressed={advanced} onClick={()=>setAdvanced(true)}>詳細指標</Button></div>
+    </div>
+    <label className="league-qualified"><input type="checkbox" aria-label="規定達成のみ" checked={qualifiedOnly} disabled={!sortCol.isRate} onChange={e=>setQualifiedOnly(e.target.checked)} />規定達成のみ{sortCol.isRate&&<span>（{qualifiedLabel}）</span>}</label>
+    <p className="league-criteria">{view==='batter'?'最低打席10':'最低投球回5.0'} · {sortLabel} · {filtered.length}人{qualifiedOnly&&sortCol.isRate?' · 規定達成者のみ':''}{!sortCol.isRate&&' · 計数指標では規定条件を適用しません'}</p>
+    <div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${view}`}>
+      <div className="league-table-heading"><h2>{leagueLabel} {view==='batter'?'打者':'投手'} ランキング</h2><span>{sortLabel} · 見出しから並び替え</span></div>
+      {sorted.length===0?<div className="league-empty"><p>この条件に該当する選手はいません。最低出場条件・リーグ・規定条件を確認してください。</p><Button variant="secondary" onClick={reset}>条件を戻す</Button></div>:<DataTableFrame stickyColumn={1} className="detail-table-scroll" label="成績表。横にスクロールできます">
+        <table className="tbl league-table"><thead><tr><th scope="col">選手／表示順</th>{displayed.map(c=><th key={c.key} scope="col" aria-sort={c.key===sortKey?(sortAsc?'ascending':'descending'):undefined}><button type="button" className="table-sort-button" aria-label={`${c.label}で並び替え`} onClick={()=>handleSort(c)}>{c.label}{c.key===sortKey&&<span aria-hidden="true">{sortAsc?' ▲':' ▼'}</span>}</button></th>)}{onToggleCompare&&<th scope="col">比較</th>}</tr></thead>
+        <tbody>{sorted.map((p,i)=><tr key={p.id} className="interactive-player-row" aria-label={`${p.name}の詳細を開く`} data-compared={comparePlayerIds.includes(p.id)||undefined} onClick={()=>openPlayer(p)} onKeyDown={e=>{if((!e.target||e.target===e.currentTarget)&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openPlayer(p);}}}>
+          <td><button type="button" className="league-player-button" aria-label={`${p.name}の詳細を開く`} onClick={e=>{e.stopPropagation();openPlayer(p);}}><strong>{firstTeamMetric(p,sortKey).value!=null?`${i+1} · `:'— · '}{p.name}{p._isMyTeam?' · 自':''}</strong><small>{p._teamShort} · {p._league} · {p._membership}</small><small>{(p.isPitcher?p.subtype||p.pos:p.pos)||'役割未記録'} · 状態 {detailNumber(p.condition)}{p.injuryDaysLeft>0?` · 負傷中 残${p.injuryDaysLeft}試合`:''}</small></button></td>
+          {displayed.map(c=><td data-number data-metric={c.key} key={c.key}>{firstTeamMetric(p,c.key).display}</td>)}
+          {onToggleCompare&&<td><Button variant="secondary" className="compare-add-button" aria-pressed={comparePlayerIds.includes(p.id)} aria-label={`${p.name}を比較${comparePlayerIds.includes(p.id)?'から外す':'へ追加'}`} onClick={e=>{e.stopPropagation();onToggleCompare(p,p._teamName);}}>{comparePlayerIds.includes(p.id)?'比較中':'＋比較'}</Button></td>}
+        </tr>)}</tbody></table>
+      </DataTableFrame>}
+    </div>
+    <details className="league-help"><summary>記録・条件の見方</summary><p>今季の一軍記録。最低出場条件と、進行日を基準にした一覧の規定条件を適用します。表彰の条件は別です。実測0を数値、未記録・分母0の算出不可を理由で表示。欠測は両方向とも末尾です。選手名から詳細へ、比較は表の末尾または詳細から追加できます。</p></details>
+    {top3.length>0&&<details className="league-leading"><summary>{sortLabel} · 先頭3選手</summary><div className="league-leading-list" aria-label="並び順の先頭3選手">{top3.map((p,i)=><button key={p.id} type="button" onClick={()=>openPlayer(p)} aria-label={`${p.name}の詳細を開く`}><span>{i+1} · {p.name}</span><small>{p._teamName} · {p._membership}</small><strong>{firstTeamMetric(p,sortCol.key).display}</strong></button>)}</div></details>}
+  </section>;
 }

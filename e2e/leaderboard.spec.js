@@ -40,14 +40,16 @@ async function checkLeaderboard(page) {
   await expect(table.locator('tbody tr').first()).toContainText('降格野手');
   await expect(table.locator('tbody')).not.toContainText('二軍のみ野手');
   const batterRow = table.getByRole('row', { name: '降格野手の詳細を開く', exact: true });
-  await expect(batterRow.locator('td').nth(7)).toHaveText('3');
-  await page.getByRole('button', { name: '⚾ 投手', exact: true }).click();
+  await expect(batterRow.locator('[data-metric="HR"]')).toHaveText('3');
+  await page.getByRole('tab', { name: '投手', exact: true }).click();
+  await page.getByRole('button', { name: '詳細指標', exact: true }).click();
+  await page.locator('.league-leading > summary').click();
   for (const label of ['S', 'H', 'QS', '奪三振']) {
     await page.getByRole('button', { name: `${label}で並び替え`, exact: true }).click();
     await expect(table.locator('tbody tr').first()).toContainText('降格ゼロ投手');
     await expect(table.locator('tbody tr').last()).toContainText('未記録投手');
-    await expect(page.getByRole('button', { name: '降格ゼロ投手の詳細を開く', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: '未記録投手の詳細を開く', exact: true })).toHaveCount(0);
+    await expect(page.locator('.league-leading-list').getByRole('button', { name: '降格ゼロ投手の詳細を開く', exact: true })).toBeVisible();
+    await expect(page.locator('.league-leading-list').getByRole('button', { name: '未記録投手の詳細を開く', exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: `${label}で並び替え`, exact: true }).click();
     await expect(table.locator('tbody tr').last()).toContainText('未記録投手');
   }
@@ -59,11 +61,28 @@ for (const width of [360, 390, 1440]) {
     await page.setViewportSize({ width, height: width === 360 ? 800 : width === 390 ? 844 : 900 });
     const errors = []; page.on('pageerror', error => errors.push(error.message));
     const ids = await setup(page);
+    const before = await saveHub(page);
     await openLeaderboard(page, width < 768);
     await checkLeaderboard(page);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: testInfo.outputPath('leaderboard-after.png'), fullPage: true });
+    await page.getByRole('tab', {name:'打者',exact:true}).click();
+    const batterOpen=page.locator('.league-player-button').filter({hasText:'降格野手'});
+    await batterOpen.click();
+    const detail=page.locator('.player-modal-card');
+    await detail.getByRole('button',{name:'＋ 比較',exact:true}).click();
+    await detail.getByRole('button',{name:'元の画面に戻る',exact:true}).click();
+    await expect(batterOpen).toBeFocused();
+    await page.getByRole('tab',{name:'投手',exact:true}).click();
+    const pitcherOpen=page.locator('.league-player-button').filter({hasText:'降格ゼロ投手'});
+    await pitcherOpen.click();await detail.getByRole('button',{name:'＋ 比較',exact:true}).click();
+    await page.keyboard.press('Escape');await expect(pitcherOpen).toBeFocused();
+    await page.getByRole('button',{name:'2人を比較',exact:true}).click();
+    await expect(page.getByRole('dialog',{name:'選手比較',exact:true})).toContainText(`一軍・${before.year}年`);
+    await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'2人を比較',exact:true})).toBeFocused();
+    await page.getByRole('button',{name:'クリア',exact:true}).click();
     const saved = await saveHub(page);
+    expect(saved.teams).toEqual(before.teams);
     const mine = saved.teams.find(t => t.id === saved.myId);
     expect(mine.players.map(p => p.id)).not.toContain(ids.batterId);
     expect(mine.farm.find(p => p.id === ids.batterId).stats.HR).toBe(3);
@@ -71,6 +90,9 @@ for (const width of [360, 390, 1440]) {
     await reloadAndLoad(page);
     await openLeaderboard(page, width < 768);
     await checkLeaderboard(page);
+    expect((await saveHub(page)).teams).toEqual(before.teams);
+    await mainNavigation(page,width < 1024).getByRole('button',{name:/^編成/}).click();
+    await expect(page.locator('.roster-overview')).toBeVisible();
     expect(errors).toEqual([]);
   });
 }

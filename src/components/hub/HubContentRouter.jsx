@@ -421,6 +421,7 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
       <DeferredHubTab label="Loading leaderboard...">
         <LeaderboardTab
           teams={teams}
+          year={year}
           myId={myId}
           gameDay={gameDay}
           onPlayerClick={gs.handlePlayerClick}
