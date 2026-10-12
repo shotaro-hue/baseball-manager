@@ -107,7 +107,7 @@ function activeForeignState(players) {
   };
 }
 
-function canAddToActiveRoster(player, activePlayers) {
+export function canAddToActiveRoster(player, activePlayers) {
   if (!isEligibleActivePlayer(player)) return false;
   if ((Number(player.registrationCooldownDays) || 0) > 0) return false;
   if (!player.isForeign) return true;
