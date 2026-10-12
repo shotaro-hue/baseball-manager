@@ -4,9 +4,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useGameState } from './useGameState';
 import { TEAM_DEFS } from '../constants';
 
-const mocks=vi.hoisted(()=>({persist:vi.fn(),generate:vi.fn(),foreign:vi.fn(),schedule:vi.fn(),trigger:vi.fn()}));
+const mocks=vi.hoisted(()=>({persist:vi.fn(),generate:vi.fn(),foreign:vi.fn(),schedule:vi.fn(),trigger:vi.fn(),queue:vi.fn()}));
 vi.mock('../engine/bootstrapTeams',()=>({createInitialTeams:()=>mocks.generate(),createInitialTeamsAsync:async()=>mocks.generate()}));
-vi.mock('../engine/saveload',()=>({hasSave:()=>false,getSaveQueueSnapshot:()=>({isSaving:false}),getAutoSaveIntervalMs:()=>Infinity,enqueueSaveGame:async(state,options)=>options?.initialCareerLogs ? mocks.persist(options.initialCareerLogs) : {ok:true}}));
+vi.mock('../engine/saveload',()=>({hasSave:()=>false,getSaveQueueSnapshot:()=>mocks.queue(),getAutoSaveIntervalMs:()=>Infinity,enqueueSaveGame:async(state,options)=>options?.initialCareerLogs ? mocks.persist(options.initialCareerLogs) : {ok:true}}));
 vi.mock('../engine/player',()=>({generateForeignFaPool:()=>mocks.foreign()}));
 vi.mock('../engine/scheduleGen',async original=>({...await original(),generateSeasonSchedule:(...args)=>mocks.schedule(...args),calcAllStarTriggerDay:()=>mocks.trigger()}));
 vi.mock('../engine/battedBallArchive',()=>({getBattedBallQueueStatus:()=>({failedRecords:0}),flushBattedBallQueue:async()=>({ok:true})}));
@@ -14,7 +14,7 @@ const scheduleActual=await vi.importActual('../engine/scheduleGen');
 let view,gs;
 const initial=()=>TEAM_DEFS.map(t=>({...t,wins:0,losses:0,draws:0,players:[{id:'p'+t.id,name:t.name,isPitcher:false,stats:{},careerLog:[{year:2024,stats:{HR:1}}]}],farm:[],lineup:[],rotation:[]}));
 beforeEach(async()=>{
-  vi.clearAllMocks();mocks.generate.mockImplementation(initial);mocks.persist.mockResolvedValue({ok:true});mocks.foreign.mockReturnValue([]);mocks.schedule.mockImplementation((year,teams)=>scheduleActual.generateSeasonSchedule(year,teams));mocks.trigger.mockReturnValue(72);
+  vi.clearAllMocks();mocks.queue.mockReturnValue({isSaving:false});mocks.generate.mockImplementation(initial);mocks.persist.mockResolvedValue({ok:true});mocks.foreign.mockReturnValue([]);mocks.schedule.mockImplementation((year,teams)=>scheduleActual.generateSeasonSchedule(year,teams));mocks.trigger.mockReturnValue(72);
   function Harness(){gs=useGameState();return null;}
   await act(async()=>{view=create(React.createElement(Harness));});
 });
@@ -64,4 +64,19 @@ it('does not publish teams or enter home when final schedule preparation fails',
   expect(gs.screen).toBe('title');expect(gs.teams).toEqual([]);expect(gs.myId).toBeNull();
   expect(gs.newGameInitializationStatus).toBe('error');expect(gs.newGameInitializationError).toMatch(/再試行/);
   expect(mocks.persist).not.toHaveBeenCalled();
+});
+
+it.each([true,false])('refreshes a stale saving snapshot after initial persistence settles (ok=%s)',async ok=>{
+  act(()=>view.unmount());
+  mocks.queue.mockReturnValue({isSaving:true,hasQueuedSave:false});
+  function Harness(){gs=useGameState();return null;}
+  await act(async()=>{view=create(React.createElement(Harness));});
+  expect(gs.saveQueueState.isSaving).toBe(true);
+  mocks.queue.mockReturnValue({isSaving:false,hasQueuedSave:false});
+  mocks.persist.mockResolvedValueOnce({ok,reason:ok?undefined:'indexeddb_write_failed'});
+  if(!ok)vi.spyOn(console,'error').mockImplementation(()=>{});
+  await act(async()=>{await gs.handleSelect(TEAM_DEFS[0].id);});
+  expect(gs.saveQueueState.isSaving).toBe(false);
+  expect(gs.screen).toBe(ok?'hub':'title');
+  expect(gs.saveResult).toBeNull();
 });

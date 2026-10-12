@@ -37,10 +37,10 @@ describe('Calm Dugout dashboard', () => {
     expect(html).toContain('球団概況・おすすめ・注目選手');
   });
   it('disables game start after the season', () => {
-    expect(render({ gameDay: 144 })).toMatch(/class="calm-primary" disabled=""/);
+    expect(render({ gameDay: 144 })).toMatch(/class="home-link" disabled=""/);
   });
   it('disables game start during batch simulation', () => {
-    expect(render({ disableStart: true })).toMatch(/class="calm-primary" disabled=""/);
+    expect(render({ disableStart: true })).toMatch(/class="home-link" disabled=""/);
   });
   it('handles an empty roster', () => {
     expect(render({ myTeam: { ...team, players: [], lineup: [] } })).toContain('表示できる野手がいません');
@@ -60,7 +60,7 @@ describe('Calm Dugout dashboard', () => {
     act(() => { button('控え選手 二').props.onClick(); });
     expect(view.root.findByProps({ className: 'calm-player-name' }).findByType('h3').children).toEqual(['控え選手']);
     act(() => { button('成績').props.onClick(); });
-    expect(view.root.findAllByType('dd').map(n => n.children.join(''))).toEqual(['.320', '7', '21']);
+    expect(view.root.findByProps({className:'calm-stats'}).findAllByType('dd').map(n => n.children.join(''))).toEqual(['.320', '7', '21']);
     act(() => { button('選手詳細を開く').props.onClick(); button('オーダーを確認').props.onClick(); button('試合へ進む').props.onClick(); });
     expect(onPlayerClick).toHaveBeenCalledWith(bench, team.name);
     expect(onTabSwitch).toHaveBeenCalledWith('roster');

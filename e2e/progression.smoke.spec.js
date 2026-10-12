@@ -348,3 +348,11 @@ for (const width of [360,390,1440]) test(`F03 farm records survive progress/relo
  await page.screenshot({path:testInfo.outputPath(`farm-${width}.png`),fullPage:true});
  await dialog.getByRole('button',{name:'選手詳細を閉じる'}).click();
 });
+
+// UI-01B shares the existing CI progression gate without a duplicate spec.
+import { registerHomeCases } from './helpers/ui-home-cases';
+registerHomeCases({ consumeExpectedError(message) {
+  const index = errors.indexOf(message);
+  expect(index, 'Intentional storage fault must emit its exact expected diagnostic').toBeGreaterThanOrEqual(0);
+  errors.splice(index, 1); // Any additional/unexpected error still fails the existing afterEach.
+} });
