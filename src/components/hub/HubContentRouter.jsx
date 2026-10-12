@@ -73,8 +73,8 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
 
   const request = regularSeasonRequest({ teams, myId, year, gameDay, schedule, offseasonPlan: gs.offseasonPlan, gameResultsMap: gs.gameResultsMap }, 1);
   const canSim = request.count > 0;
-  const rankingContext = standingsContext(gs.getSeasonHistory(), gs.allTeamResultsMap, year);
   if (tab === 'dashboard') {
+    const rankingContext = standingsContext(gs.getSeasonHistory(), gs.allTeamResultsMap, year);
     return (
       <>
       <MobileHome myTeam={myTeam} teams={teams} schedule={schedule} gameDay={gameDay} year={year}

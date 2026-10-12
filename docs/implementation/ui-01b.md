@@ -52,3 +52,9 @@
 ローカルの並行作業を隔離するため上記E2Eには一時configでport5174を指定した。通常config/CIでは既存5173を使用する。GitHub CIは公開PR最新headで別途確認し、未実行の全Vitest/全E2Eをローカル合格扱いにしない。
 
 異常の[日程なし](../validation/ui01b/after/state-no-schedule-390.png)／[進行不可](../validation/ui01b/after/state-blocked-390.png)／[処理中](../validation/ui01b/after/state-processing-390.png)／[終了](../validation/ui01b/after/state-complete-390.png)は部品表示fixture。各画像内にも実試合/保存の成功を示す資料ではないことを明示する。保存処理の成功/失敗は上記実操作ケースに基づく。
+
+## PR #452 のCIで確認した非ホーム経路の回帰
+
+初回CIの全Vitestで、既存`ContractTab.consistency.test.js`の「explicit farm release uses the shared release path…」が`gs.getSeasonHistory is not a function`で失敗した。新しいホーム用`rankingContext`をrouterの全タブで先に計算していたため、契約タブにもホーム専用の履歴依存を持ち込んでいたことが原因。
+
+既存ケースでRED（1失敗/1成功）を確認し、その計算1行だけを`tab === 'dashboard'`分岐内へ移動した。契約タブのfixtureに無関係なstubを追加せず、optional-callで依存不足を隠さず、既存リリース処理・履歴・市場追加のassertionを維持する。修正後は既存契約テストと上記ホーム/保存テストを合わせて9ファイル/56件成功。公開PRへ追加コミットで反映し、GitHub CIは更新後headで再確認する。
