@@ -7,7 +7,7 @@ import { ownedPlayers } from '../engine/renewalRules';
 import { fmtAvg } from '../utils';
 import './roster-overview.css';
 
-export function MobileRoster({ farmState, team, onPlayerClick, onReplaceLineup, onSetLineupOrder, onSetRosterDhMode }) {
+export function MobileRoster({ farmState, team, onPlayerClick, onReplaceLineup, onSetLineupOrder, onSetRosterDhMode, onOpenFarmSettings }) {
   const [view, setView] = useState('batters');
   const [metric, setMetric] = useState('condition');
   const [replaceId, setReplaceId] = useState(null);
@@ -56,7 +56,8 @@ export function MobileRoster({ farmState, team, onPlayerClick, onReplaceLineup, 
     </section> : view === 'farm' ? <>
       <h2>二軍（{team.farm?.length ?? 0}人）</h2>
       <FarmRecordScope state={farmState} teamId={team.id} />
-      <p className="roster-note">昇降格・育成目標の変更は下の詳細設定から行えます。一軍成績とは別の記録です。</p>
+      <p className="roster-note">昇降格・育成目標の変更は詳細設定から行えます。一軍成績とは別の記録です。</p>
+      {onOpenFarmSettings && <Button variant="secondary" onClick={onOpenFarmSettings}>二軍の育成・起用設定へ</Button>}
       <DataTableFrame label="二軍所属選手と実測記録"><table className="roster-farm-table"><thead><tr><th scope="col">選手</th><th scope="col">所属・役割</th><th scope="col">状態</th><th scope="col">二軍実測</th></tr></thead><tbody>
         {(team.farm || []).map(p => <tr key={p.id}><td>{playerName(p, `${p.育成 ? '育成' : '二軍支配下'} · ${p.isPitcher ? p.subtype || '投手' : p.pos} · ${conditionInfo(p)}${(p.registrationCooldownDays || 0) > 0 ? ` · 再登録まで${p.registrationCooldownDays}日` : ''}`)}</td><td><strong>{p.育成 ? '育成' : '二軍支配下'}</strong><small>{p.isPitcher ? p.subtype || '投手' : p.pos}</small></td><td>
           {conditionInfo(p)}{(p.registrationCooldownDays || 0) > 0 && <small>再登録まで{p.registrationCooldownDays}日</small>}

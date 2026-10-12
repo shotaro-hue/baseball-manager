@@ -1,12 +1,13 @@
-import {FarmRecordScope,FarmRecordSummary} from '../FarmRecordSummary';
+import {FarmDevelopmentPanel} from '../FarmDevelopmentPanel';
+import {PlayerTalkPanel} from '../PlayerTalkPanel';
 import React, { useState, useRef } from "react";
 import { Button, DataTableFrame } from '../design-system/primitives';
 import { settingNumber, settingBatterRate, settingPitcherRate, SettingCondition } from '../rosterSettingMetrics';
 import '../roster-settings.css';
 import { MobileRoster } from '../MobileRoster';
-import { MAX_ROSTER, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL, DEV_GOALS_BATTER, DEV_GOALS_PITCHER, TALK_COOLDOWN_DAYS, POSITIONS, FIELDING_POSITIONS } from '../../constants';
+import { MAX_ROSTER, MAX_外国人_一軍, MAX_SHIHAKA_TOTAL, POSITIONS, FIELDING_POSITIONS } from '../../constants';
 import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
-import { OV, CondBadge, HandBadge } from '../ui';
+import { OV, HandBadge } from '../ui';
 import {
   buildAutoLineupEntries as buildPolicyLineupEntries,
   buildAutoPitchingStaff,
@@ -28,16 +29,7 @@ import {
   stableSort,
 } from '../../engine/analysisComparison';
 
-const TALK_OPTIONS = [
-  { type: "praise",       label: "💪 激励する",      desc: "モラル +5〜+15（確実）" },
-  { type: "playing_time", label: "⚾ 出場について",   desc: "出場少→+8〜+15 / 多→+3〜+8" },
-  { type: "contract",     label: "💴 契約について",   desc: "低給→+5〜+12 / 適正→+2〜+6" },
-  { type: "trade_rumor",  label: "🤫 噂を否定する",   desc: "海外志向→-5〜+3 / その他→+2〜+8" },
-];
-
 const TRAINING_OPTIONS=[["","バランス"],["contact","ミート"],["power","長打"],["eye","選球"],["speed","走力"],["arm","肩"],["defense","守備"],["velocity","球速"],["control","制球"],["breaking","変化球"],["stamina","スタミナ"]];
-
-const MoralBadge=({v})=>{const m=v||70;const icon=m>=75?"😊":m>=50?"😐":"😟";const col=m>=75?"#14714b":m>=50?"#805700":"#b42332";return <span style={{fontSize:14,color:col}}>{icon}{m}</span>;};
 
 export function RosterTab({farmState,team,allTeams,onReplaceLineup,onSetLineupOrder,onSetRosterDhMode,onSetPlayerPosition,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onReplaceRotation,onApplyRosterPlan,onPlayerClick,onSetDevGoal,onPlayerTalk,onSetConvertTarget,onSetManagementPolicy,onSetRosterAutomationMode,gameDay}){
   const settingsRef = useRef(null);
@@ -48,11 +40,8 @@ export function RosterTab({farmState,team,allTeams,onReplaceLineup,onSetLineupOr
     summaryRef.current?.scrollIntoView({ block: "center" });
   };
   const [view,setView]=useState("batters");
-  const [justConverted,setJustConverted]=useState(new Set());
-  const [talkingPid,setTalkingPid]=useState(null);
   const [rosterRecs,setRosterRecs]=useState(null);
   const [pendingRosterPlan,setPendingRosterPlan]=useState(null);
-  const handleConvertIkusei=(pid)=>{onConvertIkusei&&onConvertIkusei(pid);setJustConverted(s=>new Set([...s,pid]));};
   const batters=team.players.filter(p=>!p.isPitcher);
   const pitchers=team.players.filter(p=>p.isPitcher);
   const liMap={};team.lineup.forEach((id,i)=>liMap[id]=i+1);
@@ -144,7 +133,12 @@ export function RosterTab({farmState,team,allTeams,onReplaceLineup,onSetLineupOr
   };
   return(
     <div>
-      <MobileRoster farmState={farmState} team={team} onPlayerClick={onPlayerClick} onReplaceLineup={onReplaceLineup} onSetLineupOrder={onSetLineupOrder} onSetRosterDhMode={onSetRosterDhMode}/>
+      <MobileRoster farmState={farmState} team={team} onPlayerClick={onPlayerClick} onReplaceLineup={onReplaceLineup} onSetLineupOrder={onSetLineupOrder} onSetRosterDhMode={onSetRosterDhMode} onOpenFarmSettings={()=>{
+        setView('farm');
+        if(settingsRef.current)settingsRef.current.open=true;
+        summaryRef.current?.focus();
+        summaryRef.current?.scrollIntoView({block:'start'});
+      }}/>
       <details ref={settingsRef} className="roster-full-settings calm-detail roster-settings" data-ds="roster-settings">
       <summary ref={summaryRef}>詳細な編成・育成設定 <small>打順・守備 / 先発・継投 / 起用方針</small></summary>
       <header className="roster-settings-ui settings-heading">
@@ -513,108 +507,8 @@ export function RosterTab({farmState,team,allTeams,onReplaceLineup,onSetLineupOr
           </div>
         );
       })()}
-      {view==="farm"&&(
-        <div>
-          {(()=>{
-            const eligible=team.farm.filter(p=>!p.育成&&(p.injuryDaysLeft??0)===0&&(p.registrationCooldownDays??0)===0);
-            if(team.players.length<MAX_ROSTER&&eligible.length>0){
-              const top=eligible.slice().sort((a,b)=>(b.potential??50)-(a.potential??50)).slice(0,3);
-              return(
-                <div style={{marginBottom:8,padding:"8px 12px",background:"rgba(52,211,153,.08)",border:"1px solid rgba(52,211,153,.25)",borderRadius:6,fontSize:14,color:"#14714b"}}>
-                  💡 一軍枠に空き（{MAX_ROSTER-team.players.length}枠）- 昇格推薦: {top.map(p=>p.name).join('、')}
-                </div>
-              );
-            }
-            return null;
-          })()}
-          <div className="card">
-            <div className="card-h">二軍 ({team.farm.length}人)</div>
-            <FarmRecordScope state={farmState} teamId={team.id}/>
-            <div className="detail-table-scroll" tabIndex={0} role="region" aria-label="成績一覧。横にスクロールできます">
-              <table className="tbl">
-                <thead><tr><th>選手名</th><th>守備</th><th>年齢</th><th>育成年</th><th>潜在</th><th>主要能力</th><th>育成目標</th><th>状態</th><th>二軍成績</th><th></th></tr></thead>
-                <tbody>
-                  {team.farm.map(p=>{
-                    const cd=p.registrationCooldownDays??0;
-                    const isInj=(p.injuryDaysLeft??0)>0;
-                    const canPromote=!p.育成&&!isInj&&cd===0;
-                    return(
-                    <tr key={p.id} style={isInj?{opacity:.6}:undefined}>
-                      <td style={{fontWeight:600,fontSize:14,cursor:"pointer"}} onClick={()=>onPlayerClick?.(p,team.name)}>
-                        <span style={{color:"#095cc7"}}>{p.name}</span>
-                        {p.育成&&<span style={{fontSize:14,color:"#7050ad",marginLeft:4}}>[育{p.ikuseiYears||0}年]</span>}
-                        {isInj&&<span style={{fontSize:14,color:"#b42332",marginLeft:4}}>🤕{p.injuryDaysLeft}</span>}
-                        {!isInj&&cd>0&&<span style={{fontSize:14,color:"#805700",marginLeft:4}}>🔒{cd}日</span>}
-                      </td>
-                      <td style={{fontSize:14,color:"#53657c"}}>{p.pos}</td><td className="mono" style={{color:"#53657c"}}>{p.age}</td>
-                      <td className="mono" style={{color:p.育成?"#7050ad":"#53657c",fontSize:14}}>{p.育成?(p.ikuseiYears||0)+"年":"—"}</td>
-                      <td><OV v={p.potential}/></td>
-                      <td><OV v={p.isPitcher?p.pitching.velocity:p.batting.contact}/></td>
-                      <td>
-                        <select style={{fontSize:14,background:"#fff",color:"#53657c",border:"1px solid #c5d8ed",borderRadius:3,padding:"1px 2px",maxWidth:90}} value={p.devGoal||""} onChange={e=>onSetDevGoal&&onSetDevGoal(p.id,e.target.value||null)}>
-                          {(p.isPitcher?DEV_GOALS_PITCHER:DEV_GOALS_BATTER).map(({key,label})=><option key={key} value={key}>{label}</option>)}
-                        </select>
-                      </td>
-                      <td><CondBadge p={p}/></td>
-                      <td className="mono" style={{fontSize:14,color:"#53657c"}}><FarmRecordSummary state={farmState} player={p} compact/></td>
-                      <td style={{display:"flex",gap:4}}>
-                        {p.育成
-                          ?<button className="bsm" style={{background:"rgba(167,139,250,.15)",border:"1px solid rgba(167,139,250,.4)",color:"#7050ad",fontSize:14,padding:"2px 6px",borderRadius:4,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>handleConvertIkusei(p.id)}>支配下登録</button>
-                          :<button className="bsm bga" onClick={()=>canPromote&&onPromo(p.id)} disabled={!canPromote} style={!canPromote?{opacity:.4,cursor:"not-allowed"}:undefined}>{cd>0?`🔒${cd}日`:isInj?`🤕${p.injuryDaysLeft}`:"↑一軍"}</button>
-                        }
-                        {justConverted.has(p.id)&&!p.育成&&<button className="bsm" style={{background:"rgba(52,211,153,.15)",border:"1px solid rgba(52,211,153,.4)",color:"#14714b",fontSize:14,padding:"2px 6px",borderRadius:4,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>{onPromo(p.id);setJustConverted(s=>{const n=new Set(s);n.delete(p.id);return n;});}}>↑一軍昇格</button>}
-                      </td>
-                    </tr>
-                    );
-                  })}
-                  {team.farm.length===0&&<tr><td colSpan={10} style={{color:"#53657c",padding:"16px",textAlign:"center"}}>二軍選手なし</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-      {view==="talk"&&(
-        <div className="card">
-          <div className="card-h">💬 選手コミュニケーション</div>
-          <div style={{fontSize:14,color:"#53657c",marginBottom:10}}>月1回（{TALK_COOLDOWN_DAYS}試合に1回）まで同一選手と話せます。モラルが低い選手から優先しましょう。</div>
-          {[...team.players].sort((a,b)=>(a.morale??70)-(b.morale??70)).map(p=>{
-            const gd=gameDay??0;
-            const lastTalk=p.lastTalkGameDay??0;
-            const cooldownLeft=lastTalk>0?Math.max(0,TALK_COOLDOWN_DAYS-(gd-lastTalk)):0;
-            const canTalk=cooldownLeft===0;
-            const isOpen=talkingPid===p.id;
-            return(
-              <div key={p.id} className="card2" style={{marginBottom:6}}>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <div style={{flex:1}}>
-                    <span style={{fontWeight:700,fontSize:14,cursor:"pointer",color:"#095cc7"}} onClick={()=>onPlayerClick?.(p,team.name)}>{p.name}</span>
-                    <span style={{fontSize:14,color:"#53657c",marginLeft:6}}>{p.pos}/{p.age}歳</span>
-                    {p.isForeign&&<span className="chip cb" style={{marginLeft:4,fontSize:14}}>外</span>}
-                  </div>
-                  <MoralBadge v={p.morale}/>
-                  {canTalk
-                    ?<button className={`bsm ${isOpen?"bgb":"bga"}`} style={{fontSize:14}} onClick={()=>setTalkingPid(isOpen?null:p.id)}>💬 話す</button>
-                    :<span style={{fontSize:14,color:"#53657c"}}>🔒 あと{cooldownLeft}試合</span>
-                  }
-                </div>
-                {isOpen&&canTalk&&(
-                  <div style={{marginTop:8,display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}}>
-                    {TALK_OPTIONS.map(opt=>(
-                      <button key={opt.type} className="bsm bga" style={{padding:"6px 8px",textAlign:"left",height:"auto"}}
-                        onClick={()=>{onPlayerTalk?.(p.id,opt.type);setTalkingPid(null);}}>
-                        <div style={{fontSize:14,fontWeight:700}}>{opt.label}</div>
-                        <div style={{fontSize:14,color:"#53657c",marginTop:1}}>{opt.desc}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          {team.players.length===0&&<div style={{color:"#53657c",fontSize:14}}>一軍選手なし</div>}
-        </div>
-      )}
+      {view==="farm"&&<FarmDevelopmentPanel team={team} farmState={farmState} onPlayerClick={onPlayerClick} onSetDevGoal={onSetDevGoal} onPromo={onPromo} onConvertIkusei={onConvertIkusei}/>}
+      {view==="talk"&&<PlayerTalkPanel team={team} gameDay={gameDay} onPlayerClick={onPlayerClick} onPlayerTalk={onPlayerTalk}/>}
       <div className="roster-settings-ui settings-footer"><Button variant="secondary" onClick={returnToOverview}>編成概要へ戻る</Button><p>試合へ戻るには、既存メニューの「ホーム」を選んでください。</p></div>
       </details>
     </div>
