@@ -76,7 +76,7 @@ export function PitchBadge({ pitchType, zone }) {
 }
 
 // セイバーメトリクスの解説ツールチップ付きテーブルヘッダー
-const STAT_TIPS = {
+export const STAT_TIPS = {
   "打席": { en: "PA", desc: "打席に立った回数" },
   "打率": { en: "AVG", desc: "安打 ÷ 打数。打者の基本指標" },
   "OPS":  { en: "OPS", desc: "出塁率+長打率。総合力の指標" },
