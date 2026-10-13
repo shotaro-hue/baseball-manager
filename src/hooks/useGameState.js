@@ -201,6 +201,8 @@ export function useGameState() {
   const [saveQueueState, setSaveQueueState] = useState({ isSaving: false });
   // Display-only outcome from the actual save request; never persisted.
   const [saveResult, setSaveResult] = useState(null);
+  const saveRequestRef = useRef(0);
+  const pendingSaveRequestsRef = useRef(new Set());
   const [persistentEnabled, setPersistentEnabled] = useState(false);
   const [newGameInitializationError, setNewGameInitializationError] = useState(null);
   const [newGameInitializationStatus, setNewGameInitializationStatus] = useState('idle');
@@ -270,6 +272,7 @@ export function useGameState() {
     setMailboxState(Array.isArray(nextValue.mailbox) ? nextValue.mailbox : []);
   }, []);
   const resetSaveTracking = useCallback(() => {
+    saveRequestRef.current++;
     saveDirtyTrackerRef.current.reset();
     setSaveDirty(false);
     setSaveResult(null);
@@ -281,7 +284,8 @@ export function useGameState() {
       .then((mod) => {
         if (!alive) return;
         setSaveExists(mod.hasSave());
-        setSaveQueueState(mod.getSaveQueueSnapshot());
+        const queue = mod.getSaveQueueSnapshot();
+        setSaveQueueState({ ...queue, isSaving: queue.isSaving || pendingSaveRequestsRef.current.has(saveRequestRef.current) });
       })
       .catch((error) => {
         console.error('Failed to load save module:', error);
@@ -364,45 +368,62 @@ export function useGameState() {
   const refreshSaveQueueState = useCallback(() => {
     loadSaveModule()
       .then((mod) => {
-        setSaveQueueState(mod.getSaveQueueSnapshot());
+        const queue = mod.getSaveQueueSnapshot();
+        setSaveQueueState({ ...queue, isSaving: queue.isSaving || pendingSaveRequestsRef.current.has(saveRequestRef.current) });
       })
       .catch((error) => {
         console.error('Failed to refresh save queue state:', error);
       });
   }, []);
-  const queueSave = useCallback((state, options = {}) => {
+  const queueSave = useCallback((state, options = {}, snapshot) => {
+    const { requestId, sessionToken } = snapshot;
+    const isCurrent = () => requestId === saveRequestRef.current && sessionToken === progressSessionRef.current;
+    pendingSaveRequestsRef.current.add(requestId);
+    setSaveResult(null);
+    setSaveQueueState(prev => ({ ...prev, isSaving: true }));
     const pending=[...pendingCareerEntriesRef.current];
     const saveOptions={...options,careerEntries:[...pending,...(options.careerEntries || [])]};
     return loadSaveModule()
       .then((mod) => {
+        if (sessionToken !== progressSessionRef.current) return { ok: false, reason: 'session_changed' };
         const task = mod.enqueueSaveGame(state, saveOptions);
-        setSaveQueueState(mod.getSaveQueueSnapshot());
+        setSaveQueueState({ ...mod.getSaveQueueSnapshot(), isSaving: true });
         return task;
       })
       .then(async (result) => {
-        if (!result?.ok) return result;
+        if (!result?.ok || sessionToken !== progressSessionRef.current) return result;
         const committed=new Set(pending);
         pendingCareerEntriesRef.current=pendingCareerEntriesRef.current.filter(entry=>!committed.has(entry));
         try {
           const archive = await import('../engine/battedBallArchive');
           const status = archive.getBattedBallQueueStatus();
-          const archiveResult = status.failedRecords > 0
+          let archiveResult = status.failedRecords > 0
             ? await archive.retryFailedBattedBallWrites()
             : await archive.flushBattedBallQueue();
-          return { ...result, archive: archiveResult };
+          // One flush only covers its snapshot. More Worker chunks may already
+          // be queued behind it; success requires those writes to settle too.
+          let settled = archive.getBattedBallQueueStatus();
+          while (settled.isWriting || settled.queuedRecords > 0) {
+            archiveResult = await archive.flushBattedBallQueue();
+            settled = archive.getBattedBallQueueStatus();
+          }
+          return { ...result, archive: { ...archiveResult, ok: archiveResult?.ok !== false && !(settled.failedRecords > 0) } };
         } catch (error) {
           console.warn('打球アーカイブのフラッシュに失敗しました。試合セーブは完了しています。', error);
           return { ...result, archive: { ok: false } };
         }
       })
-      .then((result) => { setSaveResult(result ?? { ok: false }); return result; })
-      .catch((error) => { setSaveResult({ ok: false }); throw error; })
+      .then((result) => { if (isCurrent()) setSaveResult(result ?? { ok: false }); return result; })
+      .catch((error) => { if (isCurrent()) setSaveResult({ ok: false }); throw error; })
       .finally(() => {
+        pendingSaveRequestsRef.current.delete(requestId);
         refreshSaveQueueState();
       });
   }, [refreshSaveQueueState]);
   const beginTrackedSave = useCallback((extraOptions = {}) => {
     const snapshot = saveDirtyTrackerRef.current.snapshot({ persistAll: !saveExists });
+    snapshot.requestId = ++saveRequestRef.current;
+    snapshot.sessionToken = progressSessionRef.current;
     const options = { ...extraOptions };
     if (Array.isArray(snapshot.dirtyScopes)) {
       options.dirtyScopes = snapshot.dirtyScopes;
@@ -410,6 +431,7 @@ export function useGameState() {
     return { snapshot, options };
   }, [saveExists]);
   const completeTrackedSave = useCallback((snapshot) => {
+    if (snapshot?.requestId !== saveRequestRef.current || snapshot?.sessionToken !== progressSessionRef.current) return { isCurrent: false };
     const result = saveDirtyTrackerRef.current.complete(snapshot);
     if (result.isCurrent) setSaveDirty(false);
     return result;
@@ -564,8 +586,10 @@ export function useGameState() {
       return queueSave(
         {teams,myId,gameDay,year,saveId,schedule,...farmFields,faPool,faYears,seasonHistory,news,mailbox,saveRevision,offseasonPlan,...getMatchHistorySnapshot()},
         request.options,
+        request.snapshot,
       ).then((result) => ({ result, snapshot: request.snapshot }));
     }).then(({ result, snapshot })=>{
+      if (snapshot && (snapshot.requestId !== saveRequestRef.current || snapshot.sessionToken !== progressSessionRef.current)) return;
       if(result.ok){
         setSaveExists(true);
         completeTrackedSave(snapshot);
@@ -584,7 +608,7 @@ export function useGameState() {
 
   const handleSave = useCallback(async (options = {})=>{
     if (offseasonPlan && isAutoSaveSuspended && !options.payload) return { ok: false, reason: 'transition_in_progress' };
-    const request = beginTrackedSave();
+    const request = beginTrackedSave(options.saveOptions);
     if(options.careerEntries) request.options.careerEntries=options.careerEntries;
     if (options.payload && MATCH_HISTORY_FIELDS.some(key => key in options.payload)) {
       request.options.dirtyScopes = [...new Set([...(request.options.dirtyScopes ?? ['seasonHistory', 'news', 'mailbox']), 'matchHistory'])];
@@ -594,7 +618,9 @@ export function useGameState() {
         offseasonPlan: offseasonPlan && { ...offseasonPlan, resumeScreen:
           offseasonPlan.stage === 'postseason' && screen === 'hub' ? offseasonPlan.resumeScreen : screen }, ...options.payload},
       request.options,
+      request.snapshot,
     );
+    if (request.snapshot.requestId !== saveRequestRef.current || request.snapshot.sessionToken !== progressSessionRef.current) return result;
     if(result.ok){
       setSaveExists(true);
       completeTrackedSave(request.snapshot);

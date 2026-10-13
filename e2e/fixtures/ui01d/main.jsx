@@ -17,10 +17,14 @@ if (state === 'error') {
   results[0].log[0].result = 'hr';
   Object.defineProperty(results[0].log[0], 'scorer', { get() { throw new Error('fixture aggregation error'); } });
 }
+// Match the real Worker output: summaries contain no logs; history owns them.
+const gameResultsMap = Object.fromEntries(results.map(result => [result.gameNo, { log: result.log }]));
+const summaries = results.map(({ log, ...summary }) => summary);
 const saveState = state === 'saving' ? { isSaving: true } : {};
 const saveResult = state === 'save-error' ? { ok: false } : state === 'saved' ? { ok: true } : null;
 const action = (name, gameNo) => { document.body.dataset.action = name; if (gameNo) document.body.dataset.game = gameNo; };
-createRoot(document.getElementById('root')).render(<BatchResultScreen results={results}
+createRoot(document.getElementById('root')).render(<BatchResultScreen results={summaries}
+  getGameResult={result => gameResultsMap[result.gameNo]}
   myTeam={{ name: '東京ヤクルトスワローズ', players: [{ condition: 55 }, { injuryDaysLeft: 3 }] }}
   batchMeta={{ beforeRank: 3, afterRank: 2, injuries: [{ name: '高橋 玲', type: '肩の負傷', days: 3 }], cpuHighlights: [] }}
   saveDirty={state !== 'saved'} saveQueueState={saveState} saveResult={saveResult}
