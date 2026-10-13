@@ -1,0 +1,54 @@
+/* DES-01 opt-in. Embedded renewal, FA and growth screens retain their own CSS. */
+.planning-screen[data-ds] { min-height:100dvh; background:var(--ds-canvas); color:var(--ds-text); padding:20px 16px 32px; font-size:16px; line-height:1.6; }
+.planning-screen[data-ds] > :is(header,section,aside,nav,footer,ol,.planning-layout) { max-width:1320px; margin:0 auto 16px; min-width:0; }
+.planning-screen[data-ds] .planning-heading p { margin:4px 0; color:var(--ds-muted); font-size:14px; }
+.planning-screen[data-ds] .planning-heading h1 { margin:4px 0 8px; font-size:26px; line-height:1.3; color:var(--ds-text); }
+.planning-screen[data-ds] .planning-phase { display:flex; flex-wrap:wrap; gap:8px 12px; list-style:none; padding:0; font-size:12px; color:var(--ds-muted); }
+.planning-screen[data-ds] .planning-phase [aria-current] { color:var(--ds-accent); font-weight:700; }
+.planning-screen[data-ds] .planning-metrics { margin:0; padding:8px 0; border-radius:6px; }
+.planning-screen[data-ds] .planning-metrics dd { font-size:22px; }
+.planning-screen[data-ds] .planning-note { color:var(--ds-muted); font-size:12px; margin:8px 0; }
+.planning-screen[data-ds] .planning-save { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:8px; }
+.planning-screen[data-ds] .planning-save button { margin-left:auto; padding:8px 12px; font-size:14px; }
+.planning-screen[data-ds] .planning-tabs { position:sticky; top:0; z-index:5; background:var(--ds-canvas); padding:8px 0; border-bottom:1px solid var(--ds-divider); }
+.planning-screen[data-ds] .planning-tab-buttons { display:flex; gap:8px; }
+.planning-screen[data-ds] .planning-tab-buttons button { min-height:48px; flex:1; border:0; border-bottom:3px solid transparent; border-radius:0; background:transparent; color:var(--ds-muted); padding:8px; font-size:14px; }
+.planning-screen[data-ds] .planning-tab-buttons button[aria-pressed="true"] { color:var(--ds-accent); border-bottom-color:var(--ds-accent); }
+.planning-screen[data-ds] .planning-compact { display:flex; flex-wrap:wrap; gap:4px 16px; color:var(--ds-muted); font-size:12px; }
+.planning-screen[data-ds] .planning-roster-heading { display:inline; font-size:18px; margin:0; line-height:1.4; }
+.planning-screen[data-ds] .planning-filters { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.planning-screen[data-ds] .planning-filters button { padding:8px 12px; font-size:14px; }
+.planning-screen[data-ds] .planning-filters button[aria-pressed="true"] { background:var(--ds-selected); border-color:var(--ds-accent); }
+.planning-screen[data-ds] .planning-roster table { table-layout:fixed; min-width:328px; }
+.planning-screen[data-ds] .planning-roster :is(th,td):first-child { width:40%; min-width:0; }
+.planning-screen[data-ds] .planning-roster :is(th,td):nth-child(2) { width:20%; }
+.planning-screen[data-ds] .planning-roster :is(th,td):nth-child(3) { width:40%; }
+.planning-screen[data-ds] .planning-roster :is(th,td) { padding:8px 4px; height:72px; }
+.planning-screen[data-ds] .planning-roster th { height:40px; }
+.planning-screen[data-ds] .planning-roster small { display:block; font-size:12px; font-weight:400; color:var(--ds-muted); }
+.planning-screen[data-ds] .planning-player-name { display:block; width:100%; min-height:44px; padding:4px 8px; border:0; background:transparent; text-align:left; color:var(--ds-text); font-family:inherit; font-size:14px; cursor:pointer; overflow-wrap:anywhere; }
+.planning-screen[data-ds] .planning-intent { display:block; width:100%; min-height:44px; font-family:inherit; font-size:14px; color:var(--ds-text); background:var(--ds-surface); border:1px solid var(--ds-control-border); border-radius:4px; padding:6px; }
+.planning-screen[data-ds] .planning-player .planning-danger { font-size:14px; padding:8px; margin-top:8px; }
+.planning-screen[data-ds] .planning-player-name:focus-visible, .planning-screen[data-ds] .planning-intent:focus-visible, .planning-screen[data-ds] .planning-policy>summary:focus-visible, .planning-screen[data-ds] .planning-support>details>summary:focus-visible, .planning-screen[data-ds] .planning-roster-heading:focus { outline:3px solid var(--ds-focus); outline-offset:3px; }
+.planning-screen[data-ds] .planning-policy>summary, .planning-screen[data-ds] .planning-support>details>summary { min-height:44px; padding:8px 0; font-size:16px; font-weight:700; cursor:pointer; }
+.planning-screen[data-ds] .planning-counts { display:flex; flex-wrap:wrap; gap:8px 16px; font-size:14px; }
+.planning-screen[data-ds] .planning-support>details { border-bottom:1px solid var(--ds-divider); padding:8px 0; }
+.planning-screen[data-ds] .planning-review { padding:16px; background:var(--ds-surface); border:1px solid var(--ds-divider); border-radius:6px; overflow-wrap:anywhere; }
+.planning-screen[data-ds] .planning-review h2 { font-size:18px; }
+.planning-screen[data-ds] .planning-review ul { padding-left:24px; }
+.planning-screen[data-ds] .planning-review li { padding:8px 0; border-bottom:1px solid var(--ds-divider); font-size:14px; }
+.planning-screen[data-ds] .planning-footer button { width:100%; }
+.planning-screen[data-ds] [hidden] { display:none!important; }
+.planning-overlay { position:fixed; inset:0; background:rgba(14,38,59,.72); z-index:1000; padding:16px; display:flex; justify-content:center; align-items:flex-start; overflow:auto; }
+.planning-dialog[data-ds] { background:var(--ds-surface); color:var(--ds-text); width:100%; max-width:620px; border:1px solid var(--ds-divider); border-radius:6px; padding:16px; overflow-wrap:anywhere; font-size:16px; }
+.planning-dialog[data-ds] h2 { font-size:18px; margin:0 0 12px; }
+.planning-actions { display:flex; flex-wrap:wrap; gap:12px; margin-top:16px; }
+.planning-screen[data-ds] [data-ds="button"].planning-danger, .planning-dialog[data-ds] [data-ds="button"].planning-danger { border-color:var(--ds-danger); color:var(--ds-danger); background:var(--ds-surface); }
+@media(min-width:1024px) { .planning-screen[data-ds] {padding:24px 32px 40px;} .planning-screen[data-ds] .planning-heading h1 {font-size:28px;} .planning-screen[data-ds] .planning-metrics dd {font-size:26px;} .planning-screen[data-ds] .planning-footer button {width:auto;} .planning-dialog[data-ds] {padding:24px;} }
+
+.planning-screen[data-ds] .planning-layout {display:grid; gap:24px;}
+.planning-screen[data-ds] .planning-layout > * {min-width:0;}
+@media(min-width:1024px) {
+ .planning-screen[data-ds] .planning-layout[data-view="planning"] {grid-template-columns:minmax(0,3fr) minmax(0,2fr);}
+ .planning-screen[data-ds] .planning-layout[data-view="planning"] > .planning-support {grid-column:2;grid-row:1;}
+}

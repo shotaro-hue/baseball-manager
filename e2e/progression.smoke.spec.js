@@ -1,13 +1,23 @@
+import {registerPlanningAppCases} from './helpers/planning-app-cases';
+import {registerPlanningDesignCases} from './helpers/planning-design-cases';
 import { test, expect } from '@playwright/test';
 import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
 import { startNewGame, mainNavigation, runBatch, runSingle, startSingle, saveHub, waitSaveIdle, readSave, reloadAndLoad, progressSignature, loadFixture } from './helpers/progression';
 
+registerPlanningDesignCases();
+registerPlanningAppCases();
+
 // Measured E1 includes real detailed Worker simulation and multiple IDB loads.
 test.setTimeout(60_000);
-let errors = [];
-test.beforeEach(async ({ page }) => { errors = []; page.on('pageerror', e => errors.push(e.message)); page.on('console', msg => { if (msg.type() === 'error' && /runSingleDaySimulation failed|runBatchGames failed|Save failed|Auto save failed|年度更新処理に失敗/.test(msg.text())) errors.push(msg.text()); }); });
-test.afterEach(async () => { expect(errors, 'Unhandled page exceptions').toEqual([]); });
+let errors = [], expectedConsoleErrors = [];
+test.beforeEach(async ({ page }, testInfo) => { errors = []; expectedConsoleErrors = []; page.on('pageerror', e => errors.push(e.message)); page.on('console', msg => { if (msg.type() === 'error' && /runSingleDaySimulation failed|runBatchGames failed|Save failed|Auto save failed|年度更新処理に失敗/.test(msg.text())) {
+  if (testInfo.annotations.some(a => a.type === 'expected-console-error' && a.description === msg.text())) expectedConsoleErrors.push(msg.text());
+  else errors.push(msg.text());
+ } }); });
+test.afterEach(async ({}, testInfo) => { expect(errors, 'Unhandled page exceptions').toEqual([]);
+ for (const annotation of testInfo.annotations.filter(a => a.type === 'expected-console-error')) expect(expectedConsoleErrors, 'Injected failure must reach the real save implementation').toContain(annotation.description);
+});
 
 for(const width of [360,390,1440])test(`F04 farm historical rankings, retired detail and persisted awards at ${width}px`,async({page},testInfo)=>{
  await page.setViewportSize({width,height:width===360?800:width===390?844:900});await page.goto('/');
