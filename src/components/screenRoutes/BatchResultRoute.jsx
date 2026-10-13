@@ -1,3 +1,5 @@
+import { useCallback, useMemo } from 'react';
+
 export default function BatchResultRoute({
   gs,
   sf,
@@ -5,6 +7,12 @@ export default function BatchResultRoute({
   setScreen,
   ScreenComponent,
 }) {
+  const context = sf.batchContext;
+  const currentContext = context && context.saveId === gs.saveId && context.year === gs.year
+    && context.myId === gs.myId && context.sessionToken === gs.getProgressSessionToken?.();
+  const map = currentContext ? gs.getGameResultsMap?.() : null;
+  const gameNumbers = useMemo(() => new Set((sf.batchResults || []).map(result => result?.gameNo)), [sf.batchResults]);
+  const getGameResult = useCallback(result => gameNumbers.has(result?.gameNo) ? map?.[result.gameNo] : undefined, [map, gameNumbers]);
   if (gs.screen !== 'batch_result') return null;
   // gameResult survives returning home and running another batch. Restore only
   // for the exact batch that opened the detail, not a previous batch/year.
@@ -18,13 +26,14 @@ export default function BatchResultRoute({
       saveDirty={gs.saveDirty}
       saveQueueState={gs.saveQueueState}
       saveResult={gs.saveResult}
-      canViewDetail={result => Boolean(gs.getGameResultsMap()?.[result.gameNo])}
+      getGameResult={getGameResult}
+      canViewDetail={result => Boolean(getGameResult(result))}
       returnGameNo={returning ? sf.gameResult.gameNo : undefined}
       initialVisibleCount={returning ? sf.gameResult._batchVisibleCount : undefined}
       onEnd={() => { gs.setTab('dashboard'); setScreen('hub'); }}
       onReviewRoster={() => { gs.setTab('roster'); setScreen('hub'); }}
       onViewDetail={(result, visibleCount) => {
-        const detail = gs.getGameResultsMap()?.[result.gameNo];
+        const detail = getGameResult(result);
         if (!detail) return;
         sf.setGameResult({
           score: { my: detail.myScore, opp: detail.oppScore },

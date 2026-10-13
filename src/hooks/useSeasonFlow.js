@@ -25,7 +25,6 @@ import { isTeamIdSet } from '../engine/teamId';
 const MAX_FOREIGN_ACTIVE = 4;
 let seasonPlayerModulePromise = null;
 let seasonScheduleModulePromise = null;
-let seasonSaveModulePromise = null;
 let seasonAllStarModulePromise = null;
 let seasonBattedBallArchiveModulePromise = null;
 
@@ -37,11 +36,6 @@ function loadSeasonPlayerModule() {
 function loadSeasonScheduleModule() {
   if (!seasonScheduleModulePromise) seasonScheduleModulePromise = import('../engine/scheduleGen');
   return seasonScheduleModulePromise;
-}
-
-function loadSeasonSaveModule() {
-  if (!seasonSaveModulePromise) seasonSaveModulePromise = import('../engine/saveload');
-  return seasonSaveModulePromise;
 }
 
 function loadSeasonAllStarModule() {
@@ -114,6 +108,7 @@ export function useSeasonFlow(gs) {
   const [gameMode, setGameMode] = useState(null);
   const [batchResults, setBatchResults] = useState([]);
   const [batchMeta, setBatchMeta] = useState(null);
+  const [batchContext, setBatchContext] = useState(null);
   const [playoffState, setPlayoffState] = useState(null);
   const savedPostseason = gs.offseasonPlan?.stage === 'postseason'
     && gs.offseasonPlan.year === year && gs.offseasonPlan.myId === myId ? gs.offseasonPlan.playoff : null;
@@ -915,6 +910,7 @@ export function useSeasonFlow(gs) {
       if(!gs.applyProgressCandidate) {setTeams(nextState.teams);setGameDay(nextState.gameDay);}
       setBatchMeta(batchMeta);
       setBatchResults(batchResults);
+      setBatchContext({ saveId, year, myId, sessionToken: gs.getProgressSessionToken?.() });
       const nextMatchHistory = gs.applyMatchResultPatch(result);
 
       if ((summaryCounts?.tradeMailCount || 0) > 0) {
@@ -931,19 +927,21 @@ export function useSeasonFlow(gs) {
         setScreen("batch_result");
       }
 
-      loadSeasonSaveModule()
-        .then((saveMod) => saveMod.enqueueSaveGame({ ...nextState, ...nextMatchHistory }, { skipBackupRotation: true, preferMainSave: true }))
+      const savedProgressToken = gs.getProgressToken?.();
+      const savedSessionToken = gs.getProgressSessionToken?.();
+      gs.handleSave({ payload: { ...nextState, ...nextMatchHistory }, silent: true,
+        saveOptions: { skipBackupRotation: true, preferMainSave: true } })
         .then((saveResult) => {
+          if (savedProgressToken !== gs.getProgressToken?.() || savedSessionToken !== gs.getProgressSessionToken?.()) return;
           if (!saveResult?.ok) {
             console.warn("[BatchSave] saveGame failed after batch", saveResult);
-            const feedback = saveFeedback(saveResult); notify(feedback.message, feedback.type);
             return;
           }
           setSaveRevision((prev) => Math.max(prev, Number(nextState.saveRevision) || prev));
           setSaveExists(true);
-          if (saveResult.warnings?.length) { const feedback = saveFeedback(saveResult); notify(feedback.message, feedback.type); }
         })
         .catch((error) => {
+          if (savedProgressToken !== gs.getProgressToken?.() || savedSessionToken !== gs.getProgressSessionToken?.()) return;
           console.warn("[BatchSave] saveGame failed after batch", error);
           notify(saveFeedback({ok:false}).message, "warn");
         });
@@ -1134,7 +1132,7 @@ export function useSeasonFlow(gs) {
     currentGameTeams, setCurrentGameTeams,
     gameMode, setGameMode,
     batchResults, setBatchResults,
-    batchMeta, setBatchMeta,
+    batchMeta, setBatchMeta, batchContext,
     playoff, setPlayoff,
     batchProgress,
     handleStartGame,

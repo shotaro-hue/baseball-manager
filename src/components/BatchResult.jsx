@@ -3,13 +3,16 @@ import '../calm-ui.css';
 import '../mobile-flow.css';
 import './batch-result.css';
 import { Button, StateLabel, Section } from './design-system/primitives';
+import { IS_HIT, IS_OUT } from '../constants';
 import { cancelDeferredPostGameWork, scheduleDeferredPostGameWork } from "../engine/postGameProcessing";
 
 const INITIAL_VISIBLE_RESULTS = 8;
 const VISIBLE_RESULTS_STEP = 8;
 
-function buildBatchPerfHighlights(results) {
-  const hrCounts = {};
+function buildBatchPerfHighlights(results, getGameResult) {
+  const hrCounts = new Map();
+  let recordedLogs = 0;
+  let incompleteLogs = 0;
   let biggestWin = null;
   let biggestLoss = null;
 
@@ -31,15 +34,35 @@ function buildBatchPerfHighlights(results) {
         margin,
       };
     }
-    for (const event of (result?.log || [])) {
-      if (event?.result === "hr" && event?.scorer) {
-        hrCounts[event.batter] = (hrCounts[event.batter] || 0) + 1;
+    const record = getGameResult ? getGameResult(result) : result;
+    const log = record?.log;
+    if (!Array.isArray(log)) continue;
+    let recorded = false;
+    let incomplete = false;
+    for (const event of log) {
+      if (!event || event.isStolenBase || ['change', 'sb', 'cs'].includes(event.result)) continue;
+      const plateAppearance = IS_HIT(event.result) || IS_OUT(event.result) || ['bb', 'hbp'].includes(event.result);
+      if (!plateAppearance || typeof event.scorer !== 'boolean') { incomplete = true; continue; }
+      if (!event.scorer) continue;
+      if (typeof event.batter !== 'string' || !event.batter.trim() || event.batter === '?') { incomplete = true; continue; }
+      recorded = true;
+      if (event.result === "hr") {
+        const hasId = typeof event.batId === 'string' && event.batId.trim()
+          || typeof event.batId === 'number' && Number.isFinite(event.batId);
+        const key = hasId ? `id:${typeof event.batId}:${event.batId}` : `name:${event.batter}`;
+        const row = hrCounts.get(key) ?? { key, name: event.batter, count: 0 };
+        row.count++;
+        hrCounts.set(key, row);
       }
     }
+    if (recorded) recordedLogs++;
+    if (incomplete) incompleteLogs++;
   }
 
   return {
-    hrList: Object.entries(hrCounts).sort((a, b) => b[1] - a[1]).slice(0, 3),
+    hrList: [...hrCounts.values()].sort((a, b) => b.count - a.count).slice(0, 3),
+    recordedLogs,
+    incompleteLogs,
     biggestWin,
     biggestLoss,
   };
@@ -61,6 +84,7 @@ export function BatchResultScreen({
   initialVisibleCount,
   returnGameNo,
   canViewDetail,
+  getGameResult,
   saveDirty = false,
   saveQueueState = {},
   saveResult = null,
@@ -102,7 +126,7 @@ export function BatchResultScreen({
     let cancelled = false;
     const handle = scheduleDeferredPostGameWork(() => {
       if (cancelled) return;
-      try { setDetailData(buildBatchPerfHighlights(safeResults)); }
+      try { setDetailData(buildBatchPerfHighlights(safeResults, getGameResult)); }
       catch { setDetailError('ハイライトの集計に失敗しました。試合結果と戻る操作は利用できます。'); }
       finally { setInternalProcessing(false); }
     });
@@ -111,14 +135,14 @@ export function BatchResultScreen({
       cancelled = true;
       cancelDeferredPostGameWork(handle);
     };
-  }, [safeResults, initialVisibleCount]);
+  }, [safeResults, initialVisibleCount, getGameResult]);
 
   const isBatchProcessing = isBatchProcessingProp ?? internalProcessing;
   const visibleResults = useMemo(() => safeResults.slice(0, visibleCount), [safeResults, visibleCount]);
   const hasMoreResults = safeResults.length > visibleCount;
 
   const tired = (myTeam?.players || []).filter(p => (p.condition ?? 70)<60 || (p.injuryDaysLeft || 0)>0);
-  const recordedLogs = safeResults.filter(result => Array.isArray(result.log) && result.log.length).length;
+  const recordedLogs = detailData?.recordedLogs ?? 0;
   const saving = saveQueueState.isSaving || saveQueueState.hasQueuedSave;
   const partial = saveResult?.archive?.ok === false || saveResult?.warnings?.length > 0;
   const saveLabel = saving ? '保存中' : saveResult?.ok === false ? '保存失敗' : saveDirty ? '保存待ち'
@@ -162,11 +186,12 @@ export function BatchResultScreen({
         {hasMoreResults && <Button variant="secondary" onClick={() => setVisibleCount(count => Math.min(safeResults.length, count + VISIBLE_RESULTS_STEP))}>続きを表示</Button>}
       </Section>
       <div className="batch-highlights"><Section title="打撃ハイライト">
-        <p className="batch-note">この期間の自球団の本塁打。ログ記録あり {recordedLogs}/{summary.totalGames}試合。</p>
+        <p className="batch-note">この期間の自球団の本塁打。{detailData ? `ログ記録あり ${recordedLogs}/${summary.totalGames}試合。` : 'ログ記録を確認中。'}</p>
+        {detailData?.incompleteLogs > 0 && <p className="batch-note">打席ログが不完全な試合 {detailData.incompleteLogs}試合。確認できた記録のみ集計しています。</p>}
         {detailError ? <p role="alert" className="batch-error">{detailError}</p> : !detailData ? <p className="batch-note">集計中...</p>
           : !recordedLogs ? <p className="batch-note">打撃ハイライトは未記録です。</p>
-            : detailData.hrList.length ? detailData.hrList.map(([name, count]) => <div className="batch-highlight-row" key={name}><strong>{name}</strong><span>{count}本塁打</span></div>)
-              : <p className="batch-note">本塁打なし（記録あり試合のみ）</p>}
+            : detailData.hrList.length ? detailData.hrList.map(({ key, name, count }) => <div className="batch-highlight-row" key={key}><strong>{name}</strong><span>{count}本塁打</span></div>)
+              : <p className="batch-note">{detailData.incompleteLogs > 0 ? '一部の打席ログが不完全なため、本塁打数は未確認です。' : '本塁打なし（記録あり試合のみ）'}</p>}
       </Section>
       {batchMeta && <details className="batch-disclosure"><summary>負傷・リーグの詳細</summary>
         <h2>この期間の負傷アラート</h2>{!(batchMeta.injuries || []).length && <p>負傷なし</p>}
