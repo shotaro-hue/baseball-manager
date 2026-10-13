@@ -48,7 +48,9 @@ batch context/request IDは表示用の一時情報で、セーブpayloadへ追�
 独立レビューで複数chunkの途中完了と不正ログの実測0表示を検出。
 実archiveキュー＋fake IndexedDBで後続chunk待機/失敗を再現し、全chunkのsettle後の失敗残数まで確認する修正でRED→GREEN。
 不正・非打席・名前欠損のみのログと、有効out＋名前不明HRもRED→GREEN。不完全な打席は確認済み0と区別する。
-レビュー後の最終版は新規3E2Eと390px表示ケースを再実行し、通常CIで全Unit/Build/中核E2Eを確認する。
+レビュー後の最終版: 新規3E2E＋390px表示ケースの4件成功（1.8分）。
+画像の日本語フォント欠落を解消し、同一fixtureの6画像を撮り直し。日本語表示で390px＋実新規ゲームの2件も成功（45秒）。
+通常CIで全Unit/Build/中核E2Eを確認する。
 通常CIの最終head結果は本PRに記録する。全E2Eを重複実行しない。
 Buildの既存500kB chunk警告は残る。新しい依存・テストskip/削除はない。
 
