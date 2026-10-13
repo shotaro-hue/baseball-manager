@@ -1,9 +1,11 @@
+import { registerHistoryDesignCases } from './helpers/history-design-cases';
 import { test, expect } from '@playwright/test';
 import { startNewGame, runSingle, runBatch, startSingle, saveHub, reloadAndLoad, loadFixture, readSave } from './helpers/progression';
 import { registerResultDecisionCases, resultDecisionRows, savedDecisionRows } from './helpers/result-decision-cases';
 import { registerResultDesignCases } from './helpers/result-design-cases';
 import { registerRosterDesignCases } from './helpers/roster-design-cases';
 
+registerHistoryDesignCases();
 registerResultDecisionCases();
 registerResultDesignCases();
 registerRosterDesignCases();

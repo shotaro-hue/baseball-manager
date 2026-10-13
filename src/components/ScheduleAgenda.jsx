@@ -15,7 +15,7 @@ export function ScheduleAgenda({ cells, teams, selectedDay, gameDay, onSelect, o
             <small>{matchup.isHome ? 'ホーム' : 'ビジター'}{matchup.isInterleague ? '・交流戦' : ''}{matchup.venueNote ? `・代替開催: ${matchup.venueNote === 'kyocera' ? '京セラ' : matchup.venueNote}` : ''}</small>
           </> : <span className="flow-muted">試合なし</span>}
         </div>
-        {result && <button className="schedule-score" onClick={() => onResultClick(cell.dayNo)} aria-label={`${cell.date.month}月${cell.date.day}日 ${opponent?.name || result.oppName || ''}戦の結果 ${outcome} ${result.myScore}対${result.oppScore}`}>
+        {result && <button className="schedule-score" data-history-game={cell.dayNo} onClick={() => onResultClick(cell.dayNo)} aria-label={`${cell.date.month}月${cell.date.day}日 ${opponent?.name || result.oppName || ''}戦の結果 ${outcome} ${result.myScore}対${result.oppScore}`}>
           <strong>{result.myScore} − {result.oppScore}</strong><small>{outcome}・詳細</small>
         </button>}
       </div>;

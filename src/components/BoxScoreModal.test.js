@@ -82,3 +82,24 @@ describe('BoxScoreModal saved result compatibility', () => {
     }
   });
 });
+
+it('identifies the archived year, date and score perspective', () => {
+  const markup = renderToStaticMarkup(React.createElement(BoxScoreModal, {
+    result: record(), myTeamName: 'Own Club', oppTeamName: 'Opponent Club', teamId: 0,
+    dayNo: 1, date: { month: 3, day: 31 }, year: 2025, onClose() {},
+  }));
+  assert.ok(markup.includes('2025年3月31日'));
+  assert.ok(markup.includes('Own Clubの視点'));
+});
+it('shows available opponent records when own-side details are absent', () => {
+  const markup = render({ ...record(), oppBatting: opponent.batting });
+  assert.ok(markup.includes('opponent-hitter'));
+  assert.equal(markup.includes('詳細成績データなし'), false);
+});
+it('distinguishes a missing inning score and player field from a recorded zero', () => {
+  const markup = render({ ...record(), inningScores: [{inning:1,home:0}],
+    myBatting:[{id:0,name:'打者',AB:0,H:0}], myPitching:[] });
+  assert.match(markup, /<td[^>]*>—<\/td>/);
+  assert.ok(markup.includes('未記録'));
+  assert.match(markup, /<td[^>]*>0<\/td>/);
+});

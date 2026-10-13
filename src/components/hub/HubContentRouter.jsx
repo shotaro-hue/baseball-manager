@@ -218,6 +218,10 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
   }
 
   if (tab === 'schedule') {
+    const previousView = sf.gameResult?._source === 'schedule' ? sf.gameResult._scheduleView : null;
+    const returnView = previousView && previousView.year === year && previousView.gameDay === gameDay
+      && previousView.saveId === gs.saveId && previousView.myId === myId
+      && previousView.sessionToken === gs.getProgressSessionToken?.() ? previousView : null;
     return (
       <ScheduleTab
         schedule={schedule}
@@ -230,7 +234,9 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
         allStarResult={gs.allStarResult}
         allStarTriggerDay={gs.allStarTriggerDay}
         scheduleArchive={gs.scheduleArchive || []}
-        onResultClick={(dayNo) => {
+        initialView={returnView}
+        onReturnViewConsumed={() => sf.setGameResult(previous => previous ? { ...previous, _scheduleView: null } : previous)}
+        onResultClick={(dayNo, selection) => {
           const result = gs.gameResultsMap[dayNo];
           if (!result) return;
           sf.setGameResult({
@@ -242,6 +248,7 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
             isHome: result.isHome,
             gameNo: dayNo,
             _source: 'schedule',
+            _scheduleView: { ...selection, year, gameDay, saveId: gs.saveId, myId, sessionToken: gs.getProgressSessionToken?.() },
           });
           gs.setScreen('result');
         }}

@@ -1,0 +1,52 @@
+/* UI-01E: only schedule/history surfaces opt in. Other club tabs keep their styles. */
+.history-schedule[data-ds], .team-history[data-ds] { color:var(--ds-text); background:var(--ds-canvas); padding:16px; display:grid; gap:24px; font-size:16px; line-height:1.6; border:0; border-radius:6px; }
+.history-schedule[data-ds] h1 { margin:0; font-size:26px; line-height:1.3; }
+.history-schedule[data-ds] .card { margin:0; padding:16px; background:var(--ds-surface); color:var(--ds-text); border:1px solid var(--ds-divider); border-radius:6px; box-shadow:none; min-width:0; }
+.history-schedule[data-ds] .card-h { font-size:18px; color:var(--ds-text); margin-bottom:12px; }
+.history-schedule[data-ds] button, .team-history[data-ds] button { min-height:44px; padding:8px 12px; font-size:14px; border-radius:4px; color:var(--ds-accent); background:var(--ds-surface); border:1px solid var(--ds-control-border); white-space:normal; overflow-wrap:anywhere; cursor:pointer; }
+.history-schedule[data-ds] button:focus-visible, .team-history[data-ds] button:focus-visible, .history-schedule[data-ds] [tabindex]:focus-visible { outline:3px solid var(--ds-focus); outline-offset:3px; }
+.history-schedule[data-ds] button[aria-pressed="true"], .team-history[data-ds] button[aria-pressed="true"] { background:var(--ds-selected); color:var(--ds-accent); border-color:var(--ds-accent); }
+.history-schedule[data-ds] .flow-tabs { display:flex; gap:8px; margin:12px 0; }
+.history-schedule[data-ds] .flow-tabs button { min-height:48px; border:0; border-bottom:3px solid transparent; border-radius:0; background:transparent; }
+.history-schedule[data-ds] .flow-tabs button[aria-pressed="true"] { border-bottom-color:var(--ds-accent); }
+.history-schedule[data-ds] .schedule-months { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.history-schedule[data-ds] .schedule-agenda-row { display:grid; grid-template-columns:48px minmax(0,1fr) auto; gap:8px; padding:12px 0; border:0; border-bottom:1px solid var(--ds-divider); border-radius:0; background:var(--ds-surface); }
+.history-schedule[data-ds] .schedule-agenda-row[data-selected="true"] { background:var(--ds-selected); }
+.history-schedule[data-ds] .schedule-agenda-date { color:var(--ds-muted); font-size:14px; }
+.history-schedule[data-ds] .schedule-agenda-match { min-width:0; overflow-wrap:anywhere; }
+.history-schedule[data-ds] .schedule-opponent { padding:4px; text-align:left; width:100%; background:transparent; border:0; color:var(--ds-text); font-weight:700; }
+.history-schedule[data-ds] .schedule-score { min-width:76px; padding:4px 8px; }
+.history-schedule[data-ds] .schedule-agenda-row small { display:block; font-size:12px; color:var(--ds-muted); }
+.history-schedule[data-ds] .schedule-calendar-scroll { max-width:100%; overflow-x:auto; }
+.history-schedule[data-ds] .schedule-calendar-grid { min-width:700px; padding:4px; }
+.history-schedule[data-ds] .history-progress { padding:16px; background:var(--ds-navy); color:var(--ds-inverse); border-radius:6px; }
+.history-progress-heading { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; font-size:14px; margin-bottom:8px; }
+.history-progress-track { height:6px; border-radius:3px; background:var(--ds-control-border); overflow:hidden; }
+.history-progress-track > div { height:100%; background:var(--ds-inverse); }
+.team-history .team-history-intro { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding-bottom:16px; border-bottom:1px solid var(--ds-divider); }
+.team-history h2 { margin:0; font-size:18px; }
+.team-history .team-history-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:12px 0; border-bottom:1px solid var(--ds-divider); background:var(--ds-surface); }
+.team-history .team-history-opponent { min-width:100px; flex:1; overflow-wrap:anywhere; }
+.history-score-overlay { position:fixed; inset:0; z-index:1000; padding:16px; overflow-y:auto; display:flex; align-items:flex-start; justify-content:center; background:rgba(14,38,59,.72); }
+.history-score-dialog[data-ds] { width:100%; max-width:1000px; margin:0 0 16px; padding:16px; background:var(--ds-surface); color:var(--ds-text); border-radius:6px; box-shadow:0 8px 32px rgba(14,38,59,.25); font-size:16px; line-height:1.6; }
+.history-score-dialog .history-score-header { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+.history-score-dialog .history-score-header > div { min-width:0; }
+.history-score-dialog h1 { margin:0 0 16px; font-size:26px; line-height:1.3; }
+.history-score-dialog .history-context { color:var(--ds-muted); font-size:12px; margin:0 0 4px; }
+.history-score-dialog .history-score-band { background:var(--ds-navy); color:var(--ds-inverse); padding:16px; border-radius:6px; }
+.history-score-band p { color:var(--ds-inverse-muted); font-size:12px; margin:0 0 8px; }
+.history-score-clubs { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); gap:12px; text-align:center; align-items:center; }
+.history-score-clubs strong { font-size:14px; overflow-wrap:anywhere; }
+.history-score-clubs strong span { display:block; font-size:40px; line-height:1.3; }
+.history-score-band [data-ds="state"] { margin-top:12px; }
+.history-score-dialog .history-record-note { margin:16px 0; color:var(--ds-muted); font-size:12px; }
+.history-score-dialog .history-empty { padding:16px; background:var(--ds-canvas); color:var(--ds-muted); font-size:14px; }
+.history-score-dialog .history-player-table { min-width:0; margin-top:24px; }
+.history-score-dialog h2 { margin:0 0 12px; font-size:18px; }
+.history-score-dialog table { min-width:460px; }
+.history-score-dialog [data-ds="table"] :is(td,th):first-child { width:140px; min-width:140px; max-width:140px; }
+.history-score-dialog td small { display:block; font-size:12px; color:var(--ds-muted); }
+@media(min-width:1024px) { .history-score-dialog[data-ds] {padding:24px;} .history-score-tables {display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 24px;} .history-score-dialog h1 {font-size:28px;} .history-score-clubs strong span {font-size:44px;} }
+
+.calm-shell:has(.history-schedule[data-ds="history"]) { background:#F4F6F9; }
+.history-schedule[data-ds] .card-h { letter-spacing:normal; font-weight:700; }

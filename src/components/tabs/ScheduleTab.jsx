@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { gameDayToDate } from '../../utils';
 import { getMyMatchup } from '../../engine/scheduleLookup';
 import { SEASON_GAMES } from '../../constants';
 import { BoxScoreModal } from '../BoxScoreModal';
 import { ScheduleAgenda } from '../ScheduleAgenda';
-import { useResultDialog } from '../useResultDialog';
+import '../design-system/foundation.css';
+import '../match-history.css';
 
 const MONTH_LABELS = ['3月','4月','5月','6月','7月','8月','9月','10月'];
 // 月曜始まり: 0=月,1=火,2=水,3=木,4=金,5=土,6=日
@@ -131,47 +132,6 @@ function buildMonthGrid(schedule, year, myId, month, gameResultsMap, dayIndexByD
   return weeks;
 }
 
-// 結果モーダル
-function ResultModal({ dayNo, result, date, year, opponent, onClose }) {
-  const dialogRef = useResultDialog(onClose, Boolean(result));
-  if (!result) return null;
-  const { won, drew, myScore, oppScore } = result;
-  const resultLabel = drew ? '引き分け' : won ? '勝利' : '敗北';
-  const resultColor = drew ? '#53657c' : won ? '#14714b' : '#b42332';
-  const scoreBig = `${myScore} - ${oppScore}`;
-
-  return (
-    <div
-      onClick={onClose}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-    >
-      <div
-        ref={dialogRef} className="calm-detail detail-score-dialog" role="dialog" aria-modal="true" aria-label="試合結果"
-        onClick={e => e.stopPropagation()}
-        style={{ background: '#fff', border: '1px solid rgba(148,163,184,.25)', borderRadius: 14, padding: '24px 28px', minWidth: 260, maxWidth: 340, position: 'relative' }}
-      >
-        <button
-          aria-label="試合結果を閉じる"
-          onClick={onClose}
-          style={{ position: 'absolute', top: 10, right: 12, background: 'none', border: 'none', color: '#53657c', fontSize: 18, cursor: 'pointer', lineHeight: 1 }}
-        >✕</button>
-        <div style={{ fontSize: 14, color: '#53657c', marginBottom: 4 }}>
-          第{dayNo}戦 — {formatDate(date)}({weekdayName(year, date)})
-        </div>
-        <div style={{ fontSize: 13, color: '#53657c', marginBottom: 10 }}>vs {opponent}</div>
-        <div style={{ fontSize: 38, fontWeight: 700, color: '#17243a', textAlign: 'center', letterSpacing: 4, marginBottom: 12 }}>
-          {scoreBig}
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <span style={{ background: drew ? 'rgba(107,114,128,.2)' : won ? 'rgba(74,222,128,.15)' : 'rgba(248,113,113,.15)', color: resultColor, border: `1px solid ${resultColor}40`, borderRadius: 6, padding: '4px 18px', fontSize: 14, fontWeight: 700 }}>
-            {resultLabel}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // 月別週グリッドセル
 function GridCell({ cell, year, teamMap, isToday, isSelected, onSelect, onResultClick, allStarResult }) {
   if (cell.type === 'other') {
@@ -192,11 +152,11 @@ function GridCell({ cell, year, teamMap, isToday, isSelected, onSelect, onResult
           cursor: 'default',
         }}
       >
-        <div style={{ fontSize: 14, color: '#805700', fontWeight: 700 }}>{cell.date.day}</div>
-        <div style={{ fontSize: 14, color: '#805700', marginTop: 2, fontWeight: 700 }}>⭐ AS第{cell.allStarGame}戦</div>
-        <div style={{ fontSize: 14, color: '#53657c', marginTop: 1 }}>セ vs パ</div>
+        <div style={{ fontSize: 14, color: 'var(--ds-warning)', fontWeight: 700 }}>{cell.date.day}</div>
+        <div style={{ fontSize: 14, color: 'var(--ds-warning)', marginTop: 2, fontWeight: 700 }}>AS第{cell.allStarGame}戦</div>
+        <div style={{ fontSize: 14, color: 'var(--ds-muted)', marginTop: 1 }}>セ vs パ</div>
         {asResult && (
-          <div style={{ fontSize: 14, color: '#805700', marginTop: 2, fontWeight: 700 }}>
+          <div style={{ fontSize: 14, color: 'var(--ds-warning)', marginTop: 2, fontWeight: 700 }}>
             {asResult.score.ce}-{asResult.score.pa}
           </div>
         )}
@@ -206,9 +166,9 @@ function GridCell({ cell, year, teamMap, isToday, isSelected, onSelect, onResult
 
   if (cell.type === 'off') {
     return (
-      <div style={{ minHeight: 54, background: cell.isAllStar ? 'rgba(245,200,66,.12)' : '#f6f9fd', border: cell.isAllStar ? '1px solid rgba(245,200,66,.35)' : '1px solid transparent', borderRadius: 6, padding: '4px 6px' }}>
-        <div style={{ fontSize: 14, color: '#53657c' }}>{cell.date.day}</div>
-        <div style={{ fontSize: 14, color: cell.isAllStar ? '#805700' : '#53657c', marginTop: 2 }}>{cell.isAllStar ? 'AS' : '休'}</div>
+      <div style={{ minHeight: 54, background: cell.isAllStar ? 'rgba(245,200,66,.12)' : 'var(--ds-canvas)', border: cell.isAllStar ? '1px solid rgba(245,200,66,.35)' : '1px solid transparent', borderRadius: 6, padding: '4px 6px' }}>
+        <div style={{ fontSize: 14, color: 'var(--ds-muted)' }}>{cell.date.day}</div>
+        <div style={{ fontSize: 14, color: cell.isAllStar ? 'var(--ds-warning)' : 'var(--ds-muted)', marginTop: 2 }}>{cell.isAllStar ? 'AS' : '休'}</div>
       </div>
     );
   }
@@ -217,8 +177,8 @@ function GridCell({ cell, year, teamMap, isToday, isSelected, onSelect, onResult
   const { matchup, result, dayNo, date } = cell;
   if (!matchup) {
     return (
-      <div style={{ minHeight: 54, background: '#f6f9fd', borderRadius: 6, padding: '4px 6px' }}>
-        <div style={{ fontSize: 14, color: '#53657c' }}>{date.day}</div>
+      <div style={{ minHeight: 54, background: 'var(--ds-canvas)', borderRadius: 6, padding: '4px 6px' }}>
+        <div style={{ fontSize: 14, color: 'var(--ds-muted)' }}>{date.day}</div>
       </div>
     );
   }
@@ -230,19 +190,19 @@ function GridCell({ cell, year, teamMap, isToday, isSelected, onSelect, onResult
   let bg = cell.isAllStar
     ? 'rgba(245,200,66,.14)'
     : isInterleague
-    ? 'rgba(167,139,250,.12)'
+    ? 'var(--ds-canvas)'
     : isHome
-    ? 'rgba(74,222,128,.1)'
-    : 'rgba(96,165,250,.1)';
+    ? 'var(--ds-success-surface)'
+    : 'var(--ds-selected)';
   let borderColor = isSelected
-    ? 'rgba(245,200,66,.7)'
+    ? 'var(--ds-accent)'
     : isToday
-    ? 'rgba(245,200,66,.4)'
+    ? 'var(--ds-control-border)'
     : 'rgba(148,163,184,.12)';
 
   const hasResult = !!result;
   const resultColor = result
-    ? result.drew ? '#53657c' : result.won ? '#14714b' : '#b42332'
+    ? result.drew ? 'var(--ds-muted)' : result.won ? 'var(--ds-success)' : 'var(--ds-danger)'
     : null;
 
   return (
@@ -260,21 +220,22 @@ function GridCell({ cell, year, teamMap, isToday, isSelected, onSelect, onResult
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <button className="calendar-day-button" aria-label={`${date.month}月${date.day}日 ${opp?.name || '対戦相手'}を選択`} aria-pressed={isSelected} onClick={e => { e.stopPropagation(); onSelect(dayNo); }}>{date.day}</button>
-        <div style={{ fontSize: 14, color: isHome ? '#14714b' : '#095cc7' }}>{isHome ? 'H' : 'V'}</div>
+        <div style={{ fontSize: 14, color: isHome ? 'var(--ds-success)' : 'var(--ds-accent)' }}>{isHome ? 'H' : 'V'}</div>
       </div>
-      <div style={{ fontSize: 14, color: '#17243a', marginTop: 2, lineHeight: 1.3, fontWeight: 600 }}>
+      <div style={{ fontSize: 14, color: 'var(--ds-text)', marginTop: 2, lineHeight: 1.3, fontWeight: 600 }}>
         {opp?.short || opp?.name?.slice(0,4) || '?'}
       </div>
-      {isInterleague && <div style={{ fontSize: 14, color: '#7050ad', marginTop: 1 }}>交流</div>}
-      {cell.isAllStar && <div style={{ fontSize: 14, color: '#805700', marginTop: 1, fontWeight: 700 }}>AS</div>}
+      {isInterleague && <div style={{ fontSize: 14, color: 'var(--ds-muted)', marginTop: 1 }}>交流</div>}
+      {cell.isAllStar && <div style={{ fontSize: 14, color: 'var(--ds-warning)', marginTop: 1, fontWeight: 700 }}>AS</div>}
       {hasResult && (
         <button
+          data-history-game={dayNo}
           onClick={e => { e.stopPropagation(); onResultClick(dayNo); }}
           style={{
             display: 'block',
             marginTop: 3,
             background: 'none',
-            border: `1px solid ${resultColor}50`,
+            border: `1px solid var(--ds-control-border)`,
             borderRadius: 3,
             padding: '1px 4px',
             fontSize: 14,
@@ -292,47 +253,41 @@ function GridCell({ cell, year, teamMap, isToday, isSelected, onSelect, onResult
   );
 }
 
-// シーズン進捗バー
+// Existing progression values are display-only; no game calculation changes.
 function SeasonProgressBar({ gameDay, wins, losses }) {
   const played = gameDay - 1;
   const pct = Math.min(100, Math.round(played / SEASON_GAMES * 100));
   const winPct = wins + losses > 0 ? (wins / (wins + losses)).toFixed(3).replace(/^0/, '') : '---';
-  return (
-    <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(148,163,184,.12)', borderRadius: 10, padding: '10px 14px', marginBottom: 0 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-        <div style={{ fontSize: 14, color: '#53657c' }}>シーズン進捗</div>
-        <div style={{ fontSize: 14, color: '#334962' }}>
-          <span style={{ fontWeight: 700, color: '#17243a' }}>{played}</span>
-          <span style={{ color: '#53657c' }}>/{SEASON_GAMES}試合</span>
-          <span style={{ marginLeft: 10, color: '#14714b' }}>{wins}勝</span>
-          <span style={{ marginLeft: 4, color: '#b42332' }}>{losses}敗</span>
-          <span style={{ marginLeft: 8, color: '#53657c', fontSize: 14 }}>勝率 {winPct}</span>
-        </div>
-      </div>
-      <div style={{ height: 6, background: 'rgba(148,163,184,.1)', borderRadius: 3, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: '#095cc7', borderRadius: 3, transition: 'width .3s' }} />
-      </div>
-    </div>
-  );
+  return <div className="history-progress"><div className="history-progress-heading"><span>シーズン進捗</span><span>{played}/{SEASON_GAMES}試合 · {wins}勝 {losses}敗 · 勝率 {winPct}</span></div><div className="history-progress-track"><div style={{width:`${pct}%`}}/></div></div>;
 }
 
-export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResultsMap = {}, allStarDone = false, allStarResult = null, allStarTriggerDay = 72, onResultClick = null, scheduleArchive = [] }) {
-  const [selectedDay, setSelectedDay] = useState(gameDay);
+export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResultsMap = {}, allStarDone = false, allStarResult = null, allStarTriggerDay = 72, onResultClick = null, scheduleArchive = [], initialView = null, onReturnViewConsumed }) {
+  const [selectedDay, setSelectedDay] = useState(initialView?.selectedDay ?? gameDay);
   const [resultModal, setResultModal] = useState(null); // dayNo or null
   const [boxScoreModal, setBoxScoreModal] = useState(null); // { dayNo, result } or null
   const [viewYear, setViewYear] = useState(year);
-  const [displayMode, setDisplayMode] = useState('list');
+  const [displayMode, setDisplayMode] = useState(initialView?.displayMode ?? 'list');
 
-  // 現シーズンに切り替わったら表示年をリセット
+  const clockRef = useRef({year, gameDay, viewYear: year});
+  const rootRef = useRef(null);
   useEffect(() => {
-    setViewYear(year);
-    setSelectedDay(gameDay);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year]);
-
-  useEffect(() => {
-    if (viewYear === year) setSelectedDay(gameDay);
+    const previous = clockRef.current;
+    if (previous.year !== year) { setViewYear(year); setSelectedDay(gameDay); }
+    else if (viewYear === year && (previous.gameDay !== gameDay || previous.viewYear !== viewYear)) setSelectedDay(gameDay);
+    clockRef.current = {year, gameDay, viewYear};
   }, [gameDay, viewYear, year]);
+  useEffect(() => {
+    if (!initialView) return;
+    onReturnViewConsumed?.();
+    if (!initialView.returnGameNo || typeof window === 'undefined') return;
+    const frame = requestAnimationFrame(() => {
+      const calendar = rootRef.current?.querySelector('.schedule-calendar-scroll');
+      if (calendar) calendar.scrollLeft = initialView.calendarScrollLeft ?? 0;
+      rootRef.current?.querySelector(`[data-history-game="${initialView.returnGameNo}"]`)?.focus({preventScroll:true});
+      window.scrollTo(0, initialView.scrollY ?? 0);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   // 表示対象シーズンのデータ
   const archived = useMemo(() => scheduleArchive.find(a => a.year === viewYear), [scheduleArchive, viewYear]);
@@ -399,9 +354,9 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
 
   if (!schedule || !myTeam) {
     return (
-      <div className="card">
-        <div className="card-h">🗓️ 日程</div>
-        <div style={{ fontSize: 14, color: '#53657c' }}>日程を読み込み中です…</div>
+      <div data-ds="history" className="history-schedule" role="status">
+        <h1>日程・結果</h1>
+        <div style={{ fontSize: 14, color: 'var(--ds-muted)' }}>日程を読み込み中です…</div>
       </div>
     );
   }
@@ -415,12 +370,15 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
 
   const openResult = (dayNo) => {
     if (!isPast) {
-      (onResultClick || setResultModal)(dayNo);
+      if (onResultClick) onResultClick(dayNo, {selectedDay, displayMode, returnGameNo: dayNo,
+        scrollY: typeof window === 'undefined' ? 0 : window.scrollY,
+        calendarScrollLeft: rootRef.current?.querySelector('.schedule-calendar-scroll')?.scrollLeft ?? 0});
+      else setResultModal(dayNo);
       return;
     }
     const boxResult = viewBoxResultsMap?.[dayNo];
-    if (boxResult && (boxResult.inningScores || boxResult.myBatting || boxResult.myPitching || boxResult.homeBatting || boxResult.homePitching)) {
-      setBoxScoreModal({ dayNo, result: boxResult });
+    if (boxResult) {
+      setBoxScoreModal({ dayNo, result: { ...viewResultsMap[dayNo], ...boxResult } });
     } else {
       setResultModal(dayNo);
     }
@@ -429,13 +387,13 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
   const currentGrid = monthGrids.find(m => m.month === selectedMonth) || monthGrids[0];
 
   return (
-    <div className="calm-detail detail-schedule" style={{ display: 'grid', gap: 12 }}>
+    <div ref={rootRef} data-ds="history" className="history-schedule">
       <h1>日程・結果</h1>
       {/* 年度セレクター（アーカイブがある場合のみ表示） */}
       {scheduleArchive.length > 0 && (
         <div className="card" style={{ padding: '10px 14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 14, color: '#53657c' }}>シーズン:</span>
+            <span style={{ fontSize: 14, color: 'var(--ds-muted)' }}>シーズン:</span>
             {availableYears.map(y => (
               <button
                 key={y}
@@ -449,12 +407,12 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
             ))}
           </div>
           {isPast && pastRecord && (
-            <div style={{ marginTop: 8, fontSize: 14, color: '#53657c' }}>
+            <div style={{ marginTop: 8, fontSize: 14, color: 'var(--ds-muted)' }}>
               {viewYear}年 最終成績:
-              <span style={{ color: '#14714b', marginLeft: 6, fontWeight: 700 }}>{pastRecord.w}勝</span>
-              <span style={{ color: '#b42332', marginLeft: 4, fontWeight: 700 }}>{pastRecord.l}敗</span>
-              {pastRecord.d > 0 && <span style={{ color: '#53657c', marginLeft: 4, fontWeight: 700 }}>{pastRecord.d}分</span>}
-              <span style={{ color: '#53657c', marginLeft: 8 }}>（{pastRecord.w + pastRecord.l + pastRecord.d}試合）</span>
+              <span style={{ color: 'var(--ds-success)', marginLeft: 6, fontWeight: 700 }}>{pastRecord.w}勝</span>
+              <span style={{ color: 'var(--ds-danger)', marginLeft: 4, fontWeight: 700 }}>{pastRecord.l}敗</span>
+              {pastRecord.d > 0 && <span style={{ color: 'var(--ds-muted)', marginLeft: 4, fontWeight: 700 }}>{pastRecord.d}分</span>}
+              <span style={{ color: 'var(--ds-muted)', marginLeft: 8 }}>（{pastRecord.w + pastRecord.l + pastRecord.d}試合）</span>
             </div>
           )}
         </div>
@@ -466,21 +424,21 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
       {/* 今日のカード（現シーズンのみ） */}
       {!isPast && (
       <div className="card">
-        <div className="card-h">🗓️ 今日のカード</div>
+        <div className="card-h">今日のカード</div>
         {todayMatchup && todayOpponent ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
             <div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#17243a' }}>vs {todayOpponent.name}</div>
-              <div style={{ fontSize: 14, color: '#53657c', marginTop: 4 }}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--ds-text)' }}>vs {todayOpponent.name}</div>
+              <div style={{ fontSize: 14, color: 'var(--ds-muted)', marginTop: 4 }}>
                 {formatDate(todayDate)} ({weekdayName(year, todayDate)}) 第{gameDay}戦
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                <span className="chip" style={{ background: todayMatchup.isHome ? 'rgba(74,222,128,.12)' : 'rgba(96,165,250,.12)', color: todayMatchup.isHome ? '#14714b' : '#095cc7' }}>
+                <span className="chip" style={{ background: todayMatchup.isHome ? 'rgba(74,222,128,.12)' : 'rgba(96,165,250,.12)', color: todayMatchup.isHome ? 'var(--ds-success)' : 'var(--ds-accent)' }}>
                   {todayMatchup.isHome ? 'ホーム開催' : 'ビジター'}
                 </span>
-                {todayMatchup.isInterleague && <span className="chip cy">🔄 交流戦</span>}
-                {(gameDay===allStarTriggerDay||gameDay===allStarTriggerDay+1) && <span className="chip" style={{ background: 'rgba(245,200,66,.18)', color: '#805700' }}>⭐ オールスター開催日</span>}
-                {todayMatchup.venueNote && <span style={{ fontSize: 14, color: '#805700' }}>{venueNoteLabel(todayMatchup.venueNote)}</span>}
+                {todayMatchup.isInterleague && <span className="chip cy">交流戦</span>}
+                {(gameDay===allStarTriggerDay||gameDay===allStarTriggerDay+1) && <span className="chip" style={{ background: 'rgba(245,200,66,.18)', color: 'var(--ds-warning)' }}>オールスター開催日</span>}
+                {todayMatchup.venueNote && <span style={{ fontSize: 14, color: 'var(--ds-warning)' }}>{venueNoteLabel(todayMatchup.venueNote)}</span>}
               </div>
             </div>
             {selectedDay !== gameDay && (
@@ -492,7 +450,7 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
             )}
           </div>
         ) : (
-          <div style={{ fontSize: 14, color: '#53657c' }}>今日の対戦情報がありません。</div>
+          <div style={{ fontSize: 14, color: 'var(--ds-muted)' }}>今日の対戦情報がありません。</div>
         )}
       </div>
       )}
@@ -500,7 +458,7 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
       {/* 今後8試合（現シーズンのみ） */}
       {!isPast && upcoming.length > 0 && (
         <div className="card">
-          <div className="card-h">⏭️ 今後8試合</div>
+          <div className="card-h">今後8試合</div>
           <div style={{ display: 'grid', gap: 6 }}>
             {upcoming.map(item => (
               <button
@@ -510,8 +468,8 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
                 style={{
                   textAlign: 'left',
                   padding: '8px 12px',
-                  border: selectedDay === item.day ? '1px solid rgba(245,200,66,.6)' : '1px solid rgba(148,163,184,.18)',
-                  background: selectedDay === item.day ? 'rgba(245,200,66,.08)' : '#f6f9fd',
+                  border: selectedDay === item.day ? '1px solid var(--ds-accent)' : '1px solid rgba(148,163,184,.18)',
+                  background: selectedDay === item.day ? 'var(--ds-selected)' : 'var(--ds-canvas)',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
@@ -519,20 +477,20 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
                 }}
               >
                 <div>
-                  <span style={{ fontSize: 14, color: '#53657c' }}>
+                  <span style={{ fontSize: 14, color: 'var(--ds-muted)' }}>
                     第{item.day}戦 {formatDate(item.date)}({weekdayName(year, item.date)})
                   </span>
                   {item.card && (
-                    <span style={{ fontSize: 14, color: '#805700', marginLeft: 8, fontWeight: 700 }}>
+                    <span style={{ fontSize: 14, color: 'var(--ds-warning)', marginLeft: 8, fontWeight: 700 }}>
                       CARD {item.card.index}/{item.card.total}
                     </span>
                   )}
-                  <span style={{ fontSize: 13, color: '#17243a', marginLeft: 10, fontWeight: 600 }}>
+                  <span style={{ fontSize: 13, color: 'var(--ds-text)', marginLeft: 10, fontWeight: 600 }}>
                     vs {item.opponent?.name}
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  <span className="chip" style={{ background: item.matchup.isHome ? 'rgba(74,222,128,.12)' : 'rgba(96,165,250,.12)', color: item.matchup.isHome ? '#14714b' : '#095cc7' }}>
+                  <span className="chip" style={{ background: item.matchup.isHome ? 'rgba(74,222,128,.12)' : 'rgba(96,165,250,.12)', color: item.matchup.isHome ? 'var(--ds-success)' : 'var(--ds-accent)' }}>
                     {item.matchup.isHome ? 'H' : 'V'}
                   </span>
                   {item.matchup.isInterleague && <span className="chip cy">交流</span>}
@@ -556,24 +514,24 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
         {!currentGrid && <p className="flow-muted">この年度の日程は保存されていません。</p>}
         {displayMode === 'list' && currentGrid && <ScheduleAgenda cells={currentGrid.weeks.flat()} teams={teamMap} selectedDay={selectedDay} gameDay={isPast ? null : gameDay} onSelect={setSelectedDay} onResultClick={openResult} allStarResult={isPast ? null : allStarResult} />}
         {displayMode === 'calendar' && <div className="schedule-calendar-scroll" tabIndex={0} role="region" aria-label="月間カレンダー。横にスクロールできます"><div className="schedule-calendar-grid">
-        <div style={{ fontSize: 14, color: '#53657c', marginBottom: 10, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 14, color: 'var(--ds-muted)', marginBottom: 10, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <span><span style={{ display: 'inline-block', width: 8, height: 8, background: 'rgba(74,222,128,.5)', borderRadius: 2, marginRight: 4 }} />ホーム</span>
           <span><span style={{ display: 'inline-block', width: 8, height: 8, background: 'rgba(96,165,250,.5)', borderRadius: 2, marginRight: 4 }} />ビジター</span>
           <span><span style={{ display: 'inline-block', width: 8, height: 8, background: 'rgba(167,139,250,.5)', borderRadius: 2, marginRight: 4 }} />交流戦</span>
-          <span style={{ color: '#14714b' }}>○勝</span>
-          <span style={{ color: '#b42332', marginLeft: 4 }}>●負</span>
-          <span style={{ color: '#53657c', marginLeft: 4 }}>△分</span>
-          <span style={{ color: '#805700', marginLeft: 4 }}>AS: オールスター</span>
-          <span style={{ color: '#53657c', marginLeft: 4 }}>— スコアをクリックで詳細表示</span>
+          <span style={{ color: 'var(--ds-success)' }}>○勝</span>
+          <span style={{ color: 'var(--ds-danger)', marginLeft: 4 }}>●負</span>
+          <span style={{ color: 'var(--ds-muted)', marginLeft: 4 }}>△分</span>
+          <span style={{ color: 'var(--ds-warning)', marginLeft: 4 }}>AS: オールスター</span>
+          <span style={{ color: 'var(--ds-muted)', marginLeft: 4 }}>— スコアをクリックで詳細表示</span>
         </div>
         <div style={{ display: 'grid', gap: 16 }}>
           {(currentGrid ? [currentGrid] : []).map(({ month, weeks }) => (
             <div key={month} id={`cal-month-${month}`}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#17243a', marginBottom: 8 }}>{month}月</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ds-text)', marginBottom: 8 }}>{month}月</div>
               {/* 曜日ヘッダー */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 3, marginBottom: 3 }}>
                 {WEEK_DAYS.map((w, i) => (
-                  <div key={w} style={{ fontSize: 14, color: i === 5 ? '#095cc7' : i === 6 ? '#b42332' : '#53657c', textAlign: 'center', padding: '2px 0' }}>{w}</div>
+                  <div key={w} style={{ fontSize: 14, color: i === 5 ? 'var(--ds-accent)' : i === 6 ? 'var(--ds-danger)' : 'var(--ds-muted)', textAlign: 'center', padding: '2px 0' }}>{w}</div>
                 ))}
               </div>
               {/* 週ごとの行 */}
@@ -602,12 +560,15 @@ export function ScheduleTab({ schedule, gameDay, myTeam, teams, year, gameResult
 
       {/* 結果モーダル（過去シーズンは常に内部モーダル、現シーズンは onResultClick なければ内部モーダル） */}
       {(isPast || !onResultClick) && resultModal && modalResult && (
-        <ResultModal
+        <BoxScoreModal
+          label="試合結果"
+          teamId={myTeam.id}
+          myTeamName={myTeam.name}
+          oppTeamName={modalOpponent || '相手'}
           dayNo={resultModal}
           result={modalResult}
           date={modalDate}
           year={viewYear}
-          opponent={modalOpponent}
           onClose={() => setResultModal(null)}
         />
       )}

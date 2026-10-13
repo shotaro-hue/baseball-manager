@@ -3,6 +3,7 @@ import '../calm-club.css';
 import { useEffect, useMemo, useState } from 'react';
 import { fmtAvg, fmtOBP, fmtIP } from '../utils';
 import { BoxScoreModal } from './BoxScoreModal';
+import './match-history.css';
 import { getManagementPolicy, getManagementTrait } from '../engine/managementPolicy';
 import { TeamComparisonPanel } from './TeamComparisonPanel';
 
@@ -262,14 +263,15 @@ function TeamScheduleTab({ team, allTeams, schedule, year, allTeamResultsMap, al
         : '低';
 
   if (!schedule) {
-    return <div className="card" style={{ fontSize: 14, color: '#53657c' }}>日程データなし</div>;
+    return <div data-ds="history" className="team-history">日程データなし</div>;
   }
 
   return (
-    <div className="card">
-      <div style={{ marginBottom: 10, padding: '8px 10px', borderRadius: 6, border: '1px solid rgba(56,189,248,.25)', background: 'rgba(56,189,248,.07)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 14, color: '#095cc7' }}>今後最大10試合の難易度</span>
-        <span style={{ fontSize: 14, fontWeight: 700, color: '#17243a' }}>
+    <div data-ds="history" className="team-history">
+      <h2>{year}年 · {team.name}の日程・結果</h2>
+      <div className="team-history-intro">
+        <span style={{ fontSize: 14, color: 'var(--ds-accent)' }}>今後最大10試合の難易度</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ds-text)' }}>
           {diffLabel}
           {nextDiffAvg != null ? `（相手勝率平均 ${fmtWinPctNumber(nextDiffAvg)}）` : ''}
         </span>
@@ -294,66 +296,45 @@ function TeamScheduleTab({ team, allTeams, schedule, year, allTeamResultsMap, al
       {/* 試合リスト */}
       <div style={{ display: 'grid', gap: 3 }}>
         {filtered.length === 0 && (
-          <div style={{ fontSize: 14, color: '#53657c' }}>試合なし</div>
+          <div style={{ fontSize: 14, color: 'var(--ds-muted)' }}>試合なし</div>
         )}
         {filtered.map(g => {
           const opp = teamMap.get(g.oppId);
           const dow = weekdayShort(year, g.date);
           const result = g.result;
-          const resultColor = result
-            ? result.drew ? '#6b7280' : result.won ? '#14714b' : '#b42332'
-            : null;
+
 
           return (
             <div
               key={g.dayNo}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '5px 8px',
-                background: g.isHome ? 'rgba(74,222,128,.06)' : 'rgba(96,165,250,.06)',
-                border: `1px solid ${g.isHome ? 'rgba(74,222,128,.15)' : 'rgba(96,165,250,.15)'}`,
-                borderRadius: 5,
-                fontSize: 14,
-                flexWrap: 'wrap',
-              }}
+              className="team-history-row"
             >
-              <span style={{ color: '#53657c', minWidth: 52 }}>
+              <span style={{ color: 'var(--ds-muted)', minWidth: 52 }}>
                 {g.date.month}/{g.date.day}({dow})
               </span>
               <span style={{
                 fontSize: 14, padding: '1px 5px', borderRadius: 3,
-                background: g.isHome ? 'rgba(74,222,128,.15)' : 'rgba(96,165,250,.15)',
-                color: g.isHome ? '#14714b' : '#095cc7',
+                background: g.isHome ? 'var(--ds-success-surface)' : 'var(--ds-selected)',
+                color: g.isHome ? 'var(--ds-success)' : 'var(--ds-accent)',
               }}>
                 {g.isHome ? 'ホーム' : 'ビジター'}
               </span>
               {g.isInterleague && (
-                <span style={{ fontSize: 14, padding: '1px 5px', borderRadius: 3, background: 'rgba(167,139,250,.15)', color: '#7050ad' }}>交流</span>
+                <span style={{ fontSize: 14, padding: '1px 5px', borderRadius: 3, background: 'var(--ds-canvas)', color: 'var(--ds-muted)' }}>交流</span>
               )}
-              <span style={{ color: '#17243a', fontWeight: 600, flex: 1 }}>
+              <span className="team-history-opponent">
                 vs {opp?.name || '?'}
               </span>
               {result ? (
                 <button
                   onClick={() => setBoxScore({ result: { ...result, ...(g.boxScoreDetail || {}) }, dayNo: g.dayNo })}
-                  style={{
-                    background: 'none',
-                    border: `1px solid ${resultColor}50`,
-                    borderRadius: 4,
-                    padding: '2px 8px',
-                    fontSize: 14,
-                    color: resultColor,
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                    flexShrink: 0,
-                  }}
+                  className="team-history-score"
+                  aria-label={`${year}年${g.date.month}月${g.date.day}日 ${opp?.name || result.oppName || '相手'}戦の結果 ${result.myScore}対${result.oppScore}`}
                 >
-                  {result.drew ? '△' : result.won ? '○' : '●'} {result.myScore}-{result.oppScore}
+                  {result.drew ? '引分' : result.won ? '勝利' : '敗北'} {result.myScore}-{result.oppScore}
                 </button>
               ) : (
-                <span style={{ fontSize: 14, color: '#53657c' }}>未</span>
+                <span style={{ fontSize: 14, color: 'var(--ds-muted)' }}>未実施</span>
               )}
             </div>
           );
@@ -368,6 +349,8 @@ function TeamScheduleTab({ team, allTeams, schedule, year, allTeamResultsMap, al
           oppTeamName={boxScore.result.oppName || '相手'}
           teamId={team.id}
           dayNo={boxScore.dayNo}
+          year={year}
+          date={schedule[boxScore.dayNo]?.date}
           onClose={() => setBoxScore(null)}
         />
       )}
