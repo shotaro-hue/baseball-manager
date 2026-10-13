@@ -38,7 +38,7 @@ jobs:
           - name: initialization-and-progression
             files: progression.smoke.spec.js initialization.spec.js draft.spec.js
           - name: match-history
-            files: match-history.spec.js
+            files: match-history.spec.js result-season-average.spec.js
           - name: roster-settings
             files: roster-settings.spec.js player-detail.spec.js first-team-stats.spec.js leaderboard.spec.js league-rankings.spec.js farm-rankings.spec.js farm-development.spec.js
           - name: posting-and-finance

@@ -211,7 +211,14 @@ function buildResultScreenDetails(gsResult, myTeam, oppTeam, teams = []) {
 export function ResultScreen({ gsResult, myTeam, oppTeam, teams = [], gameDay, onNext, nextLabel = 'ハブに戻る', isPostGameProcessing: isPostGameProcessingProp }) {
   const safeResult = useMemo(() => normalizeResult(gsResult), [gsResult]);
   const safeMyTeam = useMemo(() => normalizeTeam(myTeam, { ...UNKNOWN_TEAM, name: '自チーム', short: 'MY', emoji: '🏟️', color: 'var(--gold)' }), [myTeam]);
-  const safeOppTeam = useMemo(() => normalizeTeam(oppTeam || gsResult?.oppTeam, UNKNOWN_TEAM), [gsResult?.oppTeam, oppTeam]);
+  // Result payloads retain the pre-game opponent snapshot. AVG is explicitly
+  // current-season, so prefer the canonical post-game roster when available.
+  const safeOppTeam = useMemo(() => {
+    const snapshot = oppTeam || gsResult?.oppTeam;
+    const current = snapshot?.id != null && Array.isArray(teams)
+      ? teams.find(team => team.id === snapshot.id) : null;
+    return normalizeTeam(current || snapshot, UNKNOWN_TEAM);
+  }, [gsResult?.oppTeam, oppTeam, teams]);
   const [activeTab, setActiveTab] = useState('bat');
   const [detailData, setDetailData] = useState(null);
   const [detailError, setDetailError] = useState('');
