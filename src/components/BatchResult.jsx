@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { CaretRight } from '@phosphor-icons/react';
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import '../calm-ui.css';
 import '../mobile-flow.css';
+import './batch-result.css';
+import { Button, StateLabel, Section } from './design-system/primitives';
 import { cancelDeferredPostGameWork, scheduleDeferredPostGameWork } from "../engine/postGameProcessing";
 
 const INITIAL_VISIBLE_RESULTS = 8;
@@ -13,8 +14,8 @@ function buildBatchPerfHighlights(results) {
   let biggestLoss = null;
 
   for (const result of results || []) {
-    const margin = (result?.score?.my || 0) - (result?.score?.opp || 0);
-    if (result?.won && (!biggestWin || margin > biggestWin.margin)) {
+    const margin = hasScore(result) ? result.score.my - result.score.opp : null;
+    if (margin > 0 && (!biggestWin || margin > biggestWin.margin)) {
       biggestWin = {
         oppName: result?.oppTeam?.short || "?",
         my: result?.score?.my || 0,
@@ -22,7 +23,7 @@ function buildBatchPerfHighlights(results) {
         margin,
       };
     }
-    if (!result?.won && (result?.score?.my !== result?.score?.opp) && (!biggestLoss || margin < biggestLoss.margin)) {
+    if (margin < 0 && (!biggestLoss || margin < biggestLoss.margin)) {
       biggestLoss = {
         oppName: result?.oppTeam?.short || "?",
         my: result?.score?.my || 0,
@@ -44,6 +45,11 @@ function buildBatchPerfHighlights(results) {
   };
 }
 
+const hasScore = result => typeof result?.score?.my === 'number' && Number.isFinite(result.score.my)
+  && typeof result?.score?.opp === 'number' && Number.isFinite(result.score.opp);
+const outcome = result => !hasScore(result) ? '勝敗未確認'
+  : result.score.my === result.score.opp ? '分' : result.score.my > result.score.opp ? '勝' : '敗';
+
 export function BatchResultScreen({
   results,
   batchMeta,
@@ -53,73 +59,123 @@ export function BatchResultScreen({
   onViewDetail,
   isBatchProcessing: isBatchProcessingProp,
   initialVisibleCount,
+  returnGameNo,
+  canViewDetail,
+  saveDirty = false,
+  saveQueueState = {},
+  saveResult = null,
 }) {
+  const safeResults = useMemo(() => Array.isArray(results) ? results.filter(Boolean) : [], [results]);
   const summary = useMemo(() => {
-    const safeResults = Array.isArray(results) ? results : [];
-    const wins = safeResults.filter((result) => result?.won).length;
-    const losses = safeResults.length - wins;
+    const wins = safeResults.filter(result => outcome(result) === '勝').length;
+    const losses = safeResults.filter(result => outcome(result) === '敗').length;
+    const draws = safeResults.filter(result => outcome(result) === '分').length;
     return {
-      wins,
-      losses,
+      wins, losses, draws,
+      unknown: safeResults.length - wins - losses - draws,
       startGameNo: safeResults[0]?.gameNo,
       endGameNo: safeResults[safeResults.length - 1]?.gameNo,
       totalGames: safeResults.length,
     };
-  }, [results]);
+  }, [safeResults]);
 
   const [detailData, setDetailData] = useState(null);
+  const [detailError, setDetailError] = useState('');
+  const gameButtons = useRef(new Map());
+  useEffect(() => {
+    const button = gameButtons.current.get(returnGameNo);
+    if (button && !button.disabled) button.focus();
+  }, [returnGameNo]);
   const [internalProcessing, setInternalProcessing] = useState(() => isBatchProcessingProp ?? !!results?.length);
   const [visibleCount, setVisibleCount] = useState(() => {
     const requested = Number.isFinite(initialVisibleCount) ? initialVisibleCount : INITIAL_VISIBLE_RESULTS;
-    return Math.min(Math.max(0, requested), Array.isArray(results) ? results.length : 0);
+    return Math.min(Math.max(0, requested), safeResults.length);
   });
 
   useEffect(() => {
-    const safeLength = Array.isArray(results) ? results.length : 0;
+    const safeLength = safeResults.length;
     const requested = Number.isFinite(initialVisibleCount) ? initialVisibleCount : INITIAL_VISIBLE_RESULTS;
     setVisibleCount(Math.min(Math.max(0, requested), safeLength));
     setDetailData(null);
+    setDetailError('');
     setInternalProcessing(true);
-
+    let cancelled = false;
     const handle = scheduleDeferredPostGameWork(() => {
-      setDetailData(buildBatchPerfHighlights(results || []));
-      setInternalProcessing(false);
+      if (cancelled) return;
+      try { setDetailData(buildBatchPerfHighlights(safeResults)); }
+      catch { setDetailError('ハイライトの集計に失敗しました。試合結果と戻る操作は利用できます。'); }
+      finally { setInternalProcessing(false); }
     });
 
     return () => {
+      cancelled = true;
       cancelDeferredPostGameWork(handle);
     };
-  }, [results, initialVisibleCount]);
+  }, [safeResults, initialVisibleCount]);
 
   const isBatchProcessing = isBatchProcessingProp ?? internalProcessing;
-  const visibleResults = useMemo(() => (results || []).slice(0, visibleCount), [results, visibleCount]);
-  const hasMoreResults = (results?.length || 0) > visibleCount;
+  const visibleResults = useMemo(() => safeResults.slice(0, visibleCount), [safeResults, visibleCount]);
+  const hasMoreResults = safeResults.length > visibleCount;
 
-  const draws = (results || []).filter(r => r.drew || r.score?.my === r.score?.opp).length;
-  const losses = Math.max(0, summary.totalGames - summary.wins - draws);
   const tired = (myTeam?.players || []).filter(p => (p.condition ?? 70)<60 || (p.injuryDaysLeft || 0)>0);
-  return <div className="app" style={{background:'#fff'}}><main className="flow-screen flow-batch">
-    <p className="flow-muted">{myTeam?.name || myTeam?.short}</p><h1>{summary.totalGames}試合の結果</h1>
-    <p className="flow-muted">第{summary.startGameNo ?? '—'}〜第{summary.endGameNo ?? '—'}戦</p>
-    <section className="flow-summary"><strong>{summary.wins}勝 {losses}敗{draws>0 && ` ${draws}分`}</strong>
-      {batchMeta && <p>順位 {batchMeta.beforeRank}位 → {batchMeta.afterRank}位</p>}
-      {isBatchProcessing && <p role="status">結果を整理中...</p>}
+  const recordedLogs = safeResults.filter(result => Array.isArray(result.log) && result.log.length).length;
+  const saving = saveQueueState.isSaving || saveQueueState.hasQueuedSave;
+  const partial = saveResult?.archive?.ok === false || saveResult?.warnings?.length > 0;
+  const saveLabel = saving ? '保存中' : saveResult?.ok === false ? '保存失敗' : saveDirty ? '保存待ち'
+    : saveResult?.ok === true ? saveResult.archive?.ok === false ? '保存済み・一部履歴は要確認'
+      : partial ? '保存済み・保存情報は要確認' : '保存済み' : '保存状態未確認';
+  const saveTone = saving ? 'processing' : saveResult?.ok === false ? 'danger' : saveDirty || partial ? 'warning'
+    : saveResult?.ok === true ? 'success' : 'neutral';
+  return <main className="app batch-result" data-ds="batch-shell"><div className="batch-container">
+    <header className="batch-heading"><p>{myTeam?.name || myTeam?.short || '自球団'}</p>
+      <h1>{summary.totalGames}試合の結果</h1><p>結果を振り返り、次の試合に向けて編成を見直す。</p></header>
+    <section className="batch-summary" aria-label="まとめシムの概要">
+      <p>第{summary.startGameNo ?? '—'}〜第{summary.endGameNo ?? '—'}戦 / この期間の結果</p>
+      <strong>{summary.wins}勝 {summary.losses}敗 {summary.draws}分</strong>
+      {summary.unknown > 0 && <p>勝敗未確認 {summary.unknown}試合（戦績集計から除外）</p>}
+      {batchMeta && <p>順位 {batchMeta.beforeRank ?? '—'}位 → {batchMeta.afterRank ?? '—'}位</p>}
     </section>
-    {tired.length>0 && <div className="flow-warning">疲労・負傷のある選手が{tired.length}人{onReviewRoster && <button className="flow-link" onClick={onReviewRoster}>編成で確認</button>}</div>}
-    <section className="flow-section"><h2>打撃ハイライト</h2>
-      {!detailData ? <p className="flow-muted">集計中...</p> : detailData.hrList.length ? detailData.hrList.map(([name,count])=><div className="flow-row" key={name}><strong>{name}</strong><span>{count}本塁打</span></div>) : <p className="flow-muted">本塁打なし</p>}
-    </section>
-    <section className="flow-section"><h2>試合別の結果</h2>
-      {visibleResults.map((r,i)=><button className="flow-row" key={`${r.gameNo}-${i}`} onClick={()=>onViewDetail?.(r)}><span><small>第{r.gameNo}戦</small>{r.oppTeam?.short || r.oppTeam?.name || '相手球団'}</span><strong>{r.score?.my ?? '—'} − {r.score?.opp ?? '—'}</strong><span className={`flow-outcome ${r.drew || r.score?.my===r.score?.opp ? 'draw' : r.won ? 'win':'loss'}`}>{r.drew || r.score?.my===r.score?.opp ? '分' : r.won ? '勝':'敗'}</span><CaretRight size={18}/></button>)}
-      {!summary.totalGames && <p className="flow-muted">試合結果はありません</p>}
-      {hasMoreResults && <button className="flow-link" onClick={()=>setVisibleCount(n=>Math.min(results.length,n+VISIBLE_RESULTS_STEP))}>続きを表示</button>}
-    </section>
-    {batchMeta && <details className="flow-section"><summary>負傷・リーグの詳細</summary>
-      <h2>負傷アラート</h2>{!(batchMeta.injuries || []).length && <p>負傷なし</p>}{(batchMeta.injuries || []).map((r,i)=><p key={i}>{r.name} · {r.type} · {r.days}日</p>)}
-      <h2>リーグ注目試合</h2>{(batchMeta.cpuHighlights || []).map((h,i)=><p key={i}>{h.homeTeam?.short} {h.homeScore} − {h.awayScore} {h.awayTeam?.short} · {h.label}</p>)}
-      {detailData?.biggestWin && <p>最大勝利 {detailData.biggestWin.my} − {detailData.biggestWin.opp} vs {detailData.biggestWin.oppName}</p>}
-      {detailData?.biggestLoss && <p>最大敗戦 {detailData.biggestLoss.my} − {detailData.biggestLoss.opp} vs {detailData.biggestLoss.oppName}</p>}
-    </details>}
-    <div className="flow-actions">{onReviewRoster && <button className="calm-primary" onClick={onReviewRoster}>編成を見直す</button>}<button className="calm-secondary" onClick={onEnd}>ホームへ戻る</button></div>
-  </main></div>;
+    <div className="batch-state"><StateLabel tone={saveTone}>{saveLabel}</StateLabel>
+      {isBatchProcessing && <StateLabel tone="processing">結果を整理中...</StateLabel>}
+      <p>結果の集計と保存は別の処理です。保存・再試行はホームで確認できます。</p></div>
+    <div className="batch-actions">{onReviewRoster && <Button onClick={onReviewRoster}>編成を見直す</Button>}
+      <Button variant="secondary" onClick={onEnd}>ホームへ戻る</Button></div>
+    {tired.length > 0 && <p className="batch-warning">現在の一軍に疲労・負傷のある選手が{tired.length}人。編成で状態を確認してください。</p>}
+    <div className="batch-grid">
+      <Section title="試合別の結果" className="batch-results">
+        <p className="batch-note">スコアは自球団 − 相手。詳細からこの一覧へ戻れます。</p>
+        <ul className="batch-games">{visibleResults.map((result, index) => {
+          const available = Boolean(onViewDetail) && (!canViewDetail || canViewDetail(result));
+          const opponent = result.oppTeam?.short || result.oppTeam?.name || '相手球団';
+          const label = `第${result.gameNo ?? '—'}戦 ${opponent}の試合詳細 ${result.score?.my ?? '—'} 対 ${result.score?.opp ?? '—'} ${outcome(result)}${available ? '' : ' 詳細記録なし'}`;
+          return <li className="batch-game" key={`${result.gameNo}-${index}`}>
+            <button type="button" aria-label={label} disabled={!available}
+              ref={node => { if (node) gameButtons.current.set(result.gameNo, node); else gameButtons.current.delete(result.gameNo); }}
+              onClick={() => onViewDetail?.(result, visibleCount)}>
+              <span className="batch-opponent"><small>第{result.gameNo ?? '—'}戦</small><strong>{opponent}</strong></span>
+              <span className="batch-score">{result.score?.my ?? '—'} − {result.score?.opp ?? '—'}</span>
+              <span className="batch-outcome">{outcome(result)}</span><span className="batch-detail-label">{available ? '詳細 →' : '詳細記録なし'}</span>
+            </button>
+          </li>;
+        })}</ul>
+        {!summary.totalGames && <p className="batch-note">試合結果はありません。</p>}
+        {hasMoreResults && <Button variant="secondary" onClick={() => setVisibleCount(count => Math.min(safeResults.length, count + VISIBLE_RESULTS_STEP))}>続きを表示</Button>}
+      </Section>
+      <div className="batch-highlights"><Section title="打撃ハイライト">
+        <p className="batch-note">この期間の自球団の本塁打。ログ記録あり {recordedLogs}/{summary.totalGames}試合。</p>
+        {detailError ? <p role="alert" className="batch-error">{detailError}</p> : !detailData ? <p className="batch-note">集計中...</p>
+          : !recordedLogs ? <p className="batch-note">打撃ハイライトは未記録です。</p>
+            : detailData.hrList.length ? detailData.hrList.map(([name, count]) => <div className="batch-highlight-row" key={name}><strong>{name}</strong><span>{count}本塁打</span></div>)
+              : <p className="batch-note">本塁打なし（記録あり試合のみ）</p>}
+      </Section>
+      {batchMeta && <details className="batch-disclosure"><summary>負傷・リーグの詳細</summary>
+        <h2>この期間の負傷アラート</h2>{!(batchMeta.injuries || []).length && <p>負傷なし</p>}
+        {(batchMeta.injuries || []).map((row, index) => <p key={index}>{row.name} · {row.type} · {row.days}日</p>)}
+        <h2>リーグ注目試合</h2>{!(batchMeta.cpuHighlights || []).length && <p>注目試合の記録なし</p>}
+        {(batchMeta.cpuHighlights || []).map((row, index) => <p key={index}>{row.homeTeam?.short ?? '—'} {row.homeScore ?? '—'} − {row.awayScore ?? '—'} {row.awayTeam?.short ?? '—'} · {row.label}</p>)}
+        {detailData?.biggestWin && <p>最大勝利 {detailData.biggestWin.my} − {detailData.biggestWin.opp} vs {detailData.biggestWin.oppName}</p>}
+        {detailData?.biggestLoss && <p>最大敗戦 {detailData.biggestLoss.my} − {detailData.biggestLoss.opp} vs {detailData.biggestLoss.oppName}</p>}
+      </details>}</div>
+    </div>
+  </div></main>;
 }
