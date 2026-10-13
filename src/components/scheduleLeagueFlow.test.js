@@ -26,7 +26,7 @@ describe('schedule and league flow', () => {
     click(view, '3月');
     const score = view.root.findByProps({ className: 'schedule-score' });
     act(() => score.props.onClick());
-    expect(open).toHaveBeenCalledWith(1);
+    expect(open).toHaveBeenCalledWith(1, expect.objectContaining({ selectedDay:1, displayMode:'list', returnGameNo:1 }));
     click(view, 'カレンダー');
     expect(button(view, '3月').props['aria-pressed']).toBe(true);
     expect(view.root.findAllByProps({ className: 'calendar-day-button' })).toHaveLength(1);
@@ -74,4 +74,19 @@ describe('schedule and league flow', () => {
     expect(text(view.toJSON())).not.toContain('.1000');
     view.unmount();
   });
+});
+
+it('opens an archived opponent-only box score instead of hiding its player rows', () => {
+ const box={...results[1],homeId:0,awayId:1,oppBatting:[{id:0,name:'相手のみ記録',AB:0,H:0}]};
+ let view;act(()=>{view=create(React.createElement(ScheduleTab,{...props,scheduleArchive:[{year:2025,schedule,gameResultsMap:results,myTeamResultsMap:{1:box}}]}));});
+ click(view,'2025年');act(()=>view.root.findByProps({className:'schedule-score'}).props.onClick());
+ expect(text(view.root.findByProps({role:'dialog'}))).toContain('相手のみ記録');act(()=>view.unmount());
+});
+it('keeps the initial return selection instead of resetting it to today',()=>{
+ let view;act(()=>{view=create(React.createElement(ScheduleTab,{...props,initialView:{selectedDay:1,displayMode:'calendar'}}));});
+ expect(button(view,'3月').props['aria-pressed']).toBe(true);expect(button(view,'カレンダー').props['aria-pressed']).toBe(true);act(()=>view.unmount());
+});
+it('consumes a result-return view once instead of replaying it on manual visits',()=>{
+ const consumed=vi.fn();let view;act(()=>{view=create(React.createElement(ScheduleTab,{...props,initialView:{selectedDay:1,displayMode:'calendar'},onReturnViewConsumed:consumed}));});
+ expect(consumed).toHaveBeenCalledTimes(1);act(()=>view.update(React.createElement(ScheduleTab,{...props,initialView:null,onReturnViewConsumed:consumed})));expect(consumed).toHaveBeenCalledTimes(1);act(()=>view.unmount());
 });
