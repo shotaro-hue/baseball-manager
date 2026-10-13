@@ -60,6 +60,14 @@ for (const width of [360,390,1440]) {
       await expect(page.locator('.batch-game').first()).toContainText('第11戦');
       await expect(page.getByRole('button', { name: '続きを表示' })).toBeVisible();
       await page.getByRole('button', { name: '編成を見直す', exact: true }).click();
+      // Day 20 can trigger the real press event when returning to the hub.
+      // Answer it through its normal UI instead of blocking the save button.
+      const press = page.getByRole('dialog', { name: '記者会見', exact: true });
+      if (await press.isVisible()) {
+        await press.getByRole('button').filter({ hasNotText: '回答する' }).first().click();
+        await press.getByRole('button', { name: '回答する', exact: true }).click();
+        await expect(press).toBeHidden();
+      }
     }
     const before = await saveHub(page); await reloadAndLoad(page);
     const after = await saveHub(page);
