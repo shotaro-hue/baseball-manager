@@ -38,6 +38,7 @@ export default function OffseasonPlanningScreen({ gs, os, myTeam, myId, year }) 
   const [intentFilter, setIntentFilter] = useState('all');
   const rosterHeading = useRef(null);
   const intentFilters = useRef(null);
+  const growthDisclosure = useRef(null);
   const [modal, setModal] = useState(null);
   const [failure, setFailure] = useState('');
   const [busy, setBusy] = useState(false);
@@ -118,7 +119,7 @@ export default function OffseasonPlanningScreen({ gs, os, myTeam, myId, year }) 
     <aside className="planning-support">
       <details><summary>人数・年俸・予算の計上条件</summary><p className="planning-note">年俸見込みは当年契約済みの年俸、それ以外は成立済み条件の年俸を使用し、成立条件がなければ前年年俸で仮計上します。未合意の提示額は見込みへ反映しません。</p><p className="planning-note">人数見込みは一軍・二軍・育成から放出候補を除いた人数で、支配下70枠の残数ではありません。方針の選択では実際の所属人数・残予算は変わりません。FA契約は年俸×年数を先払いし、通常更改の年俸は残予算から即時控除しません。残予算から来季年俸をもう一度差し引いた値ではありません。</p></details>
       <details><summary>ポジション別人数・不足の目安</summary><div className="planning-counts">{overview.positions.map(r => <span key={r.pos}>{r.pos} {r.count}人</span>)}</div><p className="planning-note">登録と二軍の主なポジションによる人数です。複数ポジションの適性は選手詳細で確認できます。</p>{overview.needs.length ? <ul>{overview.needs.map(n => <li key={n}>{n}</li>)}</ul> : <p>先発・救援・捕手の人数目安を満たしています。能力や起用の適否を保証するものではありません。</p>}</details>
-      <details className="planning-growth"><summary>成長結果を確認する</summary><GrowthSummaryScreen farmState={{farmCompetition:gs.farmCompetition,year:gs.year,teams:gs.teams,seasonHistory:gs.getSeasonHistory?.()??gs.seasonHistory}} summary={plan.growth} year={year} teams={gs.teams} myId={myId} saveId={gs.saveId} faPool={gs.faPool} embedded /></details>
+      <details className="planning-growth" ref={growthDisclosure}><summary>成長結果を確認する</summary><GrowthSummaryScreen farmState={{farmCompetition:gs.farmCompetition,year:gs.year,teams:gs.teams,seasonHistory:gs.getSeasonHistory?.()??gs.seasonHistory}} summary={plan.growth} year={year} teams={gs.teams} myId={myId} saveId={gs.saveId} faPool={gs.faPool} embedded onClose={() => { if (growthDisclosure.current) growthDisclosure.current.open = false; growthDisclosure.current?.querySelector('summary')?.focus({preventScroll:true}); }} /></details>
       <p className="planning-note">自球団からFA宣言中：{gs.faPool.filter(p => p.marketEntryReason === '国内FA宣言' && p.faOriginTeamId === myId).length}人。宣言残留は補強市場で契約できます。</p>
     </aside>
     </div>

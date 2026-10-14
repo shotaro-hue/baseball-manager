@@ -1,3 +1,5 @@
+import {registerGrowthAppCases} from './helpers/growth-app-cases';
+import {registerGrowthDesignCases} from './helpers/growth-design-cases';
 import {registerPlanningAppCases} from './helpers/planning-app-cases';
 import {registerPlanningDesignCases} from './helpers/planning-design-cases';
 import { test, expect } from '@playwright/test';
@@ -5,6 +7,8 @@ import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
 import { startNewGame, mainNavigation, runBatch, runSingle, startSingle, saveHub, waitSaveIdle, readSave, reloadAndLoad, progressSignature, loadFixture } from './helpers/progression';
 
+registerGrowthAppCases();
+registerGrowthDesignCases();
 registerPlanningDesignCases();
 registerPlanningAppCases();
 

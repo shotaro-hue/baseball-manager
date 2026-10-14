@@ -135,7 +135,8 @@ for (const width of [390,1440]) {
         await page.getByRole('button',{name:'選手詳細・年度別成績',exact:true}).click();
       }
       if (mode === 'review') {
-        await page.locator('summary').filter({hasText:/^成長の選手/}).click();
+        const record = page.getByRole('region',{name:'成長記録一覧',exact:true}).getByRole('button',{name:/の能力変化を確認$/});
+        await expect(record).toHaveCount(1); await record.click();
         await page.getByRole('button',{name:'選手詳細・年度別成績',exact:true}).click();
       }
       const dialog = page.locator('.player-modal-card');
@@ -154,7 +155,8 @@ for (const width of [390,1440]) {
 
 test('UI-02C legacy disclosure is keyboard reachable and trapped without decision footer', async ({page}) => {
   await page.goto('/baseball-manager/e2e/fixtures/ui02c/index.html?mode=review&state=legacy');
-  await page.locator('summary').filter({hasText:/^成長の選手/}).click();
+  const record = page.getByRole('region',{name:'成長記録一覧',exact:true}).getByRole('button',{name:/の能力変化を確認$/});
+  await expect(record).toHaveCount(1); await record.click();
   await page.getByRole('button',{name:'選手詳細・年度別成績',exact:true}).click();
   const dialog = page.locator('.player-modal-card');
   await dialog.getByRole('tab',{name:'今季成績',exact:true}).click();
