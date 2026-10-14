@@ -1,4 +1,5 @@
-import { useRef } from 'react';
+import { useCallback, useRef } from 'react';
+import { compactRenewalSession } from '../../engine/offseasonPlanning';
 
 export default function ContractRenewalRoute({
   gs,
@@ -10,6 +11,11 @@ export default function ContractRenewalRoute({
   ScreenComponent,
 }) {
   const released = useRef(new Set());
+  const validPlan = gs.offseasonPlan?.version === 1 && gs.offseasonPlan.year === year && gs.offseasonPlan.myId === myId;
+  const saveSession = useCallback(session => gs.setOffseasonPlan?.(prev =>
+    prev?.year === year && prev.myId === myId ? { ...prev, session: compactRenewalSession(session) } : prev), [gs.setOffseasonPlan, year, myId]);
+  const saveView = useCallback(renewalView => gs.setOffseasonPlan?.(prev =>
+    prev?.year === year && prev.myId === myId ? { ...prev, renewalView } : prev), [gs.setOffseasonPlan, year, myId]);
   if (gs.screen !== 'contract_renewal_phase') return null;
 
   return (
@@ -19,6 +25,10 @@ export default function ContractRenewalRoute({
       year={year}
       saveId={gs.saveId}
       demands={os.contractRenewalDemands || {}}
+      savedSession={validPlan ? gs.offseasonPlan.session : undefined}
+      savedView={validPlan ? gs.offseasonPlan.renewalView : undefined}
+      onSessionChange={validPlan ? saveSession : undefined}
+      onViewChange={validPlan ? saveView : undefined}
       renewalPlayerIds={os.contractRenewalDemands == null ? undefined : Object.keys(os.contractRenewalDemands)}
       onSign={os.handleContractRenewalSign}
       onRelease={(pid, reason = 'offseason_release') => {

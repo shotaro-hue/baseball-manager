@@ -366,6 +366,10 @@ for (const width of [360,390,1440]) test(`F03 farm records survive progress/relo
 
 // UI-01B shares the existing CI progression gate without a duplicate spec.
 import { registerHomeCases } from './helpers/ui-home-cases';
+import { registerRenewalDesignCases } from './helpers/renewal-design-cases';
+import { registerRenewalAppCases } from './helpers/renewal-app-cases';
+registerRenewalDesignCases();
+registerRenewalAppCases();
 registerHomeCases({ consumeExpectedError(message) {
   const index = errors.indexOf(message);
   expect(index, 'Intentional storage fault must emit its exact expected diagnostic').toBeGreaterThanOrEqual(0);

@@ -93,6 +93,9 @@ describe('contract renewal workflow', () => {
     act(() => ui.view.root.findByType('select').props.onChange({ target: { value: '3' } }));
     const send = ui.button('オファーを出す').props.onClick;
     act(() => { send(); send(); });
+    expect(ui.props.onSign).not.toHaveBeenCalled();
+    const sendConfirmed = ui.button('この条件を提示する').props.onClick;
+    act(() => { sendConfirmed(); sendConfirmed(); });
     expect(ui.props.onSign).toHaveBeenCalledTimes(1);
     ui.rerender([{ ...p, salary: ui.props.demands[0].demandSalary, contractYearsLeft: 3 }]);
     expect(text(ui.view.root)).toContain('合意条件：');
@@ -119,18 +122,18 @@ describe('contract renewal workflow', () => {
     const p = player(0, { salary: 10000 });
     const demand = { demandSalary: 50000, minOfferSalary: 7500, minAcceptSalary: 40000, resistanceFactor: 1 };
     const ui = setup([p], { 0: demand }); ui.select(0);
-    for (let i = 0; i < 3; i++) { ui.salary('7500'); ui.click('オファーを出す'); }
+    for (let i = 0; i < 3; i++) { ui.salary('7500'); ui.click('オファーを出す'); ui.click('この条件を提示する'); }
     expect(ui.button('更改結果を確認する').props.disabled).toBe(true);
     expect(text(ui.view.root)).toContain('再交渉待ち');
     ui.click('再交渉する'); expect(text(ui.view.root)).toContain('第3回');
-    ui.salary('50000'); ui.click('オファーを出す');
+    ui.salary('50000'); ui.click('オファーを出す'); ui.click('この条件を提示する');
     expect(ui.props.onSign).toHaveBeenCalledWith(0, 50000, 1, expect.any(Number), expect.any(Number));
     act(() => ui.view.unmount());
   });
   it('passes FA player ID 0 only after the final confirmation', () => {
     const p = player(0, { salary: 10000, daysOnActiveRoster: 10000 });
     const ui = setup([p], { 0: { demandSalary: 50000, minOfferSalary: 7500, minAcceptSalary: 40000 } }); ui.select(0);
-    for (let i = 0; i < 3; i++) { ui.salary('7500'); ui.click('オファーを出す'); }
+    for (let i = 0; i < 3; i++) { ui.salary('7500'); ui.click('オファーを出す'); ui.click('この条件を提示する'); }
     expect(text(ui.view.root)).toContain('FA宣言'); expect(ui.props.onNext).not.toHaveBeenCalled();
     ui.click('更改結果を確認する'); ui.click('確定して次へ進む');
     expect(ui.props.onNext).toHaveBeenCalledWith([0]);
