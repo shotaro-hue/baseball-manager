@@ -31,7 +31,7 @@ function setup(options = {}) {
     const gs = { teams, setTeams, myId: 0, myTeam: teams[0], year: 2026, gameDay: 143, screen, setScreen,
       offseasonPlan, setOffseasonPlan, faPool, setFaPool, faYears, setFaYears, upd,
       notify: vi.fn(), addNews: vi.fn(), setMailbox: vi.fn(), setSeasonHistory: vi.fn(),
-      getSeasonHistory: () => ({ championships: [] }), handleSave: vi.fn(async () => ({ ok: true })) };
+      getSeasonHistory: () => ({ championships: [] }), handleSave: options.handleSave || vi.fn(async () => ({ ok: true })), ...(options.saveState || {}) };
     const os = useOffseason(gs); latest = { gs, os };
     return screen === 'offseason_planning' ? React.createElement(OffseasonPlanningScreen, { gs, os, myTeam: teams[0], myId: 0, year: 2026 }) : React.createElement('p', null, screen);
   }
@@ -139,4 +139,26 @@ it('rejects unknown phase versions and stale seasons, and compacts only snapshot
   expect(planningPlayer(original).stats).toEqual({ PA: 0 }); expect(original.stats.sprayPoints).toHaveLength(1);
   const s = { entries: [{ player: p(), status: 'fa' }] };
   expect(reconcileRenewalSession(s, team([p(0, { contractSignedYear: 2026, salary: 1600, contractYears: 2 })]), 2026).entries[0]).toMatchObject({ status: 'signed', terms: { salary: 1600, years: 2 } });
+});
+
+for (const [saveState,label] of [
+ [{},'保存状態未確認'],[{saveDirty:true},'保存待ち'],[{saveQueueState:{isSaving:true},saveResult:{ok:true}},'保存中'],
+ [{saveQueueState:{hasQueuedSave:true}},'保存中'],[{saveResult:{ok:false},saveDirty:true},'保存失敗'],
+ [{saveResult:{ok:true}},'保存済み'],[{saveResult:{ok:true,archive:{ok:false}}},'保存済み・一部履歴は要確認'],
+ [{saveResult:{ok:true,warnings:['warning']}},'保存済み・保存情報は要確認'],
+]) it(`reports the actual planning save status ${label}`,()=>{
+ const ui=setup({saveState});expect(text(ui.view.root.findByProps({className:'planning-save'}))).toContain(label);
+ expect(ui.button('編成内容を保存する').props.disabled).toBe(Boolean(saveState.saveQueueState?.isSaving||saveState.saveQueueState?.hasQueuedSave));
+});
+it('filters draft intentions without changing players, budget or live contracts',()=>{
+ const ui=setup({teams:[team([p(0),p(1),p(2,{contractYearsLeft:3})])]});ui.intent(0,'retain');
+ ui.click('交渉予定');const table=()=>ui.view.root.findByProps({'aria-label':'編成方針一覧'});
+ expect(text(table())).toContain('選手1');expect(text(table())).not.toContain('選手0');expect(text(table())).not.toContain('選手2');
+ ui.click('放出候補');expect(text(table())).toContain('この方針に該当する選手はいません');ui.click('全員');
+ expect(latest.gs.myTeam.players.map(p=>p.id)).toEqual([0,1,2]);expect(latest.gs.myTeam.budget).toBe(10000);expect(latest.gs.myTeam.players[0].salary).toBe(1000);
+});
+it('describes payroll using agreed terms rather than unaccepted offer drafts',()=>{
+ const ui=setup({plan:plan({session:{baseline:1000,others:[],entries:[{player:p(),status:'pending',salary:'9000',years:1,logs:[]}]}})});
+ const all=text(ui.view.toJSON());expect(all).not.toContain('未合意は提示額');expect(all).toContain('成立条件がなければ前年年俸');
+ expect(planningSummary(latest.gs.myTeam,latest.gs.offseasonPlan,2026).projectedPayroll).toBe(1000);
 });
