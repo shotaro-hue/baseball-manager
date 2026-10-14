@@ -24,6 +24,8 @@ describe('salary demand in renewal screen', () => {
     expect(text(view.root)).toContain('要求年俸の理由');
     expect(text(view.root)).toContain('野手の出場量・今季成績');
     send(view);
+    expect(onSign).not.toHaveBeenCalled();
+    act(() => view.root.findAllByType('button').find(n => text(n) === 'この条件を提示する').props.onClick());
     expect(onSign).toHaveBeenCalledWith(0, demand.demandSalary, 1, expect.any(Number), expect.any(Number));
     act(() => view.unmount());
   });

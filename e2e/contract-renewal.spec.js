@@ -41,6 +41,7 @@ test('release dialog traps focus, closes with Escape and restores opener', async
   await mount(page);
   await page.getByRole('button', { name: '選手0の契約更改', exact: true }).click();
   const opener = page.getByRole('button', { name: '戦力外を検討する' });
+  await page.getByText('契約を更新しない場合', { exact: true }).click();
   await opener.click();
   const dialog = page.getByRole('dialog');
   const title = dialog.getByRole('heading');
