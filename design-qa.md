@@ -1,3 +1,12 @@
+# UI-03D レビュー指摘修正 — 2026-10-14
+
+追加レビューでPCの埋め込み幅と連続選択後の復帰に2件の問題を再現したため、下段の初回検証結果を更新する。
+レポートの内容幅に応じる切り替えと、選手行の画面内位置の復元を実装。関連Unit43件・Chromium対象E2E13件成功、独立再レビューで重要指摘なし。
+実Appの1440×900で[修正前](./docs/validation/ui-03d/review-before-embedded-1440.png)／[修正後](./docs/validation/ui-03d/review-after-embedded-1440.png)を同じ記録で比較し、1024×900の[修正後](./docs/validation/ui-03d/review-after-embedded-1024.png)も確認。狭い補足欄でも合計・比較値を読め、広い画面の並置と既存スマホ操作を維持する。
+追加WebKit3ケースは実行ファイル未配置で起動不可。Safari/WebKit・iPhone実機の未検証を維持する。再現・原因・回帰テストの詳細は[修正記録](./docs/implementation/ui-03d.md#pr-467-レビュー指摘の修正2026-10-14)を参照。
+
+---
+
 # UI-03D 成長レポート — 2026-10-14
 
 final result: passed

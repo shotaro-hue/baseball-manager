@@ -130,7 +130,7 @@ export function GrowthSummaryScreen({ farmState, summary, year, teams, myId, sav
   const visible = records.filter(record => filter === 'all' || (filter === 'up' ? record.group !== 'decline' : record.group === 'decline'));
   const isWarning = record => record.group === 'decline' && record.p?.age >= 33 && Number.isFinite(record.diff) && Math.abs(record.diff) >= 5;
   const open = record => {
-    scroll.current = {window:typeof window !== 'undefined' ? window.scrollY : 0,list:listRef.current?.scrollTop||0,table:listRef.current?.querySelector('[data-ds="table"]')?.scrollLeft||0};
+    scroll.current = {window:typeof window !== 'undefined' ? window.scrollY : 0,list:listRef.current?.scrollTop||0,table:listRef.current?.querySelector('[data-ds="table"]')?.scrollLeft||0,rowTop:rows.current.get(record.key)?.getBoundingClientRect().top};
     setSelection({identity,key:record.key});
   };
   const back = () => { returning.current = selected?.key; setSelection(null); };
@@ -140,7 +140,10 @@ export function GrowthSummaryScreen({ farmState, summary, year, teams, myId, sav
     else if (returning.current) {
       if (typeof window !== 'undefined') window.scrollTo?.(0,scroll.current.window||0);
       if (listRef.current) {listRef.current.scrollTop=scroll.current.list||0;const table=listRef.current.querySelector('[data-ds="table"]');if(table)table.scrollLeft=scroll.current.table||0;}
-      rows.current.get(returning.current)?.focus({preventScroll:true});returning.current=null;
+      const target=rows.current.get(returning.current);
+      // Returning can replace a bounded list with a full-height list; keep the row at its old viewport position.
+      if(target && typeof window !== 'undefined' && Number.isFinite(scroll.current.rowTop))window.scrollBy?.(0,target.getBoundingClientRect().top-scroll.current.rowTop);
+      target?.focus({preventScroll:true});returning.current=null;
     }
   },[selected?.key,identity]);
   const comparison = selected ? abilityComparison(selected.p,currentPlayer(selected.p)) : [];

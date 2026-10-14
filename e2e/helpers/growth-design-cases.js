@@ -39,4 +39,17 @@ export function registerGrowthDesignCases(){
   }
   await page.goto('/baseball-manager/e2e/fixtures/ui03d/index.html?embedded=false&state=failure');await page.getByRole('button',{name:'戦力外・自由契約の整理へ',exact:true}).click();await expect(page.getByRole('alert')).toContainText('再試行');await expect(page.getByRole('button',{name:'戦力外・自由契約の整理へ',exact:true})).toBeEnabled();expect(errors).toEqual([]);
  });
+ for(const width of [1024,1440])test(`UI-03D growth repeated desktop selection restores visible row ${width}`,async({page})=>{
+  await page.setViewportSize({width,height:900});
+  await page.goto('/baseball-manager/e2e/fixtures/ui03d/index.html?state=many');
+  await page.getByRole('button',{name:'記録選手0の能力変化を確認',exact:true}).click();
+  const last=page.getByRole('button',{name:'記録選手27の能力変化を確認',exact:true});
+  await last.scrollIntoViewIfNeeded();await last.click();
+  await expect(page.getByRole('heading',{name:'記録選手27の能力変化',exact:true})).toBeFocused();
+  await page.getByRole('button',{name:'成長一覧に戻る',exact:true}).click();
+  await expect(last).toBeFocused();
+  await expect.poll(async()=>{
+   const box=await last.boundingBox();return box.y>=0&&box.y+box.height<=900;
+  }).toBe(true);
+ });
 }
