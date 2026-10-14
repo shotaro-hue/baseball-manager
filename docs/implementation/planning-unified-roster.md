@@ -36,7 +36,7 @@
 
 ## 検証とレビュー
 
-変更ファイルは`OffseasonPlanningScreen.jsx`・`ContractRenewalPhaseScreen.jsx`と両画面の局所CSS、編成／二軍Unit、既存UI-03Aのfixture・ブラウザ操作、進行E2Eの開始ボタン参照、比較スクリプトと画像・本書・ROADMAP。engine・hook・依存・CI設定は変更していない。
+変更ファイルは`OffseasonPlanningScreen.jsx`・`ContractRenewalPhaseScreen.jsx`と両画面の局所CSS、編成／二軍Unit、既存UI-03Aのfixture・ブラウザ操作、選手詳細E2Eの呼び出し口、進行E2Eの開始ボタン参照、比較スクリプトと画像・本書・ROADMAP。engine・hook・依存・CI設定は変更していない。
 
 関連Unit／結合9ファイル84件成功。統合一覧・候補の指定取消・一括除外・直接交渉開始・放出後所属表示の5回帰は修正前REDを確認。獲得済み契約表示と移籍前成績、過年度の市場記録を持つシーズン中延長の2回帰もRED→GREENを確認した。
 
@@ -48,6 +48,8 @@ npm run test:e2e -- progression.smoke.spec.js --project=chromium --grep 'UI-03A 
 ブラウザの記録・最終headのCI URLと各job結果はPR本文に記録する。CI全セットの同一commitでの重複実行は行わない。
 
 ローカルChromiumの対象19件が通しで成功（4.9分）。指定7幅×15状態、実App3幅の候補保存・取消・実放出・保存失敗／再試行・補強・タブ往復、既存更改の長い一覧復帰3幅、実Appの独立2幅／埋め込み4幅の全7状態・保存再開・終了を含む。追加のキーボード開始・候補取消・再交渉／減額制限待ちでの復帰も成功（重複を除く20シナリオ）。最終の獲得後契約・移籍前成績の追加確認は実App390pxで再検証して成功した。
+
+初回[CI #392](https://github.com/shotaro-hue/baseball-manager/actions/runs/38655034119)はBuild・Unit1181件・進行95件・試合履歴47件・契約財務23件・保存16件が成功。編成は68件成功・2件失敗し、最終ゲートも失敗した。`player-detail.spec.js`の390／1440pxの共通呼び出しテストが、削除された`.planning-roster`を待ち続けたためである。入口を統合一覧→選手選択→詳細展開へ更新し、成績・年度別・レイアウト・Escapeの期待を維持、元の操作へのフォーカス復帰も追加した。両幅のplanning／FA／growthの3経路はローカル2件ともGREEN（7.4秒）。プロダクトコードは初回CIから変更していない。修正後の最終headの通常CI結果はPR本文へ記録する。
 
 独立read-onlyレビューの指摘を修正した。
 
