@@ -1,20 +1,23 @@
-import { lazy, Suspense, useCallback, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { calcRetireWill } from '../engine/playerCore';
 import { waiverEligible } from '../engine/offseasonReview';
 import { marketMetrics } from './hub/faMarket';
 import { fmtSal } from '../utils';
 import { useResultDialog } from './useResultDialog';
 import '../calm-offseason.css';
+import {Button,MetricBand,StateLabel,DataTableFrame} from './design-system/primitives';
+import './growth-report.css';
+import {CaretRight} from '@phosphor-icons/react';
 
 const PlayerModal = lazy(() => import('./PlayerModal').then(m => ({ default: m.PlayerModal })));
 const money = n => Number.isFinite(n) ? fmtSal(n) : '未記録';
 const sum = values => values.every(Number.isFinite) ? values.reduce((a, b) => a + b, 0) : undefined;
 const retirementLabels = { accepted: '引退を受け入れ', retained: '引き留め成功', retain_failed: '引き留め不成立・引退' };
-function Frame({ farmState, title, year, teams = [], myId, saveId, children, embedded = false }) {
+function Frame({ farmState, title, year, teams = [], myId, saveId, children, embedded = false, screenClass, onClose }) {
   const [profile, setProfile] = useState(null);
   const myTeam = teams.find(t => t.id === myId);
   const Tag = embedded ? 'section' : 'main'; const Heading = embedded ? 'h2' : 'h1';
-  return <Tag className="offseason-review"><div className="review-content"><header><p>オフシーズン · {year}年</p><Heading>{title}</Heading></header>{children(setProfile)}
+  return <Tag className={`offseason-review ${screenClass || ''}`} data-ds={screenClass ? 'growth-screen' : undefined}><div className="review-content"><header>{onClose && <Button variant="secondary" className="growth-close" onClick={onClose}>編成に戻る</Button>}<p>オフシーズン · {year}年</p><Heading>{title}</Heading></header>{children(setProfile)}
     {profile && <Suspense fallback={<p role="status">選手詳細を読み込み中です。</p>}><PlayerModal farmState={farmState} key={profile.id} player={profile} teamName={myTeam?.name || '選手記録'} isMyTeam={[...(myTeam?.players || []), ...(myTeam?.farm || [])].some(p => p.id === profile.id)} saveId={saveId} teams={teams} year={year} onClose={() => setProfile(null)} /></Suspense>}
   </div></Tag>;
 }
@@ -101,25 +104,76 @@ export function WaiverResultScreen({ farmState, results, year, teams, myId, save
 }
 const abilityNames = { velocity: '球速', control: '制球', stamina: 'スタミナ', breaking: '変化球', variety: '球種', sharpness: 'キレ', tempo: 'テンポ', clutchP: 'ピンチ', recovery: '回復', durability: '耐久', contact: 'ミート', power: '長打', eye: '選球眼', speed: '走力', arm: '肩', defense: '守備', catching: '捕球', stealSkill: '盗塁', baseRunning: '走塁', clutch: 'クラッチ', vsLeft: '対左', breakingBall: '変化球対応' };
 const delta = n => Number.isFinite(n) ? `${n > 0 ? '+' : ''}${n}` : '未記録';
-export function GrowthSummaryScreen({ farmState, summary, year, teams, myId, saveId, onNext, embedded = false, faPool = [] }) {
-  const advance = useAdvance(onNext); const team = teams?.find(t => t.id === myId);
-  const groups = [['breakout', '急成長'], ['growth', '成長'], ['decline', '下降']];
-  const warnings = (summary?.decline || []).filter(item => item.p?.age >= 33 && Number.isFinite(item.diff) && Math.abs(item.diff) >= 5);
-  return <Frame {...{ farmState, teams, myId, year, saveId, embedded }} title="選手成長レポート">{profile => <>
-    <p>今季終了後の登録選手の成長記録です。変化量は記録対象の能力値の合計差です。</p><div className="review-metrics">{groups.map(([key, label]) => <span key={key}>{label} {Array.isArray(summary?.[key]) ? `${summary[key].length}人` : '未記録'}</span>)}</div>
-    {!summary ? <p>成長結果が未記録です。</p> : groups.every(([key]) => Array.isArray(summary[key]) && summary[key].length === 0) && <p>記録された大きな変化はありません。</p>}
-    {warnings.length > 0 && <aside className="review-warning"><h2>起用の見直し候補</h2><p>33歳以上で5pt以上下降した選手です。放出の推奨ではありません。</p><ul>{warnings.map((item, i) => <li key={i}>{item.p.name} · {delta(item.diff)}pt</li>)}</ul></aside>}
-    {groups.map(([key, label]) => <details className="review-card" key={key}><summary>{label}の選手と能力の内訳（{Array.isArray(summary?.[key]) ? `${summary[key].length}人` : '未記録'}）</summary>{(summary?.[key] || []).map((item, i) => {
-      const p = item.p; if (!p) return <p key={i}>選手情報未記録 · {delta(item.diff)}pt</p>;
-      const current = [...(team?.players || []), ...(team?.farm || []), ...faPool].find(entry => entry.id === p.id);
-      const before = (p.isPitcher ? p.pitching : p.batting) || {}; const after = (p.isPitcher ? current?.pitching : current?.batting) || {};
-      const keys = Object.keys(abilityNames).filter(k => k in before || k in after);
-      return <article className="review-card" key={i}><h3>{p.name} · {delta(item.diff)}pt</h3><p>{Number.isFinite(p.age) ? `${p.age}歳` : '年齢未記録'} · {p.pos}</p>
-        <button onClick={() => profile(current || p)}>選手詳細・年度別成績</button><p className="review-note">前は成長前の保存値、現在は球団に保持する能力値です。更改でモラル等が変わっても、この成長合計には加えません。</p>
-        {keys.length ? <div className="review-table" role="region" aria-label={`${p.name}の能力変化`} tabIndex={0}><table><thead><tr><th>能力</th><th>前</th><th>現在</th><th>差</th></tr></thead><tbody>{keys.map(k => <tr key={k}><th>{abilityNames[k]}</th><td>{Number.isFinite(before[k]) ? before[k] : '未記録'}</td><td>{Number.isFinite(after[k]) ? after[k] : '未記録'}</td><td>{Number.isFinite(before[k]) && Number.isFinite(after[k]) ? delta(after[k] - before[k]) : '未記録'}</td></tr>)}</tbody></table></div> : <p>能力の内訳は未記録です。</p>}
-      </article>;
-    })}</details>)}
-    <p className="review-note">このレポートに記録されていない小さな変化やファームの成長内訳は補完していません。</p>
-    {!embedded && <footer><button className="review-primary" disabled={advance.busy} onClick={() => advance.run()}>戦力外・自由契約の整理へ</button>{advance.failure && <p role="alert">{advance.failure}</p>}</footer>}
+const growthGroups = [['breakout','急成長'],['growth','成長'],['decline','下降']];
+const growthScope = (saveId,myId,year) => JSON.stringify([saveId,myId,year]);
+function abilityComparison(player,current) {
+  const before = (player?.isPitcher ? player?.pitching : player?.batting) || {};
+  const after = (player?.isPitcher ? current?.pitching : current?.batting) || {};
+  return Object.keys(abilityNames).filter(key => key in before || key in after).map(key => ({key,label:abilityNames[key],before:before[key],after:after[key],diff:Number.isFinite(before[key]) && Number.isFinite(after[key]) ? after[key]-before[key] : null}));
+}
+export function GrowthSummaryScreen({ farmState, summary, year, teams, myId, saveId, onNext, onClose, embedded = false, faPool = [] }) {
+  const advance = useAdvance(onNext);
+  const team = teams?.find(t => t.id === myId);
+  const identity = growthScope(saveId,myId,year);
+  const [filterState,setFilter] = useState({identity,value:'all'});
+  const [selection,setSelection] = useState(null);
+  const rows = useRef(new Map()),listRef = useRef(null),detailHeading = useRef(null),detailRef = useRef(null),returning = useRef(null),scroll = useRef({});
+  const filter = filterState.identity === identity ? filterState.value : 'all';
+  const records = growthGroups.flatMap(([group,label]) => (Array.isArray(summary?.[group]) ? summary[group] : []).map((item,index) => ({...item,group,label,key:`${group}:${typeof item?.p?.id}:${item?.p?.id}:${index}`})));
+  const selected = selection?.identity === identity ? records.find(record => record.key === selection.key) : null;
+  const currentPlayer = p => p?.id == null ? null : [...(team?.players||[]),...(team?.farm||[]),...faPool].find(entry => entry.id === p.id);
+  const counts = Object.fromEntries(growthGroups.map(([key]) => [key,Array.isArray(summary?.[key]) ? summary[key].length : null]));
+  const count = keys => keys.every(key => counts[key] != null) ? keys.reduce((sum,key) => sum+counts[key],0) : null;
+  const complete = growthGroups.every(([key]) => Array.isArray(summary?.[key]));
+  const filterGroups = filter === 'up' ? ['breakout','growth'] : filter === 'down' ? ['decline'] : growthGroups.map(([key])=>key);
+  const filterComplete = filterGroups.every(key=>Array.isArray(summary?.[key]));
+  const visible = records.filter(record => filter === 'all' || (filter === 'up' ? record.group !== 'decline' : record.group === 'decline'));
+  const isWarning = record => record.group === 'decline' && record.p?.age >= 33 && Number.isFinite(record.diff) && Math.abs(record.diff) >= 5;
+  const open = record => {
+    scroll.current = {window:typeof window !== 'undefined' ? window.scrollY : 0,list:listRef.current?.scrollTop||0,table:listRef.current?.querySelector('[data-ds="table"]')?.scrollLeft||0};
+    setSelection({identity,key:record.key});
+  };
+  const back = () => { returning.current = selected?.key; setSelection(null); };
+  useEffect(() => { if (selection && !selected) setSelection(null); },[selected?.key,identity]);
+  useEffect(() => {
+    if (selected) { detailRef.current?.scrollIntoView?.({block:'start'}); detailHeading.current?.focus({preventScroll:true}); }
+    else if (returning.current) {
+      if (typeof window !== 'undefined') window.scrollTo?.(0,scroll.current.window||0);
+      if (listRef.current) {listRef.current.scrollTop=scroll.current.list||0;const table=listRef.current.querySelector('[data-ds="table"]');if(table)table.scrollLeft=scroll.current.table||0;}
+      rows.current.get(returning.current)?.focus({preventScroll:true});returning.current=null;
+    }
+  },[selected?.key,identity]);
+  const comparison = selected ? abilityComparison(selected.p,currentPlayer(selected.p)) : [];
+  const PlayerHeading = embedded ? 'h3' : 'h2';
+  return <Frame {...{farmState,teams,myId,year,saveId,embedded,onClose}} screenClass={`growth-report ${embedded ? 'growth-embedded' : ''}`} title="選手成長レポート">{profile => <>
+    <p className="growth-scope">一軍登録選手の記録</p>
+    <MetricBand className="growth-metrics" items={growthGroups.map(([key,label]) => ({label,value:counts[key],unit:'人'}))}/>
+    {!complete && <p role="status">{summary ? '一部の成長区分は未記録です。記録のある選手を表示します。' : '成長結果が未記録です。'}</p>}
+    <div className={`growth-layout ${selected ? 'growth-selected' : ''}`}>
+      <section className="growth-list" ref={listRef} aria-label="成長一覧">
+        <div className="growth-filters" aria-label="成長記録の絞り込み">{[['all','記録','記録の全員',count(['breakout','growth','decline'])],['up','上昇','上昇の記録',count(['breakout','growth'])],['down','下降','下降の記録',counts.decline]].map(([value,label,aria,n]) => <Button key={value} variant="secondary" aria-label={aria} aria-pressed={filter === value} onClick={() => {setSelection(null);setFilter({identity,value});}}>{label} {n ?? '—'}</Button>)}</div>
+        <DataTableFrame label="成長記録一覧" className="growth-records"><table><thead><tr><th scope="col">選手・主な変化</th><th scope="col" data-number>変化量</th></tr></thead><tbody>
+          {visible.map(record => {
+            const p=record.p, changes=abilityComparison(p,currentPlayer(p));
+            const main=changes.filter(row=>row.diff != null && row.diff !== 0).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff)).slice(0,2);
+            const content=<><span className="growth-name">{p?.name || '選手情報未記録'}</span>{p && <small>{p.pos || '役割未記録'} · {p.age ?? '未記録'}歳</small>}<StateLabel tone={record.group === 'decline' ? 'warning' : 'success'}>{record.label}</StateLabel><span className="growth-main-changes">{main.length ? main.map(row=>`${row.label} ${delta(row.diff)}`).join(' · ') : changes.some(row=>row.diff != null) ? '比較できる項目の差は0' : '比較用の記録なし'}</span>{isWarning(record) && <small className="growth-warning">起用見直し候補</small>}</>;
+            return <tr key={record.key} className={selected?.key === record.key ? 'selected' : ''}><td>{p?.id != null ? <button className="growth-player" aria-label={`${p.name || '選手情報未記録'}の能力変化を確認`} aria-pressed={selected?.key === record.key} ref={node=>{if(node)rows.current.set(record.key,node);else rows.current.delete(record.key);}} onClick={()=>open(record)}>{content}<CaretRight className="growth-chevron" size={18} aria-hidden="true"/></button> : <div className="growth-player">{content}</div>}</td><td data-number><strong>{delta(record.diff)}{Number.isFinite(record.diff) && <small>pt</small>}</strong></td></tr>;
+          })}
+          {!visible.length && <tr><td colSpan={2}>{complete && !records.length ? '記録された大きな変化はありません。' : summary && !filterComplete ? 'この区分の記録は未記録です。' : summary ? 'この条件の成長記録はありません。記録の全員から確認できます。' : '成長結果が未記録です。'}</td></tr>}
+        </tbody></table></DataTableFrame>
+      </section>
+      {selected && <section className="growth-detail" ref={detailRef} aria-label="選んだ選手の能力内訳">
+        <Button variant="secondary" className="growth-back" onClick={back}>成長一覧に戻る</Button>
+        <PlayerHeading ref={detailHeading} tabIndex={-1}>{selected.p.name}の能力変化</PlayerHeading>
+        <p>{selected.p.pos || '役割未記録'} · {selected.p.age ?? '未記録'}歳 · 記録の変化量 {delta(selected.diff)}{Number.isFinite(selected.diff) && 'pt'}</p>
+        {isWarning(selected) && <p className="growth-warning">起用の見直し候補。放出の推奨ではありません。</p>}
+        <p className="growth-note">前は成長前の保存値、現在は球団・市場に保持する能力値です。</p>
+        <DataTableFrame label={`${selected.p.name}の能力変化`} className="growth-abilities"><table><thead><tr><th scope="col">能力</th><th scope="col" data-number>前</th><th scope="col" data-number>現在</th><th scope="col" data-number>差</th></tr></thead><tbody>{comparison.map(row=><tr key={row.key}><th scope="row">{row.label}</th><td data-number>{Number.isFinite(row.before) ? row.before : '未記録'}</td><td data-number>{Number.isFinite(row.after) ? row.after : '未記録'}</td><td data-number>{delta(row.diff)}</td></tr>)}{!comparison.length && <tr><td colSpan={4}>能力の内訳は未記録です。</td></tr>}</tbody></table></DataTableFrame>
+        <Button variant="secondary" onClick={()=>profile(currentPlayer(selected.p)||selected.p)}>選手詳細・年度別成績</Button>
+      </section>}
+    </div>
+    <p className="growth-note">変化量は記録された能力差の合計です。下降は放出の推奨ではありません。</p>
+    <details className="growth-help"><summary>表示の見方</summary><p>上昇は急成長・成長の記録です。一覧の主な変化は比較できる項目から最大2つ表示し、合計の全内訳ではありません。</p><p>0は実測値、未記録は比較に必要な値がない状態です。記録されていない小さな変化やファームの成長内訳は補完しません。</p><p>変化量は保存された成長記録を使い、現在の値から再計算しません。更改で士気などが変わっても記録の合計へ加えません。</p><p>起用見直し候補は33歳以上で5pt以上下降した選手です。能力と役割を確認する目安です。</p></details>
+    {!embedded && <footer><Button disabled={advance.busy} onClick={()=>advance.run()}>戦力外・自由契約の整理へ</Button>{advance.failure && <p role="alert">{advance.failure}</p>}</footer>}
   </>}</Frame>;
 }

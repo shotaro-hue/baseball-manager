@@ -85,7 +85,8 @@ it('result overview distinguishes recorded no releases from missing results and 
 it('growth overview shows saved categories and reveals actual before/current values without inventing missing abilities', () => {
   const p = player(0, { batting: { power: 60, contact: 0 } }); const current = { ...p, batting: { power: 62, contact: 0, speed: 50 } };
   const ui = setup(GrowthSummaryScreen, { teams: [team([current])], summary: { breakout: [], growth: [{ p, diff: 2 }], decline: [] } });
-  expect(text(ui.view.root)).toContain('成長 1人'); expect(text(ui.view.root)).toContain('+2pt');
+  expect(text(ui.view.root).replace(/\s/g,'')).toContain('成長1人'); expect(text(ui.view.root)).toContain('+2pt');
+  act(() => ui.view.root.findByProps({ 'aria-label': '選手0の能力変化を確認' }).props.onClick());
   const rows = ui.view.root.findAllByType('tr'); expect(text(rows.find(n => text(n).startsWith('長打')))).toContain('6062+2');
   expect(text(rows.find(n => text(n).startsWith('ミート')))).toContain('000');
   expect(text(rows.find(n => text(n).startsWith('走力')))).toContain('未記録50未記録');
@@ -93,7 +94,7 @@ it('growth overview shows saved categories and reveals actual before/current val
 it('marks recorded absence of major changes, missing growth data, and large declines separately', () => {
   const ui = setup(GrowthSummaryScreen, { summary: { breakout: [], growth: [], decline: [] } }); expect(text(ui.view.root)).toContain('大きな変化はありません');
   ui.update({ summary: null }); expect(text(ui.view.root)).toContain('成長結果が未記録'); expect(text(ui.view.root)).not.toContain('大きな変化はありません');
-  ui.update({ summary: { breakout: [], growth: [], decline: [{ p: player(0, { age: 33 }), diff: -5 }] } }); expect(text(ui.view.root)).toContain('起用の見直し候補'); expect(text(ui.view.root)).toContain('-5pt');
+  ui.update({ summary: { breakout: [], growth: [], decline: [{ p: player(0, { age: 33 }), diff: -5 }] } }); expect(text(ui.view.root)).toMatch(/起用.*見直し候補/); expect(text(ui.view.root)).toContain('-5pt');
 });
 it('release helper prunes roster references and preserves budget, farm and history', () => {
   const t = { ...team([player(0), player(1)]), budget: 10000, popularity: 50, farm: [player(2)], lineup: [0, 1], rotation: [0], history: [] };
