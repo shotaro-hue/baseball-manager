@@ -1,0 +1,54 @@
+{
+  "baseSha": "a14a5c888dca3cfe07c7338482e4130290a6257b",
+  "initialCiRun": 38737005259,
+  "initialCiFailure": "2/14 browser cases: Chromium390 expected saved listScroll8714, got8834; Chromium1440 expected8648, got8768. No test retry used.",
+  "controlledRed": {
+    "browser": "Chromium390",
+    "expectedManualPayload": 8714,
+    "receivedManualPayload": 8834,
+    "condition": "native keydown capture and save click in one JavaScript task; observe real handleSave entry, not eventual autosave"
+  },
+  "incompleteFix": "flushSync at the candidate listener alone still failed both390 engines because the parent view-to-save bridge used a passive effect.",
+  "fix": "Flush only pending scroll at keydown and outside pointerdown; use the three existing layout state bridges. Storage IO remains queued.",
+  "testPreparation": "Wait for the visible save button to be enabled, refocus after the preceding save disables it, and assert that a real manual request occurred before checking storage. Physical Enter and reload assertions are retained.",
+  "localResults": {
+    "journeyPassed": 2,
+    "projects": [
+      "chromium-390",
+      "webkit-390"
+    ],
+    "duration": "3.8m",
+    "unitPassed": 27,
+    "buildSeconds": 11.27,
+    "performancePassed": 2,
+    "scrollCountsEach": {
+      "candidateRenders": 8,
+      "parentStateUpdates": 1,
+      "publicRankingSorts": 0,
+      "saves": 1
+    },
+    "performanceStage": "Two390 measured after keyboard/layout fix and before outside-pointer synchronization; final six-condition work counts are captured by exact-head CI."
+  },
+  "sourceSha256": {
+    "src/components/DraftCandidates.jsx": "a88e8e37e74877a360a56c2df8c349e361aa06990c1c8d08aec34364a901a947",
+    "src/engine/draftReports.js": "7805f2fc684d51c37ea125361b39b92a68cbd2b2373b3dfcec838862aa86da4a",
+    "src/components/Draft.jsx": "bd10f34e51e111812713868c7fc8436a288e0000f07a87ae279fb614691acde4",
+    "src/components/DraftPreview.jsx": "7b94d9b3a2a901435606a13b06e2614b0802233d10f32f6fd4699c861e141006"
+  },
+  "reference": "https://react.dev/reference/react-dom/flushSync",
+  "finalCi": "Exact final-head result is recorded in PR472 body; earlier failed runs are not treated as success.",
+  "additionalCiFailure": {
+    "suite": "initialization-and-progression",
+    "run": 38737005259,
+    "passed": 118,
+    "total": 119,
+    "expectedPointerSavedPosition": 8768,
+    "received": 8968
+  },
+  "pointerRed": {
+    "expectedManualPayload": 8714,
+    "receivedManualPayload": 8834,
+    "condition": "outside pointerdown and click in same task; layout bridges already in place, only keyboard boundary had been synchronous"
+  },
+  "finalCiEvidence": "The QA-D1 CI suite writes final-ci JSON and all18 screenshots to test-results/qa-d1-evidence; existing Actions upload retains them. Per-project work counts are also printed in job logs."
+}

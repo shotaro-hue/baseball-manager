@@ -1,0 +1,325 @@
+{
+  "baseSha": "a14a5c888dca3cfe07c7338482e4130290a6257b",
+  "seed": 20261015,
+  "candidateCount": 80,
+  "browserMatrix": {
+    "projects": [
+      "chromium-360",
+      "chromium-390",
+      "chromium-1440",
+      "webkit-360",
+      "webkit-390",
+      "webkit-1440"
+    ],
+    "journeyAndPerformance": {
+      "passed": 12,
+      "duration": "10.9m",
+      "sourceStage": "after-scroll-ranking-before-focus"
+    },
+    "finalDesktopFocus": {
+      "passed": 2,
+      "duration": "1.1m",
+      "sourceStage": "final focus plus independent-review filter fix"
+    },
+    "finalCiDiscovery": 14
+  },
+  "unitRegression": {
+    "passed": 27,
+    "files": [
+      "src/components/draftPerformance.test.js",
+      "src/components/draftDecision.test.js",
+      "src/engine/__tests__/draftReports.test.js",
+      "src/hooks/useDraftEvaluation.test.js"
+    ]
+  },
+  "redEvidence": {
+    "scrollRenderBudget": "Chromium 390 candidate render budget failed: expected<=4, actual184. Final budget includes real save queue/status commits (<=12); parent updates<=2 and repeated ranking sorts<=1 are default gates.",
+    "unitRegressions": "Settled scrolling, immediate report opening, external save flush/unmount, actual filter scroll reset and public-map cache reuse first failed, then passed.",
+    "desktopFocus": "Chromium 1440 and WebKit 1440 back focus moved split list 3000px; expected<=2px. Final focused regressions preserve exact position and saved reload.",
+    "desktopFilter": "While a report is open, changing sort retained DOM scrollTop=800 despite persisted listScroll=0 and refocused report heading. Unit RED, separate scroll-reset effect GREEN; keyboard focus/DOM reset verified in Chromium and WebKit1440."
+  },
+  "work": [
+    {
+      "browser": "chromium-1440",
+      "before": {
+        "commits": 75,
+        "candidateRenders": 150,
+        "parentStateUpdates": 48,
+        "publicTierCalls": 12000,
+        "publicRankingSorts": 12000,
+        "saves": 1
+      },
+      "after": {
+        "commits": 4,
+        "candidateRenders": 8,
+        "parentStateUpdates": 1,
+        "publicTierCalls": 640,
+        "publicRankingSorts": 0,
+        "saves": 1
+      },
+      "referenceFrameP95Ms": {
+        "before": 24.599999994039536,
+        "after": 17.399999998509884
+      },
+      "referenceNavigationMs": {
+        "before": 310,
+        "after": 300
+      },
+      "repeatedRanking": {
+        "before": {
+          "calls": 8000,
+          "sorts": 8000,
+          "elapsedMs": 66.40000000596046,
+          "checksum": 36400
+        },
+        "after": {
+          "calls": 8000,
+          "sorts": 1,
+          "elapsedMs": 0.6999999955296516,
+          "checksum": 36400
+        }
+      }
+    },
+    {
+      "browser": "chromium-360",
+      "before": {
+        "commits": 78,
+        "candidateRenders": 156,
+        "parentStateUpdates": 47,
+        "publicTierCalls": 12480,
+        "publicRankingSorts": 12480,
+        "saves": 1
+      },
+      "after": {
+        "commits": 4,
+        "candidateRenders": 8,
+        "parentStateUpdates": 1,
+        "publicTierCalls": 640,
+        "publicRankingSorts": 0,
+        "saves": 1
+      },
+      "referenceFrameP95Ms": {
+        "before": 21.30000000447035,
+        "after": 17.100000001490116
+      },
+      "referenceNavigationMs": {
+        "before": 433,
+        "after": 336
+      },
+      "repeatedRanking": {
+        "before": {
+          "calls": 8000,
+          "sorts": 8000,
+          "elapsedMs": 64,
+          "checksum": 36400
+        },
+        "after": {
+          "calls": 8000,
+          "sorts": 1,
+          "elapsedMs": 0.9000000059604645,
+          "checksum": 36400
+        }
+      }
+    },
+    {
+      "browser": "chromium-390",
+      "before": {
+        "commits": 76,
+        "candidateRenders": 152,
+        "parentStateUpdates": 48,
+        "publicTierCalls": 12160,
+        "publicRankingSorts": 12160,
+        "saves": 1
+      },
+      "after": {
+        "commits": 4,
+        "candidateRenders": 8,
+        "parentStateUpdates": 1,
+        "publicTierCalls": 640,
+        "publicRankingSorts": 0,
+        "saves": 1
+      },
+      "referenceFrameP95Ms": {
+        "before": 24.100000001490116,
+        "after": 17.5
+      },
+      "referenceNavigationMs": {
+        "before": 355,
+        "after": 336
+      },
+      "repeatedRanking": {
+        "before": {
+          "calls": 8000,
+          "sorts": 8000,
+          "elapsedMs": 83.5,
+          "checksum": 36400
+        },
+        "after": {
+          "calls": 8000,
+          "sorts": 1,
+          "elapsedMs": 0.8999999985098839,
+          "checksum": 36400
+        }
+      }
+    },
+    {
+      "browser": "webkit-1440",
+      "before": {
+        "commits": 49,
+        "candidateRenders": 98,
+        "parentStateUpdates": 43,
+        "publicTierCalls": 7840,
+        "publicRankingSorts": 7840,
+        "saves": 1
+      },
+      "after": {
+        "commits": 4,
+        "candidateRenders": 8,
+        "parentStateUpdates": 1,
+        "publicTierCalls": 640,
+        "publicRankingSorts": 0,
+        "saves": 1
+      },
+      "referenceFrameP95Ms": {
+        "before": 116,
+        "after": 21
+      },
+      "referenceNavigationMs": {
+        "before": 419,
+        "after": 504
+      },
+      "repeatedRanking": {
+        "before": {
+          "calls": 8000,
+          "sorts": 8000,
+          "elapsedMs": 156,
+          "checksum": 36400
+        },
+        "after": {
+          "calls": 8000,
+          "sorts": 1,
+          "elapsedMs": 1,
+          "checksum": 36400
+        }
+      }
+    },
+    {
+      "browser": "webkit-360",
+      "before": {
+        "commits": 36,
+        "candidateRenders": 72,
+        "parentStateUpdates": 31,
+        "publicTierCalls": 5760,
+        "publicRankingSorts": 5760,
+        "saves": 1
+      },
+      "after": {
+        "commits": 4,
+        "candidateRenders": 8,
+        "parentStateUpdates": 1,
+        "publicTierCalls": 640,
+        "publicRankingSorts": 0,
+        "saves": 1
+      },
+      "referenceFrameP95Ms": {
+        "before": 124,
+        "after": 17.00000000000182
+      },
+      "referenceNavigationMs": {
+        "before": 588,
+        "after": 460
+      },
+      "repeatedRanking": {
+        "before": {
+          "calls": 8000,
+          "sorts": 8000,
+          "elapsedMs": 127,
+          "checksum": 36400
+        },
+        "after": {
+          "calls": 8000,
+          "sorts": 1,
+          "elapsedMs": 1,
+          "checksum": 36400
+        }
+      }
+    },
+    {
+      "browser": "webkit-390",
+      "before": {
+        "commits": 41,
+        "candidateRenders": 82,
+        "parentStateUpdates": 36,
+        "publicTierCalls": 6560,
+        "publicRankingSorts": 6560,
+        "saves": 1
+      },
+      "after": {
+        "commits": 4,
+        "candidateRenders": 8,
+        "parentStateUpdates": 1,
+        "publicTierCalls": 640,
+        "publicRankingSorts": 0,
+        "saves": 1
+      },
+      "referenceFrameP95Ms": {
+        "before": 124,
+        "after": 17.000000000003638
+      },
+      "referenceNavigationMs": {
+        "before": 503,
+        "after": 471
+      },
+      "repeatedRanking": {
+        "before": {
+          "calls": 8000,
+          "sorts": 8000,
+          "elapsedMs": 140,
+          "checksum": 36400
+        },
+        "after": {
+          "calls": 8000,
+          "sorts": 1,
+          "elapsedMs": 1.999999999992724,
+          "checksum": 36400
+        }
+      }
+    }
+  ],
+  "timingAttribution": "Timings are reference values. Host CPU load was not isolated from other validation processes; render/parent/sort/save work counts are primary evidence. No timing remeasurement after one-line final preventScroll focus change. Final independent-review filter reset/focus fix was checked by 27 related units and both desktop browser cases; performance timings were not remeasured after these focus/effect-only changes. After the keyboard/save bridge fix, both390 journey and performance cases were rechecked; other original six-width timings remain historical measurements.",
+  "fixtureLimits": "Journey:80 production-generated prospects, 12 team records, own roster 64, one active CPU rival 69, other 10 clubs 70. Full 12 CPU generation/lottery balance measured separately. Performance uses base roster capacity.",
+  "hardwareLimit": "Playwright Chromium141.0.7390.37 and WebKit26.0 on host, with 360/390/1440 viewports. No iPhone hardware or Safari application validation; programmatic scroll steps are not physical gestures.",
+  "screenshots": [
+    "browser-chromium-1440-detail.png",
+    "browser-chromium-1440-list.png",
+    "browser-chromium-1440-results.png",
+    "browser-chromium-360-detail.png",
+    "browser-chromium-360-list.png",
+    "browser-chromium-360-results.png",
+    "browser-chromium-390-detail.png",
+    "browser-chromium-390-list.png",
+    "browser-chromium-390-results.png",
+    "browser-webkit-1440-detail.png",
+    "browser-webkit-1440-list.png",
+    "browser-webkit-1440-results.png",
+    "browser-webkit-360-detail.png",
+    "browser-webkit-360-list.png",
+    "browser-webkit-360-results.png",
+    "browser-webkit-390-detail.png",
+    "browser-webkit-390-list.png",
+    "browser-webkit-390-results.png"
+  ],
+  "finalSourceSha256": {
+    "src/components/DraftCandidates.jsx": "a88e8e37e74877a360a56c2df8c349e361aa06990c1c8d08aec34364a901a947",
+    "src/engine/draftReports.js": "7805f2fc684d51c37ea125361b39b92a68cbd2b2373b3dfcec838862aa86da4a",
+    "src/components/Draft.jsx": "bd10f34e51e111812713868c7fc8436a288e0000f07a87ae279fb614691acde4",
+    "src/components/DraftPreview.jsx": "7b94d9b3a2a901435606a13b06e2614b0802233d10f32f6fd4699c861e141006"
+  },
+  "keyboardBoundary": {
+    "record": "keyboard-boundary.json",
+    "journeyPassed": 2,
+    "performancePassed": 2,
+    "stage": "after-input-boundaries",
+    "finalGate": "All14 tests and six final-ci measurements are captured on final head; earlier performance profiles retain their original measured hashes."
+  }
+}

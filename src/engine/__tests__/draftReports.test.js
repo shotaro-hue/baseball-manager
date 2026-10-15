@@ -1,5 +1,5 @@
-import { expect, it } from 'vitest';
-import { ensureDraftEvaluation, startDraftEvaluation, scoutDraftCandidate, draftReport, rememberDraftReport } from '../draftReports';
+import { expect, it, vi } from 'vitest';
+import { ensureDraftEvaluation, startDraftEvaluation, scoutDraftCandidate, draftReport, rememberDraftReport, publicDraftTier } from '../draftReports';
 
 const teams = [{ id: 0 }, { id: 1 }];
 const p = (id, extra = {}) => ({ id, name: `候補${id}`, age: 22, pos: '捕手', potential: 85,
@@ -81,4 +81,29 @@ it('repairs only missing reports without restoring spent points or losing saved 
  expect(restored.public[1]).toEqual(saved.public[1]);
  expect(restored.teams[0][saved.scouted[0]]).toEqual(saved.teams[0][saved.scouted[0]]);
  expect(init({existing:restored})).toBe(restored);
+});
+
+it('reuses public ranking across private scouting changes and refreshes a replaced public map',()=>{
+ const publicReports=Object.fromEntries(Array.from({length:80},(_,i)=>[String(i),{value:90-Math.floor(i/2)}]));
+ const session={public:publicReports},expected=id=>{
+  const ordered=Object.entries(publicReports).sort((a,b)=>b[1].value-a[1].value||a[0].localeCompare(b[0]));
+  const index=ordered.findIndex(([key])=>key===String(id));
+  return index<0?'評価不明':index<12?'1位候補':index<36?'上位候補':'中下位候補';
+ };
+ const expectedTiers=Object.keys(publicReports).map(expected);
+ const sort=vi.spyOn(Array.prototype,'sort');
+ let actual,sorts;
+ try {
+  actual=Object.keys(publicReports).map(id=>publicDraftTier(session,id));
+  const scouted={...session,points:4,teams:{0:{}}};
+  for(let repeat=0;repeat<10;repeat++)for(const id of Object.keys(publicReports))publicDraftTier(scouted,id);
+  sorts=sort.mock.calls.length;
+ } finally {sort.mockRestore();}
+ expect(actual).toEqual(expectedTiers);expect(sorts).toBe(1);
+ expect(publicDraftTier(session,0)).toBe('1位候補');
+ expect(publicDraftTier(session,'missing')).toBe('評価不明');
+ expect(publicDraftTier({},0)).toBe('評価不明');
+ const replaced={...session,public:{...publicReports,79:{value:120}}};
+ expect(publicDraftTier(replaced,79)).toBe('突出した目玉');
+ expect(publicDraftTier(session,79)).toBe(expected(79));
 });

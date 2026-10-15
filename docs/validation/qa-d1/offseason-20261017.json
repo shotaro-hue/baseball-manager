@@ -1,0 +1,407 @@
+{
+  "base": "a14a5c888dca3cfe07c7338482e4130290a6257b",
+  "environment": "Vitest Node; real useGameState + useOffseason in react-test-renderer; fake-indexeddb and Map localStorage; no engine/hook mocks",
+  "postseason": "Regular-season games are simulated; playoff tournament is bypassed to invoke offseason. Not full App/UI journey.",
+  "seeds": [
+    {
+      "seed": 20261017,
+      "seasons": [
+        {
+          "year": 2026,
+          "officialGamesPerTeam": 143,
+          "elapsedMs": 33867,
+          "farmCards": {
+            "played": 827,
+            "unplayed": 31,
+            "reasons": {
+              "insufficient-catcher": 31
+            }
+          },
+          "candidateCount": 80,
+          "firstNominationRounds": 3,
+          "picks": 72,
+          "faSigned": "vutf3pa",
+          "releasedId": "8d8oxke",
+          "registered": [
+            58,
+            63,
+            56,
+            57,
+            64,
+            64,
+            60,
+            65,
+            60,
+            62,
+            58,
+            63
+          ],
+          "archives": 1
+        },
+        {
+          "year": 2027,
+          "officialGamesPerTeam": 143,
+          "elapsedMs": 45471,
+          "farmCards": {
+            "played": 840,
+            "unplayed": 18,
+            "reasons": {
+              "insufficient-catcher": 18
+            }
+          },
+          "candidateCount": 80,
+          "firstNominationRounds": 3,
+          "picks": 68,
+          "faSigned": "7uic7au",
+          "releasedId": "02ektrx",
+          "registered": [
+            63,
+            70,
+            66,
+            64,
+            70,
+            69,
+            64,
+            70,
+            67,
+            67,
+            63,
+            69
+          ],
+          "archives": 2
+        },
+        {
+          "year": 2028,
+          "officialGamesPerTeam": 143,
+          "elapsedMs": 49950,
+          "farmCards": {
+            "played": 822,
+            "unplayed": 36,
+            "reasons": {
+              "insufficient-catcher": 36
+            }
+          },
+          "candidateCount": 80,
+          "firstNominationRounds": 2,
+          "picks": 28,
+          "faSigned": "xe9qc0g",
+          "releasedId": "ium0uzs",
+          "registered": [
+            65,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70
+          ],
+          "archives": 3
+        }
+      ],
+      "checkpoints": [
+        {
+          "phase": "midseason",
+          "year": 2026,
+          "gameDay": 73,
+          "owned": [
+            52,
+            58,
+            52,
+            54,
+            56,
+            60,
+            52,
+            60,
+            54,
+            55,
+            52,
+            56
+          ],
+          "registered": [
+            52,
+            58,
+            52,
+            54,
+            56,
+            60,
+            52,
+            60,
+            54,
+            55,
+            52,
+            56
+          ]
+        },
+        {
+          "phase": "camp",
+          "year": 2026,
+          "gameDay": 144,
+          "owned": [
+            58,
+            63,
+            56,
+            57,
+            64,
+            64,
+            60,
+            65,
+            60,
+            62,
+            58,
+            63
+          ],
+          "registered": [
+            58,
+            63,
+            56,
+            57,
+            64,
+            64,
+            60,
+            65,
+            60,
+            62,
+            58,
+            63
+          ]
+        },
+        {
+          "phase": "new-season",
+          "year": 2027,
+          "gameDay": 1,
+          "owned": [
+            58,
+            63,
+            56,
+            57,
+            64,
+            64,
+            60,
+            65,
+            60,
+            62,
+            58,
+            63
+          ],
+          "registered": [
+            58,
+            63,
+            56,
+            57,
+            64,
+            64,
+            60,
+            65,
+            60,
+            62,
+            58,
+            63
+          ]
+        },
+        {
+          "phase": "midseason",
+          "year": 2027,
+          "gameDay": 73,
+          "owned": [
+            58,
+            63,
+            57,
+            58,
+            65,
+            65,
+            60,
+            65,
+            60,
+            62,
+            59,
+            63
+          ],
+          "registered": [
+            58,
+            63,
+            57,
+            58,
+            65,
+            65,
+            60,
+            65,
+            60,
+            62,
+            59,
+            63
+          ]
+        },
+        {
+          "phase": "camp",
+          "year": 2027,
+          "gameDay": 144,
+          "owned": [
+            63,
+            70,
+            66,
+            64,
+            70,
+            69,
+            64,
+            70,
+            67,
+            67,
+            63,
+            69
+          ],
+          "registered": [
+            63,
+            70,
+            66,
+            64,
+            70,
+            69,
+            64,
+            70,
+            67,
+            67,
+            63,
+            69
+          ]
+        },
+        {
+          "phase": "new-season",
+          "year": 2028,
+          "gameDay": 1,
+          "owned": [
+            63,
+            70,
+            66,
+            64,
+            70,
+            69,
+            64,
+            70,
+            67,
+            67,
+            63,
+            69
+          ],
+          "registered": [
+            63,
+            70,
+            66,
+            64,
+            70,
+            69,
+            64,
+            70,
+            67,
+            67,
+            63,
+            69
+          ]
+        },
+        {
+          "phase": "midseason",
+          "year": 2028,
+          "gameDay": 73,
+          "owned": [
+            63,
+            70,
+            67,
+            65,
+            70,
+            70,
+            66,
+            70,
+            68,
+            68,
+            65,
+            69
+          ],
+          "registered": [
+            63,
+            70,
+            67,
+            65,
+            70,
+            70,
+            66,
+            70,
+            68,
+            68,
+            65,
+            69
+          ]
+        },
+        {
+          "phase": "camp",
+          "year": 2028,
+          "gameDay": 144,
+          "owned": [
+            65,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70
+          ],
+          "registered": [
+            65,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70
+          ]
+        },
+        {
+          "phase": "new-season",
+          "year": 2029,
+          "gameDay": 1,
+          "owned": [
+            65,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70
+          ],
+          "registered": [
+            65,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70,
+            70
+          ]
+        }
+      ]
+    }
+  ]
+}

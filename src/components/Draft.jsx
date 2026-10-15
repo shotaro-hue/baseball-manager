@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import React from "react";
 import { POSITIONS, DRAFT_ROUNDS, DRAFT_COMMENTS_MY, DRAFT_COMMENTS_CPU, DRAFT_LOTTERY_MAX_ROUNDS, MAX_SHIHAKA_TOTAL } from '../constants';
 import { rng } from '../utils';
@@ -45,7 +45,8 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
   const [allLotteryLosers,setAllLotteryLosers]=React.useState(restored.allLotteryLosers ?? []);
   const [round1Result,setRound1Result]=React.useState(restored.round1Result ?? {});
   useEffect(() => { phaseRef.current = phase; }, [phase]);
-  useEffect(() => { onStateChange?.(encodeLottery({ phase, showPreview, hazureRound, activeTeams, confirmedPicks,
+  // Bridge candidate-view commits into the save state before a same-task save.
+  useLayoutEffect(() => { onStateChange?.(encodeLottery({ phase, showPreview, hazureRound, activeTeams, confirmedPicks,
     myPick, cpuPicks, animStep, pendingConflicts, currentConflictIdx, lotteryTarget, lotteryTeams,
     lotteryResult, lotteryRound, resolvedPicks, allLotteryLosers, round1Result,candidateView,...(!onEvaluationChange?{evaluation:session}:{}) })); },
     [phase, showPreview, hazureRound, activeTeams, confirmedPicks, myPick, cpuPicks, animStep, pendingConflicts,
@@ -346,7 +347,7 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoS
   const [localAutoSkip,setLocalAutoSkip]=useState(savedState?.localAutoSkip ?? !!autoSkipProp);
   const effectiveAutoSkip=autoSkipProp||localAutoSkip;
   const [showPreview,setShowPreview]=useState(savedState?.showPreview ?? false);
-  useEffect(() => { onStateChange?.({ pickIdx, drafted, log: log.map(r=>({ ...r, team: r.team.id, player: r.player.id })),
+  useLayoutEffect(() => { onStateChange?.({ pickIdx, drafted, log: log.map(r=>({ ...r, team: r.team.id, player: r.player.id })),
     done, scouted: [...scouted], scoutPt, localAutoSkip, showPreview,candidateView,...(!onEvaluationChange?{evaluation:session}:{}) }); },
     [pickIdx, drafted, log, done, scouted, scoutPt, localAutoSkip, showPreview,candidateView,session,onStateChange]);
   const current=draftOrderFiltered[pickIdx];

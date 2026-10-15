@@ -1,4 +1,4 @@
-import React,{useEffect,useState} from 'react';
+import React,{useLayoutEffect,useState} from 'react';
 import {Button,StateLabel} from './design-system/primitives';
 import DraftCandidates from './DraftCandidates';
 import {useDraftEvaluation} from '../hooks/useDraftEvaluation';
@@ -9,7 +9,7 @@ import {analyzeTeamNeeds} from '../engine/trade';
 export default function DraftPreviewScreen({teams,myId,year,pool,draftAllocation,onAllocationChange,onStart,startLabel,savedState,onStateChange,evaluation,onEvaluationChange}) {
   const {session,update}=useDraftEvaluation({teams,myId,year,pool,draftAllocation,savedState,evaluation,onEvaluationChange});
   const [tab,setTab]=useState(savedState?.tab || 'overview'),[candidateView,setCandidateView]=useState(savedState?.candidateView || {});
-  useEffect(()=>{onStateChange?.({tab,candidateView,...(!onEvaluationChange?{evaluation:session}:{})});},[tab,candidateView,session,onStateChange]);
+  useLayoutEffect(()=>{onStateChange?.({tab,candidateView,...(!onEvaluationChange?{evaluation:session}:{})});},[tab,candidateView,session,onStateChange]);
   const myTeam=teams.find(t=>String(t.id)===String(myId));
   const context={teams,evaluation:session};
   const rankings=rankDraftProspects(myTeam,pool,1,[],context),forecast=forecastDraft(teams,pool,myId,context);

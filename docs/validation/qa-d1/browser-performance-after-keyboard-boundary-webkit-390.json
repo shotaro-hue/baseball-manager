@@ -1,0 +1,55 @@
+{
+  "stage": "after-keyboard-boundary",
+  "baseSha": "a14a5c888dca3cfe07c7338482e4130290a6257b",
+  "sourceSha": "df8d601baf1e1e52893792f238981f0f70c0ba6f",
+  "sourceFiles": {
+    "src/components/DraftCandidates.jsx": "d026c81f5fca9397ab705345fe333cb9dbdbd82d",
+    "src/engine/draftReports.js": "acc858ab4d72000075ed5eb5b36cd6f24e660fb4",
+    "src/components/Draft.jsx": "2909bc2f98d2ef2b9ddb301e8d56b6a00ea6c527",
+    "src/components/DraftPreview.jsx": "32081deb1b8ee4fa04b8fc23a732845eaf3d09e4"
+  },
+  "sourceSha256": {
+    "src/components/DraftCandidates.jsx": "65148c583aa16bec0a748a80df0e75fdb168599a3f464635a8e5dabf65c9972b",
+    "src/engine/draftReports.js": "7805f2fc684d51c37ea125361b39b92a68cbd2b2373b3dfcec838862aa86da4a",
+    "src/components/Draft.jsx": "bd10f34e51e111812713868c7fc8436a288e0000f07a87ae279fb614691acde4",
+    "src/components/DraftPreview.jsx": "7b94d9b3a2a901435606a13b06e2614b0802233d10f32f6fd4699c861e141006"
+  },
+  "seed": 20261015,
+  "timingAttribution": "Reference values only: host CPU load was not isolated from other validation processes.",
+  "browser": "webkit-390",
+  "candidateCount": 80,
+  "scrollSteps": 48,
+  "scrollInput": "scrollTop changes plus dispatched scroll events at requestAnimationFrame spacing",
+  "scrollElapsedMs": 5885,
+  "scrollFrames": {
+    "elapsedMs": 1889,
+    "p50Ms": 17,
+    "p95Ms": 84,
+    "maxMs": 101
+  },
+  "scrolling": {
+    "commits": 4,
+    "candidateRenders": 8,
+    "parentStateUpdates": 1,
+    "publicTierCalls": 640,
+    "publicRankingSorts": 0,
+    "saves": 1
+  },
+  "navigationActionsMs": 368,
+  "navigation": {
+    "commits": 8,
+    "candidateRenders": 16,
+    "parentStateUpdates": 2,
+    "publicTierCalls": 1286,
+    "publicRankingSorts": 0,
+    "saves": 1
+  },
+  "ranking": {
+    "calls": 8000,
+    "sorts": 1,
+    "elapsedMs": 4,
+    "checksum": 36400
+  },
+  "instrumentation": "Test-only HTTP response counters + React DevTools commit hook + storage perf-log writes. Vite React StrictMode; no CPU throttle.",
+  "hardware": "Browser automation on host, not phone hardware"
+}
