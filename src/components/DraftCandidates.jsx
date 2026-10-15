@@ -38,19 +38,19 @@ export default function DraftCandidates({pool,session,onScout,rankings=[],foreca
   useEffect(()=>{
     // Publish settled scrolling once, and flush before an outside save/navigation
     // click or keyboard action can snapshot the parent state.
-    const beforePointer=e=>{if(!rootRef.current?.contains(e.target))flushScroll();};
-    // Enter can trigger the save button's click in the same browser task.
+    // Pointer/Enter can trigger the save click in the same browser task.
     // Commit only a pending position before that click reads the parent state.
-    const beforeKeyboard=()=>{if(scrollPending.current)flushSync(flushScroll);};
+    const beforeAction=()=>{if(scrollPending.current)flushSync(flushScroll);};
+    const beforePointer=e=>{if(!rootRef.current?.contains(e.target))beforeAction();};
     if(typeof document!=='undefined'){
       document.addEventListener?.('pointerdown',beforePointer,true);
-      document.addEventListener?.('keydown',beforeKeyboard,true);
+      document.addEventListener?.('keydown',beforeAction,true);
     }
     return ()=>{
       cancelScroll();
       if(typeof document!=='undefined'){
         document.removeEventListener?.('pointerdown',beforePointer,true);
-        document.removeEventListener?.('keydown',beforeKeyboard,true);
+        document.removeEventListener?.('keydown',beforeAction,true);
       }
     };
   },[]);

@@ -74,11 +74,13 @@ ChromiumとPlaywright WebKitの360/390/1440pxを対象に、80人の通常生成
 | P0 | 検証範囲では進行停止・所属破壊を検出せず | ゲームルール・保存形式の修正なし |
 | P1（独立レビューで検出した修正中の回帰） | PCの詳細表示中に並び替えるとDOM位置が戻らず、キーボードフォーカスが詳細見出しへ移る | フィルターの位置リセットと選択時フォーカス処理を分離。失敗テスト追加後に修正、両エンジンで確認 |
 | P2 | 48回のscrollで31〜48回の親更新と5,760〜12,480回の順位ソート | 最新位置をrefに保持し150msで同期、公開mapのidentityで順位キャッシュ |
-| P2（CI追検出） | スクロール直後のEnter保存が前の位置を読む。1段の同期だけでは画面→保存状態のpassive effectによる遅延が残る | 同一taskのkeydown→clickで実handleSave要求を捕捉する失敗回帰を追加。pending位置だけ同期し、プレビュー／1位／後続巡のview橋渡しをlayout effectへ変更。両390pxの実Enter・保存再開も成功 |
+| P2（CI追検出） | スクロール直後のEnter／外部pointer保存が前の位置を読む。1段の同期だけでは画面→保存状態のpassive effectによる遅延が残る | 同一taskのpointerdown／keydown→clickで実handleSave要求を捕捉する失敗回帰を追加。pending位置だけ同期し、プレビュー／1位／後続巡のview橋渡しをlayout effectへ変更。両390pxの実Enter・保存再開も成功 |
 | P2 | PCで一覧へ戻るとfocusが深い位置を約3,000px動かす | preventScroll付きfocus。両エンジンのRED→GREEN |
 | P2／後続バランス | 二軍捕手不足による未実施、3年目の登録枠充足 | 原因・件数を記録。CPU編成全体の変更は分離 |
 
-初回CI（[run399](https://github.com/shotaro-hue/baseball-manager/actions/runs/38737005259)）はブラウザ12/14成功、Chromium390/1440のキーボード保存で失敗した。成功扱いにはしていない。[追検出記録](../validation/qa-d1/keyboard-boundary.json)にRED、同期だけでは不足した原因、最終修正と再確認を記録した。保存用状態への橋渡しは3画面の既存serializationを維持し、実ストレージIOをlayout effectへ移していない。同期はpending位置があるキー操作時に限定する（[React公式flushSync](https://react.dev/reference/react-dom/flushSync)参照）。試験側も、前の保存で無効化されフォーカスを失ったボタンを再び有効・フォーカス済みにし、Enterで実際に手動保存要求が発生したことを検証する。遅れて走る自動保存で誤って合格しないよう、要求時と保存後の両方を確認する。
+初回CI（[run399](https://github.com/shotaro-hue/baseball-manager/actions/runs/38737005259)）はブラウザ12/14成功、Chromium390/1440のキーボード保存で失敗した。既存進行suiteでも118/119成功、外部pointer保存で位置200pxの不一致があった。成功扱いにはしていない。[追検出記録](../validation/qa-d1/keyboard-boundary.json)にRED、同期だけでは不足した原因、最終修正と再確認を記録した。保存用状態への橋渡しは3画面の既存serializationを維持し、実ストレージIOをlayout effectへ移していない。同期はpending位置があるキー操作・候補パネル外のpointer操作時に限定する（[React公式flushSync](https://react.dev/reference/react-dom/flushSync)参照）。試験側も、前の保存で無効化されフォーカスを失ったボタンを再び有効・フォーカス済みにし、Enterで実際に手動保存要求が発生したことを検証する。遅れて走る自動保存で誤って合格しないよう、要求時と保存後の両方を確認する。
+
+最終headのQA-D1 CIでは`test-results/qa-d1-evidence`に6条件の`final-ci`測定JSONと18画面を保存し、既存Actions artifactへ添付する。主要な処理回数もjob logへ出力する。計測済みの過去JSONのsource hashを最終値へ書き換えず、最終headのCI成果物と区別する。
 
 ## テスト・CI・限界
 
@@ -93,7 +95,7 @@ QA_D1_CAPTURE=1 npx playwright test --config=scripts/qa-d1-browser.config.js --w
 - 関連baseline：draftReports/draftRules/useDraftEvaluation 22件成功。
 - 生成ドラフト：2件成功（最終sourceで再測定）。複数年度：3seed計9年成功、単一ファイル時のworker失敗と隔離後の確認を区別。既存draftStrategy/confirmedPicks/roles/rules/organizationNeeds 54件成功。
 - 実App既存E2：通常最終試合→大会の保存再開→引退→契約編成→ドラフト→キャンプ→翌年開幕がChromiumで成功（41.4秒）。編成不足の案内・UI修復→1試合も成功（15.4秒）。
-- 新規回帰：スクロール・順位再利用・既存の評価／hookを含む27件成功。PCで戻る際の3,000pxジャンプは両エンジンでRED→GREEN。独立レビューで検出した詳細表示中の並び替え時のフォーカス移動・DOM位置不一致もRED→GREENにし、両エンジンのPC回帰を再確認。CI追検出のキーボード保存は両390pxのjourney 2件成功（3.5分）、性能2件成功、関連27件とビルド（13.59秒）を再確認。最終head CIはPR本文に記録。全単体・統合と通常E2Eの正本はPR本文のexact-head Actions結果とする。既存の条件付き経済ベンチマーク2件を新たなskipや成功件数として数えない。
+- 新規回帰：スクロール・順位再利用・既存の評価／hookを含む27件成功。PCで戻る際の3,000pxジャンプは両エンジンでRED→GREEN。独立レビューで検出した詳細表示中の並び替え時のフォーカス移動・DOM位置不一致もRED→GREENにし、両エンジンのPC回帰を再確認。CI追検出のキーボード保存は外部pointerを含む両390pxのjourney 2件成功（3.8分）、関連27件とビルド（11.27秒）を再確認。性能2件はキーボード／layout修正時点で再測定し、pointer境界の最終修正後はCIの6条件で再確認する。最終head CIはPR本文に記録。全単体・統合と通常E2Eの正本はPR本文のexact-head Actions結果とする。既存の条件付き経済ベンチマーク2件を新たなskipや成功件数として数えない。
 
 iPhone実機、スクリーンリーダー、実端末200%拡大、3年を超える長期バランス、候補生成／成長の校正、CPUのFA・更改・戦力外判断全面改修は対象範囲の完了認定に含めない。
 

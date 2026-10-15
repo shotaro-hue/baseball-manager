@@ -5,7 +5,7 @@ import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {readSave,reloadAndLoad,waitSaveIdle} from './helpers/progression';
 
-const EVIDENCE='docs/validation/qa-d1';
+const EVIDENCE=process.env.QA_D1_EVIDENCE || 'docs/validation/qa-d1';
 const SOURCE=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 const BASE_SHA='a14a5c888dca3cfe07c7338482e4130290a6257b';
 const SOURCE_FILES=Object.fromEntries(['src/components/DraftCandidates.jsx','src/engine/draftReports.js','src/components/Draft.jsx','src/components/DraftPreview.jsx'].map(path=>[path,execFileSync('git',['hash-object',path],{encoding:'utf8'}).trim()]));
@@ -132,20 +132,24 @@ test('generated draft browser journey, persistence and candidate return',async({
   const pendingScroll=await list.evaluate(el=>{el.scrollTop-=200;el.dispatchEvent(new Event('scroll',{bubbles:true}));return el.scrollTop;});
   const viewSaved=await saveDraft(page);
   expect(viewSaved.offseasonPlan.draftViews.lottery.candidateView.listScroll).toBe(pendingScroll);
-  const immediateSave=page.getByRole('button',{name:'途中保存',exact:true});
-  await expect(immediateSave).toBeEnabled();await immediateSave.focus();
-  // Enter's default click may run before React's native-listener updates commit.
-  // Keep keydown and click in one task so the CI race has a deterministic RED.
-  const immediate=await list.evaluate(el=>{
-    el.scrollTop-=120;el.dispatchEvent(new Event('scroll',{bubbles:true}));
-    const expected=el.scrollTop,before=window.__qaManualSavePositions.length;
-    const save=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='途中保存');
-    save.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',bubbles:true}));
-    save.click();
-    return {expected,requested:window.__qaManualSavePositions.slice(before)};
-  });
-  expect(immediate.requested).toEqual([immediate.expected]);
-  await waitSaveIdle(page);
+  // Capture both outside pointer and Enter boundaries in the same task as
+  // their default click, before a later autosave could hide a stale request.
+  for(const eventType of ['pointerdown','keydown']){
+    const save=page.getByRole('button',{name:'途中保存',exact:true});
+    await expect(save).toBeEnabled();await save.focus();
+    const immediate=await list.evaluate((el,eventType)=>{
+      el.scrollTop-=120;el.dispatchEvent(new Event('scroll',{bubbles:true}));
+      const expected=el.scrollTop,before=window.__qaManualSavePositions.length;
+      const button=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='途中保存');
+      button.dispatchEvent(eventType==='keydown'
+        ?new KeyboardEvent('keydown',{key:'Enter',code:'Enter',bubbles:true})
+        :new PointerEvent('pointerdown',{bubbles:true}));
+      button.click();
+      return {expected,requested:window.__qaManualSavePositions.slice(before)};
+    },eventType);
+    expect(immediate.requested,`${eventType} manual payload`).toEqual([immediate.expected]);
+    await waitSaveIdle(page);
+  }
   // A disabled save button loses focus during the first save. Wait for the
   // visible control to be usable and focus it again for a real Enter action.
   const keyboardSave=page.getByRole('button',{name:'途中保存',exact:true});
@@ -245,6 +249,7 @@ test('generated draft scroll and repeated public ranking measurement',async({pag
     for(let round=0;round<100;round++)for(const id of ids)sum+=publicDraftTier(session,id).length;
     return {calls:100*ids.length,sorts:window.__qa.publicRankingSorts-before,elapsedMs:performance.now()-start,checksum:sum};
   });
+  if(process.env.QA_D1_CAPTURE)console.log('QA-D1 measurement '+JSON.stringify({browser:testInfo.project.name,scrolling,ranking}));
   evidence(`browser-performance-${process.env.QA_D1_STAGE || 'after'}-${testInfo.project.name}`,{browser:testInfo.project.name,candidateCount:info.pool.length,scrollSteps:48,scrollInput:'scrollTop changes plus dispatched scroll events at requestAnimationFrame spacing',scrollElapsedMs,scrollFrames,scrolling,navigationActionsMs,navigation,ranking,instrumentation:'Test-only HTTP response counters + React DevTools commit hook + storage perf-log writes. Vite React StrictMode; no CPU throttle.',hardware:'Browser automation on host, not phone hardware'});
   if(process.env.QA_D1_STAGE!=='baseline'){
     // Includes the real save queue/status commits after the settled scroll.

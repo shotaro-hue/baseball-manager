@@ -60,6 +60,10 @@ jobs:
       - name: Install Chromium and WebKit
         run: npx playwright install --with-deps chromium webkit
       - name: Run E2E subset (one worker, no retries)
+        env:
+          QA_D1_CAPTURE: ${{ matrix.suite.name == 'qa-d1-draft-browser' && '1' || '' }}
+          QA_D1_STAGE: final-ci
+          QA_D1_EVIDENCE: test-results/qa-d1-evidence
         run: npm run test:e2e -- ${{ matrix.suite.files }} --workers=1 --retries=0
       - name: Upload E2E report and failure evidence
         if: always()
