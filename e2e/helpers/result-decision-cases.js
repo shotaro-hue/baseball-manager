@@ -65,6 +65,11 @@ export function registerResultDecisionCases() {
         const { loadGame, saveGame } = await import('/baseball-manager/src/engine/saveload.js');
         const state = await loadGame(), match = state.schedule[1].matchups[0];
         state.myId = isHome ? match.homeId : match.awayId;
+        // This fixture tests W/L/S and persistence, not random retirement UI.
+        // Keep its user-team players below the event's age>=35 eligibility;
+        // the real simulation, RNG and every result/save assertion stay active.
+        const myTeam = state.teams.find(team => team.id === state.myId);
+        myTeam.players = myTeam.players.map(player => (player.age >= 35 ? { ...player, age: 34 } : player));
         if (!(await saveGame(state)).ok) throw new Error('fixture save failed');
       }, isHome);
       await reloadAndLoad(page);

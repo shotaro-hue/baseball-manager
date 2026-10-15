@@ -89,3 +89,13 @@ npx vitest run src/components/careerOps.test.js src/components/opsConsistency.te
 未検証：実機iPhone/Safari、実ユーザーの全世代セーブ、全実在選手履歴の欠測由来0の識別、3年超のゲームバランス。ブラウザでの複数年推移グラフの全hover・年度境界操作は未網羅（年度／移籍／ポスト／通算は実componentの単体テストで補完）。
 
 二軍捕手不足の原因分析、経営画面DES-01移行、CPU長期編成は次工程に残す。QA-D1の20seed・3seed×3年・42保存再開・最終CI全8ジョブ成功は#472の確定範囲で、捕手不足の原因分解・実機・3年超検証は未完了。
+
+## CI追検出：既存FIX-S4 fixtureの引退イベント
+
+初回head `397560e54a249010f76c915d21cc6e736fd23bfe` の[CI #404](https://github.com/shotaro-hue/baseball-manager/actions/runs/38818917011)はBuild（13.65秒）・全Unit（170 files / 1,242 pass、従来の条件付き2件）・保存16件・財務23件・QA-D1 browser14件・編成73件が成功。一方、match-historyは46/47成功で、FIX-S4 home=falseが保存ボタンのclick待ちで90秒停止した。進行ジョブの確定結果はPR本文を参照。
+
+[初回artifact](https://github.com/shotaro-hue/baseball-manager/actions/runs/38818917011/artifacts/12011534530)のtraceと画面では、2試合後の大島洋平（40歳）の「引退表明」overlayが保存ボタンを覆っていた。ローカルの対象1件でも同じoverlayによる停止を再現した。成績assertion不一致ではない。未変更の`singleDayCore.js`には4%の抽選と35歳以上の候補条件があり、OPSは参照しない。
+
+投手の勝敗・保存を検証する`result-decision-cases.js`の当該fixtureだけ、自球団の35歳以上を34歳へ設定する。無関係な確率イベントがテスト操作を妨げないための入力条件の明示で、シミュレーション・乱数・引退処理・保存形式・全W/L/S／再開assertionは変更しない。テスト削除・skip・force click・期待値緩和は行わない。引退UIの検証完了を意味しない。
+
+修正後の対象E2Eはホーム40.8秒・アウェイ32.3秒、2件成功（計1.3分）。最終headのBuild・全Unit・中核E2Eはこのfixture修正を含めてCIで確認し、初回失敗と区別してPR本文へ確定結果を記録する。
