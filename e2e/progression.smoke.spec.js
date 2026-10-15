@@ -2,6 +2,7 @@ import {registerGrowthAppCases} from './helpers/growth-app-cases';
 import {registerGrowthDesignCases} from './helpers/growth-design-cases';
 import {registerPlanningAppCases} from './helpers/planning-app-cases';
 import {registerPlanningDesignCases} from './helpers/planning-design-cases';
+import {registerFaMarketCases} from './helpers/fa-market-cases';
 import { test, expect } from '@playwright/test';
 import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
@@ -11,6 +12,7 @@ registerGrowthAppCases();
 registerGrowthDesignCases();
 registerPlanningDesignCases();
 registerPlanningAppCases();
+registerFaMarketCases();
 
 // Measured E1 includes real detailed Worker simulation and multiple IDB loads.
 test.setTimeout(60_000);

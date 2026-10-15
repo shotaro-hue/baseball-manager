@@ -3,12 +3,13 @@ import HubFaTab from './hub/HubFaTab';
 import { PlayerComparisonDialog, PlayerComparisonTray } from './PlayerComparisonTray';
 import { useResultDialog } from './useResultDialog';
 import { fmtSal } from '../utils';
+import { Button } from './design-system/primitives';
 
 const PlayerModal = lazy(() => import('./PlayerModal').then(module => ({ default: module.PlayerModal })));
 
 function FinishDialog({ acquired, onClose, onConfirm }) {
   const ref = useResultDialog(onClose, true);
-  return <div className="fa-overlay"><section className="fa-dialog" ref={ref} role="dialog" aria-modal="true" aria-labelledby="fa-finish-title">
+  return <div className="fa-overlay"><section data-ds="fa-dialog" className="fa-dialog" ref={ref} role="dialog" aria-modal="true" aria-labelledby="fa-finish-title">
     <h2 id="fa-finish-title" tabIndex={0}>補強を終了して契約更改へ</h2>
     {acquired.length ? <ul>{acquired.map(p => <li key={p.id}>{p.name}：年俸 {Number.isFinite(p.salary) ? fmtSal(p.salary) : '未記録'}・{p.contractYears}年</li>)}</ul> : <p>今回は補強せずに進みます。</p>}
     <p>獲得済みの選手は契約済みとして扱い、直後の契約更改では再交渉しません。</p>
@@ -21,6 +22,7 @@ export default function OffseasonFaPhaseScreen({ gs, os, myTeam, myId, year, emb
   const [profile, setProfile] = useState(null);
   const [compared, setCompared] = useState([]);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [ownSelection, setOwnSelection] = useState('');
   useEffect(() => { setCompared([]); setCompareOpen(false); }, [year]);
   const [finishOpen, setFinishOpen] = useState(false);
   const advanced = useRef(false);
@@ -35,6 +37,8 @@ export default function OffseasonFaPhaseScreen({ gs, os, myTeam, myId, year, emb
   };
   const remove = id => { setCompared(current => current.filter(p => p.id !== id)); setCompareOpen(false); };
   const owned = [...(myTeam?.players || []), ...(myTeam?.farm || [])];
+  const ownKey = p => JSON.stringify([typeof p.id, p.id]);
+  const selectedOwn = owned.find(p => ownKey(p) === ownSelection);
   const acquired = owned.filter(p => initialCandidates.current.has(p.id) && !p.isFA);
   const next = () => {
     if (advanced.current) return;
@@ -42,16 +46,17 @@ export default function OffseasonFaPhaseScreen({ gs, os, myTeam, myId, year, emb
     os.handleFaPhaseNext();
   };
   const Frame = embedded ? 'section' : 'main';
-  return <Frame className="fa-market offseason-fa-screen">
-    {!embedded && <header><h1>{year}年 オフシーズン補強</h1><p>引退整理 → <strong>国内FA・自由契約補強</strong> → 契約更改 → 成長結果・戦力外・ドラフト</p>
-      <p>全球団のFA宣言を判定済みです。他球団の補強候補と、自球団から宣言した選手の残留契約を確認し、その後に既存選手と契約更改します。補強せずに進むこともできます。</p>
+  return <Frame data-ds="fa-screen" className={`fa-market offseason-fa-screen ${embedded ? 'fa-embedded' : ''}`}>
+    {!embedded && <header><h1>{year}年 オフシーズン補強</h1><p>国内FA・自由契約補強 → 契約更改 → ドラフト</p>
     </header>}
     <HubFaTab myTeam={myTeam} myId={myId} year={year} gameDay={gs.gameDay}
       faPool={(gs.faPool || []).filter(p => !p.isForeign)} faYears={gs.faYears} setFaYears={gs.setFaYears}
-      upd={gs.upd} setFaPool={gs.setFaPool} notify={gs.notify} marketMode="offseason"
+      upd={gs.upd} setFaPool={gs.setFaPool} notify={gs.notify} marketMode="offseason" embedded={embedded}
       savedView={embedded ? gs.offseasonPlan?.marketView : undefined} onViewChange={embedded ? saveMarketView : undefined}
       onPlayerClick={(player, teamName) => setProfile({ player, teamName })} onToggleCompare={toggle} comparePlayerIds={compared.map(p => p.id)} />
-    <details><summary>自チームの選手を比較に追加</summary><div className="fa-actions">{owned.map(p => <button key={p.id} aria-pressed={compared.some(entry => entry.id === p.id)} onClick={() => toggle(p, myTeam?.name)}>{p.name}を比較{compared.some(entry => entry.id === p.id) ? 'から外す' : 'に追加'}</button>)}</div></details>
+    <details className="fa-own-comparison"><summary>自チームの選手を比較に追加</summary>
+      {owned.length ? <div className="fa-own-fields"><label>比較する自球団の選手<select aria-label="比較する自球団の選手" value={selectedOwn ? ownSelection : ''} onChange={event => setOwnSelection(event.target.value)}><option value="">選手を選択</option>{owned.map(p => <option key={p.id} value={ownKey(p)}>{p.name} · {p.pos || '役割未記録'} · {p.age ?? '未記録'}歳</option>)}</select></label><Button variant="secondary" disabled={!selectedOwn} aria-pressed={Boolean(selectedOwn && compared.some(p => p.id === selectedOwn.id))} onClick={() => selectedOwn && toggle(selectedOwn, myTeam?.name)}>{selectedOwn?.name || '自球団の選手'}を比較{selectedOwn && compared.some(p => p.id === selectedOwn.id) ? 'から外す' : 'に追加'}</Button></div> : <p>比較に追加できる所属選手はいません。</p>}
+    </details>
     {!embedded && <footer><p>補強後も既存選手の更改が残っています。予算と年俸を確認して進んでください。</p><button className="fa-primary" onClick={() => setFinishOpen(true)}>補強を終了して契約更改へ</button></footer>}
     <PlayerComparisonTray players={compared} onRemove={remove} onClear={() => { setCompared([]); setCompareOpen(false); }} onOpen={() => setCompareOpen(true)} />
     {compareOpen && <PlayerComparisonDialog year={year} teams={gs.teams} faPool={gs.faPool} players={compared} onRemove={remove} onClose={closeCompare} />}
