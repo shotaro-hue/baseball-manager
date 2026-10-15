@@ -8,7 +8,7 @@ import {readSave,reloadAndLoad,waitSaveIdle} from './helpers/progression';
 const EVIDENCE='docs/validation/qa-d1';
 const SOURCE=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 const BASE_SHA='a14a5c888dca3cfe07c7338482e4130290a6257b';
-const SOURCE_FILES=Object.fromEntries(['src/components/DraftCandidates.jsx','src/engine/draftReports.js'].map(path=>[path,execFileSync('git',['hash-object',path],{encoding:'utf8'}).trim()]));
+const SOURCE_FILES=Object.fromEntries(['src/components/DraftCandidates.jsx','src/engine/draftReports.js','src/components/Draft.jsx','src/components/DraftPreview.jsx'].map(path=>[path,execFileSync('git',['hash-object',path],{encoding:'utf8'}).trim()]));
 const SOURCE_SHA256=Object.fromEntries(Object.keys(SOURCE_FILES).map(path=>[path,createHash('sha256').update(readFileSync(path)).digest('hex')]));
 const SEED=20261015;
 function evidence(name,data){if(process.env.QA_D1_CAPTURE){mkdirSync(EVIDENCE,{recursive:true});writeFileSync(`${EVIDENCE}/${name}.json`,JSON.stringify({stage:process.env.QA_D1_STAGE||'after',baseSha:BASE_SHA,sourceSha:SOURCE,sourceFiles:SOURCE_FILES,sourceSha256:SOURCE_SHA256,seed:SEED,timingAttribution:'Reference values only: host CPU load was not isolated from other validation processes.',...data},null,2)+'\n');}}
@@ -36,6 +36,18 @@ async function instrument(page){
     // JSX's transformed formatting differs from the authored source.
     if(!needle.test(body))throw new Error(`instrumentation target missing: ${path}: ${needle}`);
     await route.fulfill({response,body:body.replace(needle,replacement)});
+  });
+}
+
+// Observe the real manual-save callback payload without changing storage or
+// game behavior. This distinguishes a stale request from a later autosave.
+async function observeManualSavePositions(page){
+  await page.addInitScript(()=>{window.__qaManualSavePositions=[];});
+  await page.route('**/src/hooks/useGameState.js*',async route=>{
+    const response=await route.fetch(),body=await response.text();
+    const entry=/const handleSave = useCallback\(async \(options = \{\}\)\s*=>\s*\{/;
+    if(!entry.test(body))throw new Error('manual-save instrumentation target missing');
+    await route.fulfill({response,body:body.replace(entry,'$& if(!options.silent)window.__qaManualSavePositions.push(offseasonPlan?.draftViews?.lottery?.candidateView?.listScroll);')});
   });
 }
 
@@ -85,6 +97,7 @@ async function layout(page){return page.evaluate(()=>({viewport:innerWidth,docum
 test('generated draft browser journey, persistence and candidate return',async({page},testInfo)=>{
   test.setTimeout(180_000); // Real large-state persistence is slower on WebKit.
   const started=Date.now(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await observeManualSavePositions(page);
   const info=await seedGenerated(page,'draft_preview',{duel:true});
   await expect(page.getByRole('heading',{name:/ドラフト展望/})).toBeVisible();
   await page.getByRole('button',{name:'各球団',exact:true}).click();
@@ -119,9 +132,28 @@ test('generated draft browser journey, persistence and candidate return',async({
   const pendingScroll=await list.evaluate(el=>{el.scrollTop-=200;el.dispatchEvent(new Event('scroll',{bubbles:true}));return el.scrollTop;});
   const viewSaved=await saveDraft(page);
   expect(viewSaved.offseasonPlan.draftViews.lottery.candidateView.listScroll).toBe(pendingScroll);
-  await page.getByRole('button',{name:'途中保存',exact:true}).focus();
+  const immediateSave=page.getByRole('button',{name:'途中保存',exact:true});
+  await expect(immediateSave).toBeEnabled();await immediateSave.focus();
+  // Enter's default click may run before React's native-listener updates commit.
+  // Keep keydown and click in one task so the CI race has a deterministic RED.
+  const immediate=await list.evaluate(el=>{
+    el.scrollTop-=120;el.dispatchEvent(new Event('scroll',{bubbles:true}));
+    const expected=el.scrollTop,before=window.__qaManualSavePositions.length;
+    const save=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='途中保存');
+    save.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',bubbles:true}));
+    save.click();
+    return {expected,requested:window.__qaManualSavePositions.slice(before)};
+  });
+  expect(immediate.requested).toEqual([immediate.expected]);
+  await waitSaveIdle(page);
+  // A disabled save button loses focus during the first save. Wait for the
+  // visible control to be usable and focus it again for a real Enter action.
+  const keyboardSave=page.getByRole('button',{name:'途中保存',exact:true});
+  await expect(keyboardSave).toBeEnabled();await keyboardSave.focus();
+  const manualBefore=await page.evaluate(()=>window.__qaManualSavePositions.length);
   const keyboardScroll=await list.evaluate(el=>{el.scrollTop-=120;el.dispatchEvent(new Event('scroll',{bubbles:true}));return el.scrollTop;});
   await page.keyboard.press('Enter');await waitSaveIdle(page);
+  expect(await page.evaluate(before=>window.__qaManualSavePositions.slice(before),manualBefore)).toEqual([keyboardScroll]);
   expect((await readSave(page)).offseasonPlan.draftViews.lottery.candidateView.listScroll).toBe(keyboardScroll);
   await reloadAndLoad(page);await expect(list).toBeVisible();
   expect(Math.abs((await list.evaluate(el=>el.scrollTop))-keyboardScroll)).toBeLessThanOrEqual(2);

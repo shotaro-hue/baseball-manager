@@ -1,14 +1,27 @@
 {
-  "sourceSha": "a14a5c888dca3cfe07c7338482e4130290a6257b",
+  "stage": "after-keyboard-boundary",
+  "baseSha": "a14a5c888dca3cfe07c7338482e4130290a6257b",
+  "sourceSha": "df8d601baf1e1e52893792f238981f0f70c0ba6f",
   "sourceFiles": {
-    "src/components/DraftCandidates.jsx": "66e1108b412342b4a7a8e86ae0773e7518c1604d",
-    "src/engine/draftReports.js": "acc858ab4d72000075ed5eb5b36cd6f24e660fb4"
+    "src/components/DraftCandidates.jsx": "d026c81f5fca9397ab705345fe333cb9dbdbd82d",
+    "src/engine/draftReports.js": "acc858ab4d72000075ed5eb5b36cd6f24e660fb4",
+    "src/components/Draft.jsx": "2909bc2f98d2ef2b9ddb301e8d56b6a00ea6c527",
+    "src/components/DraftPreview.jsx": "32081deb1b8ee4fa04b8fc23a732845eaf3d09e4"
+  },
+  "sourceSha256": {
+    "src/components/DraftCandidates.jsx": "65148c583aa16bec0a748a80df0e75fdb168599a3f464635a8e5dabf65c9972b",
+    "src/engine/draftReports.js": "7805f2fc684d51c37ea125361b39b92a68cbd2b2373b3dfcec838862aa86da4a",
+    "src/components/Draft.jsx": "bd10f34e51e111812713868c7fc8436a288e0000f07a87ae279fb614691acde4",
+    "src/components/DraftPreview.jsx": "7b94d9b3a2a901435606a13b06e2614b0802233d10f32f6fd4699c861e141006"
   },
   "seed": 20261015,
+  "timingAttribution": "Reference values only: host CPU load was not isolated from other validation processes.",
   "browser": "chromium-390",
   "browserVersion": "141.0.7390.37",
   "candidateCount": 80,
   "teamCount": 12,
+  "activeCpuDraftTeams": 1,
+  "fixture": "80 production-generated prospects; controlled roster capacity: own64, rival69, other10clubs70. Full12CPU draft measurements are separate.",
   "transitions": [
     "lottery",
     "my-repick",
@@ -46,23 +59,6 @@
     }
   },
   "errors": [],
-  "durationMs": 63712,
-  "hardware": "Playwright browser emulation; no iPhone hardware validation",
-  "baseSha": "a14a5c888dca3cfe07c7338482e4130290a6257b",
-  "timingAttribution": "Reference values only: host CPU load was not isolated from other validation processes.",
-  "sourceSha256": {
-    "src/components/DraftCandidates.jsx": "1319890c133971fae51f3bf0c2be27803cb3182f8c373fc84a599144ecc62bf9",
-    "src/engine/draftReports.js": "7805f2fc684d51c37ea125361b39b92a68cbd2b2373b3dfcec838862aa86da4a"
-  },
-  "stage": "after-scroll-ranking-before-focus",
-  "activeCpuDraftTeams": 1,
-  "fixture": "80 production-generated prospects; controlled roster capacity: own64, rival69, other10clubs70. Full12CPU draft measurements are separate.",
-  "subsequentFocusFix": {
-    "change": "Candidate return focus now uses preventScroll; no timing remeasurement after this one-line focus-only change.",
-    "finalSourceSha256": {
-      "src/components/DraftCandidates.jsx": "022f69ed0cd0c69046a45efd6b18eb1f27dbfbe28271c9ea2dea029e509bbb1b",
-      "src/engine/draftReports.js": "7805f2fc684d51c37ea125361b39b92a68cbd2b2373b3dfcec838862aa86da4a"
-    },
-    "validation": "Focused desktop Chromium1440/WebKit1440 regression (separate browser-focus JSON)."
-  }
+  "durationMs": 59527,
+  "hardware": "Playwright browser emulation; no iPhone hardware validation"
 }

@@ -1,4 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
+import {flushSync} from 'react-dom';
 import {Button,StateLabel} from './design-system/primitives';
 import {DRAFT_SKILLS,draftBand,draftReport,publicDraftTier} from '../engine/draftReports';
 import '../draft-decision.css';
@@ -38,15 +39,18 @@ export default function DraftCandidates({pool,session,onScout,rankings=[],foreca
     // Publish settled scrolling once, and flush before an outside save/navigation
     // click or keyboard action can snapshot the parent state.
     const beforePointer=e=>{if(!rootRef.current?.contains(e.target))flushScroll();};
+    // Enter can trigger the save button's click in the same browser task.
+    // Commit only a pending position before that click reads the parent state.
+    const beforeKeyboard=()=>{if(scrollPending.current)flushSync(flushScroll);};
     if(typeof document!=='undefined'){
       document.addEventListener?.('pointerdown',beforePointer,true);
-      document.addEventListener?.('keydown',flushScroll,true);
+      document.addEventListener?.('keydown',beforeKeyboard,true);
     }
     return ()=>{
       cancelScroll();
       if(typeof document!=='undefined'){
         document.removeEventListener?.('pointerdown',beforePointer,true);
-        document.removeEventListener?.('keydown',flushScroll,true);
+        document.removeEventListener?.('keydown',beforeKeyboard,true);
       }
     };
   },[]);
