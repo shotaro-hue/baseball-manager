@@ -1,0 +1,49 @@
+.draft-experience[data-ds]{background:var(--ds-canvas);color:var(--ds-text);min-height:100vh;line-height:1.6;padding:20px 16px 40px;font-size:14px}
+.draft-page{max-width:1180px;margin:auto}
+.draft-experience h1{font-size:25px;margin:0;font-weight:800;letter-spacing:.01em}
+.draft-experience h2{font-size:18px;margin:12px 0}.draft-experience h3{font-size:15px;margin:0 0 10px}
+.draft-experience p{margin:8px 0}.draft-header{background:var(--ds-navy);color:white;padding:20px 24px;margin-bottom:16px;display:flex;justify-content:space-between;gap:16px;align-items:center;border-radius:5px}
+.draft-header p{color:var(--ds-inverse-muted);font-size:13px}.draft-header small{letter-spacing:.12em;color:var(--ds-inverse-muted)}
+.draft-tabs,.draft-actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.draft-tabs [data-ds=button]{flex:1;min-width:100px;font-size:14px;padding:10px}
+.draft-panel{background:var(--ds-surface);border:1px solid var(--ds-divider);padding:20px;margin:12px 0;border-radius:5px}
+.draft-candidates{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start;margin:16px 0}
+.draft-candidate-list,.draft-candidate-detail{background:var(--ds-surface);border:1px solid var(--ds-divider);border-radius:5px;min-width:0;padding:18px}
+.draft-list-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}.draft-list-heading h2{margin:0 0 12px}.draft-list-heading small{font-size:13px;color:var(--ds-muted)}
+.draft-list-heading>span{font-size:12px;white-space:nowrap}.draft-list-heading strong{font-size:19px;color:var(--ds-accent)}
+.draft-filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 12px}.draft-filters label:last-child{grid-column:1/-1}
+.draft-filters label{display:flex;flex-direction:column;font-size:12px;color:var(--ds-muted);gap:4px}
+.draft-experience select{width:100%;min-height:44px;background:white;color:var(--ds-text);border:1px solid var(--ds-control-border);border-radius:4px;padding:7px;font-size:14px}
+.draft-candidate-scroll{max-height:680px;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.draft-candidate-row{border-bottom:1px solid var(--ds-divider);padding:12px 0}
+.draft-candidate-open{border:0;border-radius:3px;padding:8px;background:transparent;color:var(--ds-text);width:100%;text-align:left;cursor:pointer;display:grid;gap:6px;font:inherit;line-height:1.6}
+.draft-candidate-open:hover,.draft-candidate-open[aria-pressed=true]{background:var(--ds-selected)}
+.draft-identity{display:flex;gap:4px 12px;align-items:baseline;flex-wrap:wrap}.draft-identity strong{font-size:16px}.draft-identity>span{font-size:12px;color:var(--ds-muted)}
+.draft-candidate-trait{font-size:13px}.draft-candidate-evaluations{display:grid;gap:3px;color:var(--ds-muted);font-size:12px}
+.draft-row-select{border:0;background:none;color:var(--ds-accent);font-size:13px;font-weight:700;min-height:44px;padding:8px;cursor:pointer}
+.draft-candidate-detail>h2{font-size:24px;margin-top:18px}.draft-candidate-detail>[data-ds=button]{margin:6px 8px 6px 0}
+.draft-summary{font-size:16px;font-weight:700}.draft-muted,.draft-experience .draft-muted{font-size:12px;color:var(--ds-muted)}
+.draft-report-section{border-top:1px solid var(--ds-divider);margin-top:20px;padding-top:16px}.draft-report-section h3{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.draft-evaluation-grid{display:grid;grid-template-columns:1fr 1fr;background:var(--ds-canvas);padding:14px;gap:10px;margin:8px 0}.draft-evaluation-grid dt{font-size:12px;color:var(--ds-muted)}.draft-evaluation-grid dd{font-size:21px;font-weight:700;margin:4px 0}
+.draft-skills{display:grid;grid-template-columns:1fr 1fr;gap:8px}.draft-skills>div{display:flex;gap:8px;justify-content:space-between}.draft-skills dd{margin:0;font-weight:700}.draft-skills dt{font-size:13px}
+.draft-experience summary{cursor:pointer;min-height:44px;padding:10px 0;font-weight:700;color:var(--ds-accent)}
+.draft-forecast{border-left:3px solid var(--ds-accent);background:var(--ds-canvas);padding:10px 14px;margin:16px 0}.draft-forecast p{font-size:12px;color:var(--ds-muted)}
+.draft-confirm{background:var(--ds-selected);padding:16px;margin-top:20px;border:1px solid var(--ds-accent);border-radius:4px}.draft-confirm p{font-size:13px}
+.draft-compare{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;margin-bottom:12px}.draft-compare th,.draft-compare td{border-bottom:1px solid var(--ds-divider);padding:8px 4px;text-align:left;overflow-wrap:anywhere}
+.draft-detail-placeholder{padding:30px 12px;color:var(--ds-muted)}.draft-empty{padding:24px;color:var(--ds-muted)}
+.draft-experience button:focus-visible,.draft-experience select:focus-visible,.draft-experience summary:focus-visible{outline:3px solid var(--ds-focus);outline-offset:3px}
+.draft-result-row{padding:14px 0;border-bottom:1px solid var(--ds-divider)}.draft-result-row strong{font-size:16px}.draft-team-row{padding:12px 0;border-bottom:1px solid var(--ds-divider)}
+.draft-log-items{max-height:360px;overflow:auto}.draft-log-items>div{padding:10px;border-bottom:1px solid var(--ds-divider)}
+.draft-experience input[type=range]{width:100%;min-height:44px}.draft-budget{max-width:620px}.draft-result-tags{display:flex;gap:8px;flex-wrap:wrap}
+/* Scope only retained lottery presentation; inline legacy colors must not weaken contrast. */
+.draft-experience.draft-lottery .card{background:white!important;border:1px solid var(--ds-divider)!important;border-radius:5px;box-shadow:none;color:var(--ds-text)}
+.draft-experience.draft-lottery [style*="color"]{color:var(--ds-text)!important}
+.draft-experience.draft-lottery .btn{min-height:44px;border:1px solid var(--ds-control-border)!important;background:white!important;color:var(--ds-accent)!important;font-size:14px!important}
+.draft-experience.draft-lottery .btn-gold{background:var(--ds-accent)!important;color:white!important}
+@media(max-width:760px){
+ .draft-experience[data-ds]{padding:12px 10px 28px}.draft-header{padding:16px;align-items:flex-start;flex-direction:column;gap:8px}.draft-experience h1{font-size:23px}
+ .draft-candidates{display:block}.draft-candidate-list,.draft-candidate-detail{padding:14px}.draft-candidate-scroll{max-height:65vh}
+ .draft-candidates[data-selected=true]>.draft-candidate-list{display:none}.draft-candidates[data-selected=false]>.draft-candidate-detail{display:none}
+ .draft-tabs{gap:6px}.draft-tabs [data-ds=button]{min-width:0;padding:10px 4px;font-size:12px}.draft-panel{padding:16px}.draft-candidate-detail>[data-ds=button]{width:100%;margin-right:0}
+ .draft-list-heading{flex-wrap:wrap}.draft-evaluation-grid dd{font-size:20px}.draft-compare{font-size:12px}
+}

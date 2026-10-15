@@ -18,10 +18,10 @@ test('draft automatic picks respect 69/70 capacity and survive real save/reload 
  await page.evaluate(async s=>{const m=await import('/baseball-manager/src/engine/saveload.js');if(!(await m.saveGame(s)).ok)throw new Error('fixture save failed');},fixture);
  await reloadAndLoad(page);
  await page.getByRole('button',{name:/全ドラフト自動処理/}).click();
- await expect(page.getByText('ドラフト終了！',{exact:true})).toBeVisible();
+ await expect(page.getByText('ドラフト終了',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'途中保存',exact:true}).click();await waitSaveIdle(page);
  const draft=await readSave(page);expect(draft.offseasonPlan.draftAutoSkip).toBe(true);
- await reloadAndLoad(page);await expect(page.getByText('ドラフト終了！',{exact:true})).toBeVisible();
+ await reloadAndLoad(page);await expect(page.getByText('ドラフト終了',{exact:true})).toBeVisible();
  const resumed=await readSave(page);expect(resumed.offseasonPlan.draftViews.draft).toEqual(draft.offseasonPlan.draftViews.draft);
  await page.getByRole('button',{name:/結果レビューへ/}).click();
  await page.getByRole('button',{name:/シーズン開幕！/}).click();
@@ -61,11 +61,17 @@ test('CPU next-round needs include a saved first-round catcher without acquiring
   const pool=[p('confirmed-C','捕手',{_drafted:true,_r1winner:0}),p('best-DH','DH'),p('another-C','捕手')];
   state.offseasonPlan={version:1,year:state.year,myId:1,stage:'results',resumeScreen:'draft',draftPool:pool,
     draftViews:{draft:{pickIdx:0,drafted:{},log:[],scouted:[],scoutPt:0}}};
+  const {ensureDraftEvaluation}=await import('/baseball-manager/src/engine/draftReports.js');
+  const evaluation=ensureDraftEvaluation({teams:state.teams,pool:state.offseasonPlan.draftPool,year:state.year,myId:state.myId,legacy:state.offseasonPlan.draftViews.draft});
+  // Equal observed talent isolates the already-filled role from scouting error.
+  for(const [id,r] of Object.entries(evaluation.teams[0])){const q=(id.includes('best-')||id==='role-needed-SP')?71:70;r.current=q;r.future=q;r.value=q;}
+  evaluation.locked=true;state.offseasonPlan.draftEvaluation=evaluation;
   if(!(await saveGame(state)).ok)throw new Error('draft needs fixture save failed');
  },fixture);
  // Only suppress the existing optional random departure from the scored choice.
  await page.addInitScript(()=>{Math.random=()=>.5;});
  await reloadAndLoad(page);
+ await expect(page.locator('.draft-log-items')).toContainText('best-DH');
  await expect(page.getByRole('button',{name:'another-Cを指名',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'途中保存',exact:true}).click();await waitSaveIdle(page);
  const saved=await readSave(page);
@@ -101,10 +107,16 @@ for (const role of ['先発', '中継ぎ', '抑え']) test(`CPU draft includes s
     draftPool:[{...accepted,_drafted:true,_r1winner:0},batter('draft-best-batter','DH'),pitcher('draft-another-pitcher',role)],
     draftViews:{draft:{pickIdx:0,drafted:{},log:[],scouted:[],scoutPt:0}}};
   const {saveGame}=await import('/baseball-manager/src/engine/saveload.js');
+  const {ensureDraftEvaluation}=await import('/baseball-manager/src/engine/draftReports.js');
+  const evaluation=ensureDraftEvaluation({teams:state.teams,pool:state.offseasonPlan.draftPool,year:state.year,myId:state.myId,legacy:state.offseasonPlan.draftViews.draft});
+  // Equal observed talent isolates the already-filled role from scouting error.
+  for(const [id,r] of Object.entries(evaluation.teams[0])){const q=(id.includes('best-')||id==='role-needed-SP')?71:70;r.current=q;r.future=q;r.value=q;}
+  evaluation.locked=true;state.offseasonPlan.draftEvaluation=evaluation;
   if(!(await saveGame(state)).ok)throw new Error('pitcher draft fixture save failed');
  },{state:fixture,role});
  await page.addInitScript(()=>{Math.random=()=>.5;});
  await reloadAndLoad(page);
+ await expect(page.locator('.draft-log-items')).toContainText('draft-best-batter');
  await expect(page.getByRole('button',{name:'draft-another-pitcherを指名',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'途中保存',exact:true}).click();await waitSaveIdle(page);
  const saved=await readSave(page);
@@ -145,10 +157,16 @@ test('role-specific CPU picks fill SP then relief across actual save/load and ne
       pitcher('role-needed-relief','中継ぎ'),pitcher('role-spare-SP','先発')],
     draftViews:{draft:{pickIdx:0,drafted:{},log:[],scouted:[],scoutPt:0}}};
   const {saveGame}=await import('/baseball-manager/src/engine/saveload.js');
+  const {ensureDraftEvaluation}=await import('/baseball-manager/src/engine/draftReports.js');
+  const evaluation=ensureDraftEvaluation({teams:state.teams,pool:state.offseasonPlan.draftPool,year:state.year,myId:state.myId,legacy:state.offseasonPlan.draftViews.draft});
+  // Equal observed talent isolates the already-filled role from scouting error.
+  for(const [id,r] of Object.entries(evaluation.teams[0])){const q=(id.includes('best-')||id==='role-needed-SP')?71:70;r.current=q;r.future=q;r.value=q;}
+  evaluation.locked=true;state.offseasonPlan.draftEvaluation=evaluation;
   if(!(await saveGame(state)).ok)throw new Error('role draft fixture save failed');
  },fixture);
  await page.addInitScript(()=>{Math.random=()=>.5;});
  await reloadAndLoad(page);
+ await expect(page.locator('.draft-log-items')).toContainText('role-needed-SP');
  await expect(page.getByRole('button',{name:'role-covered-closerを指名',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'途中保存',exact:true}).click(); await waitSaveIdle(page);
  const second=await readSave(page);
@@ -156,8 +174,12 @@ test('role-specific CPU picks fill SP then relief across actual save/load and ne
  expect(second.offseasonPlan.draftViews.draft.drafted['role-covered-closer']).toBeUndefined();
  expect(second.teams.find(t=>t.id===0).farm).toEqual([]);
  await reloadAndLoad(page);
+ await expect(page.locator('.draft-log-items')).toContainText('role-needed-SP');
  await expect(page.getByRole('button',{name:'role-covered-closerを指名',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'role-covered-closerを指名',exact:true}).click();
+ await page.getByRole('button',{name:'指名内容を確認',exact:true}).click();
+ await page.getByRole('button',{name:'指名を確定',exact:true}).click();
+ await expect(page.locator('.draft-log-items')).toContainText('role-needed-relief');
  await expect(page.getByRole('button',{name:'role-spare-SPを指名',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'途中保存',exact:true}).click(); await waitSaveIdle(page);
  const third=await readSave(page);

@@ -76,7 +76,9 @@ it('loads serialized draft progress through the real save migration and restores
 it('accepts one explicit pick when tapped twice, preserves its cursor and cancels the CPU timer on exit', () => {
   vi.useFakeTimers(); vi.spyOn(Math, 'random').mockReturnValue(0.5); const changed = vi.fn();
   const v = mount(DraftScreen, { onStateChange: changed, onDraftDone: vi.fn() });
-  const pick = v.root.findAllByType('button').find(b => b.props['aria-label'] === '候補0を指名').props.onClick;
+  act(()=>v.root.findAllByType('button').find(b=>b.props['aria-label']==='候補0を指名').props.onClick());
+  act(()=>v.root.findAllByType('button').find(b=>text(b)==='指名内容を確認').props.onClick());
+  const pick = v.root.findAllByType('button').find(b => text(b)==='指名を確定').props.onClick;
   act(() => { pick(); pick(); });
   expect(changed.mock.lastCall[0]).toMatchObject({ pickIdx: 1, drafted: { 0: 0 } });
   expect(changed.mock.lastCall[0].log).toHaveLength(1);

@@ -386,6 +386,7 @@ export default function AppScreenRouter({ app }) {
           year={year}
           pool={os.draftPool}
           draftAllocation={os.draftAllocation}
+          evaluation={os.draftEvaluation} onEvaluationChange={os.setDraftEvaluation}
           onAllocationChange={os.setDraftAllocation}
           savedState={gs.offseasonPlan?.draftViews?.preview} onStateChange={savePreview}
           onStart={() => setScreen('draft_lottery')}
@@ -402,6 +403,7 @@ export default function AppScreenRouter({ app }) {
           myId={myId}
           year={year}
           pool={os.draftPool}
+          draftAllocation={os.draftAllocation} evaluation={os.draftEvaluation} onEvaluationChange={os.setDraftEvaluation}
           savedState={gs.offseasonPlan?.draftViews?.lottery} onStateChange={saveLottery}
           onDone={(roundOneWinners, autoSkip) => {
             os.setDraftPool((prev) =>
@@ -434,6 +436,7 @@ export default function AppScreenRouter({ app }) {
           year={year}
           pool={os.draftPool}
           draftAllocation={os.draftAllocation}
+          evaluation={os.draftEvaluation} onEvaluationChange={os.setDraftEvaluation}
           autoSkip={gs.offseasonPlan?.draftAutoSkip ?? draftAutoSkip}
           savedState={gs.offseasonPlan?.draftViews?.draft} onStateChange={saveDraft}
           onDraftDone={(pool, drafted) => {
@@ -455,6 +458,7 @@ export default function AppScreenRouter({ app }) {
           year={year}
           pool={os.draftResult.pool}
           drafted={os.draftResult.drafted}
+          evaluation={os.draftEvaluation}
           savedState={gs.offseasonPlan?.draftViews?.review} onStateChange={saveReview}
           onEnd={() =>
             os.handleDraftComplete(os.draftResult.pool, os.draftResult.drafted)
