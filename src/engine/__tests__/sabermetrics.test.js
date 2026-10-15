@@ -31,3 +31,15 @@ describe('saberBatter', () => {
       .toBe(saberBatter({ ...common, K: 40 }).wOBA);
   });
 });
+
+const known = { PA: 500, AB: 450, H: 129, D: 25, T: 3, HR: 14, BB: 40, HBP: 5, SF: 5, K: 80 };
+it('FIX-S3 computes .797 from unrounded OBP and SLG and preserves other metrics', () => {
+  expect(saberBatter(known)).toMatchObject({ OPS: .797, OBP: .348, SLG: .449, wOBA: .343, WAR: 1.22 });
+});
+it('FIX-S3 adds raw components before rounding (not .333 + .333)', () => {
+  expect(saberBatter({ ...known, AB: 3, H: 1, D: 0, T: 0, HR: 0, BB: 0, HBP: 0, SF: 0 }).OPS).toBe(.667);
+});
+it('FIX-S3 separates third-decimal results previously tied at .80', () => {
+  expect(saberBatter({ ...known, H: 130, D: 26 }).OPS).toBe(.803);
+  expect(saberBatter(known).OPS).toBe(.797);
+});

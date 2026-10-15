@@ -20,7 +20,7 @@ describe('FIX-S2 club comparison populations and missing values', () => {
     expect(buildTeamMetrics(team([player(0)])).ops).toBeNull();
     expect(buildTeamMetrics(team([player(0, { BB: 1, PA: 1 })])).ops).toBeNull();
     expect(buildTeamMetrics(team([player(0, { AB: 4, PA: 4, H: null })])).ops).toBeNull();
-    expect(buildTeamMetrics(team([player(0, { AB: 3, H: 1, PA: 3 })])).ops).toBe(0.67); // FIX-S3 stays separate
+    expect(buildTeamMetrics(team([player(0, { AB: 3, H: 1, PA: 3 })])).ops).toBe(0.667); // raw 1/3 + 1/3, rounded once
   });
   it('does not invent missing or invalid earned runs and batted-ball numerators', () => {
     for (const ER of [null, undefined, -1, '0', NaN, Infinity]) {
