@@ -1,0 +1,68 @@
+{
+  "sourceSha": "a14a5c888dca3cfe07c7338482e4130290a6257b",
+  "sourceFiles": {
+    "src/components/DraftCandidates.jsx": "66e1108b412342b4a7a8e86ae0773e7518c1604d",
+    "src/engine/draftReports.js": "acc858ab4d72000075ed5eb5b36cd6f24e660fb4"
+  },
+  "seed": 20261015,
+  "browser": "chromium-390",
+  "browserVersion": "141.0.7390.37",
+  "candidateCount": 80,
+  "teamCount": 12,
+  "transitions": [
+    "lottery",
+    "my-repick",
+    "first-round-done"
+  ],
+  "allocation": {
+    "pitcher": 70,
+    "batter": 30
+  },
+  "scoutPoints": 4,
+  "saveReloadStable": true,
+  "listReturn": {
+    "farId": "1t0yiar",
+    "scrollBefore": 9034,
+    "pendingScroll": 8834
+  },
+  "dimensions": {
+    "list": {
+      "viewport": 390,
+      "document": 390,
+      "overflow": false,
+      "undersizedPrimaryControls": []
+    },
+    "detail": {
+      "viewport": 390,
+      "document": 390,
+      "overflow": false,
+      "undersizedPrimaryControls": []
+    },
+    "results": {
+      "viewport": 390,
+      "document": 390,
+      "overflow": false,
+      "undersizedPrimaryControls": []
+    }
+  },
+  "errors": [],
+  "durationMs": 63712,
+  "hardware": "Playwright browser emulation; no iPhone hardware validation",
+  "baseSha": "a14a5c888dca3cfe07c7338482e4130290a6257b",
+  "timingAttribution": "Reference values only: host CPU load was not isolated from other validation processes.",
+  "sourceSha256": {
+    "src/components/DraftCandidates.jsx": "1319890c133971fae51f3bf0c2be27803cb3182f8c373fc84a599144ecc62bf9",
+    "src/engine/draftReports.js": "7805f2fc684d51c37ea125361b39b92a68cbd2b2373b3dfcec838862aa86da4a"
+  },
+  "stage": "after-scroll-ranking-before-focus",
+  "activeCpuDraftTeams": 1,
+  "fixture": "80 production-generated prospects; controlled roster capacity: own64, rival69, other10clubs70. Full12CPU draft measurements are separate.",
+  "subsequentFocusFix": {
+    "change": "Candidate return focus now uses preventScroll; no timing remeasurement after this one-line focus-only change.",
+    "finalSourceSha256": {
+      "src/components/DraftCandidates.jsx": "022f69ed0cd0c69046a45efd6b18eb1f27dbfbe28271c9ea2dea029e509bbb1b",
+      "src/engine/draftReports.js": "7805f2fc684d51c37ea125361b39b92a68cbd2b2373b3dfcec838862aa86da4a"
+    },
+    "validation": "Focused desktop Chromium1440/WebKit1440 regression (separate browser-focus JSON)."
+  }
+}

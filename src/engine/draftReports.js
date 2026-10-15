@@ -52,12 +52,19 @@ function observe(p, year, observer, width) {
 }
 export const draftReport = (session,id,teamId) => teamId==null ? session?.public?.[id] : session?.teams?.[teamId]?.[id];
 export const draftBand = value => value>=80?'非常に高い':value>=70?'高い':value>=60?'標準以上':value>=50?'標準':'育成が必要';
+// Public observations are immutable within a conference. Private scouting can
+// replace the session while keeping this map, so rank once per public map.
+const publicTierCache=new WeakMap();
 export function publicDraftTier(session,id) {
-  const reports=Object.entries(session?.public || {}).sort((a,b)=>b[1].value-a[1].value || a[0].localeCompare(b[0]));
-  const index=reports.findIndex(([key])=>key===String(id));
-  if(index<0) return '評価不明';
-  if(index===0 && reports.length>1 && reports[0][1].value-reports[1][1].value>=8) return '突出した目玉';
-  return index<12?'1位候補':index<36?'上位候補':'中下位候補';
+  const source=session?.public;
+  if(!source || typeof source!=='object')return '評価不明';
+  let tiers=publicTierCache.get(source);
+  if(!tiers){
+    const reports=Object.entries(source).sort((a,b)=>b[1].value-a[1].value || a[0].localeCompare(b[0]));
+    tiers=new Map(reports.map(([key],index)=>[key,index===0&&reports.length>1&&reports[0][1].value-reports[1][1].value>=8?'突出した目玉':index<12?'1位候補':index<36?'上位候補':'中下位候補']));
+    publicTierCache.set(source,tiers);
+  }
+  return tiers.get(String(id)) || '評価不明';
 }
 export function draftClassSummary(session) {
   const sorted=Object.values(session?.public || {}).sort((a,b)=>b.value-a.value);

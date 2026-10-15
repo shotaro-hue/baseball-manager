@@ -1,0 +1,23 @@
+{
+  "stage": "after",
+  "baseSha": "a14a5c888dca3cfe07c7338482e4130290a6257b",
+  "sourceSha": "a14a5c888dca3cfe07c7338482e4130290a6257b",
+  "sourceFiles": {
+    "src/components/DraftCandidates.jsx": "cd6ef91e87f38d675263b623a43a9d3c581093b0",
+    "src/engine/draftReports.js": "acc858ab4d72000075ed5eb5b36cd6f24e660fb4"
+  },
+  "sourceSha256": {
+    "src/components/DraftCandidates.jsx": "15e19cceadd3d88e54c0963fdbd966217497e0936a5a14b72daa3e905e77bb64",
+    "src/engine/draftReports.js": "7805f2fc684d51c37ea125361b39b92a68cbd2b2373b3dfcec838862aa86da4a"
+  },
+  "seed": 20261015,
+  "timingAttribution": "Reference values only: host CPU load was not isolated from other validation processes.",
+  "browser": "chromium-1440",
+  "comparedScroll": 2000,
+  "confirmScroll": 2500,
+  "returnScroll": 3000,
+  "actualScroll": 3000,
+  "focusedCandidate": "draft-candidate-ym77jxg",
+  "saveReloadStable": true,
+  "hardware": "Browser automation on host, not phone hardware"
+}
