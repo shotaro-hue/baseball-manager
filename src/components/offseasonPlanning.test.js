@@ -38,7 +38,11 @@ function setup(options = {}) {
   let view; act(() => { view = create(React.createElement(Harness)); }); views.push(view);
   const button = label => view.root.findAllByType('button').find(n => text(n) === label);
   const click = label => act(() => button(label).props.onClick());
-  const intent = (id, value) => act(() => view.root.findAllByType('select').find(n => n.props['aria-label'] === `選手${id}の編成方針`).props.onChange({ target: { value } }));
+  const intent = (id, value) => {
+    act(() => view.root.findByProps({ 'aria-label': `選手${id}の契約更改` }).props.onClick());
+    click(value === 'release' ? '放出候補にする' : '放出候補を取り消して交渉する');
+    click('← 選手一覧に戻る');
+  };
   return { view, button, click, intent };
 }
 it('plans releases before opening the market without mutating roster or cash; can cancel', () => {
@@ -46,7 +50,7 @@ it('plans releases before opening the market without mutating roster or cash; ca
   expect(latest.gs.myTeam.players).toHaveLength(1); expect(latest.gs.myTeam.budget).toBe(10000);
   expect(planningSummary(latest.gs.myTeam, latest.gs.offseasonPlan, 2026).projectedCount).toBe(0);
   ui.intent(0, 'retain'); expect(latest.gs.myTeam.players).toHaveLength(1);
-  ui.click('方針を確認して補強市場を開く');
+  ui.click('交渉・補強を始める');
   expect(latest.gs.offseasonPlan).toMatchObject({ stage: 'open', tab: 'market' });
 });
 it('keeps the individual offer draft while navigating to market and back, with a persisted view', () => {
@@ -150,15 +154,90 @@ for (const [saveState,label] of [
  const ui=setup({saveState});expect(text(ui.view.root.findByProps({className:'planning-save'}))).toContain(label);
  expect(ui.button('編成内容を保存する').props.disabled).toBe(Boolean(saveState.saveQueueState?.isSaving||saveState.saveQueueState?.hasQueuedSave));
 });
-it('filters draft intentions without changing players, budget or live contracts',()=>{
- const ui=setup({teams:[team([p(0),p(1),p(2,{contractYearsLeft:3})])]});ui.intent(0,'retain');
- ui.click('交渉予定');const table=()=>ui.view.root.findByProps({'aria-label':'編成方針一覧'});
- expect(text(table())).toContain('選手1');expect(text(table())).not.toContain('選手0');expect(text(table())).not.toContain('選手2');
- ui.click('放出候補');expect(text(table())).toContain('この方針に該当する選手はいません');ui.click('全員');
+it('filters release drafts without changing players, budget or live contracts',()=>{
+ const ui=setup({teams:[team([p(0),p(1),p(2,{contractYearsLeft:3})])]});ui.intent(0,'release');
+ ui.click('未合意');const list=()=>ui.view.root.findByProps({className:'renewal-list'});
+ const rows=()=>list().findAllByProps({className:'renewal-list-item'}).map(text).join('');
+ expect(rows()).toContain('選手1');expect(rows()).not.toContain('選手0');expect(rows()).not.toContain('選手2');
+ ui.click('放出候補');expect(rows()).toContain('選手0');expect(rows()).not.toContain('選手1');ui.click('全員');expect(rows()).toContain('選手2');
  expect(latest.gs.myTeam.players.map(p=>p.id)).toEqual([0,1,2]);expect(latest.gs.myTeam.budget).toBe(10000);expect(latest.gs.myTeam.players[0].salary).toBe(1000);
 });
 it('describes payroll using agreed terms rather than unaccepted offer drafts',()=>{
  const ui=setup({plan:plan({session:{baseline:1000,others:[],entries:[{player:p(),status:'pending',salary:'9000',years:1,logs:[]}]}})});
  const all=text(ui.view.toJSON());expect(all).not.toContain('未合意は提示額');expect(all).toContain('成立条件がなければ前年年俸');
  expect(planningSummary(latest.gs.myTeam,latest.gs.offseasonPlan,2026).projectedPayroll).toBe(1000);
+});
+
+it('uses one roster list before the market opens, including continuing contracts without adding them to negotiation state', () => {
+  const ui = setup({ teams: [team([p(0), p(2, { contractYearsLeft: 3 })], { farm: [p(3)] })] });
+  const list = ui.view.root.findByProps({ className: 'renewal-list' });
+  expect(text(list)).toContain('選手0'); expect(text(list)).toContain('選手2'); expect(text(list)).toContain('選手3');
+  expect(text(list)).toContain('継続契約');
+  expect(ui.view.root.findAllByType('select').filter(n => n.props['aria-label']?.endsWith('の編成方針'))).toHaveLength(0);
+  expect(ui.view.root.findAllByProps({ className: 'planning-compact' })).toHaveLength(0);
+  expect(latest.gs.offseasonPlan.session.entries.map(e => e.player.id)).toEqual([0, 3]);
+  expect(ui.button('オファーを出す')).toBeUndefined();
+});
+it('marks and cancels a release candidate from the selected player while preserving the offer draft and actual roster', () => {
+  const ui = setup({ plan: plan({ stage: 'open' }) });
+  act(() => ui.view.root.findByProps({ 'aria-label': '選手0の契約更改' }).props.onClick());
+  act(() => ui.view.root.findAllByType('input').find(n => n.props.type === 'number').props.onChange({ target: { value: '1320' } }));
+  ui.click('放出候補にする');
+  expect(planningSummary(latest.gs.myTeam, latest.gs.offseasonPlan, 2026)).toMatchObject({ projectedCount: 0, projectedPayroll: 0 });
+  expect(latest.gs.myTeam.players[0]).toMatchObject({ id: 0, salary: 1000, contractYearsLeft: 1 });
+  expect(latest.gs.myTeam.budget).toBe(10000);
+  expect(ui.button('オファーを出す')).toBeUndefined();
+  ui.click('放出候補を取り消して交渉する');
+  expect(latest.gs.offseasonPlan.session.entries[0]).toMatchObject({ salary: '1320', status: 'pending', round: 0 });
+  expect(ui.button('オファーを出す')).toBeDefined();
+  expect(planningSummary(latest.gs.myTeam, latest.gs.offseasonPlan, 2026).projectedCount).toBe(1);
+});
+it('keeps saved candidates out of pending and bulk offers, and keeps existing retain intentions negotiable', () => {
+  const ui = setup({ teams: [team([p(0), p(2)])], plan: plan({ stage: 'open', intents: [{ id: 0, value: 'release' }, { id: 2, value: 'retain' }] }) });
+  ui.click('未合意');
+  const list = () => ui.view.root.findByProps({ className: 'renewal-list' });
+  expect(list().findAllByProps({ className: 'renewal-list-item' }).map(text).join('')).not.toContain('選手0');
+  expect(list().findAllByProps({ 'aria-label': '選手2の契約更改' })).toHaveLength(1);
+  ui.click('まとめて提示を開く'); ui.click('提示可能な全員を選択'); ui.click('選択した選手の提示内容を確認');
+  const dialog = text(ui.view.root.findByProps({ role: 'dialog' }));
+  expect(dialog).toContain('対象 1人'); expect(dialog).toContain('選手2'); expect(dialog).not.toContain('選手0');
+  ui.click('戻る'); ui.click('放出候補');
+  expect(list().findAllByProps({ 'aria-label': '選手0の契約更改' })).toHaveLength(1);
+  expect(list().findAllByProps({ 'aria-label': '選手2の契約更改' })).toHaveLength(0);
+});
+it('opens negotiations directly from a player without an extra classification step or executing a contract', () => {
+  const ui = setup();
+  act(() => ui.view.root.findByProps({ 'aria-label': '選手0の契約更改' }).props.onClick());
+  ui.click('交渉を始める');
+  expect(latest.gs.offseasonPlan).toMatchObject({ stage: 'open', tab: 'roster', renewalView: { selectedId: 0 } });
+  expect(latest.gs.myTeam.players[0]).toMatchObject({ salary: 1000, contractYearsLeft: 1 });
+  expect(processCpuFaBids).not.toHaveBeenCalled(); expect(ui.button('オファーを出す')).toBeDefined();
+});
+it('does not call a removed farm player active when displaying the released ledger', () => {
+  const farm = p(0);
+  const ui = setup({ teams: [team([], { farm: [farm] })], plan: plan({ stage: 'open' }) });
+  act(() => ui.view.root.findByProps({ 'aria-label': '選手0の契約更改' }).props.onClick());
+  ui.click('戦力外を検討する'); ui.click('戦力外を確定する');
+  const heading = text(ui.view.root.findByProps({ className: 'renewal-player-heading' }));
+  expect(heading).toContain('所属なし'); expect(heading).not.toContain('歳 · 一軍');
+  expect(latest.gs.myTeam.farm).toHaveLength(0);
+});
+it('shows an external signing as a current contract with the transferred season record, without making up a prior salary', () => {
+  const ui = setup({ plan: plan({ stage: 'open', tab: 'market' }), faPool: [p(1, { isFA: true, salary: 2000, faEnteredYear: 2026, faOriginTeamId: 1, stats: { PA: 400, AB: 350, H: 100, HR: 20 } })] });
+  act(() => ui.view.root.findByProps({ 'aria-label': '選手1の条件を見る' }).props.onClick());
+  ui.click('契約条件を確認する'); ui.click('契約を確定する'); ui.click('自球団');
+  act(() => ui.view.root.findByProps({ 'aria-label': '選手1の契約更改' }).props.onClick());
+  const conditions = text(ui.view.root.findByProps({ className: 'renewal-conditions' }));
+  expect(conditions).toContain('契約年俸2,000万円'); expect(conditions).not.toContain('前年年俸'); expect(conditions).not.toContain('要求年俸');
+  expect(text(ui.view.root.findByProps({ className: 'renewal-player-summary' }))).toContain('本塁打 20');
+  expect(ui.view.root.findAllByProps({ className: 'renewal-response' })).toHaveLength(0);
+  expect(latest.gs.myTeam.players.find(p => p.id === 1).stats.HR).toBe(0);
+  expect(latest.gs.offseasonPlan.session.entries.map(e => e.player.id)).toEqual([0]);
+});
+it('uses the completed live season for an in-season extension, rather than a retained transfer record from last year', () => {
+  const signed = p(2, { contractSignedYear: 2026, contractYears: 3, contractYearsLeft: 3, faArchivedYear: 2025, faOriginTeamId: 1, marketLastStats: { HR: 20 }, stats: { HR: 30 } });
+  const ui = setup({ plan: plan({ stage: 'open' }), teams: [team([p(), signed])] });
+  act(() => ui.view.root.findByProps({ 'aria-label': '選手2の契約更改' }).props.onClick());
+  expect(text(ui.view.root.findByProps({ className: 'renewal-player-summary' }))).toContain('本塁打 30');
+  expect(text(ui.view.root.findByProps({ className: 'renewal-player-summary' }))).not.toContain('移籍前');
 });

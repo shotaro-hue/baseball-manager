@@ -131,7 +131,7 @@ test('E2 final regular game, postseason save/reload, offseason and next year', a
   while (await retire.count()) await retire.nth(0).click();
   await page.getByRole('button', { name: '引退結果を確認して次へ', exact:true }).click();
   await page.getByRole('dialog').getByRole('button', { name: '確定して国内FA補強へ', exact:true }).click();
-  await page.getByRole('button', { name: '方針を確認して補強市場を開く', exact:true }).click();
+  await page.getByRole('button', { name: '交渉・補強を始める', exact:true }).click();
   await page.getByRole('button', { name: '結果確認', exact:true }).click();
   await page.getByRole('button', { name: '編成終了の最終確認', exact:true }).click();
   await page.getByRole('dialog').getByRole('button', { name: '確認して確定する', exact:true }).click();

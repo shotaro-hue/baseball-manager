@@ -6,12 +6,11 @@ import { compactRenewalSession, planningSummary, reconcileRenewalSession } from 
 import { renewalEligible } from '../engine/renewalRules';
 import { fmtSal } from '../utils';
 import { useResultDialog } from './useResultDialog';
-import { Button, MetricBand, StateLabel, DataTableFrame } from './design-system/primitives';
+import { Button, MetricBand, StateLabel } from './design-system/primitives';
 import './offseason-planning.css';
 
 const PlayerModal = lazy(() => import('./PlayerModal').then(m => ({ default: m.PlayerModal })));
 const money = value => Number.isFinite(value) ? fmtSal(value) : '未記録';
-const intentLabels = { retain: '残留予定', negotiate: '交渉予定', release: '放出候補' };
 function Confirm({ children, title, onClose, onConfirm, busy, fallbackFocus }) {
   const ref = useResultDialog(onClose, true);
   useEffect(() => () => {
@@ -35,10 +34,10 @@ function PlanningSaveStatus({gs}) {
 export default function OffseasonPlanningScreen({ gs, os, myTeam, myId, year }) {
   const plan = gs.offseasonPlan;
   const [profile, setProfile] = useState(null);
-  const [intentFilter, setIntentFilter] = useState('all');
   const rosterHeading = useRef(null);
-  const intentFilters = useRef(null);
   const growthDisclosure = useRef(null);
+  const tabBar = useRef(null);
+  const startingMarket = useRef(false);
   const [modal, setModal] = useState(null);
   const [failure, setFailure] = useState('');
   const [busy, setBusy] = useState(false);
@@ -47,6 +46,11 @@ export default function OffseasonPlanningScreen({ gs, os, myTeam, myId, year }) 
   const saveSession = useCallback(session => gs.setOffseasonPlan(prev => ({ ...prev,
     session: reconcileRenewalSession(compactRenewalSession(session), myTeam, year, prev.session) })), [gs.setOffseasonPlan, myTeam, year]);
   const saveView = useCallback(renewalView => gs.setOffseasonPlan(prev => ({ ...prev, renewalView })), [gs.setOffseasonPlan]);
+  useEffect(() => {
+    if (startingMarket.current && plan?.stage === 'open') {
+      tabBar.current?.querySelector('[aria-pressed="true"]')?.focus({ preventScroll: true }); startingMarket.current = false;
+    }
+  }, [plan?.stage]);
   const overview = planningSummary(myTeam, plan, year);
   const pending = overview.pending.filter(p => !overview.releaseCandidates.some(c => c.id === p.id));
   const releasePlayer = [...(myTeam?.players || []), ...(myTeam?.farm || [])].find(p => p.id === modal?.id);
@@ -66,47 +70,34 @@ export default function OffseasonPlanningScreen({ gs, os, myTeam, myId, year }) 
   const tab = plan.tab || 'roster';
   const chooseTab = value => gs.setOffseasonPlan(prev => ({ ...prev, tab: value }));
   const setIntent = (id, value) => {
+    if (!owned.some(p => p.id === id && renewalEligible(p, year))) return;
     gs.setOffseasonPlan(prev => ({ ...prev, intents: [...(prev.intents || []).filter(i => i.id !== id), { id, value }] }));
-    if (intentFilter !== 'all' && value !== intentFilter && typeof window !== 'undefined') {
-      requestAnimationFrame(() => intentFilters.current?.querySelector('[aria-pressed="true"]')?.focus({preventScroll:true}));
-    }
   };
-  const policyPlayers = owned.filter(p => intentFilter === 'all' || (renewalEligible(p,year) && (plan.intents?.find(i => i.id === p.id)?.value || 'negotiate') === intentFilter));
+  const openNegotiations = () => gs.setOffseasonPlan(prev => ({ ...prev, stage: 'open', tab: 'roster' }));
   return <main data-ds="planning-screen" className="offseason-planning planning-screen">
-    <header className="planning-heading"><p>{myTeam.name} · {year}年</p><h1 aria-label={`${year}年 オフシーズン編成`}>オフシーズン編成</h1><p>補強・更改・放出候補を行き来して、来季の編成を決めます。</p></header>
+    <header className="planning-heading"><p>{myTeam.name} · {year}年</p><h1 ref={rosterHeading} tabIndex={-1} aria-label={`${year}年 オフシーズン編成`}>オフシーズン編成</h1></header>
     <ol className="planning-phase" aria-label="年間の現在地"><li>成長確認</li><li aria-current="step">編成計画</li><li>補強結果</li><li>ドラフト</li><li>キャンプ</li></ol>
     <section className="planning-overview" aria-label="来季の編成と予算の見込み">
       <MetricBand className="planning-metrics" items={[
-        {label:'来季人数の見込み',value:overview.projectedCount,unit:'人'},
-        {label:'来季年俸の見込み',value:overview.projectedPayroll == null ? null : money(overview.projectedPayroll)},
-        {label:'補強に使える残予算',value:overview.budget == null ? null : money(overview.budget)},
-        {label:'交渉の対応待ち',value:pending.length,unit:'人'},
+        {label:'来季人数',value:overview.projectedCount,unit:'人'},
+        {label:'年俸見込み',value:overview.projectedPayroll == null ? null : money(overview.projectedPayroll)},
+        {label:'補強の残予算',value:overview.budget == null ? null : money(overview.budget)},
+        {label:'未解決',value:pending.length,unit:'人'},
       ]}/>
-      <p className="planning-note">現在 一軍{overview.active}人・二軍／育成{overview.farm}人 · 放出候補{overview.releaseCandidates.length}人を人数・年俸見込みから除外。方針は下書きです。</p>
+      <p className="planning-note">現在 一軍{overview.active}人・二軍／育成{overview.farm}人</p>
       <PlanningSaveStatus gs={gs}/>
     </section>
-    <nav className="planning-tabs" aria-label="オフシーズン編成の切り替え"><div className="planning-compact"><span>人数見込み {overview.projectedCount}人</span><span>年俸見込み {money(overview.projectedPayroll)}</span><span>残予算 {money(overview.budget)}</span><span>対応待ち {pending.length}人</span></div>{open && <div className="planning-tab-buttons">{[['roster', '自球団'], ['market', '補強市場'], ['review', '結果確認']].map(([id, label]) => <Button variant="secondary" key={id} aria-pressed={tab === id} onClick={() => chooseTab(id)}>{label}</Button>)}</div>}</nav>
+    {!open && <div className="planning-start"><Button onClick={() => { startingMarket.current = true; gs.setOffseasonPlan(prev => ({ ...prev, stage: 'open', tab: 'market' })); }}>交渉・補強を始める</Button></div>}
+    {open && <nav ref={tabBar} className="planning-tabs" aria-label="オフシーズン編成の切り替え"><div className="planning-tab-buttons">{[['roster', '自球団'], ['market', '補強市場'], ['review', '結果確認']].map(([id, label]) => <Button variant="secondary" key={id} aria-pressed={tab === id} onClick={() => chooseTab(id)}>{label}</Button>)}</div></nav>}
     <div className="planning-layout" data-view={open ? tab : 'planning'}>
     <section hidden={open && tab !== 'roster'} aria-label="自球団の編成方針">
-      <details className="planning-policy" open={!open}><summary ref={rosterHeading}><h2 className="planning-roster-heading">編成方針・放出候補を見直す</h2></summary>
-        <div ref={intentFilters} className="planning-filters" aria-label="編成方針の絞り込み">{[['all','全員'],['negotiate','交渉予定'],['release','放出候補']].map(([value,label]) => <Button variant="secondary" key={value} aria-pressed={intentFilter === value} onClick={() => setIntentFilter(value)}>{label}</Button>)}</div>
-        <DataTableFrame label="編成方針一覧" className="planning-roster"><table><thead><tr><th scope="col">選手・所属</th><th scope="col" data-number>年俸<small>万円／年</small></th><th scope="col">方針（下書き）</th></tr></thead><tbody>
-          {policyPlayers.map(p => {
-            const active = myTeam.players.some(x => x.id === p.id);
-            const eligible = renewalEligible(p, year);
-            const intent = plan.intents?.find(i => i.id === p.id)?.value || 'negotiate';
-            return <tr className="planning-player" key={p.id}><td><button className="planning-player-name" aria-label={`${p.name}の選手詳細・年度別成績`} onClick={() => setProfile(p)}><strong>{p.name}</strong><small>{p.pos || '役割未記録'} · {p.age ?? '未記録'}歳</small><small>{p.育成 ? '育成・二軍' : active ? '一軍' : '二軍・支配下'}</small></button></td>
-              <td data-number>{Number.isFinite(p.salary) ? p.salary.toLocaleString('ja-JP') : '—'}{!Number.isFinite(p.salary) && <small>未記録</small>}</td>
-              <td>{eligible ? <><select className="planning-intent" aria-label={`${p.name}の編成方針`} value={intent} onChange={event => setIntent(p.id, event.target.value)}>{Object.entries(intentLabels).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select>{open && intent === 'release' && <Button variant="secondary" className="planning-danger" onClick={() => { setFailure(''); setModal({type:'release',id:p.id}); }}>放出の影響を確認する</Button>}</> : <span className="planning-note">{p.contractSignedYear === year ? '今オフ契約済み' : '今回の更改対象外'}</span>}</td></tr>;
-          })}
-          {!policyPlayers.length && <tr><td colSpan={3}>{owned.length ? 'この方針に該当する選手はいません。全員から見直せます。' : '所属選手はいません。補強市場で確認してください。'}</td></tr>}
-        </tbody></table></DataTableFrame>
-        <p className="planning-note">名前から能力・年度別成績を確認できます。方針の変更だけでは契約・放出は確定しません。</p>
-      </details>
-      {open && <ContractRenewalPhaseScreen teams={gs.teams} myId={myId} year={year} saveId={gs.saveId} embedded demands={plan.demands}
-        renewalPlayerIds={Object.keys(plan.demands || {})} savedSession={plan.session} onSessionChange={saveSession}
+      <ContractRenewalPhaseScreen teams={gs.teams} myId={myId} year={year} saveId={gs.saveId} embedded demands={plan.demands}
+        savedSession={plan.session} onSessionChange={saveSession}
         savedView={plan.renewalView} onViewChange={saveView} onSign={os.handleContractRenewalSign}
-        onRelease={os.handlePlanningRelease} onDeclare={id => os.handlePlanningRelease(id, 'fa')} onNext={() => chooseTab('review')} />}
+        onRelease={os.handlePlanningRelease} onDeclare={id => os.handlePlanningRelease(id, 'fa')} onNext={() => chooseTab('review')}
+        planning={{ intents: plan.intents || [], candidates: overview.releaseCandidates, negotiationOpen: open,
+          onIntentChange: setIntent, onOpenNegotiations: openNegotiations, onProfile: setProfile,
+          onInspectRelease: id => { setFailure(''); setModal({ type: 'release', id }); } }} />
     </section>
     {open && <section hidden={tab !== 'market'} aria-label="補強市場"><OffseasonFaPhaseScreen gs={gs} os={os} myTeam={myTeam} myId={myId} year={year} embedded /></section>}
     {open && <section hidden={tab !== 'review'} className="planning-review" aria-label="編成結果の確認"><h2>編成結果の確認</h2>
@@ -123,7 +114,6 @@ export default function OffseasonPlanningScreen({ gs, os, myTeam, myId, year }) 
       <p className="planning-note">自球団からFA宣言中：{gs.faPool.filter(p => p.marketEntryReason === '国内FA宣言' && p.faOriginTeamId === myId).length}人。宣言残留は補強市場で契約できます。</p>
     </aside>
     </div>
-    {!open && <footer className="planning-footer"><Button className="planning-primary" onClick={() => gs.setOffseasonPlan(prev => ({ ...prev, stage: 'open', tab: 'market' }))}>方針を確認して補強市場を開く</Button></footer>}
     {modal && <Confirm title={modal.type === 'release' ? '放出の最終確認' : 'オフシーズン編成の最終確認'} {...{ onClose: close, onConfirm: finish, busy, fallbackFocus:rosterHeading }}>
       {modal.type === 'release' ? <><p>{releasePlayer?.name || '対象選手'}を放出します。確定後は取り消せません。</p><p>所属人数 {overview.owned} → {overview.owned - 1}人 · 年俸総額 {money(overview.payroll)} → {money(overview.payroll == null || !Number.isFinite(releasePlayer?.salary) ? null : overview.payroll - releasePlayer.salary)}</p></> : <><p>来季人数の見込み {overview.projectedCount}人 · 年俸見込み {money(overview.projectedPayroll)}</p>{overview.releaseCandidates.length ? <ul>{overview.releaseCandidates.map(p => <li key={p.id}>放出確定予定：{p.name} · {money(p.salary)}</li>)}</ul> : <p>追加の放出候補はありません。</p>}<p>編成を終了し、CPUの獲得結果とドラフトへ進みます。</p></>}
       {failure && <p role="alert">{failure}</p>}

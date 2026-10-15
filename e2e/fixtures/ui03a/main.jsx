@@ -12,6 +12,8 @@ if(state==='missing')players.forEach(p=>p.salary=null);
 const club={id:0,name:'東京ヤクルトスワローズ',league:'セ',players:players.slice(0,3),farm:players.slice(3).map((p,i)=>({...p,育成:i===2})),lineup:[0,2],rotation:[1],budget:state==='zero'?0:state==='missing'?null:82000};
 if(state==='empty'){club.players=[];club.farm=[];}
 const initial={version:1,year:2026,myId:0,stage:['open','review','error','throw'].includes(state)?'open':'planning',tab:state==='review'?'review':'roster',intents:[{id:2,value:'release'},{id:1,value:'retain'}],demands:Object.fromEntries(players.map(p=>[p.id,{demandSalary:1500,minAcceptSalary:1200}])),releasedIds:[],growth:{growth:[],decline:[],breakout:[]}};
+const status=new URLSearchParams(location.search).get('status');
+if(['cooldown','free_requested'].includes(status))initial.session={baseline:6000,others:[],entries:players.map(player=>({player,demand:initial.demands[player.id],status:player.id===0?status:'pending',salary:'1500',years:1,round:3,retries:0,logs:['保存された返答']}))};
 let attempts=0;
 function Fixture(){const[plan,setPlan]=useState(initial);const[teams,setTeams]=useState([club]);const handleSave=useCallback(async()=>{document.body.dataset.action='save';return {ok:true};},[]);
  const gs={offseasonPlan:state==='stale'?{...plan,year:2025}:plan,setOffseasonPlan:setPlan,teams,setTeams,myId:0,year:2026,saveId:'fixture',faPool:[],faYears:{},saveDirty:state==='dirty',saveQueueState:{isSaving:state==='saving'},saveResult:state==='save-error'?{ok:false}:state==='partial'?{ok:true,archive:{ok:false}}:state==='saved'?{ok:true}:null,handleSave,getSeasonHistory:()=>({}),notify:()=>{}};

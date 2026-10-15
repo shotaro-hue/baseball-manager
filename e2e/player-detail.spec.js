@@ -129,7 +129,13 @@ for (const width of [390,1440]) {
     await page.setViewportSize({width,height:900});
     for (const mode of ['planning','fa','review']) {
       await page.goto(`/baseball-manager/e2e/fixtures/ui02c/index.html?mode=${mode}`);
-      if (mode === 'planning') await page.locator('.planning-roster').getByRole('button').first().click();
+      let planningOpener;
+      if (mode === 'planning') {
+        await page.locator('.renewal-row').first().click();
+        await page.locator('.renewal-career > summary').click();
+        planningOpener = page.locator('.renewal-career').getByRole('button',{name:/の選手詳細・年度別成績$/});
+        await planningOpener.click();
+      }
       if (mode === 'fa') {
         await page.getByRole('button',{name:'FA候補確認の条件を見る',exact:true}).click();
         await page.getByRole('button',{name:'選手詳細・年度別成績',exact:true}).click();
@@ -147,6 +153,7 @@ for (const width of [390,1440]) {
       await expect(dialog).not.toContainText('成績を読み込み中');
       await layout(page, dialog);
       await page.keyboard.press('Escape'); await expect(dialog).toHaveCount(0);
+      if (planningOpener) await expect(planningOpener).toBeFocused();
       expect(await page.evaluate(() => document.body.style.overflow)).not.toBe('hidden');
     }
     expect(errors).toEqual([]);

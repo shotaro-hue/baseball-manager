@@ -77,6 +77,14 @@
 .renewal-screen[data-ds] :is(ul,ol) { padding-left:24px; }
 .renewal-screen[data-ds] li { margin:8px 0; overflow-wrap:anywhere; }
 .renewal-help { margin-top:24px; }
+.renewal-list-heading:empty { display:none; }
+.renewal-candidates { border-bottom:1px solid var(--ds-divider); margin-bottom:8px; }
+.renewal-candidates > ul { list-style:none; padding:0!important; }
+.renewal-candidates li { padding:8px; background:var(--ds-surface); }
+.renewal-candidates li > span { margin-left:12px; font-size:14px; }
+.renewal-candidates .renewal-actions { margin-top:8px; }
+.renewal-intent { margin-top:12px; }
+.renewal-candidate-note { color:var(--ds-warning); font-size:14px; }
 .renewal-footer { margin-top:24px; border-top:1px solid var(--ds-divider); padding-top:16px; }
 .renewal-footer p { font-size:14px; }
 .renewal-footer p button { margin:8px 0; display:block; }

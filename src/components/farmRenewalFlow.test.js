@@ -49,7 +49,8 @@ it('renews numeric ID zero in the farm through individual confirmation without p
 });
 it('shows farm release impact as total ownership and releases once with history and a market entry', () => {
   const h = setup([p(0)]);
-  act(() => h.view.root.findAllByType('select').find(n => n.props['aria-label'] === '選手0の編成方針').props.onChange({ target: { value: 'release' } }));
+  act(() => h.view.root.findByProps({ 'aria-label': '選手0の契約更改' }).props.onClick());
+  h.click('放出候補にする'); h.click('← 選手一覧に戻る');
   h.click('放出の影響を確認する'); expect(text(h.view.root.findByProps({ role: 'dialog' }))).toContain('所属人数 1 → 0人');
   const release = h.current.os.handlePlanningRelease;
   act(() => { expect(release(0)).toBe(true); expect(release(0)).toBe(false); });
