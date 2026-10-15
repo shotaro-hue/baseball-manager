@@ -76,6 +76,30 @@ describe('FA market saved data and signing rules', () => {
 });
 
 describe('mobile FA decision flow', () => {
+  it('compares recorded performance and yearly salary directly in the candidate rows', () => {
+    const ui = setup([player(0, { stats: { AB: 10, H: 0, HR: 0 } }), player(1, { isPitcher: true, stats: { IP: 9, ER: 0 } })]);
+    const rows = ui.view.root.findAllByProps({ className: 'fa-row' });
+    expect(text(rows[0])).toContain('打率 0.000');
+    expect(text(rows[0])).toContain('本塁打 0');
+    expect(text(rows[1])).toContain('防御率 0.00');
+    expect(text(rows[1])).toContain('投球回 9.0');
+    expect(text(rows[0])).toContain('1,000万円');
+  });
+  it('shares the renewal return action and keeps saved filters after selecting a candidate', () => {
+    const changes = vi.fn();
+    const ui = setup([player(0)], { savedView: { role: 'batter', search: '候補', sort: 'salary' }, onViewChange: changes });
+    ui.select(0); ui.click('← 選手一覧に戻る');
+    expect(changes).toHaveBeenLastCalledWith(expect.objectContaining({ selectedId: null, role: 'batter', search: '候補', sort: 'salary' }));
+    expect(ui.view.root.findAllByProps({ className: 'fa-row' })).toHaveLength(1);
+  });
+  it('uses the parent planning budget overview when embedded and preserves the contract cost', () => {
+    const ui = setup([player(0)], { embedded: true });
+    expect(ui.view.root.findAllByProps({ className: 'fa-summary' })).toHaveLength(0);
+    ui.select(0);
+    expect(text(ui.view.root.findByProps({ 'aria-label': '契約条件' }))).toContain('契約後の予算');
+    ui.click('契約条件を確認する');
+    expect(text(ui.view.root.findByProps({ role: 'dialog' }))).toContain('契約総額：1,000万円');
+  });
   it('keeps ID 0 selectable, detail/comparison entrances, and confirmation before signing', () => {
     const ui = setup(); ui.select(0);
     ui.click('選手詳細・年度別成績'); expect(ui.props.onPlayerClick).toHaveBeenCalledWith(ui.props.faPool[0], 'FA市場');
@@ -96,7 +120,7 @@ describe('mobile FA decision flow', () => {
     const years = ui.view.root.findAllByType('select').at(-1);
     act(() => years.props.onChange({ target: { value: '3' } }));
     ui.update({ faYears: ui.props.setFaYears.mock.calls[0][0]({}) });
-    ui.click('← 候補一覧に戻る'); ui.select(1); ui.select(0);
+    ui.click('← 選手一覧に戻る'); ui.select(1); ui.select(0);
     expect(ui.view.root.findAllByType('select').at(-1).props.value).toBe(3);
     ui.click('契約条件を確認する'); ui.click('契約を確定する');
     expect(ui.props.upd.mock.calls[0][1](ui.props.myTeam).budget).toBe(7000);

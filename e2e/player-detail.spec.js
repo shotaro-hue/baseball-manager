@@ -138,6 +138,7 @@ for (const width of [390,1440]) {
       }
       if (mode === 'fa') {
         await page.getByRole('button',{name:'FA候補確認の条件を見る',exact:true}).click();
+        await page.locator('.fa-profile > summary').click();
         await page.getByRole('button',{name:'選手詳細・年度別成績',exact:true}).click();
       }
       if (mode === 'review') {

@@ -4,13 +4,14 @@ import { MAX_ROSTER, FOREIGN_AGENT_ACCEPT_PROB, FOREIGN_AGENT_SALARY_RATIO, FORE
 import { useResultDialog } from '../useResultDialog';
 import { marketMetrics, marketNeeds, marketPlacement, validateMarketContract, addMarketSigning } from './faMarket';
 import { planningPlayer } from '../../engine/offseasonPlanning';
+import { Button, StateLabel } from '../design-system/primitives';
 import '../../calm-fa.css';
 
 const money = n => Number.isFinite(n) ? fmtSal(n) : '未記録';
 function Confirm({ offer, budget, placement, onClose, onConfirm, error }) {
   const ref = useResultDialog(onClose, true);
   const cost = offer.salary * offer.years;
-  return <div className="fa-overlay"><section className="fa-dialog" ref={ref} role="dialog" aria-modal="true" aria-labelledby="fa-confirm-title">
+  return <div className="fa-overlay"><section data-ds="fa-dialog" className="fa-dialog" ref={ref} role="dialog" aria-modal="true" aria-labelledby="fa-confirm-title">
     <h2 id="fa-confirm-title" tabIndex={0}>契約条件の最終確認</h2>
     <h3>{offer.player.name}</h3><p>年俸 {money(offer.salary)} × {offer.years}年</p><p>契約総額：<strong>{money(cost)}</strong></p>
     <p>契約後の予算：{Number.isFinite(budget) ? money(budget - cost) : '未記録'}</p><p>配属先：{placement.farm ? 'ファーム' : '登録選手'}（{placement.reason}）</p>
@@ -19,7 +20,7 @@ function Confirm({ offer, budget, placement, onClose, onConfirm, error }) {
   </section></div>;
 }
 
-export default function HubFaTab({ myTeam, faPool = [], faYears = {}, setFaYears, foreignActiveCount, gameDay, year, myId, notify, upd, setFaPool, onPlayerClick, onToggleCompare, comparePlayerIds = [], marketMode = 'season', savedView, onViewChange }) {
+export default function HubFaTab({ myTeam, faPool = [], faYears = {}, setFaYears, foreignActiveCount, gameDay, year, myId, notify, upd, setFaPool, onPlayerClick, onToggleCompare, comparePlayerIds = [], marketMode = 'season', savedView, onViewChange, embedded = false }) {
   const [selectedId, setSelectedId] = useState(savedView?.selectedId ?? null);
   const [snapshot, setSnapshot] = useState(savedView?.snapshot ?? null);
   const [type, setType] = useState(savedView?.type ?? 'all');
@@ -35,6 +36,8 @@ export default function HubFaTab({ myTeam, faPool = [], faYears = {}, setFaYears
   const heading = useRef(null);
   const rowRefs = useRef(new Map());
   const list = useRef(null);
+  const detail = useRef(null);
+  const filterControls = useRef(null);
   const scroll = useRef({ window: 0, list: 0 });
   const returning = useRef(null);
   const ledger = useRef({ budget: myTeam?.budget, spent: 0 });
@@ -48,20 +51,21 @@ export default function HubFaTab({ myTeam, faPool = [], faYears = {}, setFaYears
     const next = new Map(negotiationRef.current); next.set(id, entry); negotiationRef.current = next; setNegotiations(next);
   };
   useEffect(() => {
-    if (selectedId != null) heading.current?.focus({ preventScroll: true });
+    if (selectedId != null) { detail.current?.scrollIntoView?.({ block: 'start' }); heading.current?.focus({ preventScroll: true }); }
     else if (returning.current != null) {
       if (typeof window !== 'undefined') window.scrollTo?.(0, scroll.current.window);
       if (list.current) list.current.scrollTop = scroll.current.list;
-      (rowRefs.current.get(returning.current) || list.current)?.focus({ preventScroll: true }); returning.current = null;
+      const target = rowRefs.current.get(returning.current.id) || [...rowRefs.current.values()][returning.current.index] || [...rowRefs.current.values()].at(-1) || filterControls.current?.querySelector('input,select') || list.current;
+      if (target && typeof window !== 'undefined' && Number.isFinite(scroll.current.rowTop)) window.scrollBy?.(0, target.getBoundingClientRect().top - scroll.current.rowTop);
+      target?.focus({ preventScroll: true }); returning.current = null;
     }
-  }, [selectedId]);
+  }, [selectedId, receipt?.player.id]);
   const close = useCallback(() => setOffer(null), []);
   const select = player => {
-    scroll.current = { window: typeof window === 'undefined' ? 0 : window.scrollY, list: list.current?.scrollTop ?? 0 };
+    scroll.current = { window: typeof window === 'undefined' ? 0 : window.scrollY, list: list.current?.scrollTop ?? 0, rowTop: rowRefs.current.get(player.id)?.getBoundingClientRect().top, index: [...rowRefs.current.keys()].indexOf(player.id) };
     setSnapshot(player); setSelectedId(player.id); setReceipt(null);
-    if (typeof window !== 'undefined' && window.matchMedia?.('(max-width: 700px)').matches) window.scrollTo?.(0, 0);
   };
-  const back = () => { returning.current = selectedId; setSelectedId(null); };
+  const back = () => { returning.current = { id: selectedId, index: Math.max(0, scroll.current.index ?? 0) }; setSelectedId(null); };
   const start = player => {
     if (!Number.isFinite(gameDay) || gameDay > FOREIGN_DEADLINE_DAY || !Number.isFinite(player.salary) || player.salary <= 0 || !faPool.some(p => p.id === player.id)) return;
     const old = negotiationRef.current.get(player.id);
@@ -91,7 +95,7 @@ export default function HubFaTab({ myTeam, faPool = [], faYears = {}, setFaYears
     notify(`${offer.player.name}を契約しました${placement.farm ? '（ファーム配属）' : ''}`, placement.farm ? 'warn' : 'ok');
     processing.current = false;
   };
-  if (!myTeam) return <section className="fa-market">球団情報を読み込み中です。</section>;
+  if (!myTeam) return <section data-ds="fa-market" className="fa-market">球団情報を読み込み中です。</section>;
   const selected = faPool.find(p => p.id === selectedId) || snapshot;
   const onMarket = selected && faPool.some(p => p.id === selected.id) && !signedIds.current.has(selected.id);
   const n = selected ? negotiations.get(selected.id) : null;
@@ -106,35 +110,41 @@ export default function HubFaTab({ myTeam, faPool = [], faYears = {}, setFaYears
     return (Number.isFinite(av) ? av : Infinity) - (Number.isFinite(bv) ? bv : Infinity);
   });
   const canOffer = onMarket && (!selected.isForeign || n?.stage === 'years') && !error;
-  return <section className={`fa-market ${selectedId != null ? 'fa-selected' : ''}`}>
+  return <section data-ds="fa-market" className={`fa-market ${selectedId != null ? 'fa-selected' : ''} ${embedded ? 'fa-embedded' : ''}`}>
     <header><h2>FA・自由契約市場</h2><p>補強候補を比較し、条件と配属先を確認して契約します。</p>
-      <div className="fa-summary"><span>予算 <strong>{money(budget)}</strong></span><span>登録 {myTeam.players.length}/{MAX_ROSTER}人</span><span>外国人 {Number.isFinite(foreignActiveCount) ? foreignActiveCount : myTeam.players.filter(p => p.isForeign).length}/4人</span><span>市場 {faPool.length}人</span></div>
-      <details><summary>人数から見る補強ポイント</summary><p>先発4・中継ぎ3・抑え1は登録選手、捕手は登録{MIN_ACTIVE_CATCHERS}・登録＋ファーム{MIN_TOTAL_BY_POS['捕手']}の目安です。選手の能力や将来性を保証する評価ではありません。</p>{needs.length ? <ul>{needs.map(h => <li key={h}>{h}</li>)}</ul> : <p>この人数の目安を満たしています。</p>}</details>
-      <p className="fa-note">{marketMode === 'offseason' ? '国内FA・自由契約の補強期間です。外国人補強は翌シーズンの市場で行えます。' : `外国人補強：${gameDay > FOREIGN_DEADLINE_DAY ? '期限終了' : Number.isFinite(gameDay) ? `期限まであと${FOREIGN_DEADLINE_DAY - gameDay}日（第${FOREIGN_DEADLINE_DAY}日まで）` : '日程未記録'}`}</p>
+      {!embedded && <div className="fa-summary"><span>予算 <strong>{money(budget)}</strong></span><span>登録 {myTeam.players.length}/{MAX_ROSTER}人</span><span>外国人 {Number.isFinite(foreignActiveCount) ? foreignActiveCount : myTeam.players.filter(p => p.isForeign).length}/4人</span><span>市場 {faPool.length}人</span></div>}
+      {marketMode !== 'offseason' && <p className="fa-note">外国人補強：{gameDay > FOREIGN_DEADLINE_DAY ? '期限終了' : Number.isFinite(gameDay) ? `期限まであと${FOREIGN_DEADLINE_DAY - gameDay}日（第${FOREIGN_DEADLINE_DAY}日まで）` : '日程未記録'}</p>}
     </header>
-    <div className="fa-layout"><section className="fa-list" ref={list} tabIndex={-1} aria-label="市場の候補一覧">
-      <div className="fa-filters"><label>市場<select value={type} onChange={e => setType(e.target.value)}><option value="all">全員</option><option value="domestic">国内FA・自由契約</option><option value="foreign">外国人FA</option></select></label><label>役割<select value={role} onChange={e => setRole(e.target.value)}><option value="all">全役割</option><option value="pitcher">投手</option><option value="batter">野手</option></select></label><label>並び順<select value={sort} onChange={e => setSort(e.target.value)}><option value="default">市場の順</option><option value="salary">年俸が安い順</option><option value="age">年齢が若い順</option></select></label><label>選手名<input type="search" value={search} onChange={e => setSearch(e.target.value)} /></label></div>
+    <div className="fa-body"><div className="fa-layout"><section className="fa-list" ref={list} tabIndex={-1} aria-label="市場の候補一覧">
+      <div className="fa-filters" ref={filterControls}><label>市場<select aria-label="市場" value={type} onChange={e => setType(e.target.value)}><option value="all">全員</option><option value="domestic">国内FA・自由契約</option><option value="foreign" disabled={marketMode === 'offseason'}>外国人FA{marketMode === 'offseason' ? '（翌シーズン）' : ''}</option></select></label><label>役割<select aria-label="役割" value={role} onChange={e => setRole(e.target.value)}><option value="all">全役割</option><option value="pitcher">投手</option><option value="batter">野手</option></select></label><label>並び順<select aria-label="並び順" value={sort} onChange={e => setSort(e.target.value)}><option value="default">市場の順</option><option value="salary">年俸が安い順</option><option value="age">年齢が若い順</option></select></label><label>選手名<input type="search" value={search} onChange={e => setSearch(e.target.value)} /></label></div>
       <p>{visible.length}人を表示</p>{visible.map(p => <article className="fa-candidate" key={p.id}>
-        <button className="fa-row" ref={node => { if (node) rowRefs.current.set(p.id, node); else rowRefs.current.delete(p.id); }} aria-label={`${p.name}の条件を見る`} aria-pressed={selectedId === p.id} onClick={() => select(p)}><strong>{p.name}</strong><span>{p.pos} · {p.age ?? '未記録'}歳 · {p.marketEntryReason || (p.isForeign ? '外国人' : '国内FA・自由契約')}</span><span>{p.marketEntryReason === '国内FA宣言' ? '要求年俸' : '契約年俸'} {money(p.salary)} / 年</span>{p.marketEntryReason === '国内FA宣言' && p.faOriginTeamId === myId && <span>自球団から宣言 · 宣言残留可能</span>}</button>
+        <button className="fa-row" ref={node => { if (node) rowRefs.current.set(p.id, node); else rowRefs.current.delete(p.id); }} aria-label={`${p.name}の条件を見る`} aria-pressed={selectedId === p.id} onClick={() => select(p)}>
+          <span className="fa-row-player"><strong>{p.name}</strong><small>{p.pos || '役割未記録'} · {p.age ?? '未記録'}歳</small><StateLabel role="none">{p.marketEntryReason || (p.isForeign ? '外国人FA' : '国内FA・自由契約')}</StateLabel><small>{marketMetrics(p).filter(([key]) => ['打率','本塁打','投球回','防御率'].includes(key)).map(([key, value]) => `${key} ${value}`).join(' · ')}</small>{p.marketEntryReason === '国内FA宣言' && p.faOriginTeamId === myId && <small>自球団から宣言 · 宣言残留可能</small>}</span>
+          <span className="fa-row-money"><small>{p.marketEntryReason === '国内FA宣言' ? '要求年俸' : '契約年俸'}</small><strong>{money(p.salary)}</strong><small>／年</small></span>
+        </button>
         {onToggleCompare && <button aria-pressed={comparePlayerIds.includes(p.id)} onClick={() => onToggleCompare(p, 'FA市場')}>{comparePlayerIds.includes(p.id) ? '比較から外す' : '比較に追加'}</button>}
       </article>)}{!visible.length && <p>{faPool.length ? 'この条件の候補はいません。絞り込みを変更してください。' : '現在、市場に候補はいません。'}</p>}
-    </section><section className="fa-detail" aria-label="候補の条件と交渉">
+    </section><section className="fa-detail" ref={detail} aria-label="候補の条件と交渉">
       {selectedId == null || !selected ? <p>候補を選ぶと成績・契約条件を確認できます。「比較に追加」で候補同士や自チームの選手と比べられます。</p> : <>
-        <button onClick={back}>← 候補一覧に戻る</button><h3 ref={heading} tabIndex={-1}>{selected.name}</h3><p>{selected.pos} · {selected.age ?? '未記録'}歳 · {selected.isForeign ? '外国人代理人交渉' : '国内FA・自由契約'}</p>
-        <div className="fa-actions">{onPlayerClick && <button onClick={() => onPlayerClick(selected, 'FA市場')}>選手詳細・年度別成績</button>}{onToggleCompare && <button aria-pressed={comparePlayerIds.includes(selected.id)} onClick={() => onToggleCompare(selected, 'FA市場')}>比較{comparePlayerIds.includes(selected.id) ? 'から外す' : 'に追加'}</button>}</div>
-        {(selected.faDeclarationDecision?.declared || selected.faNegotiationReason) && <div className="fa-card"><h4>FA宣言の理由</h4><p>{selected.faNegotiationReason || selected.faDeclarationDecision.reasons.join('・')}</p>{selected.faOriginTeamId === myId && <p>自球団から宣言した選手です。市場で契約すれば宣言残留になります。</p>}<p>前年年俸：{money(selected.faPreviousSalary)}</p></div>}
-        <div className="fa-card"><h4>保存されている成績</h4><div className="fa-metrics">{marketMetrics(selected).map(([label, value]) => <span key={label}>{label} <strong>{value}</strong></span>)}</div><p className="fa-note">カウントの0は実測値。「未記録」は欠測、率の「—」は分母がない・算出できない状態です。</p></div>
-        {receipt?.player.id === selected.id ? <div className="fa-card" role="status"><h4>契約完了</h4><p>年俸 {money(receipt.salary)}・{receipt.years}年 / 総額 {money(receipt.salary * receipt.years)}</p><p>{receipt.placement.farm ? 'ファームに配属しました。編成で登録を調整できます。' : '登録選手に加わりました。編成で起用を調整できます。'}</p></div> : !onMarket ? <p role="status">この選手は現在の市場にいません。一覧から候補を選び直してください。</p> : <div className="fa-card"><h4>契約条件</h4>
-          {!selected.isForeign ? <><p>提示年俸：{money(selected.salary)} / 年（現在のゲームでは固定額）</p><label>契約年数<select value={years} onChange={e => setFaYears(prev => ({ ...prev, [selected.id]: Number(e.target.value) }))}>{[1, 2, 3].map(v => <option key={v} value={v}>{v}年</option>)}</select></label></> : <>
+        <button className="fa-back" onClick={back}>← 選手一覧に戻る</button>
+        <div className="fa-player-heading"><div><h3 ref={heading} tabIndex={-1}>{selected.name}</h3><p>{selected.pos || '役割未記録'} · {selected.age ?? '未記録'}歳 · {selected.isForeign ? '外国人代理人交渉' : '国内FA・自由契約'}</p></div><StateLabel role="none" tone={receipt?.player.id === selected.id ? 'success' : 'neutral'}>{receipt?.player.id === selected.id ? '契約済み' : onMarket ? '交渉可能' : '市場外'}</StateLabel></div>
+        <p className="fa-stat-title">保存された一軍成績</p><div className="fa-metrics">{marketMetrics(selected).map(([label, value]) => <span key={label}>{label} <strong>{value}</strong></span>)}</div>
+        {receipt?.player.id === selected.id ? <div className="fa-card" role="status"><h4>契約完了</h4><p>年俸 {money(receipt.salary)}・{receipt.years}年 / 総額 {money(receipt.salary * receipt.years)}</p><p>{receipt.placement.farm ? 'ファームに配属しました。編成で登録を調整できます。' : '登録選手に加わりました。編成で起用を調整できます。'}</p></div> : !onMarket ? <p role="status">この選手は現在の市場にいません。一覧から候補を選び直してください。</p> : <section className="fa-card" aria-label="契約条件"><h4>契約条件</h4>
+          {!selected.isForeign ? <><p>提示年俸：{money(selected.salary)} / 年（現在のゲームでは固定額）</p><label>契約年数<select aria-label="契約年数" value={years} onChange={e => setFaYears(prev => ({ ...prev, [selected.id]: Number(e.target.value) }))}>{[1, 2, 3].map(v => <option key={v} value={v}>{v}年</option>)}</select></label></> : <>
             {!n || ['cancelled', 'failed'].includes(n.stage) ? <><p>代理人希望年俸：{Number.isFinite(selected.salary) ? money(Math.ceil(selected.salary * FOREIGN_AGENT_SALARY_RATIO)) : '未記録'} / 年</p><button disabled={gameDay > FOREIGN_DEADLINE_DAY || !Number.isFinite(gameDay) || !(selected.salary > 0)} onClick={() => start(selected)}>{n ? '再交渉を始める' : '交渉開始'}</button></> : n.stage === 'salary' ? <><p>代理人希望年俸：{money(n.salaryDemand)} / 年</p><div className="fa-actions"><button disabled={gameDay > FOREIGN_DEADLINE_DAY} onClick={() => negotiate(selected, false)}>条件を受ける</button><button disabled={gameDay > FOREIGN_DEADLINE_DAY} onClick={() => negotiate(selected, true)}>現年俸で交渉</button></div><p className="fa-note">現年俸の交渉は不合意になる場合があります。</p></> : <p>提示年俸：{money(n.salaryOffer)} / 年 · 契約年数 {n.minYears}年</p>}
             {n && !['failed', 'cancelled'].includes(n.stage) && <button onClick={() => writeNeg(selected.id, { ...n, stage: 'cancelled', logs: [...n.logs, '交渉を中止しました。'] })}>交渉を中止する</button>}
           </>}
           {( !selected.isForeign || n?.stage === 'years') && <><p>契約総額 <strong>{money(salary * years)}</strong> · 契約後の予算 {Number.isFinite(budget) && Number.isFinite(salary) ? money(budget - salary * years) : '未記録'}</p><p>配属予定：{placement.farm ? 'ファーム' : '登録選手'}（{placement.reason}）</p><p className="fa-note">総額を契約時に予算から差し引きます。ファーム配属でも契約金額は変わりません。</p><button className="fa-primary" disabled={!canOffer} onClick={() => setOffer({ player: selected, salary, years })}>契約条件を確認する</button></>}
           {error && (!selected.isForeign || n?.stage === 'years') && <p className="fa-warning" role="status">{error}</p>}
-        </div>}
+        </section>}
         {n && <div className="fa-card"><h4>最新の返答</h4><p role="status">{n.logs.at(-1)}</p><details><summary>交渉履歴</summary><ol>{n.logs.map((log, i) => <li key={i}>{log}</li>)}</ol></details></div>}
+        <div className="fa-context" key={selected.id}>
+          <details className="fa-profile"><summary>選手の詳細・比較</summary><div className="fa-actions">{onPlayerClick && <Button variant="secondary" onClick={() => onPlayerClick(selected, 'FA市場')}>選手詳細・年度別成績</Button>}{onToggleCompare && <Button variant="secondary" aria-pressed={comparePlayerIds.includes(selected.id)} onClick={() => onToggleCompare(selected, 'FA市場')}>比較{comparePlayerIds.includes(selected.id) ? 'から外す' : 'に追加'}</Button>}</div></details>
+          {(selected.faDeclarationDecision?.declared || selected.faNegotiationReason) && <details><summary>FA宣言の理由</summary><p>{selected.faNegotiationReason || selected.faDeclarationDecision.reasons.join('・')}</p>{selected.faOriginTeamId === myId && <p>自球団から宣言した選手です。市場で契約すれば宣言残留になります。</p>}<p>前年年俸：{money(selected.faPreviousSalary)}</p></details>}
+        </div>
       </>}
-    </section></div>
+    </section></div></div>
+    <details className="fa-help"><summary>補強ポイント・市場のルール</summary><p>先発4・中継ぎ3・抑え1は登録選手、捕手は登録{MIN_ACTIVE_CATCHERS}・登録＋ファーム{MIN_TOTAL_BY_POS['捕手']}の目安です。選手の能力や将来性を保証する評価ではありません。</p>{needs.length ? <ul>{needs.map(h => <li key={h}>{h}</li>)}</ul> : <p>この人数の目安を満たしています。</p>}{marketMode === 'offseason' && <p>国内FA・自由契約の補強期間です。外国人補強は翌シーズンの市場で行えます。</p>}<p>カウントの0は実測値。「未記録」は欠測、率の「—」は分母がない・算出できない状態です。</p></details>
     {offer && <Confirm offer={offer} budget={budget} placement={marketPlacement(myTeam, offer.player)} onClose={close} onConfirm={confirm} error={validateMarketContract({ team: { ...myTeam, budget }, pool: faPool, player: offer.player, salary: offer.salary, years: offer.years, gameDay })} />}
   </section>;
 }

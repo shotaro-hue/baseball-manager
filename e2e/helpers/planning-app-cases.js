@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 import {loadFixture,reloadAndLoad,readSave,waitSaveIdle} from './progression';
-async function seedPlanning(page){
+export async function seedPlanning(page){
  await loadFixture(page,'draw-complete');await waitSaveIdle(page);await page.goto('/');
  const info=await page.evaluate(async()=>{
   const {loadGame,saveGame}=await import('/baseball-manager/src/engine/saveload.js');const s=await loadGame(),my=s.teams.find(t=>t.id===s.myId);
@@ -10,7 +10,7 @@ async function seedPlanning(page){
   if(!(await saveGame(s)).ok)throw Error('planning fixture save failed');return {targets:targets.map(p=>({id:p.id,name:p.name,salary:p.salary})),budget:my.budget,year:s.year};
  });await reloadAndLoad(page);await expect(page.locator('.planning-screen')).toBeVisible();return info;
 }
-async function savePlanning(page){
+export async function savePlanning(page){
  const button=page.getByRole('button',{name:'編成内容を保存する',exact:true});await expect(button).toBeEnabled();await button.click();await expect(page.locator('.planning-save')).toContainText('保存済み');await waitSaveIdle(page);return readSave(page);
 }
 export function registerPlanningAppCases(){
