@@ -42,7 +42,7 @@
 | 20261017 | 2027 | 68 | 63〜70 | 18 |
 | 20261017 | 2028 | 28 | 65〜70 | 36 |
 
-3seed×3年、計9シーズン、42地点で保存・ロードして2029年開幕まで到達した。全年度で12球団各143試合を完了し、所属重複・70枠超過・履歴消失・更改／獲得／年度更新の二重適用は検出しなかった。seed15では毎年8地点、他2seedは毎年中盤・キャンプ・翌年開幕の3地点を確認した。二軍の未実施理由は全件`insufficient-catcher`で、二軍捕手を一軍の最低人数確保のため昇格させた後の層不足に起因する。未実施を日程消失や一軍進行停止と混同しない。3年目の登録枠充足に伴い指名人数が減る現象も記録した。CPUの捕手確保・昇降格と長期編成の改善候補として残す。
+3seed×3年、計9シーズン、42地点で保存・ロードして2029年開幕まで到達した。全年度で12球団各143試合を完了し、所属重複・70枠超過・履歴消失・更改／獲得／年度更新の二重適用は検出しなかった。seed15では毎年8地点、他2seedは毎年中盤・キャンプ・翌年開幕の3地点を確認した。二軍の未実施理由は全件`insufficient-catcher`で、直接条件は`selectFarmTeam()`で「健康かつ捕手適性がある二軍野手が0人」である。昇降格・負傷・元の層の薄さそれぞれの寄与は今回の集計では分解していない。未実施を日程消失や一軍進行停止と混同しない。3年目の登録枠充足に伴い指名人数が減る現象も記録した。CPUの捕手確保・昇降格と長期編成の改善候補として残す。
 
 初回の単一ファイル連続試験はseed15/16の計6年を完了した後、3seed目でNodeの約2GB V8 heap上限に達してworkerが終了した。その実行全体を成功扱いにしていない。試験ケースをseedごとの3ファイルに分け、fake-indexeddbも各seedに独立生成して隔離した。seed17は単独で3年を完了し、最終head CIで3ファイルを含む全試験を再確認する。これはJSメモリ内DBのテスト環境の制約であり、実ブラウザ／iPhoneのメモリ問題の修正・安全性証明とはしない。各seed記録の時間も同時負荷が異なる参考値である。
 
@@ -65,7 +65,7 @@ ChromiumとPlaywright WebKitの360/390/1440pxを対象に、80人の通常生成
 | webkit-360 | 72→8 | 31→1 | 5760→0 | 1→1 |
 | webkit-390 | 82→8 | 36→1 | 6560→0 | 1→1 |
 
-[性能・画面集計](../validation/qa-d1/browser-summary.json)と各`browser-*-baseline/performance/journey/focus.json`に計測source hash・条件・結果を保存した。性能比較はスクロール／キャッシュ修正時点、最終フォーカス修正後はPC両エンジンと単体回帰で確認した。保存は元から1回で、実保存の高速化を主張しない。画面は6条件×一覧／詳細／結果の18枚。例：[Chromium390一覧](../validation/qa-d1/browser-chromium-390-list.png)、[WebKit360詳細](../validation/qa-d1/browser-webkit-360-detail.png)、[WebKit1440結果](../validation/qa-d1/browser-webkit-1440-results.png)。
+[性能・画面集計](../validation/qa-d1/browser-summary.json)と`browser-performance-{baseline,after}-*.json`・各ブラウザのjourney JSON・`browser-focus-*.json`に計測source hash・条件・結果を保存した。性能比較はスクロール／キャッシュ修正時点、最終フォーカス修正後はPC両エンジンと単体回帰で確認した。保存は元から1回で、実保存の高速化を主張しない。画面は6条件×一覧／詳細／結果の18枚。例：[Chromium390一覧](../validation/qa-d1/browser-chromium-390-list.png)、[WebKit360詳細](../validation/qa-d1/browser-webkit-360-detail.png)、[WebKit1440結果](../validation/qa-d1/browser-webkit-1440-results.png)。
 
 ## 発見事項と修正
 
