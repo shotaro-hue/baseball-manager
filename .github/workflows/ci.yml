@@ -36,7 +36,7 @@ jobs:
       matrix:
         suite:
           - name: initialization-and-progression
-            files: progression.smoke.spec.js initialization.spec.js draft.spec.js batch-results.spec.js
+            files: progression.smoke.spec.js initialization.spec.js draft.spec.js draft-decision.spec.js batch-results.spec.js
           - name: match-history
             files: match-history.spec.js result-season-average.spec.js
           - name: roster-settings

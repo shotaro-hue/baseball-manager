@@ -93,6 +93,12 @@ export function useOffseason(gs) {
   const [draftAllocationState, setDraftAllocationState] = useState(null);
   const draftAllocation = draftAllocationState ?? gs.offseasonPlan?.draftAllocation ?? {pitcher:50,batter:50};
   const setDraftAllocation = value => { setDraftAllocationState(value); gs.setOffseasonPlan?.(prev => prev && ({ ...prev, draftAllocation: value })); };
+  const [draftEvaluationState,setDraftEvaluationState]=useState(null);
+  const draftEvaluation=draftEvaluationState ?? gs.offseasonPlan?.draftEvaluation;
+  const setDraftEvaluation=useCallback(value=>{
+    setDraftEvaluationState(value);
+    gs.setOffseasonPlan?.(prev=>prev&&({...prev,draftEvaluation:value}));
+  },[gs.setOffseasonPlan]);
   const saveDraftView = useCallback((key, value) => gs.setOffseasonPlan?.(prev => prev && ({ ...prev,
     draftViews: { ...prev.draftViews, [key]: value } })), [gs.setOffseasonPlan]);
   const [waiverClaimResultsState, setWaiverClaimResults] = useState(null);
@@ -109,7 +115,7 @@ export function useOffseason(gs) {
   const handledPostingRequests = useRef(new Set());
   const resetTransientOffseason = () => {
     setDevelopmentSummary(null); setNewSeasonInfo(null); setSpringTrainingData(null);
-    setDraftPoolState(null); setDraftResultState(null); setDraftAllocationState(null);
+    setDraftPoolState(null); setDraftResultState(null); setDraftAllocationState(null);setDraftEvaluationState(null);
     setWaiverClaimResults(null); setContractRenewalDemands(null); setCareerPersistenceError(null);
     draftAppliedRef.current = null; nextYearTransitionRef.current = false;
     retireTransitionRef.current = false; faPhaseCompletedYear.current = null; waiverCompletedYear.current = null;
@@ -905,7 +911,7 @@ export function useOffseason(gs) {
     springTrainingData,
     draftPool, setDraftPool,
     draftResult, setDraftResult,
-    draftAllocation, setDraftAllocation,
+    draftAllocation, setDraftAllocation,draftEvaluation,setDraftEvaluation,
     waiverClaimResults,
     contractRenewalDemands,
     careerPersistenceError,

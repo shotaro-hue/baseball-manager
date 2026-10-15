@@ -5,6 +5,7 @@ import { ownedPlayers } from './renewalRules';
 import { isIkuseiPlayer } from './rosterAutomation';
 import { draftPicksForTeam } from './offseasonResume';
 import { evaluateOrganizationNeeds } from './organizationNeeds';
+import { draftReport } from './draftReports';
 
 export const registeredDraftCount = team => ownedPlayers(team).filter(p => !isIkuseiPlayer(p)).length;
 export const remainingDraftSlots = (team, pool = [], drafted = {}) => Math.max(0,
@@ -32,8 +33,8 @@ function pitcherNeedBonus(player, report, amount) {
   return uncoveredActiveShortage(role) > 0 ? amount / 2 : 0;
 }
 
-export function chooseDraftProspect(team, pool, round = 1, acceptedPicks = [], draftContext = {}) {
-  if (!pool.length) return null;
+export function rankDraftProspects(team, pool, round = 1, acceptedPicks = [], draftContext = {}) {
+  if (!pool.length) return [];
   // Preserve the accepted-array API. Real draft callers provide the canonical
   // pool/assignments so the evaluator can reject refusal and ownership conflict.
   const draftPool = draftContext.draftPool ?? acceptedPicks;
@@ -67,24 +68,76 @@ export function chooseDraftProspect(team, pool, round = 1, acceptedPicks = [], d
     : needs.some(n => /先発|中継ぎ|抑え|投手/.test(n.type));
   const first = round === 1;
   const pitchingBonus = first ? 26 : 24;
-  const scored = pool.map((p, i) => ({ p, score: 100 - i * (first ? 3 : 2)
-    + (p.isPitcher ? organization.ok
+  const scored = pool.map((p, i) => {
+    const roleBonus=(p.isPitcher ? organization.ok
       ? Math.max(velocityNeed ? pitchingBonus : 0, pitcherNeedBonus(p, organization, pitchingBonus))
       : wantsPitcher ? pitchingBonus : 0
-      : !wantsPitcher ? (first ? 16 : 14) : 0)
-    + (needs.some(n => n.type.includes('捕手')) && !p.isPitcher && p.pos === '捕手' ? (first ? 18 : 16) : 0)
+      : !wantsPitcher ? (first ? 16 : 14) : 0);
+    const catcherBonus=needs.some(n => n.type.includes('捕手')) && !p.isPitcher && p.pos === '捕手' ? (first ? 18 : 16) : 0;
+    const youthBonus=needs.some(n => /若手|将来/.test(n.type)) && (p.age || 22) <= 20 ? 10 : 0;
+    const fitReason=roleBonus>0 ? `${p.isPitcher?(p.subtype || p.pos):'野手'}の組織層を補う` : catcherBonus>0?'捕手の層を補う':youthBonus>0?'若手の将来層を補う':'補強の急務より選手評価を重視';
+    if(draftContext.evaluation) {
+      const report=draftReport(draftContext.evaluation,p.id,draftContext.publicEvaluation?null:team.id);
+      if(!report) return {p,score:-Infinity,fit:0,fitReason:'評価情報なし'};
+      const currentWeight=needs[0]?.horizon==='long'?.5:.7;
+      const fit=(roleBonus+catcherBonus+youthBonus)*.35;
+      return {p,report,fit,fitReason,score:report.current*currentWeight+report.future*(1-currentWeight)+fit};
+    }
+    return {p,fit:roleBonus+catcherBonus+youthBonus,fitReason,score:100-i*(first?3:2)+roleBonus+catcherBonus
     + Math.round(needs[0]?.horizon === 'short' ? (p.readinessScore ?? 50) * .2 : (p.potential ?? 50) * .15)
-    + (needs.some(n => /若手|将来/.test(n.type)) && (p.age || 22) <= 20 ? 10 : 0)
-    + (!first && needs.some(n => n.type.includes('ミート')) && !p.isPitcher && (p.batting?.contact || 0) >= 65 ? 8 : 0)
-  })).sort((a, b) => b.score - a.score);
+    + youthBonus + (!first && needs.some(n => n.type.includes('ミート')) && !p.isPitcher && (p.batting?.contact || 0) >= 65 ? 8 : 0)};
+  }).sort((a,b)=>b.score-a.score || (draftContext.evaluation?String(a.p.id).localeCompare(String(b.p.id)):0));
+  return scored;
+}
+
+// This forecast only consumes public observations and known roster/pick facts.
+// It never consumes another club's private report or a nomination result.
+export function forecastDraft(teams,pool,myId,context={}) {
+  const out=Object.fromEntries(pool.map(p=>[p.id,{mass:0,survival:1,label:'不明'}]));
+  if(!context.evaluation?.public) return out;
+  const round=context.round ?? 1;
+  if(round>1&&context.noNextPick)return out;
+  const clubs=round>1 ? (context.nextTeams || []) : teams.filter(t=>!context.activeTeamIds || context.activeTeamIds.some(id=>String(id)===String(t.id)));
+  for(const team of clubs) {
+    if(String(team.id)===String(myId) || remainingDraftSlots(team,context.draftPool || pool,context.drafted || {})<=0) continue;
+    const ranked=rankDraftProspects(team,pool,round,[],{...context,publicEvaluation:true});
+    if(!Number.isFinite(ranked[0]?.score))continue;
+    const weights=ranked.map(r=>r.score<ranked[0].score-24?0:Math.exp((r.score-ranked[0].score)/4));
+    const total=weights.reduce((a,b)=>a+b,0);
+    ranked.forEach((r,i)=>{const probability=weights[i]/total;out[r.p.id].mass+=probability;out[r.p.id].survival*=1-probability;});
+  }
+  for(const p of pool) {
+    const f=out[p.id];
+    f.label=round>1?(f.survival>=.75?'高':f.survival>=.4?'中':'低'):(f.mass>=1.7?'高':f.mass>=.55?'中':'低');
+  }
+  return out;
+}
+
+export function chooseDraftProspect(team,pool,round=1,acceptedPicks=[],draftContext={}) {
+  const scored=rankDraftProspects(team,pool,round,acceptedPicks,draftContext);
+  if(!scored.length)return null;
+  const first=round===1;
+  if(draftContext.evaluation) {
+    if(!first)return scored[0].p;
+    const forecast=forecastDraft(draftContext.teams || [team],pool,team.id,{...draftContext,round});
+    const utility=scored.filter(r=>r.score>=scored[0].score-12).map(r=>{
+      const chance=1/(1+(forecast[r.p.id]?.mass || 0));
+      const alternative=scored.find(x=>x.p.id!==r.p.id && (forecast[x.p.id]?.mass || 0)<.8) || scored.find(x=>x.p.id!==r.p.id);
+      const fallback=(alternative?.score ?? r.score)-6;
+      const cost=Math.min(12,Math.max(0,r.score-fallback));
+      return {...r,utility:r.score-(1-chance)*cost};
+    }).sort((a,b)=>b.utility-a.utility || String(a.p.id).localeCompare(String(b.p.id)));
+    return utility[0].p;
+  }
   if (first && rng(0, 9) < 3 && scored.length > 1) return scored[rng(1, Math.min(3, scored.length - 1))].p;
   if (!first && rngf(0, 1) < .08 && pool.length > 6) return pool[rng(4, Math.min(8, pool.length - 1))];
   return scored[0].p;
 }
 
 // All first-round nominations are independent; only winners leave the pool.
-export function autoFirstRound(teams, pool) {
+export function resolveFirstRound(teams, pool, context={}) {
   const confirmed = {};
+  const rounds=[];
   let active = teams.filter(t => remainingDraftSlots(t) > 0);
   while (active.length) {
     const used = new Set(Object.values(confirmed).map(p => p.id));
@@ -92,10 +145,11 @@ export function autoFirstRound(teams, pool) {
     if (!available.length) break;
     const groups = new Map();
     for (const team of active) {
-      const player = chooseDraftProspect(team, available, 1, [], { teams });
+      const player = chooseDraftProspect(team, available, 1, [], { ...context,teams,activeTeamIds:active.map(t=>t.id) });
       if (!groups.has(player.id)) groups.set(player.id, { player, teams: [] });
       groups.get(player.id).teams.push(team);
     }
+    rounds.push(Object.fromEntries([...groups.values()].flatMap(({player,teams:nominees})=>nominees.map(t=>[t.id,player.id]))));
     const losers = [];
     for (const { player, teams: nominees } of groups.values()) {
       const winner = nominees.length === 1 ? nominees[0] : drawDraftWinner(nominees);
@@ -104,8 +158,10 @@ export function autoFirstRound(teams, pool) {
     }
     active = losers;
   }
-  return confirmed;
+  return {picks:confirmed,rounds};
 }
+
+export const autoFirstRound=(teams,pool,context={})=>resolveFirstRound(teams,pool,context).picks;
 
 export function applyDraftAcquisitions(teams, pool, drafted, year) {
   const fail = error => ({ ok: false, error });
