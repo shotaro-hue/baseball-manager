@@ -35,7 +35,7 @@ it('reports all requested roles against existing operating and depth minima', ()
   expect(Object.keys(roles)).toEqual(['starter', 'reliever', 'closer', 'catcher', 'shortstop', 'secondBase', 'thirdBase']);
   expect(roles.reliever.activeShortage).toBe(2);
   expect(roles.closer.activeShortage).toBe(0);
-  expect(roles.catcher).toMatchObject({ activeShortage: 1, organizationShortage: 2 });
+  expect(roles.catcher).toMatchObject({ activeShortage: 1, organizationMinimum: 6, organizationShortage: 5 });
   for (const role of ['shortstop', 'secondBase', 'thirdBase']) {
     expect(roles[role]).toMatchObject({ activeCount: 1, activeShortage: 0, organizationShortage: 1 });
   }
@@ -62,7 +62,7 @@ it('reports unavailable organizational depth when the active roster has no promo
   const t = team(Array.from({ length: 28 }, (_, id) => player(id, { pos: '一塁手' })),
     [player(28), player(29), player(30)]);
   expect(evaluateOrganizationNeeds(t).roles.catcher).toMatchObject({ activeCount: 0,
-    availableFarmCount: 3, directlyPromotableFarmCount: 0, organizationShortage: 0, classification: 'active-shortage-with-farm' });
+    availableFarmCount: 3, directlyPromotableFarmCount: 0, organizationShortage: 3, classification: 'active-shortage-with-farm' });
   expect(evaluateOrganizationNeeds(t).roles.catcher.reasons).toContain('farm-promotion-requires-roster-change');
 });
 
@@ -77,7 +77,7 @@ it('does not let picks erase an operating shortage or include refused, other-clu
     'other-owned': 0, conflict: 0 };
   const result = evaluateOrganizationNeeds(t, { teams: [t, other], draftPool, drafted });
   expect(result.roles.catcher).toMatchObject({ acceptedPickCount: 2, organizationCount: 3,
-    activeShortage: 1, organizationShortage: 0 });
+    activeShortage: 1, organizationShortage: 3 });
   expect(result.acceptedPickIds).toEqual([0, 'later']);
   expect(result.remainingRegisteredSlots).toBe(67);
 });

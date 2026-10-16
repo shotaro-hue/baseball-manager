@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fmtSal, rngf } from '../../utils';
-import { MAX_ROSTER, FOREIGN_AGENT_ACCEPT_PROB, FOREIGN_AGENT_SALARY_RATIO, FOREIGN_DEADLINE_DAY, MIN_ACTIVE_CATCHERS, MIN_TOTAL_BY_POS } from '../../constants';
+import { MAX_ROSTER, FOREIGN_AGENT_ACCEPT_PROB, FOREIGN_AGENT_SALARY_RATIO, FOREIGN_DEADLINE_DAY, MIN_ACTIVE_CATCHERS, TARGET_ACTIVE_CATCHERS, MIN_TOTAL_BY_POS } from '../../constants';
 import { useResultDialog } from '../useResultDialog';
 import { marketMetrics, marketNeeds, marketPlacement, validateMarketContract, addMarketSigning } from './faMarket';
 import { planningPlayer } from '../../engine/offseasonPlanning';
@@ -144,7 +144,7 @@ export default function HubFaTab({ myTeam, faPool = [], faYears = {}, setFaYears
         </div>
       </>}
     </section></div></div>
-    <details className="fa-help"><summary>補強ポイント・市場のルール</summary><p>先発4・中継ぎ3・抑え1は登録選手、捕手は登録{MIN_ACTIVE_CATCHERS}・登録＋ファーム{MIN_TOTAL_BY_POS['捕手']}の目安です。選手の能力や将来性を保証する評価ではありません。</p>{needs.length ? <ul>{needs.map(h => <li key={h}>{h}</li>)}</ul> : <p>この人数の目安を満たしています。</p>}{marketMode === 'offseason' && <p>国内FA・自由契約の補強期間です。外国人補強は翌シーズンの市場で行えます。</p>}<p>カウントの0は実測値。「未記録」は欠測、率の「—」は分母がない・算出できない状態です。</p></details>
+    <details className="fa-help"><summary>補強ポイント・市場のルール</summary><p>先発4・中継ぎ3・抑え1は登録選手の目安です。捕手は通常一軍{TARGET_ACTIVE_CATCHERS}人、故障時も最低{MIN_ACTIVE_CATCHERS}人を優先し、支配下は一軍＋二軍で{MIN_TOTAL_BY_POS['捕手']}人を補強の目安にします。選手の能力や将来性を保証する評価ではありません。</p>{needs.length ? <ul>{needs.map(h => <li key={h}>{h}</li>)}</ul> : <p>この人数の目安を満たしています。</p>}{marketMode === 'offseason' && <p>国内FA・自由契約の補強期間です。外国人補強は翌シーズンの市場で行えます。</p>}<p>カウントの0は実測値。「未記録」は欠測、率の「—」は分母がない・算出できない状態です。</p></details>
     {offer && <Confirm offer={offer} budget={budget} placement={marketPlacement(myTeam, offer.player)} onClose={close} onConfirm={confirm} error={validateMarketContract({ team: { ...myTeam, budget }, pool: faPool, player: offer.player, salary: offer.salary, years: offer.years, gameDay })} />}
   </section>;
 }

@@ -3,6 +3,7 @@ import {
   INJURY_AUTO_DEMOTE_DAYS,
   MAX_ROSTER,
   MIN_ACTIVE_CATCHERS,
+  TARGET_ACTIVE_CATCHERS,
   OPTIMAL_PITCHER_COUNT,
   REGISTRATION_COOLDOWN_DAYS,
   ROSTER_DEVREC_BONUS,
@@ -131,6 +132,14 @@ const isHealthyFarmCatcher = player => !player.isPitcher && isHealthy(player)
   && proficiencyAt(player, POS_CATCHER) > 0;
 const activeCatcherCount = players => (players || []).filter(player => !player.isPitcher
   && player.pos === POS_CATCHER && isEligibleActivePlayer(player)).length;
+
+// Three is the normal target, two remains the emergency minimum. When only
+// three healthy catchers remain, keep one playable catcher in the farm.
+function activeCatcherTarget(team, options = {}) {
+  const healthyCount = [...(team.players || []), ...(team.farm || [])].filter(isHealthyFarmCatcher).length;
+  return options.preserveFarmCatcher !== false && healthyCount <= TARGET_ACTIVE_CATCHERS
+    ? MIN_ACTIVE_CATCHERS : TARGET_ACTIVE_CATCHERS;
+}
 
 function buildPositionAssignments(team, rosterDhMode, options, leagueContext, evaluate) {
   const required = [...FIELDING_POSITIONS, ...(rosterDhMode ? ['DH'] : [])];
@@ -329,6 +338,9 @@ export function buildRosterRecs(team, options = {}) {
   };
   const canPromote = (player, downPlayer) => {
     if (usedFarmIds.has(player.id) || !canAddToActiveRoster(player, projectedPlayers)) return false;
+    const target = activeCatcherTarget({ players: projectedPlayers, farm: projectedFarm }, options);
+    if (player.pos === POS_CATCHER && activeCatcherCount(projectedPlayers) >= target
+      && downPlayer?.pos !== POS_CATCHER) return false;
     // Farm participation permits healthy developmental/cooldown catchers too.
     // Keep the last one unless the active minimum needs it or a catcher returns.
     return options.preserveFarmCatcher !== true
@@ -354,7 +366,7 @@ export function buildRosterRecs(team, options = {}) {
           !candidate.isPitcher
           && candidate.pos === POS_CATCHER
           && isEligibleActivePlayer(candidate),
-      ).length <= MIN_ACTIVE_CATCHERS
+      ).length <= activeCatcherTarget({ players: projectedPlayers, farm: projectedFarm }, options)
     ) {
       return false;
     }
@@ -614,13 +626,14 @@ export function applyRosterRecs(team, recs) {
 
 function ensureMinimumCatcherCount(team, options = {}) {
   let nextTeam = team;
+  const target = activeCatcherTarget(team, options);
   while (
     (nextTeam.players || []).filter(
       (player) =>
         !player.isPitcher
         && player.pos === POS_CATCHER
         && isEligibleActivePlayer(player),
-    ).length < MIN_ACTIVE_CATCHERS
+    ).length < target
   ) {
     const catcher = (nextTeam.farm || [])
       .map(player => options.allowSamePlanRecall === true
@@ -646,11 +659,14 @@ function ensureMinimumCatcherCount(team, options = {}) {
         upPlayer: catcher,
         downPlayer: null,
         scoreDiff: 0,
-        reasons: ['捕手2人制を充足'],
+        reasons: [`捕手${target}人制を充足`],
       };
     } else {
       const downPlayer = (nextTeam.players || [])
         .filter((player) => !player.isPitcher && player.pos !== POS_CATCHER)
+        .filter(player => [false, true].every(rosterDhMode => buildAutoLineupEntries({
+          ...nextTeam, players: [...nextTeam.players.filter(p => p.id !== player.id), catcher],
+        }, { ...options, rosterDhMode }).length === (rosterDhMode ? 9 : 8)))
         .sort(
           (a, b) => rosterRecScore(a, nextTeam, options)
             - rosterRecScore(b, nextTeam, options),
@@ -661,7 +677,7 @@ function ensureMinimumCatcherCount(team, options = {}) {
         upPlayer: catcher,
         downPlayer,
         scoreDiff: 0,
-        reasons: ['捕手2人制を充足'],
+        reasons: [`捕手${target}人制を充足`],
       };
     }
     // applyRosterRecs reads the farm snapshot, so use the recalled copy there too.
@@ -1335,6 +1351,22 @@ export function buildFullRosterPlan(team, options = {}) {
     });
     validation = validateTeamRoster(nextTeam);
   }
+  if (validation.valid) {
+    const target = activeCatcherTarget(nextTeam, options);
+    const surplus = nextTeam.players.filter(p => p.pos === POS_CATCHER && isEligibleActivePlayer(p))
+      .sort((a, b) => rosterRecScore(a, nextTeam, options) - rosterRecScore(b, nextTeam, options));
+    for (const downPlayer of surplus) {
+      if (activeCatcherCount(nextTeam.players) <= target) break;
+      const rec = { type: 'demote', downPlayer, upPlayer: null, scoreDiff: 0,
+        reasons: [`一軍捕手${target}人を維持し二軍の捕手層を確保`] };
+      const candidate = buildAutoManagedRoster(applyRosterRecs(nextTeam, [rec]), options);
+      const candidateValidation = validateTeamRoster(candidate);
+      if (!candidateValidation.valid) continue;
+      nextTeam = candidate;
+      validation = candidateValidation;
+      changes.push(rec);
+    }
+  }
   if (options.preserveFarmCatcher && validation.valid
     && !(nextTeam.farm || []).some(isHealthyFarmCatcher)
     && activeCatcherCount(nextTeam.players) >= MIN_ACTIVE_CATCHERS) {
@@ -1398,11 +1430,16 @@ export function applyManagementPolicy(team, options = {}) {
     && !(nextTeam.farm || []).some(isHealthyFarmCatcher)
     && activeCatcherCount(nextTeam.players) >= MIN_ACTIVE_CATCHERS
     && nextTeam.players.filter(p => isEligibleActivePlayer(p) && isHealthyFarmCatcher(p)).length > MIN_ACTIVE_CATCHERS;
+  const needsCatcherTargetRepair = options.includeRosterChanges !== false
+    && activeCatcherCount(nextTeam.players) < activeCatcherTarget(nextTeam)
+    && (nextTeam.farm || []).filter(isHealthyFarmCatcher).length > 1
+    && (nextTeam.farm || []).some(p => p.pos === POS_CATCHER && canAddToActiveRoster(p, nextTeam.players));
   const runRoster = options.includeRosterChanges !== false
     && (
       force
       || needsConstraintRepair
       || needsFarmCatcherRepair
+      || needsCatcherTargetRepair
       || (
         nextTeam.rosterMaintenance?.changed
         && nextTeam.rosterMaintenance?.validation?.valid === false
@@ -1412,6 +1449,7 @@ export function applyManagementPolicy(team, options = {}) {
   const runLineup = force
     || needsConstraintRepair
     || needsFarmCatcherRepair
+    || needsCatcherTargetRepair
     || nextTeam.rosterMaintenance?.changed
     || shouldRunLineupManagement(nextTeam, gameDay);
   let recs = [];

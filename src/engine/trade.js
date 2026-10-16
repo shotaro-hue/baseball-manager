@@ -1,5 +1,6 @@
 import { rng } from '../utils';
 import { MIN_TOTAL_BY_POS, MIN_ACTIVE_CATCHERS } from '../constants';
+import { canAddToActiveRoster, isIkuseiPlayer } from './rosterAutomation';
 
 /* ═══════════════════════════════════════════════
    TRADE SYSTEM
@@ -82,7 +83,6 @@ export function analyzeTeamNeeds(team, options = {}) {
   // ポジション別の合計人数（一軍+二軍）
   const allBatters = allPlayers.filter((p) => !p.isPitcher);
   const totalByPos = (pos) => allBatters.filter((p) => p.pos === pos).length;
-  const activeCatchers = batters.filter((p) => p.pos === '捕手').length;
 
   const avgV = pitchers.length
     ? pitchers.reduce((sum, p) => sum + (p.pitching?.velocity || 50), 0) / pitchers.length
@@ -109,11 +109,17 @@ export function analyzeTeamNeeds(team, options = {}) {
   if (avgV < 60) needs.push({ type: '投手陣の球威強化', score: Math.round((60 - avgV) * 0.5), horizon: 'mid' });
 
   // ── ポジション別最低人数チェック（一軍+二軍合計） ──
-  // 捕手: 一軍登録に最低 MIN_ACTIVE_CATCHERS 名、合計 MIN_TOTAL_BY_POS["捕手"] 名
-  const catcherTotal = totalByPos('捕手');
+  // Controlled depth and today's availability are separate. Farm promotions
+  // can repair active membership without requiring an external acquisition.
+  const catchers = allBatters.filter(p => p.pos === '捕手' && !isIkuseiPlayer(p));
+  const catcherTotal = catchers.length;
   const catcherMin = MIN_TOTAL_BY_POS['捕手'];
-  if (activeCatchers < MIN_ACTIVE_CATCHERS) {
-    needs.push({ type: '捕手補強が急務', score: 35 + (MIN_ACTIVE_CATCHERS - activeCatchers) * 8, horizon: 'short' });
+  const healthyCount = catchers.filter(p => !(Number(p.injuryDaysLeft) > 0)).length;
+  const availableCount = catchers.filter(p => canAddToActiveRoster(p, [])).length;
+  const operatingShortage = Math.max(0, MIN_ACTIVE_CATCHERS + 1 - healthyCount,
+    MIN_ACTIVE_CATCHERS - availableCount);
+  if (operatingShortage > 0) {
+    needs.push({ type: '捕手補強が急務', score: 35 + operatingShortage * 8, horizon: 'short' });
   } else if (catcherTotal < catcherMin) {
     needs.push({ type: '捕手補強が急務', score: 28 + (catcherMin - catcherTotal) * 5, horizon: 'short' });
   }

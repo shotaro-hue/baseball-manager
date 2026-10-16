@@ -26,8 +26,9 @@ function checkTeams(teams, real) {
     expect(new Set(all.map(p => p.id)).size).toBe(expected);
     const catchers = team.players.filter(p => !p.isPitcher && p.pos === '捕手'
       && !isIkuseiPlayer(p) && Number(p.injuryDaysLeft || 0) === 0);
-    expect(catchers.length, `team ${team.id}: active catchers`).toBeGreaterThanOrEqual(2);
-    expect(validateTeamRoster(team).valid, `team ${team.id}: roster`).toBe(true);
+    expect(catchers.length, `team ${team.id}: active catchers`).toBeGreaterThanOrEqual(3);
+    expect(all.filter(p => !p.isPitcher && p.pos === '捕手' && !isIkuseiPlayer(p)).length).toBeGreaterThanOrEqual(6);
+    expect(validateTeamRoster(team).errors, `team ${team.id}: roster`).toEqual([]);
     expect(selectFarmTeam(team, { round: 1 }).status, `team ${team.id}: farm`).toBe('ready');
   }
 }
@@ -44,7 +45,9 @@ describe('initial catcher coverage', () => {
       const farm = makeInitialFarmBatters(12, 50, []);
       expect(Math.random()).toBe(nextRandom);
       const changed = reference.filter((p, i) => farm[i].pos !== p.pos);
-      expect(changed.length).toBe(Math.max(0, 3 - reference.filter(p => p.pos === '捕手').length));
+      const otherPositions = new Set(reference.filter(p => p.pos !== '捕手').map(p => p.pos)).size;
+      const target = Math.min(6, reference.length - otherPositions);
+      expect(changed.length).toBe(Math.max(0, target - reference.filter(p => p.pos === '捕手').length));
       expect(farm).toEqual(reference.map((p, i) => farm[i].pos !== p.pos
         ? { ...p, pos: '捕手', positions: { 捕手: 100 } } : p));
       for (const pos of FIELDING_POSITIONS) {
@@ -70,7 +73,7 @@ describe('initial catcher coverage', () => {
       expect(result.farm.find(p => p.id === id).registrationCooldownDays).toBe(10);
     }
   });
-  it('keeps two active catchers and a playable farm without increasing real-team headcounts', () => {
+  it('keeps three active catchers and a playable farm without increasing real-team headcounts', () => {
     for (let seed = 1; seed <= 100; seed++) {
       seedRandom(seed);
       checkTeams(createInitialTeams(), true);

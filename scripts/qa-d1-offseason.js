@@ -192,12 +192,14 @@ it(`QA-D1: seed ${seed} plays three generated seasons with offseason save/reload
   expect(report.seasons.map(s=>s.unplayedCards)).toEqual(row.seasons.map(s=>s.farmCards.unplayed));
   expect(report.shortages.every(s=>s.farmHealthy===0)).toBe(true);
   const sourcePaths=['scripts/farm-catcher-diagnostics.js','scripts/qa-d1-offseason.js',
+   'src/constants.js','src/engine/playerCore.js','src/engine/trade.js','src/engine/organizationNeeds.js','src/engine/draftRules.js',
    'src/workers/seasonBatchCore.js','src/engine/rosterAutomation.js','src/engine/regularGameUpdates.js',
    'src/engine/farmProgression.js','src/engine/farmSelection.js','src/engine/cpuTradeExecution.js','src/hooks/useOffseason.js'];
   const sources=Object.fromEntries(sourcePaths.map(path=>[path,createHash('sha256').update(readFileSync(path)).digest('hex')]));
-  mkdirSync('docs/validation/farm-catcher-shortage',{recursive:true});
-  writeFileSync(`docs/validation/farm-catcher-shortage/seed-${seed}.json`,JSON.stringify({
-   base:'db80d6c92dd094d0f20a5128e4185c062de86f1d',sources,
+  const evidenceDir=process.env.FARM_CATCHER_EVIDENCE_DIR||'docs/validation/farm-catcher-shortage';
+  mkdirSync(evidenceDir,{recursive:true});
+  writeFileSync(`${evidenceDir}/seed-${seed}.json`,JSON.stringify({
+   base:process.env.FARM_CATCHER_BASE_SHA||'db80d6c92dd094d0f20a5128e4185c062de86f1d',sources,
    environment:'Real QA-D1 hooks/engine; test-side pass-through spies; LCG RNG; fake-indexeddb and Map localStorage',
    ...report})+'\n');
   console.log('Farm catcher diagnosis',seed,JSON.stringify(report.seasons));

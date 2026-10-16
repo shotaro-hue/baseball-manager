@@ -1,7 +1,7 @@
 import { rng, clamp, uid, pname, CITIES } from '../utils';
 import {
   FIELDING_POSITIONS, PLAYER_TYPES_B, PLAYER_TYPES_P, PLAYER_COMMENTS_B, PLAYER_COMMENTS_P, MIN_SALARY_IKUSEI,
-  SECONDARY_POSITION_RULES, MIN_ACTIVE_CATCHERS,
+  SECONDARY_POSITION_RULES, MIN_TOTAL_BY_POS,
 } from '../constants';
 import { createEmptyBattedBallProfile } from './battedBallProfile';
 
@@ -102,19 +102,19 @@ export function applyPositionFields(player) {
   return player;
 }
 
-// Initial generation needs two active primary catchers and one farm catcher.
+// Reserve six controlled primary catchers across the organization at game start.
 // Reserve existing generated slots rather than adding players or changing real players.
 export function makeInitialFarmBatters(count, quality, activePlayers) {
   const activeCatchers = activePlayers.filter(p => !p.isPitcher && p.pos === '捕手'
     && !p.育成 && !p.isIkusei && Number(p.injuryDaysLeft || 0) <= 0).length;
-  const requiredCatchers = Math.max(1, MIN_ACTIVE_CATCHERS + 1 - activeCatchers);
+  const requiredCatchers = Math.max(1, MIN_TOTAL_BY_POS['捕手'] - activeCatchers);
   const farm = Array.from({ length: count }, () =>
     makePlayer(FIELDING_POSITIONS[rng(0, FIELDING_POSITIONS.length - 1)], quality, false, rng(18, 25)));
   const counts = new Map(FIELDING_POSITIONS.map(pos => [pos, farm.filter(p => p.pos === pos).length]));
   while (counts.get('捕手') < requiredCatchers) {
     // Use a redundant position so catcher coverage doesn't remove another
     // position's last generated player. Retain abilities and RNG consumption.
-    const candidate = farm.filter(p => p.pos !== '捕手')
+    const candidate = farm.filter(p => p.pos !== '捕手' && counts.get(p.pos) > 1)
       .sort((a, b) => counts.get(b.pos) - counts.get(a.pos))[0];
     if (!candidate) break;
     counts.set(candidate.pos, counts.get(candidate.pos) - 1);

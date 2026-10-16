@@ -56,9 +56,10 @@ export function rankDraftProspects(team, pool, round = 1, acceptedPicks = [], dr
     return true;
   });
   // Picks become owned only at the existing acquisition step. Project them
-  // here so later rounds evaluate the needs they have already filled.
+  // as controlled contracts, matching acquisition even if a prospect has a
+  // development flag. Never change the original prospect or live roster.
   const needs = analyzeTeamNeeds(additions.length
-    ? { ...team, farm: [...(team.farm || []), ...additions] }
+    ? { ...team, farm: [...(team.farm || []), ...additions.map(p => ({ ...p, 育成: false, isIkusei: false }))] }
     : team, { includeFarmPitchers: true });
   const velocityNeed = needs.some(n => n.type === '投手陣の球威強化');
   const wantsPitcher = organization.ok ? velocityNeed || Object.values(organization.roles)

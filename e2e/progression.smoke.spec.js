@@ -226,7 +226,10 @@ test('E6 scheduled CPU catcher allocation, farm records and persisted reload', a
   expect(firstCard.status).toBe('played');
   const allHealthy = [...cpu.players, ...cpu.farm].filter(p => !p.isPitcher && p.pos === '捕手'
     && !p.育成 && !p.isIkusei && !(p.injuryDaysLeft > 0));
-  if (allHealthy.length >= 3) {
+  if (allHealthy.length >= 4) {
+    expect(cpu.players.filter(p => allHealthy.some(c => c.id === p.id)).length).toBeGreaterThanOrEqual(3);
+    expect(cpu.farm.some(p => allHealthy.some(c => c.id === p.id))).toBe(true);
+  } else if (allHealthy.length >= 3) {
     expect(cpu.players.filter(p => allHealthy.some(c => c.id === p.id)).length).toBeGreaterThanOrEqual(2);
     expect(cpu.farm.some(p => allHealthy.some(c => c.id === p.id))).toBe(true);
   }

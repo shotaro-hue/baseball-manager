@@ -26,9 +26,10 @@ export const ROSTER_DEVREC_POTENTIAL_MIN = 65;   // 育成加点: potential 最�
 export const ROSTER_DEVREC_DAYS_MAX = 20;        // 育成加点: 1軍登録日数の上限（今季未経験圏）
 export const OPTIMAL_PITCHER_COUNT = 13;         // 28人ロースターにおける目標投手人数（6先発+7中継ぎ）
 export const MIN_ACTIVE_CATCHERS = 2;            // 一軍に常時最低登録すべき捕手の人数
+export const TARGET_ACTIVE_CATCHERS = 3;         // 二軍の健康捕手を残せる通常時の目標
 // 一軍+二軍合計で各ポジションに必要な最低人数（補強優先度の判断基準）
 export const MIN_TOTAL_BY_POS = {
-  "捕手":   3,
+  "捕手":   6,
   "遊撃手": 2,
   "二塁手": 2,
   "三塁手": 2,

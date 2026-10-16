@@ -15,7 +15,9 @@ function fixture() {
   const team = createInitialTeams()[0];
   const keep = new Set(team.players.filter(p => p.pos === '捕手').slice(0, 2).map(p => p.id));
   team.players = team.players.filter(p => p.pos !== '捕手' || keep.has(p.id));
-  team.farm = team.farm.filter(p => p.pos !== '捕手');
+  // One accepted catcher fills the new six-player organizational target.
+  const depth = team.farm.filter(p => p.pos === '捕手').slice(0, 3);
+  team.farm = [...team.farm.filter(p => p.pos !== '捕手'), ...depth];
   Math.random.mockReturnValue(.5);
   return { team, available: [prospect('best-DH', 'DH'), prospect('another-C')] };
 }

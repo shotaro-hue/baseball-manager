@@ -46,7 +46,9 @@ export function evaluateOrganizationNeeds(team, { teams = [team], draftPool = []
     const directlyPromotableFarmCount = active.length < MAX_ROSTER
       ? second.filter(p => canAddToActiveRoster(p, active)).length : 0;
     const activeShortage = shortage(activeMinimum, activeCount);
-    const organizationShortage = shortage(organizationMinimum, organization.length);
+    const depthCount = role === 'catcher'
+      ? [...first, ...second].filter(p => !isIkuseiPlayer(p)).length + picks.length : organization.length;
+    const organizationShortage = shortage(organizationMinimum, depthCount);
     const futureDepth = role === 'starter' ? {
       // Same age/default/minimum rules as analyzeTeamNeeds; no ability cutoff.
       youngCount: organization.filter(p => (p.age || 25) <= 24).length,
