@@ -1,5 +1,6 @@
 import { FOREIGN_DEADLINE_DAY, MIN_ACTIVE_CATCHERS, MIN_TOTAL_BY_POS } from '../../constants';
 import { fmtIP } from '../../utils';
+import { saberBatter } from '../../engine/sabermetrics';
 import { marketPlacement, marketRosterError } from '../../engine/marketRoster';
 export { marketPlacement } from '../../engine/marketRoster';
 import { prepareOffseasonFreeAgent } from '../../engine/offseasonMarket';
@@ -10,7 +11,7 @@ export function marketMetrics(player) {
   const value = n => Number.isFinite(n) ? n : '未記録';
   if (player.isPitcher) return [['投球回', Number.isFinite(s.IP) ? fmtIP(s.IP) : '未記録'], ['防御率', measured(['IP', 'ER']) && s.IP > 0 ? (s.ER / s.IP * 9).toFixed(2) : '—'], ['勝利', value(s.W)], ['奪三振', value(s.Kp)], ['セーブ', value(s.SV)], ['ホールド', value(s.HLD)]];
   const denominator = s.AB + s.BB + s.HBP + s.SF;
-  const ops = measured(['AB', 'H', 'BB', 'HBP', 'SF', 'D', 'T', 'HR']) && s.AB > 0 && denominator > 0 ? ((s.H + s.BB + s.HBP) / denominator + (s.H + s.D + 2 * s.T + 3 * s.HR) / s.AB).toFixed(3) : '—';
+  const ops = measured(['AB', 'H', 'BB', 'HBP', 'SF', 'D', 'T', 'HR']) && s.AB > 0 && denominator > 0 ? saberBatter(s).OPS.toFixed(3) : '—';
   return [['打席', value(s.PA)], ['打率', measured(['AB', 'H']) && s.AB > 0 ? (s.H / s.AB).toFixed(3) : '—'], ['本塁打', value(s.HR)], ['打点', value(s.RBI)], ['OPS', ops]];
 }
 

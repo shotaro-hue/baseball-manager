@@ -177,7 +177,7 @@ function sumRecordedStats(players, keys) {
 function aggregateBattingOps(players) {
   const total = sumRecordedStats(players, ['AB', 'H', 'D', 'T', 'HR', 'BB', 'HBP', 'SF']);
   if (!total || total.AB <= 0 || total.AB + total.BB + total.HBP + total.SF <= 0) return null;
-  // Keep saberBatter's existing rounding; OPS precision belongs to FIX-S3.
+  // Aggregate counts first; the shared calculation rounds OPS only once.
   return saberBatter({ ...total, PA: 0, K: 0, RBI: 0, SB: 0 }).OPS;
 }
 

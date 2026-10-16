@@ -200,3 +200,56 @@ for (const width of [390,1440]) {
     await layout(page, dialog);
   });
 }
+
+for (const width of [360,390,1440]) {
+  test(`FIX-S3 OPS list detail career ranking and saved legacy counts ${width}`, async ({page}) => {
+    test.setTimeout(60_000);
+    const errors=[];page.on('pageerror',e=>errors.push(e.message));
+    await page.setViewportSize({width,height:width===360?800:width===390?844:900});
+    await page.goto('/baseball-manager/e2e/fixtures/fix-s3/index.html');
+    const nav=page.getByRole('navigation',{name:'検証画面'});
+    const stats=page.locator('.first-team-stats');
+    const row=stats.locator('tbody tr').filter({hasText:'佐藤海斗'});
+    await expect(row).toContainText('0.797');
+    await expect(stats.locator('tbody tr').first()).toContainText('精度比較');
+    const frame=stats.getByRole('region',{name:'打者成績。横にスクロールできます',exact:true});
+    if(width<1000){expect(await frame.evaluate(n=>n.scrollWidth>n.clientWidth)).toBe(true);await frame.evaluate(n=>{n.scrollLeft=400;});await frame.evaluate(n=>{n.scrollLeft=0;});}
+    await page.screenshot({path:`docs/validation/fix-s3/after-list-${width}.png`});
+    await row.locator('.stats-player-button').click();
+    const detail=page.locator('.player-modal-card');
+    await detail.getByRole('tab',{name:'今季成績',exact:true}).click();
+    await expect(detail).toContainText('0.797');
+    await detail.getByRole('button',{name:'＋ 比較',exact:true}).click();
+    await detail.getByRole('tab',{name:'年度別・通算',exact:true}).click();
+    const career=detail.locator('.career-detail');
+    await expect(career.locator('tbody tr').first()).toContainText('0.797');
+    await expect(career.locator('tbody tr').last()).toContainText('0.797');
+    await career.locator('.detail-table-scroll').evaluate(n=>{n.scrollLeft=n.scrollWidth;});
+    await page.screenshot({path:`docs/validation/fix-s3/after-career-${width}.png`});
+    await career.getByRole('button',{name:'ポスト',exact:true}).click();
+    await expect(career.locator('tbody tr').first()).toContainText('0.500');
+    await detail.getByRole('button',{name:'元の画面に戻る',exact:true}).click();
+    await stats.locator('tbody tr').filter({hasText:'精度比較'}).locator('.compare-add-button').click();
+    await page.getByRole('button',{name:'2人を比較',exact:true}).click();
+    const compare=page.getByRole('dialog',{name:'選手比較',exact:true});
+    await expect(compare.locator('tr').filter({hasText:'OPS'})).toContainText('0.797');
+    await expect(compare.locator('tr').filter({hasText:'OPS'})).toContainText('0.803');
+    await compare.getByRole('button',{name:'元の画面に戻る',exact:true}).click();
+    await nav.getByRole('button',{name:'ランキング',exact:true}).click();
+    const ranking=page.locator('.league-rankings');
+    await expect(ranking.locator('tbody tr').nth(0)).toContainText('精度比較');
+    await expect(ranking.locator('tbody tr').nth(1)).toContainText('同値比較');
+    await expect(ranking.locator('tbody tr').nth(2)).toContainText('0.797');
+    await expect(ranking.locator('tbody tr').nth(3)).toContainText('— 未記録');
+    await nav.getByRole('button',{name:'保存して再開',exact:true}).click();
+    await expect(page.getByRole('status').filter({hasText:'保存・再開済み'})).toBeVisible();
+    const snapshot=await page.evaluate(()=>window.s3Snapshot);
+    expect(snapshot.after).toEqual(snapshot.before);
+    expect(snapshot.after[0].players[0].recentCareerLog[0].stats.OPS).toBe(.8);
+    await nav.getByRole('button',{name:'年度別・通算',exact:true}).click();
+    await expect(page.locator('.career-detail tbody tr').first()).toContainText('0.797');
+    await expect(page.locator('.career-detail tbody tr').last()).toContainText('0.797');
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    expect(errors).toEqual([]);
+  });
+}

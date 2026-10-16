@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { fmtAvg, fmtIP } from '../../utils';
 import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
+import { careerOps, careerTotalOps } from '../careerOpsMetrics';
 import { emptyStats } from '../../engine/playerCore';
 import { mergeCareerLogWithCurrentSeason } from '../../engine/careerStats';
 
@@ -58,10 +59,17 @@ export function CareerTable({player,year,teamId,teamName,saveId,includeCurrentSe
 
   // 各年のデータ取得
   const getS=(row)=>mode==="playoff"?(row.playoffStats||emptyStats()):(row.stats||emptyStats());
+  // OPS alone needs original presence information; storage compaction fills
+  // absent live fields with zero. Other metrics keep their existing readers.
+  const getOpsS=row=>{
+    const live=includeCurrentSeason && row.year===year && !log.some(saved=>saved.year===year);
+    return mode==="playoff" ? (live?player?.playoffStats:row.playoffStats)||emptyStats()
+      : (live?player?.stats:row.stats)||{};
+  };
   // compact形式では未保存の率指標も0になるため、正の実測値だけを保存値として扱う。
   // 実測0はカウント値から再計算しても0のままなので表示結果は変わらない。
   const hasStoredRate=(s,key)=>Number(s?.[key])>0;
-  const batterRate=(s,key)=>hasStoredRate(s,key)?Number(s[key]):saberBatter(s)[key];
+  const batterRate=(s,key)=>key==="OPS"?careerOps(s).value:hasStoredRate(s,key)?Number(s[key]):saberBatter(s)[key];
   const pitcherRate=(s,key)=>hasStoredRate(s,key)?Number(s[key]):saberPitcher(s)[key];
 
   // ⑥ キャリア推移グラフ用指標定義
@@ -83,7 +91,7 @@ export function CareerTable({player,year,teamId,teamName,saveId,includeCurrentSe
   ];
   const metrics=ip?PITCHER_METRICS:BATTER_METRICS;
   const activeMet=metrics.find(m=>m.key===metricKey)||metrics[0];
-  const chartData=[...displayLog].map(row=>{const s=getS(row);return{year:row.year,value:activeMet.get(s)};});
+  const chartData=[...displayLog].map(row=>{const s=getS(row);return{year:row.year,value:metricKey==="OPS"?careerOps(getOpsS(row)).value:activeMet.get(s)};});
 
   // 通算計算
   const sumK=(k)=>displayLog.reduce((a,r)=>a+(getS(r)[k]||0),0);
@@ -94,9 +102,7 @@ export function CareerTable({player,year,teamId,teamName,saveId,includeCurrentSe
     displayLog.forEach(row=>{const s=getS(row);const weight=Number(s?.[weightKey])||0;if(weight<=0)return;const rate=hasStoredRate(s,key)?Number(s[key]):getFallback(s);weighted+=rate*weight;weightTotal+=weight;});
     return weightTotal>0?weighted/weightTotal:0;
   };
-  const totalOBP=weightedRate("OBP","PA",s=>saberBatter(s).OBP);
-  const totalSLG=weightedRate("SLG","AB",s=>saberBatter(s).SLG);
-  const totalOPS=totalOBP+totalSLG;
+  const totalOPS=detailUnavailable?{value:null,display:"— 未記録"}:careerTotalOps(displayLog.map(getOpsS));
   const totalERA=weightedRate("ERA","IP",s=>saberPitcher(s).ERA);
   const totalWHIP=weightedRate("WHIP","IP",s=>saberPitcher(s).WHIP);
 
@@ -201,7 +207,7 @@ export function CareerTable({player,year,teamId,teamName,saveId,includeCurrentSe
                     <td className="mono" style={{color:s.HR>=20?"#805700":undefined}}>{s.HR}</td>
                     <td className="mono">{s.RBI}</td>
                     <td className="mono">{s.SB}</td>
-                    <td className="mono">{s.PA>0?batterRate(s,"OPS").toFixed(3):"---"}</td>
+                    <td className="mono">{careerOps(getOpsS(row)).display}</td>
                   </tr>
                 );
               })}
@@ -214,7 +220,7 @@ export function CareerTable({player,year,teamId,teamName,saveId,includeCurrentSe
                   <td className="mono" style={{color:totals.HR>=200?"#805700":undefined}}>{totals.HR}</td>
                   <td className="mono">{totals.RBI}</td>
                   <td className="mono">{totals.SB}</td>
-                  <td className="mono">{totals.PA>0?totalOPS.toFixed(3):"---"}</td>
+                  <td className="mono">{totalOPS.display}</td>
                 </tr>
               )}
             </tbody>

@@ -1,4 +1,5 @@
-import { saberBatter } from './sabermetrics.js';
+import { rawBatterOps } from './sabermetrics.js';
+import { r2 } from '../utils';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const rate = (value, denominator) => denominator > 0 ? Number(value || 0) / denominator : 0;
@@ -104,8 +105,9 @@ export function calcBattedBallQuality(player, leagueContext = {}) {
  * 互換CPU打者評価。打球補正は今季±8%、直近±3%、合計±10%以内。
  */
 export function calcCpuBatterEvaluation(player, leagueContext = {}, options = {}) {
-  const stats = saberBatter(player?.stats ?? {});
-  const resultScore = (stats.OPS || 0) * 1000;
+  // Preserve pre-FIX-S3 CPU inputs, rounding the raw value (not a rounded OPS).
+  const ops = r2(rawBatterOps(player?.stats ?? {}));
+  const resultScore = (ops || 0) * 1000;
   const abilityScore = (player?.batting?.contact ?? 50) * 1.6
     + (player?.batting?.eye ?? 50) * 1.1
     + (player?.batting?.power ?? 50) * 1.2

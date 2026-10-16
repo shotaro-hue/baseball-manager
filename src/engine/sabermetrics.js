@@ -10,13 +10,23 @@ const FIP_C = 3.20;
 
 const WW = { BB: 0.69, HBP: 0.72, s1b: 0.88, d2b: 1.24, t3b: 1.56, HR: 2.01 };
 
+// Raw components are added before any rounding. Callers choose precision;
+// simulation/CPU consumers retain their existing two-decimal input.
+export function rawBatterOps(s) {
+  const singles = Math.max(0, s.H - s.D - s.T - s.HR);
+  const denominator = s.AB + s.BB + s.HBP + s.SF;
+  const obp = denominator > 0 ? (s.H + s.BB + s.HBP) / denominator : 0;
+  const slg = s.AB > 0 ? (singles + s.D * 2 + s.T * 3 + s.HR * 4) / s.AB : 0;
+  return obp + slg;
+}
+
 export function saberBatter(s) {
   const singles = Math.max(0, s.H - s.D - s.T - s.HR);
   const AVG = s.AB > 0 ? s.H / s.AB : 0;
   const OBP = (s.AB + s.BB + s.HBP + s.SF) > 0
     ? (s.H + s.BB + s.HBP) / (s.AB + s.BB + s.HBP + s.SF) : 0;
   const SLG = s.AB > 0 ? (singles + s.D * 2 + s.T * 3 + s.HR * 4) / s.AB : 0;
-  const OPS = OBP + SLG;
+  const OPS = rawBatterOps(s);
   const ISO = SLG - AVG;
   const BBpct = s.PA > 0 ? s.BB / s.PA : 0;
   const Kpct = s.PA > 0 ? s.K / s.PA : 0;
@@ -34,7 +44,7 @@ export function saberBatter(s) {
   const sprayTotal = (s.pullBatted || 0) + (s.centerBatted || 0) + (s.oppositeBatted || 0);
 
   return {
-    AVG: r3(AVG), OBP: r3(OBP), SLG: r3(SLG), OPS: r2(OPS), ISO: r2(ISO),
+    AVG: r3(AVG), OBP: r3(OBP), SLG: r3(SLG), OPS: r3(OPS), ISO: r2(ISO),
     BBpct: r3(BBpct), Kpct: r3(Kpct), BABIP: r3(BABIP),
     wOBA: r3(wOBA), wRCp, WAR,
     EVavg: s.evN > 0 ? r2(s.evSum / s.evN) : 0,

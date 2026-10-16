@@ -4,6 +4,7 @@ import { evaluateRenewalOffer, getFaThreshold, getFaProgress, calcPlayerDemand }
 import { salaryCutRule, renewalEligible, ikuseiContractYears, validContractOffer } from '../engine/renewalRules';
 import { compactRenewalSession, reconcileRenewalSession } from '../engine/offseasonPlanning';
 import { fmtSal, fmtIP, clamp } from '../utils';
+import { saberBatter } from '../engine/sabermetrics';
 import { useResultDialog } from './useResultDialog';
 import { Button, StateLabel } from './design-system/primitives';
 import '../calm-renewal.css';
@@ -30,7 +31,7 @@ function performance(player) {
   if (player.isPitcher) return [['投球回', Number.isFinite(s.IP) ? fmtIP(s.IP) : '未記録'], ['防御率', Number.isFinite(s.IP) && s.IP > 0 && Number.isFinite(s.ER) ? (s.ER / s.IP * 9).toFixed(2) : '—'], ['勝利', stat(s.W)], ['セーブ', stat(s.SV)], ['ホールド', stat(s.HLD)], ['奪三振', stat(s.Kp)]];
   const measured = keys => keys.every(key => Number.isFinite(s[key]));
   const obpDenominator = s.AB + s.BB + s.HBP + s.SF;
-  const ops = measured(['AB', 'H', 'BB', 'HBP', 'SF', 'D', 'T', 'HR']) && s.AB > 0 && obpDenominator > 0 ? ((s.H + s.BB + s.HBP) / obpDenominator + (s.H + s.D + 2 * s.T + 3 * s.HR) / s.AB).toFixed(3) : '—';
+  const ops = measured(['AB', 'H', 'BB', 'HBP', 'SF', 'D', 'T', 'HR']) && s.AB > 0 && obpDenominator > 0 ? saberBatter(s).OPS.toFixed(3) : '—';
   return [['打席', stat(s.PA)], ['打率', measured(['AB', 'H']) && s.AB > 0 ? (s.H / s.AB).toFixed(3) : '—'], ['本塁打', stat(s.HR)], ['打点', stat(s.RBI)], ['OPS', ops]];
 }
 // Match the existing year-end transfer marker; a past market snapshot is not this season's record.

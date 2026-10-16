@@ -1,4 +1,5 @@
-import { saberBatter } from './sabermetrics.js';
+import { rawBatterOps } from './sabermetrics.js';
+import { r2 } from '../utils';
 import {
   calcBattedBallQuality,
   createBattedBallLeagueContext,
@@ -139,9 +140,10 @@ function traitAdjustment(player, traitId) {
 }
 
 function seasonScore(player, policy) {
-  const stats = saberBatter(player?.stats ?? {});
+  // Preserve pre-FIX-S3 CPU inputs, rounding the raw value (not a rounded OPS).
+  const ops = r2(rawBatterOps(player?.stats ?? {}));
   const pa = Math.max(0, Number(player?.stats?.PA) || 0);
-  const observed = clamp(50 + ((stats.OPS || 0.7) - 0.7) * 100);
+  const observed = clamp(50 + ((ops || 0.7) - 0.7) * 100);
   const reliability = clamp(pa / Math.max(policy.patiencePa, 1), 0, 1);
   return {
     value: 50 + (observed - 50) * reliability,
