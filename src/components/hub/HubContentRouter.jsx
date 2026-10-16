@@ -1,3 +1,4 @@
+import { draftCapacityContext } from '../../engine/rosterCapacity';
 import { regularSeasonRequest } from '../../engine/seasonProgress';
 import { Suspense, lazy } from 'react';
 import { DashboardTab } from '../DashboardTab';
@@ -109,6 +110,7 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
           farmState={{farmCompetition:gs.farmCompetition,year:gs.year,teams:gs.teams,seasonHistory:gs.getSeasonHistory?.()??gs.seasonHistory}}
           team={myTeam}
           allTeams={teams}
+          draftContext={draftCapacityContext(gs.offseasonPlan,year,teams)}
           onToggle={gs.toggleLineup}
           onReplaceLineup={gs.replaceLineup}
           onSetLineupOrder={gs.setLineupOrder}
@@ -345,6 +347,8 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
     return (
       <HubFaTab
         myTeam={myTeam}
+        teams={teams}
+        offseasonPlan={gs.offseasonPlan}
         faPool={faPool}
         faYears={gs.faYears}
         setFaYears={gs.setFaYears}

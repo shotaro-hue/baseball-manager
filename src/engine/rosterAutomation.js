@@ -1,3 +1,4 @@
+import { isIkuseiPlayer } from './rosterCapacity';
 import {
   FIELDING_POSITIONS,
   INJURY_AUTO_DEMOTE_DAYS,
@@ -39,8 +40,7 @@ export const DEFAULT_ROSTER_AUTOMATION_MODE = ROSTER_AUTOMATION_MODES.EMERGENCY;
 const getRosterDhMode = (team, rosterDhMode) =>
   rosterDhMode ?? team.rosterDhMode ?? team.dhEnabled ?? false;
 
-export const isIkuseiPlayer = (player) =>
-  Boolean(player?.育成 || player?.isIkusei);
+export { isIkuseiPlayer } from './rosterCapacity';
 
 const isHealthy = (player) => (Number(player?.injuryDaysLeft) || 0) <= 0;
 

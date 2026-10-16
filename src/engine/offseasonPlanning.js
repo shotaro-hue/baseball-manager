@@ -1,3 +1,4 @@
+import { draftCapacityContext, evaluateRosterCapacity, projectRosterCapacity } from './rosterCapacity';
 import { renewalEligible, ownedPlayers } from './renewalRules';
 import { marketNeeds } from '../components/hub/faMarket';
 import { OFFSEASON_SAVE_SCREENS } from './offseasonResume';
@@ -23,7 +24,7 @@ export function reconcileRenewalSession(session, team, year, previous) {
     return e;
   }) };
 }
-export function planningSummary(team, plan, year) {
+export function planningSummary(team, plan, year, teams = [team]) {
   const owned = [...(team?.players || []), ...(team?.farm || [])];
   const entries = plan?.session?.entries || [];
   const intents = plan?.intents || [];
@@ -31,7 +32,10 @@ export function planningSummary(team, plan, year) {
   const releaseCandidates = owned.filter(p => renewalEligible(p, year) && intents.some(i => i.id === p.id && i.value === 'release'));
   const kept = owned.filter(p => !releaseCandidates.some(x => x.id === p.id));
   const salary = p => p.contractSignedYear === year ? p.salary : entries.find(e => e.player.id === p.id)?.terms?.salary ?? p.salary;
-  return { owned: owned.length, active: team?.players?.length ?? 0, farm: team?.farm?.length ?? 0,
+  const context = draftCapacityContext(plan, year, teams);
+  return { capacity: evaluateRosterCapacity(team, context),
+    projectedCapacity: projectRosterCapacity(team, { releaseIds: releaseCandidates.map(p => p.id) }, context),
+    owned: owned.length, active: team?.players?.length ?? 0, farm: team?.farm?.length ?? 0,
     projectedCount: kept.length, releaseCandidates, pending,
     payroll: sumRecorded(owned.map(salary)), projectedPayroll: sumRecorded(kept.map(salary)),
     budget: Number.isFinite(team?.budget) ? team.budget : null,

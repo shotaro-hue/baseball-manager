@@ -1,3 +1,4 @@
+import { RosterCapacitySummary } from './RosterCapacitySummary';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { ContractRenewalPhaseScreen } from './ContractRenewalPhaseScreen';
 import OffseasonFaPhaseScreen from './OffseasonFaPhaseScreen';
@@ -51,7 +52,7 @@ export default function OffseasonPlanningScreen({ gs, os, myTeam, myId, year }) 
       tabBar.current?.querySelector('[aria-pressed="true"]')?.focus({ preventScroll: true }); startingMarket.current = false;
     }
   }, [plan?.stage]);
-  const overview = planningSummary(myTeam, plan, year);
+  const overview = planningSummary(myTeam, plan, year, gs.teams);
   const pending = overview.pending.filter(p => !overview.releaseCandidates.some(c => c.id === p.id));
   const releasePlayer = [...(myTeam?.players || []), ...(myTeam?.farm || [])].find(p => p.id === modal?.id);
   const finish = () => {
@@ -85,6 +86,8 @@ export default function OffseasonPlanningScreen({ gs, os, myTeam, myId, year }) 
         {label:'未解決',value:pending.length,unit:'人'},
       ]}/>
       <p className="planning-note">現在 一軍{overview.active}人・二軍／育成{overview.farm}人</p>
+      <RosterCapacitySummary capacity={overview.capacity} className="planning-note"/>
+      <p className="planning-note">放出候補反映後の支配下見込み {overview.projectedCapacity.ok ? `${overview.projectedCapacity.projectedControlledCount}人` : '未確認'}（確定指名を含む）{overview.projectedCapacity.projectedOverBy > 0 && ` · ${overview.projectedCapacity.projectedOverBy}枠不足`}</p>
       <PlanningSaveStatus gs={gs}/>
     </section>
     {!open && <div className="planning-start"><Button onClick={() => { startingMarket.current = true; gs.setOffseasonPlan(prev => ({ ...prev, stage: 'open', tab: 'market' })); }}>交渉・補強を始める</Button></div>}
@@ -108,7 +111,7 @@ export default function OffseasonPlanningScreen({ gs, os, myTeam, myId, year }) 
       <Button className="planning-primary" disabled={pending.length > 0 || busy} onClick={() => { setFailure(''); setModal({ type: 'finish' }); }}>編成終了の最終確認</Button>
     </section>}
     <aside className="planning-support">
-      <details><summary>人数・年俸・予算の計上条件</summary><p className="planning-note">年俸見込みは当年契約済みの年俸、それ以外は成立済み条件の年俸を使用し、成立条件がなければ前年年俸で仮計上します。未合意の提示額は見込みへ反映しません。</p><p className="planning-note">人数見込みは一軍・二軍・育成から放出候補を除いた人数で、支配下70枠の残数ではありません。方針の選択では実際の所属人数・残予算は変わりません。FA契約は年俸×年数を先払いし、通常更改の年俸は残予算から即時控除しません。残予算から来季年俸をもう一度差し引いた値ではありません。</p></details>
+      <details><summary>人数・年俸・予算の計上条件</summary><p className="planning-note">年俸見込みは当年契約済みの年俸、それ以外は成立済み条件の年俸を使用し、成立条件がなければ前年年俸で仮計上します。未合意の提示額は見込みへ反映しません。</p><p className="planning-note">来季人数は一軍・二軍・育成から放出候補を除いた総所属人数です。支配下見込みは支配下の放出候補と確定指名を反映します。実際の残枠は現在の支配下と未所属の確定指名から計算し、放出候補だけでは増えません。未記録の補強予定は計上しません。方針の選択では実際の所属人数・残予算は変わりません。FA契約は年俸×年数を先払いし、通常更改の年俸は残予算から即時控除しません。残予算から来季年俸をもう一度差し引いた値ではありません。</p></details>
       <details><summary>ポジション別人数・不足の目安</summary><div className="planning-counts">{overview.positions.map(r => <span key={r.pos}>{r.pos} {r.count}人</span>)}</div><p className="planning-note">登録と二軍の主なポジションによる人数です。複数ポジションの適性は選手詳細で確認できます。</p>{overview.needs.length ? <ul>{overview.needs.map(n => <li key={n}>{n}</li>)}</ul> : <p>先発・救援・捕手の人数目安を満たしています。能力や起用の適否を保証するものではありません。</p>}</details>
       <details className="planning-growth" ref={growthDisclosure}><summary>成長結果を確認する</summary><GrowthSummaryScreen farmState={{farmCompetition:gs.farmCompetition,year:gs.year,teams:gs.teams,seasonHistory:gs.getSeasonHistory?.()??gs.seasonHistory}} summary={plan.growth} year={year} teams={gs.teams} myId={myId} saveId={gs.saveId} faPool={gs.faPool} embedded onClose={() => { if (growthDisclosure.current) growthDisclosure.current.open = false; growthDisclosure.current?.querySelector('summary')?.focus({preventScroll:true}); }} /></details>
       <p className="planning-note">自球団からFA宣言中：{gs.faPool.filter(p => p.marketEntryReason === '国内FA宣言' && p.faOriginTeamId === myId).length}人。宣言残留は補強市場で契約できます。</p>

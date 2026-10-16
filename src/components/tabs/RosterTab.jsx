@@ -1,3 +1,4 @@
+import { evaluateRosterCapacity } from '../../engine/rosterCapacity';
 import {FarmDevelopmentPanel} from '../FarmDevelopmentPanel';
 import {PlayerTalkPanel} from '../PlayerTalkPanel';
 import React, { useState, useRef } from "react";
@@ -31,7 +32,8 @@ import {
 
 const TRAINING_OPTIONS=[["","バランス"],["contact","ミート"],["power","長打"],["eye","選球"],["speed","走力"],["arm","肩"],["defense","守備"],["velocity","球速"],["control","制球"],["breaking","変化球"],["stamina","スタミナ"]];
 
-export function RosterTab({farmState,team,allTeams,onReplaceLineup,onSetLineupOrder,onSetRosterDhMode,onSetPlayerPosition,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onReplaceRotation,onApplyRosterPlan,onPlayerClick,onSetDevGoal,onPlayerTalk,onSetConvertTarget,onSetManagementPolicy,onSetRosterAutomationMode,gameDay}){
+export function RosterTab({farmState,team,allTeams,onReplaceLineup,onSetLineupOrder,onSetRosterDhMode,onSetPlayerPosition,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onReplaceRotation,onApplyRosterPlan,onPlayerClick,onSetDevGoal,onPlayerTalk,onSetConvertTarget,onSetManagementPolicy,onSetRosterAutomationMode,gameDay,draftContext={}}){
+  const capacity=evaluateRosterCapacity(team,{...draftContext,teams:allTeams ?? [team]});
   const settingsRef = useRef(null);
   const summaryRef = useRef(null);
   const returnToOverview = () => {
@@ -133,7 +135,7 @@ export function RosterTab({farmState,team,allTeams,onReplaceLineup,onSetLineupOr
   };
   return(
     <div>
-      <MobileRoster farmState={farmState} team={team} onPlayerClick={onPlayerClick} onReplaceLineup={onReplaceLineup} onSetLineupOrder={onSetLineupOrder} onSetRosterDhMode={onSetRosterDhMode} onOpenFarmSettings={()=>{
+      <MobileRoster farmState={farmState} team={team} capacity={capacity} onPlayerClick={onPlayerClick} onReplaceLineup={onReplaceLineup} onSetLineupOrder={onSetLineupOrder} onSetRosterDhMode={onSetRosterDhMode} onOpenFarmSettings={()=>{
         setView('farm');
         if(settingsRef.current)settingsRef.current.open=true;
         summaryRef.current?.focus();
@@ -181,7 +183,7 @@ export function RosterTab({farmState,team,allTeams,onReplaceLineup,onSetLineupOr
         ))}
         <span className="chip cy" style={{marginLeft:"auto",alignSelf:"center"}}>一軍 {team.players.length}/{MAX_ROSTER}</span>
         <span className="chip cb" style={{alignSelf:"center"}}>外国人 {team.players.filter(p=>p.isForeign).length}/{MAX_外国人_一軍}</span>
-        {(()=>{const s=team.players.filter(p=>!p.育成).length+team.farm.filter(p=>!p.育成).length;const over=s>=MAX_SHIHAKA_TOTAL;return <span className="chip" style={{alignSelf:"center",background:over?"rgba(248,113,113,.15)":"rgba(52,211,153,.08)",border:`1px solid ${over?"rgba(248,113,113,.4)":"rgba(52,211,153,.25)"}`,color:over?"#b42332":"#53657c",fontSize:14}}>支配下 {s}/{MAX_SHIHAKA_TOTAL}</span>;})()}
+        <span className="chip">支配下 {capacity.ok ? `${capacity.controlledCount}/${MAX_SHIHAKA_TOTAL}` : '未確認'}</span>
         <button className="bsm bgb" style={{alignSelf:"center",fontSize:14,padding:"5px 10px"}} onClick={autoSetFullRoster}>🔄 一括自動編成を確認</button>
       </div>
       {rosterRecs!==null&&(
@@ -507,7 +509,7 @@ export function RosterTab({farmState,team,allTeams,onReplaceLineup,onSetLineupOr
           </div>
         );
       })()}
-      {view==="farm"&&<FarmDevelopmentPanel team={team} farmState={farmState} onPlayerClick={onPlayerClick} onSetDevGoal={onSetDevGoal} onPromo={onPromo} onConvertIkusei={onConvertIkusei}/>}
+      {view==="farm"&&<FarmDevelopmentPanel team={team} draftContext={{...draftContext,teams:allTeams ?? [team]}} farmState={farmState} onPlayerClick={onPlayerClick} onSetDevGoal={onSetDevGoal} onPromo={onPromo} onConvertIkusei={onConvertIkusei}/>}
       {view==="talk"&&<PlayerTalkPanel team={team} gameDay={gameDay} onPlayerClick={onPlayerClick} onPlayerTalk={onPlayerTalk}/>}
       <div className="roster-settings-ui settings-footer"><Button variant="secondary" onClick={returnToOverview}>編成概要へ戻る</Button><p>試合へ戻るには、既存メニューの「ホーム」を選んでください。</p></div>
       </details>

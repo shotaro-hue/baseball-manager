@@ -1,7 +1,6 @@
-import { MAX_ROSTER, MAX_SHIHAKA_TOTAL, MIN_ACTIVE_CATCHERS, MIN_TOTAL_BY_POS } from '../constants';
+import { MAX_ROSTER, MIN_ACTIVE_CATCHERS, MIN_TOTAL_BY_POS } from '../constants';
 import { canAddToActiveRoster, isIkuseiPlayer } from './rosterAutomation';
-import { ownedPlayers } from './renewalRules';
-import { draftPicksForTeam } from './offseasonResume';
+import { evaluateRosterCapacity } from './rosterCapacity';
 import { tradeValue } from './trade';
 
 // Existing analyzeTeamNeeds minima, plus one fielder per required position.
@@ -19,24 +18,12 @@ const shortage = (minimum, count) => Math.max(0, minimum - count);
 /** Pure, derived organization report. Farm availability means registration
  * eligibility, not ability readiness. Picks contribute only projected depth.
  * See docs/organization-needs.md for counts, scope and unassessed rules. */
-export function evaluateOrganizationNeeds(team, { teams = [team], draftPool = [], drafted = {} } = {}) {
-  // Always evaluate this live team, even if the supplied league has an older copy.
-  const league = [team, ...teams.filter(t => String(t.id) !== String(team.id))];
-  const leagueOwned = league.flatMap(ownedPlayers);
-  const ownedIds = new Set(leagueOwned.map(p => p?.id));
-  if (leagueOwned.some(p => p?.id == null) || ownedIds.size !== leagueOwned.length) {
-    return { ok: false, reason: 'invalid-owned-ids' };
-  }
-  const accepted = draftPicksForTeam(draftPool, drafted, team.id).filter(p => {
-    if (p.id == null || ownedIds.has(p.id) || drafted[p.id] === 'refused') return false;
-    const firstOwner = p._drafted ? p._r1winner : null;
-    const laterOwner = drafted[p.id];
-    if (firstOwner != null && laterOwner != null && String(firstOwner) !== String(laterOwner)) return false;
-    ownedIds.add(p.id);
-    return true;
-  });
-  const active = team.players || [], farm = team.farm || [], owned = ownedPlayers(team);
-  const registeredCount = owned.filter(p => !isIkuseiPlayer(p)).length;
+export function evaluateOrganizationNeeds(team, options = {}) {
+  const capacity = evaluateRosterCapacity(team, options);
+  if (!capacity.ok) return capacity;
+  const accepted = capacity.acceptedPicks;
+  const active = team.players || [], farm = team.farm || [];
+  const registeredCount = capacity.controlledCount;
   const report = roles.map(([role, label, isPitcher, activeMinimum, organizationMinimum]) => {
     const matches = p => Boolean(p.isPitcher) === isPitcher && (isPitcher ? p.subtype : p.pos) === label;
     const first = active.filter(matches), second = farm.filter(matches), picks = accepted.filter(matches);
@@ -81,6 +68,6 @@ export function evaluateOrganizationNeeds(team, { teams = [team], draftPool = []
   });
   return { ok: true, teamId: team.id, registeredCount, acceptedPickCount: accepted.length,
     acceptedPickIds: accepted.map(p => p.id), remainingActiveSlots: Math.max(0, MAX_ROSTER - active.length),
-    remainingRegisteredSlots: Math.max(0, MAX_SHIHAKA_TOTAL - registeredCount - accepted.length),
+    remainingRegisteredSlots: capacity.remainingSlots,
     roles: Object.fromEntries(report) };
 }

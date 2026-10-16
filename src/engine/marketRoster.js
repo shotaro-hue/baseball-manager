@@ -1,15 +1,18 @@
 import { MAX_ROSTER, MAX_SHIHAKA_TOTAL, MAX_外国人_一軍 } from '../constants';
 import { ownedPlayers } from './renewalRules';
+import { evaluateRosterCapacity, isIkuseiPlayer } from './rosterCapacity';
 
-export function marketRosterError(team, player, teams = [team]) {
+export function marketRosterError(team, player, teams = [team], draftContext = {}) {
   if (player.id == null) return '選手IDが未記録です';
-  if (teams.some(t => ownedPlayers(t).some(p => p.id === player.id))) return 'この選手はすでに球団に所属しています';
-  if (!player.育成 && ownedPlayers(team).filter(p => !p.育成).length >= MAX_SHIHAKA_TOTAL) return `支配下登録枠（${MAX_SHIHAKA_TOTAL}人）が満員です`;
+  if (teams.some(t => ownedPlayers(t).some(p => p.id != null && String(p.id) === String(player.id)))) return 'この選手はすでに球団に所属しています';
+  const capacity = evaluateRosterCapacity(team, { ...draftContext, teams });
+  if (!capacity.ok) return `支配下人数が未確認です（${capacity.reason}）`;
+  if (!isIkuseiPlayer(player) && capacity.remainingSlots <= 0) return `支配下登録枠（${MAX_SHIHAKA_TOTAL}人）が満員です`;
   return null;
 }
 
 export function marketPlacement(team, player) {
-  if (player.育成) return { farm: true, reason: '育成契約のためファーム所属' };
+  if (isIkuseiPlayer(player)) return { farm: true, reason: '育成契約のためファーム所属' };
   const active = team?.players || [];
   if (active.length >= MAX_ROSTER) return { farm: true, reason: '登録枠が満員' };
   if (player.isForeign) {

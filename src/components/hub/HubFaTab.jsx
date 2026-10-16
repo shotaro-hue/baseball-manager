@@ -1,3 +1,5 @@
+import { RosterCapacitySummary } from '../RosterCapacitySummary';
+import { draftCapacityContext, evaluateRosterCapacity } from '../../engine/rosterCapacity';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fmtSal, rngf } from '../../utils';
 import { MAX_ROSTER, FOREIGN_AGENT_ACCEPT_PROB, FOREIGN_AGENT_SALARY_RATIO, FOREIGN_DEADLINE_DAY, MIN_ACTIVE_CATCHERS, TARGET_ACTIVE_CATCHERS, MIN_TOTAL_BY_POS } from '../../constants';
@@ -20,7 +22,7 @@ function Confirm({ offer, budget, placement, onClose, onConfirm, error }) {
   </section></div>;
 }
 
-export default function HubFaTab({ myTeam, faPool = [], faYears = {}, setFaYears, foreignActiveCount, gameDay, year, myId, notify, upd, setFaPool, onPlayerClick, onToggleCompare, comparePlayerIds = [], marketMode = 'season', savedView, onViewChange, embedded = false }) {
+export default function HubFaTab({ myTeam, faPool = [], faYears = {}, setFaYears, foreignActiveCount, gameDay, year, myId, notify, upd, setFaPool, onPlayerClick, onToggleCompare, comparePlayerIds = [], marketMode = 'season', teams, offseasonPlan, savedView, onViewChange, embedded = false }) {
   const [selectedId, setSelectedId] = useState(savedView?.selectedId ?? null);
   const [snapshot, setSnapshot] = useState(savedView?.snapshot ?? null);
   const [type, setType] = useState(savedView?.type ?? 'all');
@@ -81,14 +83,18 @@ export default function HubFaTab({ myTeam, faPool = [], faYears = {}, setFaYears
     const salaryOffer = currentSalary ? player.salary : n.salaryDemand;
     writeNeg(player.id, { ...n, stage: 'years', salaryOffer, logs: [...n.logs, `代理人：年俸${money(salaryOffer)}・${n.minYears}年で契約できます。`] });
   };
+  const draftContext = draftCapacityContext(offseasonPlan, year, teams ?? [myTeam]);
+  const commandRef = useRef(null);
+  commandRef.current = { myTeam, faPool, budget, gameDay, draftContext };
   const confirm = () => {
     if (processing.current || !offer || signedIds.current.has(offer.player.id)) return;
-    const error = validateMarketContract({ team: { ...myTeam, budget }, pool: faPool, player: offer.player, salary: offer.salary, years: offer.years, gameDay });
+    const current = commandRef.current;
+    const error = validateMarketContract({ team: { ...current.myTeam, budget: current.budget }, pool: current.faPool, player: offer.player, salary: offer.salary, years: offer.years, gameDay: current.gameDay, teams: current.draftContext.teams, draftContext: current.draftContext });
     if (error) { notify(error, 'warn'); setOffer(null); return; }
     processing.current = true; signedIds.current.add(offer.player.id);
-    const placement = marketPlacement(myTeam, offer.player);
+    const placement = marketPlacement(current.myTeam, offer.player);
     ledger.current.spent += offer.salary * offer.years;
-    upd(myId, team => addMarketSigning(team, offer.player, offer.salary, offer.years, year, marketMode));
+    upd(myId, team => addMarketSigning(team, offer.player, offer.salary, offer.years, year, marketMode, current.draftContext));
     setFaPool(prev => prev.filter(p => p.id !== offer.player.id));
     setFaYears(prev => { const next = { ...prev }; delete next[offer.player.id]; return next; });
     setReceipt({ ...offer, placement }); setOffer(null);
@@ -101,7 +107,7 @@ export default function HubFaTab({ myTeam, faPool = [], faYears = {}, setFaYears
   const n = selected ? negotiations.get(selected.id) : null;
   const years = selected?.isForeign ? n?.minYears : faYears[selectedId] ?? 1;
   const salary = selected?.isForeign ? n?.salaryOffer ?? n?.salaryDemand : selected?.salary;
-  const error = selected ? validateMarketContract({ team: { ...myTeam, budget }, pool: faPool, player: selected, salary, years, gameDay }) : null;
+  const error = selected ? validateMarketContract({ team: { ...myTeam, budget }, pool: faPool, player: selected, salary, years, gameDay, teams: draftContext.teams, draftContext }) : null;
   const placement = selected ? marketPlacement(myTeam, selected) : null;
   const needs = marketNeeds(myTeam);
   const visible = faPool.filter(p => (type === 'all' || (type === 'foreign' ? p.isForeign : !p.isForeign)) && (role === 'all' || (role === 'pitcher' ? p.isPitcher : !p.isPitcher)) && p.name?.includes(search.trim()));
@@ -113,6 +119,7 @@ export default function HubFaTab({ myTeam, faPool = [], faYears = {}, setFaYears
   return <section data-ds="fa-market" className={`fa-market ${selectedId != null ? 'fa-selected' : ''} ${embedded ? 'fa-embedded' : ''}`}>
     <header><h2>FA・自由契約市場</h2><p>補強候補を比較し、条件と配属先を確認して契約します。</p>
       {!embedded && <div className="fa-summary"><span>予算 <strong>{money(budget)}</strong></span><span>登録 {myTeam.players.length}/{MAX_ROSTER}人</span><span>外国人 {Number.isFinite(foreignActiveCount) ? foreignActiveCount : myTeam.players.filter(p => p.isForeign).length}/4人</span><span>市場 {faPool.length}人</span></div>}
+      <RosterCapacitySummary capacity={evaluateRosterCapacity(myTeam,draftContext)} className="fa-note"/>
       {marketMode !== 'offseason' && <p className="fa-note">外国人補強：{gameDay > FOREIGN_DEADLINE_DAY ? '期限終了' : Number.isFinite(gameDay) ? `期限まであと${FOREIGN_DEADLINE_DAY - gameDay}日（第${FOREIGN_DEADLINE_DAY}日まで）` : '日程未記録'}</p>}
     </header>
     <div className="fa-body"><div className="fa-layout"><section className="fa-list" ref={list} tabIndex={-1} aria-label="市場の候補一覧">
@@ -145,6 +152,6 @@ export default function HubFaTab({ myTeam, faPool = [], faYears = {}, setFaYears
       </>}
     </section></div></div>
     <details className="fa-help"><summary>補強ポイント・市場のルール</summary><p>先発4・中継ぎ3・抑え1は登録選手の目安です。捕手は通常一軍{TARGET_ACTIVE_CATCHERS}人、故障時も最低{MIN_ACTIVE_CATCHERS}人を優先し、支配下は一軍＋二軍で{MIN_TOTAL_BY_POS['捕手']}人を補強の目安にします。選手の能力や将来性を保証する評価ではありません。</p>{needs.length ? <ul>{needs.map(h => <li key={h}>{h}</li>)}</ul> : <p>この人数の目安を満たしています。</p>}{marketMode === 'offseason' && <p>国内FA・自由契約の補強期間です。外国人補強は翌シーズンの市場で行えます。</p>}<p>カウントの0は実測値。「未記録」は欠測、率の「—」は分母がない・算出できない状態です。</p></details>
-    {offer && <Confirm offer={offer} budget={budget} placement={marketPlacement(myTeam, offer.player)} onClose={close} onConfirm={confirm} error={validateMarketContract({ team: { ...myTeam, budget }, pool: faPool, player: offer.player, salary: offer.salary, years: offer.years, gameDay })} />}
+    {offer && <Confirm offer={offer} budget={budget} placement={marketPlacement(myTeam, offer.player)} onClose={close} onConfirm={confirm} error={validateMarketContract({ team: { ...myTeam, budget }, pool: faPool, player: offer.player, salary: offer.salary, years: offer.years, gameDay, teams: draftContext.teams, draftContext })} />}
   </section>;
 }

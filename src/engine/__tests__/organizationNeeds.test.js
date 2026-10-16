@@ -138,3 +138,8 @@ it('recomputes the same derived evaluation after a real save/load without persis
   expect(rows.get('baseball_manager_v1')).toBe(savedBefore);
   expect(restored.teams[0]).not.toHaveProperty('organizationNeeds');
 });
+it('uses the validated record of an accepted duplicate ID rather than an earlier other-club role',()=>{
+ const t=team(),draftPool=[pitcher('duplicate','先発',{_drafted:true,_r1winner:1}),player('duplicate',{pos:'遊撃手',_drafted:true,_r1winner:0})];
+ const r=evaluateOrganizationNeeds(t,{draftPool});expect(r.ok).toBe(true);
+ expect(r.roles.starter.acceptedPickCount).toBe(0);expect(r.roles.shortstop.acceptedPickCount).toBe(1);
+});

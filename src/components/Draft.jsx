@@ -1,3 +1,5 @@
+import { evaluateRosterCapacity } from '../engine/rosterCapacity';
+import { RosterCapacitySummary } from './RosterCapacitySummary';
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import React from "react";
 import { POSITIONS, DRAFT_ROUNDS, DRAFT_COMMENTS_MY, DRAFT_COMMENTS_CPU, DRAFT_LOTTERY_MAX_ROUNDS, MAX_SHIHAKA_TOTAL } from '../constants';
@@ -54,9 +56,9 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
   const finishLottery = (picks, auto) => { if (completed.current) return; completed.current = true; onDone(picks, auto); };
 
   const myTeam=teams.find(t=>t.id===myId);
-  const myShihaikaCount = registeredDraftCount(myTeam);
-  const myDraftedCount = confirmedPicks[myId] ? 1 : 0;
-  const myRemainingSlots = Math.max(0, MAX_SHIHAKA_TOTAL - myShihaikaCount - myDraftedCount);
+  const myCapacity = evaluateRosterCapacity(myTeam, { teams, draftPool: pool,
+    confirmedPicks: Object.fromEntries(Object.entries(confirmedPicks).map(([id,p])=>[id,p?.id ?? null])) });
+  const myRemainingSlots = myCapacity.ok ? myCapacity.remainingSlots : 0;
   const canMyTeamDraft = myRemainingSlots > 0;
   const amIActive=activeTeams.some(t=>t.id===myId);
   const priorUsedIds=new Set(Object.values(confirmedPicks).filter(Boolean).map(p=>p.id));
@@ -223,7 +225,7 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
 
   if(phase==="select") return <div className="draft-experience" data-ds="draft"><div className="draft-page">
     <header className="draft-header"><div><small>DRAFT {year}</small><h1>{roundLabel}</h1><p>全球団が同時に指名。競合は抽選で決まります。</p></div><Button variant="secondary" onClick={()=>setShowPreview(true)}>展望</Button></header>
-    <p>支配下登録 {myShihaikaCount+myDraftedCount}/{MAX_SHIHAKA_TOTAL} · 残枠 {myRemainingSlots}</p>
+    <RosterCapacitySummary capacity={myCapacity}/>
     {!roundPool.length?<section className="draft-panel"><p>指名できる候補がいなくなりました。確定済みの指名を引き継ぎます。</p><Button onClick={()=>finishLottery(confirmedPicks)}>候補が尽きたため結果へ</Button></section>:amIActive?<>
       {!canMyTeamDraft&&<p role="status">支配下登録人数が上限のため指名できません。</p>}
       <DraftCandidates pool={roundPool} session={session} onScout={id=>update(s=>scoutDraftCandidate(s,roundPool,id))}
@@ -359,9 +361,8 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoS
   const availPool=pool.filter(p=>!isPickedAfterRound1(p.id)&&!p._drafted);
   const myPicks=draftPicksForTeam(pool, drafted, myId);
   const myTeam = teams.find(t => Number(t.id) === Number(myId));
-  const myCurrentShihaikaCount = registeredDraftCount(myTeam);
-  const myTotalDrafted = myPicks.length;
-  const myRemainingSlots = Math.max(0, MAX_SHIHAKA_TOTAL - myCurrentShihaikaCount - myTotalDrafted);
+  const myCapacity = evaluateRosterCapacity(myTeam, {teams,draftPool:pool,drafted});
+  const myRemainingSlots = myCapacity.ok ? myCapacity.remainingSlots : 0;
   const canMyTeamDraft = myRemainingSlots > 0;
   const doScout=pid=>update(s=>scoutDraftCandidate(s,availPool,pid));
   const announcementTimer = useRef(null);
@@ -447,7 +448,7 @@ export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoS
   const ctx={teams,evaluation:session,draftPool:pool,drafted,round:(current?.round || 1)+1,nextTeams,noNextPick};
   return <div className="draft-experience" data-ds="draft"><div className="draft-page">
     <header className="draft-header"><div><small>DRAFT {year}</small><h1>{done?'ドラフト終了':`${(current?.round || 1)+1}巡目`}</h1><p>{isMyTurn?'あなたの指名です':done?'指名選手を確認して結果レビューへ':`${current?.team.name}が選択中`}</p></div><Button variant="secondary" onClick={()=>setShowPreview(true)}>展望</Button></header>
-    {!done&&<><p>支配下登録 {myCurrentShihaikaCount+myTotalDrafted}/{MAX_SHIHAKA_TOTAL} · 残枠 {myRemainingSlots}</p><div className="draft-actions"><Button variant="secondary" disabled={effectiveAutoSkip} onClick={()=>setLocalAutoSkip(true)}>残りを自動処理</Button>{effectiveAutoSkip&&<span role="status">自動処理中…</span>}</div></>}
+    {!done&&<><RosterCapacitySummary capacity={myCapacity}/><div className="draft-actions"><Button variant="secondary" disabled={effectiveAutoSkip} onClick={()=>setLocalAutoSkip(true)}>残りを自動処理</Button>{effectiveAutoSkip&&<span role="status">自動処理中…</span>}</div></>}
     {announcement&&<p role="status" className="draft-panel">{announcement.msg}</p>}
     {done?<section className="draft-panel"><h2>自チーム指名選手 ({myPicks.length}人)</h2>{myPicks.map(p=><div key={p.id} className="draft-result-row"><strong>{p.name}</strong><p>{session.snapshots[p.id]?.report.summary || '当時の評価記録なし'}</p></div>)}<Button onClick={()=>{if(finishedRef.current)return;finishedRef.current=true;onDraftDone(pool,drafted);}}>結果レビューへ →</Button></section>
       :<DraftCandidates pool={availPool} session={session} onScout={doScout} rankings={rankDraftProspects(myTeam,availPool,ctx.round,myPicks,ctx)} forecast={forecastDraft(teams,availPool,myId,ctx)} round={ctx.round} noNextPick={noNextPick} canPick={isMyTurn&&canMyTeamDraft} remainingSlots={myRemainingSlots} onPick={p=>myPick(p.id)} savedState={candidateView} onStateChange={setCandidateView}/>}

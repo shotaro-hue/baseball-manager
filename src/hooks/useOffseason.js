@@ -1,3 +1,4 @@
+import { draftCapacityContext } from '../engine/rosterCapacity';
 import {advanceFarmYear} from '../engine/farmMigration';
 import { applyTradeTransaction } from '../engine/tradeTransaction';
 import { nextSeasonMatchHistory } from '../engine/matchHistory';
@@ -384,7 +385,7 @@ export function useOffseason(gs) {
 
   const handledTradeMails = useRef(new Set());
   const tradeContextRef = useRef(null);
-  tradeContextRef.current = { teams, gameDay, schedule };
+  tradeContextRef.current = { teams, gameDay, schedule, year, offseasonPlan: gs.offseasonPlan };
   const handleTrade = (myOut, theirIn, tgtTeam, cash = 0) => {
     const current = tradeContextRef.current;
     if (current.pending) { notify('取引の反映中です', 'warn'); return false; }
@@ -394,7 +395,7 @@ export function useOffseason(gs) {
       return false;
     }
     const result = applyTradeTransaction(current.teams, { fromId: myId, toId: tgtTeam?.id,
-      outgoing: myOut, incoming: theirIn, cash });
+      outgoing: myOut, incoming: theirIn, cash }, draftCapacityContext(current.offseasonPlan, current.year, current.teams));
     if (!result.ok) { notify(result.error, 'warn'); return false; }
     // Update the command snapshot immediately, before React renders. Repeated
     // clicks/stale offer callbacks then fail current ownership validation.
@@ -816,7 +817,7 @@ export function useOffseason(gs) {
     const releasedIds=new Set([...waiverReleased.map(p=>p.id), ...(options.planning ? gs.offseasonPlan?.releasedIds || [] : [])]);
     const combinedPool=[...(options.pool || faPool),...waiverReleased.map(p => ({ ...p, marketLastStats: p.stats, faEnteredYear: year, faOriginTeamId: myId, faOriginTeamName: myTeam?.name,
       faOriginRoster: sourceTeam?.farm?.some(x => x.id === p.id) ? 'farm' : 'active' }))];
-    const faResult=processCpuFaBids(baseTeams,myId,combinedPool,baseTeams,year,'offseason');
+    const faResult=processCpuFaBids(baseTeams,myId,combinedPool,baseTeams,year,'offseason',draftCapacityContext(gs.offseasonPlan,year,baseTeams));
     setTeams(faResult.updatedTeams);
     setFaPool(faResult.remainingFaPool);
     faResult.news.forEach(n=>addNews(n));

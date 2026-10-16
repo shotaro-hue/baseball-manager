@@ -1,15 +1,17 @@
+import { controlledRosterCounts, evaluateRosterCapacity } from './rosterCapacity';
 import { MAX_SHIHAKA_TOTAL, MIN_SALARY_SHIHAKA } from '../constants';
 import { rng, rngf, clamp } from '../utils';
 import { analyzeTeamNeeds } from './trade';
 import { ownedPlayers } from './renewalRules';
-import { isIkuseiPlayer } from './rosterAutomation';
 import { draftPicksForTeam } from './offseasonResume';
 import { evaluateOrganizationNeeds } from './organizationNeeds';
 import { draftReport } from './draftReports';
 
-export const registeredDraftCount = team => ownedPlayers(team).filter(p => !isIkuseiPlayer(p)).length;
-export const remainingDraftSlots = (team, pool = [], drafted = {}) => Math.max(0,
-  MAX_SHIHAKA_TOTAL - registeredDraftCount(team) - draftPicksForTeam(pool, drafted, team.id).length);
+export const registeredDraftCount = team => controlledRosterCounts(team).controlledCount;
+export const remainingDraftSlots = (team, pool = [], drafted = {}, context = {}) => {
+  const capacity = evaluateRosterCapacity(team, { ...context, draftPool: pool, drafted });
+  return capacity.ok ? capacity.remainingSlots : 0;
+};
 export const draftRefused = (player, isMyTeam) => isMyTeam
   && rngf(0, 1) < clamp((player.potential - 70) / 200, 0, .15);
 export const drawDraftWinner = teams => teams[rng(0, teams.length - 1)];
@@ -174,6 +176,7 @@ export function applyDraftAcquisitions(teams, pool, drafted, year) {
   for (const p of pool) {
     const first = p._drafted ? p._r1winner : null;
     const later = drafted[p.id];
+    if (later === 'refused') continue;
     if (first != null && later != null && String(first) !== String(later)) return fail('当選球団が競合しています');
     const owner = later ?? first;
     if (owner == null || owner === 'refused') continue;
@@ -181,7 +184,9 @@ export function applyDraftAcquisitions(teams, pool, drafted, year) {
     if (!owned.has(p.id)) assignments.get(String(owner)).push(p);
   }
   for (const team of teams) {
-    if (registeredDraftCount(team) + assignments.get(String(team.id)).length > MAX_SHIHAKA_TOTAL)
+    const capacity = evaluateRosterCapacity(team, { teams, draftPool: pool, drafted });
+    if (!capacity.ok) return fail(`支配下人数が未確認です（${capacity.reason}）`);
+    if (capacity.overBy > 0)
       return fail(`支配下登録枠（${MAX_SHIHAKA_TOTAL}人）を超えます`);
   }
   return { ok: true, teams: teams.map(t => {

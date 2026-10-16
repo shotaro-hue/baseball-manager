@@ -321,7 +321,7 @@ function calcNeedMatch(player, needs) {
   return bonus;
 }
 
-export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = null, marketMode = 'season') {
+export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = null, marketMode = 'season', draftContext = {}) {
   if (!faPool.length) return { updatedTeams: teams, remainingFaPool: faPool, news: [] };
 
   const news = [];
@@ -352,7 +352,7 @@ export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = nu
       const plan = getFrontOfficePlanPublic(team);
       const foMode = plan.mode;
       const candidates = remainingPool
-        .filter((p) => !signedPlayers.has(p.id) && !marketRosterError(team, p, [...teamMap.values()]))
+        .filter((p) => !signedPlayers.has(p.id) && !marketRosterError(team, p, [...teamMap.values()], draftContext))
         .map((p) => {
           if (!Number.isFinite(p.salary) || p.salary < 0) return null;
           const salary = Math.max(p.育成 ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA, p.salary);

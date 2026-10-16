@@ -39,3 +39,10 @@ it('rejects empty cash transfers and non-finite overflow', () => {
   const teams=fixture();teams[0].budget=Number.MAX_VALUE;teams[1].budget=Number.MAX_VALUE;
   expect(applyTradeTransaction(teams,{...request,cash:Number.MAX_VALUE}).ok).toBe(false);
 });
+it('checks both post-trade clubs against accepted but unowned draft reservations atomically',()=>{
+ const teams=fixture();teams[1].farm=Array.from({length:68},(_,i)=>p(100+i));teams[0].players.push(p(2));
+ const context={draftPool:[p('pick')],drafted:{pick:1}},before=JSON.stringify(teams);
+ expect(applyTradeTransaction(teams,{...request,outgoing:[p(0),p(2)]},context).ok).toBe(false);
+ expect(JSON.stringify(teams)).toBe(before);
+ expect(applyTradeTransaction(teams,request,context).ok).toBe(true);
+});

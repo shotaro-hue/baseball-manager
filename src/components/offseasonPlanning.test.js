@@ -241,3 +241,24 @@ it('uses the completed live season for an in-season extension, rather than a ret
   expect(text(ui.view.root.findByProps({ className: 'renewal-player-summary' }))).toContain('本塁打 30');
   expect(text(ui.view.root.findByProps({ className: 'renewal-player-summary' }))).not.toContain('移籍前');
 });
+it('does not let the embedded FA market spend a slot already reserved by a saved draft pick',()=>{
+ const ui=setup({teams:[team([p()],{farm:Array.from({length:68},(_,i)=>p(`farm-${i}`))})],plan:plan({stage:'open',tab:'market',draftPool:[p('rookie')],draftViews:{draft:{drafted:{rookie:0}}}})});
+ act(()=>ui.view.root.findByProps({'aria-label':'選手1の条件を見る'}).props.onClick());
+ expect(text(ui.view.toJSON())).toContain('支配下登録枠（70人）が満員です');
+ expect(ui.button('契約条件を確認する').props.disabled).toBe(true);
+ expect(latest.gs.myTeam.budget).toBe(10000);
+});
+it('separates actual controlled slots from release projections and displays unowned reservations',()=>{
+ const t=team([p()],{farm:[p('dev',{isIkusei:true})]}),pl=plan({intents:[{id:0,value:'release'}],draftPool:[p('rookie')],draftViews:{draft:{drafted:{rookie:0}}}});
+ const before=planningSummary(t,pl,2026),cancelled=planningSummary(t,{...pl,intents:[]},2026);
+ expect(before.capacity).toMatchObject({controlledCount:1,developmentCount:1,acceptedPickCount:1,remainingSlots:68});
+ expect(before.projectedCapacity).toMatchObject({releaseControlledCount:1,projectedControlledCount:1});
+ expect(cancelled.capacity).toEqual(before.capacity);expect(cancelled.projectedCapacity.projectedControlledCount).toBe(2);
+ const ui=setup({teams:[t],plan:pl});const rendered=text(ui.view.toJSON());
+ for(const label of ['支配下 1/70人','育成 1人','確定指名 1人','実際の残枠 68枠','放出候補反映後の支配下見込み 1人'])expect(rendered).toContain(label);
+ expect(pl).not.toHaveProperty('capacity');
+});
+it('shows unknown capacity for ambiguous ownership rather than inventing 70 vacant slots',()=>{
+ const ui=setup({teams:[team(),{...team(),id:1}]});
+ expect(text(ui.view.toJSON())).toContain('支配下人数は未確認');
+});

@@ -31,24 +31,24 @@ export function marketNeeds(team) {
   return hints;
 }
 
-export function validateMarketContract({ team, pool, player, salary, years, gameDay }) {
+export function validateMarketContract({ team, pool, player, salary, years, gameDay, teams = [team], draftContext = {} }) {
   if (!pool.some(p => p.id === player.id)) return 'この選手は現在の市場にいません';
-  const rosterError = marketRosterError(team, player);
+  const rosterError = marketRosterError(team, player, teams, draftContext);
   if (rosterError) return rosterError;
   if (player.isForeign && (!Number.isFinite(gameDay) || gameDay > FOREIGN_DEADLINE_DAY)) return '外国人補強の期限を過ぎているか、日程が未記録です';
   if (!Number.isFinite(salary) || salary <= 0 || !Number.isInteger(years) || years < 1 || years > 3) return '契約金額または年数を確認してください';
-  if (player.育成 && player.departureReason !== 'ikusei_expiry' && years > Math.max(1, 3 - (player.ikuseiYears || 0))) return '育成3年満了までに収まる契約年数を選んでください';
+  if (isIkuseiPlayer(player) && player.departureReason !== 'ikusei_expiry' && years > Math.max(1, 3 - (player.ikuseiYears || 0))) return '育成3年満了までに収まる契約年数を選んでください';
   if (!Number.isFinite(team?.budget)) return '予算が未記録のため契約できません';
   if (team.budget < salary * years) return '予算が不足しています';
   return null;
 }
 
-export function addMarketSigning(team, player, salary, years, year, marketMode = 'season') {
-  if (marketRosterError(team, player)) return team;
+export function addMarketSigning(team, player, salary, years, year, marketMode = 'season', draftContext = {}) {
+  if (marketRosterError(team, player, draftContext.teams ?? [team], draftContext)) return team;
   const placement = marketPlacement(team, player);
   const prepared = marketMode === 'offseason' ? prepareOffseasonFreeAgent(player, year, team.id) : player;
   const signed = { ...prepared, isFA: false, salary, contractYears: years, contractYearsLeft: years, contractSignedYear: year,
-    ...(player.育成 && player.departureReason === 'ikusei_expiry' ? { ikuseiYears: 0 } : {}) };
+    ...(isIkuseiPlayer(player) && player.departureReason === 'ikusei_expiry' ? { ikuseiYears: 0 } : {}) };
   return { ...team, budget: team.budget - salary * years,
     players: placement.farm ? team.players : [...team.players, signed],
     farm: placement.farm ? [...(team.farm || []), signed] : team.farm || [],

@@ -60,3 +60,22 @@ for(const cpu of [false,true]) {
     expect(loaded).toEqual(first);
   });
 }
+
+test('trade rejects an exchange that would overfill the other recipient at 70 atomically',async({page})=>{
+ test.setTimeout(90000);await page.setViewportSize({width:390,height:844});
+ const f=await setup(page,true);
+ await page.evaluate(async()=>{
+  const {loadGame,saveGame}=await import('/baseball-manager/src/engine/saveload.js');const s=await loadGame();
+  const mail=s.mailbox.find(m=>m.id==='trade-test'),other=s.teams.find(t=>t.id===mail.offer.from.id),mine=s.teams.find(t=>t.id===s.myId);
+  const template=other.farm[0],n=[...other.players,...other.farm].filter(p=>!p.育成&&!p.isIkusei).length;
+  other.farm.push(...Array.from({length:70-n},(_,i)=>({...template,id:`trade-capacity-${i}`,育成:false,isIkusei:false})));
+  const used=new Set(mail.offer.want.map(p=>p.id));mail.offer.want.push(mine.players.find(p=>!used.has(p.id)));
+  if(!(await saveGame(s)).ok)throw Error('save failed');
+ });
+ await reloadAndLoad(page);const before=await saveHub(page);
+ await mainNavigation(page,true).getByRole('button',{name:/^その他/}).click();
+ await page.getByText('取引検証',{exact:true}).click();await page.getByRole('button',{name:'✅ 承諾する',exact:true}).click();
+ await expect(page.getByText('支配下登録枠（70人）を超えます',{exact:true})).toBeVisible();
+ const after=await saveHub(page);expect(after.teams).toEqual(before.teams);expect(after.seasonHistory).toEqual(before.seasonHistory);
+ expect(after.mailbox.find(m=>m.id==='trade-test').resolved).toBe(false);
+});

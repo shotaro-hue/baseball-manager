@@ -100,3 +100,24 @@ for(const width of [360,390,1440])test(`UI-02E actual goals registration promoti
  await page.screenshot({path:info.outputPath(`actual-talk-${width}.png`),fullPage:true});
  const saved=await saveHub(page);await reloadAndLoad(page);const restored=await saveHub(page);expect(restored.teams).toEqual(saved.teams);expect(restored.farmCompetition).toEqual(saved.farmCompetition);expect(restored.seasonHistory).toEqual(saved.seasonHistory);expect(errors).toEqual([]);
 });
+
+for(const width of [360,390,1440])test(`roster capacity conversion respects both flags and 69/70 after save resume ${width}`,async({page})=>{
+ test.setTimeout(90000);await page.setViewportSize({width,height:900});
+ const {installCapacityFixture}=await import('./helpers/rosterCapacity');
+ const initial=await installCapacityFixture(page,{screen:'hub'});
+ await mainNavigation(page,width<1024).getByRole('button',{name:/^編成/}).click();
+ await page.locator('.tabs-nav').getByRole('button',{name:'ロスター',exact:true}).click();
+ await page.locator('.roster-overview').getByRole('button',{name:'二軍',exact:true}).click();
+ await page.getByRole('button',{name:'二軍の育成・起用設定へ',exact:true}).click();
+ await expect(farm(page).locator('[data-roster-capacity]')).toContainText('支配下 69/70人 · 育成 2人');
+ const opener=farm(page).getByRole('button',{name:'旧形式育成の選手詳細を開く',exact:true});
+ await opener.click();await page.keyboard.press('Escape');await expect(opener).toBeFocused();
+ const registration=farm(page).getByRole('button',{name:'旧形式育成を支配下登録する',exact:true});await registration.click();
+ const dialog=page.getByRole('dialog',{name:'支配下登録の確認',exact:true});await expect(dialog).toContainText('69 → 70');await dialog.getByRole('button',{name:'登録を確定',exact:true}).click();
+ await expect(farm(page).locator('[data-roster-capacity]')).toContainText('支配下 70/70人 · 育成 1人');
+ await expect(farm(page).getByRole('button',{name:'育成契約選手を支配下登録する',exact:true})).toBeDisabled();
+ await layout(page,farm(page));const saved=await saveHub(page),t=saved.teams.find(t=>t.id===saved.myId),original=initial.teams.find(t=>t.id===saved.myId);
+ expect(t.budget).toBe(original.budget-180);expect(t.farm.find(p=>p.id==='capacity-dev-a')).toMatchObject({育成:false,isIkusei:false,salary:420});
+ expect(t.history).toEqual(original.history);expect(t.players.map(p=>p.id)).toEqual(original.players.map(p=>p.id));
+ await reloadAndLoad(page);expect((await saveHub(page)).teams).toEqual(saved.teams);
+});
