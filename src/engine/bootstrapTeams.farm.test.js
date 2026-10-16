@@ -23,6 +23,7 @@ function checkTeams(teams, real) {
       ? NPB2025_ROSTERS[team.id].batters.length + NPB2025_ROSTERS[team.id].pitchers.length + 18
       : 47;
     expect(all.length, `team ${team.id}: total`).toBe(expected);
+    expect(team.players.length, `team ${team.id}: active roster`).toBe(28);
     expect(new Set(all.map(p => p.id)).size).toBe(expected);
     const catchers = team.players.filter(p => !p.isPitcher && p.pos === '捕手'
       && !isIkuseiPlayer(p) && Number(p.injuryDaysLeft || 0) === 0);

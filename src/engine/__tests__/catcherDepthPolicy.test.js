@@ -40,8 +40,43 @@ it('starts all clubs with at least six controlled catchers and three active catc
     expect(owned(team).filter(p => !p.isPitcher && p.pos === '捕手' && !p.育成 && !p.isIkusei).length,
       `club ${team.id}: controlled depth`).toBeGreaterThanOrEqual(6);
     expect(activeCatchers(team).length, `club ${team.id}: active`).toBe(3);
+    expect(team.players, `club ${team.id}: active roster`).toHaveLength(28);
     expect(farmCatchers(team).length, `club ${team.id}: farm`).toBeGreaterThanOrEqual(3);
   }
+});
+
+it('fills the active bench after returning a surplus catcher to the farm', () => {
+  const team = structuredClone(fixture.teams[0]), before = structuredClone(team);
+  expect(team.players).toHaveLength(28);
+  expect(activeCatchers(team)).toHaveLength(4);
+  const { team: result, changes, validation } = buildFullRosterPlan(team);
+  expect(result.players).toHaveLength(28);
+  expect(activeCatchers(result)).toHaveLength(3);
+  expect(farmCatchers(result).length).toBeGreaterThanOrEqual(1);
+  expect(validation.errors).toEqual([]);
+  expect(changes.some(r => r.type === 'promote' && r.upPlayer.pos !== '捕手')).toBe(true);
+  expect(owned(result).map(p => p.id).sort()).toEqual(owned(before).map(p => p.id).sort());
+  expect(team).toEqual(before);
+});
+
+it.each(['cooldown', 'developmental', 'foreign-limit'])('keeps a vacancy when every replacement is blocked by %s', constraint => {
+  const team = structuredClone(fixture.teams[0]);
+  if (constraint === 'foreign-limit') {
+    team.players.find(p => p.pos !== '捕手' && !p.isForeign).isForeign = true;
+  }
+  for (const p of team.farm.filter(p => p.pos !== '捕手')) {
+    if (constraint === 'cooldown') p.registrationCooldownDays = 10;
+    else if (constraint === 'developmental') p.isIkusei = true;
+    else p.isForeign = true;
+  }
+  const before = structuredClone(team);
+  const { team: result, validation } = buildFullRosterPlan(team);
+  expect(result.players).toHaveLength(27);
+  expect(activeCatchers(result)).toHaveLength(3);
+  expect(farmCatchers(result).length).toBeGreaterThanOrEqual(1);
+  expect(validation.errors).toEqual([]);
+  expect(result.players.every(p => before.players.some(q => q.id === p.id))).toBe(true);
+  expect(team).toEqual(before);
 });
 
 it.each([[0, 3, 3], [1, 3, 2], [2, 3, 1], [3, 2, 1], [4, 2, 0]])(
