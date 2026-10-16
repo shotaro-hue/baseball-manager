@@ -123,6 +123,7 @@ it('requires unresolved renewals to finish, but confirms release candidates and 
   expect(latest.gs.screen).toBe('waiver_result'); expect(latest.gs.offseasonPlan.stage).toBe('results');
   expect(latest.gs.offseasonPlan.results.unclaimed.map(p => p.id)).toContain(0);
   expect(latest.gs.offseasonPlan.draftPool[0].id).toBe('draft-1');
+  expect(latest.gs.offseasonPlan.draftRules).toEqual({version:2,maxPicks:10});
   expect(latest.os.handlePlanningFinish()).toBe(false);
 });
 it('restores offers, round count, logs and market filters from serialized data without rerunning CPU renewal', async () => {

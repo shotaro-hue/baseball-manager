@@ -198,3 +198,6 @@ test('role-specific CPU picks fill SP then relief across actual save/load and ne
 
 import { registerCapacityPlanningCases } from './helpers/rosterCapacity';
 registerCapacityPlanningCases([360]);
+
+import {registerVariableDraftCase} from './helpers/variableDraft';
+registerVariableDraftCase(360,'six');

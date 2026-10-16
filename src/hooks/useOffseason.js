@@ -8,6 +8,7 @@ import { calcSeasonAwards, updateRecords, checkHallOfFame } from '../engine/awar
 import { evalOffer, cpuRenewContracts, processCpuFaBids, getFaThreshold, getFaProgress, calcPlayerDemand } from '../engine/contract';
 import { applyDraftAcquisitions } from '../engine/draftRules';
 import { initDraftPool } from '../engine/draft';
+import {newDraftRules} from '../engine/draftConference';
 import { calcPostingRequestProb, calcPostingBid, POSTING_FEE_RATE } from '../engine/posting';
 import { calcOffseasonPopDelta, driftPopularity } from '../engine/fanSentiment';
 import { SEASON_PARAMS, getDefaultParams } from '../data/scheduleParams.js';
@@ -302,7 +303,7 @@ export function useOffseason(gs) {
   const handleDraftComplete = (pl, dr) => {
     const { teams, year, offseasonPlan, screen } = draftContextRef.current;
     if (draftAppliedRef.current === year || offseasonPlan?.draftApplied || (offseasonPlan && screen !== 'draft_review')) return false;
-    const result = applyDraftAcquisitions(teams, pl, dr, year);
+    const result = applyDraftAcquisitions(teams, pl, dr, year, {rules:offseasonPlan?.draftRules,log:offseasonPlan?.draftViews?.draft?.log});
     if (!result.ok) { gs.notify?.(result.error); return false; }
     const ownedIds = new Set(teams.flatMap(t => [...t.players, ...(t.farm || [])].map(p => p.id)));
     const picksFor=teamId=>draftPicksForTeam(pl, dr, teamId).filter(p => !ownedIds.has(p.id));
@@ -850,6 +851,7 @@ export function useOffseason(gs) {
     setFaYears({});
     const nextDraftPool = initDraftPool(faResult.updatedTeams.find(t => t.id === myId));
     setDraftPool(nextDraftPool);
+    gs.setOffseasonPlan?.(prev => prev && ({...prev,draftRules:newDraftRules()}));
     if (options.planning) gs.setOffseasonPlan(prev => ({ ...prev, stage: 'results',
       results: { claimed: claimedNew.map(c => ({ ...c, player: planningPlayer(c.player) })), unclaimed: unclaimedNew.map(planningPlayer),
         allClaimed: (faResult.claimed || []).map(c => ({ ...c, player: planningPlayer(c.player) })) }, draftPool: nextDraftPool }));

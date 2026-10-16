@@ -24,6 +24,6 @@ export function decodeLottery(state, teams, pool) {
   return out;
 }
 export function draftPicksForTeam(pool, drafted, teamId) {
-  return pool.filter(p => (p._drafted && String(p._r1winner) === String(teamId))
-    || (drafted?.[p.id] != null && String(drafted[p.id]) === String(teamId)));
+  return pool.filter(p => drafted?.[p.id] !== 'refused' && ((p._drafted && String(p._r1winner) === String(teamId))
+    || (drafted?.[p.id] != null && String(drafted[p.id]) === String(teamId))));
 }

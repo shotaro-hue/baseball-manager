@@ -1,26 +1,30 @@
+import {draftRulesFor,draftParticipation,draftEndLabel} from '../engine/draftConference';
+import DraftEndSelection from './DraftEndSelection';
 import { evaluateRosterCapacity } from '../engine/rosterCapacity';
 import { RosterCapacitySummary } from './RosterCapacitySummary';
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import React from "react";
-import { POSITIONS, DRAFT_ROUNDS, DRAFT_COMMENTS_MY, DRAFT_COMMENTS_CPU, DRAFT_LOTTERY_MAX_ROUNDS, MAX_SHIHAKA_TOTAL } from '../constants';
+import { DRAFT_COMMENTS_MY, DRAFT_COMMENTS_CPU, DRAFT_LOTTERY_MAX_ROUNDS } from '../constants';
 import { rng } from '../utils';
-import { remainingDraftSlots, chooseDraftProspect, autoFirstRound, draftRefused, drawDraftWinner, registeredDraftCount, rankDraftProspects, forecastDraft } from '../engine/draftRules';
-import { HandBadge } from './ui';
+import { remainingDraftSlots, chooseDraftProspect, resolveFirstRound, draftRefused, drawDraftWinner, rankDraftProspects, forecastDraft } from '../engine/draftRules';
 import { Button, StateLabel } from './design-system/primitives';
 import DraftCandidates from './DraftCandidates';
 import DraftPreviewScreen from './DraftPreview';
 import { useDraftEvaluation } from '../hooks/useDraftEvaluation';
-import { draftReport, draftBand, publicDraftTier, scoutDraftCandidate, rememberDraftReport } from '../engine/draftReports';
+import { draftBand, publicDraftTier, scoutDraftCandidate, rememberDraftReport } from '../engine/draftReports';
 export { DraftPreviewScreen };
 
 import { decodeLottery, encodeLottery, draftPicksForTeam } from '../engine/offseasonResume';
 
 
 
-export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onStateChange,draftAllocation,evaluation,onEvaluationChange}){
+export function DraftLotteryScreen({teams,myId,year,pool,rules,onDone,savedState,onStateChange,draftAllocation,evaluation,onEvaluationChange}){
   const [restored] = useState(() => decodeLottery(savedState, teams, pool));
   const {session,update}=useDraftEvaluation({teams,myId,year,pool,draftAllocation,evaluation,onEvaluationChange,savedState,started:true});
   const [candidateView,setCandidateView]=useState(restored.candidateView || {});
+  const conferenceRules=draftRulesFor(rules);
+  const [endedTeams,setEndedTeams]=useState(restored.endedTeams || {});
+  const endedRef=useRef(endedTeams);
   const completed = useRef(false);
   const phaseRef = useRef(restored.phase ?? 'select');
   const drawn = useRef(new Set());
@@ -30,7 +34,7 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
   const [showPreview,setShowPreview]=React.useState(restored.showPreview ?? false);
   // ラウンド: 0=1位, 1=外れ1位, 2=外れ外れ1位...（重複あれば再指名ループ）
   const [hazureRound,setHazureRound]=React.useState(restored.hazureRound ?? 0);
-  const [activeTeams,setActiveTeams]=React.useState(()=>restored.activeTeams ?? [...teams].sort((a,b)=>a.wins-b.wins).filter(t=>remainingDraftSlots(t)>0));
+  const [activeTeams,setActiveTeams]=React.useState(()=>restored.activeTeams ?? [...teams].sort((a,b)=>a.wins-b.wins).filter(t=>draftParticipation(t,pool,{}, {rules,teams,endedTeams:restored.endedTeams}).eligible));
   const [confirmedPicks,setConfirmedPicks]=React.useState(restored.confirmedPicks ?? {});
   // 現ラウンド
   const [myPick,setMyPick]=React.useState(restored.myPick ?? null);
@@ -48,18 +52,19 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
   const [round1Result,setRound1Result]=React.useState(restored.round1Result ?? {});
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   // Bridge candidate-view commits into the save state before a same-task save.
-  useLayoutEffect(() => { onStateChange?.(encodeLottery({ phase, showPreview, hazureRound, activeTeams, confirmedPicks,
+  useLayoutEffect(() => { onStateChange?.(encodeLottery({ endedTeams, phase, showPreview, hazureRound, activeTeams, confirmedPicks,
     myPick, cpuPicks, animStep, pendingConflicts, currentConflictIdx, lotteryTarget, lotteryTeams,
     lotteryResult, lotteryRound, resolvedPicks, allLotteryLosers, round1Result,candidateView,...(!onEvaluationChange?{evaluation:session}:{}) })); },
-    [phase, showPreview, hazureRound, activeTeams, confirmedPicks, myPick, cpuPicks, animStep, pendingConflicts,
+    [endedTeams, phase, showPreview, hazureRound, activeTeams, confirmedPicks, myPick, cpuPicks, animStep, pendingConflicts,
       currentConflictIdx, lotteryTarget, lotteryTeams, lotteryResult, lotteryRound, resolvedPicks, allLotteryLosers, round1Result, candidateView, session, onStateChange]);
-  const finishLottery = (picks, auto) => { if (completed.current) return; completed.current = true; onDone(picks, auto); };
+  const finishLottery = (picks, auto, ended=endedRef.current) => { if (completed.current) return; completed.current = true; onDone(picks, auto, ended); };
 
   const myTeam=teams.find(t=>t.id===myId);
   const myCapacity = evaluateRosterCapacity(myTeam, { teams, draftPool: pool,
     confirmedPicks: Object.fromEntries(Object.entries(confirmedPicks).map(([id,p])=>[id,p?.id ?? null])) });
   const myRemainingSlots = myCapacity.ok ? myCapacity.remainingSlots : 0;
-  const canMyTeamDraft = myRemainingSlots > 0;
+  const myParticipation=draftParticipation(myTeam,pool,{}, {rules,teams,endedTeams,confirmedPicks:Object.fromEntries(Object.entries(confirmedPicks).map(([id,p])=>[id,p?.id ?? null]))});
+  const canMyTeamDraft = myParticipation.eligible;
   const amIActive=activeTeams.some(t=>t.id===myId);
   const priorUsedIds=new Set(Object.values(confirmedPicks).filter(Boolean).map(p=>p.id));
   const roundPool=pool.filter(p=>!p._drafted&&!priorUsedIds.has(p.id));
@@ -69,11 +74,15 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
   // CPU指名（現ラウンドのactiveTeams・roundPoolを使用）
   const buildCpuPicks=()=>{
     const picks={};
+    const ended={...endedRef.current};
     activeTeams.forEach(t=>{
-      if(t.id===myId) return;
+      if(t.id===myId || ended[t.id]) return;
       if (remainingDraftSlots(t) <= 0) return;
-      picks[t.id]=chooseDraftProspect(t,roundPool,1,[],{teams,evaluation:session,activeTeamIds:activeTeams.map(t=>t.id)});
+      const pick=chooseDraftProspect(t,roundPool,1,[],{rules,teams,evaluation:session,endedTeams:ended,activeTeamIds:activeTeams.map(t=>t.id),draftPool:pool});
+      if(pick)picks[t.id]=pick;
+      else ended[t.id]='no-upgrade';
     });
+    endedRef.current=ended;setEndedTeams(ended);
     return picks;
   };
 
@@ -81,7 +90,8 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
   const handleAnnounce=(chosen)=>{
     const selected=chosen?.id!=null?chosen:myPick;
     if (phaseRef.current !== 'select') return;
-    if(!selected&&amIActive&&canMyTeamDraft&&roundPool.length) return;
+    if(selected&&endedRef.current[myId])return;
+    if(!selected&&amIActive&&!endedRef.current[myId]&&canMyTeamDraft&&roundPool.length) return;
     if(selected&&amIActive){if(!roundPool.some(p=>p.id===selected.id))return;setMyPick(selected);update(s=>rememberDraftReport(s,selected.id));}
     const cpu=buildCpuPicks();
     phaseRef.current = 'announce';
@@ -104,7 +114,7 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
   // 現ラウンドの競合検出（重複OK → くじ引き、なければラウンド終了）
   const processConflicts=(cpu)=>{
     const allPicks={...cpu};
-    if(amIActive&&canMyTeamDraft&&myPick) allPicks[myId]=myPick;
+    if(amIActive&&!endedRef.current[myId]&&canMyTeamDraft&&myPick) allPicks[myId]=myPick;
     const byPlayer={};
     Object.entries(allPicks).forEach(([tid,p])=>{
       if(!p) return;
@@ -154,7 +164,7 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
       });
     });
     const cpu=cpuPicks||{};
-    const allPicks={...cpu};if(amIActive&&canMyTeamDraft&&myPick) allPicks[myId]=myPick;
+    const allPicks={...cpu};if(amIActive&&!endedRef.current[myId]&&canMyTeamDraft&&myPick) allPicks[myId]=myPick;
     const loserIds=new Set(allLosers.map(t=>String(t.id)));
     const finalRoundPicks={};
     Object.entries(allPicks).forEach(([tid,p])=>{
@@ -208,9 +218,17 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
   // Full-auto uses the same independent nominations and fair lottery.
   const handleAutoAll=()=>{
     if (phaseRef.current !== 'select' || completed.current) return;
-    const winners=autoFirstRound(allSorted,roundPool,{evaluation:session});
-    if(winners[myId])update(s=>rememberDraftReport(s,winners[myId].id));
-    finishLottery(winners,true);
+    const result=resolveFirstRound(activeTeams,roundPool,{rules,teams:allSorted,evaluation:session,endedTeams:endedRef.current});
+    if(result.picks[myId])update(s=>rememberDraftReport(s,result.picks[myId].id));
+    finishLottery({...confirmedPicks,...result.picks},true,result.endedTeams);
+  };
+
+  const endMySelection=()=>{
+    if(conferenceRules.version!==2||phaseRef.current!=='select'||endedRef.current[myId])return;
+    const ended={...endedRef.current,[myId]:'manual'};
+    endedRef.current=ended;setEndedTeams(ended);setMyPick(null);
+    const next=activeTeams.filter(t=>t.id!==myId);setActiveTeams(next);
+    if(!next.length){setPhase('done');phaseRef.current='done';}
   };
 
   if(showPreview) return(
@@ -219,21 +237,23 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
         <span style={{fontSize:12,color:"#94a3b8"}}>📋 ドラフト展望 (参考)</span>
         <button className="btn" style={{fontSize:11,padding:"4px 14px",background:"rgba(148,163,184,.1)",color:"#94a3b8",border:"1px solid rgba(148,163,184,.2)"}} onClick={()=>setShowPreview(false)}>← 戻る</button>
       </div>
-      <DraftPreviewScreen teams={teams} myId={myId} year={year} pool={pool} draftAllocation={session.allocation} evaluation={session} onEvaluationChange={onEvaluationChange} onAllocationChange={null} onStart={()=>setShowPreview(false)} startLabel="← ドラフトに戻る"/>
+      <DraftPreviewScreen teams={teams} myId={myId} year={year} pool={pool} rules={rules} endedTeams={endedTeams} draftAllocation={session.allocation} evaluation={session} onEvaluationChange={onEvaluationChange} onAllocationChange={null} onStart={()=>setShowPreview(false)} startLabel="← ドラフトに戻る"/>
     </div>
   );
 
   if(phase==="select") return <div className="draft-experience" data-ds="draft"><div className="draft-page">
     <header className="draft-header"><div><small>DRAFT {year}</small><h1>{roundLabel}</h1><p>全球団が同時に指名。競合は抽選で決まります。</p></div><Button variant="secondary" onClick={()=>setShowPreview(true)}>展望</Button></header>
     <RosterCapacitySummary capacity={myCapacity}/>
+    <p role="status">当年指名 {myParticipation.count}/{myParticipation.maxPicks}人{endedTeams[myId]&&` · ${draftEndLabel(endedTeams[myId])}`}</p>
+    {conferenceRules.version===2&&amIActive&&canMyTeamDraft&&<DraftEndSelection onEnd={endMySelection}/>}
     {!roundPool.length?<section className="draft-panel"><p>指名できる候補がいなくなりました。確定済みの指名を引き継ぎます。</p><Button onClick={()=>finishLottery(confirmedPicks)}>候補が尽きたため結果へ</Button></section>:amIActive?<>
       {!canMyTeamDraft&&<p role="status">支配下登録人数が上限のため指名できません。</p>}
       <DraftCandidates pool={roundPool} session={session} onScout={id=>update(s=>scoutDraftCandidate(s,roundPool,id))}
         rankings={rankDraftProspects(myTeam,roundPool,1,[],{teams,evaluation:session})}
-        forecast={forecastDraft(teams,roundPool,myId,{evaluation:session,activeTeamIds:activeTeams.map(t=>t.id)})}
+        forecast={forecastDraft(teams,roundPool,myId,{rules,endedTeams,evaluation:session,activeTeamIds:activeTeams.map(t=>t.id)})}
         canPick={canMyTeamDraft} remainingSlots={myRemainingSlots} onPick={handleAnnounce} savedState={candidateView} onStateChange={setCandidateView}/>
       {!canMyTeamDraft&&<Button onClick={handleAnnounce}>発表を見る →</Button>}
-    </>:<section className="draft-panel"><p>{canMyTeamDraft?'あなたの球団は指名が確定しました':'登録上限のため指名を見送ります'}</p><p>{activeTeams.map(t=>t.name).join(' / ')} が選択中</p><Button onClick={handleAnnounce}>発表を見る →</Button></section>}
+    </>:<section className="draft-panel"><p>{endedTeams[myId]?'あなたの球団は選択終了しました':canMyTeamDraft?'あなたの球団は指名が確定しました':'登録上限のため指名を見送ります'}</p><p>{activeTeams.map(t=>t.name).join(' / ')} が選択中</p><Button onClick={handleAnnounce}>発表を見る →</Button></section>}
     {hazureRound===0&&<Button variant="secondary" onClick={handleAutoAll}>全ドラフト自動処理（1巡目〜全巡一括）</Button>}
   </div></div>;
 
@@ -327,132 +347,118 @@ export function DraftLotteryScreen({teams,myId,year,pool,onDone,savedState,onSta
 }
 
 
-export function DraftScreen({teams,myId,year,pool,draftAllocation,autoSkip:autoSkipProp,onDraftDone,savedState,onStateChange,evaluation,onEvaluationChange}){
-  const alloc=draftAllocation??{pitcher:50,batter:50};
+export function DraftScreen({teams,myId,year,pool,rules,draftAllocation,autoSkip:autoSkipProp,onDraftDone,savedState,onStateChange,evaluation,onEvaluationChange}){
   const {session,update}=useDraftEvaluation({teams,myId,year,pool,draftAllocation,evaluation,onEvaluationChange,savedState,started:true});
+  const conferenceRules=draftRulesFor(rules);
   const [candidateView,setCandidateView]=useState(savedState?.candidateView || {});
   const allSorted=[...teams].sort((a,b)=>a.wins-b.wins);
-  const draftOrder=[];
-  for(let round=0;round<DRAFT_ROUNDS;round++){allSorted.forEach(t=>draftOrder.push({round,team:t}));}
-  // 1巡目はlotteryで処理済みなのでスキップ
-  const draftOrderFiltered=draftOrder.filter(function(d){return d.round>0;});
+  const draftOrderFiltered=[];
+  for(let round=1;round<conferenceRules.maxPicks;round++)allSorted.forEach(team=>draftOrderFiltered.push({round,team}));
   const [pickIdx,setPickIdx]=useState(savedState?.pickIdx ?? 0);
   const [drafted,setDrafted]=useState(savedState?.drafted ?? {});
-  const [log,setLog]=useState(() => (savedState?.log || []).map(r => ({ ...r, team: teams.find(t=>t.id===r.team), player: pool.find(p=>p.id===r.player) })).filter(r=>r.team&&r.player));
+  const [log,setLog]=useState(()=>(savedState?.log || []).map(r=>({...r,team:teams.find(t=>t.id===r.team),player:pool.find(p=>p.id===r.player)})).filter(r=>r.team&&r.player));
+  const [endedTeams,setEndedTeams]=useState(savedState?.endedTeams || {});
+  const endedRef=useRef(endedTeams);
   const [done,setDone]=useState(savedState?.done ?? false);
-  const nextPickRef = useRef(pickIdx);
-  const finishedRef = useRef(false);
-  const scouted=useMemo(()=>new Set(session.scouted),[session.scouted]);
-  const scoutPt=session.points;
+  const nextPickRef=useRef(pickIdx),finishedRef=useRef(false);
+  const scouted=useMemo(()=>new Set(session.scouted),[session.scouted]),scoutPt=session.points;
   const [announcement,setAnnouncement]=useState(null);
-  const [autoRunning,setAutoRunning]=useState(false);
   const [localAutoSkip,setLocalAutoSkip]=useState(savedState?.localAutoSkip ?? !!autoSkipProp);
   const effectiveAutoSkip=autoSkipProp||localAutoSkip;
   const [showPreview,setShowPreview]=useState(savedState?.showPreview ?? false);
-  useLayoutEffect(() => { onStateChange?.({ pickIdx, drafted, log: log.map(r=>({ ...r, team: r.team.id, player: r.player.id })),
-    done, scouted: [...scouted], scoutPt, localAutoSkip, showPreview,candidateView,...(!onEvaluationChange?{evaluation:session}:{}) }); },
-    [pickIdx, drafted, log, done, scouted, scoutPt, localAutoSkip, showPreview,candidateView,session,onStateChange]);
+  useLayoutEffect(()=>{onStateChange?.({pickIdx,drafted,log:log.map(r=>({...r,team:r.team.id,player:r.player.id})),
+    endedTeams,done,scouted:[...scouted],scoutPt,localAutoSkip,showPreview,candidateView,...(!onEvaluationChange?{evaluation:session}:{})});},
+    [pickIdx,drafted,log,endedTeams,done,scouted,scoutPt,localAutoSkip,showPreview,candidateView,session,onStateChange]);
   const current=draftOrderFiltered[pickIdx];
-
-  const isMyTurn=current&&current.team.id===myId&&!done;
-  const isPickedAfterRound1=pid=>Object.prototype.hasOwnProperty.call(drafted,pid);
-  // 1巡目で指名済みの選手を除外
-  const predrafted=pool.filter(p=>p._drafted).reduce((a,p)=>{a[p.id]=p._r1winner;return a;},{});
-  const availPool=pool.filter(p=>!isPickedAfterRound1(p.id)&&!p._drafted);
-  const myPicks=draftPicksForTeam(pool, drafted, myId);
-  const myTeam = teams.find(t => Number(t.id) === Number(myId));
-  const myCapacity = evaluateRosterCapacity(myTeam, {teams,draftPool:pool,drafted});
-  const myRemainingSlots = myCapacity.ok ? myCapacity.remainingSlots : 0;
-  const canMyTeamDraft = myRemainingSlots > 0;
-  const doScout=pid=>update(s=>scoutDraftCandidate(s,availPool,pid));
-  const announcementTimer = useRef(null);
-  useEffect(() => () => clearTimeout(announcementTimer.current), []);
-  const announce=(msg,color="#f5c842")=>{setAnnouncement({msg,color});clearTimeout(announcementTimer.current);announcementTimer.current=setTimeout(()=>setAnnouncement(null),2200);};
+  const isMyTurn=current&&current.team.id===myId&&!done&&!endedTeams[myId];
+  const availPool=pool.filter(p=>!Object.hasOwn(drafted,p.id)&&!p._drafted);
+  const myPicks=draftPicksForTeam(pool,drafted,myId);
+  const myTeam=teams.find(t=>String(t.id)===String(myId));
+  const myCapacity=evaluateRosterCapacity(myTeam,{teams,draftPool:pool,drafted});
+  const myRemainingSlots=myCapacity.ok?myCapacity.remainingSlots:0;
+  const participation=(team,nextDrafted=drafted,nextLog=log,ended=endedRef.current)=>draftParticipation(team,pool,nextDrafted,{rules,teams,log:nextLog,endedTeams:ended});
+  const mine=participation(myTeam);
+  const canMyTeamDraft=mine.eligible;
+  const announcementTimer=useRef(null);
+  useEffect(()=>()=>clearTimeout(announcementTimer.current),[]);
+  const announce=(msg,color='#f5c842')=>{setAnnouncement({msg,color});clearTimeout(announcementTimer.current);announcementTimer.current=setTimeout(()=>setAnnouncement(null),2200);};
+  const closeClub=(teamId,reason)=>{const ended={...endedRef.current,[teamId]:reason};endedRef.current=ended;setEndedTeams(ended);};
+  const advance=(nextDrafted=drafted,nextLog=log)=>{
+    let next=pickIdx+1;
+    while(next<draftOrderFiltered.length&&!participation(draftOrderFiltered[next].team,nextDrafted,nextLog).eligible)next++;
+    nextPickRef.current=next;
+    if(next>=draftOrderFiltered.length)setDone(true);
+    else setPickIdx(next);
+  };
   const doPick=(pick,isMe)=>{
-    if (!current || done || nextPickRef.current !== pickIdx || isPickedAfterRound1(pick.id) || pick._drafted || remainingDraftSlots(current.team,pool,drafted) <= 0) return;
-    nextPickRef.current = pickIdx + 1;
+    if(!pick||!current||done||nextPickRef.current!==pickIdx||!participation(current.team).eligible
+      ||!availPool.some(p=>p.id===pick.id))return;
+    nextPickRef.current=pickIdx+1;
     if(isMe)update(s=>rememberDraftReport(s,pick.id));
-    const newDrafted={...drafted,[pick.id]:isMe?myId:current.team.id};
-    const comment=isMe?DRAFT_COMMENTS_MY[rng(0,DRAFT_COMMENTS_MY.length-1)]:`${current.team.name}${DRAFT_COMMENTS_CPU[rng(0,DRAFT_COMMENTS_CPU.length-1)]}`;
-    setDrafted(newDrafted);
-    setLog(prev=>[{round:current.round+1,team:current.team,player:pick,isMe,comment},...prev]);
-    // 入団拒否リスク（自チーム指名時のみ、高ポテンシャルほど拒否しやすい）
-    let refused=false;
-    if(isMe){
-      if(draftRefused(pick,true)){
-        refused=true;
-        setDrafted({ ...drafted, [pick.id]: 'refused' });
-        setLog(prev => prev.map((entry, i) => i === 0 ? { ...entry, refused: true, comment: '入団拒否' } : entry));
-        announce(`❌ ${pick.name} が入団を拒否しました`,"#f87171");
-        if(pickIdx+1>=draftOrderFiltered.length) setDone(true);
-        else setPickIdx(i=>i+1);
-        return;
-      }
-    }
-    if(!refused){
-      announce(isMe?`🎉 ${pick.name} を指名！${comment}`:`${current.team.emoji} ${pick.name} — ${comment}`,isMe?"#f5c842":current.team.color);
-      if(pickIdx+1>=draftOrderFiltered.length) setDone(true);
-      else setPickIdx(i=>i+1);
-    }
+    const pickComment=isMe?DRAFT_COMMENTS_MY[rng(0,DRAFT_COMMENTS_MY.length-1)]:`${current.team.name}${DRAFT_COMMENTS_CPU[rng(0,DRAFT_COMMENTS_CPU.length-1)]}`;
+    const refused=isMe&&draftRefused(pick,true);
+    const comment=refused?'入団拒否':pickComment;
+    const newDrafted={...drafted,[pick.id]:refused?'refused':current.team.id};
+    const newLog=[{round:current.round+1,team:current.team,player:pick,isMe,comment,...(refused?{refused:true}:{})},...log];
+    setDrafted(newDrafted);setLog(newLog);
+    announce(refused?`❌ ${pick.name} が入団を拒否しました`:isMe?`🎉 ${pick.name} を指名！${comment}`:`${current.team.emoji} ${pick.name} — ${comment}`,refused?'#f87171':isMe?'#f5c842':current.team.color);
+    const after=participation(current.team,newDrafted,newLog);
+    if(conferenceRules.version===2&&!after.eligible)closeClub(current.team.id,after.reason);
+    advance(newDrafted,newLog);
   };
   const cpuPick=()=>{
-    if(!current||done) return;
-    const avail=pool.filter(p=>!isPickedAfterRound1(p.id)&&!p._drafted);
-    if(!avail.length){setDone(true);return;}
-    const acceptedPicks=draftPicksForTeam(pool,drafted,current.team.id);
-    doPick(chooseDraftProspect(current.team,avail,current.round+1,acceptedPicks,{teams,draftPool:pool,drafted,evaluation:session}),current.team.id===myId);
+    if(!current||done||nextPickRef.current!==pickIdx)return;
+    if(!participation(current.team).eligible){advance();return;}
+    const pick=chooseDraftProspect(current.team,availPool,current.round+1,draftPicksForTeam(pool,drafted,current.team.id),
+      {rules,teams,draftPool:pool,drafted,log,endedTeams:endedRef.current,evaluation:session});
+    if(!pick){closeClub(current.team.id,'no-upgrade');advance();return;}
+    doPick(pick,current.team.id===myId);
   };
-
+  const endMySelection=()=>{
+    if(conferenceRules.version!==2||!isMyTurn||!canMyTeamDraft||nextPickRef.current!==pickIdx)return;
+    closeClub(myId,'manual');advance();
+  };
   const myPick=pid=>{
-    if(!canMyTeamDraft){
-      announce(`⚠️ 支配下登録人数が上限（${MAX_SHIHAKA_TOTAL}名）に到達しているため、指名できません。`,"#f87171");
-      return;
-    }
-    const pick=pool.find(p=>p.id===pid);
-    if(!pick||isPickedAfterRound1(pick.id)||!isMyTurn) return;
-    doPick(pick,true);
+    if(!isMyTurn||!canMyTeamDraft)return;
+    doPick(pool.find(p=>p.id===pid),true);
   };
-  // 通常CPU自動指名（autoSkip中は無効）
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(()=>{if(effectiveAutoSkip||isMyTurn||done||pickIdx>=draftOrderFiltered.length) return;const t=setTimeout(cpuPick,350);return()=>clearTimeout(t);},[pickIdx,isMyTurn,done,effectiveAutoSkip]);
-  // Both modes skip a full club and then use the same guarded pick path.
   useEffect(()=>{
-    if(done || !current) return;
-    if(availPool.length===0) { setDone(true); return; }
-    if(remainingDraftSlots(current.team,pool,drafted)>0) return;
-    if(nextPickRef.current!==pickIdx) return;
-    nextPickRef.current=pickIdx+1;
-    if(pickIdx+1>=draftOrderFiltered.length) setDone(true);
-    else setPickIdx(i=>i+1);
-  },[pickIdx,done,pool,drafted]);
+    if(done)return;
+    if(!current||!availPool.length){setDone(true);return;}
+    const status=participation(current.team);
+    if(status.eligible)return;
+    if(nextPickRef.current!==pickIdx)return;
+    if(conferenceRules.version===2&&!endedRef.current[current.team.id])closeClub(current.team.id,status.reason);
+    advance();
+  // Eligibility changes are driven by these persisted facts, not function identity.
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[pickIdx,done,pool,drafted,endedTeams]);
   useEffect(()=>{
-    if(!effectiveAutoSkip||done||!current) return;
-    const t=setTimeout(cpuPick,30);
-    return()=>clearTimeout(t);
-  },[effectiveAutoSkip,pickIdx,done]);
-  if(showPreview) return(
-    <div style={{position:"relative"}}>
-      <div style={{position:"sticky",top:0,zIndex:99,background:"rgba(10,15,26,.95)",padding:"8px 14px",borderBottom:"1px solid rgba(255,255,255,.08)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <span style={{fontSize:12,color:"#94a3b8"}}>📋 ドラフト展望 (参考)</span>
-        <button className="btn" style={{fontSize:11,padding:"4px 14px",background:"rgba(148,163,184,.1)",color:"#94a3b8",border:"1px solid rgba(148,163,184,.2)"}} onClick={()=>setShowPreview(false)}>← 戻る</button>
-      </div>
-      <DraftPreviewScreen teams={teams} myId={myId} year={year} pool={pool} draftAllocation={session.allocation} evaluation={session} onEvaluationChange={onEvaluationChange} onAllocationChange={null} onStart={()=>setShowPreview(false)} startLabel="← ドラフトに戻る"/>
+    if(done||!current||(!effectiveAutoSkip&&isMyTurn))return;
+    const timer=setTimeout(cpuPick,effectiveAutoSkip?30:350);
+    return()=>clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[pickIdx,done,isMyTurn,effectiveAutoSkip,endedTeams]);
+  if(showPreview)return <div style={{position:'relative'}}>
+    <div style={{position:'sticky',top:0,zIndex:99,background:'rgba(10,15,26,.95)',padding:'8px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+      <span style={{fontSize:12,color:'#94a3b8'}}>📋 ドラフト展望 (参考)</span><Button variant="secondary" onClick={()=>setShowPreview(false)}>← 戻る</Button>
     </div>
-  );
+    <DraftPreviewScreen teams={teams} myId={myId} year={year} pool={pool} rules={rules} endedTeams={endedTeams} draftAllocation={session.allocation} evaluation={session} onEvaluationChange={onEvaluationChange} onStart={()=>setShowPreview(false)} startLabel="← ドラフトに戻る"/>
+  </div>;
   const nextTeams=[];
-  const nextMine=draftOrderFiltered.findIndex((d,i)=>i>pickIdx && String(d.team.id)===String(myId));
+  const nextMine=draftOrderFiltered.findIndex((d,i)=>i>pickIdx&&String(d.team.id)===String(myId));
   const limit=nextMine<0?draftOrderFiltered.length:nextMine;
-  for(let i=pickIdx;i<limit;i++) if(String(draftOrderFiltered[i].team.id)!==String(myId))nextTeams.push(draftOrderFiltered[i].team);
-  const noNextPick=nextMine<0 || myRemainingSlots<=(isMyTurn?1:0);
-  const ctx={teams,evaluation:session,draftPool:pool,drafted,round:(current?.round || 1)+1,nextTeams,noNextPick};
+  for(let i=pickIdx;i<limit;i++)if(String(draftOrderFiltered[i].team.id)!==String(myId))nextTeams.push(draftOrderFiltered[i].team);
+  const noNextPick=nextMine<0||!mine.eligible||mine.count>=(mine.maxPicks-(isMyTurn?1:0))||myRemainingSlots<=(isMyTurn?1:0);
+  const ctx={rules,teams,evaluation:session,draftPool:pool,drafted,log,endedTeams,round:(current?.round || 1)+1,nextTeams,noNextPick};
   return <div className="draft-experience" data-ds="draft"><div className="draft-page">
     <header className="draft-header"><div><small>DRAFT {year}</small><h1>{done?'ドラフト終了':`${(current?.round || 1)+1}巡目`}</h1><p>{isMyTurn?'あなたの指名です':done?'指名選手を確認して結果レビューへ':`${current?.team.name}が選択中`}</p></div><Button variant="secondary" onClick={()=>setShowPreview(true)}>展望</Button></header>
-    {!done&&<><RosterCapacitySummary capacity={myCapacity}/><div className="draft-actions"><Button variant="secondary" disabled={effectiveAutoSkip} onClick={()=>setLocalAutoSkip(true)}>残りを自動処理</Button>{effectiveAutoSkip&&<span role="status">自動処理中…</span>}</div></>}
+    <p role="status">当年指名 {mine.count}/{mine.maxPicks}人{endedTeams[myId]&&` · ${draftEndLabel(endedTeams[myId])}`}</p>
+    {!done&&<><RosterCapacitySummary capacity={myCapacity}/><div className="draft-actions"><Button variant="secondary" disabled={effectiveAutoSkip} onClick={()=>setLocalAutoSkip(true)}>残りを自動処理</Button>{conferenceRules.version===2&&isMyTurn&&canMyTeamDraft&&<DraftEndSelection onEnd={endMySelection}/>} {effectiveAutoSkip&&<span role="status">自動処理中…</span>}</div></>}
     {announcement&&<p role="status" className="draft-panel">{announcement.msg}</p>}
     {done?<section className="draft-panel"><h2>自チーム指名選手 ({myPicks.length}人)</h2>{myPicks.map(p=><div key={p.id} className="draft-result-row"><strong>{p.name}</strong><p>{session.snapshots[p.id]?.report.summary || '当時の評価記録なし'}</p></div>)}<Button onClick={()=>{if(finishedRef.current)return;finishedRef.current=true;onDraftDone(pool,drafted);}}>結果レビューへ →</Button></section>
-      :<DraftCandidates pool={availPool} session={session} onScout={doScout} rankings={rankDraftProspects(myTeam,availPool,ctx.round,myPicks,ctx)} forecast={forecastDraft(teams,availPool,myId,ctx)} round={ctx.round} noNextPick={noNextPick} canPick={isMyTurn&&canMyTeamDraft} remainingSlots={myRemainingSlots} onPick={p=>myPick(p.id)} savedState={candidateView} onStateChange={setCandidateView}/>}
-    <section className="draft-panel"><h2>指名実況</h2><div className="draft-log-items">{log.map((e,i)=><div key={i}>{e.round}巡目 · {e.team.name} <strong>{e.player.name}</strong> · {e.player.pos}{e.refused?' · 入団拒否':''}</div>)}{!log.length&&<p>指名待ち…</p>}</div></section>
+      :<DraftCandidates pool={availPool} session={session} onScout={id=>update(s=>scoutDraftCandidate(s,availPool,id))} rankings={rankDraftProspects(myTeam,availPool,ctx.round,myPicks,ctx)} forecast={forecastDraft(teams,availPool,myId,ctx)} round={ctx.round} noNextPick={noNextPick} canPick={isMyTurn&&canMyTeamDraft} remainingSlots={myRemainingSlots} onPick={p=>myPick(p.id)} savedState={candidateView} onStateChange={setCandidateView}/>}
+    <section className="draft-panel"><h2>指名実況</h2><div className="draft-log-items">{log.map((e,i)=><div key={i}>{e.round}巡目 · {e.team.name} <strong>{e.player.name}</strong> · {e.player.pos}{e.refused?' · 入団拒否':''}</div>)}{!log.length&&<p>指名待ち…</p>}{Object.entries(endedTeams).map(([id,reason])=><p key={`end-${id}`}>{teams.find(t=>String(t.id)===id)?.name} · {draftEndLabel(reason)}</p>)}</div></section>
   </div></div>;
 }
 /* ═══════════════════════════════════════════════

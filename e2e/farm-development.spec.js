@@ -124,3 +124,12 @@ for(const width of [360,390,1440])test(`roster capacity conversion respects both
 
 import { registerCapacityPlanningCases } from './helpers/rosterCapacity';
 registerCapacityPlanningCases([390,1440]);
+
+import {registerVariableDraftCase} from './helpers/variableDraft';
+registerVariableDraftCase(390,'zero');
+registerVariableDraftCase(1440,'ten');
+
+registerVariableDraftCase(390,'auto');
+
+import {registerLegacyDraftCase} from './helpers/variableDraftLegacy';
+registerLegacyDraftCase();

@@ -1,3 +1,5 @@
+import {draftRulesFor,draftParticipation,draftNominationCount} from './draftConference';
+import {evaluateDraftContinuation} from './draftContinuation';
 import { controlledRosterCounts, evaluateRosterCapacity } from './rosterCapacity';
 import { MAX_SHIHAKA_TOTAL, MIN_SALARY_SHIHAKA } from '../constants';
 import { rng, rngf, clamp } from '../utils';
@@ -102,8 +104,9 @@ export function forecastDraft(teams,pool,myId,context={}) {
   if(round>1&&context.noNextPick)return out;
   const clubs=round>1 ? (context.nextTeams || []) : teams.filter(t=>!context.activeTeamIds || context.activeTeamIds.some(id=>String(id)===String(t.id)));
   for(const team of clubs) {
-    if(String(team.id)===String(myId) || remainingDraftSlots(team,context.draftPool || pool,context.drafted || {})<=0) continue;
-    const ranked=rankDraftProspects(team,pool,round,[],{...context,publicEvaluation:true});
+    if(String(team.id)===String(myId) || !draftParticipation(team,context.draftPool || pool,context.drafted || {},context).eligible) continue;
+    const available=draftRulesFor(context.rules).version===2 ? evaluateDraftContinuation(team,pool,round,[],{...context,publicEvaluation:true}).candidates : pool;
+    const ranked=rankDraftProspects(team,available,round,[],{...context,publicEvaluation:true});
     if(!Number.isFinite(ranked[0]?.score))continue;
     const weights=ranked.map(r=>r.score<ranked[0].score-24?0:Math.exp((r.score-ranked[0].score)/4));
     const total=weights.reduce((a,b)=>a+b,0);
@@ -117,7 +120,9 @@ export function forecastDraft(teams,pool,myId,context={}) {
 }
 
 export function chooseDraftProspect(team,pool,round=1,acceptedPicks=[],draftContext={}) {
-  const scored=rankDraftProspects(team,pool,round,acceptedPicks,draftContext);
+  const candidates=draftRulesFor(draftContext.rules).version===2
+    ? evaluateDraftContinuation(team,pool,round,acceptedPicks,draftContext).candidates : pool;
+  const scored=rankDraftProspects(team,candidates,round,acceptedPicks,draftContext);
   if(!scored.length)return null;
   const first=round===1;
   if(draftContext.evaluation) {
@@ -141,14 +146,16 @@ export function chooseDraftProspect(team,pool,round=1,acceptedPicks=[],draftCont
 export function resolveFirstRound(teams, pool, context={}) {
   const confirmed = {};
   const rounds=[];
-  let active = teams.filter(t => remainingDraftSlots(t) > 0);
+  const endedTeams={...context.endedTeams},league=context.teams || teams;
+  let active = teams.filter(t => draftParticipation(t,pool,context.drafted || {},{...context,teams:league,endedTeams}).eligible);
   while (active.length) {
     const used = new Set(Object.values(confirmed).map(p => p.id));
     const available = pool.filter(p => !p._drafted && !used.has(p.id));
     if (!available.length) break;
     const groups = new Map();
     for (const team of active) {
-      const player = chooseDraftProspect(team, available, 1, [], { ...context,teams,activeTeamIds:active.map(t=>t.id) });
+      const player = chooseDraftProspect(team, available, 1, [], { ...context,teams:league,endedTeams,activeTeamIds:active.map(t=>t.id),draftPool:pool });
+      if(!player){endedTeams[team.id]='no-upgrade';continue;}
       if (!groups.has(player.id)) groups.set(player.id, { player, teams: [] });
       groups.get(player.id).teams.push(team);
     }
@@ -161,12 +168,12 @@ export function resolveFirstRound(teams, pool, context={}) {
     }
     active = losers;
   }
-  return {picks:confirmed,rounds};
+  return {picks:confirmed,rounds,endedTeams};
 }
 
 export const autoFirstRound=(teams,pool,context={})=>resolveFirstRound(teams,pool,context).picks;
 
-export function applyDraftAcquisitions(teams, pool, drafted, year) {
+export function applyDraftAcquisitions(teams, pool, drafted, year, context={}) {
   const fail = error => ({ ok: false, error });
   if (!Array.isArray(pool) || !drafted || typeof drafted !== 'object') return fail('ドラフト結果が無効です');
   const ids = pool.map(p => p?.id);
@@ -184,6 +191,9 @@ export function applyDraftAcquisitions(teams, pool, drafted, year) {
     if (!owned.has(p.id)) assignments.get(String(owner)).push(p);
   }
   for (const team of teams) {
+    const rules=draftRulesFor(context.rules);
+    if(rules.version===2&&draftNominationCount(team.id,pool,drafted,context.log)>rules.maxPicks)
+      return fail(`年間指名上限（${rules.maxPicks}人）を超えます`);
     const capacity = evaluateRosterCapacity(team, { teams, draftPool: pool, drafted });
     if (!capacity.ok) return fail(`支配下人数が未確認です（${capacity.reason}）`);
     if (capacity.overBy > 0)
