@@ -100,3 +100,9 @@ it('rejects incoming FA assignment-key collisions before ownership, money or his
  const before=JSON.stringify(t);expect(marketRosterError(t,p)).not.toBeNull();expect(addMarketSigning(t,p,500,1,2026)).toBe(t);
  expect(JSON.stringify(t)).toBe(before);
 });
+it('uses current ownership when a market state updater receives an older league snapshot',()=>{
+ const p={id:'owned',salary:500},t={...club(),players:[p],budget:10000,history:[]},stale={...t,players:[]};
+ expect(marketRosterError(t,p,[stale])).not.toBeNull();
+ expect(addMarketSigning(t,p,500,1,2026,'season',{teams:[stale]})).toBe(t);
+ expect(t.budget).toBe(10000);expect(t.players).toEqual([p]);expect(t.history).toEqual([]);
+});

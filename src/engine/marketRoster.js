@@ -4,8 +4,9 @@ import { evaluateRosterCapacity, isIkuseiPlayer } from './rosterCapacity';
 
 export function marketRosterError(team, player, teams = [team], draftContext = {}) {
   if (player.id == null) return '選手IDが未記録です';
-  if (teams.some(t => ownedPlayers(t).some(p => p.id != null && String(p.id) === String(player.id)))) return 'この選手はすでに球団に所属しています';
-  const capacity = evaluateRosterCapacity(team, { ...draftContext, teams });
+  const league = [team, ...teams.filter(t => String(t.id) !== String(team.id))];
+  if (league.some(t => ownedPlayers(t).some(p => p.id != null && String(p.id) === String(player.id)))) return 'この選手はすでに球団に所属しています';
+  const capacity = evaluateRosterCapacity(team, { ...draftContext, teams: league });
   if (!capacity.ok) return `支配下人数が未確認です（${capacity.reason}）`;
   if (!isIkuseiPlayer(player) && capacity.remainingSlots <= 0) return `支配下登録枠（${MAX_SHIHAKA_TOTAL}人）が満員です`;
   return null;
