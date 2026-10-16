@@ -4,6 +4,7 @@ import { saberBatter } from '../../engine/sabermetrics';
 import { marketPlacement, marketRosterError } from '../../engine/marketRoster';
 export { marketPlacement } from '../../engine/marketRoster';
 import { prepareOffseasonFreeAgent } from '../../engine/offseasonMarket';
+import { isIkuseiPlayer } from '../../engine/rosterAutomation';
 
 export function marketMetrics(player) {
   const s = (player.isFA && player.marketLastStats) || player.stats || {};
@@ -25,7 +26,7 @@ export function marketNeeds(team) {
     ['中継ぎ', players.filter(p => p.isPitcher && (p.subtype || p.pos) === '中継ぎ').length, 3],
     ['抑え', players.filter(p => p.isPitcher && (p.subtype || p.pos) === '抑え').length, 1],
     ['捕手（登録）', players.filter(p => !p.isPitcher && p.pos === '捕手').length, MIN_ACTIVE_CATCHERS],
-    ['捕手（登録＋ファーム）', all.filter(p => !p.isPitcher && p.pos === '捕手').length, MIN_TOTAL_BY_POS['捕手']],
+    ['捕手（登録＋ファーム）', all.filter(p => !p.isPitcher && p.pos === '捕手' && !isIkuseiPlayer(p)).length, MIN_TOTAL_BY_POS['捕手']],
   ]) if (count < target) hints.push(`${label} ${count}/${target}人`);
   return hints;
 }

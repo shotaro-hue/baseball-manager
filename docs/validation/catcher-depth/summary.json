@@ -1,0 +1,231 @@
+{
+  "base": "b0eaa58b02149af2e77073c3de495a14aa2b9779",
+  "environment": "Vitest Node; real hooks/engine; LCG; Map localStorage and fake-indexeddb; full-auto regular seasons; playoff tournament bypassed",
+  "rounds": 1287,
+  "farmCards": 7722,
+  "unplayedCards": 0,
+  "baselineUnplayedCards": 223,
+  "baselineNote": "Prior #474 sample, same seeds; changed roster/decisions diverge RNG paths, not a paired outcome or general improvement rate.",
+  "localFullUnit": {
+    "passed": 1261,
+    "failed": 1,
+    "skippedExisting": 2,
+    "failure": "src/App.lazy-load.test.js imports App without module resolution errors: 10000ms timeout",
+    "isolatedRecheck": "3/3 passed, App import 4471ms; no test timeout or CI config changes",
+    "duration": "   Duration  937.26s (transform 6.15s, setup 0ms, collect 78.60s, tests 1204.02s, environment 70ms, prepare 22.60s)"
+  },
+  "focusedPolicyTests": 15,
+  "localBrowserCases": 3,
+  "seeds": [
+    {
+      "seed": 20261015,
+      "seasons": [
+        {
+          "year": 2026,
+          "rounds": 143,
+          "unplayedCards": 0,
+          "shortageClubDays": 0,
+          "constraints": {},
+          "clubs": {},
+          "reasons": {}
+        },
+        {
+          "year": 2027,
+          "rounds": 143,
+          "unplayedCards": 0,
+          "shortageClubDays": 0,
+          "constraints": {},
+          "clubs": {},
+          "reasons": {}
+        },
+        {
+          "year": 2028,
+          "rounds": 143,
+          "unplayedCards": 0,
+          "shortageClubDays": 0,
+          "constraints": {},
+          "clubs": {},
+          "reasons": {}
+        }
+      ],
+      "openingControlledDepth": [
+        {
+          "year": 2026,
+          "controlledPrimaryMin": 6,
+          "controlledPrimaryMax": 6
+        },
+        {
+          "year": 2027,
+          "controlledPrimaryMin": 6,
+          "controlledPrimaryMax": 8
+        },
+        {
+          "year": 2028,
+          "controlledPrimaryMin": 6,
+          "controlledPrimaryMax": 8
+        }
+      ],
+      "sourceHashes": {
+        "scripts/farm-catcher-diagnostics.js": "2cb23ee4c4d7024d03de0111ae706501a0a7ad7066423fa7bcf84e6afe3a8bca",
+        "scripts/qa-d1-offseason.js": "3cde4b8444c826ef0b3856e0baf14e93657ade34bb98219627ecd2c142f52144",
+        "src/constants.js": "4be1c084143bf51c89ab66385933dd17ba3c0e976b1fdc824f91810fd2985731",
+        "src/engine/playerCore.js": "7b33a10adb6a1a3c57246472d2dbaffc90a3d2ec65bcddab582b58dacce8590d",
+        "src/engine/trade.js": "09cf549b29d88251920109851aca6ef1e19fbcce21847c18158911d2748670a6",
+        "src/engine/organizationNeeds.js": "f251a492500ab58392d48d671a596fbaa206f1dc08423550192b4e3683a9364d",
+        "src/engine/draftRules.js": "c40b97c868f8082e99e26bdcc2c1951400040f6bd2a53c9ffe2846d8618fb19d",
+        "src/workers/seasonBatchCore.js": "7612491dd5465104131643dc6cd872390f80781a7efed6d48487709050409410",
+        "src/engine/rosterAutomation.js": "8b6eb78132117ee3eebda66deeecee01b1b212132a971dc1a47133f78ed13131",
+        "src/engine/regularGameUpdates.js": "4f77c7f20fad8359277c3516588d1c6bb39efe1e28ebd071cdcb1301a454c345",
+        "src/engine/farmProgression.js": "7298dd252c798bdddc02a53ff7aa280299fc3386bb39ef6d41a1211aa40d88c8",
+        "src/engine/farmSelection.js": "736d97995d8ccd05fc81127931462a401ef799e055a60be1acff5135069884e7",
+        "src/engine/cpuTradeExecution.js": "3a9b29bbcd08a7df9d4ba94629dde3260cb2dab90f864a1da380fb07a67a6c87",
+        "src/hooks/useOffseason.js": "2a3bcf2659d696595d0c1f1450018fabe3683db61a53509a9bb856f14a7bf16a"
+      },
+      "rawSha256": "d5e48f99548360edb8511ec917aeba1968ed3810dd347bb441d75ff60ead087b",
+      "gzipSha256": "dfc1355db2517e8d02d7ae18595eb02247a6d6312f535ab03c62929a85ef608f",
+      "file": "seed-20261015.json.gz",
+      "rawBytes": 568446,
+      "gzipBytes": 18119
+    },
+    {
+      "seed": 20261016,
+      "seasons": [
+        {
+          "year": 2026,
+          "rounds": 143,
+          "unplayedCards": 0,
+          "shortageClubDays": 0,
+          "constraints": {},
+          "clubs": {},
+          "reasons": {}
+        },
+        {
+          "year": 2027,
+          "rounds": 143,
+          "unplayedCards": 0,
+          "shortageClubDays": 0,
+          "constraints": {},
+          "clubs": {},
+          "reasons": {}
+        },
+        {
+          "year": 2028,
+          "rounds": 143,
+          "unplayedCards": 0,
+          "shortageClubDays": 0,
+          "constraints": {},
+          "clubs": {},
+          "reasons": {}
+        }
+      ],
+      "openingControlledDepth": [
+        {
+          "year": 2026,
+          "controlledPrimaryMin": 6,
+          "controlledPrimaryMax": 6
+        },
+        {
+          "year": 2027,
+          "controlledPrimaryMin": 6,
+          "controlledPrimaryMax": 8
+        },
+        {
+          "year": 2028,
+          "controlledPrimaryMin": 6,
+          "controlledPrimaryMax": 11
+        }
+      ],
+      "sourceHashes": {
+        "scripts/farm-catcher-diagnostics.js": "2cb23ee4c4d7024d03de0111ae706501a0a7ad7066423fa7bcf84e6afe3a8bca",
+        "scripts/qa-d1-offseason.js": "3cde4b8444c826ef0b3856e0baf14e93657ade34bb98219627ecd2c142f52144",
+        "src/constants.js": "4be1c084143bf51c89ab66385933dd17ba3c0e976b1fdc824f91810fd2985731",
+        "src/engine/playerCore.js": "7b33a10adb6a1a3c57246472d2dbaffc90a3d2ec65bcddab582b58dacce8590d",
+        "src/engine/trade.js": "09cf549b29d88251920109851aca6ef1e19fbcce21847c18158911d2748670a6",
+        "src/engine/organizationNeeds.js": "f251a492500ab58392d48d671a596fbaa206f1dc08423550192b4e3683a9364d",
+        "src/engine/draftRules.js": "c40b97c868f8082e99e26bdcc2c1951400040f6bd2a53c9ffe2846d8618fb19d",
+        "src/workers/seasonBatchCore.js": "7612491dd5465104131643dc6cd872390f80781a7efed6d48487709050409410",
+        "src/engine/rosterAutomation.js": "8b6eb78132117ee3eebda66deeecee01b1b212132a971dc1a47133f78ed13131",
+        "src/engine/regularGameUpdates.js": "4f77c7f20fad8359277c3516588d1c6bb39efe1e28ebd071cdcb1301a454c345",
+        "src/engine/farmProgression.js": "7298dd252c798bdddc02a53ff7aa280299fc3386bb39ef6d41a1211aa40d88c8",
+        "src/engine/farmSelection.js": "736d97995d8ccd05fc81127931462a401ef799e055a60be1acff5135069884e7",
+        "src/engine/cpuTradeExecution.js": "3a9b29bbcd08a7df9d4ba94629dde3260cb2dab90f864a1da380fb07a67a6c87",
+        "src/hooks/useOffseason.js": "2a3bcf2659d696595d0c1f1450018fabe3683db61a53509a9bb856f14a7bf16a"
+      },
+      "rawSha256": "4a69718ef87060ba2077625e2e8b2333fbf0e6e1a7064b5ffd72c95fd0ba85dd",
+      "gzipSha256": "ec303bfa2a5f3fde0053f914d28f1c161503093c024d455cf6cb89c0d82db0ee",
+      "file": "seed-20261016.json.gz",
+      "rawBytes": 563083,
+      "gzipBytes": 18586
+    },
+    {
+      "seed": 20261017,
+      "seasons": [
+        {
+          "year": 2026,
+          "rounds": 143,
+          "unplayedCards": 0,
+          "shortageClubDays": 0,
+          "constraints": {},
+          "clubs": {},
+          "reasons": {}
+        },
+        {
+          "year": 2027,
+          "rounds": 143,
+          "unplayedCards": 0,
+          "shortageClubDays": 0,
+          "constraints": {},
+          "clubs": {},
+          "reasons": {}
+        },
+        {
+          "year": 2028,
+          "rounds": 143,
+          "unplayedCards": 0,
+          "shortageClubDays": 0,
+          "constraints": {},
+          "clubs": {},
+          "reasons": {}
+        }
+      ],
+      "openingControlledDepth": [
+        {
+          "year": 2026,
+          "controlledPrimaryMin": 6,
+          "controlledPrimaryMax": 6
+        },
+        {
+          "year": 2027,
+          "controlledPrimaryMin": 6,
+          "controlledPrimaryMax": 8
+        },
+        {
+          "year": 2028,
+          "controlledPrimaryMin": 6,
+          "controlledPrimaryMax": 8
+        }
+      ],
+      "sourceHashes": {
+        "scripts/farm-catcher-diagnostics.js": "2cb23ee4c4d7024d03de0111ae706501a0a7ad7066423fa7bcf84e6afe3a8bca",
+        "scripts/qa-d1-offseason.js": "3cde4b8444c826ef0b3856e0baf14e93657ade34bb98219627ecd2c142f52144",
+        "src/constants.js": "4be1c084143bf51c89ab66385933dd17ba3c0e976b1fdc824f91810fd2985731",
+        "src/engine/playerCore.js": "7b33a10adb6a1a3c57246472d2dbaffc90a3d2ec65bcddab582b58dacce8590d",
+        "src/engine/trade.js": "09cf549b29d88251920109851aca6ef1e19fbcce21847c18158911d2748670a6",
+        "src/engine/organizationNeeds.js": "f251a492500ab58392d48d671a596fbaa206f1dc08423550192b4e3683a9364d",
+        "src/engine/draftRules.js": "c40b97c868f8082e99e26bdcc2c1951400040f6bd2a53c9ffe2846d8618fb19d",
+        "src/workers/seasonBatchCore.js": "7612491dd5465104131643dc6cd872390f80781a7efed6d48487709050409410",
+        "src/engine/rosterAutomation.js": "8b6eb78132117ee3eebda66deeecee01b1b212132a971dc1a47133f78ed13131",
+        "src/engine/regularGameUpdates.js": "4f77c7f20fad8359277c3516588d1c6bb39efe1e28ebd071cdcb1301a454c345",
+        "src/engine/farmProgression.js": "7298dd252c798bdddc02a53ff7aa280299fc3386bb39ef6d41a1211aa40d88c8",
+        "src/engine/farmSelection.js": "736d97995d8ccd05fc81127931462a401ef799e055a60be1acff5135069884e7",
+        "src/engine/cpuTradeExecution.js": "3a9b29bbcd08a7df9d4ba94629dde3260cb2dab90f864a1da380fb07a67a6c87",
+        "src/hooks/useOffseason.js": "2a3bcf2659d696595d0c1f1450018fabe3683db61a53509a9bb856f14a7bf16a"
+      },
+      "rawSha256": "e387166f814dd56a79f05b447ada2227d30ec24b3a22a9af863a0f48bb3aaa7c",
+      "gzipSha256": "b40febe79e1647db8580253824649adfa64c8d197236d37f99e615aac9952658",
+      "file": "seed-20261017.json.gz",
+      "rawBytes": 641629,
+      "gzipBytes": 21703
+    }
+  ]
+}

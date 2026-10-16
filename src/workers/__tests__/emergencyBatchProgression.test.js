@@ -27,10 +27,16 @@ it('continues after the seed-99 second injury instead of leaving a seven-player 
   seedRandom(99);
   const first = simulateSeasonBatch({ snapshot: state, count: 5, isCancelled: () => false });
   const after = first.nextState.teams.find(t => t.id === state.myId);
-  expect([...after.players, ...after.farm].some(p => p.id !== shortstop.id && !p.isPitcher && p.injuryDaysLeft > 0)).toBe(true);
   expect(validateTeamRoster(after).errors).toEqual([]);
   expect(after.lineupNoDh).toHaveLength(8);
+  // Initial catcher depth intentionally changes lineups and therefore game
+  // RNG consumption. Keep this a two-injury regression, not a probability test.
+  const second = after.players.find(p => !p.isPitcher && p.id !== shortstop.id
+    && after.lineupNoDh.includes(p.id) && !(p.injuryDaysLeft > 0));
+  Object.assign(second, { injuryDaysLeft: 6, injury: '二人目の固定負傷' });
+  expect([...after.players, ...after.farm].filter(p => !p.isPitcher && p.injuryDaysLeft > 0).length).toBeGreaterThanOrEqual(2);
   const next = simulateSeasonBatch({ snapshot: first.nextState, count: 1, isCancelled: () => false });
   expect(next.nextState.gameDay).toBe(first.nextState.gameDay + 1);
   expect(validateTeamRoster(next.nextState.teams.find(t => t.id === state.myId)).errors).toEqual([]);
+  expect(next.nextState.teams.find(t => t.id === state.myId).lineupNoDh).toHaveLength(8);
 });

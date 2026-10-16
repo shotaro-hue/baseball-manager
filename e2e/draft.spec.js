@@ -52,7 +52,9 @@ test('CPU next-round needs include a saved first-round catcher without acquiring
   const cpu=state.teams.find(t=>t.id===0);
   const keep=new Set(cpu.players.filter(p=>p.pos==='捕手').slice(0,2).map(p=>p.id));
   cpu.players=cpu.players.filter(p=>p.pos!=='捕手'||keep.has(p.id));
-  cpu.farm=cpu.farm.filter(p=>p.pos!=='捕手');
+  // Five owned plus the saved first-round pick meet the six-catcher target.
+  const depth=cpu.farm.filter(p=>p.pos==='捕手').slice(0,3);
+  cpu.farm=[...cpu.farm.filter(p=>p.pos!=='捕手'),...depth];
   state.teams.forEach(t=>{t.wins=t.id===0?0:t.id===1?10:20;t.losses=0;t.draws=143-t.wins;});
   state.myId=1;state.gameDay=144;
   const template=cpu.players.find(p=>p.pos==='捕手');

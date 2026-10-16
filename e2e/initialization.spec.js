@@ -88,7 +88,7 @@ test('failed initial IndexedDB write stays on title and retry saves all history 
   await page.getByRole('button',{name:TEAM,exact:true}).click();
   await waitForNewGameReady(page,TEAM);
   await saveHub(page);const before=await initialContents(page);
-  expect(before.catcherCoverage.every(t => t.active >= 2 && t.farmStatus === 'ready')).toBe(true);
+  expect(before.catcherCoverage.every(t => t.active >= 3 && t.farmStatus === 'ready')).toBe(true);
   expect(before.teamCount).toBe(12);expect(before.playerIds).toHaveLength(661);
   expect(new Set(before.playerIds).size).toBe(661);
   expect(before.rows).toBe(2009);expect(before.historyKeys).toHaveLength(376);

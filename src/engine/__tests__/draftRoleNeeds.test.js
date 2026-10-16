@@ -135,7 +135,7 @@ it.each([true, false])('projects the valid pick entity before deduplication (can
   const draftPool = [batter(0, '捕手', { _drafted: true, _r1winner: 1 }),
     { ...missing, id: 0, _drafted: true, _r1winner: 0 }];
   const context = { teams: [team], draftPool, drafted: { 0: 0 } };
-  expect(evaluateOrganizationNeeds(team, context).roles.catcher.organizationShortage).toBe(1);
+  expect(evaluateOrganizationNeeds(team, context).roles.catcher.organizationShortage).toBe(4);
   expect(chooseDraftProspect(team, [batter('best-DH'), batter('needed-C', '捕手')], 2,
     canonical ? [] : draftPool, canonical ? context : {}).id).toBe('needed-C');
 });

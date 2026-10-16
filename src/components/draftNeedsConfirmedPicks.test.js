@@ -18,7 +18,9 @@ for (const firstRound of [true, false]) it(`CPU uses ${firstRound ? 'first' : 'l
   const team = createInitialTeams()[0];
   const keep = new Set(team.players.filter(p => p.pos === '捕手').slice(0, 2).map(p => p.id));
   team.players = team.players.filter(p => p.pos !== '捕手' || keep.has(p.id));
-  team.farm = team.farm.filter(p => p.pos !== '捕手');
+  // Five owned plus one accepted catcher meet the six-player depth target.
+  const depth = team.farm.filter(p => p.pos === '捕手').slice(0, 3);
+  team.farm = [...team.farm.filter(p => p.pos !== '捕手'), ...depth];
   team.wins = 0;
   Math.random.mockReturnValue(.5); vi.useFakeTimers();
   const p = (id, pos = '捕手', extra = {}) => ({ id, name: String(id), pos, isPitcher: false,

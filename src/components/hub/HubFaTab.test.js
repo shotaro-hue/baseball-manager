@@ -42,9 +42,15 @@ describe('FA market saved data and signing rules', () => {
   });
   it('shows structural needs from actual active and farm counts', () => {
     const players = [...Array.from({ length: 4 }, (_, i) => player(i, { isPitcher: true, subtype: '先発' })), ...Array.from({ length: 3 }, (_, i) => player(i + 4, { isPitcher: true, pos: '中継ぎ' })), player(8, { isPitcher: true, pos: '抑え' }), player(9, { pos: '捕手' })];
-    expect(marketNeeds(team({ players: [...players, player(10, { pos: '捕手' })], farm: [player(11, { pos: '捕手' })] }))).toEqual([]);
-    expect(marketNeeds(team({ players, farm: [player(10, { pos: '捕手' }), player(11, { pos: '捕手' })] }))).toEqual(['捕手（登録） 1/2人']);
-    expect(marketNeeds(team())).toEqual(['先発 0/4人', '中継ぎ 0/3人', '抑え 0/1人', '捕手（登録） 0/2人', '捕手（登録＋ファーム） 0/3人']);
+    const depth = Array.from({ length: 4 }, (_, i) => player(11 + i, { pos: '捕手' }));
+    expect(marketNeeds(team({ players: [...players, player(10, { pos: '捕手' })], farm: depth }))).toEqual([]);
+    expect(marketNeeds(team({ players, farm: [player(10, { pos: '捕手' }), ...depth] }))).toEqual(['捕手（登録） 1/2人']);
+    for (const flag of ['育成', 'isIkusei']) {
+      expect(marketNeeds(team({ players: [...players, player(10, { pos: '捕手' })],
+        farm: depth.map((p, i) => i < 2 ? { ...p, [flag]: true } : p) })))
+        .toEqual(['捕手（登録＋ファーム） 4/6人']);
+    }
+    expect(marketNeeds(team())).toEqual(['先発 0/4人', '中継ぎ 0/3人', '抑え 0/1人', '捕手（登録） 0/2人', '捕手（登録＋ファーム） 0/6人']);
   });
   it('preserves roster, foreign count, and foreign position balance restrictions', () => {
     const foreign = player(20, { isForeign: true, isPitcher: true });

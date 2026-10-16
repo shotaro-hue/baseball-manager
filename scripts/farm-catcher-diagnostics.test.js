@@ -4,7 +4,7 @@ import { createInitialTeams } from '../src/engine/bootstrapTeams';
 import { generateSeasonSchedule } from '../src/engine/scheduleGen';
 import { createFarmCompetition } from '../src/engine/farmRecords';
 import { simulateSeasonBatch } from '../src/workers/seasonBatchCore';
-import { applyEmergencyRosterMaintenance } from '../src/engine/rosterAutomation';
+import { applyEmergencyRosterMaintenance, proficiencyAt } from '../src/engine/rosterAutomation';
 import { executeCpuTrade } from '../src/engine/cpuTradeExecution';
 
 const catcher = (id, extra = {}) => ({ id, name: id, pos: '捕手', isPitcher: false, ...extra });
@@ -55,6 +55,15 @@ it('observes the real batch without changing state or consuming game RNG', () =>
   Math.random = () => { n = (Math.imul(n, 1664525) + 1013904223) >>> 0; return n / 4294967296; };
   try {
     const teams = createInitialTeams(), year = 2026, saveId = 'catcher-parity';
+    // Fix the shortage itself rather than depending on a random injury to
+    // exhaust the newly deeper initial catcher group within these 80 days.
+    const keep = new Set(teams[1].players.filter(p => p.pos === '捕手').slice(0, 2).map(p => p.id));
+    for (const p of [...teams[1].players, ...teams[1].farm]) {
+      if (!p.isPitcher && proficiencyAt(p, '捕手') > 0 && !keep.has(p.id)) {
+        p.injuryDaysLeft = 999;
+        p.injury = '診断用固定負傷';
+      }
+    }
     const snapshot = { teams, year, saveId, myId: 0, gameDay: 1, faPool: [], faYears: {},
       schedule: generateSeasonSchedule(year, teams), allStarDone: true,
       farmCompetition: createFarmCompetition({ teams, year, saveId }), farmCompetitionVersion: 1 };
