@@ -468,6 +468,8 @@ export function buildRosterRecs(team, options = {}) {
     if (!addPromotion(candidate, ['一軍枠を充足', '方針評価上位'])) break;
   }
 
+  if (options.fillVacanciesOnly === true) return recs;
+
   const addSwap = (upPlayer, downPlayer, reasons) => {
     if (!upPlayer || !downPlayer || !canPromote(upPlayer, downPlayer)) return false;
     recs.push({
@@ -1384,6 +1386,18 @@ export function buildFullRosterPlan(team, options = {}) {
       validation = candidateValidation;
       changes.push(rec);
       break;
+    }
+  }
+  // Late catcher demotions happen after the ordinary fill pass. Reuse its
+  // eligibility and position targets without running another round of swaps.
+  if (validation.valid && nextTeam.players.length < MAX_ROSTER) {
+    const refill = buildRosterRecs(nextTeam, { ...options, fillVacanciesOnly: true });
+    const candidate = buildAutoManagedRoster(applyRosterRecs(nextTeam, refill), options);
+    const candidateValidation = validateTeamRoster(candidate);
+    if (candidateValidation.valid) {
+      nextTeam = candidate;
+      validation = candidateValidation;
+      changes.push(...refill);
     }
   }
   return { team: nextTeam, changes, validation };

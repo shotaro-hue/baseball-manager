@@ -1,6 +1,6 @@
 # 捕手層の編成方針：通常一軍3人・支配下6人
 
-実施日：2026-10-16。基準main：`b0eaa58b02149af2e77073c3de495a14aa2b9779`（#474マージ後）。最新mainをfetchして開始し、添付ZIPは実装基準にしていない。本変更は独立PRで提案するもので、マージ済みではない。
+実施日：2026-10-16。実装時の基準main：`b0eaa58b02149af2e77073c3de495a14aa2b9779`（#474マージ後）。最新mainをfetchして開始し、添付ZIPは実装基準にしていない。PR作成時点では未マージだったが、同日の再照合で[#475](https://github.com/shotaro-hue/baseball-manager/pull/475)のマージを確認した。マージcommitは`cd02b4503fefb839095805e8a0dd7443a23d46ad`。[マージ後のレビューと次工程](./catcher-depth-review.md)を参照。
 
 ## 目的と根拠
 
@@ -63,6 +63,8 @@ npm run test:e2e -- progression.smoke.spec.js initialization.spec.js draft.spec.
 ```
 
 ローカル全Unitの最終計測は171ファイル・1,261件成功、既存の任意benchmark2件skip、`src/App.lazy-load.test.js`のApp importが10秒timeoutで1件失敗（937.26秒）。同項目は並列再確認でもtimeoutしたが、Appだけの1worker実行は3/3成功（import 4,471ms）。閾値・テスト・CI設定は緩和していない。新規方針試験は両方の育成フラグを含め最終15/15成功、HubFaTabは21/21成功。Build成功（39.17秒、既存のchunkサイズ警告）。ローカル全Unitを全成功とは報告せず、最終headのCIで全Unitを改めて確認する。
+
+その後、最終head `0839fb0f337c999092cccf2b60460ca628cce9d8` の[CI #409](https://github.com/shotaro-hue/baseball-manager/actions/runs/38893847391)でBuild・Unit 1,263件・中核E2E 292件を含む全8ジョブの成功を確認した。既存の任意benchmark2件skipは維持し、App importもCIでは成功した。上記のローカル失敗記録は残す。
 
 FA市場の同一fixture（`/baseball-manager/e2e/fixtures/ui03c/index.html?state=normal`）で「補強ポイント・市場のルール」を開き、360/390/1440pxで比較した。beforeは基準mainの展開、afterは本ブランチ。6画面とも横はみ出し・ブラウザ例外なし。[確認JSON](../validation/catcher-depth/ui-checks.json)／変更後 [360px](../validation/catcher-depth/after-market-360.png)・[390px](../validation/catcher-depth/after-market-390.png)・[1440px](../validation/catcher-depth/after-market-1440.png)。同ディレクトリの`before-market-*.png`が変更前。
 
