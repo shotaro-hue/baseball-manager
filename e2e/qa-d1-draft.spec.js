@@ -85,7 +85,8 @@ async function seedGenerated(page,screen='draft_preview',options={}){
     if(!(await saveGame(state)).ok)throw new Error('generated draft fixture save failed');
     return {pool:pool.map(p=>({id:p.id,name:p.name,role:p.subtype||p.pos,type:p.prospectType})),myId:state.myId,year:state.year,rivalPick:options.rivalPick};
   },{state,screen,options,seed:SEED});
-  expect(info.pool.length).toBeGreaterThanOrEqual(80);
+  // This generated fixture has no scouted additions; old saved 80-player pools are covered separately.
+  expect(info.pool).toHaveLength(160);
   await reloadAndLoad(page);return info;
 }
 async function saveDraft(page){await page.getByRole('button',{name:'途中保存',exact:true}).click();await waitSaveIdle(page);return readSave(page);}
@@ -212,12 +213,12 @@ test('generated draft browser journey, persistence and candidate return',async({
   await page.getByRole('button',{name:'全球団結果',exact:true}).click();await expect(page.getByRole('heading',{name:'全球団 指名結果',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'指名漏れ',exact:true}).click();await expect(page.getByRole('heading',{name:/指名漏れ \(/})).toBeVisible();
   const dimensions=await layout(page);expect(dimensions.overflow).toBe(false);expect(dimensions.undersizedPrimaryControls).toEqual([]);expect(errors).toEqual([]);
-  evidence(`browser-${testInfo.project.name}`,{browser:testInfo.project.name,browserVersion:page.context().browser().version(),candidateCount:info.pool.length,teamCount:12,activeCpuDraftTeams:1,fixture:'80 production-generated prospects; controlled roster capacity: own64, rival69, other10clubs70. Full12CPU draft measurements are separate.',transitions,allocation:{pitcher:70,batter:30},scoutPoints:4,saveReloadStable:true,listReturn:{farId,scrollBefore,pendingScroll},dimensions:{list:listDimensions,detail:detailDimensions,results:dimensions},errors,durationMs:Date.now()-started,hardware:'Playwright browser emulation; no iPhone hardware validation'});
+  evidence(`browser-${testInfo.project.name}`,{browser:testInfo.project.name,browserVersion:page.context().browser().version(),candidateCount:info.pool.length,teamCount:12,activeCpuDraftTeams:1,fixture:'160 production-generated prospects; controlled roster capacity: own64, rival69, other10clubs70. Full12CPU draft measurements are separate.',transitions,allocation:{pitcher:70,batter:30},scoutPoints:4,saveReloadStable:true,listReturn:{farId,scrollBefore,pendingScroll},dimensions:{list:listDimensions,detail:detailDimensions,results:dimensions},errors,durationMs:Date.now()-started,hardware:'Playwright browser emulation; no iPhone hardware validation'});
 });
 
 test('generated draft scroll and repeated public ranking measurement',async({page},testInfo)=>{
   await instrument(page);const info=await seedGenerated(page,'draft_lottery');
-  await expect(page.locator('.draft-candidate-open')).toHaveCount(80);
+  await expect(page.locator('.draft-candidate-open')).toHaveCount(160);
   await saveDraft(page);await page.waitForTimeout(1200);await waitSaveIdle(page);
   await page.evaluate(()=>{for(const key of Object.keys(window.__qa))window.__qa[key]=0;});
   const start=Date.now();

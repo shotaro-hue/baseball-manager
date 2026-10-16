@@ -48,7 +48,9 @@
 - 関連ドラフト一括：`VARIABLE_DRAFT_EVIDENCE=1 npx vitest run draft src/components/variableDraft.test.js` → **19ファイル122件成功**。既存200クラスの抽選・予想・調査、20seed六巡の指名反映再現を含む。後者の候補生成は現行160人で、旧80候補の実保存確認とは区別する。
 - Chromiumの新方式4ケース成功（360px手動6人、390px0人、1440px10人目拒否、390px12球団全自動）。全て実保存・再開・結果反映まで確認。操作試験の全経路は約72〜103秒。160候補の最下部、比較、追加調査と残pt、一覧への復帰、終了確認のEscape・フォーカス復帰、横はみ出しなし、pageerrorなしを対象範囲で確認した。個別入力遅延の厳密なベンチマークではない。
 - **旧80候補・6巡の途中セーブ**：`npm run test:e2e -- farm-development.spec.js --grep 'legacy 80-candidate' --workers=1 --retries=0`成功。版なし・4巡目・指名3人・調査0ptから実保存を往復し、pool80人と手番・log・所属・成績・球歴を照合。6人で終了・入団反映後66人を確認。旧poolは#475の実生成値を保持したfixtureで、ロード時の再生成ではない。
-- 初回ブラウザはキャッシュ欠落で起動不可、次に日本語font不足を確認した。ChromiumとローカルNotoを導入し再実行した。新規手動旅程の90秒枠は保存再開時に足りず、既存の生成ドラフト旅程と同じ180秒へ設定。新規12球団全自動の既定5秒assertは5巡目の進行中に期限となったため、最大108手番の完走待ちを60秒へ設定し再実行成功。既存試験の期待値・timeout・retriesは変更していない。
+- 初回ブラウザはキャッシュ欠落で起動不可、次に日本語font不足を確認した。ChromiumとローカルNotoを導入し再実行した。新規手動旅程の90秒枠は保存再開時に足りず、既存の生成ドラフト旅程と同じ180秒へ設定。新規12球団全自動の既定5秒assertは5巡目の進行中に期限となったため、最大108手番の完走待ちを60秒へ設定し再実行成功。既存試験のtimeout・retriesは変更していない。
+- 初回PR head `02de41f`の[CI #417](https://github.com/shotaro-hue/baseball-manager/actions/runs/38980364235)で、QA-D1性能試験の候補数assertを80人のまま残した更新漏れを確認した。Chromium/WebKitの360/390/1440pxの6ケースは実際の160人表示で失敗し、同グループの他8ケースは成功。固定数を新仕様の160人へ修正し、生成fixtureも「80以上」から「160と一致」へ強化した。旧80人保存の専用試験は保持する。
+- 修正後に`QA_D1_CAPTURE=1 QA_D1_EVIDENCE=/tmp/variable-qa-perf npm run test:e2e -- --config=scripts/qa-d1-browser.config.js --project=chromium-360 --project=chromium-390 --project=chromium-1440 --grep 'generated draft scroll and repeated public ranking measurement' --workers=1 --retries=0`を実行し、**3件成功**。全幅で候補再描画8／親state更新1／保存1、公開順位16,000回参照に対しsort1回。既存の性能上限（再描画12以下・親更新2以下・保存1以下・sort1以下）は維持した。[測定値](../validation/variable-draft/browser-performance.json)。ローカルWebKitは共有ライブラリ不足で起動確認をしておらず、修正後の6幅・ブラウザ組み合わせは最終head CIで確認する。
 
 ## 画面・CI・レビュー
 
