@@ -121,3 +121,6 @@ for(const width of [360,390,1440])test(`roster capacity conversion respects both
  expect(t.history).toEqual(original.history);expect(t.players.map(p=>p.id)).toEqual(original.players.map(p=>p.id));
  await reloadAndLoad(page);expect((await saveHub(page)).teams).toEqual(saved.teams);
 });
+
+import { registerCapacityPlanningCases } from './helpers/rosterCapacity';
+registerCapacityPlanningCases([390,1440]);
