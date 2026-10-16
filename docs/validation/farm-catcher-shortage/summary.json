@@ -1,0 +1,454 @@
+{
+  "base": "db80d6c92dd094d0f20a5128e4185c062de86f1d",
+  "condition": "QA-D1 generated clubs; full automation; regular seasons 2026-2028; real hooks and 42 save/reloads",
+  "plainBaselineCI": {
+    "runId": 38821179632,
+    "jobId": 116717854236,
+    "head": "c34c4ce1314df28a0857d58e6115a21d93f5dfd9",
+    "matchesAllNineUnplayedCounts": true
+  },
+  "totalCards": 7722,
+  "unplayedCards": 223,
+  "shortageClubDays": 223,
+  "distribution": [
+    {
+      "owned": 3,
+      "healthy": 2,
+      "activePrimary": 2,
+      "injured": 1,
+      "clubDays": 161
+    },
+    {
+      "owned": 4,
+      "healthy": 2,
+      "activePrimary": 2,
+      "injured": 2,
+      "clubDays": 55
+    },
+    {
+      "owned": 5,
+      "healthy": 2,
+      "activePrimary": 2,
+      "injured": 3,
+      "clubDays": 7
+    }
+  ],
+  "constraints": {
+    "injury-under-three": 223
+  },
+  "healthySurplusDays": 0,
+  "seasons": [
+    {
+      "seed": 20261015,
+      "year": 2026,
+      "rounds": 143,
+      "unplayedCards": 47,
+      "shortageClubDays": 47,
+      "constraints": {
+        "injury-under-three": 47
+      },
+      "clubs": {
+        "2": 5,
+        "8": 40,
+        "11": 2
+      },
+      "reasons": {
+        "insufficient-catcher": 47
+      }
+    },
+    {
+      "seed": 20261015,
+      "year": 2027,
+      "rounds": 143,
+      "unplayedCards": 20,
+      "shortageClubDays": 20,
+      "constraints": {
+        "injury-under-three": 20
+      },
+      "clubs": {
+        "0": 7,
+        "2": 13
+      },
+      "reasons": {
+        "insufficient-catcher": 20
+      }
+    },
+    {
+      "seed": 20261015,
+      "year": 2028,
+      "rounds": 143,
+      "unplayedCards": 25,
+      "shortageClubDays": 25,
+      "constraints": {
+        "injury-under-three": 25
+      },
+      "clubs": {
+        "2": 19,
+        "3": 6
+      },
+      "reasons": {
+        "insufficient-catcher": 25
+      }
+    },
+    {
+      "seed": 20261016,
+      "year": 2026,
+      "rounds": 143,
+      "unplayedCards": 38,
+      "shortageClubDays": 38,
+      "constraints": {
+        "injury-under-three": 38
+      },
+      "clubs": {
+        "2": 7,
+        "6": 31
+      },
+      "reasons": {
+        "insufficient-catcher": 38
+      }
+    },
+    {
+      "seed": 20261016,
+      "year": 2027,
+      "rounds": 143,
+      "unplayedCards": 8,
+      "shortageClubDays": 8,
+      "constraints": {
+        "injury-under-three": 8
+      },
+      "clubs": {
+        "11": 8
+      },
+      "reasons": {
+        "insufficient-catcher": 8
+      }
+    },
+    {
+      "seed": 20261016,
+      "year": 2028,
+      "rounds": 143,
+      "unplayedCards": 0,
+      "shortageClubDays": 0,
+      "constraints": {},
+      "clubs": {},
+      "reasons": {}
+    },
+    {
+      "seed": 20261017,
+      "year": 2026,
+      "rounds": 143,
+      "unplayedCards": 31,
+      "shortageClubDays": 31,
+      "constraints": {
+        "injury-under-three": 31
+      },
+      "clubs": {
+        "6": 31
+      },
+      "reasons": {
+        "insufficient-catcher": 31
+      }
+    },
+    {
+      "seed": 20261017,
+      "year": 2027,
+      "rounds": 143,
+      "unplayedCards": 18,
+      "shortageClubDays": 18,
+      "constraints": {
+        "injury-under-three": 18
+      },
+      "clubs": {
+        "3": 16,
+        "5": 2
+      },
+      "reasons": {
+        "insufficient-catcher": 18
+      }
+    },
+    {
+      "seed": 20261017,
+      "year": 2028,
+      "rounds": 143,
+      "unplayedCards": 36,
+      "shortageClubDays": 36,
+      "constraints": {
+        "injury-under-three": 36
+      },
+      "clubs": {
+        "5": 7,
+        "11": 29
+      },
+      "reasons": {
+        "insufficient-catcher": 36
+      }
+    }
+  ],
+  "episodes": [
+    {
+      "seed": 20261015,
+      "year": 2026,
+      "teamId": 8,
+      "start": 43,
+      "end": 69,
+      "owned": 3,
+      "healthy": 2
+    },
+    {
+      "seed": 20261015,
+      "year": 2026,
+      "teamId": 8,
+      "start": 107,
+      "end": 119,
+      "owned": 3,
+      "healthy": 2
+    },
+    {
+      "seed": 20261015,
+      "year": 2026,
+      "teamId": 11,
+      "start": 80,
+      "end": 81,
+      "owned": 4,
+      "healthy": 2
+    },
+    {
+      "seed": 20261015,
+      "year": 2026,
+      "teamId": 2,
+      "start": 138,
+      "end": 142,
+      "owned": 3,
+      "healthy": 2
+    },
+    {
+      "seed": 20261015,
+      "year": 2027,
+      "teamId": 2,
+      "start": 73,
+      "end": 85,
+      "owned": 3,
+      "healthy": 2
+    },
+    {
+      "seed": 20261015,
+      "year": 2027,
+      "teamId": 0,
+      "start": 130,
+      "end": 136,
+      "owned": 5,
+      "healthy": 2
+    },
+    {
+      "seed": 20261015,
+      "year": 2028,
+      "teamId": 3,
+      "start": 57,
+      "end": 60,
+      "owned": 4,
+      "healthy": 2
+    },
+    {
+      "seed": 20261015,
+      "year": 2028,
+      "teamId": 3,
+      "start": 80,
+      "end": 81,
+      "owned": 4,
+      "healthy": 2
+    },
+    {
+      "seed": 20261015,
+      "year": 2028,
+      "teamId": 2,
+      "start": 61,
+      "end": 68,
+      "owned": 3,
+      "healthy": 2
+    },
+    {
+      "seed": 20261015,
+      "year": 2028,
+      "teamId": 2,
+      "start": 98,
+      "end": 108,
+      "owned": 3,
+      "healthy": 2
+    },
+    {
+      "seed": 20261016,
+      "year": 2026,
+      "teamId": 6,
+      "start": 16,
+      "end": 29,
+      "owned": 3,
+      "healthy": 2
+    },
+    {
+      "seed": 20261016,
+      "year": 2026,
+      "teamId": 6,
+      "start": 117,
+      "end": 127,
+      "owned": 3,
+      "healthy": 2
+    },
+    {
+      "seed": 20261016,
+      "year": 2026,
+      "teamId": 6,
+      "start": 138,
+      "end": 143,
+      "owned": 3,
+      "healthy": 2
+    },
+    {
+      "seed": 20261016,
+      "year": 2026,
+      "teamId": 2,
+      "start": 137,
+      "end": 143,
+      "owned": 3,
+      "healthy": 2
+    },
+    {
+      "seed": 20261016,
+      "year": 2027,
+      "teamId": 11,
+      "start": 28,
+      "end": 35,
+      "owned": 3,
+      "healthy": 2
+    },
+    {
+      "seed": 20261017,
+      "year": 2026,
+      "teamId": 6,
+      "start": 78,
+      "end": 108,
+      "owned": 3,
+      "healthy": 2
+    },
+    {
+      "seed": 20261017,
+      "year": 2027,
+      "teamId": 3,
+      "start": 102,
+      "end": 117,
+      "owned": 4,
+      "healthy": 2
+    },
+    {
+      "seed": 20261017,
+      "year": 2027,
+      "teamId": 5,
+      "start": 133,
+      "end": 134,
+      "owned": 4,
+      "healthy": 2
+    },
+    {
+      "seed": 20261017,
+      "year": 2028,
+      "teamId": 5,
+      "start": 15,
+      "end": 21,
+      "owned": 3,
+      "healthy": 2
+    },
+    {
+      "seed": 20261017,
+      "year": 2028,
+      "teamId": 11,
+      "start": 81,
+      "end": 94,
+      "owned": 4,
+      "healthy": 2
+    },
+    {
+      "seed": 20261017,
+      "year": 2028,
+      "teamId": 11,
+      "start": 105,
+      "end": 119,
+      "owned": 4,
+      "healthy": 2
+    }
+  ],
+  "files": [
+    {
+      "file": "seed-20261015.json.gz",
+      "uncompressedSha256": "f048e85ab0dac6e8c3e7ec37b067132f177fdca60d26133cc0cf32b4666fdc74",
+      "bytes": 577460,
+      "gzipBytes": 16689
+    },
+    {
+      "file": "seed-20261016.json.gz",
+      "uncompressedSha256": "df824be9c17b5c329858c7139631f5cc5f93e3397330e049393c25bd593fafd6",
+      "bytes": 485406,
+      "gzipBytes": 14632
+    },
+    {
+      "file": "seed-20261017.json.gz",
+      "uncompressedSha256": "5262302555ee1922a35de5c92c4ba3482b79793045339e663f4f8b773a5d4290",
+      "bytes": 566232,
+      "gzipBytes": 15462
+    }
+  ],
+  "seasonStartOwnedRanges": [
+    {
+      "seed": 20261015,
+      "year": 2026,
+      "min": 3,
+      "max": 6
+    },
+    {
+      "seed": 20261015,
+      "year": 2027,
+      "min": 3,
+      "max": 8
+    },
+    {
+      "seed": 20261015,
+      "year": 2028,
+      "min": 3,
+      "max": 8
+    },
+    {
+      "seed": 20261016,
+      "year": 2026,
+      "min": 3,
+      "max": 7
+    },
+    {
+      "seed": 20261016,
+      "year": 2027,
+      "min": 3,
+      "max": 7
+    },
+    {
+      "seed": 20261016,
+      "year": 2028,
+      "min": 4,
+      "max": 8
+    },
+    {
+      "seed": 20261017,
+      "year": 2026,
+      "min": 3,
+      "max": 6
+    },
+    {
+      "seed": 20261017,
+      "year": 2027,
+      "min": 4,
+      "max": 7
+    },
+    {
+      "seed": 20261017,
+      "year": 2028,
+      "min": 3,
+      "max": 8
+    }
+  ]
+}
