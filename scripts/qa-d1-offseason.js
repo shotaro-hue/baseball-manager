@@ -2,7 +2,9 @@ import React from 'react';
 import {act,create} from 'react-test-renderer';
 import {afterEach,expect,it,vi} from 'vitest';
 import {IDBFactory,IDBKeyRange} from 'fake-indexeddb';
-import {writeFileSync} from 'node:fs';
+import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {createCatcherProbe,installCatcherProbe} from './farm-catcher-diagnostics';
 import {useOffseason} from '../src/hooks/useOffseason';
 import {useGameState} from '../src/hooks/useGameState';
 import {createInitialTeams} from '../src/engine/bootstrapTeams';
@@ -90,9 +92,13 @@ it(`QA-D1: seed ${seed} plays three generated seasons with offseason save/reload
   seasonHistory:{awards:[],records:{},hallOfFame:[],championships:[],standingsHistory:[],transfers:[]},
   schedule:generateSeasonSchedule(year,teams),gameResultsMap:{},allTeamResultsMap:{},allTeamBoxScoresMap:{},scheduleArchive:[],
   farmCompetition:createFarmCompetition({teams,year,saveId}),farmCompetitionVersion:1,offseasonPlan:null});
+ const catcherProbe=process.env.FARM_CATCHER_DIAGNOSE==='1'?createCatcherProbe(seed):null;
+ if(catcherProbe)installCatcherProbe(vi,catcherProbe);
+ const catcherPhase=label=>catcherProbe?.phase(label,current.s);
  const row={seed,seasons:[],checkpoints:[]};measurements.push(row);
  for(let season=0;season<3;season++) {
   const y=current.s.year,started=performance.now();
+  catcherPhase('season-start');
   // Split at 72 to prove real midseason serialization, then run to round 143.
   for(const count of [72,71]) {
    const r=simulateSeasonBatch({snapshot:current.s,count,autoManageMyTeam:true});
@@ -107,8 +113,10 @@ it(`QA-D1: seed ${seed} plays three generated seasons with offseason save/reload
   const playedCards=finished.farmCompetition.cards.filter(c=>c.status==='played').length;
   const unplayed=finished.farmCompetition.cards.filter(c=>c.status==='unplayed');
   const farmReasons=unplayed.flatMap(c=>c.reasons||[]).reduce((a,r)=>(a[r.code||r.reason||JSON.stringify(r)]=(a[r.code||r.reason||JSON.stringify(r)]||0)+1,a),{});
+  catcherPhase('season-end');
   patch({screen:'retire_phase'});
   await act(async()=>{expect(await current.os.handleRetirePhaseNext({})).toBe(true);});
+  catcherPhase('cpu-renewal-retirement-fa');
   expect(current.s.screen).toBe('offseason_planning');
   patch({offseasonPlan:{...current.s.offseasonPlan,stage:'open'}});
   if(seed===20261015)await checkpoint('renewal-open',row.checkpoints);
@@ -122,6 +130,7 @@ it(`QA-D1: seed ${seed} plays three generated seasons with offseason save/reload
    act(()=>current.os.handleContractRenewalSign(p.id,salary,1,0,0));
   }
   if(seed===20261015)await checkpoint('renewal-signed-release',row.checkpoints);
+  catcherPhase('user-renewal-release');
   const candidate=current.s.faPool.find(p=>p.id!==releasedId&&!p.育成&&validateMarketContract({team:current.gs.myTeam,pool:current.s.faPool,player:p,salary:p.salary,years:1,gameDay:1})===null);
   let faSigned=null;
   if(candidate) {
@@ -131,7 +140,9 @@ it(`QA-D1: seed ${seed} plays three generated seasons with offseason save/reload
    expect(ownedPlayers(current.gs.myTeam).find(p=>p.id===faSigned)).toMatchObject({isFA:false,contractSignedYear:y,contractYearsLeft:1});
   }
   if(seed===20261015)await checkpoint('FA-complete',row.checkpoints);
+  catcherPhase('user-fa-signing');
   act(()=>expect(current.os.handlePlanningFinish()).toBe(true));
+  catcherPhase('planning-complete');
   expect(current.s.screen).toBe('waiver_result');
   if(releasedId)expect(ownedPlayers(current.gs.myTeam).some(p=>p.id===releasedId)).toBe(false);
   if(seed===20261015)await checkpoint('waiver-results',row.checkpoints);
@@ -149,12 +160,14 @@ it(`QA-D1: seed ${seed} plays three generated seasons with offseason save/reload
   patch({screen:'draft_review',offseasonPlan:{...current.s.offseasonPlan,draftEvaluation:evaluation,draftResult:{pool,drafted}}});
   if(seed===20261015)await checkpoint('draft-review',row.checkpoints);
   act(()=>expect(current.os.handleDraftComplete(pool,drafted)).toBe(true));
+  catcherPhase('draft-complete');
   integrity(current.s);expect(current.s.screen).toBe('spring_training');
   await checkpoint('camp',row.checkpoints);
   act(()=>expect(current.os.handleDraftComplete(pool,drafted)).toBe(false));
   const contracts=new Map(current.s.teams.flatMap(ownedPlayers).map(p=>[p.id,{years:p.contractYearsLeft,signed:p.contractSignedYear,age:p.age,salary:p.salary}]));
   await act(async()=>{expect(await current.os.handleSpringTrainingComplete()).toBe(true);});
   expect(current.s.year).toBe(y+1);expect(current.s.gameDay).toBe(1);expect(current.s.screen).toBe('new_season');
+  catcherPhase('year-advanced');
   expect(current.s.seasonHistory.farmArchives).toHaveLength(season+1);
   expect(current.s.scheduleArchive.some(a=>a.year===y)).toBe(true);
   for(const p of current.s.teams.flatMap(ownedPlayers)) {
@@ -173,5 +186,21 @@ it(`QA-D1: seed ${seed} plays three generated seasons with offseason save/reload
  expect(new Set(career.filter(r=>r.year>=2026&&r.year<=2028).map(r=>r.year))).toEqual(new Set([2026,2027,2028]));
  expect(new Set(career.map(getCareerEntryKey)).size).toBe(career.length);
  expect(current.s.year).toBe(2029);expect(current.s.seasonHistory.awards).toHaveLength(3);expect(current.s.seasonHistory.standingsHistory).toHaveLength(3);
+ if(catcherProbe) {
+  const report=catcherProbe.report();
+  expect(report.seasons.map(s=>s.rounds)).toEqual([143,143,143]);
+  expect(report.seasons.map(s=>s.unplayedCards)).toEqual(row.seasons.map(s=>s.farmCards.unplayed));
+  expect(report.shortages.every(s=>s.farmHealthy===0)).toBe(true);
+  const sourcePaths=['scripts/farm-catcher-diagnostics.js','scripts/qa-d1-offseason.js',
+   'src/workers/seasonBatchCore.js','src/engine/rosterAutomation.js','src/engine/regularGameUpdates.js',
+   'src/engine/farmProgression.js','src/engine/farmSelection.js','src/engine/cpuTradeExecution.js','src/hooks/useOffseason.js'];
+  const sources=Object.fromEntries(sourcePaths.map(path=>[path,createHash('sha256').update(readFileSync(path)).digest('hex')]));
+  mkdirSync('docs/validation/farm-catcher-shortage',{recursive:true});
+  writeFileSync(`docs/validation/farm-catcher-shortage/seed-${seed}.json`,JSON.stringify({
+   base:'db80d6c92dd094d0f20a5128e4185c062de86f1d',sources,
+   environment:'Real QA-D1 hooks/engine; test-side pass-through spies; LCG RNG; fake-indexeddb and Map localStorage',
+   ...report})+'\n');
+  console.log('Farm catcher diagnosis',seed,JSON.stringify(report.seasons));
+ }
 },600000);
 }
