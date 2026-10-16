@@ -81,3 +81,11 @@ it('offers a direct entry from the farm overview without changing the team',()=>
  click(v,'二軍');click(v,'二軍の育成・起用設定へ');
  expect(v.root.findByProps({'aria-label':'二軍育成・起用'})).toBeTruthy();expect(t).toEqual(before);
 });
+it('shows the same counts and conversion action for an isIkusei-only player and a reserved last slot',()=>{
+ const t=structuredClone(source);t.players=t.players.slice(0,27);
+ const dev={...t.farm[0],id:'dev-only',育成:false,isIkusei:true,salary:240};
+ t.farm=[...Array.from({length:42},(_,i)=>({...t.farm[1],id:`capacity-${i}`,育成:false,isIkusei:false})),dev];
+ let v;act(()=>v=create(React.createElement(RosterTab,{team:t,allTeams:[t],draftContext:{draftPool:[{id:0}],drafted:{0:t.id}},onConvertIkusei:vi.fn()})));views.push(v);
+ const root=farm(v);expect(text(root)).toContain('支配下 69/70人');expect(text(root)).toContain('育成 1人');expect(text(root)).toContain('確定指名 1人');
+ expect(root.findByProps({'aria-label':`${dev.name}を支配下登録する`}).props.disabled).toBe(true);
+});

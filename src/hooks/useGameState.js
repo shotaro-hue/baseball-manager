@@ -1,3 +1,5 @@
+import { draftCapacityContext, evaluateRosterCapacity, isIkuseiPlayer } from '../engine/rosterCapacity';
+import { marketRosterError } from '../engine/marketRoster';
 import {createFarmCompetition} from '../engine/farmRecords';
 import {validateFarmSaveState} from '../engine/farmMigration';
 import { saveFeedback } from '../engine/saveFeedback';
@@ -471,6 +473,14 @@ export function useGameState() {
   },[year,teams.length]);
 
   const myTeam = useMemo(()=>teams.find(t=>t.id===myId),[teams,myId]);
+  // Command snapshot also advances synchronously to reject repeated clicks.
+  const rosterCommandRef = useRef(null);
+  rosterCommandRef.current = { teams, myId, year, offseasonPlan };
+  const commitRosterCommand = (current, nextTeam) => {
+    const nextTeams = current.teams.map(t => t.id === current.myId ? nextTeam : t);
+    rosterCommandRef.current = { ...current, teams: nextTeams };
+    setTeams(nextTeams);
+  };
   const tabBadges = useMemo(()=>{
     if(!myTeam) return {};
     const expiringCount=myTeam.players.filter(p=>!p.isIkusei&&(p.contractYearsLeft??99)<=1).length;
@@ -930,7 +940,7 @@ export function useGameState() {
     if(!myTeam) return;
     const p=myTeam.farm.find(x=>x.id===pid);
     if(!p) return;
-    if(p.育成){notify("育成選手は一軍出場不可。先に支配下登録してください","warn");return;}
+    if(isIkuseiPlayer(p)){notify("育成選手は一軍出場不可。先に支配下登録してください","warn");return;}
     if(myTeam.players.length>=MAX_ROSTER){notify("一軍枠満杯","warn");return;}
     if (p.isForeign) {
       const foreignPlayers = myTeam.players.filter(x => x.isForeign);
@@ -953,20 +963,19 @@ export function useGameState() {
   },[myTeam,upd,myId,notify]);
 
   const convertIkusei = useCallback((pid)=>{
-    if(!myTeam) return;
-    const p=myTeam.farm.find(x=>x.id===pid);
-    if(!p||!p.育成) return;
-    // 支配下70人枠チェック
-    const shihakaNow=myTeam.players.filter(x=>!x.育成).length+myTeam.farm.filter(x=>!x.育成).length;
-    if(shihakaNow>=MAX_SHIHAKA_TOTAL){notify(`支配下上限（${MAX_SHIHAKA_TOTAL}人）到達。支配下登録不可`,"warn");return;}
-    if(myTeam.players.length>=MAX_ROSTER){notify("支配下枠満杯（最大"+MAX_ROSTER+"名）","warn");return;}
-    const minSal=MIN_SALARY_SHIHAKA;
-    const newSal=Math.max(p.salary,minSal);
-    const diff=newSal-p.salary;
-    if(diff>0&&myTeam.budget<diff){notify("予算不足（差額"+Math.round(diff/10000)+"万円必要）","warn");return;}
-    upd(myId,t=>({...t,budget:t.budget-diff,farm:t.farm.map(x=>x.id===pid?{...x,育成:false,salary:newSal,contractYears:1,contractYearsLeft:1,ikuseiYears:0}:x)}));
+    const current=rosterCommandRef.current, team=current.teams.find(t=>t.id===current.myId);
+    const p=team?.farm.find(x=>x.id===pid);
+    if(!p||!isIkuseiPlayer(p)) return;
+    const capacity=evaluateRosterCapacity(team,draftCapacityContext(current.offseasonPlan,current.year,current.teams));
+    if(!capacity.ok){notify(`支配下人数が未確認です（${capacity.reason}）`,"warn");return;}
+    if(capacity.remainingSlots<=0){notify(`支配下上限（${MAX_SHIHAKA_TOTAL}人）到達。支配下登録不可`,"warn");return;}
+    if(team.players.length>=MAX_ROSTER){notify("一軍枠満杯（最大"+MAX_ROSTER+"名）のため現在の登録処理では実行不可","warn");return;}
+    const newSal=Math.max(p.salary,MIN_SALARY_SHIHAKA),diff=newSal-p.salary;
+    if(!Number.isFinite(diff)||!Number.isFinite(team.budget)){notify("年俸・予算が未記録です","warn");return;}
+    if(diff>0&&team.budget<diff){notify("予算不足（差額"+Math.round(diff/10000)+"万円必要）","warn");return;}
+    commitRosterCommand(current,{...team,budget:team.budget-diff,farm:team.farm.map(x=>x.id===pid?{...x,育成:false,isIkusei:false,salary:newSal,contractYears:1,contractYearsLeft:1,ikuseiYears:0}:x)});
     notify(`${p.name}を支配下登録！`,"ok");
-  },[myTeam,upd,myId,notify]);
+  },[setTeams,notify]);
 
   const demote = useCallback((pid)=>{
     if(!myTeam) return;
@@ -1001,14 +1010,17 @@ export function useGameState() {
   },[myTeam,upd,myId,notify]);
 
   const signPlayer = useCallback((idx)=>{
-    if(!myTeam) return;
-    const p=myTeam.scoutResults[idx];
-    if(!p||myTeam.budget<p.salary){notify("予算不足","warn");return;}
-    const shihakaNow=myTeam.players.filter(x=>!x.育成).length+myTeam.farm.filter(x=>!x.育成).length;
-    if(shihakaNow>=MAX_SHIHAKA_TOTAL){notify(`支配下上限（${MAX_SHIHAKA_TOTAL}人）到達。獲得不可`,"warn");return;}
-    upd(myId,t=>({...t,budget:t.budget-p.salary,farm:[...t.farm,{...p,contractYearsLeft:2}],scoutResults:t.scoutResults.filter((_,i)=>i!==idx)}));
+    const current=rosterCommandRef.current, team=current.teams.find(t=>t.id===current.myId);
+    const intendedId=myTeam?.scoutResults[idx]?.id;
+    if(intendedId==null) return;
+    const p=team?.scoutResults.find(candidate=>candidate.id===intendedId);
+    if(!p) return;
+    if(!Number.isFinite(p.salary)||!Number.isFinite(team.budget)||team.budget<p.salary){notify("予算不足","warn");return;}
+    const error=marketRosterError(team,p,current.teams,draftCapacityContext(current.offseasonPlan,current.year,current.teams));
+    if(error){notify(error,"warn");return;}
+    commitRosterCommand(current,{...team,budget:team.budget-p.salary,farm:[...team.farm,{...p,contractYearsLeft:2}],scoutResults:team.scoutResults.filter(candidate=>candidate.id!==intendedId)});
     notify(`${p.name}を獲得！`,"ok");
-  },[myTeam,upd,myId,notify]);
+  },[myTeam,setTeams,notify]);
 
   const handlePressAnswer = useCallback((choiceIdx) => {
     if (!pressEvent) return;

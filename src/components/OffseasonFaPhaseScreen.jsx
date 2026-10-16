@@ -49,7 +49,7 @@ export default function OffseasonFaPhaseScreen({ gs, os, myTeam, myId, year, emb
   return <Frame data-ds="fa-screen" className={`fa-market offseason-fa-screen ${embedded ? 'fa-embedded' : ''}`}>
     {!embedded && <header><h1>{year}年 オフシーズン補強</h1><p>国内FA・自由契約補強 → 契約更改 → ドラフト</p>
     </header>}
-    <HubFaTab myTeam={myTeam} myId={myId} year={year} gameDay={gs.gameDay}
+    <HubFaTab myTeam={myTeam} myId={myId} year={year} gameDay={gs.gameDay} teams={gs.teams} offseasonPlan={gs.offseasonPlan}
       faPool={(gs.faPool || []).filter(p => !p.isForeign)} faYears={gs.faYears} setFaYears={gs.setFaYears}
       upd={gs.upd} setFaPool={gs.setFaPool} notify={gs.notify} marketMode="offseason" embedded={embedded}
       savedView={embedded ? gs.offseasonPlan?.marketView : undefined} onViewChange={embedded ? saveMarketView : undefined}

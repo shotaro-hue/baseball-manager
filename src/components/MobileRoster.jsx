@@ -1,3 +1,5 @@
+import { evaluateRosterCapacity, isIkuseiPlayer } from '../engine/rosterCapacity';
+import { RosterCapacitySummary } from './RosterCapacitySummary';
 import { FarmRecordScope, FarmRecordSummary } from './FarmRecordSummary';
 import React, { useState } from 'react';
 import { CaretRight, ArrowLeft } from '@phosphor-icons/react';
@@ -7,7 +9,7 @@ import { ownedPlayers } from '../engine/renewalRules';
 import { fmtAvg } from '../utils';
 import './roster-overview.css';
 
-export function MobileRoster({ farmState, team, onPlayerClick, onReplaceLineup, onSetLineupOrder, onSetRosterDhMode, onOpenFarmSettings }) {
+export function MobileRoster({ farmState, team, capacity = evaluateRosterCapacity(team), onPlayerClick, onReplaceLineup, onSetLineupOrder, onSetRosterDhMode, onOpenFarmSettings }) {
   const [view, setView] = useState('batters');
   const [metric, setMetric] = useState('condition');
   const [replaceId, setReplaceId] = useState(null);
@@ -39,6 +41,7 @@ export function MobileRoster({ farmState, team, onPlayerClick, onReplaceLineup, 
   const injuredCount = ownedPlayers(team).filter(p => (p.injuryDaysLeft || 0) > 0).length;
   return <section className="mobile-roster flow-screen roster-overview" data-ds="roster-overview" aria-label="編成一覧">
     <header className="roster-heading"><p>{team.name}{farmState?.year && ` / ${farmState.year}年`}</p><h1>編成</h1><p>所属・役割・状態を確認して、次戦の起用を見直す。</p></header>
+    <RosterCapacitySummary capacity={capacity} className="roster-note"/>
     <MetricBand className="roster-summary" items={[
       { label: '一軍登録', value: (team.players || []).length, unit: '人' },
       { label: '二軍（育成含む）', value: (team.farm || []).length, unit: '人' },
@@ -59,7 +62,7 @@ export function MobileRoster({ farmState, team, onPlayerClick, onReplaceLineup, 
       <p className="roster-note">昇降格・育成目標の変更は詳細設定から行えます。一軍成績とは別の記録です。</p>
       {onOpenFarmSettings && <Button variant="secondary" onClick={onOpenFarmSettings}>二軍の育成・起用設定へ</Button>}
       <DataTableFrame label="二軍所属選手と実測記録"><table className="roster-farm-table"><thead><tr><th scope="col">選手</th><th scope="col">所属・役割</th><th scope="col">状態</th><th scope="col">二軍実測</th></tr></thead><tbody>
-        {(team.farm || []).map(p => <tr key={p.id}><td>{playerName(p, `${p.育成 ? '育成' : '二軍支配下'} · ${p.isPitcher ? p.subtype || '投手' : p.pos} · ${conditionInfo(p)}${(p.registrationCooldownDays || 0) > 0 ? ` · 再登録まで${p.registrationCooldownDays}日` : ''}`)}</td><td><strong>{p.育成 ? '育成' : '二軍支配下'}</strong><small>{p.isPitcher ? p.subtype || '投手' : p.pos}</small></td><td>
+        {(team.farm || []).map(p => <tr key={p.id}><td>{playerName(p, `${isIkuseiPlayer(p) ? '育成' : '二軍支配下'} · ${p.isPitcher ? p.subtype || '投手' : p.pos} · ${conditionInfo(p)}${(p.registrationCooldownDays || 0) > 0 ? ` · 再登録まで${p.registrationCooldownDays}日` : ''}`)}</td><td><strong>{isIkuseiPlayer(p) ? '育成' : '二軍支配下'}</strong><small>{p.isPitcher ? p.subtype || '投手' : p.pos}</small></td><td>
           {conditionInfo(p)}{(p.registrationCooldownDays || 0) > 0 && <small>再登録まで{p.registrationCooldownDays}日</small>}
         </td><td><FarmRecordSummary state={farmState} player={p} compact /></td></tr>)}
       </tbody></table></DataTableFrame>

@@ -1,12 +1,12 @@
 import { MAX_SHIHAKA_TOTAL } from '../constants';
 import { ownedPlayers } from './renewalRules';
 import { marketPlacement } from './marketRoster';
-import { isIkuseiPlayer } from './rosterAutomation';
+import { evaluateRosterCapacity, isIkuseiPlayer } from './rosterCapacity';
 import { pruneRosterReferences } from './offseasonReview';
 
 // cash is signed 万円: positive means fromId pays toId. No state or effects
 // are committed until both clubs pass. Offer copies are only ID selectors.
-export function applyTradeTransaction(teams, { fromId, toId, outgoing, incoming, cash = 0 }) {
+export function applyTradeTransaction(teams, { fromId, toId, outgoing, incoming, cash = 0 }, draftContext = {}) {
   const fail = error => ({ ok: false, error });
   if (fromId == null || toId == null || fromId === toId) return fail('取引球団が無効です');
   const from = teams.find(t => t.id === fromId), to = teams.find(t => t.id === toId);
@@ -48,8 +48,11 @@ export function applyTradeTransaction(teams, { fromId, toId, outgoing, incoming,
     return next;
   };
   const nextFrom = exchange(from, sent, received, fromBudget), nextTo = exchange(to, received, sent, toBudget);
+  const nextTeams = teams.map(t => t.id === fromId ? nextFrom : t.id === toId ? nextTo : t);
   for (const team of [nextFrom, nextTo]) {
-    if (ownedPlayers(team).filter(p => !isIkuseiPlayer(p)).length > MAX_SHIHAKA_TOTAL) return fail(`支配下登録枠（${MAX_SHIHAKA_TOTAL}人）を超えます`);
+    const capacity = evaluateRosterCapacity(team, { ...draftContext, teams: nextTeams });
+    if (!capacity.ok) return fail(`支配下人数が未確認です（${capacity.reason}）`);
+    if (capacity.overBy > 0) return fail(`支配下登録枠（${MAX_SHIHAKA_TOTAL}人）を超えます`);
   }
-  return { ok: true, teams: teams.map(t => t.id === fromId ? nextFrom : t.id === toId ? nextTo : t), outgoing: sent, incoming: received };
+  return { ok: true, teams: nextTeams, outgoing: sent, incoming: received };
 }

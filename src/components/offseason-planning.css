@@ -11,6 +11,8 @@
 .planning-screen[data-ds] .planning-support>details>summary { min-height:44px; padding:8px 0; font-size:14px; font-weight:700; cursor:pointer; }
 .planning-screen[data-ds] :is(.planning-support>details>summary,.planning-heading h1):focus-visible { outline:3px solid var(--ds-focus); outline-offset:3px; }
 .planning-screen[data-ds] .planning-note { color:var(--ds-muted); font-size:12px; margin:8px 0; }
+/* Keep the first roster row visible with the added actual/projected counts. */
+.planning-screen[data-ds] .planning-overview .planning-note { margin:4px 0; line-height:1.4; }
 .planning-screen[data-ds] .planning-save { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:8px; }
 .planning-screen[data-ds] .planning-save button { margin-left:auto; padding:8px 12px; font-size:14px; }
 .planning-screen[data-ds] .planning-tabs { position:sticky; top:0; z-index:5; background:var(--ds-canvas); padding:8px 0; border-bottom:1px solid var(--ds-divider); }

@@ -195,3 +195,6 @@ test('role-specific CPU picks fill SP then relief across actual save/load and ne
  expect(reopened.offseasonPlan.draftViews.draft).toEqual(third.offseasonPlan.draftViews.draft);
  expect(reopened.teams).toEqual(third.teams);
 });
+
+import { registerCapacityPlanningCases } from './helpers/rosterCapacity';
+registerCapacityPlanningCases([360]);
