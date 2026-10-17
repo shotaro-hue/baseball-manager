@@ -32,3 +32,8 @@ it('records actual FA acquisition reasons and cross-club moves rather than treat
   expect.objectContaining({id:'move',teamId:1,type:'arrival',fromTeamId:0,reason:'fa'}),
  ]));
 });
+it('retains rookie farm opportunities from every club stint after a midseason trade',()=>{
+ const s=state([],[p('rookie',{isPitcher:true,pos:'先発',stats:{BF:0,IP:0}})]);
+ s.farmCompetition.players=[{playerId:'rookie',teams:[{teamId:1,pitching:{BF:70,outs:40}},{teamId:0,pitching:{BF:10,outs:6}}]}];
+ expect(rosterRows(s,new Set(['rookie']))[0].playerUsage[0]).toMatchObject({rookie:true,farmBF:80,farmOuts:46});
+});

@@ -11,7 +11,9 @@ export function rosterRows(state,rookieIds=new Set()) {
   const owned=ownedPlayers(team),counts=controlledRosterCounts(team);
   const active=new Set((team.players||[]).map(p=>p.id));
   const playerUsage=owned.map(p=>{
-   const record=farm.get(p.id),stints=record?.teams.filter(t=>t.teamId===team.id)||[];
+   // Ownership is current; opportunities cover the entire player-season,
+   // including another club's farm stint before a deadline trade.
+   const record=farm.get(p.id),stints=record?.teams||[];
    const sum=(kind,key)=>stints.reduce((n,t)=>n+(t[kind]?.[key]||0),0);
    return {id:p.id,age:p.age,pos:p.pos,isPitcher:Boolean(p.isPitcher),development:isIkuseiPlayer(p),
     roster:active.has(p.id)?'active':'farm',rookie:rookieIds.has(p.id),serviceYears:p.serviceYears??null,

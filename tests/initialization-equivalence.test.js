@@ -16,9 +16,16 @@ function seedRandom(seed) {
 for (const seed of [7,42,20261009]) it('preserves complete generated data and random/ID consumption (seed '+seed+')', async () => {
   const calls=seedRandom(seed);
   const teams=bootstrap.createInitialTeams();
+  for(const team of teams){
+    const owned=[...team.players,...team.farm].filter(p=>!p.育成&&!p.isIkusei);
+    expect(owned).toHaveLength(65);expect(owned.filter(p=>p.isPitcher)).toHaveLength(32);
+    expect(owned.filter(p=>!p.isPitcher)).toHaveLength(33);
+    expect(owned.filter(p=>!p.isPitcher&&p.pos==='捕手').length).toBeGreaterThanOrEqual(6);
+  }
   const baselineCalls=calls();
   const digest=createHash('sha256').update(JSON.stringify(teams)).digest('hex');
-  // Initial catcher coverage intentionally changes generated positions and initial membership.
+  // Approved65-player supplementation intentionally changes generated roles,
+  // real primary-position preservation, RNG consumption and full payloads.
   // Pin the full payload and RNG consumption; sync/async must still match exactly.
   expect({digest,calls:baselineCalls}).toMatchSnapshot();
   vi.restoreAllMocks();const asyncCalls=seedRandom(seed);

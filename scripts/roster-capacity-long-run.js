@@ -25,6 +25,7 @@ import {addMarketSigning,validateMarketContract} from '../src/components/hub/faM
 import {getCareerEntryKey} from '../src/engine/careerStats';
 import {matchHistorySnapshot} from '../src/engine/matchHistory';
 import {rosterRows,rosterTransitions} from './roster-capacity-metrics';
+import {releaseCompletedTransactions} from './fake-indexeddb-prune';
 
 // Real application hooks run in react-test-renderer. Only browser storage is
 // adapted to Node (Map localStorage and fake-indexeddb); game logic is unmocked.
@@ -78,13 +79,15 @@ async function checkpoint(label,rows) {
  // JSON persistence canonically removes undefined and normalizes numeric -0.
  expect(loaded.offseasonPlan).toEqual(JSON.parse(JSON.stringify(persistedPlan)));
  if(persistedPlan)expect(planningResumeScreen(loaded.offseasonPlan,loaded.year,loaded.myId)).toBe(before.screen);
- rows.push({phase:label,year:loaded.year,gameDay:loaded.gameDay,owned:loaded.teams.map(t=>ownedPlayers(t).length),registered:loaded.teams.map(registeredDraftCount)});
+ rows.push({phase:label,year:loaded.year,gameDay:loaded.gameDay,owned:loaded.teams.map(t=>ownedPlayers(t).length),registered:loaded.teams.map(registeredDraftCount),
+  releasedAdapterTransactions:releaseCompletedTransactions(indexedDB)});
  mount({...loaded,screen:loaded.offseasonPlan?.resumeScreen||before.screen});
+ globalThis.gc?.();
 }
 function saveEvidence(){
  if(!measurements.length)return;
  const dir=process.env.ROSTER_LONG_EVIDENCE||'/tmp/roster-long-evidence';mkdirSync(dir,{recursive:true});
- const paths=['src/engine/bootstrapTeams.js','src/engine/playerCore.js','src/engine/realplayer.js','src/engine/contract.js','src/engine/draftContinuation.js','src/engine/initialRoster.js','src/engine/rosterPlanning.js','src/hooks/useOffseason.js','src/workers/seasonBatchCore.js','scripts/roster-capacity-long-run.js','scripts/roster-capacity-metrics.js'];
+ const paths=['src/engine/bootstrapTeams.js','src/engine/playerCore.js','src/engine/realplayer.js','src/engine/contract.js','src/engine/draftContinuation.js','src/engine/initialRoster.js','src/engine/rosterPlanning.js','src/hooks/useOffseason.js','src/workers/seasonBatchCore.js','scripts/roster-capacity-long-run.js','scripts/roster-capacity-metrics.js','scripts/fake-indexeddb-prune.js'];
  const sources=Object.fromEntries(paths.map(p=>{try{return [p,createHash('sha256').update(readFileSync(p)).digest('hex')];}catch(error){if(error.code!=='ENOENT')throw error;return [p,null];}}));
  writeFileSync(`${dir}/seed-${measurements[0].seed}.json`,JSON.stringify({base:process.env.ROSTER_LONG_BASE,variant:process.env.ROSTER_LONG_VARIANT,sources,environment:'Real application hooks + 143-game season batch + farm synchronization; fake-indexeddb/Map localStorage; postseason tournament bypassed; user renews all remaining players, releases1 and signs at most1 FA, delegates draft; no engine mocks',seeds:measurements})+'\n');
 }
