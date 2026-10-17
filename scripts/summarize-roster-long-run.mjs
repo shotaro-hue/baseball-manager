@@ -9,8 +9,35 @@ if(!beforeDir||!afterDir||!outputDir)throw Error('Usage: [--partial] beforeDir a
 const seeds=[20261015,20261016,20261017],artifacts=[],summaries={};
 const histogram=values=>values.reduce((a,k)=>(a[k??'unrecorded']=(a[k??'unrecorded']||0)+1,a),{});
 const range=values=>values.length?{min:Math.min(...values),max:Math.max(...values),mean:values.reduce((a,n)=>a+n,0)/values.length}:null;
+const opportunity=p=>(p.PA??0)+(p.BF??0)+p.farmPA+p.farmBF;
+const annualClub=(s,t)=>{
+ const picks=s.decisions.filter(d=>d.teamId===t.id),usage=s.seasonEnd.find(x=>x.id===t.id).playerUsage;
+ const claims=s.phases.market.find(x=>x.id===t.id).marketClaims,owned=t.playerUsage.filter(p=>!p.development);
+ const rookies=usage.filter(p=>p.rookie),opening=s.phases.start.find(x=>x.id===t.id);
+ return {id:t.id,controlled:t.controlled,pitchers:t.pitchers,batters:t.controlled-t.pitchers,
+  controlledCatchers:owned.filter(p=>!p.isPitcher&&p.pos==='捕手').length,
+  positions:histogram(owned.map(p=>p.pos)),development:t.development,
+  openingControlled:opening.controlled,nominations:picks.length,accepted:picks.filter(p=>!p.refused).length,
+  refused:picks.filter(p=>p.refused).length,endReason:s.endedTeams[t.id]??null,
+  aboveTargetPicks:picks.filter(p=>p.projectedCount>67).map(p=>({id:p.id,pos:p.pos,reason:p.rosterReason,current:p.current,future:p.future,currentBaseline:p.currentBaseline,futureBaseline:p.futureBaseline,projectedCount:p.projectedCount})),
+  faCount:claims.length,faSalary:claims.reduce((n,p)=>n+p.salary,0),faReasons:histogram(claims.map(p=>p.reason)),
+  rookieCount:rookies.length,rookieZero:rookies.filter(p=>opportunity(p)===0).map(p=>p.id),
+  rookieBatterPA:rookies.filter(p=>!p.isPitcher).map(p=>({id:p.id,active:p.PA,farm:p.farmPA})),
+  rookiePitcherBF:rookies.filter(p=>p.isPitcher).map(p=>({id:p.id,active:p.BF,farm:p.farmBF})),
+  payroll:t.payroll,openingPayroll:opening.payroll,budget:t.budget,openingBudget:opening.budget,
+  movements:histogram(s.events.filter(e=>e.teamId===t.id).map(e=>e.type))};
+};
+
 for(const [variant,dir,logPath]of [['before',beforeDir,beforeLog],['after',afterDir,afterLog]]) {
- if(!partial){const log=readFileSync(logPath,'utf8');assert.match(log,/Test Files\s+3 passed \(3\)/);assert.match(log,/Tests\s+3 passed \(3\)/);assert.doesNotMatch(log,/Unhandled Errors|Worker exited unexpectedly|FATAL ERROR|Failed Tests/);}
+ if(!partial){
+  const perSeedLogs=seeds.every(seed=>existsSync(`${dir}/seed-${seed}.log`));
+  const logs=perSeedLogs?seeds.map(seed=>readFileSync(`${dir}/seed-${seed}.log`,'utf8')):[readFileSync(logPath,'utf8')];
+  for(const log of logs){
+   assert.match(log,perSeedLogs?/Test Files\s+1 passed \(1\)/:/Test Files\s+3 passed \(3\)/);
+   assert.match(log,perSeedLogs?/Tests\s+1 passed \(1\)/:/Tests\s+3 passed \(3\)/);
+   assert.doesNotMatch(log,/Unhandled Errors|Worker exited unexpectedly|FATAL ERROR|Failed Tests/);
+  }
+ }
  const snapshot=JSON.parse(readFileSync(`${dir}/source-snapshot.json`)),runs=[];
  for(const seed of seeds) {
   const path=`${dir}/seed-${seed}.json`;if(partial&&!existsSync(path))continue;
@@ -43,7 +70,7 @@ for(const [variant,dir,logPath]of [['before',beforeDir,beforeLog],['after',after
   rookieBatterPA:range(rookies.filter(p=>!p.isPitcher).map(p=>(p.PA??0)+p.farmPA)),rookiePitcherBF:range(rookies.filter(p=>p.isPitcher).map(p=>(p.BF??0)+p.farmBF)),
   unplayedFarmCards:seasons.reduce((n,s)=>n+s.farmCards.unplayed,0),budget:range(ends.map(t=>t.budget)),negativeBudgetClubSeasons:ends.filter(t=>t.budget<0).length,payroll:range(ends.map(t=>t.payroll)),marketRemaining:range(seasons.map(s=>s.marketRemaining)),
   memoryRss:range(seasons.map(s=>s.memory.rss)),elapsedMs:seasons.reduce((n,s)=>n+s.elapsedMs,0),
-  perSeed:runs.map(r=>({seed:r.seed,years:r.seasons.length,checkpoints:r.checkpoints.length,annual:r.seasons.map(s=>({year:s.year,controlled:s.registered,catchers:s.afterOffseason.map(t=>t.catchers),picks:s.picks,farmUnplayed:s.farmCards.unplayed,marketRemaining:s.marketRemaining}))}))};
+  perSeed:runs.map(r=>({seed:r.seed,years:r.seasons.length,checkpoints:r.checkpoints.length,annual:r.seasons.map(s=>({year:s.year,controlled:s.registered,catchers:s.afterOffseason.map(t=>t.catchers),picks:s.picks,farmUnplayed:s.farmCards.unplayed,marketRemaining:s.marketRemaining,clubs:s.afterOffseason.map(t=>annualClub(s,t))}))}))};
  artifacts.push({path:`${variant}-source-snapshot.json`,bytes:Buffer.from(JSON.stringify(snapshot,null,2)+'\n')});
 }
 if(!partial){assert.equal(summaries.before.completedSeasons,30);assert.equal(summaries.after.completedSeasons,30);}
