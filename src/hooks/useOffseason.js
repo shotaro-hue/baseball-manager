@@ -1,3 +1,4 @@
+import {newReinforcementPlan} from '../engine/rosterPlanning';
 import { draftCapacityContext } from '../engine/rosterCapacity';
 import {advanceFarmYear} from '../engine/farmMigration';
 import { applyTradeTransaction } from '../engine/tradeTransaction';
@@ -701,7 +702,7 @@ export function useOffseason(gs) {
     faPhaseCompletedYear.current = null;
     waiverCompletedYear.current = null;
     if (gs.setOffseasonPlan) {
-      gs.setOffseasonPlan({ version: 1, year, myId, stage: 'planning', tab: 'roster', intents: [], demands,
+      gs.setOffseasonPlan({ version: 1, year, myId, stage: 'planning', tab: 'roster', intents: [], demands,reinforcements:newReinforcementPlan(myDeveloped,year),
         growth: mySummary && Object.fromEntries(Object.entries(mySummary).map(([key, rows]) => [key, Array.isArray(rows) ? rows.map(row => ({ ...row, p: row.p ? planningPlayer(row.p) : row.p })) : rows])),
         seasonInfo: { retiredNames: retiredMyNames, year: year + 1, draftCount: 0, draftNames: [] }, releasedIds: [] });
       setScreen('offseason_planning');

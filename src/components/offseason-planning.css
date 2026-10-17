@@ -36,3 +36,6 @@
 .planning-screen[data-ds] .planning-layout > * {min-width:0;}
 
 @media(min-width:1024px) { .planning-screen[data-ds] {padding:24px 32px 40px;} .planning-screen[data-ds] .planning-heading h1 {font-size:28px;} .planning-screen[data-ds] .planning-metrics dd {font-size:26px;} .planning-screen[data-ds] .planning-start button {width:auto;} .planning-dialog[data-ds] {padding:24px;} }
+
+.planning-dialog[data-reinforcement-dialog] input[type="number"] { min-height:44px; padding:8px; font-size:16px; }
+.planning-dialog[data-reinforcement-dialog] fieldset label { min-height:44px; padding:8px 0; }

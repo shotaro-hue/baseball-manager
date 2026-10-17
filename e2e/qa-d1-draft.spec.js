@@ -288,3 +288,6 @@ test('desktop split view retains user scroll through compare, confirmation and r
   expect(Math.abs((await list.evaluate(el=>el.scrollTop))-returnScroll)).toBeLessThanOrEqual(2);
   evidence(`browser-focus-${testInfo.project.name}`,{browser:testInfo.project.name,comparedScroll,confirmScroll,returnScroll,actualScroll,focusedCandidate:id,saveReloadStable:true,hardware:'Browser automation on host, not phone hardware'});
 });
+
+import {registerRosterPlanningCases} from './helpers/rosterPlanning';
+registerRosterPlanningCases();

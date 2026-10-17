@@ -1,3 +1,4 @@
+import {assessCpuAddition,cpuRosterPlan} from './rosterPlanning';
 import {draftParticipation} from './draftConference';
 import {draftReport,ownedDraftCurrent} from './draftReports';
 import {evaluateOrganizationNeeds} from './organizationNeeds';
@@ -22,6 +23,7 @@ export function evaluateDraftContinuation(team,pool,round=1,acceptedPicks=[],con
   const additions=evaluateRosterCapacity(team,{...context,draftPool,drafted}).acceptedPicks
     .map(p=>({p,...draftReport(context.evaluation,p.id,observer)}));
   const layer=[...owned,...additions];
+  const cpuPlan=cpuRosterPlan(team,{...context,draftPool,drafted,phase:'draft'});
   const decisions=pool.map(p=>{
     const report=draftReport(context.evaluation,p.id,observer);
     if(!report || !Number.isFinite(report.current)||!Number.isFinite(report.future))return {id:p.id,reason:'evaluation-missing',eligible:false};
@@ -35,10 +37,13 @@ export function evaluateDraftContinuation(team,pool,round=1,acceptedPicks=[],con
     const reason=shortage>0&&(report.current>=50||report.future>=60) ? 'organization-shortage'
       : report.current>=50&&report.current>=currentBaseline+UPDATE_MARGIN ? 'current-upgrade'
         : (p.age || 25)<=24&&report.future>=60&&report.future>=futureBaseline+UPDATE_MARGIN ? 'future-upgrade' : 'no-upgrade';
-    return {id:p.id,eligible:reason!=='no-upgrade',reason,current:report.current,future:report.future,
+    const rosterDecision=assessCpuAddition(team,p,{...context,draftPool,drafted,phase:'draft',report,layer,cpuPlan,organization,
+      manual:String(team.id)===String(context.myId??context.evaluation?.myId)});
+    return {id:p.id,talentEligible:reason!=='no-upgrade',eligible:reason!=='no-upgrade'&&rosterDecision.eligible,reason:reason==='no-upgrade'||rosterDecision.eligible?reason:rosterDecision.reason,
+      rosterReason:rosterDecision.reason,projectedCount:rosterDecision.projectedCount,current:report.current,future:report.future,
       currentBaseline,futureBaseline,shortage};
   });
   const viable=new Set(decisions.filter(d=>d.eligible).map(d=>d.id));
   const candidates=pool.filter(p=>viable.has(p.id));
-  return {continue:candidates.length>0,reason:candidates.length?'candidate-available':'no-upgrade',candidates,decisions};
+  return {continue:candidates.length>0,reason:candidates.length?'candidate-available':decisions.find(d=>d.talentEligible&&!d.eligible)?.rosterReason||'no-upgrade',candidates,decisions};
 }
