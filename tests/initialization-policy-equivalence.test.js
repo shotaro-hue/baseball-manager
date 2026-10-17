@@ -10,6 +10,10 @@ it('matches uncached baseline values and plans across all policies, DH modes and
   vi.spyOn(Math,'random').mockImplementation(()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;});
   vi.spyOn(Date,'now').mockReturnValue(1791508062000);
   const source=buildTeam(TEAM_DEFS[0]);
+  const owned=[...source.players,...source.farm];
+  expect(owned).toHaveLength(65);expect(owned.filter(p=>p.isPitcher)).toHaveLength(32);
+  expect(owned.filter(p=>!p.isPitcher)).toHaveLength(33);
+  // Re-pin policy outputs for the approved larger input, not changed scoring.
   const outputs=[];
   for(const policyId of MANAGEMENT_POLICY_ORDER)for(const rosterDhMode of [false,true]){
     const team=structuredClone(source);team.managementPolicyId=policyId;

@@ -155,7 +155,7 @@ export function resolveFirstRound(teams, pool, context={}) {
     const groups = new Map();
     for (const team of active) {
       const player = chooseDraftProspect(team, available, 1, [], { ...context,teams:league,endedTeams,activeTeamIds:active.map(t=>t.id),draftPool:pool });
-      if(!player){endedTeams[team.id]='no-upgrade';continue;}
+      if(!player){endedTeams[team.id]=draftRulesFor(context.rules).version===2?evaluateDraftContinuation(team,available,1,[],{...context,teams:league,endedTeams,draftPool:pool}).reason:'no-upgrade';continue;}
       if (!groups.has(player.id)) groups.set(player.id, { player, teams: [] });
       groups.get(player.id).teams.push(team);
     }

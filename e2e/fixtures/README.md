@@ -1,5 +1,13 @@
 # Progression save fixtures
 
+`injury-rosters-122d02b-seed1.json.gz` fixes the E4/E5 emergency fielding
+scenarios to the rosters generated at main `122d02b7a76ed0af90b17cecb1f8a6ff488c40d8`.
+It contains only `createInitialTeams()` output using the tests' existing LCG seed 1
+(1664525, 1013904223, unsigned 32 bit). It was generated from that checkout,
+not an uploaded archive. These tests retain their exact lineup, promotion,
+position, real Worker and save/reload assertions. The separate initialization
+tests verify the current 65 players per club rather than changing this fixture.
+
 `new-game.json.gz` is one fixed, real 2026 new-game save, produced by selecting
 Yomiuri in the UI, saving, and reading with `loadGame`. IDs and roster data stay
 fixed across runs; the file is gzip-compressed JSON, not a different save schema.

@@ -28,8 +28,8 @@ for(const width of widths)test(`roster capacity planned release cannot spend a r
  await installCapacityFixture(page,{reserved:true});const overview=page.locator('.planning-overview');
  await expect(overview).toContainText('支配下 69/70人 · 育成 2人 · 確定指名 1人 · 実際の残枠 0枠');
  await page.getByRole('button',{name:'枠確認0の契約更改',exact:true}).click();await page.getByRole('button',{name:'放出候補にする',exact:true}).click();
- await expect(overview).toContainText('放出候補反映後の支配下見込み 69人');await expect(overview).toContainText('実際の残枠 0枠');
- await page.getByRole('button',{name:'放出候補を取り消して交渉する',exact:true}).click();await expect(overview).toContainText('放出候補反映後の支配下見込み 70人');
+ await expect(overview).toContainText('予定反映後の支配下見込み 69人');await expect(overview).toContainText('実際の残枠 0枠');
+ await page.getByRole('button',{name:'放出候補を取り消して交渉する',exact:true}).click();await expect(overview).toContainText('予定反映後の支配下見込み 70人');
  await page.getByRole('button',{name:'補強市場',exact:true}).click();await page.getByRole('button',{name:'枠確認FAの条件を見る',exact:true}).click();
  await expect(page.getByRole('button',{name:'契約条件を確認する',exact:true})).toBeDisabled();await expect(page.locator('.fa-detail')).toContainText('支配下登録枠（70人）が満員です');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);

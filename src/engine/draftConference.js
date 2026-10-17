@@ -34,4 +34,5 @@ export function draftParticipation(team,pool,drafted={},context={}) {
 
 export const draftEndLabel = reason => ({manual:'選択終了', 'no-upgrade':'戦力更新候補なし',
   'roster-full':'支配下枠が満員','pick-limit':'指名上限に到達','pool-exhausted':'候補なし',
+  'catcher-reserve':'捕手補充用の枠を留保','normal-target':'通常の補強目標に到達','rookie-budget':'新人年俸の留保不足','budget-missing':'予算を確認できません',
   'invalid-capacity':'人数データを確認できません'})[reason] || reason;

@@ -73,6 +73,9 @@ test('trade rejects an exchange that would overfill the other recipient at 70 at
   if(!(await saveGame(s)).ok)throw Error('save failed');
  });
  await reloadAndLoad(page);const before=await saveHub(page);
+ // Finish the manual-save notification before asserting a new transient warning.
+ // Otherwise its older 3.5s timer can clear the rejection just after the click.
+ await expect(page.locator('.notif')).toBeHidden();
  await mainNavigation(page,true).getByRole('button',{name:/^その他/}).click();
  await page.getByText('取引検証',{exact:true}).click();await page.getByRole('button',{name:'✅ 承諾する',exact:true}).click();
  await expect(page.getByText('支配下登録枠（70人）を超えます',{exact:true})).toBeVisible();

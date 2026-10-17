@@ -1,0 +1,27 @@
+name: Verify retained roster evidence
+
+on:
+  push:
+    branches: [feat/roster-planning-65]
+    paths:
+      - .github/workflows/roster-evidence.yml
+      - docs/validation/roster-planning-65/ten-year/**
+      - scripts/summarize-roster-long-run.mjs
+      - scripts/roster-long-run-log.mjs
+      - scripts/verify-roster-long-evidence.mjs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Recheck all six retained runs without repeating the simulation
+        run: node scripts/verify-roster-long-evidence.mjs

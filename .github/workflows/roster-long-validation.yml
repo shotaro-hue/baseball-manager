@@ -1,0 +1,93 @@
+name: Roster ten-year comparison
+
+# Calibration revision: protect existing six-catcher depth before other upgrades.
+# Explicit branch-scoped validation. Subsequent evidence-only commits do not
+# restart an expensive run; workflow_dispatch remains available for reuse.
+on:
+  push:
+    branches: [feat/roster-planning-65]
+    paths: [.github/workflows/roster-long-validation.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  seed:
+    name: ${{ matrix.variant }}-${{ matrix.seed }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [before, after]
+        seed: [20261015, 20261016, 20261017]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Prepare fixed baseline with the same validation adapter
+        if: matrix.variant == 'before'
+        run: |
+          git worktree add --detach baseline 122d02b7a76ed0af90b17cecb1f8a6ff488c40d8
+          for file in roster-capacity-long-run.js roster-capacity-metrics.js roster-career-evidence.js fake-indexeddb-prune.js roster-long-run-source.mjs run-roster-long-run.mjs; do
+            cp "scripts/$file" "baseline/scripts/$file"
+          done
+          ln -s "$GITHUB_WORKSPACE/node_modules" baseline/node_modules
+      - name: Ten seasons with real hooks, 143 games, farm and save/reload
+        shell: bash
+        env:
+          VARIANT: ${{ matrix.variant }}
+          SEED: ${{ matrix.seed }}
+        run: |
+          set -o pipefail
+          evidence="$GITHUB_WORKSPACE/evidence/$VARIANT"
+          mkdir -p "$evidence"
+          if [ "$VARIANT" = before ]; then cd baseline; fi
+          node scripts/run-roster-long-run.mjs "$VARIANT" "$evidence" "$SEED" 2>&1 | tee "$evidence/seed-$SEED.log"
+      - name: Preserve completed and failed seed evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: roster-long-${{ matrix.variant }}-${{ matrix.seed }}
+          path: evidence/${{ matrix.variant }}/
+          retention-days: 90
+          if-no-files-found: error
+
+  summarize:
+    needs: seed
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: roster-long-before-*
+          path: evidence/before
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: roster-long-after-*
+          path: evidence/after
+          merge-multiple: true
+      - name: Require all six completed ten-year seeds
+        env:
+          SEED_RESULT: ${{ needs.seed.result }}
+        run: |
+          test "$SEED_RESULT" = success
+          node scripts/summarize-roster-long-run.mjs evidence/before evidence/after evidence/comparison > evidence/comparison.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: roster-long-comparison
+          path: evidence/
+          retention-days: 90
+          if-no-files-found: error

@@ -256,10 +256,18 @@ it('separates actual controlled slots from release projections and displays unow
  expect(before.projectedCapacity).toMatchObject({releaseControlledCount:1,projectedControlledCount:1});
  expect(cancelled.capacity).toEqual(before.capacity);expect(cancelled.projectedCapacity.projectedControlledCount).toBe(2);
  const ui=setup({teams:[t],plan:pl});const rendered=text(ui.view.toJSON());
- for(const label of ['支配下 1/70人','育成 1人','確定指名 1人','実際の残枠 68枠','放出候補反映後の支配下見込み 1人'])expect(rendered).toContain(label);
+ for(const label of ['支配下 1/70人','育成 1人','確定指名 1人','実際の残枠 68枠','予定反映後の支配下見込み 1人'])expect(rendered).toContain(label);
  expect(pl).not.toHaveProperty('capacity');
 });
 it('shows unknown capacity for ambiguous ownership rather than inventing 70 vacant slots',()=>{
  const ui=setup({teams:[team(),{...team(),id:1}]});
  expect(text(ui.view.toJSON())).toContain('支配下人数は未確認');
+});
+it('edits reinforcement goals without changing ownership or budget and restores them on remount',()=>{
+ const ui=setup({plan:plan({stage:'open'})});expect(ui.button('補強予定を編集')).toBeDefined();
+ ui.click('補強予定を編集');
+ for(const [label,value]of [['ドラフト予定人数','4'],['FA予定人数','2']])act(()=>ui.view.root.findByProps({'aria-label':label}).props.onChange({target:{value}}));
+ expect(latest.gs.offseasonPlan.reinforcements).toBeUndefined();ui.click('予定を保存');
+ expect(latest.gs.offseasonPlan.reinforcements).toMatchObject({draftGoal:4,faGoal:2});expect(latest.gs.myTeam.players).toHaveLength(1);expect(latest.gs.myTeam.budget).toBe(10000);
+ const saved=JSON.parse(JSON.stringify({teams:latest.gs.teams,plan:latest.gs.offseasonPlan}));act(()=>ui.view.unmount());const restored=setup(saved);restored.click('補強予定を編集');expect(restored.view.root.findByProps({'aria-label':'ドラフト予定人数'}).props.value).toBe(4);
 });

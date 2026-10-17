@@ -8,6 +8,9 @@ import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
 import { startNewGame, mainNavigation, runBatch, runSingle, startSingle, saveHub, waitSaveIdle, readSave, reloadAndLoad, progressSignature, loadFixture } from './helpers/progression';
 
+// Preserve the emergency-coverage scenarios independently of new-game roster calibration.
+const injuryTeams=JSON.parse(gunzipSync(readFileSync(new URL('./fixtures/injury-rosters-122d02b-seed1.json.gz',import.meta.url))));
+
 registerGrowthAppCases();
 registerGrowthDesignCases();
 registerPlanningDesignCases();
@@ -242,22 +245,16 @@ test('E6 scheduled CPU catcher allocation, farm records and persisted reload', a
 test('E5 multiple short injuries, farm coverage, persisted reload and next game', async ({ page }) => {
   await loadFixture(page, 'new');
   const state = await readSave(page);
-  const expected = await page.evaluate(async state => {
-    const { createInitialTeams } = await import('/baseball-manager/src/engine/bootstrapTeams.js');
+  const expected = await page.evaluate(async ({state,teams}) => {
     const { saveGame } = await import('/baseball-manager/src/engine/saveload.js');
-    const random = Math.random;
-    let seed = 1;
-    try {
-      Math.random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
-      state.teams = createInitialTeams();
-    } finally { Math.random = random; }
+    state.teams = teams;
     state.myId = 4;
     const team = state.teams.find(t => t.id === state.myId);
     const injured = team.players.filter(p => ['遊撃手', '二塁手'].includes(team.fieldingNoDh[p.id]));
     injured.forEach(p => { p.injuryDaysLeft = 10; p.injury = '軽微'; });
     if (!(await saveGame(state)).ok) throw new Error('multiple injury fixture save failed');
     return { injured: injured.map(p => p.id), farmIds: team.farm.map(p => p.id) };
-  }, state);
+  }, {state,teams:injuryTeams});
   await reloadAndLoad(page);
   await runBatch(page, false);
   const saved = await saveHub(page);
@@ -279,16 +276,9 @@ test('E5 multiple short injuries, farm coverage, persisted reload and next game'
 test('E4 shortstop injury, emergency fielding moves, batch and persisted reload', async ({ page }) => {
   await loadFixture(page, 'new');
   const fixture = await readSave(page);
-  const expected = await page.evaluate(async state => {
-    const { createInitialTeams } = await import('/baseball-manager/src/engine/bootstrapTeams.js');
+  const expected = await page.evaluate(async ({state,teams}) => {
     const { saveGame } = await import('/baseball-manager/src/engine/saveload.js');
-    const random = Math.random;
-    let seed = 1;
-    // Fix only fixture construction; Worker simulation and storage stay real.
-    try {
-      Math.random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
-      state.teams = createInitialTeams();
-    } finally { Math.random = random; }
+    state.teams = teams;
     state.myId = 4;
     const team = state.teams.find(t => t.id === state.myId);
     const shortstop = team.players.find(p => team.fieldingNoDh[p.id] === '遊撃手');
@@ -301,7 +291,7 @@ test('E4 shortstop injury, emergency fielding moves, batch and persisted reload'
       retainedOrder: team.lineupNoDh.filter(id => id !== shortstop.id), rotation: team.rotation,
       starter: team.rotation[team.rotIdx % team.rotation.length],
       injuryHistories: Object.fromEntries([...team.players,...team.farm].map(p=>[p.id,JSON.stringify(p.injuryHistory || [])])) };
-  }, fixture);
+  }, {state:fixture,teams:injuryTeams});
   await reloadAndLoad(page);
   await runBatch(page, false);
   const saved = await saveHub(page);

@@ -1,4 +1,5 @@
-import { draftCapacityContext, evaluateRosterCapacity, projectRosterCapacity } from './rosterCapacity';
+import {reinforcementProjection} from './rosterPlanning';
+import { draftCapacityContext, evaluateRosterCapacity } from './rosterCapacity';
 import { renewalEligible, ownedPlayers } from './renewalRules';
 import { marketNeeds } from '../components/hub/faMarket';
 import { OFFSEASON_SAVE_SCREENS } from './offseasonResume';
@@ -34,7 +35,7 @@ export function planningSummary(team, plan, year, teams = [team]) {
   const salary = p => p.contractSignedYear === year ? p.salary : entries.find(e => e.player.id === p.id)?.terms?.salary ?? p.salary;
   const context = draftCapacityContext(plan, year, teams);
   return { capacity: evaluateRosterCapacity(team, context),
-    projectedCapacity: projectRosterCapacity(team, { releaseIds: releaseCandidates.map(p => p.id) }, context),
+    projectedCapacity: reinforcementProjection(team,plan,year,teams),
     owned: owned.length, active: team?.players?.length ?? 0, farm: team?.farm?.length ?? 0,
     projectedCount: kept.length, releaseCandidates, pending,
     payroll: sumRecorded(owned.map(salary)), projectedPayroll: sumRecorded(kept.map(salary)),

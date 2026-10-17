@@ -1,14 +1,16 @@
 import {test,expect} from '@playwright/test';
 import {loadFixture,reloadAndLoad,readSave,waitSaveIdle} from './progression';
-export async function seedPlanning(page){
- await loadFixture(page,'draw-complete');await waitSaveIdle(page);await page.goto('/');
+export async function seedPlanning(page,{resume=true}={}){
+ // Prepare the final save before opening App; do not start and immediately
+ // navigate away from an unrelated lazy-loaded postseason screen.
+ await loadFixture(page,'draw-complete',{resume:false});
  const info=await page.evaluate(async()=>{
   const {loadGame,saveGame}=await import('/baseball-manager/src/engine/saveload.js');const s=await loadGame(),my=s.teams.find(t=>t.id===s.myId);
   const owned=[...my.players,...my.farm];owned.forEach(p=>{p.contractYearsLeft=3;p.contractYears=3;});const targets=my.players.slice(0,3);targets.forEach(p=>p.contractYearsLeft=1);
   const candidate={...targets[0],id:'ui03a-market',name:'編成確認FA候補',salary:900,contractYears:1,contractYearsLeft:0,isFA:true,isForeign:false,marketEntryReason:'自由契約',faEnteredYear:s.year,faOriginTeamId:s.teams.find(t=>t.id!==s.myId).id,stats:{...targets[0].stats,PA:400,AB:350,H:100,HR:20}};
   s.faPool=[candidate];s.offseasonPlan={version:1,year:s.year,myId:s.myId,stage:'planning',resumeScreen:'offseason_planning',tab:'roster',intents:[],releasedIds:[],growth:{growth:[],decline:[],breakout:[]},demands:Object.fromEntries(targets.map(p=>[p.id,{demandSalary:p.salary,minAcceptSalary:p.salary}]))};
   if(!(await saveGame(s)).ok)throw Error('planning fixture save failed');return {targets:targets.map(p=>({id:p.id,name:p.name,salary:p.salary})),budget:my.budget,year:s.year};
- });await reloadAndLoad(page);await expect(page.locator('.planning-screen')).toBeVisible();return info;
+ });if(resume){await reloadAndLoad(page);await expect(page.locator('.planning-screen')).toBeVisible();}return info;
 }
 export async function savePlanning(page){
  const button=page.getByRole('button',{name:'編成内容を保存する',exact:true});await expect(button).toBeEnabled();await button.click();await expect(page.locator('.planning-save')).toContainText('保存済み');await waitSaveIdle(page);return readSave(page);

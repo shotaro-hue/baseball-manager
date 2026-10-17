@@ -1,3 +1,4 @@
+import {cpuRosterPlan,assessCpuAddition} from './rosterPlanning';
 import { clamp, rng } from '../utils';
 import {
   ACCEPT_THRESHOLD, MIN_SALARY_SHIHAKA, MIN_SALARY_IKUSEI,
@@ -336,6 +337,8 @@ export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = nu
     .filter((t) => t.id !== myId)
     .sort((a, b) => b.budget - a.budget);
 
+  const phase=marketMode==='offseason'?'offseason':'season';
+  const rosterPlans=new Map(cpuTeams.map(t=>[t.id,cpuRosterPlan(t,{...draftContext,phase})]));
   let changed = true;
   while (changed && remainingPool.length > 0) {
     changed = false;
@@ -357,6 +360,8 @@ export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = nu
           if (!Number.isFinite(p.salary) || p.salary < 0) return null;
           const salary = Math.max(p.育成 ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA, p.salary);
           if (team.budget - reserve < salary) return null;
+          const rosterDecision=assessCpuAddition(team,p,{...draftContext,phase,teams:[...teamMap.values()],rosterPlan:rosterPlans.get(team.id),salary});
+          if(!rosterDecision.eligible)return null;
           const r = evalOffer(p, { salary, years: 1 }, team, allTeams);
           const needBonus = calcNeedMatch(p, needs);
           let modeBonus = 0;
@@ -366,7 +371,7 @@ export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = nu
           } else if (foMode === 'contend') {
             if ((p.age || 25) >= 29) modeBonus += CPU_FA_CONTEND_VET_BONUS;
           }
-          return { pid: p.id, score: r.total + needBonus * 0.3 + modeBonus, salary };
+          return { pid: p.id, score: r.total + needBonus * 0.3 + modeBonus, salary, rosterDecision };
         })
         .filter((c) => c && c.score >= CPU_FA_MIN_SCORE)
         .sort((a, b) => b.score - a.score);
@@ -383,7 +388,8 @@ export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = nu
       const newPlayerEntry = { ...prepared, isFA: false, contractYears: 1, contractYearsLeft: 1, contractSignedYear: currentYear, salary: best.salary,
         ...(player.育成 && player.departureReason === 'ikusei_expiry' ? { ikuseiYears: 0 } : {}) };
       const acquireReason = player.isForeign ? '外国人獲得' : (player.isWaiverReleased ? '戦力外獲得' : 'FA獲得');
-      const historyRecord = { ...newPlayerEntry, exitYear: currentYear ?? 0, exitReason: acquireReason, tenure: 0 };
+      const historyRecord = { ...newPlayerEntry, exitYear: currentYear ?? 0, exitReason: acquireReason, tenure: 0,rosterDecision:best.rosterDecision.reason };
+      rosterPlans.set(team.id,{...rosterPlans.get(team.id),draftRemaining:best.rosterDecision.draftRemaining});
 
       if (goToFarm) {
         teamMap.set(team.id, {
@@ -403,7 +409,7 @@ export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = nu
 
       remainingPool = remainingPool.filter((p) => p.id !== best.pid);
       signedPlayers.add(best.pid);
-      claimed.push({ player, teamName: team.name, teamEmoji: team.emoji, teamId: team.id });
+      claimed.push({ player, teamName: team.name, teamEmoji: team.emoji, teamId: team.id,rosterDecision:best.rosterDecision.reason,projectedCount:best.rosterDecision.projectedCount });
       changed = true;
 
       news.push({

@@ -1,3 +1,4 @@
+import {initialRosterSlots} from './initialRoster';
 import { rng, clamp, uid, pname, CITIES } from '../utils';
 import {
   FIELDING_POSITIONS, PLAYER_TYPES_B, PLAYER_TYPES_P, PLAYER_COMMENTS_B, PLAYER_COMMENTS_P, MIN_SALARY_IKUSEI,
@@ -137,8 +138,9 @@ export function buildTeam(def) {
 
   const nonPitchers = players.filter((p) => !p.isPitcher);
   if (nonPitchers[8]) nonPitchers[8].pos = 'DH';
-  const farm = makeInitialFarmBatters(15, q - 20, players);
-  for (let i = 0; i < 8; i++) farm.push(makePlayer('先発', q - 15, true, rng(18, 24)));
+  const slots=initialRosterSlots(players);
+  const farm=slots.batterPositions.map(pos=>makePlayer(pos,q-20,false,rng(18,25)));
+  for(const role of slots.pitcherRoles)farm.push(makePlayer(role,q-15,true,rng(18,24)));
 
   const lineupNoDh = nonPitchers.slice(0, 8).map((p) => p.id);
   const lineupDh = nonPitchers.slice(0, 9).map((p) => p.id);
