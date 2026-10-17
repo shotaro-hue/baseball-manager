@@ -7,7 +7,7 @@ export function registerRosterPlanningCases(){
   const width=testInfo.project.use.viewport.width;
   test.setTimeout(180000);await page.setViewportSize({width,height:width===360?800:width===390?844:1000});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await seedPlanning(page);await waitSaveIdle(page);await page.goto('/');
+  await seedPlanning(page,{resume:false});
   const info=await page.evaluate(async()=>{
    const {loadGame,saveGame}=await import('/baseball-manager/src/engine/saveload.js');const s=await loadGame(),t=s.teams.find(t=>t.id===s.myId);
    const dev=t.farm.find(p=>!p.isPitcher&&!p.isForeign);Object.assign(dev,{育成:true,isIkusei:true,salary:240});

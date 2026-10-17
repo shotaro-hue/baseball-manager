@@ -108,7 +108,7 @@ export function progressSignature(save, playerId) {
 // Test-only fixtures use the existing save API. No runtime state injection or
 // replacement of Worker/progression/storage code. Counters and result maps are
 // derived from fixed scheduled outcomes, including one draw on round 20.
-export async function loadFixture(page, kind) {
+export async function loadFixture(page, kind, {resume=true}={}) {
   await page.goto('/');
   const fixture = JSON.parse(gunzipSync(readFileSync(new URL('../fixtures/new-game.json.gz', import.meta.url))).toString());
   await page.evaluate(async ({kind, fixture}) => {
@@ -159,5 +159,5 @@ export async function loadFixture(page, kind) {
     const result = await saveGame(state);
     if (!result.ok) throw new Error('fixture save failed');
   }, { kind, fixture });
-  await reloadAndLoad(page);
+  if(resume)await reloadAndLoad(page);
 }
