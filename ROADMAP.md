@@ -102,7 +102,7 @@ PR #432は未マージでクローズ。テスト運用の成果は#431として
 - 採用方針は[支配下70人・可変ドラフトの承認仕様](./docs/superpowers/specs/2026-10-16-roster-capacity-design.md)。
 - **第1PR：[#477](https://github.com/shotaro-hue/baseball-manager/pull/477)でマージ済み**。支配下／育成両フラグ／受諾済み未所属指名を共通集計し、FA・スカウト・トレード・育成登録・指名反映と人数表示へ接続。予定放出と実際の残枠を区別。検証・独立レビュー・最終head CIは[実装記録](./docs/implementation/roster-capacity-1.md)とPR本文を参照。
 - **第2PR：[#478](https://github.com/shotaro-hue/baseball-manager/pull/478)でマージ済み**。新会議10人・160候補、選択終了、拒否を含む年上限、CPU継続判定と旧6巡の保存互換。[計画](./docs/superpowers/plans/2026-10-17-variable-draft.md)／[検証記録](./docs/implementation/variable-draft.md)。20seedの会議で指名5〜10人、旧80候補・6巡の実保存再開と新方式4ブラウザ旅程を確認。最終head CIはPR本文に記録する。長期校正とは区別する。
-- **第3PR：実装・対象単体／画面検証済み、長期検証未完了・ドラフト・未マージ**。新規65人・CPU通常67人目標、編集可能な補強予定、FA前の新人枠／最低年俸の留保。[計画](./docs/superpowers/plans/2026-10-17-roster-planning-65.md)／[検証記録](./docs/implementation/roster-planning-65.md)。3seed×10年は検証用メモリと実行環境切断で中断し、未完了。コード・画像と検証用修正を復元し、最終head CIはPR本文で確認する。長期結果が確定するまでドラフトを維持する。第1PRでは従来の6巡・80候補を維持し、第2PRから新会議だけ可変方式へ移す。
+- **第3PR：[#479](https://github.com/shotaro-hue/baseball-manager/pull/479)で実装・変更前後3seed×10年の実行完了、受け入れ不合格・ドラフト・未マージ**。新規65人・CPU通常67人目標、補強予定、FA前の新人枠/最低年俸留保、特殊入力と捕手補充枠を修正。前後60年度・保存再開280回を完了し、変更後の二軍未実施0を確認したが、CPU指名選手の9年連続無出場を検出。P1の修正と再検証がマージ前に必要。67超の20点例外も最適性未確定。[実装記録](./docs/implementation/roster-planning-65.md)／[確定証跡・年度別集計](./docs/validation/roster-planning-65/ten-year/README.md)。最終head CIはPR本文を参照。
 
 ### 次の作業順（人数基盤の後続以外は候補）
 

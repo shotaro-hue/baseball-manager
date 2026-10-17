@@ -2,6 +2,7 @@ import {readFileSync,writeFileSync,mkdirSync,existsSync} from 'node:fs';
 import {gzipSync} from 'node:zlib';
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
+import {assertCompletedVitestLog} from './roster-long-run-log.mjs';
 
 const args=process.argv.slice(2),partial=args[0]==='--partial';if(partial)args.shift();
 const [beforeDir,afterDir,outputDir,beforeLog,afterLog]=args;
@@ -33,9 +34,7 @@ for(const [variant,dir,logPath]of [['before',beforeDir,beforeLog],['after',after
   const perSeedLogs=seeds.every(seed=>existsSync(`${dir}/seed-${seed}.log`));
   const logs=perSeedLogs?seeds.map(seed=>readFileSync(`${dir}/seed-${seed}.log`,'utf8')):[readFileSync(logPath,'utf8')];
   for(const log of logs){
-   assert.match(log,perSeedLogs?/Test Files\s+1 passed \(1\)/:/Test Files\s+3 passed \(3\)/);
-   assert.match(log,perSeedLogs?/Tests\s+1 passed \(1\)/:/Tests\s+3 passed \(3\)/);
-   assert.doesNotMatch(log,/Unhandled Errors|Worker exited unexpectedly|FATAL ERROR|Failed Tests/);
+   assertCompletedVitestLog(log,perSeedLogs?1:3);
   }
  }
  const snapshot=JSON.parse(readFileSync(`${dir}/source-snapshot.json`)),runs=[];
