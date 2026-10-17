@@ -75,3 +75,26 @@ it('requires two report bands to spend the final three contingency slots',()=>{
  expect(planning.assessCpuAddition(young,p('small-future',60,{age:18,potential:90}),{phase:'draft'})).toMatchObject({eligible:false,reason:'normal-target'});
  expect(planning.assessCpuAddition(young,p('clear-current',85),{phase:'draft'})).toMatchObject({eligible:true,reason:'current-upgrade'});
 });
+
+it('reserves final controlled slots for the existing six-catcher minimum instead of filling them with upgrades elsewhere',()=>{
+ const t=team(68);t.farm=t.farm.map((p,i)=>i<4?p:{...p,pos:'一塁手'});
+ expect(planning.assessCpuAddition(t,p('star',99,{pos:'一塁手'}),{phase:'draft'})).toMatchObject({eligible:false,reason:'catcher-reserve'});
+ expect(planning.assessCpuAddition(t,p('catcher'),{phase:'draft'})).toMatchObject({eligible:true,reason:'catcher-depth-shortage'});
+ expect(planning.assessCpuAddition(t,p('manual',99,{pos:'一塁手'}),{phase:'draft',manual:true})).toMatchObject({eligible:true,reason:'player-choice'});
+ expect(planning.assessCpuAddition({...t,farm:[...t.farm,p('c5'),p('c6')]},p('catcher'),{phase:'draft'})).toMatchObject({eligible:false,reason:'roster-full'});
+});
+it('includes accepted catchers but excludes refused and development ownership from catcher reservations',()=>{
+ const t=team(67);t.farm=t.farm.map((p,i)=>i<4?p:{...p,pos:'一塁手'});t.farm.push(p('dev',60,{育成:true}));
+ const pool=[p('accepted'),p('refused')];
+ const context={phase:'draft',draftPool:pool,drafted:{accepted:0,refused:'refused'}};
+ expect(planning.assessCpuAddition(t,p('other',99,{pos:'一塁手'}),context)).toMatchObject({eligible:true,reason:'current-upgrade'});
+ const oneSlot={...t,farm:[...t.farm,p('additional',60,{pos:'一塁手'})]};
+ expect(planning.assessCpuAddition(oneSlot,p('other',99,{pos:'一塁手'}),context)).toMatchObject({eligible:false,reason:'catcher-reserve'});
+});
+it('protects catcher replacement slots during offseason FA without changing reserve budgets or allowing a seventh depth-only catcher',()=>{
+ const t=team(68);t.farm=t.farm.map((p,i)=>i<4?p:{...p,pos:'一塁手'});
+ expect(planning.assessCpuAddition(t,p('other',99,{pos:'一塁手'}),{phase:'offseason'})).toMatchObject({eligible:false,reason:'catcher-reserve'});
+ expect(planning.assessCpuAddition(t,p('c5'),{phase:'offseason'})).toMatchObject({eligible:true,reason:'catcher-depth-shortage'});
+ const covered=team(69);covered.farm=covered.farm.map((p,i)=>i<6?p:{...p,pos:'一塁手'});
+ expect(planning.assessCpuAddition(covered,p('c7'),{phase:'offseason'})).toMatchObject({eligible:false,reason:'normal-target'});
+});

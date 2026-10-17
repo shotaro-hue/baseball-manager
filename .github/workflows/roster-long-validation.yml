@@ -1,5 +1,6 @@
 name: Roster ten-year comparison
 
+# Calibration revision: protect existing six-catcher depth before other upgrades.
 # Explicit branch-scoped validation. Subsequent evidence-only commits do not
 # restart an expensive run; workflow_dispatch remains available for reuse.
 on:

@@ -1,4 +1,4 @@
-import {CPU_FA_BUDGET_RESERVE_RATIO,MIN_SALARY_SHIHAKA} from '../constants';
+import {CPU_FA_BUDGET_RESERVE_RATIO,MIN_SALARY_SHIHAKA,MIN_TOTAL_BY_POS} from '../constants';
 import {draftCapacityContext,evaluateRosterCapacity,isIkuseiPlayer,projectRosterCapacity} from './rosterCapacity';
 import {draftNominationCount} from './draftConference';
 import {ownedPlayers,renewalEligible} from './renewalRules';
@@ -58,10 +58,16 @@ export function assessCpuAddition(team,player,context={}){
  if(!Number.isFinite(team.budget)||!Number.isFinite(salary)||salary<0)return result(false,'budget-missing',projectedCount);
  if(plan.rookieReserve-(plan.draftRemaining-draftRemaining)*MIN_SALARY_SHIHAKA+salary+budgetReserve>team.budget)return result(false,'rookie-budget',projectedCount);
  if(development)return result(true,'development-contract',projectedCount);
+ const owned=ownedPlayers(team).filter(p=>!isIkuseiPlayer(p));
+ const isCatcher=p=>!p.isPitcher&&p.pos==='捕手';
+ const catcherGap=Math.max(0,MIN_TOTAL_BY_POS['捕手']-[...owned,...plan.acceptedPicks].filter(isCatcher).length);
+ // Keep the last real slots available for an existing catcher-depth deficit.
+ // Accepted picks cover the reservation; refused/development ownership does not.
+ if(!isCatcher(player)&&catcherGap>0&&plan.remainingSlots<=catcherGap)return result(false,'catcher-reserve',projectedCount);
  if(projectedCount<=CPU_ROSTER_TARGET)return result(true,'normal-target',projectedCount);
+ if(isCatcher(player)&&catcherGap>0)return result(true,'catcher-depth-shortage',projectedCount);
  const organization=context.organization??evaluateOrganizationNeeds(team,context);
  const role=organization.ok?Object.values(organization.roles).find(r=>r.label===roleOf(player)):null;
- const owned=ownedPlayers(team).filter(p=>!isIkuseiPlayer(p));
  const operating=owned.filter(p=>sameRole(p,player)&&!(p.injuryDaysLeft>0)&&!(p.registrationCooldownDays>0));
  const committed=plan.acceptedPicks.filter(p=>sameRole(p,player)).length;
  if(operating.length+committed<(role?.activeMinimum??1))return result(true,'operating-shortage',projectedCount);

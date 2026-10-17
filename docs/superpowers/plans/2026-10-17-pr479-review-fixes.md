@@ -37,3 +37,5 @@ Execution: inline, existing PR #479 only; no merge, main push or balance changes
 - User already authorized implementation and PR updates; no repeated plan approval.
 - Ruling: first-team archive expectations must follow recorded participation, while farm-only seasons remain in farmArchives. The failed before/20261017 2032 row had zero first-team activity and 186 farm BF; compare every continuing player's actual eligible years instead of fabricating a missing first-team row. Missing eligible years and duplicate/fabricated rows still fail.
 - Trade E2E fixture now waits for the manual-save notification to finish before testing another transient notification; all original rejection and atomicity assertions remain. Target Chromium test passed three runs with retries0.
+
+- Ruling: pre-fix 20261015 annual records show 237 farm cards unplayed because a CPU catcher corps declined to2–3; retain constants and reserve the last real slots for the existing six-catcher deficit, allowing only those catchers a depth exception above67. Cost if wrong: fewer optional upgrades while catchers are below the existing minimum. Manual acquisition and70-cap remain unchanged.

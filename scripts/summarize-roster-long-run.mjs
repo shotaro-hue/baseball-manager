@@ -44,7 +44,7 @@ for(const [variant,dir,logPath]of [['before',beforeDir,beforeLog],['after',after
   const bytes=readFileSync(path),data=JSON.parse(bytes),run=data.seeds[0];assert.equal(data.base,snapshot.sourceCommit);
   assert.equal(data.variant,variant);assert.equal(run.seed,seed);assert.equal(data.seeds.length,1);
   assert.deepEqual(data.sources,snapshot.sources);
-  if(!partial){assert.equal(run.status,'passed');assert.equal(run.years,10);assert.equal(run.seasons.length,10);assert.deepEqual(run.seasons.map(s=>s.year),Array.from({length:10},(_,i)=>2026+i));}
+  if(!partial){assert.equal(run.status,'passed');assert.ok(run.careerValidation?.length>0);for(const c of run.careerValidation)assert.deepEqual(c.recordedYears,c.expectedYears);assert.equal(run.years,10);assert.equal(run.seasons.length,10);assert.deepEqual(run.seasons.map(s=>s.year),Array.from({length:10},(_,i)=>2026+i));}
   for(const season of run.seasons) {
    assert.equal(season.officialGamesPerTeam,143);assert.ok(Array.isArray(season.events));
    for(const phase of ['midseason','camp','new-season'])assert.ok(run.checkpoints.some(c=>c.phase===phase&&c.year===season.year+Number(phase==='new-season')));
@@ -53,7 +53,7 @@ for(const [variant,dir,logPath]of [['before',beforeDir,beforeLog],['after',after
     const ids=clubs.flatMap(t=>t.playerUsage.map(p=>p.id));assert.equal(new Set(ids).size,ids.length);
     for(const t of clubs){assert.ok(t.controlled<=70);assert.equal(t.controlled,t.playerUsage.filter(p=>!p.development).length);assert.ok(Number.isFinite(t.budget));}
    }
-   if(variant==='after')for(const d of season.decisions.filter(d=>d.teamId!==0&&d.projectedCount>67))assert.ok(['operating-shortage','current-upgrade','future-upgrade'].includes(d.rosterReason));
+   if(variant==='after')for(const d of season.decisions.filter(d=>d.teamId!==0&&d.projectedCount>67))assert.ok(['operating-shortage','catcher-depth-shortage','current-upgrade','future-upgrade'].includes(d.rosterReason));
   }
   runs.push(run);artifacts.push({path:`${variant}-${seed}.json.gz`,bytes:gzipSync(bytes,{level:9,mtime:0})});
  }
