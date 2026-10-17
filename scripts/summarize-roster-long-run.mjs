@@ -15,7 +15,8 @@ for(const [variant,dir,logPath]of [['before',beforeDir,beforeLog],['after',after
  for(const seed of seeds) {
   const path=`${dir}/seed-${seed}.json`;if(partial&&!existsSync(path))continue;
   const bytes=readFileSync(path),data=JSON.parse(bytes),run=data.seeds[0];assert.equal(data.base,snapshot.sourceCommit);
-  if(!partial){assert.equal(run.years,10);assert.equal(run.seasons.length,10);assert.deepEqual(run.seasons.map(s=>s.year),Array.from({length:10},(_,i)=>2026+i));}
+  assert.deepEqual(data.sources,snapshot.sources);
+  if(!partial){assert.equal(run.status,'passed');assert.equal(run.years,10);assert.equal(run.seasons.length,10);assert.deepEqual(run.seasons.map(s=>s.year),Array.from({length:10},(_,i)=>2026+i));}
   for(const season of run.seasons) {
    assert.equal(season.officialGamesPerTeam,143);assert.ok(Array.isArray(season.events));
    for(const phase of ['midseason','camp','new-season'])assert.ok(run.checkpoints.some(c=>c.phase===phase&&c.year===season.year+Number(phase==='new-season')));

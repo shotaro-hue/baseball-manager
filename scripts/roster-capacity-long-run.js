@@ -2,11 +2,10 @@ import React from 'react';
 import {act,create} from 'react-test-renderer';
 import {afterEach,expect,it,vi} from 'vitest';
 import {IDBFactory,IDBKeyRange} from 'fake-indexeddb';
-import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
+import {mkdirSync,writeFileSync,renameSync} from 'node:fs';
 import {draftRulesFor,draftParticipation} from '../src/engine/draftConference';
 import {evaluateDraftContinuation} from '../src/engine/draftContinuation';
 import {draftRefused} from '../src/engine/draftRules';
-import {createHash} from 'node:crypto';
 import {createCatcherProbe,installCatcherProbe} from './farm-catcher-diagnostics';
 import {useOffseason} from '../src/hooks/useOffseason';
 import {useGameState} from '../src/hooks/useGameState';
@@ -26,10 +25,11 @@ import {getCareerEntryKey} from '../src/engine/careerStats';
 import {matchHistorySnapshot} from '../src/engine/matchHistory';
 import {rosterRows,rosterTransitions} from './roster-capacity-metrics';
 import {releaseCompletedTransactions} from './fake-indexeddb-prune';
+import {validationSourceHashes,assertValidationSourcesUnchanged} from './roster-long-run-source.mjs';
 
 // Real application hooks run in react-test-renderer. Only browser storage is
 // adapted to Node (Map localStorage and fake-indexeddb); game logic is unmocked.
-let view,current,restoreRandom;
+let view,current,restoreRandom,validationSources;
 const measurements=[];
 const snapshot=gs=>({teams:gs.teams,year:gs.year,saveId:gs.saveId,myId:gs.myId,gameDay:gs.gameDay,
  screen:gs.screen,faPool:gs.faPool,faYears:gs.faYears,news:gs.getNewsBySelector(),mailbox:gs.getMailboxBySelector(),
@@ -66,6 +66,7 @@ function integrity(s) {
  validateFarmSaveState(s);
 }
 async function checkpoint(label,rows) {
+ assertValidationSourcesUnchanged(validationSources);
  const before=current.s;integrity(before);
  const persistedPlan=before.offseasonPlan&&{...before.offseasonPlan,resumeScreen:before.screen};
  let result;await act(async()=>{result=await current.gs.handleSave({silent:true,payload:{offseasonPlan:persistedPlan}});});
@@ -87,14 +88,15 @@ async function checkpoint(label,rows) {
 function saveEvidence(){
  if(!measurements.length)return;
  const dir=process.env.ROSTER_LONG_EVIDENCE||'/tmp/roster-long-evidence';mkdirSync(dir,{recursive:true});
- const paths=['src/engine/bootstrapTeams.js','src/engine/playerCore.js','src/engine/realplayer.js','src/engine/contract.js','src/engine/draftContinuation.js','src/engine/initialRoster.js','src/engine/rosterPlanning.js','src/hooks/useOffseason.js','src/workers/seasonBatchCore.js','scripts/roster-capacity-long-run.js','scripts/roster-capacity-metrics.js','scripts/fake-indexeddb-prune.js'];
- const sources=Object.fromEntries(paths.map(p=>{try{return [p,createHash('sha256').update(readFileSync(p)).digest('hex')];}catch(error){if(error.code!=='ENOENT')throw error;return [p,null];}}));
- writeFileSync(`${dir}/seed-${measurements[0].seed}.json`,JSON.stringify({base:process.env.ROSTER_LONG_BASE,variant:process.env.ROSTER_LONG_VARIANT,sources,environment:'Real application hooks + 143-game season batch + farm synchronization; fake-indexeddb/Map localStorage; postseason tournament bypassed; user renews all remaining players, releases1 and signs at most1 FA, delegates draft; no engine mocks',seeds:measurements})+'\n');
+ assertValidationSourcesUnchanged(validationSources);const sources=validationSources;
+ const path=`${dir}/seed-${measurements[0].seed}.json`;
+ writeFileSync(`${path}.tmp`,JSON.stringify({base:process.env.ROSTER_LONG_BASE,variant:process.env.ROSTER_LONG_VARIANT,sources,environment:'Real application hooks + 143-game season batch + farm synchronization; fake-indexeddb/Map localStorage; postseason tournament bypassed; user renews all remaining players, releases1 and signs at most1 FA, delegates draft; no engine mocks',seeds:measurements})+'\n');renameSync(`${path}.tmp`,path);
 }
 afterEach(()=>{if(view)act(()=>view.unmount());view=null;restoreRandom?.();restoreRandom=null;vi.restoreAllMocks();vi.unstubAllGlobals();saveEvidence();});
 
 export function registerRosterLongRun(seed,years=Number(process.env.ROSTER_LONG_YEARS)||10) {
-it(`QA-D1: seed ${seed} plays ten generated seasons with offseason save/reload`,async()=>{
+it(`QA-D1: seed ${seed} targets ${years} generated seasons with offseason save/reload`,async()=>{
+ validationSources=validationSourceHashes();
  // A non-recording RNG adapter avoids retaining millions of mock call records.
  let random=seed;const originalRandom=Math.random;restoreRandom=()=>{Math.random=originalRandom;};
  Math.random=()=>{random=(Math.imul(random,1664525)+1013904223)>>>0;return random/4294967296;};
@@ -110,7 +112,7 @@ it(`QA-D1: seed ${seed} plays ten generated seasons with offseason save/reload`,
  const catcherPhase=label=>catcherProbe?.phase(label,current.s);
  const continuousIds=new Set(ownedPlayers(teams[0]).map(p=>p.id));
  let rookieIds=new Set();
- const row={seed,years,initial:rosterRows(current.s),seasons:[],checkpoints:[]};measurements.push(row);
+ const row={seed,years,status:'in-progress',initial:rosterRows(current.s),seasons:[],checkpoints:[]};measurements.push(row);
  for(let season=0;season<years;season++) {
   const y=current.s.year,started=performance.now(),phases={start:rosterRows(current.s,rookieIds)},events=[];
   let previous=phases.start;
@@ -215,5 +217,6 @@ it(`QA-D1: seed ${seed} plays ten generated seasons with offseason save/reload`,
  expect(new Set(career.filter(r=>r.year>=2026&&r.year<2026+years).map(r=>r.year))).toEqual(new Set(Array.from({length:years},(_,i)=>2026+i)));
  expect(new Set(career.map(getCareerEntryKey)).size).toBe(career.length);
  expect(current.s.year).toBe(2026+years);expect(current.s.seasonHistory.awards).toHaveLength(years);expect(current.s.seasonHistory.standingsHistory).toHaveLength(years);
+ row.status='passed';saveEvidence();
 },3600000);
 }

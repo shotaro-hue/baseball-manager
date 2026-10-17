@@ -5,10 +5,18 @@ import {isIkuseiPlayer} from './rosterCapacity';
 export function initialRosterSlots(players) {
   const owned=players.filter(p=>!isIkuseiPlayer(p));
   if(owned.length>MAX_SHIHAKA_TOTAL)throw new Error('初期支配下人数が70人を超えています');
-  if(owned.length>=65)return {pitcherRoles:[],batterPositions:[]};
   const pitchers=owned.filter(p=>p.isPitcher),batters=owned.filter(p=>!p.isPitcher);
-  const pitcherCount=Math.max(0,Math.min(32,65-batters.length)-pitchers.length);
-  const batterCount=65-owned.length-pitcherCount;
+  // Protect defensive coverage before distributing the optional 32/33 target.
+  // Minimums use primary positions and controlled players only; never rewrite
+  // a real player's position or use development players to fill these slots.
+  const missingBatters=FIELDING_POSITIONS.reduce((n,pos)=>n+Math.max(0,
+    (pos==='捕手'?MIN_TOTAL_BY_POS['捕手']:1)-batters.filter(p=>p.pos===pos).length),0);
+  const missingPitcher=Number(pitchers.length===0);
+  const target=Math.max(65,owned.length+missingBatters+missingPitcher);
+  if(target>MAX_SHIHAKA_TOTAL)throw new Error('初期守備を成立させる補充が支配下70人以内に収まりません');
+  const available=target-owned.length;
+  const pitcherCount=Math.max(missingPitcher,Math.min(Math.max(0,32-pitchers.length),available-missingBatters));
+  const batterCount=available-pitcherCount;
   const roles=['先発','中継ぎ','抑え'],targets=[14,14,4];
   const counts=roles.map(role=>pitchers.filter(p=>(p.subtype||p.pos)===role).length),pitcherRoles=[];
   for(let i=0;i<pitcherCount;i++){
