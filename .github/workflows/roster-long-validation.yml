@@ -34,7 +34,7 @@ jobs:
         if: matrix.variant == 'before'
         run: |
           git worktree add --detach baseline 122d02b7a76ed0af90b17cecb1f8a6ff488c40d8
-          for file in roster-capacity-long-run.js roster-capacity-metrics.js fake-indexeddb-prune.js roster-long-run-source.mjs run-roster-long-run.mjs; do
+          for file in roster-capacity-long-run.js roster-capacity-metrics.js roster-career-evidence.js fake-indexeddb-prune.js roster-long-run-source.mjs run-roster-long-run.mjs; do
             cp "scripts/$file" "baseline/scripts/$file"
           done
           ln -s "$GITHUB_WORKSPACE/node_modules" baseline/node_modules

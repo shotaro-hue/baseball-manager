@@ -35,3 +35,5 @@ Execution: inline, existing PR #479 only; no merge, main push or balance changes
 - main 122d02b, PR head 75c38c6, CI #421 all 8 jobs successful.
 - Baseline comparison started from isolated 122d02b; existing fake-IDB pruning kept.
 - User already authorized implementation and PR updates; no repeated plan approval.
+- Ruling: first-team archive expectations must follow recorded participation, while farm-only seasons remain in farmArchives. The failed before/20261017 2032 row had zero first-team activity and 186 farm BF; compare every continuing player's actual eligible years instead of fabricating a missing first-team row. Missing eligible years and duplicate/fabricated rows still fail.
+- Trade E2E fixture now waits for the manual-save notification to finish before testing another transient notification; all original rejection and atomicity assertions remain. Target Chromium test passed three runs with retries0.

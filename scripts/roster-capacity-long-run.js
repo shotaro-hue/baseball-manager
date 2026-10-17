@@ -25,6 +25,7 @@ import {getCareerEntryKey} from '../src/engine/careerStats';
 import {matchHistorySnapshot} from '../src/engine/matchHistory';
 import {rosterRows,rosterTransitions} from './roster-capacity-metrics';
 import {releaseCompletedTransactions} from './fake-indexeddb-prune';
+import {recordCareerExpectations,verifyCareerExpectations} from './roster-career-evidence';
 import {validationSourceHashes,assertValidationSourcesUnchanged} from './roster-long-run-source.mjs';
 
 // Real application hooks run in react-test-renderer. Only browser storage is
@@ -110,7 +111,7 @@ it(`QA-D1: seed ${seed} targets ${years} generated seasons with offseason save/r
  const catcherProbe=process.env.FARM_CATCHER_DIAGNOSE==='1'?createCatcherProbe(seed):null;
  if(catcherProbe)installCatcherProbe(vi,catcherProbe);
  const catcherPhase=label=>catcherProbe?.phase(label,current.s);
- const continuousIds=new Set(ownedPlayers(teams[0]).map(p=>p.id));
+ const continuousIds=new Set(ownedPlayers(teams[0]).map(p=>p.id)),careerExpectations=new Map();
  let rookieIds=new Set();
  const row={seed,years,status:'in-progress',initial:rosterRows(current.s),seasons:[],checkpoints:[]};measurements.push(row);
  for(let season=0;season<years;season++) {
@@ -192,6 +193,7 @@ it(`QA-D1: seed ${seed} targets ${years} generated seasons with offseason save/r
   integrity(current.s);expect(current.s.screen).toBe('spring_training');
   await checkpoint('camp',row.checkpoints);
   act(()=>expect(current.os.handleDraftComplete(pool,drafted)).toBe(false));
+  recordCareerExpectations(careerExpectations,current.gs.myTeam,y);
   const contracts=new Map(current.s.teams.flatMap(ownedPlayers).map(p=>[p.id,{years:p.contractYearsLeft,signed:p.contractSignedYear,age:p.age,salary:p.salary}]));
   await act(async()=>{expect(await current.os.handleSpringTrainingComplete()).toBe(true);});
   expect(current.s.year).toBe(y+1);expect(current.s.gameDay).toBe(1);expect(current.s.screen).toBe('new_season');
@@ -211,11 +213,13 @@ it(`QA-D1: seed ${seed} targets ${years} generated seasons with offseason save/r
   for(const id of continuousIds)if(!ownedPlayers(current.gs.myTeam).some(p=>p.id===id))continuousIds.delete(id);
   row.seasons.push(seasonRow);saveEvidence();console.log('QA-D1 season',seed,y,'ms',seasonRow.elapsedMs,'farm unplayed',unplayed.length);
  }
- const recorded=ownedPlayers(current.gs.myTeam).find(p=>continuousIds.has(p.id));
- expect(recorded).toBeTruthy();
- const career=await loadPlayerCareerLogById(recorded.id,current.s.saveId);
- expect(new Set(career.filter(r=>r.year>=2026&&r.year<2026+years).map(r=>r.year))).toEqual(new Set(Array.from({length:years},(_,i)=>2026+i)));
- expect(new Set(career.map(getCareerEntryKey)).size).toBe(career.length);
+ // A continuously owned farm-only player need not have a first-team row every
+ // year. Verify every continuing player's actual archive years, not one
+ // arbitrarily selected survivor with an assumed ten first-team appearances.
+ expect(continuousIds.size).toBeGreaterThan(0);
+ row.careerValidation=await verifyCareerExpectations([...continuousIds],careerExpectations,
+  id=>loadPlayerCareerLogById(id,current.s.saveId),2026,years);
+ expect(row.careerValidation).toHaveLength(continuousIds.size);
  expect(current.s.year).toBe(2026+years);expect(current.s.seasonHistory.awards).toHaveLength(years);expect(current.s.seasonHistory.standingsHistory).toHaveLength(years);
  row.status='passed';saveEvidence();
 },3600000);
