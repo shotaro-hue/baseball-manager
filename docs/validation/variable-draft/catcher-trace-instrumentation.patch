@@ -1,0 +1,37 @@
+diff --git a/scripts/qa-d1-offseason.js b/scripts/qa-d1-offseason.js
+index df70b0b..ec52953 100644
+--- a/scripts/qa-d1-offseason.js
++++ b/scripts/qa-d1-offseason.js
+@@ -15,7 +15,7 @@ import {simulateSeasonBatch} from '../src/workers/seasonBatchCore';
+ import {loadGame,loadPlayerCareerLogById} from '../src/engine/saveload';
+ import {renewalEligible,ownedPlayers} from '../src/engine/renewalRules';
+ import {ensureDraftEvaluation,startDraftEvaluation} from '../src/engine/draftReports';
+-import {resolveFirstRound,chooseDraftProspect,remainingDraftSlots,registeredDraftCount} from '../src/engine/draftRules';
++import {rankDraftProspects,resolveFirstRound,chooseDraftProspect,remainingDraftSlots,registeredDraftCount} from '../src/engine/draftRules';
+ import {planningResumeScreen} from '../src/engine/offseasonPlanning';
+ import {draftPicksForTeam} from '../src/engine/offseasonResume';
+ import {addMarketSigning,validateMarketContract} from '../src/components/hub/faMarket';
+@@ -150,13 +150,23 @@ it(`QA-D1: seed ${seed} plays three generated seasons with offseason save/reload
+   const evaluation=startDraftEvaluation(ensureDraftEvaluation({teams:current.s.teams,pool,year:y,myId:0}),pool);
+   const order=[...current.s.teams].sort((a,b)=>a.wins-b.wins),drafted={};
+   const first=resolveFirstRound(order,pool,{evaluation,year:y});
++  const trace=[];
++  const tracePick=(team,p,round,available)=>{
++   if(team.id!==1)return;
++   const ranked=rankDraftProspects(team,available,round,draftPicksForTeam(pool,drafted,team.id),{evaluation,teams:order,draftPool:pool,drafted,year:y});
++   trace.push({year:y,round,selectedId:p.id,selectedName:p.name,selectedPos:p.subtype||p.pos,priorPicks:draftPicksForTeam(pool,drafted,team.id).map(x=>({id:x.id,pos:x.subtype||x.pos})),ranked:ranked.map(r=>({id:r.p.id,name:r.p.name,pos:r.p.subtype||r.p.pos,age:r.p.age,score:r.score,fit:r.fit,fitReason:r.fitReason,current:r.report?.current,future:r.report?.future}))});
++  };
++  if(first.picks[1])tracePick(order.find(t=>t.id===1),first.picks[1],1,pool);
++  writeFileSync(`/tmp/variable-draft-trace-${y}-input.json`,JSON.stringify({base:'cd02b45',seed,year:y,teams:order,pool,evaluation,first}));
+   for(const [tid,p] of Object.entries(first.picks))drafted[p.id]=Number(tid);
+   for(let round=2;round<=6;round++)for(const team of order) {
+    const available=pool.filter(p=>drafted[p.id]==null);
+    if(!available.length||remainingDraftSlots(team,pool,drafted)<=0)continue;
+    const p=chooseDraftProspect(team,available,round,draftPicksForTeam(pool,drafted,team.id),{evaluation,teams:order,draftPool:pool,drafted,year:y});
++   tracePick(team,p,round,available);
+    drafted[p.id]=team.id;
+   }
++  writeFileSync(`/tmp/variable-draft-trace-${y}.json`,JSON.stringify(trace,null,2));
+   patch({screen:'draft_review',offseasonPlan:{...current.s.offseasonPlan,draftEvaluation:evaluation,draftResult:{pool,drafted}}});
+   if(seed===20261015)await checkpoint('draft-review',row.checkpoints);
+   act(()=>expect(current.os.handleDraftComplete(pool,drafted)).toBe(true));

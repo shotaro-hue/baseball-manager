@@ -27,6 +27,12 @@ function weights(p) {
   if(['遊撃手','二塁手','中堅手'].includes(p.pos)) return { contact:.23,power:.14,eye:.14,speed:.19,defense:.24,arm:.06 };
   return { contact:.3,power:.28,eye:.2,speed:.1,defense:.08,arm:.04 };
 }
+// Owned abilities are known; candidates must keep using their observed report.
+export function ownedDraftCurrent(player) {
+  const values=player.isPitcher ? player.pitching : player.batting;
+  return Object.entries(weights(player)).reduce((sum,[key,weight])=>sum+numeric(values?.[key])*weight,0);
+}
+
 function observe(p, year, observer, width) {
   const keys = Object.keys(weights(p));
   const values = p.isPitcher ? p.pitching : p.batting;

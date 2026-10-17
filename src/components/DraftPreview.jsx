@@ -6,12 +6,12 @@ import {draftClassSummary,draftReport,publicDraftTier,startDraftEvaluation} from
 import {rankDraftProspects,forecastDraft} from '../engine/draftRules';
 import {analyzeTeamNeeds} from '../engine/trade';
 
-export default function DraftPreviewScreen({teams,myId,year,pool,draftAllocation,onAllocationChange,onStart,startLabel,savedState,onStateChange,evaluation,onEvaluationChange}) {
+export default function DraftPreviewScreen({teams,myId,year,pool,rules,endedTeams,draftAllocation,onAllocationChange,onStart,startLabel,savedState,onStateChange,evaluation,onEvaluationChange}) {
   const {session,update}=useDraftEvaluation({teams,myId,year,pool,draftAllocation,savedState,evaluation,onEvaluationChange});
   const [tab,setTab]=useState(savedState?.tab || 'overview'),[candidateView,setCandidateView]=useState(savedState?.candidateView || {});
   useLayoutEffect(()=>{onStateChange?.({tab,candidateView,...(!onEvaluationChange?{evaluation:session}:{})});},[tab,candidateView,session,onStateChange]);
   const myTeam=teams.find(t=>String(t.id)===String(myId));
-  const context={teams,evaluation:session};
+  const context={rules,endedTeams,teams,evaluation:session};
   const rankings=rankDraftProspects(myTeam,pool,1,[],context),forecast=forecastDraft(teams,pool,myId,context);
   const publicOrder=[...pool].sort((a,b)=>draftReport(session,b.id).value-draftReport(session,a.id).value||String(a.id).localeCompare(String(b.id)));
   const allocation=session.locked?session.allocation:(draftAllocation || session.allocation);

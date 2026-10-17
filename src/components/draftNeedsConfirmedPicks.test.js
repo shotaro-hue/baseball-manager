@@ -33,7 +33,7 @@ for (const firstRound of [true, false]) it(`CPU uses ${firstRound ? 'first' : 'l
   const before = structuredClone({ team, pool, savedState });
   const changed = vi.fn();
   let view;
-  act(() => { view = create(React.createElement(DraftScreen, { teams: [team, { ...team, id: 1, wins: 10 }],
+  act(() => { view = create(React.createElement(DraftScreen, { teams: [team, { ...team, id: 1, wins: 10, players: team.players.map(p=>({...p,id:`other-${p.id}`})), farm: team.farm.map(p=>({...p,id:`other-${p.id}`})) }],
     myId: 1, year: 2026, pool, savedState, onStateChange: changed, onDraftDone: vi.fn() })); });
   views.push(view);
   act(() => vi.advanceTimersByTime(350));

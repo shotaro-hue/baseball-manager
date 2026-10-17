@@ -385,6 +385,7 @@ export default function AppScreenRouter({ app }) {
           myId={myId}
           year={year}
           pool={os.draftPool}
+          rules={gs.offseasonPlan?.draftRules}
           draftAllocation={os.draftAllocation}
           evaluation={os.draftEvaluation} onEvaluationChange={os.setDraftEvaluation}
           onAllocationChange={os.setDraftAllocation}
@@ -403,9 +404,10 @@ export default function AppScreenRouter({ app }) {
           myId={myId}
           year={year}
           pool={os.draftPool}
+          rules={gs.offseasonPlan?.draftRules}
           draftAllocation={os.draftAllocation} evaluation={os.draftEvaluation} onEvaluationChange={os.setDraftEvaluation}
           savedState={gs.offseasonPlan?.draftViews?.lottery} onStateChange={saveLottery}
-          onDone={(roundOneWinners, autoSkip) => {
+          onDone={(roundOneWinners, autoSkip, endedTeams) => {
             os.setDraftPool((prev) =>
               prev.map((player) => {
                 const winner = Object.entries(roundOneWinners).find(
@@ -419,7 +421,8 @@ export default function AppScreenRouter({ app }) {
               }),
             );
             if (autoSkip) setDraftAutoSkip(true);
-            gs.setOffseasonPlan(prev => prev && ({ ...prev, draftAutoSkip: !!autoSkip }));
+            gs.setOffseasonPlan(prev => prev && ({ ...prev, draftAutoSkip: !!autoSkip,
+              ...(endedTeams?{draftViews:{...prev.draftViews,draft:{...prev.draftViews?.draft,endedTeams}}}:{}) }));
             setScreen('draft');
           }}
         />
@@ -435,6 +438,7 @@ export default function AppScreenRouter({ app }) {
           myId={myId}
           year={year}
           pool={os.draftPool}
+          rules={gs.offseasonPlan?.draftRules}
           draftAllocation={os.draftAllocation}
           evaluation={os.draftEvaluation} onEvaluationChange={os.setDraftEvaluation}
           autoSkip={gs.offseasonPlan?.draftAutoSkip ?? draftAutoSkip}

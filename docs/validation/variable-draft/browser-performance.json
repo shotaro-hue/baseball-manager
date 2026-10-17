@@ -1,0 +1,170 @@
+{
+  "description": "Post-CI417 exact160 assertion fix; Chromium local measurement; production source unchanged from sourceSha. Final-head browser matrix is recorded in PR CI.",
+  "records": [
+    {
+      "stage": "after",
+      "baseSha": "a14a5c888dca3cfe07c7338482e4130290a6257b",
+      "sourceSha": "02de41f4684b5871d72504041290a141e8da3400",
+      "sourceFiles": {
+        "src/components/DraftCandidates.jsx": "2aaee59abedeb6fca5249f34bf2f91677f820ca8",
+        "src/engine/draftReports.js": "4d462813b20aa80edd6bccd6a6ebb48b7439b5a2",
+        "src/components/Draft.jsx": "8e15860fe6c734acd6d608fcfe2346ddd5bb4c00",
+        "src/components/DraftPreview.jsx": "fadd664644cad2be38d37f254b5c475d0f4c51d1"
+      },
+      "sourceSha256": {
+        "src/components/DraftCandidates.jsx": "a88e8e37e74877a360a56c2df8c349e361aa06990c1c8d08aec34364a901a947",
+        "src/engine/draftReports.js": "c24f2f5e17d5be303ad134131d24b3d5de01b276d772bf6a64372ad00eb2a52f",
+        "src/components/Draft.jsx": "75c7a30f9bae56ed548076820cbc48aed83ab1ca6a4b72a1e608f64dc10e765a",
+        "src/components/DraftPreview.jsx": "1d42716e93d2aefbac2002ff9b7ae04ae05635c0cb93ac3f28eb4efd626c544d"
+      },
+      "seed": 20261015,
+      "timingAttribution": "Reference values only: host CPU load was not isolated from other validation processes.",
+      "browser": "chromium-1440",
+      "candidateCount": 160,
+      "scrollSteps": 48,
+      "scrollInput": "scrollTop changes plus dispatched scroll events at requestAnimationFrame spacing",
+      "scrollElapsedMs": 4180,
+      "scrollFrames": {
+        "elapsedMs": 1282.2000000001863,
+        "p50Ms": 20.800000000745058,
+        "p95Ms": 59.799999999813735,
+        "maxMs": 143
+      },
+      "scrolling": {
+        "commits": 4,
+        "candidateRenders": 8,
+        "parentStateUpdates": 1,
+        "publicTierCalls": 1280,
+        "publicRankingSorts": 0,
+        "saves": 1
+      },
+      "navigationActionsMs": 623,
+      "navigation": {
+        "commits": 8,
+        "candidateRenders": 16,
+        "parentStateUpdates": 2,
+        "publicTierCalls": 2566,
+        "publicRankingSorts": 0,
+        "saves": 1
+      },
+      "ranking": {
+        "calls": 16000,
+        "sorts": 1,
+        "elapsedMs": 2,
+        "checksum": 76400
+      },
+      "instrumentation": "Test-only HTTP response counters + React DevTools commit hook + storage perf-log writes. Vite React StrictMode; no CPU throttle.",
+      "hardware": "Browser automation on host, not phone hardware"
+    },
+    {
+      "stage": "after",
+      "baseSha": "a14a5c888dca3cfe07c7338482e4130290a6257b",
+      "sourceSha": "02de41f4684b5871d72504041290a141e8da3400",
+      "sourceFiles": {
+        "src/components/DraftCandidates.jsx": "2aaee59abedeb6fca5249f34bf2f91677f820ca8",
+        "src/engine/draftReports.js": "4d462813b20aa80edd6bccd6a6ebb48b7439b5a2",
+        "src/components/Draft.jsx": "8e15860fe6c734acd6d608fcfe2346ddd5bb4c00",
+        "src/components/DraftPreview.jsx": "fadd664644cad2be38d37f254b5c475d0f4c51d1"
+      },
+      "sourceSha256": {
+        "src/components/DraftCandidates.jsx": "a88e8e37e74877a360a56c2df8c349e361aa06990c1c8d08aec34364a901a947",
+        "src/engine/draftReports.js": "c24f2f5e17d5be303ad134131d24b3d5de01b276d772bf6a64372ad00eb2a52f",
+        "src/components/Draft.jsx": "75c7a30f9bae56ed548076820cbc48aed83ab1ca6a4b72a1e608f64dc10e765a",
+        "src/components/DraftPreview.jsx": "1d42716e93d2aefbac2002ff9b7ae04ae05635c0cb93ac3f28eb4efd626c544d"
+      },
+      "seed": 20261015,
+      "timingAttribution": "Reference values only: host CPU load was not isolated from other validation processes.",
+      "browser": "chromium-360",
+      "candidateCount": 160,
+      "scrollSteps": 48,
+      "scrollInput": "scrollTop changes plus dispatched scroll events at requestAnimationFrame spacing",
+      "scrollElapsedMs": 7916,
+      "scrollFrames": {
+        "elapsedMs": 847.7999999998137,
+        "p50Ms": 16.799999999813735,
+        "p95Ms": 20.399999999441206,
+        "maxMs": 94.70000000018626
+      },
+      "scrolling": {
+        "commits": 4,
+        "candidateRenders": 8,
+        "parentStateUpdates": 1,
+        "publicTierCalls": 1280,
+        "publicRankingSorts": 0,
+        "saves": 1
+      },
+      "navigationActionsMs": 1681,
+      "navigation": {
+        "commits": 8,
+        "candidateRenders": 16,
+        "parentStateUpdates": 2,
+        "publicTierCalls": 2566,
+        "publicRankingSorts": 0,
+        "saves": 1
+      },
+      "ranking": {
+        "calls": 16000,
+        "sorts": 1,
+        "elapsedMs": 11.100000000558794,
+        "checksum": 76400
+      },
+      "instrumentation": "Test-only HTTP response counters + React DevTools commit hook + storage perf-log writes. Vite React StrictMode; no CPU throttle.",
+      "hardware": "Browser automation on host, not phone hardware"
+    },
+    {
+      "stage": "after",
+      "baseSha": "a14a5c888dca3cfe07c7338482e4130290a6257b",
+      "sourceSha": "02de41f4684b5871d72504041290a141e8da3400",
+      "sourceFiles": {
+        "src/components/DraftCandidates.jsx": "2aaee59abedeb6fca5249f34bf2f91677f820ca8",
+        "src/engine/draftReports.js": "4d462813b20aa80edd6bccd6a6ebb48b7439b5a2",
+        "src/components/Draft.jsx": "8e15860fe6c734acd6d608fcfe2346ddd5bb4c00",
+        "src/components/DraftPreview.jsx": "fadd664644cad2be38d37f254b5c475d0f4c51d1"
+      },
+      "sourceSha256": {
+        "src/components/DraftCandidates.jsx": "a88e8e37e74877a360a56c2df8c349e361aa06990c1c8d08aec34364a901a947",
+        "src/engine/draftReports.js": "c24f2f5e17d5be303ad134131d24b3d5de01b276d772bf6a64372ad00eb2a52f",
+        "src/components/Draft.jsx": "75c7a30f9bae56ed548076820cbc48aed83ab1ca6a4b72a1e608f64dc10e765a",
+        "src/components/DraftPreview.jsx": "1d42716e93d2aefbac2002ff9b7ae04ae05635c0cb93ac3f28eb4efd626c544d"
+      },
+      "seed": 20261015,
+      "timingAttribution": "Reference values only: host CPU load was not isolated from other validation processes.",
+      "browser": "chromium-390",
+      "candidateCount": 160,
+      "scrollSteps": 48,
+      "scrollInput": "scrollTop changes plus dispatched scroll events at requestAnimationFrame spacing",
+      "scrollElapsedMs": 4488,
+      "scrollFrames": {
+        "elapsedMs": 784,
+        "p50Ms": 16.700000000186265,
+        "p95Ms": 17.700000000186265,
+        "maxMs": 18.699999999254942
+      },
+      "scrolling": {
+        "commits": 4,
+        "candidateRenders": 8,
+        "parentStateUpdates": 1,
+        "publicTierCalls": 1280,
+        "publicRankingSorts": 0,
+        "saves": 1
+      },
+      "navigationActionsMs": 1161,
+      "navigation": {
+        "commits": 8,
+        "candidateRenders": 16,
+        "parentStateUpdates": 2,
+        "publicTierCalls": 2566,
+        "publicRankingSorts": 0,
+        "saves": 1
+      },
+      "ranking": {
+        "calls": 16000,
+        "sorts": 1,
+        "elapsedMs": 4.2000000001862645,
+        "checksum": 76400
+      },
+      "instrumentation": "Test-only HTTP response counters + React DevTools commit hook + storage perf-log writes. Vite React StrictMode; no CPU throttle.",
+      "hardware": "Browser automation on host, not phone hardware"
+    }
+  ]
+}

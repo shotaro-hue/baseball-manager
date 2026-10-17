@@ -65,15 +65,15 @@ export function recommendForTeam(team, pool) {
 }
 
 export function initDraftPool(myTeam) {
-  const pitPos = [...Array(12)].map(() => "先発")
-    .concat([...Array(10)].map(() => "中継ぎ"))
-    .concat([...Array(8)].map(() => "抑え"));  // 30 slots
+  const pitPos = [...Array(32)].map(() => "先発")
+    .concat([...Array(27)].map(() => "中継ぎ"))
+    .concat([...Array(21)].map(() => "抑え"));  // 80 slots
   const raw = Array.from({ length: DRAFT_POOL_SIZE }, (_, i) => {
-    const isPitch = i < 30;
+    const isPitch = i < pitPos.length;
     const prospectType = pickProspectType();
     const age = entryAgeFromType(prospectType);
     const q = rng(40, 78);
-    const p = makePlayer(isPitch ? pitPos[i % 30] : POSITIONS[i % 8], q, isPitch, age);
+    const p = makePlayer(isPitch ? pitPos[i] : POSITIONS[i % 8], q, isPitch, age);
     p.prospectType = prospectType;
     p.readinessScore = readinessFromType(prospectType);
     return p;
