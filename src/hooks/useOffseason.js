@@ -1,4 +1,5 @@
 import {newReinforcementPlan} from '../engine/rosterPlanning';
+import {ensureDraftEvaluation} from '../engine/draftReports';
 import { draftCapacityContext } from '../engine/rosterCapacity';
 import {advanceFarmYear} from '../engine/farmMigration';
 import { applyTradeTransaction } from '../engine/tradeTransaction';
@@ -675,7 +676,13 @@ export function useOffseason(gs) {
     const declarations = resolveOffseasonFaDeclarations(developedTeams, year, sharedSalaryContext);
     const myDeveloped=declarations.updatedTeams.find(t=>t.id===myId);
     const expiringMine=ownedPlayers(myDeveloped).filter(p=>renewalEligible(p, year));
-    const renewResult = cpuRenewContracts(declarations.updatedTeams, myId, developedTeams, sharedSalaryContext);
+    // Prepare this year's real class once, before CPU renewals. The same
+    // candidates and observations survive planning saves and market completion.
+    const preparedDraftPool=initDraftPool(myDeveloped);
+    const preparedEvaluation=ensureDraftEvaluation({teams:declarations.updatedTeams,pool:preparedDraftPool,year,myId});
+    setDraftPoolState(preparedDraftPool);setDraftEvaluationState(preparedEvaluation);
+    const renewResult = cpuRenewContracts(declarations.updatedTeams, myId, developedTeams,
+      {...sharedSalaryContext,draftPool:preparedDraftPool,evaluation:preparedEvaluation,farmCompetition:gs.farmCompetition});
     const salaryContext = { year, awards, championship: currentSeasonHistory.championships?.find(c => c.year === year), teams: developedTeams, team: myDeveloped };
     const demands={};
     for(const p of expiringMine) demands[p.id]=calcPlayerDemand(p, salaryContext);
@@ -706,6 +713,7 @@ export function useOffseason(gs) {
     waiverCompletedYear.current = null;
     if (gs.setOffseasonPlan) {
       gs.setOffseasonPlan({ version: 1, year, myId, stage: 'planning', tab: 'roster', intents: [], demands,reinforcements:newReinforcementPlan(myDeveloped,year),
+        draftPool:preparedDraftPool,draftEvaluation:preparedEvaluation,cpuOpportunityPlanning:1,
         growth: mySummary && Object.fromEntries(Object.entries(mySummary).map(([key, rows]) => [key, Array.isArray(rows) ? rows.map(row => ({ ...row, p: row.p ? planningPlayer(row.p) : row.p })) : rows])),
         seasonInfo: { retiredNames: retiredMyNames, year: year + 1, draftCount: 0, draftNames: [] }, releasedIds: [] });
       setScreen('offseason_planning');
@@ -853,7 +861,7 @@ export function useOffseason(gs) {
     const unclaimedNew=faResult.remainingFaPool.filter(p=>releasedIds.has(p.id));
     setWaiverClaimResults({claimed:claimedNew,unclaimed:unclaimedNew,allClaimed:faResult.claimed || []});
     setFaYears({});
-    const nextDraftPool = initDraftPool(faResult.updatedTeams.find(t => t.id === myId));
+    const nextDraftPool = draftPool??initDraftPool(faResult.updatedTeams.find(t => t.id === myId));
     setDraftPool(nextDraftPool);
     gs.setOffseasonPlan?.(prev => prev && ({...prev,draftRules:newDraftRules()}));
     if (options.planning) gs.setOffseasonPlan(prev => ({ ...prev, stage: 'results',

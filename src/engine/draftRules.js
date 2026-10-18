@@ -8,6 +8,7 @@ import { ownedPlayers } from './renewalRules';
 import { draftPicksForTeam } from './offseasonResume';
 import { evaluateOrganizationNeeds } from './organizationNeeds';
 import { draftReport } from './draftReports';
+import {emitCpuDecision} from './cpuDecisionTrace';
 
 export const registeredDraftCount = team => controlledRosterCounts(team).controlledCount;
 export const remainingDraftSlots = (team, pool = [], drafted = {}, context = {}) => {
@@ -120,13 +121,21 @@ export function forecastDraft(teams,pool,myId,context={}) {
 }
 
 export function chooseDraftProspect(team,pool,round=1,acceptedPicks=[],draftContext={}) {
+  const continuation=draftRulesFor(draftContext.rules).version===2
+    ? evaluateDraftContinuation(team,pool,round,acceptedPicks,draftContext):null;
   const candidates=draftRulesFor(draftContext.rules).version===2
-    ? evaluateDraftContinuation(team,pool,round,acceptedPicks,draftContext).candidates : pool;
+    ? continuation.candidates : pool;
+  const chosen=p=>{
+    emitCpuDecision({type:p?'draft-nomination':'draft-end',teamId:team.id,year:draftContext.year??draftContext.evaluation?.year,round,
+      ...(p?{id:p.id,...continuation?.decisions.find(d=>d.id===p.id)}:{reason:continuation?.reason??'no-candidate'}),
+      controlledBefore:registeredDraftCount(team),acceptedPickCount:acceptedPicks.length,budget:team.budget});
+    return p;
+  };
   const scored=rankDraftProspects(team,candidates,round,acceptedPicks,draftContext);
-  if(!scored.length)return null;
+  if(!scored.length)return chosen(null);
   const first=round===1;
   if(draftContext.evaluation) {
-    if(!first)return scored[0].p;
+    if(!first)return chosen(scored[0].p);
     const forecast=forecastDraft(draftContext.teams || [team],pool,team.id,{...draftContext,round});
     const utility=scored.filter(r=>r.score>=scored[0].score-12).map(r=>{
       const chance=1/(1+(forecast[r.p.id]?.mass || 0));
@@ -135,11 +144,11 @@ export function chooseDraftProspect(team,pool,round=1,acceptedPicks=[],draftCont
       const cost=Math.min(12,Math.max(0,r.score-fallback));
       return {...r,utility:r.score-(1-chance)*cost};
     }).sort((a,b)=>b.utility-a.utility || String(a.p.id).localeCompare(String(b.p.id)));
-    return utility[0].p;
+    return chosen(utility[0].p);
   }
-  if (first && rng(0, 9) < 3 && scored.length > 1) return scored[rng(1, Math.min(3, scored.length - 1))].p;
-  if (!first && rngf(0, 1) < .08 && pool.length > 6) return pool[rng(4, Math.min(8, pool.length - 1))];
-  return scored[0].p;
+  if (first && rng(0, 9) < 3 && scored.length > 1) return chosen(scored[rng(1, Math.min(3, scored.length - 1))].p);
+  if (!first && rngf(0, 1) < .08 && pool.length > 6) return chosen(pool[rng(4, Math.min(8, pool.length - 1))]);
+  return chosen(scored[0].p);
 }
 
 // All first-round nominations are independent; only winners leave the pool.
@@ -147,7 +156,12 @@ export function resolveFirstRound(teams, pool, context={}) {
   const confirmed = {};
   const rounds=[];
   const endedTeams={...context.endedTeams},league=context.teams || teams;
-  let active = teams.filter(t => draftParticipation(t,pool,context.drafted || {},{...context,teams:league,endedTeams}).eligible);
+  let active = teams.filter(t => {
+    const participation=draftParticipation(t,pool,context.drafted||{},{...context,teams:league,endedTeams});
+    if(!participation.eligible){endedTeams[t.id]=participation.reason;emitCpuDecision({type:'draft-end',teamId:t.id,
+      year:context.year??context.evaluation?.year,round:1,reason:participation.reason,controlledBefore:registeredDraftCount(t),budget:t.budget});}
+    return participation.eligible;
+  });
   while (active.length) {
     const used = new Set(Object.values(confirmed).map(p => p.id));
     const available = pool.filter(p => !p._drafted && !used.has(p.id));
@@ -201,6 +215,9 @@ export function applyDraftAcquisitions(teams, pool, drafted, year, context={}) {
   }
   return { ok: true, teams: teams.map(t => {
     const picks = assignments.get(String(t.id));
+    emitCpuDecision({type:'draft-complete',teamId:t.id,year,controlledBefore:registeredDraftCount(t),controlledAfter:registeredDraftCount(t)+picks.length,
+      pickIds:picks.map(p=>p.id),committedRookiePayroll:picks.reduce((n,p)=>n+Math.max(MIN_SALARY_SHIHAKA,p.salary||0),0),
+      immediateSpending:0,budget:t.budget});
     return !picks.length ? t : { ...t, farm: [...(t.farm || []), ...picks.map(p => ({ ...p,
       育成: false, isIkusei: false, salary: Math.max(MIN_SALARY_SHIHAKA, Number.isFinite(p.salary) ? p.salary : MIN_SALARY_SHIHAKA),
       contractYears: 1, contractYearsLeft: 1, contractSignedYear: year, ikuseiYears: 0 }))] };

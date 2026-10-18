@@ -47,17 +47,44 @@ export function reinforcementProjection(team,plan,year,teams=[team]){
 export function cpuRosterPlan(team,context={}){
  const capacity=evaluateRosterCapacity(team,context);
  if(!capacity.ok)return {...capacity,draftRemaining:0,rookieReserve:null};
+ const acceptedReserve=capacity.acceptedPicks.reduce((n,p)=>n+rookieSalary(p),0);
+ let draftOpportunities=context.rosterPlan?.draftOpportunities;
+ if(context.phase==='offseason'&&context.cpuOpportunityPlanning===1&&!draftOpportunities){
+  const owned=ownedPlayers(team).filter(p=>!isIkuseiPlayer(p));
+  const layer=owned.map(p=>({p,current:ownedDraftCurrent(p),future:p.potential}));
+  const organization=evaluateOrganizationNeeds(team,context);
+  const basePlan={...capacity,draftRemaining:0,rookieReserve:acceptedReserve};
+  const seen=new Set();
+  draftOpportunities=(context.draftPool||[]).filter(p=>!p._drafted&&!Object.hasOwn(context.drafted||{},p.id)&&!seen.has(p.id)&&seen.add(p.id))
+   .map(p=>({p,...draftReport(context.evaluation,p.id,team.id)}))
+   .filter(r=>Number.isFinite(r.current)&&Number.isFinite(r.future))
+   .filter(r=>{
+    const role=Object.values(organization.roles||{}).find(x=>x.label===roleOf(r.p));
+    const comparison=roleComparison(layer,r.p,role?.activeMinimum??1);
+    const shortage=layer.filter(x=>sameRole(x.p,r.p)).length<(role?.organizationMinimum??1);
+    const improves=shortage&&(r.current>=50||r.future>=60)
+      ||r.current>=50&&r.current>=comparison.currentBaseline+10
+      ||r.p.age<=24&&r.future>=60&&r.future>=comparison.futureBaseline+10;
+    return improves&&assessCpuAddition(team,r.p,{...context,phase:'draft',cpuPlan:basePlan,report:r,layer,organization}).eligible;
+   }).sort((a,b)=>prospectValue(b.p,b)-prospectValue(a.p,a))
+   .slice(0,Math.min(6,capacity.remainingSlots))
+   .map(r=>({id:r.p.id,age:r.p.age,current:r.current,future:r.future,salary:rookieSalary(r.p),role:roleOf(r.p)}));
+ }
  const requested=context.phase==='draft'||context.phase==='season'?0
-  :context.rosterPlan?.draftRemaining??Math.min(6,Math.max(0,CPU_ROSTER_TARGET-capacity.controlledCount-capacity.acceptedPickCount));
+  :context.rosterPlan?.draftRemaining??draftOpportunities?.length??Math.min(6,Math.max(0,CPU_ROSTER_TARGET-capacity.controlledCount-capacity.acceptedPickCount));
  const draftRemaining=Math.min(requested,capacity.remainingSlots);
- return {...capacity,draftRemaining,rookieReserve:capacity.acceptedPicks.reduce((n,p)=>n+rookieSalary(p),0)+draftRemaining*MIN_SALARY_SHIHAKA};
+ const opportunities=draftOpportunities?.slice(0,draftRemaining);
+ return {...capacity,draftRemaining,...(opportunities?{draftOpportunities:opportunities}:{}),
+  rookieReserve:acceptedReserve+(opportunities?opportunities.reduce((n,p)=>n+p.salary,0):draftRemaining*MIN_SALARY_SHIHAKA)};
 }
+const prospectValue=(p,report)=>(p.age??25)<=24?Math.max(report.current,report.current*.65+report.future*.35):report.current;
 
 /** A planning guard, not a replacement for ranking or transaction validation. */
 export function assessCpuAddition(team,player,context={}){
  const plan=context.cpuPlan??cpuRosterPlan(team,context);let draftRemaining=plan.draftRemaining;
  let comparison={};
- const result=(eligible,reason,projectedCount)=>({eligible,reason,projectedCount,draftRemaining,...comparison});
+ const displaced=()=>Math.max(0,plan.draftRemaining-draftRemaining);
+ const result=(eligible,reason,projectedCount)=>({eligible,reason,projectedCount,draftRemaining,displacedDraftSlots:displaced(),...comparison});
  if(!plan.ok)return result(false,'invalid-capacity',null);
  const development=context.phase!=='draft'&&isIkuseiPlayer(player);
  draftRemaining=Math.min(plan.draftRemaining,Math.max(0,plan.remainingSlots-Number(!development)));
@@ -67,7 +94,9 @@ export function assessCpuAddition(team,player,context={}){
  const salary=context.salary??rookieSalary(player);
  const budgetReserve=context.phase==='draft'?0:team.budget*CPU_FA_BUDGET_RESERVE_RATIO;
  if(!Number.isFinite(team.budget)||!Number.isFinite(salary)||salary<0)return result(false,'budget-missing',projectedCount);
- if(plan.rookieReserve-(plan.draftRemaining-draftRemaining)*MIN_SALARY_SHIHAKA+salary+budgetReserve>team.budget)return result(false,'rookie-budget',projectedCount);
+ const lostOpportunities=plan.draftOpportunities?.slice(draftRemaining)||[];
+ const releasedReserve=plan.draftOpportunities?lostOpportunities.reduce((n,p)=>n+p.salary,0):displaced()*MIN_SALARY_SHIHAKA;
+ if(plan.rookieReserve-releasedReserve+salary+budgetReserve>team.budget)return result(false,'rookie-budget',projectedCount);
  if(development)return result(true,'development-contract',projectedCount);
  const owned=ownedPlayers(team).filter(p=>!isIkuseiPlayer(p));
  const isCatcher=p=>!p.isPitcher&&p.pos==='捕手';
@@ -88,8 +117,15 @@ export function assessCpuAddition(team,player,context={}){
  comparison=roleComparison(layer,player,role?.activeMinimum??1);
  const baseline=comparison.currentBaseline;
  const report=context.report??{current:ownedDraftCurrent(player),future:player.potential};
- if(report.current>=50&&report.current>=baseline+CONTINGENCY_UPDATE_MARGIN)return result(true,'current-upgrade',projectedCount);
+ const opportunityValue=lostOpportunities.length?Math.max(...lostOpportunities.map(p=>prospectValue(p,p))):null;
+ const mayDisplace=()=>{
+  comparison={...comparison,opportunityValue,additionValue:prospectValue(player,report),lostProspectIds:lostOpportunities.map(p=>p.id)};
+  return opportunityValue==null||prospectValue(player,report)>opportunityValue;
+ };
+ if(report.current>=50&&report.current>=baseline+CONTINGENCY_UPDATE_MARGIN)
+  return mayDisplace()?result(true,'current-upgrade',projectedCount):result(false,'draft-opportunity',projectedCount);
  const future=comparison.futureBaseline;
- if((player.age||25)<=24&&report.future>=60&&report.future>=future+CONTINGENCY_UPDATE_MARGIN)return result(true,'future-upgrade',projectedCount);
+ if((player.age||25)<=24&&report.future>=60&&report.future>=future+CONTINGENCY_UPDATE_MARGIN)
+  return mayDisplace()?result(true,'future-upgrade',projectedCount):result(false,'draft-opportunity',projectedCount);
  return result(false,'normal-target',projectedCount);
 }
