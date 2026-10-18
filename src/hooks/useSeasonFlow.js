@@ -1,4 +1,5 @@
 import {prepareFarmProgress,finishFarmProgress} from '../engine/farmProgression';
+import {selectFarmUsage} from '../engine/farmSelectors';
 import { saveFeedback } from '../engine/saveFeedback';
 import { regularSeasonRequest } from '../engine/seasonProgress';
 import { useState, useRef, useEffect } from "react";
@@ -71,7 +72,8 @@ export function buildSafeGameResult(rawResult, { oppTeam = null, gameNo = null, 
   return nextResult;
 }
 
-function applyScheduledCpuManagement(teams, gameDay, myId) {
+function applyScheduledCpuManagement(teams, gameDay, myId, farmCompetition) {
+  const farmUsage = selectFarmUsage(farmCompetition);
   return teams.map((team) => (
     team.id === myId
       ? team
@@ -79,6 +81,7 @@ function applyScheduledCpuManagement(teams, gameDay, myId) {
           teams,
           gameDay: gameDay + 1,
           includeRosterChanges: true,
+          farmUsage,
         })
   ));
 }
@@ -558,7 +561,8 @@ export function useSeasonFlow(gs) {
       let managedOpponent;
       try {
         preparedMyTeam = applyDhToTeam(myTeam, useDh);
-        managedOpponent = applyManagementPolicy(opp, { teams, gameDay, includeRosterChanges: true, automationMode: ROSTER_AUTOMATION_MODES.FULL });
+        managedOpponent = applyManagementPolicy(opp, { teams, gameDay, includeRosterChanges: true, automationMode: ROSTER_AUTOMATION_MODES.FULL,
+          farmUsage: selectFarmUsage(gs.farmCompetition) });
         preparedOpponent = applyDhToTeam(managedOpponent, useDh);
       } catch (error) {
         setPregameError({
@@ -655,7 +659,7 @@ export function useSeasonFlow(gs) {
       Object.assign(b, applyRegularSeasonTeamUpdate(b, cr, { isFirstTeam: false, isHomeTeam: false, gameDay, year }, playerMod).team);
     }
     updatedTeams = finishFarmProgress(updatedTeams,farmProgress,gameDay);
-    updatedTeams = applyScheduledCpuManagement(updatedTeams, gameDay, myId);
+    updatedTeams = applyScheduledCpuManagement(updatedTeams, gameDay, myId, farmProgress?.competition ?? gs.farmCompetition);
     setAllTeamResultsMap(prev=>{
       const next={...prev};
       const recordGame=(homeId,awayId,cr,hPlayers,aPlayers,oppHName,oppAName)=>{
@@ -986,6 +990,7 @@ export function useSeasonFlow(gs) {
       : applyManagementPolicy(team, {
           teams, gameDay, includeRosterChanges: true,
           automationMode: ROSTER_AUTOMATION_MODES.FULL,
+          farmUsage: selectFarmUsage(gs.farmCompetition),
         }));
     if(baseToken!=null&&baseToken!==gs.getProgressToken?.())return;
     const farmProgress = prepareFarmProgress(gs,gameTeams,gameDay);
@@ -1021,7 +1026,7 @@ export function useSeasonFlow(gs) {
       Object.assign(b, applyRegularSeasonTeamUpdate(b, cr, { isFirstTeam: false, isHomeTeam: false, gameDay, year }, playerMod).team);
     }
     updatedTeams = finishFarmProgress(updatedTeams,farmProgress,gameDay);
-    updatedTeams = applyScheduledCpuManagement(updatedTeams, gameDay, myId);
+    updatedTeams = applyScheduledCpuManagement(updatedTeams, gameDay, myId, farmProgress?.competition ?? gs.farmCompetition);
     setAllTeamResultsMap(prev=>{
       try {
         const next={...prev};
