@@ -14,3 +14,8 @@ it('does not count refused prospects or unobserved final-year picks as zero-appe
  const s=summarizeAi03([{seed:1,checkpoints:[],seasons:[season(2026,[{teamId:1,id:'refused',refused:true},{teamId:1,id:'last'}])]}]);
  expect(s.totalNominations).toBe(2);expect(s.accepted.mean).toBe(1);expect(s.observedRookieCohorts).toBe(0);expect(s.rookieFirstZero).toBe(0);
 });
+it('counts the actual contingency reasons and zero future baseline rather than lottery nominations',()=>{
+ const s=summarizeAi03([{seed:1,checkpoints:[],seasons:[season(2026,[{teamId:1,id:'a',projectedCount:68,rosterReason:'future-upgrade',futureBaseline:0},
+  {teamId:1,id:'b',projectedCount:69,rosterReason:'current-upgrade',futureBaseline:65}])]}]);
+ expect(s.contingencyReasons).toEqual({'future-upgrade':1,'current-upgrade':1});expect(s.zeroFutureBaselineContingencies).toBe(1);
+});

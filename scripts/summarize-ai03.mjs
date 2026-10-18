@@ -17,7 +17,7 @@ function tarFiles(path){
   i+=512+Math.ceil(size/512)*512;
  }return files;
 }
-mkdirSync(outDir,{recursive:true});const variants={},artifacts=[];
+mkdirSync(outDir,{recursive:true});const variants={},artifacts=[];let frozenRuntime;
 for(const [variant,dir] of [['before',beforeDir],['after',afterDir]]){
  const runs=[],source=tarFiles(`${dir}/source-application.tar.gz`),harness=tarFiles(`${dir}/source-harness.tar.gz`);
  for(const seed of seeds){
@@ -30,10 +30,12 @@ for(const [variant,dir] of [['before',beforeDir],['after',afterDir]]){
   assert.equal(run.seasons.length,10);assert.deepEqual(run.seasons.map(s=>s.year),Array.from({length:10},(_,i)=>2026+i));
   assert.ok(run.careerValidation?.length>0);for(const c of run.careerValidation)assert.deepEqual(c.recordedYears,c.expectedYears);
   assert.equal(snapshot.sourceCommit,data.base);assert.deepEqual(snapshot.sources,data.sources);
+  const runtime=Object.fromEntries(Object.entries(data.sources).filter(([path])=>path.startsWith('@runtime/')));
+  frozenRuntime??=runtime;assert.deepEqual(runtime,frozenRuntime,'comparison runtime/dependencies differ');
   for(const [path,hash] of Object.entries(data.sources)){
    const bytes=source.get(path)??harness.get(path);
    if(bytes)assert.equal(sha(bytes),hash,`${variant}/${seed} fixed source ${path}`);
-   else if(path.startsWith('src/')||path==='package.json'||path==='package-lock.json')assert.fail(`fixed source missing ${path}`);
+   else if(!path.startsWith('@runtime/'))assert.fail(`fixed source missing ${path}`);
   }
   for(const s of run.seasons){
    assert.equal(s.officialGamesPerTeam,143);assert.equal(s.farmCards.played+s.farmCards.unplayed,858);

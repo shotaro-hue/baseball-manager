@@ -26,33 +26,33 @@
 
 Files: rosterPlanning.js, draftContinuation.js, regression tests.
 Interface: roleComparison(layer, player) returns currentBaseline, futureBaseline, futureSource.
-- [ ] 若手比較対象なしの平凡な候補・絶対的有望株・既存若手・主力を再現テストでRED。
-- [ ] CPUの将来性比較を現戦力/絶対水準へfallback。手動の既存判断は維持。
-- [ ] 関連4ファイルのテストGREEN、独立commit。
+- [x] 若手比較対象なしの平凡な候補・絶対的有望株・既存若手・主力を再現テストでRED。
+- [x] CPUの将来性比較を現戦力/絶対水準へfallback。手動の既存判断は維持。
+- [x] 関連4ファイルのテストGREEN、独立commit。
 
 ### Task 2: 更改前計画と更改連動 (AI-03A/B)
 
 Files: cpuRosterCycle.js, contract.js, useOffseason.js, tests.
 Interface: planCpuRenewals(team, context) returns releaseIds, replacements and reasons; CPU market consumes year-scoped plan derived from real draftPool/evaluation.
-- [ ] 65/67/69/70、弱い候補、若手過多、高齢主力、高年俸、守備最低数、複数年契約のRED。
-- [ ] 重複戦力を実新人の更新差・獲得可能な代替数と比較し、逐次保護条件を再検査。年齢だけの放出はしない。
-- [ ] 満了時のみ戦力外、既存異動/球歴を保持。既存交渉/給与式は共通利用。
-- [ ] 実候補を一度作り、既存offseasonPlanへ保存/再開。旧セーブは従来どおり遅延生成。
-- [ ] 統合更改・保存再開GREEN、独立commit。
+- [x] 65/67/69/70、弱い候補、若手過多、高齢主力、高年俸、守備最低数、複数年契約のRED。
+- [x] 重複戦力を実新人の更新差・獲得可能な代替数と比較し、逐次保護条件を再検査。年齢だけの放出はしない。
+- [x] 満了時のみ戦力外、既存異動/球歴を保持。既存交渉/給与式は共通利用。
+- [x] 実候補を一度作り、既存offseasonPlanへ保存/再開。旧セーブは従来どおり遅延生成。
+- [x] 統合更改・保存再開GREEN、独立commit。
 
 ### Task 3: 市場の機会費用と診断 (AI-03D/E)
 
 Files: rosterPlanning.js, contract.js, cpuDecisionTrace.js, hooks, tests, long harness.
 Interface: assessCpuAddition returns reservation and displaced opportunity details; subscribeCpuDecisions(listener) supplies bounded records outside save state.
-- [ ] FA/外国人/戦力外、通常予約保護、強力FAによる変更、予算境界、拒否/育成昇格をRED。
-- [ ] 予約を消費する獲得は実候補と比較し、実枠/実額/留保の整合性を守る。
-- [ ] 更改/獲得/指名/終了/人数/予算を診断sinkへ記録し、保存stateへ詳細ログを追加しない。
-- [ ] 単体・統合・対象E2E GREEN、独立commit。
+- [x] FA/外国人/戦力外、通常予約保護、強力FAによる変更、予算境界、拒否/育成昇格をRED。
+- [x] 予約を消費する獲得は実候補と比較し、実枠/実額/留保の整合性を守る。
+- [x] 更改/獲得/指名/終了/人数/予算を診断sinkへ記録し、保存stateへ詳細ログを追加しない。
+- [x] 単体・統合・対象E2E GREEN、独立commit。
 
 ### Task 4: 長期比較と提出
 
 Files: scripts/ai03 comparison tooling, docs/validation/ai-03, SPEC.md, ROADMAP.md, CHANGELOG.md.
-- [ ] 固定baselineの同環境3×10年と最終版3×10年を完走。全ソースhash・stdout・失敗を保存。
-- [ ] 分布・指名0継続・年齢・異動・出場・守備・予算・球歴を比較し、人数だけの合否判定を避ける。
-- [ ] 独立レビュー、必要修正、build/unit/integration/E2Eと正確なcommitの必須CI。
-- [ ] 独立PRを作成し、URL・検証結果・限界・残課題・マージ可否を報告。マージしない。
+- [x] 固定baselineの同環境3×10年と最終版3×10年を完走。全ソースhash・stdout・失敗を保存。
+- [x] 分布・指名0継続・年齢・異動・出場・守備・予算・球歴を比較し、人数だけの合否判定を避ける。
+- [x] 独立レビューと修正、対象unit/integration/E2E。提出headの必須CIはPR #480 checksで追跡し、最終報告で実結果を確定する。
+- [x] 独立PR #480と固定検証資料を作成。マージせず、最新head CI完了後にURL・結果・制限・マージ可否を最終報告する。

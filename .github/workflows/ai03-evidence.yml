@@ -1,0 +1,26 @@
+name: Verify retained AI-03 evidence
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/ai03-evidence.yml
+      - docs/validation/ai-03/**
+      - scripts/verify-ai03-evidence.mjs
+      - scripts/summarize-ai03.mjs
+      - scripts/ai03-summary.mjs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Recheck retained raw results and summaries without repeating 60 seasons
+        run: node scripts/verify-ai03-evidence.mjs

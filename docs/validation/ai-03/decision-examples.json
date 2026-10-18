@@ -1,0 +1,124 @@
+[
+  {
+    "example": "release",
+    "seed": 20261015,
+    "year": 2026,
+    "event": {
+      "type": "renewal",
+      "id": "nbkitxs",
+      "action": "release",
+      "reason": "rookie-current-upgrade",
+      "current": 48.85000000000001,
+      "future": 62,
+      "age": 25,
+      "salary": 1900,
+      "usage": {
+        "first": 256,
+        "farm": 72
+      },
+      "prospectId": "4l52wkk",
+      "prospectCurrent": 68,
+      "prospectFuture": 86,
+      "alternatives": 2,
+      "retainedRoleCount": 3,
+      "replacementSalary": 1000,
+      "teamId": 1,
+      "year": 2026,
+      "contractResult": "planned-release",
+      "signedSalary": null
+    }
+  },
+  {
+    "example": "preserved-veteran",
+    "seed": 20261015,
+    "year": 2026,
+    "event": {
+      "type": "renewal",
+      "id": "tv4hxx5",
+      "action": "retain",
+      "reason": "operating-core",
+      "current": 54.410000000000004,
+      "future": 80,
+      "age": 38,
+      "salary": 13000,
+      "usage": {
+        "first": 463,
+        "farm": 41
+      },
+      "teamId": 2,
+      "year": 2026,
+      "contractResult": "signed",
+      "signedSalary": 10900
+    }
+  },
+  {
+    "example": "exceptional-market-displaces-rookie",
+    "seed": 20261015,
+    "year": 2028,
+    "event": {
+      "type": "market-sign",
+      "teamId": 4,
+      "year": 2028,
+      "id": "wml6jk2",
+      "kind": "戦力外獲得",
+      "eligible": true,
+      "reason": "future-upgrade",
+      "projectedCount": 70,
+      "draftRemaining": 5,
+      "displacedDraftSlots": 1,
+      "currentBaseline": 88.14,
+      "futureBaseline": 72,
+      "futureSource": "young-peers",
+      "opportunityValue": 70.4,
+      "additionValue": 71.17099999999999,
+      "lostProspectIds": [
+        "w8ry85m"
+      ],
+      "salary": 420,
+      "budgetBefore": 1284159,
+      "budgetAfter": 1283739,
+      "rookieReserveBefore": 8500
+    }
+  },
+  {
+    "example": "future-without-young-peer",
+    "seed": 20261015,
+    "year": 2026,
+    "event": {
+      "type": "draft-nomination",
+      "teamId": 6,
+      "year": 2026,
+      "round": 6,
+      "id": "o6gkqvp",
+      "talentEligible": true,
+      "eligible": true,
+      "reason": "future-upgrade",
+      "rosterReason": "future-upgrade",
+      "projectedCount": 68,
+      "current": 43,
+      "future": 92,
+      "currentBaseline": 67.45,
+      "futureBaseline": 67.45,
+      "futureSource": "current-role",
+      "shortage": 0,
+      "controlledBefore": 62,
+      "acceptedPickCount": 5,
+      "budget": 1018888
+    }
+  },
+  {
+    "example": "stop-with-room",
+    "seed": 20261015,
+    "year": 2026,
+    "event": {
+      "type": "draft-end",
+      "teamId": 1,
+      "year": 2026,
+      "round": 6,
+      "reason": "no-upgrade",
+      "controlledBefore": 61,
+      "acceptedPickCount": 5,
+      "budget": 902370
+    }
+  }
+]
