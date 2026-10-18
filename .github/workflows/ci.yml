@@ -48,7 +48,7 @@ jobs:
           - name: posting-and-finance
             files: posting.spec.js finance.spec.js trade.spec.js club-comparison.spec.js
           - name: save-integrity
-            files: save-generations.spec.js career-generations.spec.js
+            files: save-generations.spec.js career-generations.spec.js ai03-roster-cycle.spec.js
     steps:
       - name: Checkout
         uses: actions/checkout@v4

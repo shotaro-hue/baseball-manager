@@ -26,7 +26,7 @@
 
 ## 1. 現在地サマリ
 
-照合日：2026-10-17（日本時間）。基準main：`122d02b7a76ed0af90b17cecb1f8a6ff488c40d8`（PR #478マージ後）。最新mainをfetchして確認。QA-D1は#472、FIX-S3は#473、捕手不足の原因分析は#474、捕手層の編成方針は#475、一軍空き枠の補足修正は#476、共通人数基盤は#477、可変ドラフトは#478でマージ済み。各工程の対象範囲・実測・限界は[QA-D1](./docs/implementation/qa-d1.md)・[FIX-S3](./docs/implementation/fix-s3.md)・[捕手不足の原因分析](./docs/implementation/farm-catcher-shortage.md)・[捕手層のレビューと次工程](./docs/implementation/catcher-depth-review.md)を参照。全機能・全年度・実機の完了認定ではない。
+照合日：2026-10-17（日本時間）。基準main：`270edd8286762c1de5949953e1887bdb286e36ee`（PR #479マージ後）。最新mainをfetchして確認。QA-D1は#472、FIX-S3は#473、捕手不足の原因分析は#474、捕手層の編成方針は#475、一軍空き枠の補足修正は#476、共通人数基盤は#477、可変ドラフトは#478でマージ済み。各工程の対象範囲・実測・限界は[QA-D1](./docs/implementation/qa-d1.md)・[FIX-S3](./docs/implementation/fix-s3.md)・[捕手不足の原因分析](./docs/implementation/farm-catcher-shortage.md)・[捕手層のレビューと次工程](./docs/implementation/catcher-depth-review.md)を参照。全機能・全年度・実機の完了認定ではない。
 
 **二軍の実測基盤は実装・マージ済み。CPUの編成判断は段階的に改善中。新デザインの全画面移行と長期バランスの完了には至っていない。**
 
@@ -102,7 +102,7 @@ PR #432は未マージでクローズ。テスト運用の成果は#431として
 - 採用方針は[支配下70人・可変ドラフトの承認仕様](./docs/superpowers/specs/2026-10-16-roster-capacity-design.md)。
 - **第1PR：[#477](https://github.com/shotaro-hue/baseball-manager/pull/477)でマージ済み**。支配下／育成両フラグ／受諾済み未所属指名を共通集計し、FA・スカウト・トレード・育成登録・指名反映と人数表示へ接続。予定放出と実際の残枠を区別。検証・独立レビュー・最終head CIは[実装記録](./docs/implementation/roster-capacity-1.md)とPR本文を参照。
 - **第2PR：[#478](https://github.com/shotaro-hue/baseball-manager/pull/478)でマージ済み**。新会議10人・160候補、選択終了、拒否を含む年上限、CPU継続判定と旧6巡の保存互換。[計画](./docs/superpowers/plans/2026-10-17-variable-draft.md)／[検証記録](./docs/implementation/variable-draft.md)。20seedの会議で指名5〜10人、旧80候補・6巡の実保存再開と新方式4ブラウザ旅程を確認。最終head CIはPR本文に記録する。長期校正とは区別する。
-- **第3PR：[#479](https://github.com/shotaro-hue/baseball-manager/pull/479)で実装・最終3seed×10年の長期受入合格、ドラフト・未マージ**。新規65人・CPU通常67人目標、補強予定、FA前の新人枠/最低年俸留保、特殊入力と捕手補充枠を修正。旧比較の9年連続無出場を二軍機会・年度管理日・一軍控えの実戦機会の3点で修正し、最終30年度・保存再開140回を追加完了。CPU652コホートの初年度0・複数年連続0、二軍未実施・予算負値は全て0。70人偏重と4年連続指名0・20点例外の最適性は後続P2であり、67人への強制収束は行わない。[実装記録](./docs/implementation/roster-planning-65.md)／[最終証跡・年度別集計](./docs/validation/roster-planning-65/farm-opportunities/README.md)。マージ判断は最新headの全CI成功も条件とし、SHAと結果はPR本文を参照。
+- **第3PR：[#479](https://github.com/shotaro-hue/baseball-manager/pull/479)でマージ済み・最終3seed×10年の長期受入合格**。新規65人・CPU通常67人目標、補強予定、FA前の新人枠/最低年俸留保、特殊入力と捕手補充枠を修正。旧比較の9年連続無出場を二軍機会・年度管理日・一軍控えの実戦機会の3点で修正し、最終30年度・保存再開140回を追加完了。CPU652コホートの初年度0・複数年連続0、二軍未実施・予算負値は全て0。70人偏重と4年連続指名0・20点例外の最適性は後続P2であり、67人への強制収束は行わない。[実装記録](./docs/implementation/roster-planning-65.md)／[最終証跡・年度別集計](./docs/validation/roster-planning-65/farm-opportunities/README.md)。マージ判断は最新headの全CI成功も条件とし、SHAと結果はPR本文を参照。
 
 ### 次の作業順（人数基盤の後続以外は候補）
 
@@ -150,6 +150,12 @@ PR #432は未マージでクローズ。テスト運用の成果は#431として
 - [x] 一時的コンディション変動と期待値調整（±15変動・台頭+20・不調-15）
 
 **狙い**: 「開幕前にも意思決定がある」状態を作り、毎年のマンネリを防ぐ。
+
+### AI-03 CPU編成循環・ドラフト枠最適化
+
+- CPU更改前の実候補比較、保護された余剰満了選手の入替、比較対象なしの将来性基準、市場と実新人の機会費用、診断sinkを実装。独立レビューの不整合を回帰で修正。
+- 改善前後3seed×10年を完走。70人273/330→16/330、指名0最長4→1年、将来比較0の例外284→0。補強後捕手6–9、複数年無出場/支配下超過/負予算/二軍未実施0。途中退団後の捕手不足・捕手9/投手38等の余剰は継続監視する。
+- 独立PR [#480](https://github.com/shotaro-hue/baseball-manager/pull/480)。マージ可は最新headの必須CI全成功を条件とし、マージ操作は行わない。[実装・判断](./docs/implementation/ai-03.md)／[固定比較と制限](./docs/validation/ai-03/README.md)。
 
 ### D. CPU球団フロントAIの深化
 - [x] 買い手/売り手判定を順位だけでなく年齢構成・契約残年数でも判定

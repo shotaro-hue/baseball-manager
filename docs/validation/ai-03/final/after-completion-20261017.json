@@ -1,0 +1,11 @@
+{
+  "sourceCommit": "d2033b6d1a9c7e37898739f0a2b6710a86c7e001",
+  "seeds": [
+    20261017
+  ],
+  "variant": "after",
+  "exitCode": 0,
+  "signal": null,
+  "report": "/home/runner/work/baseball-manager/baseball-manager/evidence/after/vitest-20261017.json",
+  "finishedAt": "2026-10-18T06:15:29.272Z"
+}

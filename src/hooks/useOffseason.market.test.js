@@ -50,6 +50,15 @@ it('makes other clubs candidates available before own renewal and processes CPU 
   expect(h.current.gs.screen).toBe('development_phase'); expect(cpuRenewContracts).toHaveBeenCalledTimes(1);
   expect(h.current.gs.myTeam.players).toHaveLength(2); expect(h.current.gs.myTeam.budget).toBe(9000);
 });
+it('prepares the real class before CPU renewals and reuses it when the market finishes',async()=>{
+ const h=setup();await act(async()=>expect(await h.current.os.handleRetirePhaseNext({})).toBe(true));
+ const pool=h.current.os.draftPool,context=cpuRenewContracts.mock.calls[0][3];
+ expect(pool).toHaveLength(160);expect(context.draftPool).toBe(pool);
+ expect(context.evaluation.candidateIds).toHaveLength(160);
+ act(()=>h.current.gs.setScreen('waiver_phase'));
+ act(()=>expect(h.current.os.handleWaiverPhaseNext([])).toBe(true));
+ expect(h.current.os.draftPool).toBe(pool);expect(cpuRenewContracts).toHaveBeenCalledTimes(1);
+});
 
 it('allows no acquisition and preserves own FA declarations after the market phase', async () => {
   const h = setup(); await act(async () => { await h.current.os.handleRetirePhaseNext({}); });

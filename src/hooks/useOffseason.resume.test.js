@@ -75,6 +75,15 @@ it('applies draft acquisitions and saved camp once, excluding refused and alread
   act(() => expect(restored.current.os.handleDraftComplete(candidates, { 3: 0 })).toBe(false));
   expect(restored.current.gs.teams[0].farm.map(p => p.id)).toEqual([1, 3]);
 });
+it('keeps prepared candidate identities and observations across planning save/reload and market completion',()=>{
+ const pool=[p('prepared-prospect')],evaluation={version:1,public:{'prepared-prospect':{current:65,future:80}},teams:{}};
+ const saved=JSON.parse(JSON.stringify({version:1,year:2026,myId:0,stage:'open',draftPool:pool,draftEvaluation:evaluation,cpuOpportunityPlanning:1}));
+ const h=setup({screen:'waiver_phase',plan:saved}),random=vi.spyOn(Math,'random');
+ act(()=>expect(h.current.os.handleWaiverPhaseNext([])).toBe(true));
+ expect(h.current.gs.offseasonPlan.draftPool).toEqual(pool);
+ expect(h.current.gs.offseasonPlan.draftEvaluation).toEqual(evaluation);
+ expect(h.current.gs.offseasonPlan.cpuOpportunityPlanning).toBe(1);expect(random).not.toHaveBeenCalled();random.mockRestore();
+});
 it('permits next years draft in the same mounted game while preserving previous acquisitions', () => {
   const h = setup({ screen: 'draft_review', plan: { version: 1, year: 2026, myId: 0, stage: 'results' } });
   for (const year of [2026, 2027, 2028]) {

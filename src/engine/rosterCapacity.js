@@ -73,6 +73,7 @@ export function projectRosterCapacity(team, { releaseIds = [], draftRemaining = 
 export function draftCapacityContext(plan, year, teams = []) {
   if (!plan || plan.year !== year) return { teams, draftPool: [], drafted: {}, confirmedPicks: {} };
   return { teams, draftPool: plan.draftResult?.pool ?? plan.draftPool ?? [],
+    evaluation:plan.draftEvaluation,cpuOpportunityPlanning:plan.cpuOpportunityPlanning,
     drafted: plan.draftResult?.drafted ?? plan.draftViews?.draft?.drafted ?? {},
     confirmedPicks: plan.draftViews?.lottery?.confirmedPicks ?? {} };
 }

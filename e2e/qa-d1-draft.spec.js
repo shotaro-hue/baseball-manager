@@ -4,6 +4,7 @@ import {gunzipSync} from 'node:zlib';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {readSave,reloadAndLoad,waitSaveIdle} from './helpers/progression';
+import {fetchInstrumentationSource} from './helpers/sourceInstrumentation';
 
 const EVIDENCE=process.env.QA_D1_EVIDENCE || 'docs/validation/qa-d1';
 const SOURCE=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
@@ -32,7 +33,7 @@ async function instrument(page){
     ['hooks/useGameState.js',/setOffseasonPlanState\(value\);/,'window.__qa.parentStateUpdates++; $&'],
     ['engine/draftReports.js',/function publicDraftTier\s*\([^)]*\)\s*\{/,'$& window.__qa.publicTierCalls++;'],
   ])await page.route(`**/src/${path}*`,async route=>{
-    const response=await route.fetch();let body=await response.text();
+    const response=await fetchInstrumentationSource(route);let body=await response.text();
     // JSX's transformed formatting differs from the authored source.
     if(!needle.test(body))throw new Error(`instrumentation target missing: ${path}: ${needle}`);
     await route.fulfill({response,body:body.replace(needle,replacement)});
@@ -44,7 +45,7 @@ async function instrument(page){
 async function observeManualSavePositions(page){
   await page.addInitScript(()=>{window.__qaManualSavePositions=[];});
   await page.route('**/src/hooks/useGameState.js*',async route=>{
-    const response=await route.fetch(),body=await response.text();
+    const response=await fetchInstrumentationSource(route),body=await response.text();
     const entry=/const handleSave = useCallback\(async \(options = \{\}\)\s*=>\s*\{/;
     if(!entry.test(body))throw new Error('manual-save instrumentation target missing');
     await route.fulfill({response,body:body.replace(entry,'$& if(!options.silent)window.__qaManualSavePositions.push(offseasonPlan?.draftViews?.lottery?.candidateView?.listScroll);')});
