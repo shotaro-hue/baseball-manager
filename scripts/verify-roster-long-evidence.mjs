@@ -121,6 +121,11 @@ try{
  verifyDiagnosticPrefix(calibrationRoot,'single-year-zero',20261016,3);
  verifyCadenceCalibration(`${latestRoot}/calibration/cadence-only`);
  verifyStoppedEnvironment(`${latestRoot}/calibration/environment-interruption`,after);
+ const tradeRoot='docs/validation/roster-planning-65/ci427-trade-notification';
+ verifyManifest(tradeRoot);
+ const tradeFailure=gunzipSync(readFileSync(`${tradeRoot}/failure.log.gz`)).toString();
+ assert.match(tradeFailure,/1 failed/);assert.match(tradeFailure,/23 passed/);
+ assert.match(gunzipSync(readFileSync(`${tradeRoot}/local-green.log.gz`)).toString(),/3 passed/);
  const latest=verifyComparison(latestRoot);
  assert.equal(latest.acceptance.status,'passed');
  assert.equal(latest.summaries.after.cpuAnyMultipleYearZero,0,'CPU draft cohorts still have multiple consecutive zero-opportunity seasons');

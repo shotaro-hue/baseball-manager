@@ -1,0 +1,19 @@
+{
+  "artifacts": [
+    {
+      "path": "failure.log.gz",
+      "bytes": 29619,
+      "sha256": "c1e4c3b04560f79d7780d389d7ac538eea2334ff10970573e8b7e33e6f4ec555"
+    },
+    {
+      "path": "local-green.log.gz",
+      "bytes": 257,
+      "sha256": "c0dfcc0c2792b3e7cef98a1c78643569c6453102b51473557afa9c18304f0564"
+    },
+    {
+      "path": "trace-observation.json.gz",
+      "bytes": 1598,
+      "sha256": "34f2819e6251a5abbf351cd9191758a72ce9dbca4994bdd9ed85b8524bfacd29"
+    }
+  ]
+}
