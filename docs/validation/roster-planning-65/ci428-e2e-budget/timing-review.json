@@ -1,0 +1,129 @@
+{
+  "sourceHead": "88d5f13b8ef9e279ad5cbced377e983b4dd9ee13",
+  "workflowRun": 39093761923,
+  "job": {
+    "id": 117575789456,
+    "run_id": 39093761923,
+    "workflow_name": "CI",
+    "head_branch": "feat/roster-planning-65",
+    "run_url": "https://api.github.com/repos/shotaro-hue/baseball-manager/actions/runs/39093761923",
+    "run_attempt": 1,
+    "node_id": "CR_kwDORneTR88AAAAbYBArkA",
+    "head_sha": "88d5f13b8ef9e279ad5cbced377e983b4dd9ee13",
+    "url": "https://api.github.com/repos/shotaro-hue/baseball-manager/actions/jobs/117575789456",
+    "html_url": "https://github.com/shotaro-hue/baseball-manager/actions/runs/39093761923/job/117575789456",
+    "status": "completed",
+    "conclusion": "cancelled",
+    "created_at": "2026-10-18T03:28:50Z",
+    "started_at": "2026-10-18T03:28:52Z",
+    "completed_at": "2026-10-18T03:59:10Z",
+    "name": "e2e-initialization-and-progression",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-10-18T03:28:52Z",
+        "completed_at": "2026-10-18T03:28:53Z"
+      },
+      {
+        "name": "Checkout",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-10-18T03:28:53Z",
+        "completed_at": "2026-10-18T03:29:02Z"
+      },
+      {
+        "name": "Setup Node.js",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-10-18T03:29:02Z",
+        "completed_at": "2026-10-18T03:29:08Z"
+      },
+      {
+        "name": "Install dependencies",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-10-18T03:29:08Z",
+        "completed_at": "2026-10-18T03:29:13Z"
+      },
+      {
+        "name": "Install Chromium and WebKit",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-10-18T03:29:13Z",
+        "completed_at": "2026-10-18T03:29:54Z"
+      },
+      {
+        "name": "Run E2E subset (one worker, no retries)",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "number": 6,
+        "started_at": "2026-10-18T03:29:54Z",
+        "completed_at": "2026-10-18T03:59:06Z"
+      },
+      {
+        "name": "Upload E2E report and failure evidence",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-10-18T03:59:06Z",
+        "completed_at": "2026-10-18T03:59:08Z"
+      },
+      {
+        "name": "Post Setup Node.js",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 13,
+        "started_at": "2026-10-18T03:59:08Z",
+        "completed_at": "2026-10-18T03:59:08Z"
+      },
+      {
+        "name": "Post Checkout",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 14,
+        "started_at": "2026-10-18T03:59:08Z",
+        "completed_at": "2026-10-18T03:59:08Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15,
+        "started_at": "2026-10-18T03:59:08Z",
+        "completed_at": "2026-10-18T03:59:08Z"
+      }
+    ],
+    "check_run_url": "https://api.github.com/repos/shotaro-hue/baseball-manager/check-runs/117575789456",
+    "labels": [
+      "ubuntu-latest"
+    ],
+    "runner_id": 1000002464,
+    "runner_name": "GitHub Actions 1000002464",
+    "runner_group_id": 0,
+    "runner_group_name": "GitHub Actions"
+  },
+  "passedBeforeCancellation": 122,
+  "assertionFailuresRecorded": 0,
+  "previousSameProduct": {
+    "sourceHead": "a5436c50dab3a144e361ceac10d001c128e62c5b",
+    "workflowRun": 39092934161,
+    "passed": 123,
+    "testMinutes": 21.3
+  },
+  "unchanged": {
+    "productSourceFiles": 378,
+    "workers": 1,
+    "retries": 0,
+    "jobTimeoutMinutes": 30,
+    "testTimeouts": true,
+    "ciJobs": 8,
+    "e2eCases": 318
+  }
+}

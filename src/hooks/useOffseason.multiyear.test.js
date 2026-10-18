@@ -6,6 +6,7 @@ import { calcSeasonAwards, updateRecords } from '../engine/awards';
 import { emptyStats } from '../engine/playerCore';
 import { getCareerEntryKey } from '../engine/careerStats';
 import { TEAM_DEFS } from '../constants';
+import { shouldRunLineupManagement, shouldRunRosterManagement } from '../engine/managementPolicy';
 vi.mock('../engine/player', () => ({ generateForeignFaPool: () => [], rollRetire: () => false,
   developPlayers: players => ({ players, summary: {} }) }));
 vi.mock('../engine/scheduleGen', () => ({ generateSeasonSchedule: () => ({}), calcAllStarTriggerDay: () => 50 }));
@@ -69,6 +70,39 @@ it('keeps farm stats and career data on a failed new-year save, then retries wit
   expect(h.current.gs.teams[0].farm[0].recentCareerLog).toBeUndefined();
   await act(async () => expect(await h.current.os.handleNextYear()).toBe(true));
   expect(h.current.gs.teams[0].farm[0].recentCareerLog).toHaveLength(1); expect(archived.size).toBe(1);
+});
+it('restarts the existing management cadence each year, including the committed save and reload', async () => {
+  let h = setup([{ ...team([player(0)]), managementPolicyId: 'development', managementTraitId: 'youth',
+    managementMeta: { lastRosterDay: 141, lastLineupDay: 143, lastDecision: '前年の判断' } }]);
+  for (let offset = 0; offset < 3; offset++) {
+    act(() => {
+      h.current.gs.setScreen('spring_training');
+      h.current.gs.setOffseasonPlan({ version: 1, year: h.current.gs.year, myId: 0, stage: 'results' });
+      h.current.gs.setTeams(teams => teams.map(t => ({ ...t,
+        managementMeta: { ...t.managementMeta, lastRosterDay: 141, lastLineupDay: 143 } })));
+    });
+    await act(async () => expect(await h.current.os.handleNextYear()).toBe(true));
+    const savedTeams = h.save.mock.calls.at(-1)[0].payload.teams;
+    expect(savedTeams).toEqual(h.current.gs.teams);
+    const saved = JSON.parse(JSON.stringify({ teams: savedTeams, year: h.current.gs.year, history: h.current.gs.getSeasonHistory() }));
+    act(() => view.unmount()); h = setup(saved.teams, saved);
+    const resumed = h.current.gs.teams[0];
+    expect(resumed.managementMeta).toMatchObject({ lastRosterDay: 0, lastLineupDay: 0, lastDecision: '前年の判断' });
+    expect(resumed).toMatchObject({ managementPolicyId: 'development', managementTraitId: 'youth' });
+    expect(shouldRunLineupManagement(resumed, 6)).toBe(false);
+    expect(shouldRunLineupManagement(resumed, 7)).toBe(true);
+    expect(shouldRunRosterManagement(resumed, 13)).toBe(false);
+    expect(shouldRunRosterManagement(resumed, 14)).toBe(true);
+  }
+});
+it('keeps the current management dates when the new-year save fails, and resets them only on retry commit', async () => {
+  const source = { ...team([player(0)]), managementMeta: { lastRosterDay: 141, lastLineupDay: 143 } };
+  const h = setup([source]); h.save.mockResolvedValueOnce({ ok: false });
+  await act(async () => expect(await h.current.os.handleNextYear()).toBe(false));
+  expect(h.current.gs.year).toBe(2026);
+  expect(h.current.gs.teams[0].managementMeta).toEqual(source.managementMeta);
+  await act(async () => expect(await h.current.os.handleNextYear()).toBe(true));
+  expect(h.current.gs.teams[0].managementMeta).toMatchObject({ lastRosterDay: 0, lastLineupDay: 0 });
 });
 it('updates a continuing active contract once per year and preserves FA service days through serialization', async () => {
   let h = setup([team([player(0, {}, { contractYearsLeft: 4, daysOnActiveRoster: 700 })])]);

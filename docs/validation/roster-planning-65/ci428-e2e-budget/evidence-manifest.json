@@ -1,0 +1,24 @@
+{
+  "artifacts": [
+    {
+      "path": "cancelled-job.log.gz",
+      "bytes": 31905,
+      "sha256": "7f53dbea64bd0371d655794976ce124adc01080ceff12c575315f686d76f042e"
+    },
+    {
+      "path": "inventory-comparison.json.gz",
+      "bytes": 16199,
+      "sha256": "c77206467e46294b81090b3eb35cb323d16d239838094290cc7cc2d24c8f0140"
+    },
+    {
+      "path": "timing-review.json",
+      "bytes": 3992,
+      "sha256": "7e990f0cd7cfb4b54034063c275512e614746a1b5b5f39ffe5391b7e7600e682"
+    },
+    {
+      "path": "ci-before.yml",
+      "bytes": 3140,
+      "sha256": "0a4f472596f38372befa48009ff90cd68d0970ab9de1523c6617152cab78eda2"
+    }
+  ]
+}

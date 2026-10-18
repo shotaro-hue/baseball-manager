@@ -35,12 +35,14 @@ jobs:
       fail-fast: false
       matrix:
         suite:
+          # CI #428 reached the job limit after 122/123 successes. Balance the
+          # same 318 cases across the same six suites; keep workers/timeouts.
           - name: initialization-and-progression
-            files: progression.smoke.spec.js initialization.spec.js draft.spec.js draft-decision.spec.js batch-results.spec.js
+            files: progression.smoke.spec.js initialization.spec.js
           - name: qa-d1-draft-browser
             files: --config=scripts/qa-d1-browser.config.js
           - name: match-history
-            files: match-history.spec.js result-season-average.spec.js
+            files: match-history.spec.js result-season-average.spec.js draft.spec.js draft-decision.spec.js batch-results.spec.js
           - name: roster-settings
             files: roster-settings.spec.js player-detail.spec.js first-team-stats.spec.js leaderboard.spec.js league-rankings.spec.js farm-rankings.spec.js farm-development.spec.js
           - name: posting-and-finance

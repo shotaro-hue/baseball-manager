@@ -1,3 +1,4 @@
+import {newReinforcementPlan} from '../engine/rosterPlanning';
 import { draftCapacityContext } from '../engine/rosterCapacity';
 import {advanceFarmYear} from '../engine/farmMigration';
 import { applyTradeTransaction } from '../engine/tradeTransaction';
@@ -179,7 +180,10 @@ export function useOffseason(gs) {
           serviceYears: p.育成 ? (p.serviceYears || 0) : (p.serviceYears || 0) + 1,
           ikuseiYears: p.育成 ? (p.ikuseiYears || 0) + 1 : 0 };
       });
-      return{...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,revenueThisSeason:0,winStreak:0,loseStreak:0,stadiumLevel:t.stadiumLevel??0,budget:newBudget,players:nextPlayers,lineup:(t.lineup||[]).filter(id=>nextIds.has(id)),lineupNoDh:(t.lineupNoDh||[]).filter(id=>nextIds.has(id)),lineupDh:(t.lineupDh||[]).filter(id=>nextIds.has(id)),rotation:(t.rotation||[]).filter(id=>nextIds.has(id)),farm:nextFarm};
+      // These counters are season-relative. Keeping day 141 from the previous
+      // year suppresses the next year's ordinary 14-day roster reviews.
+      const managementMeta = { ...t.managementMeta, lastRosterDay: 0, lastLineupDay: 0 };
+      return{...t,wins:0,losses:0,draws:0,rf:0,ra:0,rotIdx:0,revenueThisSeason:0,winStreak:0,loseStreak:0,stadiumLevel:t.stadiumLevel??0,budget:newBudget,players:nextPlayers,lineup:(t.lineup||[]).filter(id=>nextIds.has(id)),lineupNoDh:(t.lineupNoDh||[]).filter(id=>nextIds.has(id)),lineupDh:(t.lineupDh||[]).filter(id=>nextIds.has(id)),rotation:(t.rotation||[]).filter(id=>nextIds.has(id)),farm:nextFarm,managementMeta};
     });
     const unsignedDomestic = faPool.filter(p => !p.isForeign).map(p => {
       if (shouldArchiveFreeAgentSeason(p, year) && p.faArchivedYear !== year) indexedDbEntries.push({ playerId: String(p.id), careerEntry: mkCareerEntry(p.stats, p.playoffStats, year, p.faOriginTeamId, p.faOriginTeamName) });
@@ -701,7 +705,7 @@ export function useOffseason(gs) {
     faPhaseCompletedYear.current = null;
     waiverCompletedYear.current = null;
     if (gs.setOffseasonPlan) {
-      gs.setOffseasonPlan({ version: 1, year, myId, stage: 'planning', tab: 'roster', intents: [], demands,
+      gs.setOffseasonPlan({ version: 1, year, myId, stage: 'planning', tab: 'roster', intents: [], demands,reinforcements:newReinforcementPlan(myDeveloped,year),
         growth: mySummary && Object.fromEntries(Object.entries(mySummary).map(([key, rows]) => [key, Array.isArray(rows) ? rows.map(row => ({ ...row, p: row.p ? planningPlayer(row.p) : row.p })) : rows])),
         seasonInfo: { retiredNames: retiredMyNames, year: year + 1, draftCount: 0, draftNames: [] }, releasedIds: [] });
       setScreen('offseason_planning');

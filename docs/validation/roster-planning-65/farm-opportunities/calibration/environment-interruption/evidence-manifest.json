@@ -1,0 +1,39 @@
+{
+  "artifacts": [
+    {
+      "path": "seed-20261015.log.gz",
+      "bytes": 38212,
+      "sha256": "fbe24ead188658dcff9b8569db572521cea46306e9f6e189c7b6271362fbb0d8"
+    },
+    {
+      "path": "seed-20261017.json.gz",
+      "bytes": 159250,
+      "sha256": "8928ba2cac5f876c512e86f3e084f1ec33667924edd22436db1c61e136c7d090"
+    },
+    {
+      "path": "seed-20261017.log.gz",
+      "bytes": 38118,
+      "sha256": "5af54f715909e7eba5ddddd510bb3902f8742c16c0dc53bb089fd332861f23d8"
+    },
+    {
+      "path": "source-snapshot.json",
+      "bytes": 42060,
+      "sha256": "c32f8c3d0c6eab4c705c77b31ed590ff66312f5137d5715c7d461dbcdf2aed4b"
+    },
+    {
+      "path": "dependencies-restore.log.gz",
+      "bytes": 293,
+      "sha256": "828d88f471f13a91cf969e6a0e68a8afa27950057dc60e5f72cfef387cf17bf9"
+    },
+    {
+      "path": "dependencies-restore-network.log.gz",
+      "bytes": 200,
+      "sha256": "6665846b9caeda50365a425c65908f77a14127dcb228df9978f89e01ed5cf4cd"
+    },
+    {
+      "path": "cpu-opportunity-dependencies-restored.log.gz",
+      "bytes": 523,
+      "sha256": "3154182818a7209325e08e188cd76c4925a19247e0c0be4bb27b6ad805bd91f9"
+    }
+  ]
+}

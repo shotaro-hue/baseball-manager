@@ -1,3 +1,4 @@
+import {evaluateDraftContinuation} from '../engine/draftContinuation';
 import {draftRulesFor,draftParticipation,draftEndLabel} from '../engine/draftConference';
 import DraftEndSelection from './DraftEndSelection';
 import { evaluateRosterCapacity } from '../engine/rosterCapacity';
@@ -80,7 +81,7 @@ export function DraftLotteryScreen({teams,myId,year,pool,rules,onDone,savedState
       if (remainingDraftSlots(t) <= 0) return;
       const pick=chooseDraftProspect(t,roundPool,1,[],{rules,teams,evaluation:session,endedTeams:ended,activeTeamIds:activeTeams.map(t=>t.id),draftPool:pool});
       if(pick)picks[t.id]=pick;
-      else ended[t.id]='no-upgrade';
+      else ended[t.id]=conferenceRules.version===2?evaluateDraftContinuation(t,roundPool,1,[],{rules,teams,evaluation:session,endedTeams:ended,draftPool:pool}).reason:'no-upgrade';
     });
     endedRef.current=ended;setEndedTeams(ended);
     return picks;
@@ -411,7 +412,8 @@ export function DraftScreen({teams,myId,year,pool,rules,draftAllocation,autoSkip
     if(!participation(current.team).eligible){advance();return;}
     const pick=chooseDraftProspect(current.team,availPool,current.round+1,draftPicksForTeam(pool,drafted,current.team.id),
       {rules,teams,draftPool:pool,drafted,log,endedTeams:endedRef.current,evaluation:session});
-    if(!pick){closeClub(current.team.id,'no-upgrade');advance();return;}
+    if(!pick){const reason=conferenceRules.version===2?evaluateDraftContinuation(current.team,availPool,current.round+1,draftPicksForTeam(pool,drafted,current.team.id),
+      {rules,teams,draftPool:pool,drafted,log,endedTeams:endedRef.current,evaluation:session}).reason:'no-upgrade';closeClub(current.team.id,reason);advance();return;}
     doPick(pick,current.team.id===myId);
   };
   const endMySelection=()=>{

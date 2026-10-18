@@ -21,5 +21,13 @@ export function selectFarmTeams(state,{year=state.year,league}={}) {
   return (r.cards?farmStandings(r):structuredClone(r.standings)).filter(t=>league===undefined||t.league===league);
 }
 export function selectFarmUsage(c) {
-  return Object.fromEntries((c?.usage||[]).map(u=>[String(u.playerId),{...structuredClone(u),outs7:u.recentPitching.reduce((n,r)=>n+r.outs,0)}]));
+  // Derived from measured records only. Neither these totals nor legacy
+  // estimates are written into the version-1 persisted usage schema.
+  const totals = new Map((c?.players || []).map(p => [String(p.playerId), p.teams.reduce((sum, stint) => ({
+    battingGames: sum.battingGames + (stint.batting?.G || 0),
+    battingPA: sum.battingPA + (stint.batting?.PA || 0),
+    pitchingBF: sum.pitchingBF + (stint.pitching?.BF || 0),
+  }), { battingGames: 0, battingPA: 0, pitchingBF: 0 })]));
+  return Object.fromEntries((c?.usage||[]).map(u=>[String(u.playerId),{...structuredClone(u),
+    ...totals.get(String(u.playerId)),outs7:u.recentPitching.reduce((n,r)=>n+r.outs,0)}]));
 }

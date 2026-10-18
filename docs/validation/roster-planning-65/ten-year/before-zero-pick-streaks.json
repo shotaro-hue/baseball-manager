@@ -1,0 +1,463 @@
+[
+  {
+    "seed": 20261015,
+    "teamId": 1,
+    "longestZeroStreak": 8,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034,
+      2035
+    ]
+  },
+  {
+    "seed": 20261015,
+    "teamId": 2,
+    "longestZeroStreak": 7,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034
+    ]
+  },
+  {
+    "seed": 20261015,
+    "teamId": 3,
+    "longestZeroStreak": 8,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034,
+      2035
+    ]
+  },
+  {
+    "seed": 20261015,
+    "teamId": 4,
+    "longestZeroStreak": 7,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034
+    ]
+  },
+  {
+    "seed": 20261015,
+    "teamId": 5,
+    "longestZeroStreak": 4,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2033,
+      2034
+    ]
+  },
+  {
+    "seed": 20261015,
+    "teamId": 6,
+    "longestZeroStreak": 8,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034,
+      2035
+    ]
+  },
+  {
+    "seed": 20261015,
+    "teamId": 7,
+    "longestZeroStreak": 9,
+    "zeroYears": [
+      2027,
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034,
+      2035
+    ]
+  },
+  {
+    "seed": 20261015,
+    "teamId": 8,
+    "longestZeroStreak": 8,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034,
+      2035
+    ]
+  },
+  {
+    "seed": 20261015,
+    "teamId": 9,
+    "longestZeroStreak": 6,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033
+    ]
+  },
+  {
+    "seed": 20261015,
+    "teamId": 10,
+    "longestZeroStreak": 6,
+    "zeroYears": [
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034
+    ]
+  },
+  {
+    "seed": 20261015,
+    "teamId": 11,
+    "longestZeroStreak": 6,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 1,
+    "longestZeroStreak": 4,
+    "zeroYears": [
+      2029,
+      2030,
+      2031,
+      2032,
+      2034
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 2,
+    "longestZeroStreak": 8,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034,
+      2035
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 3,
+    "longestZeroStreak": 7,
+    "zeroYears": [
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034,
+      2035
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 4,
+    "longestZeroStreak": 6,
+    "zeroYears": [
+      2027,
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2034,
+      2035
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 5,
+    "longestZeroStreak": 4,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2033
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 6,
+    "longestZeroStreak": 4,
+    "zeroYears": [
+      2030,
+      2031,
+      2032,
+      2033,
+      2035
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 7,
+    "longestZeroStreak": 7,
+    "zeroYears": [
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034,
+      2035
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 8,
+    "longestZeroStreak": 6,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2035
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 9,
+    "longestZeroStreak": 7,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 10,
+    "longestZeroStreak": 8,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034,
+      2035
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 11,
+    "longestZeroStreak": 8,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034,
+      2035
+    ]
+  },
+  {
+    "seed": 20261017,
+    "teamId": 1,
+    "longestZeroStreak": 8,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034,
+      2035
+    ]
+  },
+  {
+    "seed": 20261017,
+    "teamId": 2,
+    "longestZeroStreak": 8,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034,
+      2035
+    ]
+  },
+  {
+    "seed": 20261017,
+    "teamId": 3,
+    "longestZeroStreak": 8,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034,
+      2035
+    ]
+  },
+  {
+    "seed": 20261017,
+    "teamId": 4,
+    "longestZeroStreak": 7,
+    "zeroYears": [
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034,
+      2035
+    ]
+  },
+  {
+    "seed": 20261017,
+    "teamId": 5,
+    "longestZeroStreak": 6,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2035
+    ]
+  },
+  {
+    "seed": 20261017,
+    "teamId": 6,
+    "longestZeroStreak": 6,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033
+    ]
+  },
+  {
+    "seed": 20261017,
+    "teamId": 7,
+    "longestZeroStreak": 4,
+    "zeroYears": [
+      2029,
+      2030,
+      2031,
+      2032,
+      2034
+    ]
+  },
+  {
+    "seed": 20261017,
+    "teamId": 8,
+    "longestZeroStreak": 7,
+    "zeroYears": [
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034,
+      2035
+    ]
+  },
+  {
+    "seed": 20261017,
+    "teamId": 9,
+    "longestZeroStreak": 7,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034
+    ]
+  },
+  {
+    "seed": 20261017,
+    "teamId": 10,
+    "longestZeroStreak": 5,
+    "zeroYears": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2034
+    ]
+  },
+  {
+    "seed": 20261017,
+    "teamId": 11,
+    "longestZeroStreak": 7,
+    "zeroYears": [
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034,
+      2035
+    ]
+  }
+]

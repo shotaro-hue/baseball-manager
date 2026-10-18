@@ -1,4 +1,5 @@
 import {prepareFarmProgress,finishFarmProgress} from '../engine/farmProgression';
+import {selectFarmUsage} from '../engine/farmSelectors';
 import { regularSeasonRequest } from '../engine/seasonProgress';
 import { uid, rng, rngf, gameDayToDate } from '../utils';
 import * as playerRules from '../engine/player';
@@ -573,6 +574,7 @@ export function simulateSeasonBatch({
   for (let index = 0; index < safeCount; index += 1) {
     ensureNotCancelled(isCancelled);
 
+    const farmUsage = selectFarmUsage(state.farmCompetition);
     newTeams = newTeams.map((team) => {
       if (team.id === state.myId && !autoManageMyTeam) {
         return applyEmergencyRosterMaintenance(team);
@@ -582,6 +584,7 @@ export function simulateSeasonBatch({
         gameDay: newDay,
         includeRosterChanges: true,
         automationMode: ROSTER_AUTOMATION_MODES.FULL,
+        farmUsage,
       });
     });
 

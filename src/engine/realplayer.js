@@ -1,5 +1,6 @@
+import {initialRosterSlots} from './initialRoster';
 import { clamp, rng, uid } from '../utils';
-import { emptyStats, makePlayer, makeInitialFarmBatters, applyPositionFields } from './playerCore';
+import { emptyStats, makePlayer, applyPositionFields } from './playerCore';
 import { DEFAULT_CONTRACT_END_YEAR } from '../data/npb2025';
 import { buildCareerLogSummary, compactCareerStats, getRecentCareerLog } from './careerStats';
 
@@ -212,7 +213,7 @@ export function realBatterToPlayer(b, teamDef) {
     isPitcher: false, isForeign,
     salary: salary ?? 5000000,
     contractYears: resolveInitialContractYears(b.contractEndYear), contractYearsLeft: resolveInitialContractYears(b.contractEndYear),
-    育成: false, isFA: false,
+    育成: Boolean(b.育成 || b.isIkusei), isIkusei: Boolean(b.育成 || b.isIkusei), isFA: false,
     condition: rng(85, 100),
     form: 50,
     injury: null, injuryDaysLeft: 0,
@@ -283,7 +284,7 @@ export function realPitcherToPlayer(p, teamDef) {
     subtype,
     salary: salary ?? 5000000,
     contractYears: resolveInitialContractYears(p.contractEndYear), contractYearsLeft: resolveInitialContractYears(p.contractEndYear),
-    育成: false, isFA: false,
+    育成: Boolean(p.育成 || p.isIkusei), isIkusei: Boolean(p.育成 || p.isIkusei), isFA: false,
     condition: rng(85, 100),
     form: 50,
     injury: null, injuryDaysLeft: 0,
@@ -318,9 +319,9 @@ export function buildRealTeam(def, rosterData) {
   // ファームはランダム生成（ドラフト候補など）
   const q = rng(42, 58);
   const nonPitchers = players.filter(p => !p.isPitcher);
-  if (nonPitchers[8]) nonPitchers[8].pos = 'DH';
-  const farm = makeInitialFarmBatters(12, q, players);
-  for (let i = 0; i < 6;  i++) farm.push(makePlayer('先発', q - 5, true, rng(18, 24)));
+  const slots=initialRosterSlots(players);
+  const farm=slots.batterPositions.map(pos=>makePlayer(pos,q,false,rng(18,25)));
+  for(const role of slots.pitcherRoles)farm.push(makePlayer(role,q-5,true,rng(18,24)));
 
   const starters    = players.filter(p => p.isPitcher && p.subtype === '先発');
   const dhEnabled = def.league === 'パ';

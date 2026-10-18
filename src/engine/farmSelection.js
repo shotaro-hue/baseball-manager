@@ -29,7 +29,7 @@ export function validateFarmTeams(teams) {
   }
 }
 
-// Rectangular Hungarian assignment: nine positions, >=9 real batters.
+// Rectangular Hungarian assignment: real field/DH positions and real batters.
 // Stable column order resolves ties; catcher-ineligible edges are forbidden.
 function assignPositions(batters, positions, score) {
   const n = positions.length, m = batters.length;
@@ -70,11 +70,24 @@ export function selectFarmTeam(team, { round, usage = {} } = {}) {
   if (!batters.some(p => fit(p, '捕手') > 0)) reasons.push({ code: 'insufficient-catcher', available: 0, required: 1 });
   if (reasons.length) return { teamId: team.id, status: 'unplayed', reasons, warnings: [] };
   const playerUsage = p => Object.hasOwn(usage, String(p.id)) ? usage[String(p.id)] : {};
-  const lineup = assignPositions(batters, [...FIELDING_POSITIONS, 'DH'], (p,pos) => {
+  const battingScore = (p,pos) => {
     if (pos === '捕手' && fit(p,pos) <= 0) return -1e6;
     return batScore(p) + (pos === 'DH' ? 0 : fit(p,pos)*2)
       - (playerUsage(p)?.lastBattedRound === round-1 ? 5 : 0);
-  }).sort((a,b) => batScore(b.player) - batScore(a.player) || compareFarmIds(a.player.id,b.player.id));
+  };
+  let lineup = assignPositions(batters, [...FIELDING_POSITIONS, 'DH'], battingScore);
+  const games = p => playerUsage(p).battingGames || 0;
+  const selectedIds = new Set(lineup.map(x => x.player.id));
+  const developmentBatter = batters.filter(p => !selectedIds.has(p.id)).sort((a,b) => games(a) - games(b)
+    || (playerUsage(a).battingPA || 0) - (playerUsage(b).battingPA || 0)
+    || batScore(b) - batScore(a) || compareFarmIds(a.id,b.id))[0];
+  // One actual DH start, only when every normally selected batter has played
+  // more games. Keep the other eight positions optimized for defensive fit.
+  if (developmentBatter && games(developmentBatter) < Math.min(...lineup.map(x => games(x.player)))) {
+    lineup = [...assignPositions(batters.filter(p => p.id !== developmentBatter.id), FIELDING_POSITIONS, battingScore),
+      { player: developmentBatter, position: 'DH', proficiency: 0 }];
+  }
+  lineup.sort((a,b) => batScore(b.player) - batScore(a.player) || compareFarmIds(a.player.id,b.player.id));
   const warnings = lineup.filter(x => x.position !== 'DH' && x.proficiency === 0)
     .map(x => ({ code: 'alternative-defense', playerId: x.player.id, position: x.position }));
   const rest = p => {
@@ -88,6 +101,15 @@ export function selectFarmTeam(team, { round, usage = {} } = {}) {
   const ordered = [...pitchers].sort((a,b) => Number(normal(b)) - Number(normal(a))
     || Number(rest(b) >= 5) - Number(rest(a) >= 5) || pitchScore(b) - pitchScore(a)
     || rest(b) - rest(a) || compareFarmIds(a.id,b.id));
+  // Share starts among fully rested normal candidates; never trade the
+  // existing condition/rest safeguards for a development appearance.
+  const developmentPitcher = ordered.filter(p => normal(p) && rest(p) >= 5).sort((a,b) =>
+    (playerUsage(a).pitchingBF || 0) - (playerUsage(b).pitchingBF || 0)
+    || pitchScore(b) - pitchScore(a) || compareFarmIds(a.id,b.id))[0];
+  if (developmentPitcher && (playerUsage(developmentPitcher).pitchingBF || 0) < (playerUsage(ordered[0]).pitchingBF || 0)) {
+    ordered.splice(ordered.indexOf(developmentPitcher), 1);
+    ordered.unshift(developmentPitcher);
+  }
   // Relievers favor a rested next candidate too; used pitchers are never reused in a game.
   const plan = ordered.map((player, index) => ({
     player, rescue: !normal(player) || (index === 0 && rest(player) < 5) || pitchers.length === 1,

@@ -82,6 +82,10 @@ async function seedGenerated(page,screen='draft_preview',options={}){
       state.offseasonPlan.draftEvaluation=evaluation;
       options.rivalPick=rivalPick.id;
     }
+    if(options.endedReason){
+      state.offseasonPlan.draftRules={version:2,maxPicks:10};
+      state.offseasonPlan.draftViews={draft:{pickIdx:0,drafted:{},log:[],endedTeams:{1:options.endedReason},done:false}};
+    }
     if(!(await saveGame(state)).ok)throw new Error('generated draft fixture save failed');
     return {pool:pool.map(p=>({id:p.id,name:p.name,role:p.subtype||p.pos,type:p.prospectType})),myId:state.myId,year:state.year,rivalPick:options.rivalPick};
   },{state,screen,options,seed:SEED});
@@ -287,4 +291,19 @@ test('desktop split view retains user scroll through compare, confirmation and r
   await reloadAndLoad(page);await expect(list).toBeVisible();
   expect(Math.abs((await list.evaluate(el=>el.scrollTop))-returnScroll)).toBeLessThanOrEqual(2);
   evidence(`browser-focus-${testInfo.project.name}`,{browser:testInfo.project.name,comparedScroll,confirmScroll,returnScroll,actualScroll,focusedCandidate:id,saveReloadStable:true,hardware:'Browser automation on host, not phone hardware'});
+});
+
+import {registerRosterPlanningCases} from './helpers/rosterPlanning';
+registerRosterPlanningCases();
+
+test('catcher reserve reason survives real save and fits the draft view',async({page},testInfo)=>{
+ test.setTimeout(90000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await seedGenerated(page,'draft',{endedReason:'catcher-reserve'});
+ const reason=page.getByText('捕手補充用の枠を留保',{exact:false});
+ await expect(reason).toBeVisible();
+ const saved=await saveDraft(page);
+ expect(saved.offseasonPlan.draftViews.draft.endedTeams[1]).toBe('catcher-reserve');
+ await reloadAndLoad(page);await expect(reason).toBeVisible();
+ expect((await layout(page)).overflow).toBe(false);expect(errors).toEqual([]);
+ if(process.env.QA_D1_CAPTURE){mkdirSync(EVIDENCE,{recursive:true});await page.screenshot({path:`${EVIDENCE}/catcher-reserve-${testInfo.project.name}.png`,fullPage:true});}
 });

@@ -72,7 +72,16 @@ test('trade rejects an exchange that would overfill the other recipient at 70 at
   const used=new Set(mail.offer.want.map(p=>p.id));mail.offer.want.push(mine.players.find(p=>!used.has(p.id)));
   if(!(await saveGame(s)).ok)throw Error('save failed');
  });
- await reloadAndLoad(page);const before=await saveHub(page);
+ await reloadAndLoad(page);
+ await mainNavigation(page,true).getByRole('button',{name:/^その他/}).click();
+ await page.getByText('取引検証',{exact:true}).click();
+ const before=await saveHub(page);
+ expect(before.mailbox.find(m=>m.id==='trade-test').read).toBe(true);
+ // Reading the mail starts an autosave. Persist that real read state first,
+ // then reload to finish both save callbacks and their notification timers.
+ // Opening the now-read mail will not race a new save against the rejection.
+ await expect(page.locator('.notif')).toBeHidden();
+ await reloadAndLoad(page);
  await mainNavigation(page,true).getByRole('button',{name:/^その他/}).click();
  await page.getByText('取引検証',{exact:true}).click();await page.getByRole('button',{name:'✅ 承諾する',exact:true}).click();
  await expect(page.getByText('支配下登録枠（70人）を超えます',{exact:true})).toBeVisible();

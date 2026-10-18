@@ -1,0 +1,277 @@
+[
+  {
+    "seed": 20261015,
+    "teamId": 1,
+    "longestZeroStreak": 2,
+    "zeroYears": [
+      2027,
+      2028
+    ]
+  },
+  {
+    "seed": 20261015,
+    "teamId": 2,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2034
+    ]
+  },
+  {
+    "seed": 20261015,
+    "teamId": 3,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2031
+    ]
+  },
+  {
+    "seed": 20261015,
+    "teamId": 4,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2027,
+      2031
+    ]
+  },
+  {
+    "seed": 20261015,
+    "teamId": 5,
+    "longestZeroStreak": 2,
+    "zeroYears": [
+      2029,
+      2031,
+      2032
+    ]
+  },
+  {
+    "seed": 20261015,
+    "teamId": 6,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2028,
+      2031
+    ]
+  },
+  {
+    "seed": 20261015,
+    "teamId": 7,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2035
+    ]
+  },
+  {
+    "seed": 20261015,
+    "teamId": 8,
+    "longestZeroStreak": 0,
+    "zeroYears": []
+  },
+  {
+    "seed": 20261015,
+    "teamId": 9,
+    "longestZeroStreak": 2,
+    "zeroYears": [
+      2029,
+      2030
+    ]
+  },
+  {
+    "seed": 20261015,
+    "teamId": 10,
+    "longestZeroStreak": 0,
+    "zeroYears": []
+  },
+  {
+    "seed": 20261015,
+    "teamId": 11,
+    "longestZeroStreak": 2,
+    "zeroYears": [
+      2030,
+      2031
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 1,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2029,
+      2032,
+      2035
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 2,
+    "longestZeroStreak": 2,
+    "zeroYears": [
+      2029,
+      2030
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 3,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2029,
+      2033
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 4,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2031
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 5,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2027
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 6,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2031
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 7,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2028,
+      2035
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 8,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2029,
+      2035
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 9,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2028,
+      2032,
+      2034
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 10,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2035
+    ]
+  },
+  {
+    "seed": 20261016,
+    "teamId": 11,
+    "longestZeroStreak": 0,
+    "zeroYears": []
+  },
+  {
+    "seed": 20261017,
+    "teamId": 1,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2034
+    ]
+  },
+  {
+    "seed": 20261017,
+    "teamId": 2,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2035
+    ]
+  },
+  {
+    "seed": 20261017,
+    "teamId": 3,
+    "longestZeroStreak": 0,
+    "zeroYears": []
+  },
+  {
+    "seed": 20261017,
+    "teamId": 4,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2029
+    ]
+  },
+  {
+    "seed": 20261017,
+    "teamId": 5,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2030,
+      2032
+    ]
+  },
+  {
+    "seed": 20261017,
+    "teamId": 6,
+    "longestZeroStreak": 2,
+    "zeroYears": [
+      2030,
+      2031
+    ]
+  },
+  {
+    "seed": 20261017,
+    "teamId": 7,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2028,
+      2033
+    ]
+  },
+  {
+    "seed": 20261017,
+    "teamId": 8,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2027,
+      2031
+    ]
+  },
+  {
+    "seed": 20261017,
+    "teamId": 9,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2029,
+      2032,
+      2034
+    ]
+  },
+  {
+    "seed": 20261017,
+    "teamId": 10,
+    "longestZeroStreak": 0,
+    "zeroYears": []
+  },
+  {
+    "seed": 20261017,
+    "teamId": 11,
+    "longestZeroStreak": 1,
+    "zeroYears": [
+      2031
+    ]
+  }
+]

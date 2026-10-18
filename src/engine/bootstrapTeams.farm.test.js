@@ -19,10 +19,10 @@ afterEach(() => { vi.restoreAllMocks(); vi.doUnmock('../data/npb2025'); vi.reset
 function checkTeams(teams, real) {
   for (const team of teams) {
     const all = [...team.players, ...team.farm];
-    const expected = real
-      ? NPB2025_ROSTERS[team.id].batters.length + NPB2025_ROSTERS[team.id].pitchers.length + 18
-      : 47;
+    const expected = 65;
     expect(all.length, `team ${team.id}: total`).toBe(expected);
+    expect(all.filter(p=>p.isPitcher)).toHaveLength(32);
+    expect(all.filter(p=>!p.isPitcher)).toHaveLength(33);
     expect(team.players.length, `team ${team.id}: active roster`).toBe(28);
     expect(new Set(all.map(p => p.id)).size).toBe(expected);
     const catchers = team.players.filter(p => !p.isPitcher && p.pos === '捕手'
@@ -74,14 +74,14 @@ describe('initial catcher coverage', () => {
       expect(result.farm.find(p => p.id === id).registrationCooldownDays).toBe(10);
     }
   });
-  it('keeps three active catchers and a playable farm without increasing real-team headcounts', () => {
+  it('keeps three active catchers and a playable farm in 65-player real-team organizations', () => {
     for (let seed = 1; seed <= 100; seed++) {
       seedRandom(seed);
       checkTeams(createInitialTeams(), true);
       vi.restoreAllMocks();
     }
   }, 60000);
-  it('also covers the generated-team fallback with unchanged headcounts', async () => {
+  it('also covers the generated-team fallback with 65 controlled players', async () => {
     vi.doMock('../data/npb2025', async importOriginal => ({ ...await importOriginal(), NPB2025_ROSTERS: {} }));
     const { createInitialTeams: createFallback } = await import('./bootstrapTeams');
     for (let seed = 1; seed <= 100; seed++) {

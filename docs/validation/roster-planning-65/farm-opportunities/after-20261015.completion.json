@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "captureMethod": "exec_command/write_stdin",
+  "sessionId": 60387,
+  "seed": 20261015,
+  "sourceCommit": "4b00d070072bbc9b2c70d1726003c4f2544e1538",
+  "rawSha256": "79d9bc0300835ed6cdae92d5b02f2dfcad005c7c31cc1cbcb293a613c6dd9e37",
+  "note": "The separate file capture lost its tail. This is the actual terminal completion result retained by the tool, including its explicit intermediate-output truncation notice. The two captures are not a continuous full stdout transcript.",
+  "result": {
+    "chunk_id": "f4fe0d",
+    "wall_time_seconds": 0.000023213,
+    "exit_code": 0,
+    "original_token_count": 5985,
+    "output": "Warning: truncated output (original token count: 5985)\nTotal output lines: 154\n\nstdout | .superpowers/validation/roster-long-run/seed-20261015.test.js > QA-D1: seed 20261015 targets 10 generated seasons with offseason save/reload\n[Perf] saveGame.stringify: 138.4ms\n[Perf] saveGame.compressToUTF16: 8501.0ms\n[Perf] saveGame.localStorage.setItem: 0.1ms\n\nstdout | .superpowers/validation/roster-long-run/seed-20261015.test.js > QA-D1: seed 20261015 targets 10 generated seasons with offseason save/reload\n┌──────────┬───────────────────┬─────────────────────┬───────────────────────┬──────────────…5635 tokens truncated…┘\n[Perf] saveGame: 5806.1ms\n[Perf] loadGame.localStorage.getItem: 0.0ms\n[Perf] loadGame.parse: 53.9ms\n\nstdout | .superpowers/validation/roster-long-run/seed-20261015.test.js > QA-D1: seed 20261015 targets 10 generated seasons with offseason save/reload\n[Perf] loadGame: 897.4ms\nQA-D1 season 20261015 2035 ms 119714 farm unplayed 0\n\n ✓ .superpowers/validation/roster-long-run/seed-20261015.test.js (1 test) 949564ms\n   ✓ QA-D1: seed 20261015 targets 10 generated seasons with offseason save/reload 949563ms\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  19:47:06\n   Duration  950.90s (transform 692ms, setup 0ms, collect 1.06s, tests 949.56s, environment 0ms, prepare 53ms)\n\n"
+  }
+}

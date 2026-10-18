@@ -1,4 +1,5 @@
 import {prepareFarmProgress,finishFarmProgress} from '../engine/farmProgression';
+import {selectFarmUsage} from '../engine/farmSelectors';
 import { regularSeasonRequest } from '../engine/seasonProgress';
 import { getMyMatchup } from '../engine/scheduleGen';
 import { uid, rng, rngf, gameDayToDate } from '../utils';
@@ -271,8 +272,10 @@ export function simulateSingleDay({
   const matchup = getMyMatchup(snapshot.schedule, snapshot.gameDay, snapshot.myId);
   if (matchup.oppId !== gameContext?.selectedOpponentId || matchup.isHome !== gameContext?.isHome) throw new Error('対戦日程と要求が一致しません。');
   const safeSnapshot = cloneValue(snapshot || {});
+  const farmUsage = selectFarmUsage(safeSnapshot.farmCompetition);
   const teams = (safeSnapshot.teams || []).map(team => team.id === safeSnapshot.myId ? team : applyManagementPolicy(team, {
     teams: safeSnapshot.teams, gameDay: safeSnapshot.gameDay, includeRosterChanges: true, automationMode: ROSTER_AUTOMATION_MODES.FULL,
+    farmUsage,
   }));
   const myTeam = teams.find((team) => team.id === safeSnapshot.myId);
   const currentOpp = teams.find((team) => team.id === gameContext?.selectedOpponentId);

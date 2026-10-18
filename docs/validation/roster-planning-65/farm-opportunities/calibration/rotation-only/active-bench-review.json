@@ -1,0 +1,64 @@
+{
+  "id": "ibd3pum",
+  "seed": 20261015,
+  "prefixMatches": true,
+  "diagnosticYears": 5,
+  "years": [
+    {
+      "year": 2027,
+      "healthyGames": 143,
+      "activeGames": 143,
+      "farmGames": 0,
+      "farmStarts": 0,
+      "officialBatEvents": 312,
+      "openingManagementMeta": {
+        "lastLineupDay": 1,
+        "lastDecision": "育成重視・機動力: 内川　一樹、渡辺　優斗、宇都宮　葵星を上位起用",
+        "lastRosterChanges": 11,
+        "lastRosterDay": 1
+      }
+    },
+    {
+      "year": 2028,
+      "healthyGames": 143,
+      "activeGames": 143,
+      "farmGames": 0,
+      "farmStarts": 0,
+      "officialBatEvents": 63,
+      "openingManagementMeta": {
+        "lastLineupDay": 140,
+        "lastDecision": "育成重視・機動力: 内川　一樹、渡辺　優斗、井上　悠生を上位起用",
+        "lastRosterChanges": 0,
+        "lastRosterDay": 141
+      }
+    },
+    {
+      "year": 2029,
+      "healthyGames": 143,
+      "activeGames": 143,
+      "farmGames": 0,
+      "farmStarts": 0,
+      "officialBatEvents": 0,
+      "openingManagementMeta": {
+        "lastLineupDay": 143,
+        "lastDecision": "育成重視・機動力: 渡辺　優斗、高梨　和、伊藤　悠生を上位起用",
+        "lastRosterChanges": 0,
+        "lastRosterDay": 141
+      }
+    },
+    {
+      "year": 2030,
+      "healthyGames": 143,
+      "activeGames": 143,
+      "farmGames": 0,
+      "farmStarts": 0,
+      "officialBatEvents": 0,
+      "openingManagementMeta": {
+        "lastLineupDay": 138,
+        "lastDecision": "育成重視・機動力: 内川　一樹、渡辺　優斗、近藤　充を上位起用",
+        "lastRosterChanges": 1,
+        "lastRosterDay": 142
+      }
+    }
+  ]
+}

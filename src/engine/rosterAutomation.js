@@ -11,6 +11,7 @@ import {
   ROSTER_DEVREC_DAYS_MAX,
   ROSTER_DEVREC_POTENTIAL_MIN,
   ROSTER_SWAP_SCORE_THRESHOLD,
+  SEASON_GAMES,
 } from '../constants.js';
 import { saberPitcher } from './sabermetrics.js';
 import { createBattedBallLeagueContext } from './cpuBatterEvaluation.js';
@@ -563,6 +564,36 @@ export function buildRosterRecs(team, options = {}) {
         { ...activePlayer, registrationCooldownDays: REGISTRATION_COOLDOWN_DAYS },
       ];
     });
+
+  // Ordinary score-based swaps cannot give a stronger but unused reserve
+  // farm practice. On a scheduled full-auto review only, exchange at most one
+  // such batter with a player who already has measured farm PA. Catchers
+  // exchange with catchers; the protected field starters cover other roles.
+  if (options.rotateUnusedBatters === true && options.farmUsage) {
+    const projectedTeam = { ...team, players: projectedPlayers, farm: projectedFarm };
+    const noDh = buildAutoLineupEntries(projectedTeam, { ...options, rosterDhMode: false });
+    const dh = buildAutoLineupEntries(projectedTeam, { ...options, rosterDhMode: true });
+    const fieldStarters = new Set([...noDh, ...dh].filter(entry => entry.pos !== 'DH').map(entry => entry.id));
+    // Absence from the supplied current ledger is zero farm PA, not a legacy
+    // estimate. A replacement must have an actual positive measured record.
+    const farmPA = player => options.farmUsage[String(player.id)]?.battingPA ?? 0;
+    const reserves = projectedPlayers.filter(player => !player.isPitcher
+      && isEligibleActivePlayer(player) && player.stats?.PA === 0
+      && !fieldStarters.has(player.id) && !usedActiveIds.has(player.id) && !usedFarmIds.has(player.id)
+      && Number.isFinite(farmPA(player)))
+      .sort((a, b) => farmPA(a) - farmPA(b) || score(a, false) - score(b, false)
+        || String(a.id).localeCompare(String(b.id)));
+    if (noDh.length === FIELDING_POSITIONS.length && dh.length === FIELDING_POSITIONS.length + 1) {
+      for (const downPlayer of reserves) {
+        const upPlayer = projectedFarm.filter(player => !player.isPitcher
+          && (player.pos === POS_CATCHER) === (downPlayer.pos === POS_CATCHER)
+          && Number.isFinite(options.farmUsage[String(player.id)]?.battingPA)
+          && farmPA(player) > farmPA(downPlayer) && canPromote(player, downPlayer))
+          .sort((a, b) => score(b, true) - score(a, true) || String(a.id).localeCompare(String(b.id)))[0];
+        if (addSwap(upPlayer, downPlayer, ['実測出場のない控えに二軍の実戦機会'])) break;
+      }
+    }
+  }
 
   return recs;
 }
@@ -1471,6 +1502,8 @@ export function applyManagementPolicy(team, options = {}) {
     const plan = buildFullRosterPlan(nextTeam, {
       ...options,
       automationMode: ROSTER_AUTOMATION_MODES.FULL,
+      rotateUnusedBatters: !force && gameDay <= SEASON_GAMES
+        && options.includeRosterChanges !== false && shouldRunRosterManagement(nextTeam, gameDay),
     });
     nextTeam = plan.team;
     recs = plan.changes;
