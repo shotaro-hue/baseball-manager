@@ -20,6 +20,17 @@ export function roleComparison(layer,player,minimum=1){
  const futureBaseline=young.length?Math.max(...young):Math.max(60,currentBaseline);
  return {currentBaseline,futureBaseline,futureSource:young.length?'young-peers':currents.length?'current-role':'absolute-standard'};
 }
+export function draftTalentDecision(layer,player,report,organization,manual=false){
+ const role=Object.values(organization.roles||{}).find(r=>r.label===roleOf(player));
+ const peers=layer.filter(x=>sameRole(x.p,player));
+ const comparison=roleComparison(layer,player,role?.activeMinimum??1);
+ if(manual){comparison.futureBaseline=Math.max(0,...peers.filter(x=>(x.p.age||25)<=24).map(x=>x.future).filter(Number.isFinite));comparison.futureSource='player-choice';}
+ const shortage=Math.max(0,(role?.organizationMinimum??1)-peers.length);
+ const reason=shortage>0&&(report.current>=50||report.future>=60)?'organization-shortage'
+  :report.current>=50&&report.current>=comparison.currentBaseline+10?'current-upgrade'
+   :(player.age||25)<=24&&report.future>=60&&report.future>=comparison.futureBaseline+10?'future-upgrade':'no-upgrade';
+ return {...comparison,shortage,reason};
+}
 const rookieSalary=p=>Math.max(MIN_SALARY_SHIHAKA,Number.isFinite(p.salary)?p.salary:MIN_SALARY_SHIHAKA);
 const marketIds=(team,year)=>[...new Set((team.history||[]).filter(p=>p.exitYear===year
   &&['fa','waiver_fa','foreign_fa'].includes(p.exitReason)&&!isIkuseiPlayer(p)).map(p=>p.id))];
@@ -49,30 +60,32 @@ export function cpuRosterPlan(team,context={}){
  if(!capacity.ok)return {...capacity,draftRemaining:0,rookieReserve:null};
  const acceptedReserve=capacity.acceptedPicks.reduce((n,p)=>n+rookieSalary(p),0);
  let draftOpportunities=context.rosterPlan?.draftOpportunities;
- if(context.phase==='offseason'&&context.cpuOpportunityPlanning===1&&!draftOpportunities){
+ if(context.phase==='offseason'&&context.cpuOpportunityPlanning===1){
   const owned=ownedPlayers(team).filter(p=>!isIkuseiPlayer(p));
-  const layer=owned.map(p=>({p,current:ownedDraftCurrent(p),future:p.potential}));
+  const layer=[...owned.map(p=>({p,current:ownedDraftCurrent(p),future:p.potential})),
+    ...capacity.acceptedPicks.map(p=>({p,...draftReport(context.evaluation,p.id,team.id)}))];
   const organization=evaluateOrganizationNeeds(team,context);
   const basePlan={...capacity,draftRemaining:0,rookieReserve:acceptedReserve};
-  const seen=new Set();
-  draftOpportunities=(context.draftPool||[]).filter(p=>!p._drafted&&!Object.hasOwn(context.drafted||{},p.id)&&!seen.has(p.id)&&seen.add(p.id))
+  const seen=new Set([...ownedPlayers(team),...capacity.acceptedPicks].map(p=>p.id));
+  const confirmed=new Set(Object.values(context.confirmedPicks||{}).map(p=>String(p?.id??p)));
+  const planned=draftOpportunities&&new Set(draftOpportunities.map(p=>p.id));
+  const ranked=(context.draftPool||[]).filter(p=>(!planned||planned.has(p.id))&&!p._drafted&&!Object.hasOwn(context.drafted||{},p.id)&&!confirmed.has(String(p.id))&&!seen.has(p.id)&&seen.add(p.id))
    .map(p=>({p,...draftReport(context.evaluation,p.id,team.id)}))
    .filter(r=>Number.isFinite(r.current)&&Number.isFinite(r.future))
-   .filter(r=>{
-    const role=Object.values(organization.roles||{}).find(x=>x.label===roleOf(r.p));
-    const comparison=roleComparison(layer,r.p,role?.activeMinimum??1);
-    const shortage=layer.filter(x=>sameRole(x.p,r.p)).length<(role?.organizationMinimum??1);
-    const improves=shortage&&(r.current>=50||r.future>=60)
-      ||r.current>=50&&r.current>=comparison.currentBaseline+10
-      ||r.p.age<=24&&r.future>=60&&r.future>=comparison.futureBaseline+10;
-    return improves&&assessCpuAddition(team,r.p,{...context,phase:'draft',cpuPlan:basePlan,report:r,layer,organization}).eligible;
-   }).sort((a,b)=>prospectValue(b.p,b)-prospectValue(a.p,a))
-   .slice(0,Math.min(6,capacity.remainingSlots))
-   .map(r=>({id:r.p.id,age:r.p.age,current:r.current,future:r.future,salary:rookieSalary(r.p),role:roleOf(r.p)}));
+   .sort((a,b)=>prospectValue(b.p,b)-prospectValue(a.p,a));
+  draftOpportunities=[];
+  for(const r of ranked){
+   if(draftOpportunities.length>=Math.min(6,capacity.remainingSlots))break;
+   if(draftTalentDecision(layer,r.p,r,organization).reason==='no-upgrade'
+    ||!assessCpuAddition(team,r.p,{...context,phase:'draft',cpuPlan:basePlan,report:r,layer,organization}).eligible)continue;
+   draftOpportunities.push({id:r.p.id,age:r.p.age,current:r.current,future:r.future,salary:rookieSalary(r.p),role:roleOf(r.p)});
+   layer.push(r);basePlan.acceptedPicks=[...basePlan.acceptedPicks,r.p];basePlan.acceptedPickCount++;
+   basePlan.remainingSlots--;basePlan.rookieReserve+=rookieSalary(r.p);
+  }
  }
  const requested=context.phase==='draft'||context.phase==='season'?0
   :context.rosterPlan?.draftRemaining??draftOpportunities?.length??Math.min(6,Math.max(0,CPU_ROSTER_TARGET-capacity.controlledCount-capacity.acceptedPickCount));
- const draftRemaining=Math.min(requested,capacity.remainingSlots);
+ const draftRemaining=Math.min(requested,draftOpportunities?.length??requested,capacity.remainingSlots);
  const opportunities=draftOpportunities?.slice(0,draftRemaining);
  return {...capacity,draftRemaining,...(opportunities?{draftOpportunities:opportunities}:{}),
   rookieReserve:acceptedReserve+(opportunities?opportunities.reduce((n,p)=>n+p.salary,0):draftRemaining*MIN_SALARY_SHIHAKA)};

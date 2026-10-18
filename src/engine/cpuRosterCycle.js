@@ -3,6 +3,8 @@ import {ownedPlayers,renewalEligible} from './renewalRules';
 import {evaluateRosterCapacity,isIkuseiPlayer} from './rosterCapacity';
 import {ownedDraftCurrent,draftReport} from './draftReports';
 import {roleOf,sameRole,roleComparison} from './rosterPlanning';
+import {evaluateDraftContinuation} from './draftContinuation';
+import {newDraftRules} from './draftConference';
 
 // Two operating teams, plus the established six-catcher organization minimum.
 // These are protection floors, never target roster sizes or release quotas.
@@ -22,9 +24,9 @@ function usage(p,context){
 export function planCpuRenewals(team,context={}){
  const owned=ownedPlayers(team).filter(p=>!isIkuseiPlayer(p));
  const capacity=evaluateRosterCapacity(team,context),releaseIds=[],replacements=[];
- if(!capacity.ok)return {releaseIds,replacements,reason:'invalid-capacity'};
+ if(!capacity.ok)return {releaseIds,replacements,decisions:[],rookieReserve:0,reason:'invalid-capacity'};
  const layer=owned.map(p=>({p,current:ownedDraftCurrent(p),future:p.potential,usage:usage(p,context)}));
- const protectedIds=new Set();
+ const protectedIds=new Set(['lineup','lineupDh','lineupNoDh','rotation'].flatMap(key=>team[key]||[]));
  for(const row of layer){
   const peers=layer.filter(x=>sameRole(x.p,row.p)),minimum=activeMinimum(row.p);
   for(const x of [...peers].sort((a,b)=>b.current-a.current).slice(0,minimum))protectedIds.add(x.p.id);
@@ -53,7 +55,12 @@ export function planCpuRenewals(team,context={}){
     &&((r.current>=50&&r.current>=row.current+10)
       ||(r.p.age<=24&&r.future>=60&&r.future>=Math.max(row.future??60,comparison.futureBaseline)+10)))
    .sort((a,b)=>(b.current*.65+b.future*.35)-(a.current*.65+a.future*.35));
-  const replacement=options.find(r=>rookieReserve+Math.max(MIN_SALARY_SHIHAKA,r.p.salary||0)<=team.budget);
+  const projected={...team,players:(team.players||[]).filter(p=>!releaseIds.includes(p.id)&&p.id!==row.p.id),
+    farm:(team.farm||[]).filter(p=>!releaseIds.includes(p.id)&&p.id!==row.p.id)};
+  const projectedTeams=(context.teams||[team]).map(t=>t.id===team.id?projected:t);
+  const viable=new Set(evaluateDraftContinuation(projected,options.map(r=>r.p),1,[],{
+    ...context,teams:projectedTeams,rules:newDraftRules()}).candidates.map(p=>p.id));
+  const replacement=options.find(r=>viable.has(r.p.id)&&rookieReserve+Math.max(MIN_SALARY_SHIHAKA,r.p.salary||0)<=team.budget);
   if(!replacement)continue;
   const reason=replacement.current>=row.current+10?'rookie-current-upgrade':'rookie-future-upgrade';
   const salary=Math.max(MIN_SALARY_SHIHAKA,replacement.p.salary||0);rookieReserve+=salary;

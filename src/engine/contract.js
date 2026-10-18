@@ -221,6 +221,10 @@ export function cpuRenewContracts(teams, myId, allTeams, salaryContext = {}) {
     if (t.id === myId) { updatedTeams.push(t); continue; }
 
     const plan=rosterPlans.get(t.id),plannedReleases=new Set(plan.releaseIds);
+    if(plan.reason==='invalid-capacity'){
+      emitCpuDecision({type:'renewal-end',teamId:t.id,year:salaryContext.year,reason:'invalid-capacity',budget:t.budget});
+      updatedTeams.push(t);continue;
+    }
     const expiring = ownedPlayers(t).filter(p => renewalEligible(p, salaryContext.year));
     const farmIds = new Set((t.farm || []).map(p => p.id));
     let players = ownedPlayers(t);
