@@ -7,9 +7,19 @@ import {evaluateOrganizationNeeds} from './organizationNeeds';
 
 export const CPU_ROSTER_TARGET=67;
 // Spending contingency slots needs two report bands; ordinary draft quality stays one band.
-const CONTINGENCY_UPDATE_MARGIN=20;
-const roleOf=p=>p.isPitcher?p.subtype||p.pos:p.pos;
-const sameRole=(a,b)=>Boolean(a.isPitcher)===Boolean(b.isPitcher)&&roleOf(a)===roleOf(b);
+export const CONTINGENCY_UPDATE_MARGIN=20;
+export const roleOf=p=>p.isPitcher?p.subtype||p.pos:p.pos;
+export const sameRole=(a,b)=>Boolean(a.isPitcher)===Boolean(b.isPitcher)&&roleOf(a)===roleOf(b);
+export function roleComparison(layer,player,minimum=1){
+ const peers=layer.filter(x=>sameRole(x.p,player));
+ const currents=peers.map(x=>x.current).filter(Number.isFinite).sort((a,b)=>b-a);
+ const currentBaseline=currents[Math.min(minimum,currents.length)-1]??0;
+ const young=peers.filter(x=>(x.p.age??25)<=24).map(x=>x.future).filter(Number.isFinite);
+ // No contemporary is not evidence of zero replacement quality. Use the
+ // established future floor and the actual role's current first-team level.
+ const futureBaseline=young.length?Math.max(...young):Math.max(60,currentBaseline);
+ return {currentBaseline,futureBaseline,futureSource:young.length?'young-peers':currents.length?'current-role':'absolute-standard'};
+}
 const rookieSalary=p=>Math.max(MIN_SALARY_SHIHAKA,Number.isFinite(p.salary)?p.salary:MIN_SALARY_SHIHAKA);
 const marketIds=(team,year)=>[...new Set((team.history||[]).filter(p=>p.exitYear===year
   &&['fa','waiver_fa','foreign_fa'].includes(p.exitReason)&&!isIkuseiPlayer(p)).map(p=>p.id))];
@@ -46,7 +56,8 @@ export function cpuRosterPlan(team,context={}){
 /** A planning guard, not a replacement for ranking or transaction validation. */
 export function assessCpuAddition(team,player,context={}){
  const plan=context.cpuPlan??cpuRosterPlan(team,context);let draftRemaining=plan.draftRemaining;
- const result=(eligible,reason,projectedCount)=>({eligible,reason,projectedCount,draftRemaining});
+ let comparison={};
+ const result=(eligible,reason,projectedCount)=>({eligible,reason,projectedCount,draftRemaining,...comparison});
  if(!plan.ok)return result(false,'invalid-capacity',null);
  const development=context.phase!=='draft'&&isIkuseiPlayer(player);
  draftRemaining=Math.min(plan.draftRemaining,Math.max(0,plan.remainingSlots-Number(!development)));
@@ -74,12 +85,11 @@ export function assessCpuAddition(team,player,context={}){
  const observer=context.publicEvaluation?null:team.id;
  const layer=context.layer??[...owned.map(p=>({p,current:ownedDraftCurrent(p),future:p.potential})),
   ...plan.acceptedPicks.map(p=>({p,...draftReport(context.evaluation,p.id,observer)}))];
- const peers=layer.filter(x=>sameRole(x.p,player)),minimum=role?.activeMinimum??1;
- const currents=peers.map(x=>x.current).filter(Number.isFinite).sort((a,b)=>b-a);
- const baseline=currents[Math.min(minimum,currents.length)-1]??0;
+ comparison=roleComparison(layer,player,role?.activeMinimum??1);
+ const baseline=comparison.currentBaseline;
  const report=context.report??{current:ownedDraftCurrent(player),future:player.potential};
  if(report.current>=50&&report.current>=baseline+CONTINGENCY_UPDATE_MARGIN)return result(true,'current-upgrade',projectedCount);
- const future=Math.max(0,...peers.filter(x=>(x.p.age||25)<=24).map(x=>x.future).filter(Number.isFinite));
+ const future=comparison.futureBaseline;
  if((player.age||25)<=24&&report.future>=60&&report.future>=future+CONTINGENCY_UPDATE_MARGIN)return result(true,'future-upgrade',projectedCount);
  return result(false,'normal-target',projectedCount);
 }

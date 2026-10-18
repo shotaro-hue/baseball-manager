@@ -1,4 +1,4 @@
-import {assessCpuAddition,cpuRosterPlan} from './rosterPlanning';
+import {assessCpuAddition,cpuRosterPlan,roleComparison} from './rosterPlanning';
 import {draftParticipation} from './draftConference';
 import {draftReport,ownedDraftCurrent} from './draftReports';
 import {evaluateOrganizationNeeds} from './organizationNeeds';
@@ -32,16 +32,18 @@ export function evaluateDraftContinuation(team,pool,round=1,acceptedPicks=[],con
     const minimum=role?.organizationMinimum ?? 1,activeMinimum=role?.activeMinimum ?? 1;
     const currents=peers.map(x=>x.current).filter(Number.isFinite).sort((a,b)=>b-a);
     const currentBaseline=currents[Math.min(activeMinimum,currents.length)-1] ?? 0;
-    const futureBaseline=Math.max(0,...peers.filter(x=>(x.p.age || 25)<=24).map(x=>x.future).filter(Number.isFinite));
+    const manual=String(team.id)===String(context.myId??context.evaluation?.myId);
+    const comparison=roleComparison(layer,p,activeMinimum);
+    const futureBaseline=manual?Math.max(0,...peers.filter(x=>(x.p.age || 25)<=24).map(x=>x.future).filter(Number.isFinite)):comparison.futureBaseline;
     const shortage=Math.max(0,minimum-peers.length);
     const reason=shortage>0&&(report.current>=50||report.future>=60) ? 'organization-shortage'
       : report.current>=50&&report.current>=currentBaseline+UPDATE_MARGIN ? 'current-upgrade'
         : (p.age || 25)<=24&&report.future>=60&&report.future>=futureBaseline+UPDATE_MARGIN ? 'future-upgrade' : 'no-upgrade';
     const rosterDecision=assessCpuAddition(team,p,{...context,draftPool,drafted,phase:'draft',report,layer,cpuPlan,organization,
-      manual:String(team.id)===String(context.myId??context.evaluation?.myId)});
+      manual});
     return {id:p.id,talentEligible:reason!=='no-upgrade',eligible:reason!=='no-upgrade'&&rosterDecision.eligible,reason:reason==='no-upgrade'||rosterDecision.eligible?reason:rosterDecision.reason,
       rosterReason:rosterDecision.reason,projectedCount:rosterDecision.projectedCount,current:report.current,future:report.future,
-      currentBaseline,futureBaseline,shortage};
+      currentBaseline,futureBaseline,futureSource:manual?'player-choice':comparison.futureSource,shortage};
   });
   const viable=new Set(decisions.filter(d=>d.eligible).map(d=>d.id));
   const candidates=pool.filter(p=>viable.has(p.id));
