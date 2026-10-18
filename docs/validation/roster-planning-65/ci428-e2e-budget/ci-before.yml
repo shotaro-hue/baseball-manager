@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main, test/restore-progression-e2e-main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: All unit and integration tests (including stress and physics)
+        run: npm test
+
+  progression-e2e-suites:
+    name: e2e-${{ matrix.suite.name }}
+    runs-on: ubuntu-latest
+    # Includes browser/OS dependency setup. Observed apt mirror delays consumed
+    # the former 15-minute budget before otherwise passing tests could finish.
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - name: initialization-and-progression
+            files: progression.smoke.spec.js initialization.spec.js draft.spec.js draft-decision.spec.js batch-results.spec.js
+          - name: qa-d1-draft-browser
+            files: --config=scripts/qa-d1-browser.config.js
+          - name: match-history
+            files: match-history.spec.js result-season-average.spec.js
+          - name: roster-settings
+            files: roster-settings.spec.js player-detail.spec.js first-team-stats.spec.js leaderboard.spec.js league-rankings.spec.js farm-rankings.spec.js farm-development.spec.js
+          - name: posting-and-finance
+            files: posting.spec.js finance.spec.js trade.spec.js club-comparison.spec.js
+          - name: save-integrity
+            files: save-generations.spec.js career-generations.spec.js
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium and WebKit
+        run: npx playwright install --with-deps chromium webkit
+      - name: Run E2E subset (one worker, no retries)
+        env:
+          QA_D1_CAPTURE: ${{ matrix.suite.name == 'qa-d1-draft-browser' && '1' || '' }}
+          QA_D1_STAGE: final-ci
+          QA_D1_EVIDENCE: test-results/qa-d1-evidence
+        run: npm run test:e2e -- ${{ matrix.suite.files }} --workers=1 --retries=0
+      - name: Upload E2E report and failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: progression-e2e-${{ matrix.suite.name }}-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+  # Keep the required check name stable. Any failed/cancelled suite fails the gate.
+  progression-e2e:
+    if: ${{ always() }}
+    needs: [progression-e2e-suites]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require every E2E suite to succeed
+        env:
+          SMOKE_SUITE_RESULT: ${{ needs['progression-e2e-suites'].result }}
+        run: test "$SMOKE_SUITE_RESULT" = success

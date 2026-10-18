@@ -159,8 +159,8 @@ export function buildOpportunityComparison(root='docs/validation/roster-planning
     ['初年度から複数年連続0',s=>s.cpuMultipleYearZero],['途中年からも含む複数年連続0',s=>s.cpuAnyMultipleYearZero],
     ['最長連続0（途中年含む）',s=>s.cpuLongestAnyZero],['野手初年度PA P10／中央値',s=>`${s.firstYearBatterPA.p10}／${s.firstYearBatterPA.median}`],
     ['投手初年度BF 最少／P10／中央値',s=>`${s.firstYearPitcherBF.min}／${s.firstYearPitcherBF.p10}／${s.firstYearPitcherBF.median}`],
-    ['CPU指名数',s=>s.picks],['CPU指名0最長継続',s=>s.longestZeroPick],['CPU FA獲得数',s=>s.faCount],
-    ['CPU FA支出（万円）',s=>s.faSalary],['CPU支配下分布',s=>JSON.stringify(s.controlled)],
+    ['CPU指名数',s=>s.picks],['CPU指名0最長継続',s=>s.longestZeroPick],['CPU市場獲得数',s=>s.faCount],
+    ['CPU市場支出（万円）',s=>s.faSalary],['CPU支配下分布',s=>JSON.stringify(s.controlled)],
     ['CPU捕手 最少～最多',s=>`${s.catchers.min}～${s.catchers.max}`],['CPU投手 最少～最多',s=>`${s.pitchers.min}～${s.pitchers.max}`],
     ['CPU予算負値',s=>s.negativeBudgets],['二軍未実施カード',s=>s.farmUnplayed],['保存・再開',s=>s.checkpoints]];
   const average=(rs,k)=>rs.reduce((n,r)=>n+r[k],0)/rs.length;
@@ -180,7 +180,7 @@ export function buildOpportunityComparison(root='docs/validation/roster-planning
     lines.push(`|${year}|${values(rs=>average(rs,'controlled').toFixed(2))}|${values(rs=>rs.filter(r=>r.controlled===70).length)}|${values(rs=>average(rs,'nominations').toFixed(2))}|${values(rs=>rs.filter(r=>!r.nominations).length)}|`);
   }
   lines.push('','## 年度別の修正版CPU出場量・財務','','年俸・予算・FA支出は万円。出場量は前年指名コホートの選手単位。','',
-    '|年度|捕手 最少～最多|野手PA P10／中央値|投手BF P10／中央値|FA人数／支出|平均年俸総額|平均予算|',
+    '|年度|捕手 最少～最多|野手PA P10／中央値|投手BF P10／中央値|市場人数／支出|平均年俸総額|平均予算|',
     '|---|---:|---:|---:|---:|---:|---:|');
   for(let year=2026;year<=2035;year++){
     const annual=rows.filter(r=>r.variant==='after'&&r.year===year&&r.teamId!==0);
