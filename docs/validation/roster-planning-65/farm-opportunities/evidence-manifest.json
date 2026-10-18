@@ -1,0 +1,129 @@
+{
+  "artifacts": [
+    {
+      "path": "after-20261015.file-prefix.log.gz",
+      "bytes": 7572,
+      "sha256": "e8e467a5265a16959e1d09aaadeadf14ed3ff1e98f010f15c03e758f3075d937"
+    },
+    {
+      "path": "after-20261015.completion.json",
+      "bytes": 2189,
+      "sha256": "ff0aced9bf2029f2c1e1cd0f16a7105a7a51bcb80718d089570193f17f1ebe29"
+    },
+    {
+      "path": "after-20261015.json.gz",
+      "bytes": 1395644,
+      "sha256": "13dc8a33843497f20b27c3ee9dd86bfa297948ea6d3aacf9076bad4d8a7039f5"
+    },
+    {
+      "path": "after-20261015.log.gz",
+      "bytes": 7994,
+      "sha256": "57e2a6a07851e92d1a87b9c850fd709850c28adffb277acf7653ad9d77a52058"
+    },
+    {
+      "path": "after-20261016.json.gz",
+      "bytes": 1388891,
+      "sha256": "973c083cfb86cc62d366dcb54419d966bb4b5c24610b8e4ffdfce9f5f3f0adc1"
+    },
+    {
+      "path": "after-20261016.log.gz",
+      "bytes": 5658,
+      "sha256": "d1634edbc5e02eed1ba4c7ef12ed9aa79ec5584b0576d0d01e380e4a212d66c6"
+    },
+    {
+      "path": "after-20261017.json.gz",
+      "bytes": 1387361,
+      "sha256": "015c7db20dac02ad9fda4602cd00e2401daf7a3c6965d8e0a47455117ef6f963"
+    },
+    {
+      "path": "after-20261017.log.gz",
+      "bytes": 5617,
+      "sha256": "a944cfb9314a42244ed01dd93d5f6c01c58bebaed7710c75bcb7bf166362eec7"
+    },
+    {
+      "path": "after-source-snapshot.json",
+      "bytes": 42160,
+      "sha256": "04a55b1a2406af69821923feeb3adfa001a85f18b059807741f9319152f50704"
+    },
+    {
+      "path": "original-roster.json.gz",
+      "bytes": 36056,
+      "sha256": "c64d8cc730607df735051502bfc3afd35b05ed0cf4590b81f37b3486420151fe"
+    },
+    {
+      "path": "farm-replay-red.log.gz",
+      "bytes": 697,
+      "sha256": "94f1ff774a0162642c263289cef0ec12786205a7ab463530ef28f888ed1ee3cd"
+    },
+    {
+      "path": "farm-replay-green.log.gz",
+      "bytes": 527,
+      "sha256": "5384e47e02fd09080769bb85ecd5c81a52f3b28ac7c3b5d38d5b7b8670dfa4b3"
+    },
+    {
+      "path": "farm-opportunity-unit.log.gz",
+      "bytes": 36613,
+      "sha256": "2c6a6abab00261ca2181106d60680155c790b2cf321cd3772de6ee1324e58271"
+    },
+    {
+      "path": "farm-opportunity-build.log.gz",
+      "bytes": 1569,
+      "sha256": "326068609ef58a6a230155a71b8b37ea015807b7aa8951a68df4e30dd88ac02a"
+    },
+    {
+      "path": "farm-opportunity-tools.log.gz",
+      "bytes": 615,
+      "sha256": "340178231440e2fdc0f40f649eb9a6d140411647c5300ea0590c8db08daedec6"
+    },
+    {
+      "path": "management-rollover-red.log.gz",
+      "bytes": 1023,
+      "sha256": "997feb2d31836ed899bb8f93df1f0fd51b287ae9b7a07510ff25b8ba56a2a4ea"
+    },
+    {
+      "path": "management-rollover-green-sequential.log.gz",
+      "bytes": 4739,
+      "sha256": "a1999df03d7b9a5c93aab12d3839005bca5ef029dad7e1d13e8798c5032c80f9"
+    },
+    {
+      "path": "opportunity-missing-red.log.gz",
+      "bytes": 687,
+      "sha256": "8243ace596e01f49a92c6172ee51dd1492499fcc5bcdb51474e56b64a77a1b37"
+    },
+    {
+      "path": "opportunity-margin-red.log.gz",
+      "bytes": 794,
+      "sha256": "ee92afedebcbe4113d4cd774156148a947ebf143846aa8c6ba855d5febd714a8"
+    },
+    {
+      "path": "opportunity-tools-final.log.gz",
+      "bytes": 607,
+      "sha256": "696b94f37906d3338ccbbbefa90cf0a12bd1fb2762644f0475b358cf69d4e338"
+    },
+    {
+      "path": "cpu-opportunity-red-expanded.log.gz",
+      "bytes": 1681,
+      "sha256": "589960e67592522081a0a95d58b232737f349edfc3cca2348f750f1c906ba3e8"
+    },
+    {
+      "path": "cpu-opportunity-green.log.gz",
+      "bytes": 2055,
+      "sha256": "5e4a16b36b14e3f331daa35b54e6e320d175fe806cac9a260cdd72799e71d0fc"
+    },
+    {
+      "path": "cpu-opportunity-catcher-green.log.gz",
+      "bytes": 313,
+      "sha256": "8a36d46397e5c7e0af971ff40107f6f8c2eb579ceee24b03ab35050bd446e948"
+    },
+    {
+      "path": "cpu-opportunity-build.log.gz",
+      "bytes": 1563,
+      "sha256": "e9ce44e8e20ddfe885dc43737214551b6e9bdc142c007630ea327de18b119963"
+    },
+    {
+      "path": "opportunity-capture-green.log.gz",
+      "bytes": 621,
+      "sha256": "ce71e3014f21ea1e7ee16650baafd56c498a6934fc1064d7cc7ea0604ad873d2"
+    }
+  ]
+}

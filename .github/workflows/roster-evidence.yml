@@ -6,8 +6,11 @@ on:
     paths:
       - .github/workflows/roster-evidence.yml
       - docs/validation/roster-planning-65/ten-year/**
+      - docs/validation/roster-planning-65/farm-opportunities/**
+      - scripts/summarize-farm-opportunities.mjs
       - scripts/summarize-roster-long-run.mjs
       - scripts/roster-long-run-log.mjs
+      - scripts/roster-completion-capture.mjs
       - scripts/verify-roster-long-evidence.mjs
   workflow_dispatch:
 
@@ -23,5 +26,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Recheck all six retained runs without repeating the simulation
+      - name: Recheck retained comparisons, calibrations and final acceptance without repeating the simulation
         run: node scripts/verify-roster-long-evidence.mjs

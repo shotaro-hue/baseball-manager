@@ -1,0 +1,1 @@
+export default { esbuild:{jsx:'automatic'}, test:{globals:true,environment:'node',pool:'forks',poolOptions:{forks:{execArgv:['--expose-gc','--max-old-space-size=2300']}},include:['.superpowers/validation/opportunity-followup/probe.test.js'],testTimeout:3600000} };

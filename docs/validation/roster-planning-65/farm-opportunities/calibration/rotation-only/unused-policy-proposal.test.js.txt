@@ -1,0 +1,73 @@
+// Investigation only: this unimplemented policy proposal was superseded by
+// the verified year-rollover cadence defect. Original failing expectations
+// are retained verbatim here; final long-run acceptance still requires no
+// consecutive measured zero-opportunity seasons.
+import { expect, it } from 'vitest';
+import { FIELDING_POSITIONS, MAX_ROSTER, OPTIMAL_PITCHER_COUNT } from '../src/constants';
+import { applyManagementPolicy, buildAutoManagedRoster, validateTeamRoster } from '../src/engine/rosterAutomation';
+import { batter, pitcher, freeze } from '../src/engine/__tests__/farmFixtures';
+
+const stats=PA=>({PA,AB:PA,H:Math.floor(PA/4),HR:0,BB:0,HBP:0,K:0,BF:0,IP:0});
+const hit=(id,pos,ability,PA=20)=>batter(id,pos,{age:24,potential:ability,stats:stats(PA),
+  batting:Object.fromEntries(['contact','power','eye','stamina','speed','arm','defense','catching'].map(k=>[k,ability]))});
+function fixture(){
+  const regulars=FIELDING_POSITIONS.map((pos,i)=>hit(`regular-${i}`,pos,pos==='捕手'?40:90,100));
+  const target=hit('unused-dh','三塁手',70,0),catchers=[hit('reserve-c1','捕手',30),hit('reserve-c2','捕手',30)];
+  const batters=[...regulars,target,...catchers];
+  while(batters.length<MAX_ROSTER-OPTIMAL_PITCHER_COUNT)batters.push(hit(`reserve-${batters.length}`,'一塁手',30));
+  const farm=[hit('replacement','三塁手',60,0),...Array.from({length:3},(_,i)=>hit(`farm-c${i}`,'捕手',25,0)),
+    ...Array.from({length:6},(_,i)=>hit(`farm-b${i}`,'一塁手',20,0)),...Array.from({length:6},(_,i)=>pitcher(`farm-p${i}`))];
+  const source={id:1,name:'CPU',league:'セ',dhEnabled:false,rosterDhMode:false,managementPolicyId:'results',managementTraitId:'steady',
+    players:[...batters,...Array.from({length:OPTIMAL_PITCHER_COUNT},(_,i)=>pitcher(`active-p${i}`,{stats:stats(0)}))],farm};
+  const t=buildAutoManagedRoster(source),farmUsage=Object.fromEntries(farm.filter(p=>!p.isPitcher).map(p=>[p.id,{battingGames:40,battingPA:150}]));
+  return {t,farmUsage};
+}
+
+it('moves an unused DH-only reserve to actual farm practice at the normal roster-review interval',()=>{
+  const {t,farmUsage}=fixture(),before=structuredClone(t);
+  expect(t.lineupNoDh).not.toContain('unused-dh');expect(t.lineupDh).toContain('unused-dh');
+  const result=applyManagementPolicy(freeze(t),{gameDay:70,automationMode:'full',farmUsage:freeze(farmUsage)});
+  expect(result.farm.some(p=>p.id==='unused-dh')).toBe(true);
+  expect(result.farm.find(p=>p.id==='unused-dh').registrationCooldownDays).toBe(10);
+  expect(result.players).toHaveLength(MAX_ROSTER);expect(validateTeamRoster(result).valid).toBe(true);
+  expect(result.players.filter(p=>p.pos==='捕手')).toHaveLength(3);
+  expect(result.farm.some(p=>p.pos==='捕手'&&!p.injuryDaysLeft)).toBe(true);
+  expect([...result.players,...result.farm].map(p=>p.id).sort()).toEqual([...before.players,...before.farm].map(p=>p.id).sort());
+  expect(t).toEqual(before);
+});
+
+it.each(['manual','emergency'])('keeps %s membership unchanged even with opportunity measurements',mode=>{
+  const {t,farmUsage}=fixture();const r=applyManagementPolicy(t,{gameDay:70,automationMode:mode,farmUsage});
+  expect(r.players.map(p=>p.id)).toEqual(t.players.map(p=>p.id));expect(r.farm.map(p=>p.id)).toEqual(t.farm.map(p=>p.id));
+});
+
+it('does not use a forced repair before the next scheduled review to rotate healthy reserves',()=>{
+  const {t,farmUsage}=fixture();t.managementMeta={lastRosterDay:69};
+  const r=applyManagementPolicy(t,{gameDay:70,force:true,automationMode:'full',farmUsage});
+  expect(r.players.some(p=>p.id==='unused-dh')).toBe(true);
+});
+
+it('keeps missing or legacy-only farm measurements out of the opportunity decision',()=>{
+  const {t}=fixture();t.farm.forEach(p=>{p.stats2={PA:999};});
+  for(const farmUsage of [undefined,{}]){
+    const r=applyManagementPolicy(t,{gameDay:70,automationMode:'full',farmUsage});
+    expect(r.players.some(p=>p.id==='unused-dh')).toBe(true);
+  }
+});
+
+it('keeps field starters and required catchers registered while rotating at most one reserve',()=>{
+  const {t,farmUsage}=fixture();t.players.filter(p=>!p.isPitcher).forEach(p=>{p.stats=stats(0);});
+  const r=applyManagementPolicy(t,{gameDay:70,automationMode:'full',farmUsage});
+  for(const id of t.lineupNoDh)expect(r.players.some(p=>p.id===id)).toBe(true);
+  expect(r.players.filter(p=>p.pos==='捕手')).toHaveLength(3);
+  expect(t.players.filter(p=>!r.players.some(x=>x.id===p.id))).toHaveLength(1);
+});
+
+it('honors foreign-active and registration-cooldown eligibility for the replacement',()=>{
+  const {t,farmUsage}=fixture();
+  t.players.filter(p=>!p.isPitcher).slice(0,3).forEach(p=>{p.isForeign=true;});t.players.find(p=>p.isPitcher).isForeign=true;
+  t.farm.find(p=>p.id==='replacement').isForeign=true;
+  t.farm.filter(p=>p.id!=='replacement').forEach(p=>{p.registrationCooldownDays=10;});
+  const r=applyManagementPolicy(t,{gameDay:70,automationMode:'full',farmUsage});
+  expect(r.players.some(p=>p.id==='unused-dh')).toBe(true);
+});

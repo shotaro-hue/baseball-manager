@@ -1,0 +1,89 @@
+{
+  "artifacts": [
+    {
+      "path": "after-source-snapshot.json",
+      "bytes": 42146,
+      "sha256": "888e791f49780b64ca3ef44d3219a1a1f0d92f7d2d1f386fa1b6372d021d8764"
+    },
+    {
+      "path": "after-20261015.json.gz",
+      "bytes": 1394218,
+      "sha256": "285ee8dbfe26964191dde0321f07f0ba29da7a7cab489687b7a366ea6a60b5f8"
+    },
+    {
+      "path": "after-20261015.log.gz",
+      "bytes": 4005,
+      "sha256": "66afcc9d4d71a83590235b0bd76a644fbf796f19eb7044bfb477cd9b5081650b"
+    },
+    {
+      "path": "after-20261017.json.gz",
+      "bytes": 1390287,
+      "sha256": "026d5be42c75e163724c2177abcaf27a1dfe7f725b135e16f842bd27c7b6e644"
+    },
+    {
+      "path": "after-20261017.log.gz",
+      "bytes": 5714,
+      "sha256": "3714e5cdff39b7c02a79d08fad0cf9a2aadf64243ff8ac7cee40c9498d4c3267"
+    },
+    {
+      "path": "cadence-review.json",
+      "bytes": 17854,
+      "sha256": "a8c4468d34c1361cf6553e2fed9e4ac18cdcc670d6ec82c480f5a795e1d54244"
+    },
+    {
+      "path": "active-reserve-run.json.gz",
+      "bytes": 1252413,
+      "sha256": "7f6e8986e149ab18fac1287302294186eede72f0733a1f73c667f9ec80eb247b"
+    },
+    {
+      "path": "active-reserve-probe.json.gz",
+      "bytes": 764484,
+      "sha256": "8ac9e68974f067dca8dee2d9e2292098223b03f3c464260ebbd9dbc02e9ec167"
+    },
+    {
+      "path": "active-reserve.log.gz",
+      "bytes": 5168,
+      "sha256": "ef7f913123256cb5aa943f455cd3bbbb875e9db77ca8830a40977b3f0261a625"
+    },
+    {
+      "path": "diagnostic-without-review-metadata-stopped.log.gz",
+      "bytes": 3056,
+      "sha256": "a12f0e2421e1ab9fd49aa032ee240ffd5fb65f30734b18eccf13d94e0866073f"
+    },
+    {
+      "path": "diagnostic-runner.test.js.txt",
+      "bytes": 3290,
+      "sha256": "a1614680e8566715741eb1bcd886b84e9677227730ff080476e5ef428cbe712c"
+    },
+    {
+      "path": "diagnostic-config.mjs.txt",
+      "bytes": 265,
+      "sha256": "d041d152fffb271313c458184e0abe62e8b4e31d1793f1e4366544e024fb1d3d"
+    },
+    {
+      "path": "cpu-opportunity-red-expanded.log.gz",
+      "bytes": 1681,
+      "sha256": "589960e67592522081a0a95d58b232737f349edfc3cca2348f750f1c906ba3e8"
+    },
+    {
+      "path": "cpu-opportunity-green.log.gz",
+      "bytes": 2055,
+      "sha256": "5e4a16b36b14e3f331daa35b54e6e320d175fe806cac9a260cdd72799e71d0fc"
+    },
+    {
+      "path": "cpu-opportunity-catcher-green.log.gz",
+      "bytes": 313,
+      "sha256": "8a36d46397e5c7e0af971ff40107f6f8c2eb579ceee24b03ab35050bd446e948"
+    },
+    {
+      "path": "cpu-opportunity-build.log.gz",
+      "bytes": 1563,
+      "sha256": "e9ce44e8e20ddfe885dc43737214551b6e9bdc142c007630ea327de18b119963"
+    },
+    {
+      "path": "cpu-opportunity-flow-debug.log.gz",
+      "bytes": 1285,
+      "sha256": "90f04fb6a4a2961fa54a89d27d2fa1f8c28769bee746ca1874cf456589a4d0b5"
+    }
+  ]
+}

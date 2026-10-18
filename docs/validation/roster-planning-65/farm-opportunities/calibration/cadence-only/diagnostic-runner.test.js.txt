@@ -1,0 +1,46 @@
+import {beforeEach,afterEach,vi} from 'vitest';
+import {mkdirSync,writeFileSync} from 'node:fs';
+import * as farm from '../../../src/engine/farmSelection';
+import * as progress from '../../../src/engine/farmProgression';
+import * as regular from '../../../src/engine/regularGameUpdates';
+import * as roster from '../../../src/engine/rosterAutomation';
+import {shouldRunRosterManagement} from '../../../src/engine/managementPolicy';
+import {registerRosterLongRun} from '../../../scripts/roster-capacity-long-run';
+const id=process.env.OPPORTUNITY_PROBE_ID||'299vk0p',seed=Number(process.env.OPPORTUNITY_PROBE_SEED||20261016),years=Number(process.env.OPPORTUNITY_PROBE_YEARS||3);
+const report={id,seed,years,mode:'read-only forwarding, original functions and RNG',farmDays:[],officialDays:[],snapshots:[],managementDays:[],reviewSnapshots:[]};
+let year;
+beforeEach(()=>{
+ const manage=roster.applyManagementPolicy;
+ const manageSpy=vi.spyOn(roster,'applyManagementPolicy').mockImplementation((t,o)=>{
+  const p=[...t.players,...t.farm].find(p=>p.id===id),scheduled=shouldRunRosterManagement(t,o.gameDay),out=manage(t,o);
+  if(p&&o.gameDay>1){
+   report.managementDays.push({year,round:o.gameDay,active:t.players.some(p=>p.id===id),injury:p.injuryDaysLeft,
+    PA:p.stats?.PA,scheduled,force:o.force===true,lastRosterDay:t.managementMeta?.lastRosterDay,
+    afterRosterDay:out.managementMeta?.lastRosterDay,afterActive:out.players.some(p=>p.id===id)});
+   if(scheduled&&p.stats?.PA===0&&!report.reviewSnapshots.some(s=>s.year===year))report.reviewSnapshots.push({year,round:o.gameDay,team:JSON.parse(JSON.stringify(t))});
+  }
+  manageSpy.mockClear();return out;
+ });
+ const prepare=progress.prepareFarmProgress;
+ const prepareSpy=vi.spyOn(progress,'prepareFarmProgress').mockImplementation((s,teams,round)=>{
+  year=s.year;const out=prepare(s,teams,round);prepareSpy.mockClear();return out;
+ });
+ const select=farm.selectFarmTeam;
+ const selectSpy=vi.spyOn(farm,'selectFarmTeam').mockImplementation((t,o)=>{
+  const out=select(t,o),p=[...t.players,...t.farm].find(p=>p.id===id);
+  if(p)report.farmDays.push({year,round:o.round,active:t.players.some(p=>p.id===id),farm:t.farm.some(p=>p.id===id),
+   injury:p.injuryDaysLeft,condition:p.condition,selected:out.lineup?.some(x=>x.player.id===id)||false});
+  if(p&&o.round===1)report.snapshots.push({year,team:JSON.parse(JSON.stringify(t))});
+  selectSpy.mockClear();return out;
+ });
+ const update=regular.applyRegularSeasonTeamUpdate;
+ const updateSpy=vi.spyOn(regular,'applyRegularSeasonTeamUpdate').mockImplementation((t,r,o,rules)=>{
+  const p=[...t.players,...t.farm].find(p=>p.id===id),out=update(t,r,o,rules);
+  if(p)report.officialDays.push({year:o.year,round:o.gameDay,active:t.players.some(p=>p.id===id),injury:p.injuryDaysLeft,
+   lineup:t.lineup?.includes(id)||false,lineupDh:t.lineupDh?.includes(id)||false,lineupNoDh:t.lineupNoDh?.includes(id)||false,
+   actualBatEvents:(r.log||[]).filter(e=>e.batId===id&&e.scorer===o.isFirstTeam&&e.result&&e.result!=='change').length});
+  updateSpy.mockClear();return out;
+ });
+});
+afterEach(()=>{const dir=process.env.ROSTER_LONG_EVIDENCE;mkdirSync(dir,{recursive:true});writeFileSync(`${dir}/single-year-zero-probe.json`,JSON.stringify(report,null,2)+'\n');});
+registerRosterLongRun(seed,years);
