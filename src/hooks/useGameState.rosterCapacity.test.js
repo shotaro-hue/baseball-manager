@@ -2,11 +2,19 @@ import React from 'react';
 import { act, create } from 'react-test-renderer';
 import { afterEach, expect, it, vi } from 'vitest';
 import { useGameState } from './useGameState';
+import { startClubFinance } from '../engine/clubFinance';
 vi.mock('../engine/saveload',()=>({hasSave:()=>false,getAutoSaveIntervalMs:()=>30000,getSaveQueueSnapshot:()=>({isSaving:false})}));
 let view,gs;
 afterEach(()=>{if(view)act(()=>view.unmount());view=null;});
 const roster=(n)=>({id:0,name:'球団',budget:10000,players:[],farm:[...Array.from({length:n},(_,i)=>({id:`p${i}`,salary:500})),{id:'dev',isIkusei:true,salary:240}],scoutResults:[{id:'scout',name:'新人',salary:500}],history:[]});
 function setup(n=69,plan=null){function Harness(){gs=useGameState();return null;}act(()=>{view=create(React.createElement(Harness));});act(()=>{gs.setMyId(0);gs.setYear(2026);gs.setTeams([roster(n)]);gs.setOffseasonPlan(plan);});}
+it('uses the same new-model upgrade cost and refuses repeated stale spending beyond the budget', () => {
+ setup(); act(() => gs.setTeams([startClubFinance({ ...roster(69), budget: 110000, stadiumLevel: 0 }, 2026)]));
+ const upgrade = gs.handleStadiumUpgrade;
+ act(() => { upgrade(); upgrade(); });
+ expect(gs.myTeam.stadiumLevel).toBe(1);
+ expect(gs.myTeam.budget).toBe(10000);
+});
 it('blocks direct promotion of isIkusei-only players and clears both flags on conversion once',()=>{
  setup();act(()=>gs.promote('dev'));expect(gs.myTeam.players).toHaveLength(0);
  const convert=gs.convertIkusei;act(()=>{convert('dev');convert('dev');});

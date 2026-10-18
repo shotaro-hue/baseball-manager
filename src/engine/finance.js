@@ -7,6 +7,8 @@ import {
   TEAM_STADIUM_CAPACITY,
 } from '../constants';
 import { clamp } from '../utils';
+export { startClubFinance, calcClubGameFinance, applyClubGameFinance, forecastClubFinance, nextClubBudget,
+  validateClubFinance, stadiumUpgradeCosts } from './clubFinance';
 
 /* ═══════════════════════════════════════════════
    FINANCE

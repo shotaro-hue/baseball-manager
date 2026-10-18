@@ -1,0 +1,11 @@
+{
+  "sourceCommit": "7ce1b3ac322a86838c62e26df8508df3e12f8984",
+  "seeds": [
+    20261016
+  ],
+  "variant": "finance",
+  "exitCode": 0,
+  "signal": null,
+  "report": "/tmp/club-finance-real/vitest-20261016.json",
+  "finishedAt": "2026-10-18T14:25:01.209Z"
+}

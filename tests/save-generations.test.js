@@ -2,6 +2,7 @@ import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { IDBFactory, IDBObjectStore } from 'fake-indexeddb';
 import { saveGame, loadGame, hasSave, enqueueSaveGame } from '../src/engine/saveload';
 import { openBaseballManagerDb } from '../src/engine/baseballManagerDb';
+import { startClubFinance, applyClubGameFinance } from '../src/engine/clubFinance';
 const primary = 'baseball_manager_v1', bk1 = primary + '_bk1', bk2 = primary + '_bk2';
 let rows;
 const state = (day = 1, saveId = 'game-a') => ({ teams: [{ id: 0, name: '球団', players: [], farm: [] }], myId: 0,
@@ -13,6 +14,20 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const save = (s, opts = {}) => saveGame(s, { skipCompression: true, ...opts });
 const parsed = () => JSON.parse(rows.get(primary));
+
+it('persists new club receipts exactly and restores a valid backup on corrupt introduced finance', async () => {
+ const s = state(2);
+ s.teams = [applyClubGameFinance(startClubFinance({ ...s.teams[0], budget: 500000, popularity: 50 }, 2026),
+   { year: 2026, gameDay: 1, isHomeTeam: true })];
+ expect((await save(s)).ok).toBe(true);
+ expect((await loadGame()).teams[0].clubFinance).toEqual(s.teams[0].clubFinance);
+ await save({ ...s, gameDay: 3 });
+ const broken = parsed(); broken.teams[0].clubFinance.operatingSurplus += 1;
+ rows.set(primary, JSON.stringify(broken));
+ const restored = await loadGame();
+ expect(restored.gameDay).toBe(2);
+ expect(restored.teams[0].clubFinance).toEqual(s.teams[0].clubFinance);
+});
 async function chunks() { const db = await openBaseballManagerDb(); return new Promise((res, rej) => {
  const tx = db.transaction('save_chunks', 'readonly'), store = tx.objectStore('save_chunks');
  const keys = store.getAllKeys(), values = store.getAll();

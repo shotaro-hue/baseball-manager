@@ -3,6 +3,7 @@ import { INJURY_HISTORY_MAX } from '../constants';
 import { applyGameStatsFromLog, applyPostGameCondition } from './postGame';
 import { applyPopularityDelta } from './fanSentiment';
 import { calcRevenue } from './finance';
+import { applyClubGameFinance } from './clubFinance';
 
 function tickCooldowns(players) {
   return players.map(p => (p.registrationCooldownDays ?? 0) > 0
@@ -44,8 +45,10 @@ export function applyRegularSeasonTeamUpdate(team, result, { isFirstTeam, isHome
     wins: (team.wins ?? 0) + (won ? 1 : 0), losses: (team.losses ?? 0) + (!won && !drew ? 1 : 0),
     draws: (team.draws ?? 0) + (drew ? 1 : 0), rf: (team.rf ?? 0) + scoreFor, ra: (team.ra ?? 0) + scoreAgainst,
     rotIdx: (team.rotIdx ?? 0) + 1, ...applyPopularityDelta(team, won, drew) };
-  // Preserve the game's per-played-game revenue model. Home-only revenue is a
-  // separate economy change; here every participating club follows one rule.
+  if (team.clubFinance !== undefined) {
+    return { team: applyClubGameFinance(updated, { year, gameDay, isHomeTeam }), injuries };
+  }
+  // A pre-model save completes its current year using its original receipts.
   const revenue = calcRevenue(updated);
   const total = revenue.ticket + revenue.sponsor + revenue.merch;
   updated.budget = (team.budget ?? 0) + total;
