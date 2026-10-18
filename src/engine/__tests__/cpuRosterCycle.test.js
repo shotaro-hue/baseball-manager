@@ -4,7 +4,7 @@ import {evaluateDraftContinuation} from '../draftContinuation';
 import {ensureDraftEvaluation} from '../draftReports';
 import {newDraftRules} from '../draftConference';
 import * as cycle from '../cpuRosterCycle';
-import {cpuRenewContracts} from '../contract';
+import {cpuRenewContracts,processCpuFaBids} from '../contract';
 import {ownedPlayers} from '../renewalRules';
 
 const skills=q=>Object.fromEntries(['contact','power','eye','speed','defense','catching','arm'].map(k=>[k,q]));
@@ -117,4 +117,14 @@ it('does not spend through a NaN reserve when ownership cannot be validated',()=
  const duplicate=p('duplicate'),t={...balanced(65),budget:0,players:[duplicate],farm:[duplicate]};
  const before=structuredClone(t),result=cpuRenewContracts([t],0,[t],{year:2026});
  expect(result.updatedTeams[0].budget).toBe(0);expect(result.updatedTeams[0]).toEqual(before);
+});
+it('keeps the surviving rookie opportunity when an earlier market signing covers another planned role',()=>{
+ const t=balanced(65),pool=[p('rookie-1B',60,{age:18,potential:90}),p('rookie-2B',60,{pos:'二塁手',age:18,potential:95})];
+ const ctx={...draftContext(t,pool,60,90),cpuOpportunityPlanning:1};ctx.evaluation.teams[t.id]['rookie-1B'].future=99;ctx.evaluation.teams[t.id]['rookie-2B'].future=96;
+ const market=(id,pos,q,potential)=>p(id,q,{pos,age:22,potential,trust:60,hometown:'東京',personality:{money:100,winning:0,playing:0,hometown:0,loyalty:0,stability:0,future:0}});
+ const fa=[market('star-1B','一塁手',99,99),market('star-3B','三塁手',99,99),market('star-SS','遊撃手',99,99),market('star-RF','右翼手',99,99),market('inferior','左翼手',65,86)];
+ const r=processCpuFaBids([t],0,fa,[t],2026,'offseason',ctx);
+ expect(r.claimed.map(c=>c.player.id)).toEqual(fa.slice(0,4).map(p=>p.id));
+ expect(r.remainingFaPool.map(p=>p.id)).toEqual(['inferior']);
+ expect(ownedPlayers(r.updatedTeams[0])).toHaveLength(69);
 });

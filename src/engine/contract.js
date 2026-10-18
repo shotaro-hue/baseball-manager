@@ -396,13 +396,16 @@ export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = nu
       const needs = analyzeTeamNeeds(team);
       const plan = getFrontOfficePlanPublic(team);
       const foMode = plan.mode;
+      // Re-evaluate once for this actual roster, retaining the feasible IDs,
+      // not a prefix of the older plan after a previous signing covers a role.
+      const currentRosterPlan=cpuRosterPlan(team,{...draftContext,phase,teams:[...teamMap.values()],rosterPlan:rosterPlans.get(team.id)});
       const candidates = remainingPool
         .filter((p) => !signedPlayers.has(p.id) && !marketRosterError(team, p, [...teamMap.values()], draftContext))
         .map((p) => {
           if (!Number.isFinite(p.salary) || p.salary < 0) return null;
           const salary = Math.max(p.育成 ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA, p.salary);
           if (team.budget - reserve < salary) return null;
-          const rosterDecision=assessCpuAddition(team,p,{...draftContext,phase,teams:[...teamMap.values()],rosterPlan:rosterPlans.get(team.id),salary});
+          const rosterDecision=assessCpuAddition(team,p,{...draftContext,phase,teams:[...teamMap.values()],cpuPlan:currentRosterPlan,salary});
           if(!rosterDecision.eligible)return null;
           const r = evalOffer(p, { salary, years: 1 }, team, allTeams);
           const needBonus = calcNeedMatch(p, needs);
@@ -433,9 +436,9 @@ export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = nu
       const historyRecord = { ...newPlayerEntry, exitYear: currentYear ?? 0, exitReason: acquireReason, tenure: 0,rosterDecision:best.rosterDecision.reason };
       emitCpuDecision({type:'market-sign',teamId:team.id,year:currentYear,id:player.id,kind:acquireReason,
         ...best.rosterDecision,salary:best.salary,budgetBefore:team.budget,budgetAfter:team.budget-best.salary,
-        rookieReserveBefore:rosterPlans.get(team.id).rookieReserve});
-      rosterPlans.set(team.id,{...rosterPlans.get(team.id),draftRemaining:best.rosterDecision.draftRemaining,
-        ...(rosterPlans.get(team.id).draftOpportunities?{draftOpportunities:rosterPlans.get(team.id).draftOpportunities.slice(0,best.rosterDecision.draftRemaining)}:{})});
+        rookieReserveBefore:currentRosterPlan.rookieReserve});
+      rosterPlans.set(team.id,{...currentRosterPlan,draftRemaining:best.rosterDecision.draftRemaining,
+        ...(currentRosterPlan.draftOpportunities?{draftOpportunities:currentRosterPlan.draftOpportunities.slice(0,best.rosterDecision.draftRemaining)}:{})});
 
       if (goToFarm) {
         teamMap.set(team.id, {
