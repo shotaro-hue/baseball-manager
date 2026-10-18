@@ -1,5 +1,6 @@
 import {ownedPlayers} from '../src/engine/renewalRules';
 import {controlledRosterCounts,isIkuseiPlayer} from '../src/engine/rosterCapacity';
+import {ownedDraftCurrent} from '../src/engine/draftReports';
 
 const marketReasons=new Set(['fa','waiver_fa','foreign_fa','FA獲得','戦力外獲得','外国人獲得']);
 const measured=value=>Number.isFinite(value)?value:null;
@@ -15,9 +16,9 @@ export function rosterRows(state,rookieIds=new Set()) {
    // including another club's farm stint before a deadline trade.
    const record=farm.get(p.id),stints=record?.teams||[];
    const sum=(kind,key)=>stints.reduce((n,t)=>n+(t[kind]?.[key]||0),0);
-   return {id:p.id,age:p.age,pos:p.pos,isPitcher:Boolean(p.isPitcher),development:isIkuseiPlayer(p),
+   return {id:p.id,age:p.age,pos:p.pos,subtype:p.subtype??null,isPitcher:Boolean(p.isPitcher),development:isIkuseiPlayer(p),
     roster:active.has(p.id)?'active':'farm',rookie:rookieIds.has(p.id),serviceYears:p.serviceYears??null,
-    salary:p.salary,potential:p.potential,current:p.batting?.catching??null,
+    salary:p.salary,potential:p.potential,current:ownedDraftCurrent(p),
     PA:measured(p.stats?.PA),BF:measured(p.stats?.BF),IP:measured(p.stats?.IP),
     farmRecorded:stints.length>0,farmPA:sum('batting','PA'),farmBF:sum('pitching','BF'),farmOuts:sum('pitching','outs')};
   });

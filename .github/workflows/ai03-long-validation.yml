@@ -1,0 +1,94 @@
+name: AI-03 ten-year comparison
+
+# Revision 1: isolated identical Node24 jobs; retained failures remain artifacts.
+on:
+  push:
+    branches: [feat/ai-03-roster-cycle]
+    paths: [.github/workflows/ai03-long-validation.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  seed:
+    name: ${{ matrix.variant }}-${{ matrix.seed }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [before, after]
+        seed: [20261015, 20261016, 20261017]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: actions/checkout@v4
+        if: matrix.variant == 'before'
+        with:
+          ref: 270edd8286762c1de5949953e1887bdb286e36ee
+          path: baseline
+      - name: Use the same diagnostic harness on the fixed baseline
+        if: matrix.variant == 'before'
+        run: |
+          for file in ai03-roster-long-run.js run-ai03-long-run.mjs roster-capacity-long-run.js roster-capacity-metrics.js roster-career-evidence.js fake-indexeddb-prune.js roster-long-run-source.mjs run-roster-long-run.mjs; do
+            cp "scripts/$file" "baseline/scripts/$file"
+          done
+          ln -s "$GITHUB_WORKSPACE/node_modules" baseline/node_modules
+      - name: Run ten real seasons, contracts, market, draft and save/reload
+        shell: bash
+        env:
+          VARIANT: ${{ matrix.variant }}
+          SEED: ${{ matrix.seed }}
+        run: |
+          set -o pipefail
+          evidence="$GITHUB_WORKSPACE/evidence/$VARIANT"
+          mkdir -p "$evidence"
+          if [ "$VARIANT" = before ]; then cd baseline; fi
+          git archive --format=tar.gz HEAD src package.json package-lock.json > "$evidence/source-application.tar.gz"
+          tar -czf "$evidence/source-harness.tar.gz" scripts/ai03-roster-long-run.js scripts/run-ai03-long-run.mjs scripts/roster-capacity-metrics.js scripts/roster-career-evidence.js scripts/fake-indexeddb-prune.js scripts/roster-long-run-source.mjs scripts/roster-capacity-long-run.js scripts/run-roster-long-run.mjs
+          node scripts/run-ai03-long-run.mjs "$VARIANT" "$evidence" "$SEED" 2>&1 | tee "$evidence/seed-$SEED.log"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ai03-${{ matrix.variant }}-${{ matrix.seed }}
+          path: evidence/${{ matrix.variant }}/
+          retention-days: 90
+          if-no-files-found: error
+
+  comparison:
+    needs: seed
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ai03-before-*
+          path: evidence/before
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ai03-after-*
+          path: evidence/after
+          merge-multiple: true
+      - name: Require all six complete runs and compare safety and circulation
+        env:
+          SEED_RESULT: ${{ needs.seed.result }}
+        run: |
+          test "$SEED_RESULT" = success
+          node scripts/summarize-ai03.mjs evidence/before evidence/after evidence/comparison
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ai03-comparison
+          path: evidence/
+          retention-days: 90
+          if-no-files-found: error
