@@ -49,7 +49,8 @@ export function planCpuRenewals(team,context={}){
   const healthy=p=>!(p.injuryDaysLeft>0);
   const healthyBefore=layer.filter(x=>sameRole(x.p,row.p)&&healthy(x.p)).length;
   if(peers.length<depthMinimum(row.p)||peers.filter(x=>healthy(x.p)).length<Math.min(depthMinimum(row.p),healthyBefore))continue;
-  const comparison=roleComparison(remaining,row.p,activeMinimum(row.p));
+  const plannedProspects=replacements.map(r=>candidates.find(c=>c.p.id===r.prospectId));
+  const comparison=roleComparison([...remaining,...plannedProspects],row.p,activeMinimum(row.p));
   const options=candidates.filter(r=>!unavailable.has(r.p.id)&&sameRole(r.p,row.p)
     &&!(row.p.age<=24&&Number.isFinite(row.future)&&row.future>r.future)
     &&((r.current>=50&&r.current>=row.current+10)
@@ -58,8 +59,9 @@ export function planCpuRenewals(team,context={}){
   const projected={...team,players:(team.players||[]).filter(p=>!releaseIds.includes(p.id)&&p.id!==row.p.id),
     farm:(team.farm||[]).filter(p=>!releaseIds.includes(p.id)&&p.id!==row.p.id)};
   const projectedTeams=(context.teams||[team]).map(t=>t.id===team.id?projected:t);
-  const viable=new Set(evaluateDraftContinuation(projected,options.map(r=>r.p),1,[],{
-    ...context,teams:projectedTeams,rules:newDraftRules()}).candidates.map(p=>p.id));
+  const projectedDrafted={...context.drafted,...Object.fromEntries(replacements.map(r=>[r.prospectId,team.id]))};
+  const viable=new Set(evaluateDraftContinuation(projected,options.map(r=>r.p),1,plannedProspects.map(r=>r.p),{
+    ...context,drafted:projectedDrafted,teams:projectedTeams,rules:newDraftRules()}).candidates.map(p=>p.id));
   const replacement=options.find(r=>viable.has(r.p.id)&&rookieReserve+Math.max(MIN_SALARY_SHIHAKA,r.p.salary||0)<=team.budget);
   if(!replacement)continue;
   const reason=replacement.current>=row.current+10?'rookie-current-upgrade':'rookie-future-upgrade';

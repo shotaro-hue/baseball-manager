@@ -69,6 +69,11 @@ it('does not promise the same prospect twice or release an entire position for o
  const plan=cycle.planCpuRenewals(t,cycleContext(t,pool,85,95));
  expect(plan.releaseIds).toHaveLength(1);expect(new Set(plan.replacements.map(r=>r.prospectId)).size).toBe(1);
 });
+it('does not plan two releases for equivalent same-role alternatives that cannot both be drafted',()=>{
+ const t=balanced(67);t.farm.splice(-2,2,p('weak-a',25,{potential:30}),p('weak-b',25,{potential:30}));
+ const pool=[p('a',85,{age:18,potential:95}),p('b',85,{age:18,potential:95})];
+ expect(cycle.planCpuRenewals(t,cycleContext(t,pool,85,95)).releaseIds).toHaveLength(1);
+});
 it('does not release a player for a bench upgrade that actual CPU drafting would reject',()=>{
  const t=balanced(67);t.farm[t.farm.length-1]=p('expendable',35,{potential:40,stats:{PA:0}});
  const pool=[p('ordinary',55,{age:18,potential:65})];
