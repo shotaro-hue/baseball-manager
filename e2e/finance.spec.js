@@ -44,16 +44,16 @@ for (const width of [360,390,1440]) {
       return {revenue:fmtSal(f.revenue.min),costs:fmtSal(f.operatingCosts.min),budget:fmtSal(t.budget)};
     });
     await openFinance(page,width<1024);
-    const region=page.getByRole('region',{name:'運営費と編成予算',exact:true});
+    const region=page.getByRole('region',{name:'売上・運営費の内訳',exact:true});
     await expect(region).toContainText(expected.costs);
-    await expect(region).toContainText(expected.budget);
-    await expect(page.getByText('シーズン収入予測',{exact:true}).locator('..')).toContainText(expected.revenue);
+    await expect(page.locator('.finance-tab [data-ds="metrics"]')).toContainText(expected.budget);
+    await expect(page.locator('.finance-tab [data-ds="metrics"]')).toContainText(expected.revenue);
     await expect(page.getByText('実施2試合の実績＋残り試合の予測。実際の日程を使用。',{exact:true})).toBeVisible();
     await page.screenshot({path:testInfo.outputPath('finance-model.png'),fullPage:true});
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     expect(await saveSnapshot(page)).toBe(before);
     await reloadAndLoad(page);await openFinance(page,width<1024);
-    await expect(page.getByRole('region',{name:'運営費と編成予算',exact:true})).toContainText(expected.budget);
+    await expect(page.locator('.finance-tab [data-ds="metrics"]')).toContainText(expected.budget);
     expect(await saveSnapshot(page)).toBe(before);
   });
 }
@@ -75,7 +75,11 @@ async function saveSnapshot(page) {
 async function openFinance(page, mobile) {
   await mainNavigation(page, mobile).getByRole('button', { name: /^経営/ }).click();
   await page.getByRole('navigation', { name: '経営メニュー' }).getByRole('button', { name: '財務', exact: true }).click();
-  await expect(page.getByText('予算 / 年俸上位', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '財務', exact: true })).toBeVisible();
+}
+async function openContracts(page) {
+  await page.getByRole('navigation', { name: '経営メニュー' }).getByRole('button', { name: /^契約/ }).click();
+  await expect(page.getByRole('region', { name: '年俸上位（所属選手）', exact: true })).toBeVisible();
 }
 async function assertPayroll(page) {
   const region = page.getByRole('region', { name: '選手契約年俸（年額）', exact: true });
@@ -97,10 +101,12 @@ for (const width of [360,390,1280]) {
     const before = await saveSnapshot(page);
     await openFinance(page, width < 1024);
     // Same fixture before/after evidence can be collected on the unmodified UI.
-    const salaryCard = page.locator('.card').filter({ hasText: /選手年俸|選手契約年俸（年額）/ }).first();
+    await page.getByText('契約年俸の内訳', { exact: true }).click();
+    const salaryCard = page.getByRole('region', { name: '選手契約年俸（年額）', exact: true });
     await salaryCard.scrollIntoViewIfNeeded();
     await page.screenshot({ path: testInfo.outputPath('finance-viewport.png') });
     await salaryCard.screenshot({ path: testInfo.outputPath('finance-payroll.png') });
+    await page.getByRole('button', { name: '契約一覧・年俸上位を見る', exact: true }).click();
     const display = await assertPayroll(page);
     const leaders = page.getByRole('region', { name: '年俸上位（所属選手）', exact: true });
     await leaders.getByRole('button', { name: '二軍二百万円', exact: true }).click();
@@ -113,17 +119,19 @@ for (const width of [360,390,1280]) {
     expect(after).toEqual(before);
     await mainNavigation(page, width < 1024).getByRole('button', { name: 'ホーム', exact: true }).click();
     await openFinance(page, width < 1024);
+    await openContracts(page);
     expect(await assertPayroll(page)).toEqual(display);
     expect(await saveSnapshot(page)).toEqual(before);
     await reloadAndLoad(page);
     await openFinance(page, width < 1024);
+    await openContracts(page);
     expect(await assertPayroll(page)).toEqual(display);
     expect(await saveSnapshot(page)).toEqual(before);
   });
 }
 test('finance warns about incomplete recorded salaries after real save/load', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 900 });
-  await loadPayrollFixture(page, true); await openFinance(page, true);
+  await loadPayrollFixture(page, true); await openFinance(page, true); await openContracts(page);
   const region = page.getByRole('region', { name: '選手契約年俸（年額）', exact: true });
   await expect(region).toContainText('集計不完全');
   await expect(region.locator('[data-payroll-category="total"]')).toContainText('確認済み 350万円');
@@ -137,7 +145,7 @@ test('finance opens an unrecorded salary leader safely without mutating saved cl
   await page.setViewportSize({ width: 390, height: 900 });
   await loadPayrollFixture(page, true, true);
   const before = await saveSnapshot(page);
-  await openFinance(page, true);
+  await openFinance(page, true); await openContracts(page);
   const leaders = page.getByRole('region', { name: '年俸上位（所属選手）', exact: true });
   await expect(leaders).toContainText('未記録');
   await leaders.getByRole('button', { name: '一軍百万円', exact: true }).click();
@@ -150,4 +158,89 @@ test('finance opens an unrecorded salary leader safely without mutating saved cl
   await page.getByRole('button', { name: '選手詳細を閉じる', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(await saveSnapshot(page)).toEqual(before);
+});
+
+async function expectedChangeHash(page, changes) {
+  return page.evaluate(async changes => {
+    const {loadGame}=await import('/baseball-manager/src/engine/saveload.js');
+    const save=await loadGame(), team=save.teams.find(t=>t.id===save.myId);
+    if (changes.upgrade) {
+      const {stadiumUpgradeCosts}=await import('/baseball-manager/src/engine/clubFinance.js');
+      team.budget-=stadiumUpgradeCosts(team)[team.stadiumLevel??0];team.stadiumLevel=(team.stadiumLevel??0)+1;
+    }
+    if (changes.price) team.customAvgTicketPrice=changes.price;
+    const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(save.teams)));
+    return Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
+  },changes);
+}
+for (const width of [360,390,1440]) {
+  test(`finance price draft ${width}px cancels without mutation and persists only explicit confirmation`,async({page},testInfo)=>{
+    test.setTimeout(60_000);
+    const errors=[];page.on('pageerror',e=>errors.push(e.message));
+    await page.setViewportSize({width,height:width===360?800:width===390?844:900});
+    await loadPayrollFixture(page,false,false,true);await openFinance(page,width<1024);
+    const before=await saveSnapshot(page),expected=await expectedChangeHash(page,{price:3300});
+    const input=page.getByLabel('新しい平均価格（円）');await input.fill('3300');await input.press('Tab');
+    expect(await saveSnapshot(page)).toBe(before);
+    await page.getByRole('button',{name:'価格変更を確認',exact:true}).click();
+    await expect(page.getByRole('heading',{name:'価格変更の確認',exact:true})).toBeFocused();
+    await page.getByRole('button',{name:'価格の確認を閉じる',exact:true}).click();
+    await expect(page.getByRole('button',{name:'価格変更を確認',exact:true})).toBeFocused();
+    await expect(input).toHaveValue('3300');expect(await saveSnapshot(page)).toBe(before);
+    // Notifications preserve the same draft and do not change financial state.
+    await page.getByRole('button',{name:/^通知（未読/}).click();
+    await page.getByRole('button',{name:'元の画面へ戻る',exact:true}).click();await expect(input).toHaveValue('3300');
+    await page.getByRole('button',{name:'価格変更を確認',exact:true}).click();
+    await page.getByRole('button',{name:'この価格で確定',exact:true}).click();
+    expect(await saveSnapshot(page)).toBe(expected);
+    await expect(page.locator('.finance-action').first()).toContainText('3,300円/枚');
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await page.screenshot({path:testInfo.outputPath('finance-price-confirmed.png'),fullPage:true});
+    await reloadAndLoad(page);await openFinance(page,width<1024);
+    await expect(input).toHaveValue('3300');expect(await saveSnapshot(page)).toBe(expected);expect(errors).toEqual([]);
+  });
+}
+test('finance stadium comparison preserves manual price and commits one upgrade after cancellation and reload',async({page})=>{
+  test.setTimeout(60_000);await page.setViewportSize({width:390,height:844});await loadPayrollFixture(page,false,false,true);
+  await openFinance(page,true);const input=page.getByLabel('新しい平均価格（円）');await input.fill('3300');
+  await page.getByRole('button',{name:'価格変更を確認',exact:true}).click();await page.getByRole('button',{name:'この価格で確定',exact:true}).click();
+  const before=await saveSnapshot(page),expected=await expectedChangeHash(page,{upgrade:true});
+  await page.getByRole('button',{name:'投資内容を確認',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'球場投資の確認',exact:true})).toBeFocused();
+  await page.getByRole('button',{name:'投資の確認を閉じる',exact:true}).click();
+  await expect(page.getByRole('button',{name:'投資内容を確認',exact:true})).toBeFocused();expect(await saveSnapshot(page)).toBe(before);
+  await page.getByRole('button',{name:'投資内容を確認',exact:true}).click();await page.getByRole('button',{name:'この内容で投資を確定',exact:true}).click();
+  expect(await saveSnapshot(page)).toBe(expected);await expect(input).toHaveValue('3300');
+  await expect(page.getByRole('region',{name:'球場投資',exact:true})).toContainText('現在 Lv1');
+  await reloadAndLoad(page);await openFinance(page,true);expect(await saveSnapshot(page)).toBe(expected);await expect(input).toHaveValue('3300');
+});
+test('finance invalid price inputs remain uncommitted and negative budgets block investment without blocking navigation',async({page})=>{
+  test.setTimeout(60_000);await page.setViewportSize({width:360,height:800});await loadPayrollFixture(page,false,false,true);await openFinance(page,true);
+  const before=await saveSnapshot(page);for (const value of ['','499','5001','2.5']) {
+    await page.getByLabel('新しい平均価格（円）').fill(value);await page.getByLabel('新しい平均価格（円）').press('Tab');
+    await expect(page.getByRole('button',{name:'価格変更を確認',exact:true})).toBeDisabled();
+  }
+  expect(await saveSnapshot(page)).toBe(before);
+  await page.evaluate(async()=>{const {loadGame,saveGame}=await import('/baseball-manager/src/engine/saveload.js');const save=await loadGame();save.teams.find(t=>t.id===save.myId).budget=-100;await saveGame(save);});
+  await reloadAndLoad(page);await openFinance(page,true);await expect(page.getByRole('button',{name:'投資内容を確認',exact:true})).toBeDisabled();
+  await expect(page.getByRole('region',{name:'球場投資',exact:true})).toContainText('予算不足');
+  await mainNavigation(page,true).getByRole('button',{name:'ホーム',exact:true}).click();await expect(page.locator('main.mobile-home')).toBeVisible();
+});
+for (const action of ['confirm','discard']) {
+  test(`finance focus price ${action} returns to the stable input`,async({page})=>{
+    await page.setViewportSize({width:390,height:844});await loadPayrollFixture(page,false,false,true);await openFinance(page,true);
+    const input=page.getByLabel('新しい平均価格（円）');await input.fill('3400');
+    if(action==='confirm'){
+      await page.getByRole('button',{name:'価格変更を確認',exact:true}).click();await page.getByRole('button',{name:'この価格で確定',exact:true}).click();
+    }else await page.getByRole('button',{name:'下書きを取り消す',exact:true}).click();
+    await expect(input).toBeFocused();
+  });
+}
+test('finance focus after final stadium upgrade returns to the stable heading',async({page})=>{
+  await page.setViewportSize({width:390,height:844});await loadPayrollFixture(page,false,false,true);
+  await page.evaluate(async()=>{const{loadGame,saveGame}=await import('/baseball-manager/src/engine/saveload.js');const save=await loadGame();Object.assign(save.teams.find(t=>t.id===save.myId),{stadiumLevel:2,budget:500000});await saveGame(save);});
+  await reloadAndLoad(page);await openFinance(page,true);
+  await page.getByRole('button',{name:'投資内容を確認',exact:true}).click();await page.getByRole('button',{name:'この内容で投資を確定',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'球場投資',exact:true})).toBeFocused();
+  await expect(page.getByRole('region',{name:'球場投資',exact:true})).toContainText('最高レベル');
 });

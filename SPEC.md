@@ -555,6 +555,8 @@ CPU指名は `evaluateOrganizationNeeds()` により、先発・中継ぎ・抑�
 
 ### 4.8 財務システム
 
+UI-04Bでは経営概要と財務をDES-01へ移行。価格は下書き→同条件比較→画面内確認→明示確定、投資は費用/後予算と通年の動員・売上・給与前運営差額を比較して確定する。年俸上位は契約へ配置する。今季実績・残り予測・年間見込み、0/負値/未記録/算出不可を区別し、表示操作だけで保存内容を変更しない。[表示と比較の定義](./docs/implementation/ui-04.md)。
+
 金額の内部単位は万円。新規ゲームと年度移行後は `clubFinance` に球団収支を保存する。[実装・判断](docs/implementation/club-finance.md)／[校正と検証範囲](docs/validation/club-finance/README.md)を参照。
 
 #### 売上と自動運営費

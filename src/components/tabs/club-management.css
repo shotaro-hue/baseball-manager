@@ -1,0 +1,50 @@
+/* UI-04B: opt-in management/finance content. Shared shell breakpoints stay intact. */
+.club-management { color: #162b3d; font: 16px/1.65 'Noto Sans JP', sans-serif; min-width: 0; padding: 16px 0; }
+.club-management h1 { font-size: 26px; line-height: 1.3; color: #162b3d; margin: 0 0 12px; }
+.club-management > p { margin: 8px 0 16px; }
+.club-management h3,.finance-payroll-summary h3 { font-size: 18px; line-height: 1.4; color: #162b3d; margin: 0 0 12px; }
+.club-management h4 { font-size: 16px; margin: 0 0 8px; }
+.club-management [data-ds="metrics"] { text-align: left; }
+.club-management [data-ds="metrics"] > div { padding: 8px 16px; }
+.club-management [data-ds="metrics"] dt { min-height: 40px; }
+.finance-note { display: block; color: #526778; font-size: 12px; line-height: 1.65; margin: 8px 0 12px; overflow-wrap: anywhere; }
+.finance-warning,.finance-error { padding: 12px; color: #855200; background: #fff1d6; border-left: 3px solid #855200; font-size: 14px; }
+.finance-error { color: #b12c38; background: #fae9eb; border-color: #b12c38; }
+.finance-actions { display: grid; gap: 24px; align-items: start; }
+.finance-action { border: 1px solid #d6dfe7; border-radius: 6px; padding: 16px; background: #fff; min-width: 0; }
+.finance-action label { display: block; font-size: 14px; color: #162b3d; margin: 12px 0 8px; }
+.finance-price-field { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.finance-price-field input { width: 140px; max-width: 100%; box-sizing: border-box; min-height: 44px; padding: 8px 12px; border: 1px solid #70889b; border-radius: 4px; color: #162b3d; background: #fff; font: inherit; font-variant-numeric: tabular-nums; }
+.finance-price-field input[aria-invalid="true"] { border-color: #b12c38; }
+.club-management input:focus-visible,.club-management h4:focus,.club-management h3:focus { outline: 3px solid #1766da; outline-offset: 3px; }
+.finance-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.finance-confirm { padding: 16px; background: #e9f1fd; border: 1px solid #70889b; margin-top: 16px; }
+.finance-confirm p { font-size: 14px; }
+.finance-rows { margin: 0 0 16px; }
+.finance-rows > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; padding: 12px 0; border-bottom: 1px solid #d6dfe7; font-size: 14px; }
+.finance-rows dt,.finance-rows dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.finance-rows dd { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.finance-rows .finance-note { display: inline; margin: 0; font-weight: 400; }
+.finance-rows small { display: block; color: #855200; font-weight: 400; font-size: 12px; }
+.finance-rows [data-payroll-category="total"] { border-bottom: 0; }
+.finance-comparison caption,.finance-ledger caption { text-align: left; padding: 8px; font-size: 14px; color: #526778; }
+.finance-comparison table { min-width: 320px; }
+.finance-ledger table { min-width: 600px; }
+.finance-comparison td,.finance-ledger td { min-width: 92px; overflow-wrap: anywhere; }
+.club-management details { margin: 12px 0; min-width: 0; }
+.club-management summary { cursor: pointer; min-height: 44px; padding: 10px 0; box-sizing: border-box; font-size: 14px; font-weight: 700; color: #162b3d; }
+.finance-payroll-summary { background: #fff; color: #162b3d; padding: 16px; border: 1px solid #d6dfe7; border-radius: 6px; margin: 16px 0; font: 14px/1.6 'Noto Sans JP', sans-serif; }
+.finance-leader { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; border-bottom: 1px solid #d6dfe7; padding: 8px 0; }
+.finance-leader > div { min-width: 0; }
+.finance-leader > span { font-variant-numeric: tabular-nums; text-align: right; }
+.finance-leader [data-ds="button"] { padding: 8px 0; border: 0; background: transparent; text-align: left; justify-content: start; }
+.finance-pending { padding: 12px; background: #fff1d6; border-left: 3px solid #855200; color: #855200; display: grid; gap: 8px; }
+.finance-pending p { margin: 0; font-weight: 700; }
+@media (min-width: 1024px) {
+  .club-management h1 { font-size: 28px; }
+  .club-management { padding: 24px 0; }
+  .finance-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .management-columns { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 32px; grid-template-areas: 'routes pending'; }
+  .management-pending { grid-area: pending; }
+  .management-routes { grid-area: routes; min-width: 0; }
+}

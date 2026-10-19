@@ -4,6 +4,11 @@ import { fmtSal } from '../../utils';
 import { ownedPlayers, renewalEligible, ikuseiContractYears, validContractOffer } from '../../engine/renewalRules';
 import { evalOffer } from '../../engine/contract';
 import { PersonalityView } from '../ui';
+import { ContractPayroll } from './ContractPayroll';
+import { contractSalaryStatus } from '../../engine/contractPayroll';
+
+const salaryLabel = salary => contractSalaryStatus(salary) === 'recorded' ? fmtSal(salary)
+  : contractSalaryStatus(salary) === 'missing' ? '— 未記録' : '— 不正値';
 
 function getReactionTone(total){
   if(total >= ACCEPT_THRESHOLD + 10) return "excited";
@@ -76,7 +81,7 @@ function makeNegotiationChat(player, offerSal, offerYrs, preview, incentives){
   ];
 }
 
-export function ContractTab({team,allTeams,onOffer,onRelease,year}){
+export function ContractTab({team,allTeams,onOffer,onRelease,year,onPlayerClick}){
   const [selId,setSelId]=useState(null);
   const [offerSal,setOfferSal]=useState(0);
   const [offerYrs,setOfferYrs]=useState(1);
@@ -161,18 +166,20 @@ export function ContractTab({team,allTeams,onOffer,onRelease,year}){
 
   return(
     <div>
+      <ContractPayroll team={team} leaders onPlayerClick={onPlayerClick} />
       <div className="card">
         <div className="card-h">契約満了選手 ({expiring.length}人)</div>
         <p style={{color:"#2a3a4c",fontSize:13}}>登録・ファームの選手が対象です。提示を辞退されても所属と現契約は維持し、満了時の処理はシーズン終了後に行います。</p>
+        {expiring.some(p=>contractSalaryStatus(p.salary)!=='recorded')&&<p className="finance-warning">年俸が未記録・不正値の選手は、年俸を確認するまで契約条件を提示できません。</p>}
         {expiring.length===0&&<p style={{color:"#2a3a4c",fontSize:12}}>今季満了の選手はいません</p>}
         <div style={{overflowX:"auto"}}>{expiring.length>0&&(
           <table className="tbl">
             <thead><tr><th>選手名</th><th>守備</th><th>年齢</th><th>現年俸</th><th>契約期限</th><th></th></tr></thead>
             <tbody>{expiring.map(p=>(
               <tr key={p.id} style={{background:selId===p.id?"rgba(245,200,66,.04)":undefined}}>
-                <td style={{fontWeight:700,cursor:"pointer",color:selId===p.id?"#f5c842":undefined}} onClick={()=>{setSelId(p.id);setOfferSal(Math.max(1000,Math.round(p.salary/100)*100));setOfferYrs(1);setPerfBonusRate(0);setTitleBonus(0);setOptOut(false);}}>{p.name}</td>
+                <td style={{fontWeight:700,cursor:contractSalaryStatus(p.salary)==='recorded'?"pointer":"default",color:selId===p.id?"#f5c842":undefined}} onClick={()=>{if(contractSalaryStatus(p.salary)!=='recorded')return;setSelId(p.id);setOfferSal(Math.max(1000,Math.round(p.salary/100)*100));setOfferYrs(1);setPerfBonusRate(0);setTitleBonus(0);setOptOut(false);}}>{p.name}</td>
                 <td style={{fontSize:10,color:"#374151"}}>{p.pos}</td><td className="mono">{p.age}</td>
-                <td className="mono">{fmtSal(p.salary)}</td>
+                <td className="mono">{salaryLabel(p.salary)}</td>
                 <td className="mono" style={{color:p.contractYearsLeft===0?"#f87171":"#f5c842"}}>{formatExpirySeason(year, p.contractYearsLeft)}</td>
                 <td><button className="bsm bgr" onClick={()=>onRelease(p.id)}>放出</button></td>
               </tr>

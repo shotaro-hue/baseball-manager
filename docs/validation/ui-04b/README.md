@@ -1,0 +1,57 @@
+# UI-04B — 経営概要・財務の刷新
+
+基準main: `64bda9741a31799280c159276c2138aa574a7727`（#484マージ済み）。本工程は独立PR、マージなし。UI-04C/DとQA-04全体の完了認定は含まない。
+
+## 変更と判断
+
+経営概要は編成予算・全所属契約年俸・支配下/残枠と実際の対応待ちを表示する。予算は現金残高と区別し、通常契約の年俸を再控除した補強余力は作らない。既存の `contractPayroll` / `evaluateRosterCapacity` / `draftCapacityContext` を使用。受諾済み未所属を残枠に反映する。
+
+財務は4指標→経営アクション→実績/残り予測/年間見込み→展開可能な費目/年俸/前提の順。価格のonBlur確定を廃止し、下書き・同条件比較・画面内確認・明示確定に変更。球場投資も費用・後予算・動員/売上/給与前運営差額・参考回収年数を見て確定する。年俸上位は契約へ移設し、二軍/育成/未記録選手の既存詳細に接続する。
+
+比較は元teamを変更しない。価格案は実績を維持して残り試合へ適用。投資は同じ人気・勝敗・年度契約・日程・確定価格を通年に適用し、手動価格を維持する。回収年数は費用÷年間運営差額増分（正の場合のみ）。年間動員は現在条件による推定で実績累計ではない。シーズン末の残試合0でも通年効果を示す。エンジン変更は既存予測の `costs` レンジ追加公開だけで、収支計算・保存形式・CPU・費用定数を変更しない。
+
+## 再現可能な表示比較
+
+[fixture.json.gz](./fixture.json.gz)は既存new-game fixtureから固定seed `20261020`、固定時刻で生成した実Worker2試合後の状態。基準mainと最終UIの両方へ同じfixtureを通常のsaveGame→続きからで読み込む。初回の既存ロード正規化後に保存・待機し、全12球団のhashを固定。以後は閲覧だけで全所属/金額/stateが変わらないことを検証する。seed生成中の乱数/時刻置換は検証コードに限定し、製品へ追加しない。
+
+- 元fixture teams SHA-256: `60ceb38a10fa66f02cef92d08019ff5cb73c6ce9228d258aab30d669d9915dd7`
+- 既存の保存/ロード正規化後の全12球団 SHA-256: `572f3ceb3d5c8c5a8e81c984660ea1226ace6b56d7418bb2be684a116cddee92`
+- [変更前レイアウト](./before-layout.json) / [変更後レイアウト](./after-layout.json)。360×800、390×844、1440×900と760/761・1023/1024×900。新しい境界は導入しない。
+
+| 画面 | 360px 前→後 | 390px 前→後 | 1440px 前→後 |
+|---|---|---|---|
+| 経営概要 | [前](./before-management-360.png) → [後](./after-management-360.png) | [前](./before-management-390.png) → [後](./after-management-390.png) | [前](./before-management-1440.png) → [後](./after-management-1440.png) |
+| 財務 | [前](./before-finance-360.png) → [後](./after-finance-360.png) | [前](./before-finance-390.png) → [後](./after-finance-390.png) | [前](./before-finance-1440.png) → [後](./after-finance-1440.png) |
+
+各 `*-viewport.png` は同じ状態の初期表示。全文PNGはスクロール全体。撮影環境はChromium 141、OSフォールバックとしてNoto Sans CJK JPを追加。初回の日本語フォントなし画像は採用せず、同じフォントの変更前後を再撮影する。本番フォント/依存追加はない。
+
+## 実行記録
+
+- 基準main: FinanceTab / clubFinance / lifecycle、3ファイル46件成功。基準財務のChromium3幅も成功。
+- 読取モデル18件: 未実装の失敗を確認→GREEN。凍結入力、現在/案、500/5000円、満員、日程概算、負予算、通年/終了後、回収不能を検証。
+- 概要/操作10件: 未実装の失敗→GREEN。枠/受諾/欠測、要対応、blur非確定、確認取消、二重確定、最新予算更新を検証。
+- 最終対象Vitest: 9ファイル90件成功。既存の年俸/投稿移籍金/契約/通知を含む。
+- 財務Chromium E2E: 16件中14件成功・移設先で欠測年俸を描画する既存処理が2件失敗。`fmtSal(null)`によるクラッシュを確認し、欠測/不正表示と提示不可理由へ修正。該当2件の再実行は2/2成功。全件VitestとChromium/WebKitの最終ゲートは同一head CIを使用し、実行結果は提出PR本文に記載する。
+
+```sh
+npx vitest run src/components/tabs/financeView.test.js src/components/tabs/FinanceActions.test.js src/components/tabs/FinanceTab.test.js src/components/hub/HubManagementTab.test.js src/components/tabs/ContractTab.consistency.test.js src/hooks/useOffseason.posting.test.js src/components/hub/HubShell.navigation.test.js src/engine/__tests__/clubFinance.test.js src/engine/__tests__/clubFinance.lifecycle.test.js --maxWorkers=1 --minWorkers=1
+npx playwright test e2e/finance.spec.js --project=chromium --workers=1 --retries=0
+npm run build
+```
+
+既存財務E2Eの年俸・順序・詳細・全12球団hashは契約移設後も維持。画面名・契約バッジ付き入口に合わせてセレクタのみ更新。価格3幅と投資は下書き/取消時の全12球団hash不変、確定時は自球団の価格または予算/球場Lvだけの差分、再読込後も一致を検証する。通知往復の価格下書き、無効入力、負予算の投資禁止とホーム復帰も含む。
+
+## 独立レビューと修正
+
+独立レビュアーが全差分と比較計算を確認。P0/P1や新収支の計算不具合は検出せず、P2を2件検出した。
+
+1. 価格確定/下書き取消後にフォーカスがbodyへ外れ、球場Lv3到達時も復帰先ボタンが消える。実Chromiumの3回帰で全て失敗を確認し、入力または安定した球場見出しへ復帰するよう修正。確認を取り消す場合の元ボタン復帰も維持。
+2. 旧モデルにも新モデルの基準価格+3.5%を表示していた。表示テストの失敗を確認し、旧モデルの球場倍率の説明へ分岐。新モデルと手動価格保持の説明は維持。
+
+統合検証で、移設先の旧契約一覧が年俸nullをfmtSalへ渡して落ちる問題を検出（既存E2E2件でRED）。`contractSalaryStatus`を再利用して未記録/不正値を表示し、年俸を確認できない行で提示画面を生成しない。詳細閲覧と全12球団保存hashの既存E2EをGREENにした。通常の更改判定・年俸・所属・保存形式は変更しない。
+
+新設テストの期待額を修正した例: 1試合計上済みfixtureに初期予算を固定していたため、実予算−費用の厳密assertへ訂正した。既存の期待値や金額閾値を緩和していない。中間の旧財務テストは改名後のsection/契約バッジとセレクタが一致せず失敗し、対象を正しい画面へ接続して数値/hashassertを保持した。テスト削除・skip追加・再試行はない。
+
+## 限界
+
+ローカルWebKitはOSライブラリ不足で起動できず、通常CIのWebKit実行で判定する。実iPhone、スクリーンリーダー、全世代の旧セーブ、新規→全オフシーズン→翌年度のQA-04全体、経済バランスの長期再校正は本工程の完了範囲外。読み込み表示は既存の遅延読み込みfallbackを維持し、破損収支は算出不可として表示する。

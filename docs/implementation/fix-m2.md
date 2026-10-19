@@ -1,6 +1,6 @@
 # FIX-M2 — 試合前需要による収入計上と赤字予算の整合
 
-作成: 2026-10-19。基準main: `99b73a3a2d3b64735fa5edbd807dfab1fe9d0c42`（#483マージ済み）。UI-04Bより前の独立修正。本PRは未マージ。
+作成: 2026-10-19。基準main: `99b73a3a2d3b64735fa5edbd807dfab1fe9d0c42`（#483マージ済み）。UI-04Bより前の独立修正。[#484](https://github.com/shotaro-hue/baseball-manager/pull/484)でマージ済み（2026-10-20 JST）。後続UI-04Bは `64bda9741a31799280c159276c2138aa574a7727` から着手。
 
 ## 目的と確定方針
 

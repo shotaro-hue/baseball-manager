@@ -1,0 +1,128 @@
+[
+  {
+    "route": "management",
+    "width": 360,
+    "scrollWidth": 360,
+    "smallControls": [],
+    "errors": [],
+    "fixtureHash": "572f3ceb3d5c8c5a8e81c984660ea1226ace6b56d7418bb2be684a116cddee92",
+    "sourceFixtureHash": "60ceb38a10fa66f02cef92d08019ff5cb73c6ce9228d258aab30d669d9915dd7"
+  },
+  {
+    "route": "finance",
+    "width": 360,
+    "scrollWidth": 360,
+    "smallControls": [],
+    "errors": [],
+    "fixtureHash": "572f3ceb3d5c8c5a8e81c984660ea1226ace6b56d7418bb2be684a116cddee92",
+    "sourceFixtureHash": "60ceb38a10fa66f02cef92d08019ff5cb73c6ce9228d258aab30d669d9915dd7"
+  },
+  {
+    "route": "management",
+    "width": 390,
+    "scrollWidth": 390,
+    "smallControls": [],
+    "errors": [],
+    "fixtureHash": "572f3ceb3d5c8c5a8e81c984660ea1226ace6b56d7418bb2be684a116cddee92",
+    "sourceFixtureHash": "60ceb38a10fa66f02cef92d08019ff5cb73c6ce9228d258aab30d669d9915dd7"
+  },
+  {
+    "route": "finance",
+    "width": 390,
+    "scrollWidth": 390,
+    "smallControls": [],
+    "errors": [],
+    "fixtureHash": "572f3ceb3d5c8c5a8e81c984660ea1226ace6b56d7418bb2be684a116cddee92",
+    "sourceFixtureHash": "60ceb38a10fa66f02cef92d08019ff5cb73c6ce9228d258aab30d669d9915dd7"
+  },
+  {
+    "route": "management",
+    "width": 760,
+    "scrollWidth": 760,
+    "smallControls": [],
+    "errors": [],
+    "fixtureHash": "572f3ceb3d5c8c5a8e81c984660ea1226ace6b56d7418bb2be684a116cddee92",
+    "sourceFixtureHash": "60ceb38a10fa66f02cef92d08019ff5cb73c6ce9228d258aab30d669d9915dd7"
+  },
+  {
+    "route": "finance",
+    "width": 760,
+    "scrollWidth": 760,
+    "smallControls": [],
+    "errors": [],
+    "fixtureHash": "572f3ceb3d5c8c5a8e81c984660ea1226ace6b56d7418bb2be684a116cddee92",
+    "sourceFixtureHash": "60ceb38a10fa66f02cef92d08019ff5cb73c6ce9228d258aab30d669d9915dd7"
+  },
+  {
+    "route": "management",
+    "width": 761,
+    "scrollWidth": 761,
+    "smallControls": [],
+    "errors": [],
+    "fixtureHash": "572f3ceb3d5c8c5a8e81c984660ea1226ace6b56d7418bb2be684a116cddee92",
+    "sourceFixtureHash": "60ceb38a10fa66f02cef92d08019ff5cb73c6ce9228d258aab30d669d9915dd7"
+  },
+  {
+    "route": "finance",
+    "width": 761,
+    "scrollWidth": 761,
+    "smallControls": [],
+    "errors": [],
+    "fixtureHash": "572f3ceb3d5c8c5a8e81c984660ea1226ace6b56d7418bb2be684a116cddee92",
+    "sourceFixtureHash": "60ceb38a10fa66f02cef92d08019ff5cb73c6ce9228d258aab30d669d9915dd7"
+  },
+  {
+    "route": "management",
+    "width": 1023,
+    "scrollWidth": 1023,
+    "smallControls": [],
+    "errors": [],
+    "fixtureHash": "572f3ceb3d5c8c5a8e81c984660ea1226ace6b56d7418bb2be684a116cddee92",
+    "sourceFixtureHash": "60ceb38a10fa66f02cef92d08019ff5cb73c6ce9228d258aab30d669d9915dd7"
+  },
+  {
+    "route": "finance",
+    "width": 1023,
+    "scrollWidth": 1023,
+    "smallControls": [],
+    "errors": [],
+    "fixtureHash": "572f3ceb3d5c8c5a8e81c984660ea1226ace6b56d7418bb2be684a116cddee92",
+    "sourceFixtureHash": "60ceb38a10fa66f02cef92d08019ff5cb73c6ce9228d258aab30d669d9915dd7"
+  },
+  {
+    "route": "management",
+    "width": 1024,
+    "scrollWidth": 1024,
+    "smallControls": [],
+    "errors": [],
+    "fixtureHash": "572f3ceb3d5c8c5a8e81c984660ea1226ace6b56d7418bb2be684a116cddee92",
+    "sourceFixtureHash": "60ceb38a10fa66f02cef92d08019ff5cb73c6ce9228d258aab30d669d9915dd7"
+  },
+  {
+    "route": "finance",
+    "width": 1024,
+    "scrollWidth": 1024,
+    "smallControls": [],
+    "errors": [],
+    "fixtureHash": "572f3ceb3d5c8c5a8e81c984660ea1226ace6b56d7418bb2be684a116cddee92",
+    "sourceFixtureHash": "60ceb38a10fa66f02cef92d08019ff5cb73c6ce9228d258aab30d669d9915dd7"
+  },
+  {
+    "route": "management",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "smallControls": [],
+    "errors": [],
+    "fixtureHash": "572f3ceb3d5c8c5a8e81c984660ea1226ace6b56d7418bb2be684a116cddee92",
+    "sourceFixtureHash": "60ceb38a10fa66f02cef92d08019ff5cb73c6ce9228d258aab30d669d9915dd7"
+  },
+  {
+    "route": "finance",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "smallControls": [],
+    "errors": [],
+    "fixtureHash": "572f3ceb3d5c8c5a8e81c984660ea1226ace6b56d7418bb2be684a116cddee92",
+    "sourceFixtureHash": "60ceb38a10fa66f02cef92d08019ff5cb73c6ce9228d258aab30d669d9915dd7"
+  }
+]
