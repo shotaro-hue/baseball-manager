@@ -25,6 +25,9 @@ import { standingsContext } from '../../engine/standings';
 import HubFaTab from './HubFaTab';
 import HubScoutTab from './HubScoutTab';
 import HubTabFallback from './HubTabFallback';
+import HubManagementTab from './HubManagementTab';
+import HubSettingsTab from './HubSettingsTab';
+import { deliveredMailbox } from './hubNavigation';
 
 const StatsTab = lazy(() =>
   import('../tabs/StatsTab').then((module) => ({ default: module.StatsTab })),
@@ -61,11 +64,11 @@ function DeferredHubTab({ label, children }) {
   );
 }
 
-export default function HubContentRouter({ app, tab, onTabChange, comparison }) {
+export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTabChange, comparison, notifications }) {
   const { gs, sf, os } = app;
-  const { myTeam, myId, teams, year, gameDay, schedule, faPool, mailbox } = gs;
+  const { myTeam, myId, teams, year, gameDay, schedule, faPool } = gs;
 
-  const mailboxForView = gs.getMailboxBySelector({ limit: 200 });
+  const mailboxForView = deliveredMailbox(gs.getMailboxBySelector(), gameDay);
   const newsForView = gs.getNewsBySelector({ limit: 200 });
   const unreadMailboxCount = gs.getUnreadMailboxCount(gameDay);
   const latestNewsId = gs.getLatestNewsId();
@@ -74,6 +77,8 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
 
   const request = regularSeasonRequest({ teams, myId, year, gameDay, schedule, offseasonPlan: gs.offseasonPlan, gameResultsMap: gs.gameResultsMap }, 1);
   const canSim = request.count > 0;
+  if (tab === 'management' || tab === 'reinforcement') return <HubManagementTab team={myTeam} recruitment={tab === 'reinforcement'} onNavigate={onTabChange} notifications={notifications} />;
+  if (tab === 'settings') return <HubSettingsTab onNavigate={onOpen} />;
   if (tab === 'dashboard') {
     const rankingContext = standingsContext(gs.getSeasonHistory(), gs.allTeamResultsMap, year);
     return (
@@ -288,13 +293,15 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
         onTrade={os.handleTrade}
         onTeamClick={gs.handleTeamClick}
         gameDay={gameDay}
+        unreadCount={unreadMailboxCount}
+        onNavigate={onOpen}
       />
     );
   }
 
   if (tab === 'trade') {
-    const pendingTrades = mailbox.filter(
-      (mail) => mail.type === 'trade' && !mail.resolved,
+    const pendingTrades = mailboxForView.filter(
+      (mail) => mail.type === 'trade' && mail.offer && !mail.resolved,
     );
     const deadlinePassed = (() => {
       const date = gameDayToDate(gameDay, schedule);

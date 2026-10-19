@@ -1,0 +1,50 @@
+[
+  {
+    "stage": "before",
+    "width": 360,
+    "teamsHash": "9f755d69804cdbe439e3a7b0853b5c040d401b6031e06ab3a53921068a3a27c7",
+    "year": 2026,
+    "gameDay": 1,
+    "overflow": false
+  },
+  {
+    "stage": "before",
+    "width": 390,
+    "teamsHash": "9f755d69804cdbe439e3a7b0853b5c040d401b6031e06ab3a53921068a3a27c7",
+    "year": 2026,
+    "gameDay": 1,
+    "overflow": false
+  },
+  {
+    "stage": "before",
+    "width": 1440,
+    "teamsHash": "9f755d69804cdbe439e3a7b0853b5c040d401b6031e06ab3a53921068a3a27c7",
+    "year": 2026,
+    "gameDay": 1,
+    "overflow": false
+  },
+  {
+    "stage": "after",
+    "width": 360,
+    "teamsHash": "9f755d69804cdbe439e3a7b0853b5c040d401b6031e06ab3a53921068a3a27c7",
+    "year": 2026,
+    "gameDay": 1,
+    "overflow": false
+  },
+  {
+    "stage": "after",
+    "width": 390,
+    "teamsHash": "9f755d69804cdbe439e3a7b0853b5c040d401b6031e06ab3a53921068a3a27c7",
+    "year": 2026,
+    "gameDay": 1,
+    "overflow": false
+  },
+  {
+    "stage": "after",
+    "width": 1440,
+    "teamsHash": "9f755d69804cdbe439e3a7b0853b5c040d401b6031e06ab3a53921068a3a27c7",
+    "year": 2026,
+    "gameDay": 1,
+    "overflow": false
+  }
+]

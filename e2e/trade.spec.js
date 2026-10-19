@@ -20,8 +20,11 @@ async function setup(page, cpu = false) {
     if(!(await saveGame(fixture)).ok) throw new Error('fixture save failed');
   },fixture);
   await reloadAndLoad(page);
-  await mainNavigation(page,true).getByRole('button',{name:/^その他/}).click();
-  if (!cpu) await page.getByRole('button',{name:/^トレード\d*$/}).click();
+  if (cpu) await page.getByRole('button',{name:/^通知（未読/}).click();
+  else {
+    await mainNavigation(page,true).getByRole('button',{name:/^経営/}).click();
+    await page.getByRole('button',{name:'トレード',exact:true}).click();
+  }
   return {mine,other,incoming,outgoing};
 }
 function summary(saved, f) {
@@ -73,7 +76,7 @@ test('trade rejects an exchange that would overfill the other recipient at 70 at
   if(!(await saveGame(s)).ok)throw Error('save failed');
  });
  await reloadAndLoad(page);
- await mainNavigation(page,true).getByRole('button',{name:/^その他/}).click();
+ await page.getByRole('button',{name:/^通知（未読/}).click();
  await page.getByText('取引検証',{exact:true}).click();
  const before=await saveHub(page);
  expect(before.mailbox.find(m=>m.id==='trade-test').read).toBe(true);
@@ -82,7 +85,7 @@ test('trade rejects an exchange that would overfill the other recipient at 70 at
  // Opening the now-read mail will not race a new save against the rejection.
  await expect(page.locator('.notif')).toBeHidden();
  await reloadAndLoad(page);
- await mainNavigation(page,true).getByRole('button',{name:/^その他/}).click();
+ await page.getByRole('button',{name:/^通知（未読/}).click();
  await page.getByText('取引検証',{exact:true}).click();await page.getByRole('button',{name:'✅ 承諾する',exact:true}).click();
  await expect(page.getByText('支配下登録枠（70人）を超えます',{exact:true})).toBeVisible();
  const after=await saveHub(page);expect(after.teams).toEqual(before.teams);expect(after.seasonHistory).toEqual(before.seasonHistory);

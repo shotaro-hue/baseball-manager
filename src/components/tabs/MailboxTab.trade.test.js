@@ -4,6 +4,29 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { MailboxTab } from './MailboxTab';
 let view;
 afterEach(() => { if(view) act(() => view.unmount()); view=null; });
+it('refreshes a selected mail after the linked trade screen resolves it', () => {
+  const mail = { id: 'linked', type: 'trade', title: '外部判断', body: '', read: true, resolved: false, offer: { want: [], offer: [], cash: 0 } };
+  const props = { mailbox: [mail], onRead: () => {}, onAction: vi.fn(), onNavigate: vi.fn() };
+  const text = n => typeof n === 'string' ? n : (n.children || []).map(text).join('');
+  act(() => { view = create(React.createElement(MailboxTab, props)); });
+  act(() => view.root.findAll(n => n.type === 'div' && n.props.onClick).find(n => text(n).includes('外部判断')).props.onClick());
+  act(() => view.update(React.createElement(MailboxTab, { ...props, mailbox: [{ ...mail, resolved: true }] })));
+  expect(text(view.root)).toContain('対応済み');
+  expect(view.root.findAllByType('button').some(n => text(n).includes('承諾する'))).toBe(false);
+});
+it('opens the existing trade screen without accepting a proposal', () => {
+  const onAction = vi.fn(), onNavigate = vi.fn();
+  const mail = { id: 'offer', type: 'trade', title: '提案', body: '', offer: { want: [], offer: [], cash: 0 } };
+  act(() => { view = create(React.createElement(MailboxTab, { mailbox: [mail], onRead: () => {}, onAction, onNavigate })); });
+  const text = n => typeof n === 'string' ? n : (n.children || []).map(text).join('');
+  const row = view.root.findAll(n => n.type === 'div' && n.props.onClick).find(n => text(n).includes('提案'));
+  act(() => row.props.onClick());
+  const link = view.root.findAllByType('button').find(n => text(n) === 'トレード画面で検討する');
+  expect(link).toBeTruthy();
+  act(() => link.props.onClick());
+  expect(onNavigate).toHaveBeenCalledWith('trade');
+  expect(onAction).not.toHaveBeenCalled();
+});
 it('keeps a rejected trade mail actionable instead of locally marking it resolved', () => {
   const onAction = vi.fn(() => false);
   const mail = { id: 'trade', type: 'trade', title: '取引テスト', body: '', offer: { from: {name:'相手'}, want:[], offer:[], cash:0 } };

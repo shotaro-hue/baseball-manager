@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 
-export function MailboxTab({ mailbox, unreadCount = 0, onRead, onAction, teams, myTeam, onTrade, onTeamClick, gameDay }){
-  const [selected, setSelected] = useState(null);
+export function MailboxTab({ mailbox, unreadCount = 0, onRead, onAction, teams, myTeam, onTrade, onTeamClick, gameDay, onNavigate }){
+  const [selectedId, setSelectedId] = useState(null);
+  // The linked trade screen can resolve this mail while the inbox is hidden.
+  const selected = mailbox.find(mail => mail.id === selectedId) ?? null;
 
   const handleSelect = (m) => {
-    setSelected(m);
+    setSelectedId(m.id);
     if(!m.read) onRead(m.id);
   };
 
@@ -39,7 +41,7 @@ export function MailboxTab({ mailbox, unreadCount = 0, onRead, onAction, teams, 
         <div className="card" style={{padding:"12px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
             <span style={{fontSize:10,color:typeColor(selected.type),fontWeight:700}}>{typeIcon(selected.type)} {typeLabel(selected.type)}</span>
-            <button className="bsm bga" onClick={()=>setSelected(null)}>✕</button>
+            <button className="bsm bga" onClick={()=>setSelectedId(null)}>✕</button>
           </div>
           <div style={{fontWeight:700,fontSize:14,marginBottom:4}}>{selected.title}</div>
           <div style={{fontSize:10,color:"#374151",marginBottom:10}}>差出人: {selected.from} · {selected.dateLabel}</div>
@@ -47,6 +49,7 @@ export function MailboxTab({ mailbox, unreadCount = 0, onRead, onAction, teams, 
 
           {selected.type==="trade"&&selected.offer&&!selected.resolved&&(
             <div>
+              {onNavigate && <button className="bsm bga" style={{minHeight:44,marginBottom:12}} onClick={() => onNavigate('trade')}>トレード画面で検討する</button>}
               <div style={{marginBottom:10,padding:"8px",borderRadius:6,background:"rgba(249,115,22,.06)",border:"1px solid rgba(249,115,22,.2)"}}>
                 <div style={{fontSize:10,color:"#374151",marginBottom:6}}>オファー内容</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:6,alignItems:"center"}}>
@@ -63,8 +66,8 @@ export function MailboxTab({ mailbox, unreadCount = 0, onRead, onAction, teams, 
                 </div>
               </div>
               <div style={{display:"flex",gap:8}}>
-                <button className="bsm bga" style={{flex:1}} onClick={()=>{if(onAction(selected.id,"accept")===true)setSelected({...selected,resolved:true});}}>✅ 承諾する</button>
-                <button className="bsm bgr" style={{flex:1}} onClick={()=>{if(onAction(selected.id,"decline")===true)setSelected({...selected,resolved:true});}}>❌ 断る</button>
+                <button className="bsm bga" style={{flex:1}} onClick={()=>onAction(selected.id,"accept")}>✅ 承諾する</button>
+                <button className="bsm bgr" style={{flex:1}} onClick={()=>onAction(selected.id,"decline")}>❌ 断る</button>
               </div>
             </div>
           )}
@@ -79,8 +82,8 @@ export function MailboxTab({ mailbox, unreadCount = 0, onRead, onAction, teams, 
                 </div>
               </div>
               <div style={{display:"flex",gap:8}}>
-                <button className="bsm bga" style={{flex:1}} onClick={()=>{onAction(selected.id,"accept");setSelected({...selected,resolved:true});}}>✅ 承認する</button>
-                <button className="bsm bgr" style={{flex:1}} onClick={()=>{onAction(selected.id,"decline");setSelected({...selected,resolved:true});}}>❌ 拒否する</button>
+                <button className="bsm bga" style={{flex:1}} onClick={()=>onAction(selected.id,"accept")}>✅ 承認する</button>
+                <button className="bsm bgr" style={{flex:1}} onClick={()=>onAction(selected.id,"decline")}>❌ 拒否する</button>
               </div>
             </div>
           )}
