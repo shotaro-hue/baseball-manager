@@ -3,9 +3,12 @@ import { act, create } from 'react-test-renderer';
 import { afterEach, expect, it, vi } from 'vitest';
 import HubShell from './HubShell';
 
-vi.mock('./HubContentRouter', () => ({ default: ({ tab, onTabChange }) =>
-  React.createElement('section', { 'data-test-tab': tab }, tab,
-    React.createElement('button', { onClick: () => onTabChange('fa') }, '候補を探す')) }));
+vi.mock('./HubContentRouter', () => ({ default: function Content({ tab, onTabChange }) {
+  const [draft, setDraft] = useState('');
+  return React.createElement('section', { 'data-test-tab': tab }, tab,
+    React.createElement('input', { value: draft, onChange: e => setDraft(e.target.value) }),
+    React.createElement('button', { onClick: () => onTabChange('fa') }, '候補を探す'));
+} }));
 const team = { id: 0, name: '自軍', wins: 0, losses: 0, draws: 0, players: [], farm: [], lineup: [], rotation: [] };
 const opponent = { ...team, id: 1, name: '相手' };
 const schedule = { 1: { date: { month: 3, day: 27 }, matchups: [{ homeId: 0, awayId: 1 }] } };
@@ -14,19 +17,20 @@ afterEach(() => { if (view) act(() => view.unmount()); view = null; });
 const text = n => typeof n === 'string' ? n : (n.children || []).map(text).join('');
 const button = (label, parent = view.root) => parent.findAllByType('button').find(n => text(n) === label || n.props['aria-label'] === label);
 const click = label => { const b = button(label); expect(b, `button ${label}`).toBeTruthy(); act(() => b.props.onClick()); };
-function mount({ initialTab = 'dashboard', mailbox = [], news = [] } = {}) {
+function mount({ initialTab = 'dashboard', mailbox = [], news = [], year = 2026, saveId = 'navigation' } = {}) {
   const setTabSpy = vi.fn();
-  function Harness() {
+  function Harness({ year, saveId }) {
     const [tab, update] = useState(initialTab);
-    const gs = { myTeam: team, teams: [team, opponent], myId: 0, year: 2026, gameDay: 1, schedule,
-      gameResultsMap: {}, tab, tabBadges: {}, saveId: 'navigation', mailbox, news,
+    const gs = { myTeam: team, teams: [team, opponent], myId: 0, year, gameDay: 1, schedule,
+      gameResultsMap: {}, tab, tabBadges: {}, saveId, mailbox, news,
       getMailboxBySelector: () => mailbox, getNewsBySelector: () => news,
       getUnreadMailboxCount: () => mailbox.filter(m => !m.read && (m.deliverOnDay ?? 0) <= 1).length,
       setTab: id => { setTabSpy(id); update(id); }, notify: vi.fn() };
     const app = { gs, sf: {}, os: {} };
     return React.createElement(HubShell, { state: { gs }, flows: app, app });
   }
-  act(() => { view = create(React.createElement(Harness)); });
+  act(() => { view = create(React.createElement(Harness, { year, saveId })); });
+  setTabSpy.setScope = props => act(() => view.update(React.createElement(Harness, { year, saveId, ...props })));
   return setTabSpy;
 }
 it('uses the same five approved sections on mobile and desktop', () => {
@@ -68,4 +72,18 @@ it('moves balance under settings with a return route', () => {
   const changed = mount({ initialTab: 'schedule' });
   click('設定'); expect(changed).toHaveBeenLastCalledWith('settings');
   click('元の画面へ戻る'); expect(changed).toHaveBeenLastCalledWith('schedule');
+});
+
+it('keeps an unconfirmed trade draft across notifications', () => {
+  mount({ initialTab: 'trade' });
+  act(() => view.root.findByProps({ 'data-test-tab': 'trade' }).findByType('input').props.onChange({ target: { value: '未確定の条件' } }));
+  click('通知（未読0件・要対応0件）');
+  click('元の画面へ戻る');
+  expect(view.root.findByProps({ 'data-test-tab': 'trade' }).findByType('input').props.value).toBe('未確定の条件');
+});
+it.each([{ year: 2027 }, { saveId: 'another-save' }])('clears mounted drafts when the session scope changes: %s', scope => {
+  const changed = mount({ initialTab: 'trade' });
+  act(() => view.root.findByProps({ 'data-test-tab': 'trade' }).findByType('input').props.onChange({ target: { value: '前セッションの条件' } }));
+  changed.setScope(scope);
+  expect(view.root.findByProps({ 'data-test-tab': 'trade' }).findByType('input').props.value).toBe('');
 });

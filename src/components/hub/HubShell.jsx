@@ -45,7 +45,8 @@ export default function HubShell({ state, flows, app }) {
     handlePressAnswer,
   } = gs;
 
-  const navigation = useHubNavigation(tab, setTab, `${gs.saveId}:${gs.myId}:${year}`);
+  const navigationScope = `${gs.saveId}:${gs.myId}:${year}`;
+  const navigation = useHubNavigation(tab, setTab, navigationScope);
   const { currentPrimarySection } = navigation;
   const notifications = notificationSummary({ mailbox: gs.getMailboxBySelector?.() ?? gs.mailbox,
     news: gs.getNewsBySelector?.() ?? gs.news, gameDay, unreadCount: gs.getUnreadMailboxCount?.(gameDay) });
@@ -201,7 +202,7 @@ export default function HubShell({ state, flows, app }) {
             onTabChange={handleTabChange}
           />}
 
-          <ErrorBoundary key={gs.saveId}>
+          <ErrorBoundary key={navigationScope}>
             {decisionTarget?.tab === tab && (
               <div className="decision-context-banner" role="status">
                 <div>

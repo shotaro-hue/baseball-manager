@@ -1,0 +1,137 @@
+[
+  {
+    "stage": "before",
+    "width": 360,
+    "baselineLength": 2,
+    "beforeReturn": {
+      "length": 4,
+      "navigation": {
+        "session": "hub-2",
+        "routes": [
+          "finance",
+          "news",
+          "news"
+        ]
+      }
+    },
+    "teamsHash": "9f755d69804cdbe439e3a7b0853b5c040d401b6031e06ab3a53921068a3a27c7",
+    "year": 2026,
+    "gameDay": 1,
+    "active": "news",
+    "hash": "#hub/news",
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "stage": "before",
+    "width": 390,
+    "baselineLength": 2,
+    "beforeReturn": {
+      "length": 4,
+      "navigation": {
+        "session": "hub-2",
+        "routes": [
+          "finance",
+          "news",
+          "news"
+        ]
+      }
+    },
+    "teamsHash": "9f755d69804cdbe439e3a7b0853b5c040d401b6031e06ab3a53921068a3a27c7",
+    "year": 2026,
+    "gameDay": 1,
+    "active": "news",
+    "hash": "#hub/news",
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "stage": "before",
+    "width": 1440,
+    "baselineLength": 2,
+    "beforeReturn": {
+      "length": 4,
+      "navigation": {
+        "session": "hub-2",
+        "routes": [
+          "finance",
+          "news",
+          "news"
+        ]
+      }
+    },
+    "teamsHash": "9f755d69804cdbe439e3a7b0853b5c040d401b6031e06ab3a53921068a3a27c7",
+    "year": 2026,
+    "gameDay": 1,
+    "active": "news",
+    "hash": "#hub/news",
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "stage": "after",
+    "width": 360,
+    "baselineLength": 2,
+    "beforeReturn": {
+      "length": 3,
+      "navigation": {
+        "session": "hub-1792413915723-4",
+        "routes": [
+          "finance",
+          "news"
+        ]
+      }
+    },
+    "teamsHash": "9f755d69804cdbe439e3a7b0853b5c040d401b6031e06ab3a53921068a3a27c7",
+    "year": 2026,
+    "gameDay": 1,
+    "active": "finance",
+    "hash": "#hub/finance",
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "stage": "after",
+    "width": 390,
+    "baselineLength": 2,
+    "beforeReturn": {
+      "length": 3,
+      "navigation": {
+        "session": "hub-1792413921205-4",
+        "routes": [
+          "finance",
+          "news"
+        ]
+      }
+    },
+    "teamsHash": "9f755d69804cdbe439e3a7b0853b5c040d401b6031e06ab3a53921068a3a27c7",
+    "year": 2026,
+    "gameDay": 1,
+    "active": "finance",
+    "hash": "#hub/finance",
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "stage": "after",
+    "width": 1440,
+    "baselineLength": 2,
+    "beforeReturn": {
+      "length": 3,
+      "navigation": {
+        "session": "hub-1792413925863-4",
+        "routes": [
+          "finance",
+          "news"
+        ]
+      }
+    },
+    "teamsHash": "9f755d69804cdbe439e3a7b0853b5c040d401b6031e06ab3a53921068a3a27c7",
+    "year": 2026,
+    "gameDay": 1,
+    "active": "finance",
+    "hash": "#hub/finance",
+    "overflow": false,
+    "errors": []
+  }
+]

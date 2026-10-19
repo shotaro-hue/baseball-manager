@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PRIMARY_SECTIONS, TAB_TO_SECTION } from './hubNavigation';
+import { PRIMARY_SECTIONS, TAB_TO_SECTION, navigationSlot } from './hubNavigation';
 
 let nextSession = 0;
+const documentSession = Date.now();
 const HISTORY_KEY = 'baseballHubNavigation';
 
 // Transient navigation only. Never serialized into the game save.
@@ -9,7 +10,7 @@ export function useHubNavigation(tab, setTab, scope) {
   const [routes, setRoutes] = useState([tab]);
   const [lastTabs, setLastTabs] = useState(() => Object.fromEntries(PRIMARY_SECTIONS.map(s => [s.id, s.defaultTab])));
   const session = useRef(null), routeRef = useRef(routes), setter = useRef(setTab);
-  const positions = useRef(new Map()), restore = useRef(null);
+  const positions = useRef(new Map()), restore = useRef(null), revisit = useRef(null);
   setter.current = setTab;
   routeRef.current = routes;
   const writeHistory = useCallback((next, push = false) => {
@@ -21,21 +22,38 @@ export function useHubNavigation(tab, setTab, scope) {
     if (push) window.location.hash = hash;
     window.history.replaceState(state, '', hash);
   }, []);
+  const reset = useCallback(target => {
+    session.current = `hub-${documentSession}-${++nextSession}`;
+    positions.current.clear(); restore.current = null; revisit.current = null;
+    routeRef.current = [target]; setRoutes([target]); writeHistory([target]);
+  }, [writeHistory]);
 
   useEffect(() => {
-    session.current = `hub-${++nextSession}`;
-    positions.current.clear(); restore.current = null;
-    setRoutes([tab]);
+    reset(tab);
     setLastTabs(Object.fromEntries(PRIMARY_SECTIONS.map(s => [s.id, s.defaultTab])));
-    writeHistory([tab]);
     if (typeof window === 'undefined') return;
     const previousRestoration = window.history.scrollRestoration;
     window.history.scrollRestoration = 'manual';
     const pop = event => {
-      const next = event.state?.[HISTORY_KEY];
-      if (next?.session !== session.current || !Array.isArray(next.routes) || !next.routes.length) return;
-      restore.current = positions.current.get(next.routes.at(-1));
-      setRoutes(next.routes); setter.current(next.routes.at(-1));
+      const entry = event.state?.[HISTORY_KEY];
+      // Native hash assignment also emits a null-state event. Ignore it.
+      if (!entry || !Array.isArray(entry.routes) || !entry.routes.length) return;
+      if (entry.session !== session.current) {
+        // Old saves/years/primary visits cannot restore a discarded UI chain.
+        const root = routeRef.current[0];
+        reset(root); setter.current(root);
+        return;
+      }
+      let next = entry.routes;
+      const pending = revisit.current;
+      revisit.current = null;
+      if (pending && pending.index === next.length - 1
+        && navigationSlot(next.at(-1)) === navigationSlot(pending.target)) {
+        next = [...next.slice(0, -1), pending.target];
+        writeHistory(next);
+      }
+      restore.current = positions.current.get(next.at(-1));
+      routeRef.current = next; setRoutes(next); setter.current(next.at(-1));
     };
     window.addEventListener('popstate', pop);
     return () => {
@@ -44,12 +62,12 @@ export function useHubNavigation(tab, setTab, scope) {
     };
     // A new save/year starts a fresh UI navigation session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scope, writeHistory]);
+  }, [scope, reset, writeHistory]);
 
   useEffect(() => {
     const section = TAB_TO_SECTION[tab];
     if (section) setLastTabs(prev => prev[section] === tab ? prev : { ...prev, [section]: tab });
-    if (routeRef.current.at(-1) !== tab) { setRoutes([tab]); writeHistory([tab]); }
+    if (routeRef.current.at(-1) !== tab) reset(tab);
     if (restore.current && typeof window !== 'undefined') {
       const saved = restore.current; restore.current = null;
       const frame = window.requestAnimationFrame(() => {
@@ -58,28 +76,29 @@ export function useHubNavigation(tab, setTab, scope) {
       });
       return () => window.cancelAnimationFrame(frame);
     }
-  }, [tab, writeHistory]);
+  }, [tab, reset]);
 
   const navigate = useCallback(target => {
-    setRoutes([target]); writeHistory([target]); setter.current(target);
-  }, [writeHistory]);
-  const open = useCallback(target => {
+    reset(target); setter.current(target);
+  }, [reset]);
+  const visit = useCallback((target, replaceCurrent = false) => {
     const current = routeRef.current;
-    if (current.at(-1) === target) return;
+    // history.go is asynchronous: repeated header clicks must share its visit.
+    if (revisit.current || current.at(-1) === target) return;
     if (typeof window !== 'undefined') positions.current.set(current.at(-1), { focus: document.activeElement, scrollY: window.scrollY });
-    const existing = current.indexOf(target);
-    if (existing >= 0 && typeof window !== 'undefined' && window.history.state?.[HISTORY_KEY]?.session === session.current) {
+    const existing = current.findIndex(route => navigationSlot(route) === navigationSlot(target));
+    if (existing >= 0 && existing < current.length - 1 && typeof window !== 'undefined' && window.history.state?.[HISTORY_KEY]?.session === session.current) {
+      revisit.current = { index: existing, target };
       window.history.go(existing - current.length + 1);
       return;
     }
-    const next = existing >= 0 ? current.slice(0, existing + 1) : [...current, target];
-    setRoutes(next); writeHistory(next, existing < 0); setter.current(target);
-    if (typeof window !== 'undefined') window.scrollTo(0, 0);
+    const next = existing >= 0 ? [...current.slice(0, existing), target]
+      : replaceCurrent ? [...current.slice(0, -1), target] : [...current, target];
+    routeRef.current = next; setRoutes(next); writeHistory(next, existing < 0 && !replaceCurrent); setter.current(target);
+    if (typeof window !== 'undefined' && !replaceCurrent) window.scrollTo(0, 0);
   }, [writeHistory]);
-  const replace = useCallback(target => {
-    const next = [...routeRef.current.slice(0, -1), target];
-    setRoutes(next); writeHistory(next); setter.current(target);
-  }, [writeHistory]);
+  const open = useCallback(target => visit(target), [visit]);
+  const replace = useCallback(target => visit(target, true), [visit]);
   const back = useCallback(() => {
     const current = routeRef.current;
     if (current.length < 2) return;

@@ -1,0 +1,35 @@
+[
+  {
+    "length": 3,
+    "navigation": {
+      "session": "hub-2",
+      "routes": [
+        "finance",
+        "news"
+      ]
+    }
+  },
+  {
+    "length": 4,
+    "navigation": {
+      "session": "hub-2",
+      "routes": [
+        "finance",
+        "news",
+        "news"
+      ]
+    }
+  },
+  {
+    "length": 5,
+    "navigation": {
+      "session": "hub-2",
+      "routes": [
+        "finance",
+        "news",
+        "news",
+        "news"
+      ]
+    }
+  }
+]

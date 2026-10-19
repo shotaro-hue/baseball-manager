@@ -11,6 +11,8 @@ export const TAB_TO_SECTION = {
   fa: 'management', trade: 'management', scout: 'management', alumni: 'analysis',
 };
 export const AUXILIARY_TABS = ['mailbox', 'news', 'settings', 'balance'];
+// Inbox/news are subtabs of one notification visit, not separate return steps.
+export const navigationSlot = tab => ['mailbox', 'news'].includes(tab) ? 'notifications' : tab;
 export const RECRUITMENT_TABS = [['reinforcement', '補強トップ'], ['fa', 'FA'], ['trade', 'トレード'], ['scout', 'スカウト']];
 export function parentTab(tab) {
   return ['fa', 'trade', 'scout'].includes(tab) ? 'reinforcement' : tab === 'alumni' ? 'records' : tab;

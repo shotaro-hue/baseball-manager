@@ -5,6 +5,79 @@ import { mainNavigation, reloadAndLoad, saveHub, loadFixture, startNewGame } fro
 
 const notifications = page => page.getByRole('button', { name: /^通知（未読/ });
 const active = page => page.locator('[data-hub-route]:not([hidden])');
+test('hub navigation repeated notification tabs return to finance without duplicate history', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 }); await prepare(page); await management(page, 390);
+  await page.getByRole('navigation', { name: '経営メニュー' }).getByRole('button', { name: '財務', exact: true }).click();
+  const initialLength = await page.evaluate(() => history.length);
+  const news = page.getByRole('navigation', { name: '通知メニュー' }).getByRole('button', { name: 'ニュース', exact: true });
+  const snapshots = [];
+  for (let i = 0; i < 3; i++) {
+    await notifications(page).click();
+    await expect(active(page)).toHaveAttribute('data-hub-route', 'mailbox');
+    await news.click();
+    await expect(active(page)).toHaveAttribute('data-hub-route', 'news');
+    snapshots.push(await page.evaluate(() => ({ length: history.length, navigation: history.state.baseballHubNavigation })));
+  }
+  await test.info().attach('notification-history', { body: JSON.stringify(snapshots, null, 2), contentType: 'application/json' });
+  await page.getByRole('button', { name: '元の画面へ戻る', exact: true }).click();
+  await expect(active(page)).toHaveAttribute('data-hub-route', 'finance');
+  expect(snapshots.map(s => s.length)).toEqual([initialLength + 1, initialLength + 1, initialLength + 1]);
+  expect(snapshots.every(s => s.navigation.routes.join(',') === 'finance,news')).toBe(true);
+  await page.goForward(); await expect(active(page)).toHaveAttribute('data-hub-route', 'news');
+  await page.goBack(); await expect(active(page)).toHaveAttribute('data-hub-route', 'finance');
+  await reloadAndLoad(page);
+  await expect(notifications(page)).toBeVisible();
+});
+test('hub navigation settings return, primary reset and reload discard stale visits', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 }); await prepare(page); await management(page, 390);
+  await page.getByRole('navigation', { name: '経営メニュー' }).getByRole('button', { name: '財務', exact: true }).click();
+  const before = await saveHub(page);
+  await page.getByRole('button', { name: '設定', exact: true }).click();
+  await active(page).getByText('開発者向け機能', { exact: true }).click();
+  await active(page).getByRole('button', { name: 'バランス検証', exact: true }).click();
+  const back = page.getByRole('button', { name: '元の画面へ戻る', exact: true });
+  await back.click(); await expect(active(page)).toHaveAttribute('data-hub-route', 'settings');
+  await back.click(); await expect(active(page)).toHaveAttribute('data-hub-route', 'finance');
+  await page.goForward(); await expect(active(page)).toHaveAttribute('data-hub-route', 'settings');
+  await page.goForward(); await expect(active(page)).toHaveAttribute('data-hub-route', 'balance');
+  await mainNavigation(page, true).getByRole('button', { name: '編成', exact: true }).click();
+  await expect(back).toHaveCount(0);
+  await page.goBack(); await expect(active(page)).toHaveAttribute('data-hub-route', 'roster');
+  expect(await page.evaluate(() => location.hash)).toBe('#hub/roster');
+  await expect(back).toHaveCount(0);
+  await reloadAndLoad(page);
+  await expect(active(page)).toHaveAttribute('data-hub-route', 'dashboard');
+  await page.goBack(); await expect(active(page)).toHaveAttribute('data-hub-route', 'dashboard');
+  expect(await page.evaluate(() => location.hash)).toBe('#hub/dashboard');
+  expect((await saveHub(page)).teams).toEqual(before.teams);
+});
+test('hub navigation retains unconfirmed trade inputs during a notification detour', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 }); await prepare(page); await management(page, 390);
+  const before = await saveHub(page);
+  await active(page).getByRole('button', { name: 'トレード', exact: true }).click();
+  const targetTeam = before.teams.find(t => t.id !== before.myId);
+  await active(page).getByText(`${targetTeam.emoji} ${targetTeam.name}`, { exact: true }).click();
+  const cash = active(page).locator('input[type="number"]');
+  await cash.fill('1234');
+  await notifications(page).click();
+  await page.getByRole('navigation', { name: '通知メニュー' }).getByRole('button', { name: 'ニュース', exact: true }).click();
+  await notifications(page).click();
+  await page.getByRole('button', { name: '元の画面へ戻る', exact: true }).click();
+  await expect(active(page)).toHaveAttribute('data-hub-route', 'trade');
+  await expect(cash).toHaveValue('1234');
+  expect((await saveHub(page)).teams).toEqual(before.teams);
+});
+test('hub navigation reading an unresolved offer keeps it actionable and does not execute a trade', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 }); await prepare(page, { unreadOffer: true });
+  const before = await saveHub(page);
+  await notifications(page).click();
+  await active(page).getByText('UI04既読の提案', { exact: true }).click();
+  await expect(notifications(page)).toHaveAccessibleName('通知（未読1件・要対応1件）');
+  const after = await saveHub(page);
+  const offer = after.mailbox.find(m => m.id === 'visible-offer');
+  expect(offer.read).toBe(true); expect(offer.resolved).toBe(false);
+  expect(after.teams).toEqual(before.teams);
+});
 test('hub navigation entry surfaces use the readable DES-01 canvas and full-width budget', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 }); await prepare(page); await management(page, 390);
   await expect(page.locator('.calm-shell')).toHaveCSS('background-color', 'rgb(244, 246, 249)');
@@ -13,13 +86,13 @@ test('hub navigation entry surfaces use the readable DES-01 canvas and full-widt
   const bandWidth = await band.evaluate(n => n.getBoundingClientRect().width);
   expect(metricWidth).toBeGreaterThan(bandWidth / 2);
 });
-async function prepare(page) {
+async function prepare(page, { unreadOffer = false } = {}) {
   const fixture = JSON.parse(gunzipSync(readFileSync(new URL('./fixtures/new-game.json.gz', import.meta.url))));
   const mine = fixture.teams.find(t => t.id === fixture.myId), other = fixture.teams.find(t => t.id !== fixture.myId);
   const used = new Set([...(mine.lineupDh || []), ...(mine.lineupNoDh || []), ...(mine.rotation || [])]);
   const outgoing = mine.players.find(p => !used.has(p.id)), incoming = other.players.find(p => !p.isPitcher);
   fixture.mailbox = [
-    { id: 'visible-offer', type: 'trade', title: 'UI04既読の提案', body: '閲覧だけでは確定しません。', read: true, resolved: false,
+    { id: 'visible-offer', type: 'trade', title: 'UI04既読の提案', body: '閲覧だけでは確定しません。', read: !unreadOffer, resolved: false,
       offer: { from: other, want: [outgoing], offer: [incoming], cash: 5000000 } },
     { id: 'unread-info', type: 'info', title: 'UI04未読のお知らせ', body: 'お知らせ', read: false },
     { id: 'future-offer', type: 'trade', title: 'UI04未来の提案', read: false, resolved: false, deliverOnDay: fixture.gameDay + 10,
@@ -32,7 +105,7 @@ async function prepare(page) {
     if (!(await saveGame(fixture)).ok) throw new Error('navigation fixture save failed');
   }, fixture);
   await reloadAndLoad(page);
-  await expect(notifications(page)).toHaveAccessibleName('通知（未読1件・要対応1件）');
+  await expect(notifications(page)).toHaveAccessibleName(`通知（未読${unreadOffer ? 2 : 1}件・要対応1件）`);
 }
 async function management(page, width) {
   await mainNavigation(page, width < 1024).getByRole('button', { name: /^経営/ }).click();
@@ -127,7 +200,8 @@ test('hub navigation notifications preserve FA filter, focus, scroll and existin
   const unopened = await saveHub(page); expect(unopened.teams).toEqual(before.teams);
   expect(unopened.mailbox.find(m => m.id === 'visible-offer').resolved).toBe(false);
   // Reopening a mounted ancestor must use the same browser-history return path.
-  await notifications(page).click(); await expect(active(page)).toHaveAttribute('data-hub-route', 'mailbox');
+  await notifications(page).evaluate(button => { button.click(); button.click(); });
+  await expect(active(page)).toHaveAttribute('data-hub-route', 'mailbox');
   await page.getByRole('button', { name: '元の画面へ戻る', exact: true }).click();
   await expect(active(page)).toHaveAttribute('data-hub-route', 'fa');
   await expect(market).toHaveValue(filterValue); await expect(notifications(page)).toBeFocused();
