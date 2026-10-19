@@ -25,7 +25,12 @@ export function applyTradeTransaction(teams, { fromId, toId, outgoing, incoming,
   if ([...sent, ...received].some(p => !p)) return fail('選手の所属が変わっています。条件を選び直してください');
   if (![from.budget, to.budget].every(Number.isFinite)) return fail('球団予算が未記録または無効です');
   const fromBudget = from.budget - cash, toBudget = to.budget + cash;
-  if (![fromBudget, toBudget].every(v => Number.isFinite(v) && v >= 0)) return fail('支払う球団の予算が不足しています');
+  // Operating costs can leave a club with a negative spending envelope.
+  // A zero-cash swap or cash received must remain possible; an outflow must
+  // neither cross below zero nor deepen a pre-existing deficit.
+  const allowedBalance = (before, after) => Number.isFinite(after) && after >= Math.min(0, before);
+  if (!allowedBalance(from.budget, fromBudget) || !allowedBalance(to.budget, toBudget))
+    return fail('支払う球団の予算が不足しています');
   const exchange = (team, removed, added, budget) => {
     const removedIds = new Set(removed.map(p => p.id));
     const next = { ...team, budget, players: (team.players || []).filter(p => !removedIds.has(p.id)),

@@ -29,6 +29,11 @@ export function applyRegularSeasonTeamUpdate(team, result, { isFirstTeam, isHome
   const scoreAgainst = isFirstTeam ? result.score.opp : result.score.my;
   const won = scoreFor > scoreAgainst, drew = scoreFor === scoreAgainst;
   const log = result.log || [];
+  // Quote this game's receipts from the pre-game budget, popularity, record and
+  // ticket policy. Win/loss and fan sentiment changes only influence NEXT game.
+  // Keep this calculation in the shared regular-season path used by both Workers.
+  const accounted = team.clubFinance !== undefined
+    ? applyClubGameFinance(team, { year, gameDay, isHomeTeam }) : null;
   let players = applyGameStatsFromLog(team.players, log, isFirstTeam, won, gameDay);
   players = applyPostGameCondition(players, log, isFirstTeam, gameDay, isHomeTeam);
   players = playerRules.tickPositionTraining(playerRules.tickInjuries(players));
@@ -45,8 +50,9 @@ export function applyRegularSeasonTeamUpdate(team, result, { isFirstTeam, isHome
     wins: (team.wins ?? 0) + (won ? 1 : 0), losses: (team.losses ?? 0) + (!won && !drew ? 1 : 0),
     draws: (team.draws ?? 0) + (drew ? 1 : 0), rf: (team.rf ?? 0) + scoreFor, ra: (team.ra ?? 0) + scoreAgainst,
     rotIdx: (team.rotIdx ?? 0) + 1, ...applyPopularityDelta(team, won, drew) };
-  if (team.clubFinance !== undefined) {
-    return { team: applyClubGameFinance(updated, { year, gameDay, isHomeTeam }), injuries };
+  if (accounted) {
+    return { team: { ...updated, budget: accounted.budget,
+      revenueThisSeason: accounted.revenueThisSeason, clubFinance: accounted.clubFinance }, injuries };
   }
   // A pre-model save completes its current year using its original receipts.
   const revenue = calcRevenue(updated);
