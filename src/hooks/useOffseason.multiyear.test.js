@@ -6,6 +6,7 @@ import { calcSeasonAwards, updateRecords } from '../engine/awards';
 import { emptyStats } from '../engine/playerCore';
 import { getCareerEntryKey } from '../engine/careerStats';
 import { TEAM_DEFS } from '../constants';
+import { startClubFinance, applyClubGameFinance, nextClubBudget } from '../engine/clubFinance';
 import { shouldRunLineupManagement, shouldRunRosterManagement } from '../engine/managementPolicy';
 vi.mock('../engine/player', () => ({ generateForeignFaPool: () => [], rollRetire: () => false,
   developPlayers: players => ({ players, summary: {} }) }));
@@ -13,6 +14,27 @@ vi.mock('../engine/scheduleGen', () => ({ generateSeasonSchedule: () => ({}), ca
 vi.mock('../engine/contract', async original => ({ ...await original(), cpuRenewContracts: teams => ({ updatedTeams: teams, newFaPlayers: [], news: [] }) }));
 const player = (id, stats = {}, extra = {}) => ({ id, name: `選手${id}`, age: 26, pos: '捕手', salary: 1000,
   contractYearsLeft: 5, serviceYears: 2, condition: 80, personality: {}, stats: { ...emptyStats(), ...stats }, playoffStats: emptyStats(), ...extra });
+
+it('commits the operating-surplus allocation and a clean next-year ledger through the actual year transition', async () => {
+  let t = startClubFinance(team([player(0)]), 2026);
+  for (let gameDay = 1; gameDay <= 143; gameDay++) t = applyClubGameFinance(t, { year: 2026, gameDay, isHomeTeam: gameDay % 2 === 1 });
+  const expected = nextClubBudget(t, t, 0), h = setup([t]);
+  await act(async () => expect(await h.current.os.handleNextYear()).toBe(true));
+  const next = h.current.gs.teams[0];
+  expect(next.budget).toBe(expected);
+  expect(next.revenueThisSeason).toBe(0);
+  expect(next.clubFinance).toMatchObject({ year: 2027, homeGames: 0, awayGames: 0, operatingSurplus: 0 });
+  expect(next.clubFinance.postedRounds).toEqual([]);
+  expect(h.save.mock.calls.at(-1)[0].payload.teams[0]).toEqual(next);
+});
+
+it('preserves the old year income basis on rollover and starts new receipts without retroactive credits', async () => {
+  const t = { ...team([player(0)]), revenueThisSeason: 987654 };
+  const before = structuredClone(t), expected = nextClubBudget(t, t, 0), h = setup([t]);
+  await act(async () => expect(await h.current.os.handleNextYear()).toBe(true));
+  expect(t).toEqual(before);
+  expect(h.current.gs.teams[0]).toMatchObject({ budget: expected, revenueThisSeason: 0, clubFinance: { version: 1, year: 2027 } });
+});
 const team = (players, farm = [], id = 0) => ({ ...TEAM_DEFS[id], players, farm, wins: 80, losses: 63, draws: 0,
   budget: 100000, rf: 500, ra: 400, history: [], lineup: players.map(p => p.id), lineupNoDh: players.map(p => p.id), rotation: [] });
 let current, view; const archived = new Map();

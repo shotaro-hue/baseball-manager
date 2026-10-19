@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { fmtSal } from '../../utils';
 import { calcRevenue } from '../../engine/finance';
-import { SEASON_GAMES } from '../../constants';
+import { SEASON_GAMES, FINANCE_TICKET_LEVEL_MULT } from '../../constants';
+import { calcClubGameFinance, forecastClubFinance, stadiumUpgradeCosts } from '../../engine/clubFinance';
+import { regularSeasonProgress } from '../../engine/seasonProgress';
 import { contractPayroll } from '../../engine/contractPayroll';
 import './finance-payroll.css';
 
-export function FinanceTab({team,onStadiumUpgrade,onTicketPriceChange,gameDay,onPlayerClick}){
-  const rev=calcRevenue(team);
+export function FinanceTab({team,onStadiumUpgrade,onTicketPriceChange,gameDay,onPlayerClick,schedule}){
+  const forecast=forecastClubFinance(team,schedule);
+  const quote=forecast?calcClubGameFinance(team,true,Math.min(SEASON_GAMES,forecast.gamesPlayed+1)):null;
+  const rev=quote?{...quote,...quote.income}:calcRevenue(team);
   const payroll=contractPayroll(team);
   const payrollAmount = group => group.missing + group.invalid > 0
     ? `確認済み ${fmtSal(group.amount)}（集計不完全）` : fmtSal(group.amount);
@@ -16,23 +20,19 @@ export function FinanceTab({team,onStadiumUpgrade,onTicketPriceChange,gameDay,on
     setTicketPriceInput(String(team.customAvgTicketPrice??rev.avgTicketPrice));
   },[team.customAvgTicketPrice,rev.avgTicketPrice]);
   const lvl=team.stadiumLevel??0;
-  const UPGRADE_COSTS=[5000000,10000000,20000000];
-  const MULT_LABELS=["1.0x","1.25x","1.6x","2.0x"];
+  const UPGRADE_COSTS=stadiumUpgradeCosts(team);
+  const MULT_LABELS=forecast?["基準","基準単価+3.5%","基準単価+7%","基準単価+10.5%"]:FINANCE_TICKET_LEVEL_MULT.map(n=>`${n}x`);
   const STAR_LABELS=["★☆☆","★★☆","★★★","★★★+"];
   const nextCost=lvl<3?UPGRADE_COSTS[lvl]:null;
   const revThisSeason=team.revenueThisSeason??0;
-  const gamesPlayed=(gameDay||1)-1;
-  const HOME_GAMES_MIN = Math.floor(SEASON_GAMES / 2);
-  const HOME_GAMES_MAX = Math.ceil(SEASON_GAMES / 2);
-  const projectedMin=gamesPlayed>0?Math.round(revThisSeason/gamesPlayed*HOME_GAMES_MIN):0;
-  const projectedMax=gamesPlayed>0?Math.round(revThisSeason/gamesPlayed*HOME_GAMES_MAX):0;
-  const annualTicketMin = rev.ticket * HOME_GAMES_MIN;
-  const annualTicketMax = rev.ticket * HOME_GAMES_MAX;
-  const annualSponsorMin = rev.sponsor * HOME_GAMES_MIN;
-  const annualSponsorMax = rev.sponsor * HOME_GAMES_MAX;
-  const annualMerchMin = rev.merch * HOME_GAMES_MIN;
-  const annualMerchMax = rev.merch * HOME_GAMES_MAX;
-  const fmtRange=(min,max)=>`${fmtSal(min)} 〜 ${fmtSal(max)}`;
+  const progress=regularSeasonProgress(team);
+  const gamesPlayed=forecast?.gamesPlayed??(progress.valid?progress.playedGames:0);
+  const projected=gamesPlayed>0?Math.round(revThisSeason/gamesPlayed*SEASON_GAMES):null;
+  const fmtRange=(min,max)=>min===max?fmtSal(min):`${fmtSal(min)} 〜 ${fmtSal(max)}`;
+  const amount = r => fmtRange(r.min,r.max);
+  const annualRows=forecast?Object.entries({ticket:'チケット売上',food:'飲食',merch:'物販',sponsor:'スポンサー',broadcast:'放映権',membership:'会員'})
+    .map(([key,label])=>[label,amount(forecast.income[key])]):[['チケット売上',fmtSal(rev.ticket*SEASON_GAMES)],['スポンサー',fmtSal(rev.sponsor*SEASON_GAMES)],['グッズ',fmtSal(rev.merch*SEASON_GAMES)]];
+  annualRows.push(['年間合計',forecast?amount(forecast.revenue):fmtSal((rev.ticket+rev.sponsor+rev.merch)*SEASON_GAMES)]);
   const applyTicketPrice=()=>{
     const next=Math.round(Number(ticketPriceInput));
     if(!Number.isFinite(next)) return;
@@ -40,20 +40,34 @@ export function FinanceTab({team,onStadiumUpgrade,onTicketPriceChange,gameDay,on
   };
   return(
     <div className="finance-tab">
+      <p className="finance-payroll-note">{forecast?'球団別の動員基準と推定値による簡易収支です。編成予算は現金残高ではありません。':'旧モデルの収入を表示しています。翌年度から新しい収支モデルへ切り替わります。'}</p>
       <div className="g2">
         <div className="card">
-          <div className="card-h">収入（試合ごと）</div>
+          <div className="card-h">{forecast?'主催試合の収入（現在条件）':'収入（試合ごと）'}</div>
           {[["チケット売上",fmtSal(rev.ticket)],["平均単価",`${rev.avgTicketPrice.toLocaleString()}円/枚`],["観客動員",`${rev.attendance.toLocaleString()}人`]].map(([l,v])=>(
             <div key={l} className="fsb" style={{padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,.03)"}}><span style={{fontSize:11,color:"#4b5563"}}>{l}</span><span className="mono" style={{color:"#34d399"}}>{v}</span></div>
           ))}
         </div>
         <div className="card">
-          <div className="card-h">収入（年間見込み / 本拠地71〜72試合）</div>
-          {[["チケット売上",fmtRange(annualTicketMin,annualTicketMax)],["スポンサー",fmtRange(annualSponsorMin,annualSponsorMax)],["グッズ",fmtRange(annualMerchMin,annualMerchMax)],["年間合計",fmtRange(annualTicketMin+annualSponsorMin+annualMerchMin,annualTicketMax+annualSponsorMax+annualMerchMax)]].map(([l,v])=>(
+          <div className="card-h">{forecast?`年間売上見込み / 主催${forecast.homeGames.min===forecast.homeGames.max?forecast.homeGames.min:`${forecast.homeGames.min}〜${forecast.homeGames.max}`}試合`:'年間見込み / 旧モデル・出場143試合換算'}</div>
+          {forecast&&<p className="finance-payroll-note">実施{gamesPlayed}試合の実績＋残り試合の予測。{forecast.completeSchedule?'実際の日程を使用。':'日程未確認のため主催試合数は概算。'}</p>}
+          {annualRows.map(([l,v])=>(
             <div key={l} className="fsb" style={{padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,.03)"}}><span style={{fontSize:11,color:"#4b5563"}}>{l}</span><span className="mono" style={{color:"#34d399"}}>{v}</span></div>
           ))}
         </div>
       </div>
+      {forecast&&<section className="card finance-payroll" aria-label="運営費と編成予算">
+        <h2 className="card-h">運営費と編成予算</h2>
+        <dl className="finance-payroll-breakdown">
+          {[
+            ['年間運営費の見込み',amount(forecast.operatingCosts)],
+            ['選手給与前の運営差額',amount(forecast.operatingSurplus)],
+            ['契約年俸差引後（参考）',payroll.total.missing+payroll.total.invalid?'年俸の確認が必要':fmtRange(forecast.operatingSurplus.min-payroll.total.amount,forecast.operatingSurplus.max-payroll.total.amount)],
+            ['編成予算の残枠',fmtSal(team.budget)],
+          ].map(([label,value])=><div className="finance-payroll-row" key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+        </dl>
+        <p className="finance-payroll-note">運営費は球場・興行・飲食物販原価・一般運営を自動計上。選手給与は別枠です。売上から運営費を引いた差額を編成予算へ反映し、翌年度はオーナー配分と契約年俸から予算を再設定します。契約年俸差引後の額は利益の参考値で、支払済み額ではありません。</p>
+      </section>}
       <div className="card">
         <div className="card-h">🎫 チケット価格調整</div>
         <div style={{fontSize:11,color:"#4b5563",marginBottom:8}}>平均価格を上げると動員が下がり、下げると動員が上がります。</div>
@@ -97,12 +111,13 @@ export function FinanceTab({team,onStadiumUpgrade,onTicketPriceChange,gameDay,on
       </div>
       <div className="card">
         <div className="card-h">📈 シーズン収益サマリー</div>
-        {[["シーズン累計",fmtSal(revThisSeason)],["投資済み球場レベル",`Lv${lvl} ${STAR_LABELS[lvl]} (${MULT_LABELS[lvl]})`],["シーズン収入予測",gamesPlayed>0?fmtRange(projectedMin,projectedMax):"計算中..."]].map(([l,v])=>(
+        {[["シーズン累計",fmtSal(revThisSeason)],["投資済み球場レベル",`Lv${lvl} ${STAR_LABELS[lvl]} (${MULT_LABELS[lvl]})`],["シーズン収入予測",forecast?amount(forecast.revenue):projected!==null?fmtSal(projected):"計算中..."]].map(([l,v])=>(
           <div key={l} className="fsb" style={{padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,.03)"}}><span style={{fontSize:11,color:"#4b5563"}}>{l}</span><span className="mono" style={{color:"#34d399"}}>{v}</span></div>
         ))}
       </div>
       <div className="card">
         <div className="card-h">🏟️ 球場投資</div>
+        {forecast&&Number(team.customAvgTicketPrice)>0&&<p className="finance-payroll-note">手動設定中のチケット価格は維持されます。</p>}
         <div className="fsb" style={{marginBottom:8}}><span style={{fontSize:12}}>現在: Lv{lvl} {STAR_LABELS[lvl]}</span><span style={{fontSize:11,color:"#34d399"}}>チケット {MULT_LABELS[lvl]}</span></div>
         {lvl<3?(<>
           <div style={{fontSize:11,color:"#4b5563",marginBottom:8}}>Lv{lvl+1}アップグレード: {fmtSal(nextCost)}<span style={{fontSize:10,color:"#34d399",marginLeft:6}}>→ {MULT_LABELS[lvl+1]}</span></div>

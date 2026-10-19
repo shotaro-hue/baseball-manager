@@ -4,6 +4,7 @@ import { optimizeTeamForGameStart } from './rosterAutomation';
 import { NPB2025_ROSTERS } from '../data/npb2025';
 import { TEAM_DEFS } from '../constants';
 import { yieldToBrowser } from './yieldToBrowser';
+import { startClubFinance } from './clubFinance';
 
 export function createInitialTeams() {
   return TEAM_DEFS.map(createInitialTeam);
@@ -43,5 +44,5 @@ function createInitialTeam(def) {
   team.lineup = (team.rosterDhMode ? team.lineupDh : team.lineupNoDh).slice();
   team.history = [];
   // 呼び出し側が全履歴をIndexedDBへ保存してからReact state用に軽量化する。
-  return team;
+  return startClubFinance(team, 2026);
 }

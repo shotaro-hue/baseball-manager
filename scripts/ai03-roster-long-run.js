@@ -28,6 +28,7 @@ import {rosterRows,rosterTransitions} from './roster-capacity-metrics';
 import {releaseCompletedTransactions} from './fake-indexeddb-prune';
 import {recordCareerExpectations,verifyCareerExpectations} from './roster-career-evidence';
 import {validationSourceHashes,assertValidationSourcesUnchanged} from './roster-long-run-source.mjs';
+import {validateClubFinance} from '../src/engine/clubFinance';
 
 // Real application hooks run in react-test-renderer. Only browser storage is
 // adapted to Node (Map localStorage and fake-indexeddb); game logic is unmocked.
@@ -60,6 +61,7 @@ function integrity(s) {
  for(const t of s.teams) {
   expect(registeredDraftCount(t)).toBeLessThanOrEqual(70);
   expect(Number.isFinite(t.budget)).toBe(true);
+  if(t.clubFinance)expect(t.budget).toBeGreaterThanOrEqual(0);
   for(const p of ownedPlayers(t)) {
    expect(Number.isFinite(p.salary)).toBe(true);expect(p.salary).toBeGreaterThan(0);
    expect(Number.isInteger(p.contractYearsLeft)).toBe(true);expect(p.contractYearsLeft).toBeGreaterThanOrEqual(0);
@@ -79,6 +81,7 @@ async function checkpoint(label,rows) {
   .toEqual(before.teams.map(t=>ownedPlayers(t).map(p=>[p.id,p.salary,p.contractYearsLeft,p.contractSignedYear])));
  expect(loaded.teams.map(t=>(t.history||[]).map(p=>[p.id,p.exitYear,p.exitReason])))
   .toEqual(before.teams.map(t=>(t.history||[]).map(p=>[p.id,p.exitYear,p.exitReason])));
+ expect(loaded.teams.map(t=>t.clubFinance)).toEqual(before.teams.map(t=>t.clubFinance));
  expect(loaded.farmCompetition).toEqual(before.farmCompetition);
  expect(loaded.seasonHistory).toEqual(before.seasonHistory);
  // JSON persistence canonically removes undefined and normalizes numeric -0.
@@ -140,6 +143,14 @@ it(`QA-D1: seed ${seed} targets ${years} generated seasons with offseason save/r
    if(count===72)await checkpoint('midseason',row.checkpoints);
   }
   const finished=current.s,seasonEnd=recordPhase('seasonEnd');integrity(finished);
+  const financial=finished.teams.map(t=>{
+   if(!t.clubFinance)return {teamId:t.id,model:'legacy'};
+   expect(validateClubFinance(t.clubFinance)).toBe(true);
+   expect(t.clubFinance.year).toBe(y);
+   expect(t.clubFinance.homeGames+t.clubFinance.awayGames).toBe(143);
+   expect(t.revenueThisSeason).toBe(Object.values(t.clubFinance.income).reduce((a,b)=>a+b,0));
+   return {teamId:t.id,year:y,revenue:t.revenueThisSeason,budget:t.budget,...t.clubFinance};
+  });
   expect(finished.teams.map(t=>t.wins+t.losses+(t.draws||0))).toEqual(Array(12).fill(143));
   expect(finished.farmCompetition.nextRound).toBe(144);
   const playedCards=finished.farmCompetition.cards.filter(c=>c.status==='played').length;
@@ -222,7 +233,7 @@ it(`QA-D1: seed ${seed} targets ${years} generated seasons with offseason save/r
   await act(async()=>{expect(await current.os.handleSpringTrainingComplete()).toBe(false);});
   events.push(...rosterTransitions(previous,rosterRows(current.s,rookieIds),{...current.s,year:y},'year-advance'));
   globalThis.gc?.();
-  const seasonRow={year:y,cpuDecisions:audit.splice(0),phases,events,seasonEnd,afterOffseason:rosterRows(current.s,rookieIds),decisions,endedTeams,marketRemaining:current.s.faPool.length,officialGamesPerTeam:143,elapsedMs:Math.round(performance.now()-started),memory:process.memoryUsage(),farmCards:{played:playedCards,unplayed:unplayed.length,reasons:farmReasons},candidateCount:pool.length,firstNominationRounds:first.rounds.length,picks:Object.keys(drafted).length,faSigned,releasedId,registered:current.s.teams.map(registeredDraftCount),archives:current.s.seasonHistory.farmArchives.length};
+  const seasonRow={year:y,financial,cpuDecisions:audit.splice(0),phases,events,seasonEnd,afterOffseason:rosterRows(current.s,rookieIds),decisions,endedTeams,marketRemaining:current.s.faPool.length,officialGamesPerTeam:143,elapsedMs:Math.round(performance.now()-started),memory:process.memoryUsage(),farmCards:{played:playedCards,unplayed:unplayed.length,reasons:farmReasons},candidateCount:pool.length,firstNominationRounds:first.rounds.length,picks:Object.keys(drafted).length,faSigned,releasedId,registered:current.s.teams.map(registeredDraftCount),archives:current.s.seasonHistory.farmArchives.length};
   for(const id of continuousIds)if(!ownedPlayers(current.gs.myTeam).some(p=>p.id===id))continuousIds.delete(id);
   row.seasons.push(seasonRow);saveEvidence();console.log('QA-D1 season',seed,y,'ms',seasonRow.elapsedMs,'farm unplayed',unplayed.length);
  }

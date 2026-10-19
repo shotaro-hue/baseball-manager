@@ -1,4 +1,5 @@
 import { draftCapacityContext, evaluateRosterCapacity, isIkuseiPlayer } from '../engine/rosterCapacity';
+import { stadiumUpgradeCosts } from '../engine/clubFinance';
 import { marketRosterError } from '../engine/marketRoster';
 import {createFarmCompetition} from '../engine/farmRecords';
 import {validateFarmSaveState} from '../engine/farmMigration';
@@ -1047,15 +1048,17 @@ export function useGameState() {
   }, [pressEvent, upd, myId, notify, gameDay]);
 
   const handleStadiumUpgrade = useCallback(()=>{
-    if(!myTeam) return;
-    const lvl=myTeam.stadiumLevel??0;
-    const UPGRADE_COSTS=[5000000,10000000,20000000];
+    const current = rosterCommandRef.current;
+    if (!current || current.myId !== myId) return;
+    const team = current.teams.find(t => t.id === current.myId);
+    if (!team) return;
+    const lvl=team.stadiumLevel??0;
     if(lvl>=3){notify("球場はすでに最高レベルです","warn");return;}
-    const cost=UPGRADE_COSTS[lvl];
-    if(myTeam.budget<cost){notify("予算不足","warn");return;}
-    upd(myId,t=>({...t,budget:t.budget-cost,stadiumLevel:(t.stadiumLevel??0)+1}));
+    const cost=stadiumUpgradeCosts(team)[lvl];
+    if(!Number.isFinite(cost) || !Number.isFinite(team.budget) || team.budget<cost){notify("予算不足","warn");return;}
+    commitRosterCommand(current,{...team,budget:team.budget-cost,stadiumLevel:lvl+1});
     notify(`球場をLv${lvl+1}にアップグレード！チケット収入 UP`,"ok");
-  },[myTeam,upd,myId,notify]);
+  },[myId,notify]);
 
   const handleSetTicketPrice = useCallback((nextPrice)=>{
     if(!myTeam) return;

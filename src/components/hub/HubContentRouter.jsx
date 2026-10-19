@@ -391,6 +391,7 @@ export default function HubContentRouter({ app, tab, onTabChange, comparison }) 
           onStadiumUpgrade={gs.handleStadiumUpgrade}
           onTicketPriceChange={gs.handleSetTicketPrice}
           gameDay={gameDay}
+          schedule={schedule}
           onPlayerClick={gs.handlePlayerClick}
         />
       </DeferredHubTab>

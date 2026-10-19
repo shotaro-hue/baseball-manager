@@ -1,0 +1,966 @@
+{
+  "scope": "96 fixed-condition synthetic seasons; real 2026 schedule and production receipts/forecast functions. No games, growth, contracts or AI are simulated.",
+  "units": "万円",
+  "rows": [
+    {
+      "scenario": "baseline",
+      "teamId": 0,
+      "team": "ヤクルト",
+      "homeGames": 74,
+      "revenueManYen": 1589392,
+      "operatingCostsManYen": 1112896,
+      "surplusBeforePlayerPayrollManYen": 476496,
+      "closingBudgetManYen": 976496
+    },
+    {
+      "scenario": "baseline",
+      "teamId": 1,
+      "team": "DeNA",
+      "homeGames": 74,
+      "revenueManYen": 2236696,
+      "operatingCostsManYen": 1466594,
+      "surplusBeforePlayerPayrollManYen": 770102,
+      "closingBudgetManYen": 1250102
+    },
+    {
+      "scenario": "baseline",
+      "teamId": 2,
+      "team": "広島",
+      "homeGames": 72,
+      "revenueManYen": 1371640,
+      "operatingCostsManYen": 1017520,
+      "surplusBeforePlayerPayrollManYen": 354120,
+      "closingBudgetManYen": 704120
+    },
+    {
+      "scenario": "baseline",
+      "teamId": 3,
+      "team": "阪神",
+      "homeGames": 69,
+      "revenueManYen": 2510053,
+      "operatingCostsManYen": 1872907,
+      "surplusBeforePlayerPayrollManYen": 637146,
+      "closingBudgetManYen": 1237146
+    },
+    {
+      "scenario": "baseline",
+      "teamId": 4,
+      "team": "巨人",
+      "homeGames": 71,
+      "revenueManYen": 2812588,
+      "operatingCostsManYen": 2074461,
+      "surplusBeforePlayerPayrollManYen": 738127,
+      "closingBudgetManYen": 1388127
+    },
+    {
+      "scenario": "baseline",
+      "teamId": 5,
+      "team": "中日",
+      "homeGames": 69,
+      "revenueManYen": 1831183,
+      "operatingCostsManYen": 1421590,
+      "surplusBeforePlayerPayrollManYen": 409593,
+      "closingBudgetManYen": 829593
+    },
+    {
+      "scenario": "baseline",
+      "teamId": 6,
+      "team": "ソフトバンク",
+      "homeGames": 74,
+      "revenueManYen": 2604636,
+      "operatingCostsManYen": 1932158,
+      "surplusBeforePlayerPayrollManYen": 672478,
+      "closingBudgetManYen": 1252478
+    },
+    {
+      "scenario": "baseline",
+      "teamId": 7,
+      "team": "楽天",
+      "homeGames": 74,
+      "revenueManYen": 1315108,
+      "operatingCostsManYen": 932532,
+      "surplusBeforePlayerPayrollManYen": 382576,
+      "closingBudgetManYen": 742576
+    },
+    {
+      "scenario": "baseline",
+      "teamId": 8,
+      "team": "西武",
+      "homeGames": 72,
+      "revenueManYen": 1270888,
+      "operatingCostsManYen": 932816,
+      "surplusBeforePlayerPayrollManYen": 338072,
+      "closingBudgetManYen": 738072
+    },
+    {
+      "scenario": "baseline",
+      "teamId": 9,
+      "team": "ロッテ",
+      "homeGames": 69,
+      "revenueManYen": 1411279,
+      "operatingCostsManYen": 1016917,
+      "surplusBeforePlayerPayrollManYen": 394362,
+      "closingBudgetManYen": 764362
+    },
+    {
+      "scenario": "baseline",
+      "teamId": 10,
+      "team": "日本ハム",
+      "homeGames": 71,
+      "revenueManYen": 2285863,
+      "operatingCostsManYen": 1752522,
+      "surplusBeforePlayerPayrollManYen": 533341,
+      "closingBudgetManYen": 983341
+    },
+    {
+      "scenario": "baseline",
+      "teamId": 11,
+      "team": "オリックス",
+      "homeGames": 69,
+      "revenueManYen": 1612867,
+      "operatingCostsManYen": 1156868,
+      "surplusBeforePlayerPayrollManYen": 455999,
+      "closingBudgetManYen": 915999
+    },
+    {
+      "scenario": "low-demand",
+      "teamId": 0,
+      "team": "ヤクルト",
+      "homeGames": 74,
+      "revenueManYen": 1111317,
+      "operatingCostsManYen": 988502,
+      "surplusBeforePlayerPayrollManYen": 122815,
+      "closingBudgetManYen": 622815
+    },
+    {
+      "scenario": "low-demand",
+      "teamId": 1,
+      "team": "DeNA",
+      "homeGames": 74,
+      "revenueManYen": 1553888,
+      "operatingCostsManYen": 1289512,
+      "surplusBeforePlayerPayrollManYen": 264376,
+      "closingBudgetManYen": 744376
+    },
+    {
+      "scenario": "low-demand",
+      "teamId": 2,
+      "team": "広島",
+      "homeGames": 72,
+      "revenueManYen": 954537,
+      "operatingCostsManYen": 908656,
+      "surplusBeforePlayerPayrollManYen": 45881,
+      "closingBudgetManYen": 395881
+    },
+    {
+      "scenario": "low-demand",
+      "teamId": 3,
+      "team": "阪神",
+      "homeGames": 69,
+      "revenueManYen": 1753984,
+      "operatingCostsManYen": 1676464,
+      "surplusBeforePlayerPayrollManYen": 77520,
+      "closingBudgetManYen": 677520
+    },
+    {
+      "scenario": "low-demand",
+      "teamId": 4,
+      "team": "巨人",
+      "homeGames": 71,
+      "revenueManYen": 1982009,
+      "operatingCostsManYen": 1877507,
+      "surplusBeforePlayerPayrollManYen": 104502,
+      "closingBudgetManYen": 754502
+    },
+    {
+      "scenario": "low-demand",
+      "teamId": 5,
+      "team": "中日",
+      "homeGames": 69,
+      "revenueManYen": 1277090,
+      "operatingCostsManYen": 1277035,
+      "surplusBeforePlayerPayrollManYen": 55,
+      "closingBudgetManYen": 420055
+    },
+    {
+      "scenario": "low-demand",
+      "teamId": 6,
+      "team": "ソフトバンク",
+      "homeGames": 74,
+      "revenueManYen": 1822990,
+      "operatingCostsManYen": 1732580,
+      "surplusBeforePlayerPayrollManYen": 90410,
+      "closingBudgetManYen": 670410
+    },
+    {
+      "scenario": "low-demand",
+      "teamId": 7,
+      "team": "楽天",
+      "homeGames": 74,
+      "revenueManYen": 924180,
+      "operatingCostsManYen": 835666,
+      "surplusBeforePlayerPayrollManYen": 88514,
+      "closingBudgetManYen": 448514
+    },
+    {
+      "scenario": "low-demand",
+      "teamId": 8,
+      "team": "西武",
+      "homeGames": 72,
+      "revenueManYen": 893499,
+      "operatingCostsManYen": 835904,
+      "surplusBeforePlayerPayrollManYen": 57595,
+      "closingBudgetManYen": 457595
+    },
+    {
+      "scenario": "low-demand",
+      "teamId": 9,
+      "team": "ロッテ",
+      "homeGames": 69,
+      "revenueManYen": 990845,
+      "operatingCostsManYen": 908242,
+      "surplusBeforePlayerPayrollManYen": 82603,
+      "closingBudgetManYen": 452603
+    },
+    {
+      "scenario": "low-demand",
+      "teamId": 10,
+      "team": "日本ハム",
+      "homeGames": 71,
+      "revenueManYen": 1587915,
+      "operatingCostsManYen": 1563094,
+      "surplusBeforePlayerPayrollManYen": 24821,
+      "closingBudgetManYen": 474821
+    },
+    {
+      "scenario": "low-demand",
+      "teamId": 11,
+      "team": "オリックス",
+      "homeGames": 69,
+      "revenueManYen": 1133640,
+      "operatingCostsManYen": 1034531,
+      "surplusBeforePlayerPayrollManYen": 99109,
+      "closingBudgetManYen": 559109
+    },
+    {
+      "scenario": "high-demand",
+      "teamId": 0,
+      "team": "ヤクルト",
+      "homeGames": 74,
+      "revenueManYen": 1786045,
+      "operatingCostsManYen": 1152190,
+      "surplusBeforePlayerPayrollManYen": 633855,
+      "closingBudgetManYen": 1133855
+    },
+    {
+      "scenario": "high-demand",
+      "teamId": 1,
+      "team": "DeNA",
+      "homeGames": 74,
+      "revenueManYen": 2355772,
+      "operatingCostsManYen": 1477028,
+      "surplusBeforePlayerPayrollManYen": 878744,
+      "closingBudgetManYen": 1358744
+    },
+    {
+      "scenario": "high-demand",
+      "teamId": 2,
+      "team": "広島",
+      "homeGames": 72,
+      "revenueManYen": 1598663,
+      "operatingCostsManYen": 1069504,
+      "surplusBeforePlayerPayrollManYen": 529159,
+      "closingBudgetManYen": 879159
+    },
+    {
+      "scenario": "high-demand",
+      "teamId": 3,
+      "team": "阪神",
+      "homeGames": 69,
+      "revenueManYen": 2878066,
+      "operatingCostsManYen": 1952326,
+      "surplusBeforePlayerPayrollManYen": 925740,
+      "closingBudgetManYen": 1525740
+    },
+    {
+      "scenario": "high-demand",
+      "teamId": 4,
+      "team": "巨人",
+      "homeGames": 71,
+      "revenueManYen": 3137434,
+      "operatingCostsManYen": 2128492,
+      "surplusBeforePlayerPayrollManYen": 1008942,
+      "closingBudgetManYen": 1658942
+    },
+    {
+      "scenario": "high-demand",
+      "teamId": 5,
+      "team": "中日",
+      "homeGames": 69,
+      "revenueManYen": 1969551,
+      "operatingCostsManYen": 1440979,
+      "surplusBeforePlayerPayrollManYen": 528572,
+      "closingBudgetManYen": 948572
+    },
+    {
+      "scenario": "high-demand",
+      "teamId": 6,
+      "team": "ソフトバンク",
+      "homeGames": 74,
+      "revenueManYen": 2812930,
+      "operatingCostsManYen": 1961018,
+      "surplusBeforePlayerPayrollManYen": 851912,
+      "closingBudgetManYen": 1431912
+    },
+    {
+      "scenario": "high-demand",
+      "teamId": 7,
+      "team": "楽天",
+      "homeGames": 74,
+      "revenueManYen": 1568174,
+      "operatingCostsManYen": 989068,
+      "surplusBeforePlayerPayrollManYen": 579106,
+      "closingBudgetManYen": 939106
+    },
+    {
+      "scenario": "high-demand",
+      "teamId": 8,
+      "team": "西武",
+      "homeGames": 72,
+      "revenueManYen": 1515365,
+      "operatingCostsManYen": 989336,
+      "surplusBeforePlayerPayrollManYen": 526029,
+      "closingBudgetManYen": 926029
+    },
+    {
+      "scenario": "high-demand",
+      "teamId": 9,
+      "team": "ロッテ",
+      "homeGames": 69,
+      "revenueManYen": 1630647,
+      "operatingCostsManYen": 1064320,
+      "surplusBeforePlayerPayrollManYen": 566327,
+      "closingBudgetManYen": 936327
+    },
+    {
+      "scenario": "high-demand",
+      "teamId": 10,
+      "team": "日本ハム",
+      "homeGames": 71,
+      "revenueManYen": 2573715,
+      "operatingCostsManYen": 1815073,
+      "surplusBeforePlayerPayrollManYen": 758642,
+      "closingBudgetManYen": 1208642
+    },
+    {
+      "scenario": "high-demand",
+      "teamId": 11,
+      "team": "オリックス",
+      "homeGames": 69,
+      "revenueManYen": 1923113,
+      "operatingCostsManYen": 1228145,
+      "surplusBeforePlayerPayrollManYen": 694968,
+      "closingBudgetManYen": 1154968
+    },
+    {
+      "scenario": "low-price",
+      "teamId": 0,
+      "team": "ヤクルト",
+      "homeGames": 74,
+      "revenueManYen": 1077460,
+      "operatingCostsManYen": 1152190,
+      "surplusBeforePlayerPayrollManYen": -74730,
+      "closingBudgetManYen": 425270
+    },
+    {
+      "scenario": "low-price",
+      "teamId": 1,
+      "team": "DeNA",
+      "homeGames": 74,
+      "revenueManYen": 1418552,
+      "operatingCostsManYen": 1477028,
+      "surplusBeforePlayerPayrollManYen": -58476,
+      "closingBudgetManYen": 421524
+    },
+    {
+      "scenario": "low-price",
+      "teamId": 2,
+      "team": "広島",
+      "homeGames": 72,
+      "revenueManYen": 927760,
+      "operatingCostsManYen": 1069504,
+      "surplusBeforePlayerPayrollManYen": -141744,
+      "closingBudgetManYen": 208256
+    },
+    {
+      "scenario": "low-price",
+      "teamId": 3,
+      "team": "阪神",
+      "homeGames": 69,
+      "revenueManYen": 1757263,
+      "operatingCostsManYen": 1952326,
+      "surplusBeforePlayerPayrollManYen": -195063,
+      "closingBudgetManYen": 404937
+    },
+    {
+      "scenario": "low-price",
+      "teamId": 4,
+      "team": "巨人",
+      "homeGames": 71,
+      "revenueManYen": 1891860,
+      "operatingCostsManYen": 2128492,
+      "surplusBeforePlayerPayrollManYen": -236632,
+      "closingBudgetManYen": 413368
+    },
+    {
+      "scenario": "low-price",
+      "teamId": 5,
+      "team": "中日",
+      "homeGames": 69,
+      "revenueManYen": 1188172,
+      "operatingCostsManYen": 1440979,
+      "surplusBeforePlayerPayrollManYen": -252807,
+      "closingBudgetManYen": 167193
+    },
+    {
+      "scenario": "low-price",
+      "teamId": 6,
+      "team": "ソフトバンク",
+      "homeGames": 74,
+      "revenueManYen": 1720336,
+      "operatingCostsManYen": 1961018,
+      "surplusBeforePlayerPayrollManYen": -240682,
+      "closingBudgetManYen": 339318
+    },
+    {
+      "scenario": "low-price",
+      "teamId": 7,
+      "team": "楽天",
+      "homeGames": 74,
+      "revenueManYen": 974856,
+      "operatingCostsManYen": 1022590,
+      "surplusBeforePlayerPayrollManYen": -47734,
+      "closingBudgetManYen": 312266
+    },
+    {
+      "scenario": "low-price",
+      "teamId": 8,
+      "team": "西武",
+      "homeGames": 72,
+      "revenueManYen": 953368,
+      "operatingCostsManYen": 1015760,
+      "surplusBeforePlayerPayrollManYen": -62392,
+      "closingBudgetManYen": 337608
+    },
+    {
+      "scenario": "low-price",
+      "teamId": 9,
+      "team": "ロッテ",
+      "homeGames": 69,
+      "revenueManYen": 989275,
+      "operatingCostsManYen": 1064320,
+      "surplusBeforePlayerPayrollManYen": -75045,
+      "closingBudgetManYen": 294955
+    },
+    {
+      "scenario": "low-price",
+      "teamId": 10,
+      "team": "日本ハム",
+      "homeGames": 71,
+      "revenueManYen": 1593400,
+      "operatingCostsManYen": 1815073,
+      "surplusBeforePlayerPayrollManYen": -221673,
+      "closingBudgetManYen": 228327
+    },
+    {
+      "scenario": "low-price",
+      "teamId": 11,
+      "team": "オリックス",
+      "homeGames": 69,
+      "revenueManYen": 1203352,
+      "operatingCostsManYen": 1251536,
+      "surplusBeforePlayerPayrollManYen": -48184,
+      "closingBudgetManYen": 411816
+    },
+    {
+      "scenario": "high-price",
+      "teamId": 0,
+      "team": "ヤクルト",
+      "homeGames": 74,
+      "revenueManYen": 1312632,
+      "operatingCostsManYen": 965858,
+      "surplusBeforePlayerPayrollManYen": 346774,
+      "closingBudgetManYen": 846774
+    },
+    {
+      "scenario": "high-price",
+      "teamId": 1,
+      "team": "DeNA",
+      "homeGames": 74,
+      "revenueManYen": 1968742,
+      "operatingCostsManYen": 1328658,
+      "surplusBeforePlayerPayrollManYen": 640084,
+      "closingBudgetManYen": 1120084
+    },
+    {
+      "scenario": "high-price",
+      "teamId": 2,
+      "team": "広島",
+      "homeGames": 72,
+      "revenueManYen": 1107472,
+      "operatingCostsManYen": 874672,
+      "surplusBeforePlayerPayrollManYen": 232800,
+      "closingBudgetManYen": 582800
+    },
+    {
+      "scenario": "high-price",
+      "teamId": 3,
+      "team": "阪神",
+      "homeGames": 69,
+      "revenueManYen": 2137453,
+      "operatingCostsManYen": 1679983,
+      "surplusBeforePlayerPayrollManYen": 457470,
+      "closingBudgetManYen": 1057470
+    },
+    {
+      "scenario": "high-price",
+      "teamId": 4,
+      "team": "巨人",
+      "homeGames": 71,
+      "revenueManYen": 2564301,
+      "operatingCostsManYen": 1948294,
+      "surplusBeforePlayerPayrollManYen": 616007,
+      "closingBudgetManYen": 1266007
+    },
+    {
+      "scenario": "high-price",
+      "teamId": 5,
+      "team": "中日",
+      "homeGames": 69,
+      "revenueManYen": 1507849,
+      "operatingCostsManYen": 1250746,
+      "surplusBeforePlayerPayrollManYen": 257103,
+      "closingBudgetManYen": 677103
+    },
+    {
+      "scenario": "high-price",
+      "teamId": 6,
+      "team": "ソフトバンク",
+      "homeGames": 74,
+      "revenueManYen": 2278222,
+      "operatingCostsManYen": 1763068,
+      "surplusBeforePlayerPayrollManYen": 515154,
+      "closingBudgetManYen": 1095154
+    },
+    {
+      "scenario": "high-price",
+      "teamId": 7,
+      "team": "楽天",
+      "homeGames": 74,
+      "revenueManYen": 1101618,
+      "operatingCostsManYen": 818054,
+      "surplusBeforePlayerPayrollManYen": 283564,
+      "closingBudgetManYen": 643564
+    },
+    {
+      "scenario": "high-price",
+      "teamId": 8,
+      "team": "西武",
+      "homeGames": 72,
+      "revenueManYen": 1035808,
+      "operatingCostsManYen": 805592,
+      "surplusBeforePlayerPayrollManYen": 230216,
+      "closingBudgetManYen": 630216
+    },
+    {
+      "scenario": "high-price",
+      "teamId": 9,
+      "team": "ロッテ",
+      "homeGames": 69,
+      "revenueManYen": 1171021,
+      "operatingCostsManYen": 888508,
+      "surplusBeforePlayerPayrollManYen": 282513,
+      "closingBudgetManYen": 652513
+    },
+    {
+      "scenario": "high-price",
+      "teamId": 10,
+      "team": "日本ハム",
+      "homeGames": 71,
+      "revenueManYen": 2050427,
+      "operatingCostsManYen": 1631183,
+      "surplusBeforePlayerPayrollManYen": 419244,
+      "closingBudgetManYen": 869244
+    },
+    {
+      "scenario": "high-price",
+      "teamId": 11,
+      "team": "オリックス",
+      "homeGames": 69,
+      "revenueManYen": 1355221,
+      "operatingCostsManYen": 1020317,
+      "surplusBeforePlayerPayrollManYen": 334904,
+      "closingBudgetManYen": 794904
+    },
+    {
+      "scenario": "upgrade-1",
+      "teamId": 0,
+      "team": "ヤクルト",
+      "homeGames": 74,
+      "revenueManYen": 1648148,
+      "operatingCostsManYen": 1125476,
+      "surplusBeforePlayerPayrollManYen": 522672,
+      "closingBudgetManYen": 1022672
+    },
+    {
+      "scenario": "upgrade-1",
+      "teamId": 1,
+      "team": "DeNA",
+      "homeGames": 74,
+      "revenueManYen": 2321796,
+      "operatingCostsManYen": 1485020,
+      "surplusBeforePlayerPayrollManYen": 836776,
+      "closingBudgetManYen": 1316776
+    },
+    {
+      "scenario": "upgrade-1",
+      "teamId": 2,
+      "team": "広島",
+      "homeGames": 72,
+      "revenueManYen": 1424056,
+      "operatingCostsManYen": 1028176,
+      "surplusBeforePlayerPayrollManYen": 395880,
+      "closingBudgetManYen": 745880
+    },
+    {
+      "scenario": "upgrade-1",
+      "teamId": 3,
+      "team": "阪神",
+      "homeGames": 69,
+      "revenueManYen": 2602582,
+      "operatingCostsManYen": 1893124,
+      "surplusBeforePlayerPayrollManYen": 709458,
+      "closingBudgetManYen": 1309458
+    },
+    {
+      "scenario": "upgrade-1",
+      "teamId": 4,
+      "team": "巨人",
+      "homeGames": 71,
+      "revenueManYen": 2912485,
+      "operatingCostsManYen": 2094767,
+      "surplusBeforePlayerPayrollManYen": 817718,
+      "closingBudgetManYen": 1467718
+    },
+    {
+      "scenario": "upgrade-1",
+      "teamId": 5,
+      "team": "中日",
+      "homeGames": 69,
+      "revenueManYen": 1899838,
+      "operatingCostsManYen": 1436149,
+      "surplusBeforePlayerPayrollManYen": 463689,
+      "closingBudgetManYen": 883689
+    },
+    {
+      "scenario": "upgrade-1",
+      "teamId": 6,
+      "team": "ソフトバンク",
+      "homeGames": 74,
+      "revenueManYen": 2700022,
+      "operatingCostsManYen": 1952730,
+      "surplusBeforePlayerPayrollManYen": 747292,
+      "closingBudgetManYen": 1327292
+    },
+    {
+      "scenario": "upgrade-1",
+      "teamId": 7,
+      "team": "楽天",
+      "homeGames": 74,
+      "revenueManYen": 1362838,
+      "operatingCostsManYen": 942078,
+      "surplusBeforePlayerPayrollManYen": 420760,
+      "closingBudgetManYen": 780760
+    },
+    {
+      "scenario": "upgrade-1",
+      "teamId": 8,
+      "team": "西武",
+      "homeGames": 72,
+      "revenueManYen": 1316752,
+      "operatingCostsManYen": 942392,
+      "surplusBeforePlayerPayrollManYen": 374360,
+      "closingBudgetManYen": 774360
+    },
+    {
+      "scenario": "upgrade-1",
+      "teamId": 9,
+      "team": "ロッテ",
+      "homeGames": 69,
+      "revenueManYen": 1462339,
+      "operatingCostsManYen": 1027888,
+      "surplusBeforePlayerPayrollManYen": 434451,
+      "closingBudgetManYen": 804451
+    },
+    {
+      "scenario": "upgrade-1",
+      "teamId": 10,
+      "team": "日本ハム",
+      "homeGames": 71,
+      "revenueManYen": 2372199,
+      "operatingCostsManYen": 1772615,
+      "surplusBeforePlayerPayrollManYen": 599584,
+      "closingBudgetManYen": 1049584
+    },
+    {
+      "scenario": "upgrade-1",
+      "teamId": 11,
+      "team": "オリックス",
+      "homeGames": 69,
+      "revenueManYen": 1670827,
+      "operatingCostsManYen": 1169219,
+      "surplusBeforePlayerPayrollManYen": 501608,
+      "closingBudgetManYen": 961608
+    },
+    {
+      "scenario": "upgrade-2",
+      "teamId": 0,
+      "team": "ヤクルト",
+      "homeGames": 74,
+      "revenueManYen": 1708532,
+      "operatingCostsManYen": 1138204,
+      "surplusBeforePlayerPayrollManYen": 570328,
+      "closingBudgetManYen": 1070328
+    },
+    {
+      "scenario": "upgrade-2",
+      "teamId": 1,
+      "team": "DeNA",
+      "homeGames": 74,
+      "revenueManYen": 2372338,
+      "operatingCostsManYen": 1493086,
+      "surplusBeforePlayerPayrollManYen": 879252,
+      "closingBudgetManYen": 1359252
+    },
+    {
+      "scenario": "upgrade-2",
+      "teamId": 2,
+      "team": "広島",
+      "homeGames": 72,
+      "revenueManYen": 1478056,
+      "operatingCostsManYen": 1039192,
+      "surplusBeforePlayerPayrollManYen": 438864,
+      "closingBudgetManYen": 788864
+    },
+    {
+      "scenario": "upgrade-2",
+      "teamId": 3,
+      "team": "阪神",
+      "homeGames": 69,
+      "revenueManYen": 2697388,
+      "operatingCostsManYen": 1913686,
+      "surplusBeforePlayerPayrollManYen": 783702,
+      "closingBudgetManYen": 1383702
+    },
+    {
+      "scenario": "upgrade-2",
+      "teamId": 4,
+      "team": "巨人",
+      "homeGames": 71,
+      "revenueManYen": 3014583,
+      "operatingCostsManYen": 2115570,
+      "surplusBeforePlayerPayrollManYen": 899013,
+      "closingBudgetManYen": 1549013
+    },
+    {
+      "scenario": "upgrade-2",
+      "teamId": 5,
+      "team": "中日",
+      "homeGames": 69,
+      "revenueManYen": 1970356,
+      "operatingCostsManYen": 1450984,
+      "surplusBeforePlayerPayrollManYen": 519372,
+      "closingBudgetManYen": 939372
+    },
+    {
+      "scenario": "upgrade-2",
+      "teamId": 6,
+      "team": "ソフトバンク",
+      "homeGames": 74,
+      "revenueManYen": 2797776,
+      "operatingCostsManYen": 1973820,
+      "surplusBeforePlayerPayrollManYen": 823956,
+      "closingBudgetManYen": 1403956
+    },
+    {
+      "scenario": "upgrade-2",
+      "teamId": 7,
+      "team": "楽天",
+      "homeGames": 74,
+      "revenueManYen": 1411974,
+      "operatingCostsManYen": 951920,
+      "surplusBeforePlayerPayrollManYen": 460054,
+      "closingBudgetManYen": 820054
+    },
+    {
+      "scenario": "upgrade-2",
+      "teamId": 8,
+      "team": "西武",
+      "homeGames": 72,
+      "revenueManYen": 1363912,
+      "operatingCostsManYen": 952256,
+      "surplusBeforePlayerPayrollManYen": 411656,
+      "closingBudgetManYen": 811656
+    },
+    {
+      "scenario": "upgrade-2",
+      "teamId": 9,
+      "team": "ロッテ",
+      "homeGames": 69,
+      "revenueManYen": 1514779,
+      "operatingCostsManYen": 1038997,
+      "surplusBeforePlayerPayrollManYen": 475782,
+      "closingBudgetManYen": 845782
+    },
+    {
+      "scenario": "upgrade-2",
+      "teamId": 10,
+      "team": "日本ハム",
+      "homeGames": 71,
+      "revenueManYen": 2460168,
+      "operatingCostsManYen": 1792992,
+      "surplusBeforePlayerPayrollManYen": 667176,
+      "closingBudgetManYen": 1117176
+    },
+    {
+      "scenario": "upgrade-2",
+      "teamId": 11,
+      "team": "オリックス",
+      "homeGames": 69,
+      "revenueManYen": 1730236,
+      "operatingCostsManYen": 1181846,
+      "surplusBeforePlayerPayrollManYen": 548390,
+      "closingBudgetManYen": 1008390
+    },
+    {
+      "scenario": "upgrade-3",
+      "teamId": 0,
+      "team": "ヤクルト",
+      "homeGames": 74,
+      "revenueManYen": 1770322,
+      "operatingCostsManYen": 1151228,
+      "surplusBeforePlayerPayrollManYen": 619094,
+      "closingBudgetManYen": 1119094
+    },
+    {
+      "scenario": "upgrade-3",
+      "teamId": 1,
+      "team": "DeNA",
+      "homeGames": 74,
+      "revenueManYen": 2422732,
+      "operatingCostsManYen": 1501078,
+      "surplusBeforePlayerPayrollManYen": 921654,
+      "closingBudgetManYen": 1401654
+    },
+    {
+      "scenario": "upgrade-3",
+      "teamId": 2,
+      "team": "広島",
+      "homeGames": 72,
+      "revenueManYen": 1533208,
+      "operatingCostsManYen": 1050208,
+      "surplusBeforePlayerPayrollManYen": 483000,
+      "closingBudgetManYen": 833000
+    },
+    {
+      "scenario": "upgrade-3",
+      "teamId": 3,
+      "team": "阪神",
+      "homeGames": 69,
+      "revenueManYen": 2794333,
+      "operatingCostsManYen": 1934524,
+      "surplusBeforePlayerPayrollManYen": 859809,
+      "closingBudgetManYen": 1459809
+    },
+    {
+      "scenario": "upgrade-3",
+      "teamId": 4,
+      "team": "巨人",
+      "homeGames": 71,
+      "revenueManYen": 3119237,
+      "operatingCostsManYen": 2136515,
+      "surplusBeforePlayerPayrollManYen": 982722,
+      "closingBudgetManYen": 1632722
+    },
+    {
+      "scenario": "upgrade-3",
+      "teamId": 5,
+      "team": "中日",
+      "homeGames": 69,
+      "revenueManYen": 2021416,
+      "operatingCostsManYen": 1459885,
+      "surplusBeforePlayerPayrollManYen": 561531,
+      "closingBudgetManYen": 981531
+    },
+    {
+      "scenario": "upgrade-3",
+      "teamId": 6,
+      "team": "ソフトバンク",
+      "homeGames": 74,
+      "revenueManYen": 2875402,
+      "operatingCostsManYen": 1988694,
+      "surplusBeforePlayerPayrollManYen": 886708,
+      "closingBudgetManYen": 1466708
+    },
+    {
+      "scenario": "upgrade-3",
+      "teamId": 7,
+      "team": "楽天",
+      "homeGames": 74,
+      "revenueManYen": 1462072,
+      "operatingCostsManYen": 961836,
+      "surplusBeforePlayerPayrollManYen": 500236,
+      "closingBudgetManYen": 860236
+    },
+    {
+      "scenario": "upgrade-3",
+      "teamId": 8,
+      "team": "西武",
+      "homeGames": 72,
+      "revenueManYen": 1412008,
+      "operatingCostsManYen": 962120,
+      "surplusBeforePlayerPayrollManYen": 449888,
+      "closingBudgetManYen": 849888
+    },
+    {
+      "scenario": "upgrade-3",
+      "teamId": 9,
+      "team": "ロッテ",
+      "homeGames": 69,
+      "revenueManYen": 1568323,
+      "operatingCostsManYen": 1050313,
+      "surplusBeforePlayerPayrollManYen": 518010,
+      "closingBudgetManYen": 888010
+    },
+    {
+      "scenario": "upgrade-3",
+      "teamId": 10,
+      "team": "日本ハム",
+      "homeGames": 71,
+      "revenueManYen": 2550409,
+      "operatingCostsManYen": 1813653,
+      "surplusBeforePlayerPayrollManYen": 736756,
+      "closingBudgetManYen": 1186756
+    },
+    {
+      "scenario": "upgrade-3",
+      "teamId": 11,
+      "team": "オリックス",
+      "homeGames": 69,
+      "revenueManYen": 1790956,
+      "operatingCostsManYen": 1194611,
+      "surplusBeforePlayerPayrollManYen": 596345,
+      "closingBudgetManYen": 1056345
+    }
+  ]
+}

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { mainNavigation, reloadAndLoad, waitSaveIdle } from './helpers/progression';
 
-async function loadPayrollFixture(page, invalid = false, sparse = false) {
+async function loadPayrollFixture(page, invalid = false, sparse = false, newFinance = false) {
   const fixture = JSON.parse(gunzipSync(readFileSync(new URL('./fixtures/new-game.json.gz', import.meta.url))));
   const t = fixture.teams.find(t => t.id === fixture.myId);
   for (const p of [...t.players, ...t.farm]) { p.salary = sparse ? null : 0; p.育成 = false; }
@@ -13,12 +13,49 @@ async function loadPayrollFixture(page, invalid = false, sparse = false) {
   Object.assign(t.farm[1], { name: '育成五十万円', salary: 50, 育成: true });
   if (invalid) { t.players[0].salary = null; t.farm[0].salary = '200'; }
   await page.goto('/');
-  await page.evaluate(async fixture => {
+  await page.evaluate(async ({fixture,newFinance}) => {
     const { saveGame } = await import('/baseball-manager/src/engine/saveload.js');
+    if (newFinance) {
+      const { startClubFinance } = await import('/baseball-manager/src/engine/clubFinance.js');
+      const { simulateSeasonBatch } = await import('/baseball-manager/src/workers/seasonBatchCore.js');
+      const { generateSeasonSchedule } = await import('/baseball-manager/src/engine/scheduleGen.js');
+      fixture.teams = fixture.teams.map(t => startClubFinance(t,fixture.year));
+      fixture.schedule = generateSeasonSchedule(fixture.year,fixture.teams);
+      const result = simulateSeasonBatch({ snapshot: fixture, count: 2, isCancelled: () => false });
+      Object.assign(fixture,result.nextState);
+    }
     if (!(await saveGame(fixture)).ok) throw new Error('fixture save failed');
-  }, fixture);
+  }, {fixture,newFinance});
   await reloadAndLoad(page);
   await expect(page.getByRole('button', { name: '保存', exact: true })).toBeVisible();
+}
+
+for (const width of [360,390,1440]) {
+  test(`finance model ${width}px uses real game receipts, schedule forecasts and save reload`, async ({page},testInfo) => {
+    await page.setViewportSize({width,height:900});
+    await loadPayrollFixture(page,false,false,true);
+    const before=await saveSnapshot(page);
+    const expected=await page.evaluate(async()=>{
+      const {loadGame}=await import('/baseball-manager/src/engine/saveload.js');
+      const {forecastClubFinance}=await import('/baseball-manager/src/engine/clubFinance.js');
+      const {fmtSal}=await import('/baseball-manager/src/utils.js');
+      const s=await loadGame(),t=s.teams.find(t=>t.id===s.myId),f=forecastClubFinance(t,s.schedule);
+      if(f.gamesPlayed!==2)throw Error('real receipts missing');
+      return {revenue:fmtSal(f.revenue.min),costs:fmtSal(f.operatingCosts.min),budget:fmtSal(t.budget)};
+    });
+    await openFinance(page,width<1024);
+    const region=page.getByRole('region',{name:'運営費と編成予算',exact:true});
+    await expect(region).toContainText(expected.costs);
+    await expect(region).toContainText(expected.budget);
+    await expect(page.getByText('シーズン収入予測',{exact:true}).locator('..')).toContainText(expected.revenue);
+    await expect(page.getByText('実施2試合の実績＋残り試合の予測。実際の日程を使用。',{exact:true})).toBeVisible();
+    await page.screenshot({path:testInfo.outputPath('finance-model.png'),fullPage:true});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    expect(await saveSnapshot(page)).toBe(before);
+    await reloadAndLoad(page);await openFinance(page,width<1024);
+    await expect(page.getByRole('region',{name:'運営費と編成予算',exact:true})).toContainText(expected.budget);
+    expect(await saveSnapshot(page)).toBe(before);
+  });
 }
 async function saveSnapshot(page) {
   await waitSaveIdle(page);
@@ -36,7 +73,7 @@ async function saveSnapshot(page) {
   });
 }
 async function openFinance(page, mobile) {
-  await mainNavigation(page, mobile).getByRole('button', { name: 'その他', exact: true }).click();
+  await mainNavigation(page, mobile).getByRole('button', { name: /^その他(?:\s+\d+)?$/ }).click();
   await page.getByRole('button', { name: '球団運営', exact: true }).click();
   await expect(page.getByText('予算 / 年俸上位', { exact: true })).toBeVisible();
 }

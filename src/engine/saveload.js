@@ -1,4 +1,5 @@
 import { validateFarmSaveState } from './farmMigration';
+import { validateClubFinance } from './clubFinance';
 import { GENERATION_VERSION, LEGACY_GENERATION_VERSION, prepareGeneration, readGeneration, readCareerGeneration, collectUnusedChunks } from './saveGenerations';
 import { prepareCareerData, captureInlineCareerLogs } from './careerGenerations';
 import { MATCH_HISTORY_FIELDS, matchHistorySnapshot, matchHistoryForSave } from './matchHistory';
@@ -264,6 +265,10 @@ function validateAndMigrateSave(state) {
   }
   // Introduced data is validated as-is; a corrupt ledger must reach backup recovery.
   validateFarmSaveState(state);
+  for (const team of state.teams) {
+    validateClubFinance(team.clubFinance);
+    if (team.clubFinance !== undefined && team.clubFinance.year !== state.year) throw new Error('球団収支の年度が一致しません。');
+  }
   const teams = state.teams.map(t => ({
     ...t,
     wins:               t.wins               ?? 0,
