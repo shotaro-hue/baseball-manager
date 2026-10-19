@@ -4,6 +4,8 @@
 
 ## 結論・運用の原則
 
+UI-04A追加（2026-10-19）: `e2e/hub-navigation.spec.js` を通常CIの独立 `hub-navigation` グループへ追加。Chromiumとmobile-webkitで360/390/1440および760/761・1023/1024px、全9機能、通知/元画面/フォーカス/スクロール/ブラウザ戻る、既読と要対応、配達前除外、保存前後不変、編成エラー中の閲覧・試合開始検証を確認する。既存finance/posting/tradeは入口だけを新ナビへ更新し、取引/所属/金額/保存の検証を保持。下の件数は過去計測のまま。[UI-04A記録](./validation/ui-04a/README.md)が今回の結果。
+
 - **削除/skipによって速くしない**。開発中は関連テストまたは `npm run test:fast`、PR CIで全Vitest + 中核E2E、リリース/大規模変更前に手動フルE2Eへ段階分けする。
 - `npm test` には100試合・10万打席・Monte Carlo HR 検証も元から含まれる。CIで `npm run validate:physics-hr` を重複実行しない。
 - Workは同じコミットで成功したCIを証拠として再利用。変更なしで全テストの再実行を繰り返さない。失敗時には該当テストとトレースから原因を絞る。

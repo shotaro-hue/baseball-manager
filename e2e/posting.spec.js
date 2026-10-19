@@ -27,7 +27,7 @@ async function loadPostingFixture(page, legacy, budget = 1000) {
 }
 
 async function openMail(page) {
-  await page.getByRole('complementary', { name: '監督メニュー' }).getByRole('button', { name: /その他/ }).click();
+  await page.getByRole('button', { name: /^通知（未読/ }).click();
   await page.getByText('D01 ポスティング申請', { exact: true }).click();
 }
 
@@ -44,7 +44,8 @@ for (const legacy of [false, true]) {
     await page.evaluate(() => { Math.random = window.postingOriginalRandom; delete window.postingOriginalRandom; });
     await page.getByText(`【ポスティング成立】${name} 入札額1.0億円`, { exact: true }).click();
     await expect(page.getByText(/球団受取移籍金: 2000万円/)).toBeVisible();
-    await page.getByRole('button', { name: '球団運営', exact: true }).click();
+    await page.getByRole('complementary', { name: '監督メニュー' }).getByRole('button', { name: /^経営/ }).click();
+    await page.getByRole('navigation', { name: '経営メニュー' }).getByRole('button', { name: '財務', exact: true }).click();
     const budgetCard = page.locator('.card').filter({ has: page.getByText('予算 / 年俸上位', { exact: true }) });
     await expect(budgetCard).toContainText('3,000万円');
     const before = await saveHub(page);
@@ -62,7 +63,7 @@ for (const legacy of [false, true]) {
       expect(saved.players.map(p => p.id)).toEqual(other.players.map(p => p.id));
       expect(saved.farm.map(p => p.id)).toEqual(other.farm.map(p => p.id));
     }
-    await page.getByRole('complementary', { name: '監督メニュー' }).getByRole('button', { name: /その他/ }).click();
+    await page.getByRole('button', { name: /^通知（未読/ }).click();
     await page.getByText('D01 ポスティング申請', { exact: true }).click();
     await expect(page.getByRole('button', { name: '✅ 承認する', exact: true })).toHaveCount(0);
     expect(errors).toEqual([]);

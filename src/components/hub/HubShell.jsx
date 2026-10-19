@@ -1,83 +1,32 @@
 import { regularSeasonProgress, regularSeasonRequest } from '../../engine/seasonProgress';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { RetireModal } from '../RetireModal';
 import { PlayerModal } from '../PlayerModal';
 import { PressConferenceModal } from '../PressConferenceModal';
 import { SEASON_GAMES } from '../../constants';
-import { validateLineup } from '../../engine/rosterAutomation';
 import HubHeader from './HubHeader';
 import HubSimPanel from './HubSimPanel';
 import HubTabsNav from './HubTabsNav';
 import HubContentRouter from './HubContentRouter';
 import HubBottomNav from './HubBottomNav';
-import { House, CalendarBlank, Users, ChartBar, DotsThree } from '@phosphor-icons/react';
+import { House, CalendarBlank, Users, ChartBar, Buildings } from '@phosphor-icons/react';
+import { PRIMARY_SECTIONS as SECTION_DEFINITIONS, AUXILIARY_TABS, notificationSummary, sectionBadge } from './hubNavigation';
+import { useHubNavigation } from './useHubNavigation';
 import '../../calm-ui.css';
 import '../../mobile-flow.css';
 import '../../home-ui.css';
+import './hub-navigation.css';
 import {
   PlayerComparisonDialog,
   PlayerComparisonTray,
 } from '../PlayerComparisonTray';
 
-const PRIMARY_SECTIONS = [
-  {
-    id: 'home',
-    label: 'ホーム',
-    icon: <House size={22} />,
-    defaultTab: 'dashboard',
-    tabs: [['dashboard', 'ダッシュボード']],
-  },
-  {
-    id: 'rosterOps',
-    label: '編成',
-    icon: <Users size={22} />,
-    defaultTab: 'roster',
-    tabs: [
-      ['roster', 'ロスター'],
-    ],
-  },
-  {
-    id: 'game', label: '日程', icon: <CalendarBlank size={22} />,
-    defaultTab: 'schedule', tabs: [['schedule', '日程']],
-  },
-  {
-    id: 'analysis',
-    label: '成績',
-    icon: <ChartBar size={22} />,
-    defaultTab: 'stats',
-    tabs: [
-      ['stats', '成績'],
-      ['leaderboard', 'ランキング'],
-      ['standings', '順位表'],
-      ['records', '記録'],
-    ],
-  },
-  {
-    id: 'other',
-    label: 'その他',
-    icon: <DotsThree size={22} />,
-    defaultTab: 'mailbox',
-    tabs: [
-      ['mailbox', 'メール'],
-      ['news', 'ニュース'],
-      ['alumni', 'OB'],
-      ['trade', 'トレード'],
-      ['contract', '契約'],
-      ['fa', 'FA'],
-      ['scout', 'スカウト'],
-      ['finance', '球団運営'],
-      ['balance', 'バランス検証'],
-    ],
-  },
-];
-
-const TAB_TO_SECTION = PRIMARY_SECTIONS.reduce((acc, section) => {
-  section.tabs.forEach(([tabId]) => {
-    acc[tabId] = section.id;
-  });
-  return acc;
-}, {});
+const ICONS = { home: House, rosterOps: Users, game: CalendarBlank, analysis: ChartBar, management: Buildings };
+const PRIMARY_SECTIONS = SECTION_DEFINITIONS.map(section => {
+  const Icon = ICONS[section.id];
+  return { ...section, icon: <Icon size={22} aria-hidden="true" /> };
+});
 
 export default function HubShell({ state, flows, app }) {
   const gs = state.gs;
@@ -96,60 +45,29 @@ export default function HubShell({ state, flows, app }) {
     handlePressAnswer,
   } = gs;
 
-  const [sectionLastTab, setSectionLastTab] = useState(() =>
-    PRIMARY_SECTIONS.reduce(
-      (acc, section) => ({ ...acc, [section.id]: section.defaultTab }),
-      {},
-    ),
-  );
-  const [currentPrimarySection, setCurrentPrimarySection] = useState('home');
+  const navigation = useHubNavigation(tab, setTab, `${gs.saveId}:${gs.myId}:${year}`);
+  const { currentPrimarySection } = navigation;
+  const notifications = notificationSummary({ mailbox: gs.getMailboxBySelector?.() ?? gs.mailbox,
+    news: gs.getNewsBySelector?.() ?? gs.news, gameDay, unreadCount: gs.getUnreadMailboxCount?.(gameDay) });
+  const uiBadges = { ...tabBadges, trade: notifications.trades > 0 ? { n: notifications.trades, label: '要対応', color: '#855200' } : null };
   const [comparePlayers, setComparePlayers] = useState([]);
   const [compareOpen, setCompareOpen] = useState(false);
   useEffect(() => { setComparePlayers([]); setCompareOpen(false); }, [year]);
   const [decisionTarget, setDecisionTarget] = useState(null);
 
-  useEffect(() => {
-    const sectionId = TAB_TO_SECTION[tab];
-    if (!sectionId) return;
-    setCurrentPrimarySection(sectionId);
-    setSectionLastTab((prev) =>
-      prev[sectionId] === tab ? prev : { ...prev, [sectionId]: tab },
-    );
-  }, [tab]);
+  const handleTabChange = (newTab) => {
+    if (AUXILIARY_TABS.includes(newTab)) navigation.open(newTab);
+    else if (AUXILIARY_TABS.includes(tab)) navigation.open(newTab);
+    else navigation.navigate(newTab);
+  };
 
-  const handleTabChange = useCallback(
-    (newTab) => {
-      if (tab === 'roster' && newTab !== 'roster' && myTeam) {
-        const rosterDhMode = myTeam.rosterDhMode ?? myTeam.dhEnabled;
-        const lineupValidation = validateLineup(myTeam, rosterDhMode);
-        if (lineupValidation.errors.length > 0) {
-          gs.notify(lineupValidation.errors[0], 'warn');
-          return;
-        }
-      }
-
-      setTab(newTab);
-    },
-    [gs, myTeam, setTab, tab],
-  );
-
-  const handlePrimarySectionChange = useCallback(
-    (sectionId) => {
+  const handlePrimarySectionChange = (sectionId) => {
       const section = PRIMARY_SECTIONS.find((item) => item.id === sectionId);
       if (!section) return;
-      const targetTab = sectionLastTab[sectionId] || section.defaultTab;
-      handleTabChange(targetTab);
-    },
-    [handleTabChange, sectionLastTab],
-  );
-
-  const activeSection = useMemo(
-    () =>
-      PRIMARY_SECTIONS.find(
-        (section) => section.id === currentPrimarySection,
-      ) || PRIMARY_SECTIONS[0],
-    [currentPrimarySection],
-  );
+      const targetTab = navigation.lastTabs[sectionId] || section.defaultTab;
+      navigation.navigate(targetTab);
+  };
+  const activeSection = PRIMARY_SECTIONS.find(section => section.id === currentPrimarySection) || PRIMARY_SECTIONS[0];
 
   const progress = regularSeasonProgress(myTeam);
   const remain = progress.remainingGames;
@@ -179,11 +97,11 @@ export default function HubShell({ state, flows, app }) {
   const navigateWithPlayer = useCallback((targetTab, player, teamName) => {
     setDecisionTarget({ tab: targetTab, player, teamName });
     gs.setPlayerModal(null);
-    handleTabChange(targetTab);
-  }, [gs, handleTabChange]);
+    navigation.open(targetTab);
+  }, [gs, navigation.open]);
 
   return (
-    <div className={`app calm-shell ${tab === 'dashboard' ? 'calm-home' : ''}`}
+    <div className={`app calm-shell ${tab === 'dashboard' ? 'calm-home' : ''} ${['management', 'reinforcement', 'settings'].includes(tab) ? 'hub-entry-shell' : ''}`}
       data-ds={tab === 'dashboard' ? 'home-shell' : undefined}
       data-initialization-state={gs.newGameInitializationStatus}>
       <div className="app-layout">
@@ -191,13 +109,7 @@ export default function HubShell({ state, flows, app }) {
           <div className="primary-sidebar-title"><strong>{myTeam?.name}</strong><span>{year}年 シーズン</span></div>
           <div className="primary-sidebar-list">
             {PRIMARY_SECTIONS.map((section) => {
-              const badgeTab =
-                section.id === 'other'
-                  ? 'mailbox'
-                  : section.id === 'rosterOps'
-                    ? 'contract'
-                    : null;
-              const badge = badgeTab ? tabBadges[badgeTab] : null;
+              const badge = sectionBadge(section.id, uiBadges, notifications);
               return (
                 <button
                   key={section.id}
@@ -238,7 +150,21 @@ export default function HubShell({ state, flows, app }) {
             remain={remain}
             onSave={gs.handleSave}
             home={tab === 'dashboard'} saveDirty={gs.saveDirty} saveQueueState={gs.saveQueueState} saveResult={gs.saveResult}
+            notifications={notifications} onNotifications={() => navigation.open('mailbox')} onSettings={() => navigation.open('settings')}
           />
+
+          {navigation.routes.length > 1 && <div className="hub-return"><button onClick={navigation.back}>元の画面へ戻る</button></div>}
+          {['mailbox', 'news'].includes(tab) && <nav className="hub-secondary-nav" aria-label="通知メニュー">
+            <button aria-current={tab === 'mailbox' ? 'page' : undefined} onClick={() => navigation.replace('mailbox')}>受信箱</button>
+            <button aria-current={tab === 'news' ? 'page' : undefined} onClick={() => navigation.replace('news')}>ニュース</button>
+            <p>未読 {notifications.unread}件 · 要対応 {notifications.actionable}件</p>
+          </nav>}
+          {tab === 'dashboard' && notifications.actionable > 0 && <section className="hub-attention" aria-label="重要な対応待ち">
+            <strong>要対応 {notifications.actionable}件</strong>
+            {notifications.trades > 0 && <button onClick={() => navigation.open('trade')}>トレード提案 {notifications.trades}件</button>}
+            {notifications.posting > 0 && <button onClick={() => navigation.open('mailbox')}>ポスティング申請 {notifications.posting}件</button>}
+            {notifications.interviews > 0 && <button onClick={() => navigation.open('news')}>インタビュー回答待ち {notifications.interviews}件</button>}
+          </section>}
 
           {(!progress.valid || (!canSim && remain > 0)) && <p role="status">成績・日程・進行フェーズを確認できないため試合を開始できません。保存データを読み直してください。</p>}
           {notif && (
@@ -255,7 +181,7 @@ export default function HubShell({ state, flows, app }) {
             </div>
           )}
 
-          {gameDay <= SEASON_GAMES && tab !== 'dashboard' && (
+          {gameDay <= SEASON_GAMES && tab !== 'dashboard' && !AUXILIARY_TABS.includes(tab) && (
             <details className="flow-sim-settings"><summary>試合を進める</summary>
             <HubSimPanel
               gameDay={gameDay}
@@ -268,14 +194,14 @@ export default function HubShell({ state, flows, app }) {
             /></details>
           )}
 
-          {tab !== 'dashboard' && <HubTabsNav
+          {tab !== 'dashboard' && !AUXILIARY_TABS.includes(tab) && <HubTabsNav
             activeSection={activeSection}
             tab={tab}
-            tabBadges={tabBadges}
+            tabBadges={uiBadges}
             onTabChange={handleTabChange}
           />}
 
-          <ErrorBoundary key={tab}>
+          <ErrorBoundary key={gs.saveId}>
             {decisionTarget?.tab === tab && (
               <div className="decision-context-banner" role="status">
                 <div>
@@ -297,15 +223,19 @@ export default function HubShell({ state, flows, app }) {
               </div>
             )}
 
+            {[...new Set(navigation.routes)].map(route => <div key={route} hidden={route !== tab} data-hub-route={route}>
+            <ErrorBoundary>
             <HubContentRouter
               app={app}
-              tab={tab}
+              tab={route}
               onTabChange={handleTabChange}
+              onOpen={navigation.open}
+              notifications={notifications}
               comparison={{
                 players: comparePlayers,
                 onToggle: toggleCompare,
               }}
-            />
+            /></ErrorBoundary></div>)}
 
             <RetireModal
               modal={gs.retireModal}
@@ -422,7 +352,8 @@ export default function HubShell({ state, flows, app }) {
           <HubBottomNav
             sections={PRIMARY_SECTIONS}
             currentPrimarySection={currentPrimarySection}
-            tabBadges={tabBadges}
+            tabBadges={uiBadges}
+            notifications={notifications}
             onSectionChange={handlePrimarySectionChange}
             onStartGame={sf.handleStartGame}
             disableStart={!canSim || Boolean(sf.batchProgress)}

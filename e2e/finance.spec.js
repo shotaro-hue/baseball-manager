@@ -73,8 +73,8 @@ async function saveSnapshot(page) {
   });
 }
 async function openFinance(page, mobile) {
-  await mainNavigation(page, mobile).getByRole('button', { name: /^その他(?:\s+\d+)?$/ }).click();
-  await page.getByRole('button', { name: '球団運営', exact: true }).click();
+  await mainNavigation(page, mobile).getByRole('button', { name: /^経営/ }).click();
+  await page.getByRole('navigation', { name: '経営メニュー' }).getByRole('button', { name: '財務', exact: true }).click();
   await expect(page.getByText('予算 / 年俸上位', { exact: true })).toBeVisible();
 }
 async function assertPayroll(page) {

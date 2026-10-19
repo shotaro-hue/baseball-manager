@@ -210,7 +210,7 @@ test('game preparation appends the scheduled starter only in no-DH games', () =>
   assert.equal(dh.lineup.some((id) => planned.players.find((player) => player.id === id)?.isPitcher), false);
 });
 
-test('lineup validation uses assigned fielding positions instead of primary positions', async () => {
+test('lineup validation uses assigned fielding positions instead of primary positions', () => {
   const planned = buildFullRosterPlan(makeTeam()).team;
   const rightFielderId = planned.lineupNoDh.find(
     (id) => planned.fieldingNoDh[id] === '右翼手',
@@ -229,12 +229,13 @@ test('lineup validation uses assigned fielding positions instead of primary posi
 
   assert.equal(validateLineup(reassigned, false).errors.length, 0);
 
-  const hubSource = await readFile(
-    new URL('../src/components/hub/HubShell.jsx', import.meta.url),
-    'utf8',
-  );
-  assert.match(hubSource, /validateLineup\(myTeam, rosterDhMode\)/);
-  assert.doesNotMatch(hubSource, /posCount\[player\.pos\]/);
+  // UI-04A permits reading other tabs with an invalid lineup. Validation stays
+  // at game preparation; assert real assigned-position behavior there rather
+  // than requiring a source-code call in the navigation component.
+  assert.doesNotThrow(() => prepareTeamForGame(reassigned, false));
+  const invalid = { ...reassigned, fieldingNoDh: { ...reassigned.fieldingNoDh, [rightFielderId]: '左翼手' } };
+  assert.ok(validateLineup(invalid, false).errors.length > 0);
+  assert.throws(() => prepareTeamForGame(invalid, false), RosterValidationError);
 });
 
 test('legacy hidden lineup repair and four-player guards are removed from every game path', async () => {
