@@ -59,3 +59,7 @@ npm run build
 ## 初回CIのテスト接続修正
 
 CI run `39339125601` の全単体・結合は1,549成功/5失敗/既存2skip。失敗は `PlayerModal.salary.test.js` の5入力（null/undefined/負値/数値文字列/0）が、移設済みの年俸上位を旧FinanceTabで探していたため。製品の選手詳細・給与表示・保存に失敗したものではない。ハーネスを実際のContractTabへ接続し、元の5入力、元player参照、給与表示、球団全体JSON不変のassertを全て保持する。製品コードや閾値は変更しない。最終headのCIはPR本文を正本とする。
+
+初回CIの財務E2E自体はChromium/WebKit32/32成功。`posting-and-finance`群の44成功/2失敗は、ポスティング受諾後の予算参照が旧「予算 / 年俸上位」cardを指した2ケースのみ。新しい予算KPIへ接続し、3000万円・所属/他球団/メール・保存再開の期待値は全て維持する。ナビ群の28成功/2失敗も旧1指標のddを単一要素と仮定した表示テストのみ。承認済み4指標のラベル・予算額・390px2列/1440px4列・値の非クリップ/ページはみ出しなしを実際に検証する形へ更新する。
+
+上記の接続修正後、`hub-navigation.spec.js`のentry surfacesと`posting.spec.js`のapproved postingをChromiumで再実行し3/3成功。全件に新たなskip・retry・金額期待値緩和はない。製品ソースは初回CIから変更せず、テストと記録のみを追加更新している。
