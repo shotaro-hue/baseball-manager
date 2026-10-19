@@ -87,7 +87,11 @@ for (const width of [360, 390, 760, 761, 1023, 1024, 1440]) {
     await expect(active(page)).toHaveAttribute('data-hub-route', 'balance');
     await page.goBack(); await expect(active(page)).toHaveAttribute('data-hub-route', 'settings');
     await page.goBack(); await expect(active(page)).toHaveAttribute('data-hub-route', 'finance');
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    // Wait for the restored view and its scroll frame, then scroll once and
+    // measure after layout. WebKit commits scroll offsets asynchronously.
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => {
+      window.scrollTo(0, document.body.scrollHeight); requestAnimationFrame(resolve);
+    })));
     if (width < 1024) {
       const navTop = await nav.evaluate(n => n.getBoundingClientRect().top);
       const bottom = await active(page).evaluate(n => n.getBoundingClientRect().bottom);

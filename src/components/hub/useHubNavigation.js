@@ -14,8 +14,12 @@ export function useHubNavigation(tab, setTab, scope) {
   routeRef.current = routes;
   const writeHistory = useCallback((next, push = false) => {
     if (typeof window === 'undefined') return;
-    window.history[push ? 'pushState' : 'replaceState']({ ...window.history.state,
-      [HISTORY_KEY]: { session: session.current, routes: next } }, '');
+    const state = { ...window.history.state, [HISTORY_KEY]: { session: session.current, routes: next } };
+    const hash = `#hub/${encodeURIComponent(next.at(-1))}`;
+    // Native fragment entries survive back → reload in WebKit. pushState
+    // entries crash that sequence even in a standalone HTTP page. See UI-04A QA.
+    if (push) window.location.hash = hash;
+    window.history.replaceState(state, '', hash);
   }, []);
 
   useEffect(() => {
@@ -25,6 +29,8 @@ export function useHubNavigation(tab, setTab, scope) {
     setLastTabs(Object.fromEntries(PRIMARY_SECTIONS.map(s => [s.id, s.defaultTab])));
     writeHistory([tab]);
     if (typeof window === 'undefined') return;
+    const previousRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
     const pop = event => {
       const next = event.state?.[HISTORY_KEY];
       if (next?.session !== session.current || !Array.isArray(next.routes) || !next.routes.length) return;
@@ -32,7 +38,10 @@ export function useHubNavigation(tab, setTab, scope) {
       setRoutes(next.routes); setter.current(next.routes.at(-1));
     };
     window.addEventListener('popstate', pop);
-    return () => window.removeEventListener('popstate', pop);
+    return () => {
+      window.removeEventListener('popstate', pop);
+      window.history.scrollRestoration = previousRestoration;
+    };
     // A new save/year starts a fresh UI navigation session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, writeHistory]);
