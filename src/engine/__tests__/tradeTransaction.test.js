@@ -46,3 +46,30 @@ it('checks both post-trade clubs against accepted but unowned draft reservations
  expect(JSON.stringify(teams)).toBe(before);
  expect(applyTradeTransaction(teams,request,context).ok).toBe(true);
 });
+
+it('allows a zero-cash player exchange even when a club already has a deficit', () => {
+  const teams = fixture(); teams[0].budget = -300;
+  const before = structuredClone(teams);
+  const r = applyTradeTransaction(teams, { ...request, cash: 0 });
+  expect(r.ok).toBe(true);
+  expect(r.teams.map(t => t.budget)).toEqual([-300, 2000]);
+  expect(r.teams.flatMap(t => [...t.players, ...t.farm]).map(p => p.id).sort()).toEqual([0, 1]);
+  expect(teams).toEqual(before);
+});
+
+it('allows receiving cash to reduce a deficit, but forbids spending more', () => {
+  const teams = fixture(); teams[0].budget = -300;
+  const incomingCash = applyTradeTransaction(teams, { ...request, cash: -150 });
+  expect(incomingCash.ok).toBe(true);
+  expect(incomingCash.teams.map(t => t.budget)).toEqual([-150, 1850]);
+  expect(applyTradeTransaction(teams, { ...request, cash: 1 }).ok).toBe(false);
+  const healthyPayer = fixture(); healthyPayer[1].budget = -300;
+  expect(applyTradeTransaction(healthyPayer, { ...request, cash: 500 }).ok).toBe(true);
+  expect(applyTradeTransaction(healthyPayer, { ...request, cash: -1 }).ok).toBe(false);
+});
+
+it('still rejects any cash transfer that would create a new deficit', () => {
+  const teams = fixture();
+  expect(applyTradeTransaction(teams, { ...request, cash: 1001 }).ok).toBe(false);
+  expect(applyTradeTransaction(teams, { ...request, cash: -2001 }).ok).toBe(false);
+});

@@ -4,6 +4,8 @@
 
 ## 結論・運用の原則
 
+FIX-M2追加（2026-10-19）: `regularGameUpdates.finance.test.js` で試合前需要と結果後の人気差分、ホーム/アウェーと視点、旧セーブ分岐を検証。`clubFinance.lifecycle.test.js` で実際のシーズンWorker初日の計上を試合前見積りと突合。`clubFinance.test.js` と `tradeTransaction.test.js` で赤字予算の継続進行・無金銭取引・追加支出禁止を確認。通常CIの既存Worker/保存/財務/取引E2Eで回帰を判定する。[検証記録](./validation/fix-m2/README.md)。
+
 UI-04A追加（2026-10-19）: `e2e/hub-navigation.spec.js` を通常CIの独立 `hub-navigation` グループへ追加。Chromiumとmobile-webkitで360/390/1440および760/761・1023/1024px、全9機能、通知/元画面/フォーカス/スクロール/ブラウザ戻る、既読と要対応、配達前除外、保存前後不変、編成エラー中の閲覧・試合開始検証を確認する。既存finance/posting/tradeは入口だけを新ナビへ更新し、取引/所属/金額/保存の検証を保持。下の件数は過去計測のまま。[UI-04A記録](./validation/ui-04a/README.md)が今回の結果。
 
 UI-04A-FIX追加（2026-10-19）: 同じ`hub-navigation` CI枠で、財務→通知サブタブ反復→復帰と履歴長、戻る/進む/再読込、設定→バランス→2段階復帰、主ナビ後の旧履歴無効化、未確定トレード金額の保持をChromium/WebKitで実行。hookで祖先の通知サブタブ再訪とscopeリセット、Shellで年度/セーブ変更時の本文下書き初期化も検証。[RED→GREEN記録](./validation/ui-04a-fix/README.md)。全件Vitest/既存進行・保存・取引E2Eは提出headの通常CIを使い、Workで同じ全セットを重ねない。

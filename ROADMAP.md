@@ -1,6 +1,6 @@
 # ROADMAP — NPB Franchise Manager
 
-> 最終更新: 2026-10-19（PR #482マージ反映、UI-04A-FIX・後続工程の順序確定）
+> 最終更新: 2026-10-19（PR #483マージ反映、FIX-M2試合前需要・負予算の修正中）
 > 目的: **OOTP / Football Manager のように「何年も遊べる、意思決定が積み重なる経営シミュレーション」**を作る。
 
 > 現在の進捗は第1節を参照。第2・3・5節の旧チェックリストと期日は2026-05-01時点の履歴であり、現在の完了認定ではない。UI/UX改革の一次監査・推奨PR分割は [全体改革の青写真 v1](./docs/REFORM_BLUEPRINT_V1.md)、現行の設計方針は [UI/UX設計基準](./docs/DESIGN_SYSTEM.md) を参照。着手時には最新mainと再照合する。
@@ -26,7 +26,7 @@
 
 ## 1. 現在地サマリ
 
-照合日：2026-10-19。基準main：`f7dd9d8ac6575c7b4a899dafbd49ef7026096ee7`（PR #482マージ後）。GitHubのmainとマージ状態を確認。QA-D1は#472、FIX-S3は#473、捕手不足の原因分析は#474、捕手層の編成方針は#475、一軍空き枠の補足修正は#476、共通人数基盤は#477、可変ドラフトは#478、65人方針は#479、AI-03は#480、球団収支FIX-M1は#481でマージ済み。各工程の対象範囲・実測・限界は[QA-D1](./docs/implementation/qa-d1.md)・[FIX-S3](./docs/implementation/fix-s3.md)・[捕手不足の原因分析](./docs/implementation/farm-catcher-shortage.md)・[捕手層のレビューと次工程](./docs/implementation/catcher-depth-review.md)・[収支検証](./docs/validation/club-finance/README.md)を参照。全機能・全年度・実機の完了認定ではない。
+照合日：2026-10-19。基準main：`99b73a3a2d3b64735fa5edbd807dfab1fe9d0c42`（PR #483マージ後）。GitHubのmainとマージ状態を確認。QA-D1は#472、FIX-S3は#473、捕手不足の原因分析は#474、捕手層の編成方針は#475、一軍空き枠の補足修正は#476、共通人数基盤は#477、可変ドラフトは#478、65人方針は#479、AI-03は#480、球団収支FIX-M1は#481でマージ済み。各工程の対象範囲・実測・限界は[QA-D1](./docs/implementation/qa-d1.md)・[FIX-S3](./docs/implementation/fix-s3.md)・[捕手不足の原因分析](./docs/implementation/farm-catcher-shortage.md)・[捕手層のレビューと次工程](./docs/implementation/catcher-depth-review.md)・[収支検証](./docs/validation/club-finance/README.md)を参照。全機能・全年度・実機の完了認定ではない。
 
 ### UI-04 球団経営・ナビゲーション刷新（今回確定）
 
@@ -35,14 +35,14 @@
 | 工程 | 優先度 | 状態 | 依存・完了条件 |
 |---|---|---|---|
 | UI-04A | — | [#482](https://github.com/shotaro-hue/baseball-manager/pull/482)マージ済み | 5分類・9機能への入口。旧本文の移行完了とは区別 |
-| UI-04A-FIX | P1 | 修正・回帰検証をこの独立PRで提出（未マージ） | #482。通知スロットの再訪/置換、戻る/進む/再読込、主ナビ/セーブ/年度のリセット、Chromium/WebKit・同一head CI。[検証](./docs/validation/ui-04a-fix/README.md) |
-| FIX-M2 | P1 | 調査ポイント・受入条件確定、コード未着手 | #481。実行はA-FIXレビュー・マージ後。試合前需要/価格・主催区分・通常/CPU/Worker・負予算・年度/保存を整合 |
+| UI-04A-FIX | — | [#483](https://github.com/shotaro-hue/baseball-manager/pull/483)マージ済み | 通知サブタブの履歴重複・画面復帰を修正。[検証](./docs/validation/ui-04a-fix/README.md) |
+| FIX-M2 | P1 | この独立PRで実装・検証（未マージ） | #483後のmain。試合前需要で収益計上、主催区分/Worker一致、負予算下の無金銭トレード・支出制約・年度/保存。[要件](./docs/implementation/fix-m2.md) |
 | UI-04B | P1 | 要件・390/1440px構成案あり、コード未着手 | A-FIX・FIX-M2マージ。経営指標、実績/予測/欠測、価格下書き→比較→確定、投資比較・保存再開 |
 | UI-04C | P1 | 要件確定、コード未着手 | A-FIXマージ。原則Bレビュー・マージ後。補強/契約、選択→詳細→比較→確定→結果→元画面、通知対象・解決済み表示 |
 | UI-04D | P2 | 要件確定、コード未着手 | Cマージ。通知/ニュース/球団史/設定の旧本文移行。既読/要対応/対応済み、実在する設定のみ |
 | QA-04 | P1 | 全体未着手。A/FIXの回帰のみ先行 | 全工程レビュー・マージ後。新規/全機能/試合/財務/取引/オフシーズン/年度/保存。360/390/760/761/1023/1024/1440、Chromium/WebKit・キーボード/タッチ |
 
-各工程は原則前工程のレビュー/マージ後の最新mainから独立PRとする。旧セーブ移行は受入対象外。今回のA-FIXにB以降やM2のコードを混ぜない。B/Cの独立部分は設計だけ並行可。既存完了履歴は以下に保持する。
+各工程は原則前工程のレビュー/マージ後の最新mainから独立PRとする。旧セーブ移行は受入対象外。今回のM2にB以降のUIコードを混ぜない。B/Cの独立部分は設計だけ並行可。既存完了履歴は以下に保持する。
 
 **二軍の実測基盤は実装・マージ済み。CPUの編成判断は段階的に改善中。新デザインの全画面移行と長期バランスの完了には至っていない。**
 

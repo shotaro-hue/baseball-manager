@@ -135,4 +135,23 @@ describe('club finance receipts and allocation', () => {
       expect(() => finance.validateClubFinance(f)).toThrow(/収支/);
     }
   });
+  it('keeps a genuine negative operating balance and continues scheduled games', () => {
+    const t = start();
+    const annual = { ...t.clubFinance.annual, sponsor: 0, broadcast: 0, membership: 0, fixedCost: 1000000 };
+    const deficit = { ...t, budget: 0, clubFinance: { ...t.clubFinance, annual } };
+    const quote = finance.calcClubGameFinance(deficit, false, 1);
+    expect(quote.operatingSurplus).toBeLessThan(0);
+    const first = finance.applyClubGameFinance(deficit, { year: 2026, gameDay: 1, isHomeTeam: false });
+    expect(first.budget).toBe(quote.operatingSurplus);
+    expect(first.revenueThisSeason).toBe(quote.revenue);
+    expect(first.clubFinance.awayGames).toBe(1);
+    expect(finance.validateClubFinance(first.clubFinance)).toBe(true);
+    const reloaded = JSON.parse(JSON.stringify(first));
+    const second = finance.applyClubGameFinance(reloaded, { year: 2026, gameDay: 2, isHomeTeam: false });
+    expect(second.budget).toBeLessThan(first.budget);
+    expect(second.clubFinance.postedRounds).toEqual([1, 2]);
+    expect(finance.validateClubFinance(second.clubFinance)).toBe(true);
+    expect(finance.applyClubGameFinance(second, { year: 2026, gameDay: 2, isHomeTeam: false })).toBe(second);
+  });
+
 });
