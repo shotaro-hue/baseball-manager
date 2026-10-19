@@ -4,7 +4,7 @@
 
 ## 結論・運用の原則
 
-UI-04B追加（2026-10-20）: `financeView.test.js`で既存エンジンとの価格/投資同条件比較・通年換算・手動価格維持・欠測と負予算を確認。`FinanceActions.test.js`/`HubManagementTab.test.js`で下書き・明示確定・取消・二重実行・要対応と共通枠を検証。`finance.spec.js`の既存年俸/保存assertは契約への移設後も保持し、3幅の価格/全12球団hash・投資/保存再開・無効入力・負予算とフォーカス回帰を追加。既存の通常CI `posting-and-finance` とWebKit対象に含む。[実行記録](./validation/ui-04b/README.md)。
+UI-04B追加（2026-10-20）: `financeView.test.js`で既存エンジンとの価格/投資同条件比較・通年換算・手動価格維持・欠測と負予算を確認。`FinanceActions.test.js`/`HubManagementTab.test.js`で下書き・明示確定・取消・二重実行・要対応と共通枠を検証。`finance.spec.js`の既存年俸/保存assertは契約への移設後も保持し、3幅の価格/全12球団hash・投資/保存再開・無効入力・負予算とフォーカス回帰を追加。`PlayerModal.salary.test.js`の5入力は契約の年俸上位から詳細を開き、参照/給与表示/全体不変を維持する。既存の通常CI `posting-and-finance` とWebKit対象に含む。[実行記録](./validation/ui-04b/README.md)。
 
 FIX-M2追加（2026-10-19）: `regularGameUpdates.finance.test.js` で試合前需要と結果後の人気差分、ホーム/アウェーと視点、旧セーブ分岐を検証。`clubFinance.lifecycle.test.js` で実際のシーズンWorker初日の計上を試合前見積りと突合。`clubFinance.test.js` と `tradeTransaction.test.js` で赤字予算の継続進行・無金銭取引・追加支出禁止を確認。通常CIの既存Worker/保存/財務/取引E2Eで回帰を判定する。[検証記録](./validation/fix-m2/README.md)。
 
