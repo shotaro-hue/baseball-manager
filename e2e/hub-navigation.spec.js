@@ -56,7 +56,7 @@ test('hub navigation retains unconfirmed trade inputs during a notification deto
   const before = await saveHub(page);
   await active(page).getByRole('button', { name: 'トレード', exact: true }).click();
   const targetTeam = before.teams.find(t => t.id !== before.myId);
-  await active(page).getByText(`${targetTeam.emoji} ${targetTeam.name}`, { exact: true }).click();
+  await active(page).getByRole('button', { name: `${targetTeam.name}と交渉する`, exact: true }).click();
   const cash = active(page).locator('input[type="number"]');
   await cash.fill('1234');
   await notifications(page).click();
@@ -220,7 +220,9 @@ test('hub navigation notifications preserve FA filter, focus, scroll and existin
   await mainNavigation(page, true).getByRole('button', { name: 'ホーム', exact: true }).click();
   await expect(page.getByRole('region', { name: '重要な対応待ち' })).toContainText('トレード提案 1件');
   await page.getByRole('button', { name: 'トレード提案 1件', exact: true }).click();
-  await active(page).getByRole('button', { name: '✅ 承諾', exact: true }).click();
+  await active(page).getByRole('button', { name: 'UI04既読の提案', exact: true }).click();
+  await active(page).getByRole('button', { name: '承諾内容を確認する', exact: true }).click();
+  await active(page).getByRole('button', { name: '承諾を確定する', exact: true }).click();
   await expect(notifications(page)).toHaveAccessibleName('通知（未読0件・要対応0件）');
   const settled = await saveHub(page);
   expect(settled.teams.find(t => t.id === settled.myId).budget).toBe(before.teams.find(t => t.id === before.myId).budget + 500);

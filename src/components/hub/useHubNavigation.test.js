@@ -138,3 +138,26 @@ it('coalesces repeated ancestor opens until asynchronous history traversal finis
   h.flushHistory();
   expect(h.nav.routes).toEqual(['fa']);
 });
+
+it('an explicit case link does not restore the previous control over its requested target', () => {
+  const h = mount('trade', 'save:2026', true);
+  const focus = vi.fn();
+  document.activeElement = { isConnected: true, closest: () => null, focus };
+  act(() => h.nav.open('mailbox'));
+  act(() => h.nav.open('trade', { restorePosition: false }));
+  h.flushHistory();
+  expect(h.nav.routes).toEqual(['trade']);
+  expect(focus).not.toHaveBeenCalled();
+});
+
+it('ordinary back still restores the saved control and scroll position', () => {
+  const h = mount('trade', 'save:2026', true);
+  const focus = vi.fn();
+  document.activeElement = { isConnected: true, closest: () => null, focus };
+  window.scrollY = 640;
+  act(() => h.nav.open('mailbox'));
+  act(() => h.nav.back());
+  h.flushHistory();
+  expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+  expect(window.scrollTo).toHaveBeenLastCalledWith(0, 640);
+});

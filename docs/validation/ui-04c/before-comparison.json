@@ -1,0 +1,122 @@
+[
+  {
+    "stage": "before",
+    "width": 360,
+    "screen": "reinforcement",
+    "overflow": false,
+    "pageErrors": [],
+    "teamsHash": "6f8358b9e3d708d407232da3660bf656eea139a6995fe0eb1fd533f586aaca05",
+    "year": 2026,
+    "gameDay": 1
+  },
+  {
+    "stage": "before",
+    "width": 360,
+    "screen": "contract",
+    "overflow": false,
+    "pageErrors": [],
+    "teamsHash": "6f8358b9e3d708d407232da3660bf656eea139a6995fe0eb1fd533f586aaca05",
+    "year": 2026,
+    "gameDay": 1
+  },
+  {
+    "stage": "before",
+    "width": 360,
+    "screen": "scout",
+    "overflow": false,
+    "pageErrors": [],
+    "teamsHash": "6f8358b9e3d708d407232da3660bf656eea139a6995fe0eb1fd533f586aaca05",
+    "year": 2026,
+    "gameDay": 1
+  },
+  {
+    "stage": "before",
+    "width": 360,
+    "screen": "trade",
+    "overflow": false,
+    "pageErrors": [],
+    "teamsHash": "6f8358b9e3d708d407232da3660bf656eea139a6995fe0eb1fd533f586aaca05",
+    "year": 2026,
+    "gameDay": 1
+  },
+  {
+    "stage": "before",
+    "width": 390,
+    "screen": "reinforcement",
+    "overflow": false,
+    "pageErrors": [],
+    "teamsHash": "6f8358b9e3d708d407232da3660bf656eea139a6995fe0eb1fd533f586aaca05",
+    "year": 2026,
+    "gameDay": 1
+  },
+  {
+    "stage": "before",
+    "width": 390,
+    "screen": "contract",
+    "overflow": false,
+    "pageErrors": [],
+    "teamsHash": "6f8358b9e3d708d407232da3660bf656eea139a6995fe0eb1fd533f586aaca05",
+    "year": 2026,
+    "gameDay": 1
+  },
+  {
+    "stage": "before",
+    "width": 390,
+    "screen": "scout",
+    "overflow": false,
+    "pageErrors": [],
+    "teamsHash": "6f8358b9e3d708d407232da3660bf656eea139a6995fe0eb1fd533f586aaca05",
+    "year": 2026,
+    "gameDay": 1
+  },
+  {
+    "stage": "before",
+    "width": 390,
+    "screen": "trade",
+    "overflow": false,
+    "pageErrors": [],
+    "teamsHash": "6f8358b9e3d708d407232da3660bf656eea139a6995fe0eb1fd533f586aaca05",
+    "year": 2026,
+    "gameDay": 1
+  },
+  {
+    "stage": "before",
+    "width": 1440,
+    "screen": "reinforcement",
+    "overflow": false,
+    "pageErrors": [],
+    "teamsHash": "6f8358b9e3d708d407232da3660bf656eea139a6995fe0eb1fd533f586aaca05",
+    "year": 2026,
+    "gameDay": 1
+  },
+  {
+    "stage": "before",
+    "width": 1440,
+    "screen": "contract",
+    "overflow": false,
+    "pageErrors": [],
+    "teamsHash": "6f8358b9e3d708d407232da3660bf656eea139a6995fe0eb1fd533f586aaca05",
+    "year": 2026,
+    "gameDay": 1
+  },
+  {
+    "stage": "before",
+    "width": 1440,
+    "screen": "scout",
+    "overflow": false,
+    "pageErrors": [],
+    "teamsHash": "6f8358b9e3d708d407232da3660bf656eea139a6995fe0eb1fd533f586aaca05",
+    "year": 2026,
+    "gameDay": 1
+  },
+  {
+    "stage": "before",
+    "width": 1440,
+    "screen": "trade",
+    "overflow": false,
+    "pageErrors": [],
+    "teamsHash": "6f8358b9e3d708d407232da3660bf656eea139a6995fe0eb1fd533f586aaca05",
+    "year": 2026,
+    "gameDay": 1
+  }
+]

@@ -52,7 +52,9 @@ export function useHubNavigation(tab, setTab, scope) {
         next = [...next.slice(0, -1), pending.target];
         writeHistory(next);
       }
-      restore.current = positions.current.get(next.at(-1));
+      // A case link supplies a new focus/scroll target in the destination.
+      // Ordinary back/forward still restores the saved control and position.
+      restore.current = pending?.restorePosition === false ? null : positions.current.get(next.at(-1));
       routeRef.current = next; setRoutes(next); setter.current(next.at(-1));
     };
     window.addEventListener('popstate', pop);
@@ -81,14 +83,14 @@ export function useHubNavigation(tab, setTab, scope) {
   const navigate = useCallback(target => {
     reset(target); setter.current(target);
   }, [reset]);
-  const visit = useCallback((target, replaceCurrent = false) => {
+  const visit = useCallback((target, replaceCurrent = false, { restorePosition = true } = {}) => {
     const current = routeRef.current;
     // history.go is asynchronous: repeated header clicks must share its visit.
     if (revisit.current || current.at(-1) === target) return;
     if (typeof window !== 'undefined') positions.current.set(current.at(-1), { focus: document.activeElement, scrollY: window.scrollY });
     const existing = current.findIndex(route => navigationSlot(route) === navigationSlot(target));
     if (existing >= 0 && existing < current.length - 1 && typeof window !== 'undefined' && window.history.state?.[HISTORY_KEY]?.session === session.current) {
-      revisit.current = { index: existing, target };
+      revisit.current = { index: existing, target, restorePosition };
       window.history.go(existing - current.length + 1);
       return;
     }
@@ -97,7 +99,7 @@ export function useHubNavigation(tab, setTab, scope) {
     routeRef.current = next; setRoutes(next); writeHistory(next, existing < 0 && !replaceCurrent); setter.current(target);
     if (typeof window !== 'undefined' && !replaceCurrent) window.scrollTo(0, 0);
   }, [writeHistory]);
-  const open = useCallback(target => visit(target), [visit]);
+  const open = useCallback((target, options) => visit(target, false, options), [visit]);
   const replace = useCallback(target => visit(target, true), [visit]);
   const back = useCallback(() => {
     const current = routeRef.current;

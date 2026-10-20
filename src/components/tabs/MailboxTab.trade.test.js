@@ -24,7 +24,7 @@ it('opens the existing trade screen without accepting a proposal', () => {
   const link = view.root.findAllByType('button').find(n => text(n) === 'トレード画面で検討する');
   expect(link).toBeTruthy();
   act(() => link.props.onClick());
-  expect(onNavigate).toHaveBeenCalledWith('trade');
+  expect(onNavigate).toHaveBeenCalledWith('trade', 'offer');
   expect(onAction).not.toHaveBeenCalled();
 });
 it('keeps a rejected trade mail actionable instead of locally marking it resolved', () => {
@@ -36,6 +36,22 @@ it('keeps a rejected trade mail actionable instead of locally marking it resolve
   act(()=>row.props.onClick());
   const accept=view.root.findAllByType('button').find(n=>text(n).includes('承諾する'));
   act(()=>accept.props.onClick());
+  expect(onAction).not.toHaveBeenCalled();
+  const confirm=view.root.findAllByType('button').find(n=>text(n)==='承諾を確定する');
+  expect(confirm).toBeTruthy();act(()=>confirm.props.onClick());
   expect(text(view.root)).not.toContain('対応済み');
   expect(view.root.findAllByType('button').some(n=>text(n).includes('承諾する'))).toBe(true);
+});
+it('requires explicit mail confirmation and preserves a failed proposal for another decision', () => {
+  const onAction = vi.fn(() => false);
+  const mail = { id: 'selected', type: 'trade', title: '選択案件', body: '', offer: { want: [], offer: [], cash: 0 } };
+  act(() => { view = create(React.createElement(MailboxTab, { mailbox: [mail], onRead: () => {}, onAction })); });
+  const text = n => typeof n === 'string' ? n : (n.children || []).map(text).join('');
+  const button = label => view.root.findAllByType('button').find(n => text(n) === label);
+  act(() => view.root.findAll(n => n.type === 'div' && n.props.onClick).find(n => text(n).includes('選択案件')).props.onClick());
+  act(() => button('✅ 承諾する').props.onClick());
+  expect(onAction).not.toHaveBeenCalled();
+  act(() => button('戻って見直す').props.onClick()); expect(onAction).not.toHaveBeenCalled();
+  act(() => button('✅ 承諾する').props.onClick()); act(() => button('承諾を確定する').props.onClick());
+  expect(onAction).toHaveBeenCalledWith('selected', 'accept'); expect(text(view.root)).not.toContain('対応済み');
 });

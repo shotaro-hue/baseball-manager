@@ -55,6 +55,11 @@ export default function HubShell({ state, flows, app }) {
   const [compareOpen, setCompareOpen] = useState(false);
   useEffect(() => { setComparePlayers([]); setCompareOpen(false); }, [year]);
   const [decisionTarget, setDecisionTarget] = useState(null);
+  const [caseTarget, setCaseTarget] = useState(null);
+  const openCase = (target, id) => {
+    setCaseTarget(previous => ({ tab: target, id, token: (previous?.token ?? 0) + 1, scope: navigationScope }));
+    navigation.open(target, { restorePosition: false });
+  };
 
   const handleTabChange = (newTab) => {
     if (AUXILIARY_TABS.includes(newTab)) navigation.open(newTab);
@@ -102,7 +107,7 @@ export default function HubShell({ state, flows, app }) {
   }, [gs, navigation.open]);
 
   return (
-    <div className={`app calm-shell ${tab === 'dashboard' ? 'calm-home' : ''} ${['management', 'reinforcement', 'settings', 'finance'].includes(tab) ? 'hub-entry-shell' : ''}`}
+    <div className={`app calm-shell ${tab === 'dashboard' ? 'calm-home' : ''} ${['management', 'reinforcement', 'settings', 'finance', 'contract', 'trade', 'scout'].includes(tab) ? 'hub-entry-shell' : ''}`}
       data-ds={tab === 'dashboard' ? 'home-shell' : undefined}
       data-initialization-state={gs.newGameInitializationStatus}>
       <div className="app-layout">
@@ -229,8 +234,11 @@ export default function HubShell({ state, flows, app }) {
             <HubContentRouter
               app={app}
               tab={route}
+              active={route === tab}
               onTabChange={handleTabChange}
               onOpen={navigation.open}
+              onOpenCase={openCase}
+              focusRequest={caseTarget?.scope === navigationScope && caseTarget.tab === route ? caseTarget : null}
               notifications={notifications}
               comparison={{
                 players: comparePlayers,

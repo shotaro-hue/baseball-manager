@@ -40,6 +40,7 @@ for (const legacy of [false, true]) {
     // tradeValue=20, rngf(0.8,1.5)=1: use real bid logic with a fixed random draw.
     await page.evaluate(() => { window.postingOriginalRandom = Math.random; Math.random = () => 2 / 7; });
     await page.getByRole('button', { name: '✅ 承認する', exact: true }).click();
+    await page.getByRole('button', { name: '承認を確定する', exact: true }).click();
     await expect(page.getByText(`${name} MLB移籍承認 — 移籍金+2000万円`, { exact: true })).toBeVisible();
     await page.evaluate(() => { Math.random = window.postingOriginalRandom; delete window.postingOriginalRandom; });
     await page.getByText(`【ポスティング成立】${name} 入札額1.0億円`, { exact: true }).click();
@@ -77,6 +78,7 @@ test(`D01 rejection preserves the budget and roster through real save/reload (${
   const initial = await saveHub(page);
   await openMail(page);
   await page.getByRole('button', { name: '❌ 拒否する', exact: true }).click();
+  await page.getByRole('button', { name: '辞退を確定する', exact: true }).click();
   const before = await saveHub(page);
   await reloadAndLoad(page);
   const after = await saveHub(page);

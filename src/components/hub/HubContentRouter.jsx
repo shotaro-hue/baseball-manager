@@ -21,6 +21,7 @@ import {
 } from '../../constants';
 import { ownedPlayers, renewalEligible } from '../../engine/renewalRules';
 import { releaseWaiverPlayers } from '../../engine/offseasonReview';
+import { planningResumeScreen } from '../../engine/offseasonPlanning';
 import { standingsContext } from '../../engine/standings';
 import HubFaTab from './HubFaTab';
 import HubScoutTab from './HubScoutTab';
@@ -64,11 +65,12 @@ function DeferredHubTab({ label, children }) {
   );
 }
 
-export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTabChange, comparison, notifications }) {
+export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTabChange, onOpenCase, focusRequest, comparison, notifications, active = true }) {
   const { gs, sf, os } = app;
   const { myTeam, myId, teams, year, gameDay, schedule, faPool } = gs;
 
-  const mailboxForView = deliveredMailbox(gs.getMailboxBySelector(), gameDay);
+  const allMailbox = gs.getMailboxBySelector();
+  const mailboxForView = deliveredMailbox(allMailbox, gameDay);
   const newsForView = gs.getNewsBySelector({ limit: 200 });
   const unreadMailboxCount = gs.getUnreadMailboxCount(gameDay);
   const latestNewsId = gs.getLatestNewsId();
@@ -294,14 +296,14 @@ export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTab
         onTeamClick={gs.handleTeamClick}
         gameDay={gameDay}
         unreadCount={unreadMailboxCount}
-        onNavigate={onOpen}
+        onNavigate={(target, id) => id != null && onOpenCase ? onOpenCase(target, id) : onOpen(target)}
       />
     );
   }
 
   if (tab === 'trade') {
-    const pendingTrades = mailboxForView.filter(
-      (mail) => mail.type === 'trade' && mail.offer && !mail.resolved,
+    const tradeMails = mailboxForView.filter(
+      (mail) => mail.type === 'trade' && mail.offer,
     );
     const deadlinePassed = (() => {
       const date = gameDayToDate(gameDay, schedule);
@@ -312,15 +314,20 @@ export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTab
         myTeam={myTeam}
         teams={teams}
         onTrade={os.handleTrade}
-        cpuOffers={pendingTrades.map((mail) => mail.offer)}
+        offerMails={tradeMails}
+        focusRequest={focusRequest}
+        active={active}
+        capacityContext={draftCapacityContext(gs.offseasonPlan, year, teams)}
         onAcceptOffer={(index) =>
-          os.handleMailAction(pendingTrades[index].id, 'accept')
+          os.handleMailAction(tradeMails[index]?.id, 'accept')
         }
         onDeclineOffer={(index) =>
-          os.handleMailAction(pendingTrades[index].id, 'decline')
+          os.handleMailAction(tradeMails[index]?.id, 'decline')
         }
         deadlinePassed={deadlinePassed}
         onPlayerClick={gs.handlePlayerClick}
+        onToggleCompare={comparison?.onToggle}
+        comparePlayerIds={comparison?.players?.map(player => player.id) || []}
       />
     );
   }
@@ -332,16 +339,25 @@ export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTab
         allTeams={teams}
         onPlayerClick={gs.handlePlayerClick}
         year={year}
+        gameDay={gameDay}
+        mailbox={allMailbox}
+        focusRequest={focusRequest}
+        active={active}
+        onToggleCompare={comparison?.onToggle}
+        comparePlayerIds={comparison?.players?.map(player => player.id) || []}
+        onResumeOffseason={['planning', 'open', 'results'].includes(gs.offseasonPlan?.stage) && gs.offseasonPlan.year === year && gs.offseasonPlan.myId === myId
+          ? () => gs.setScreen(planningResumeScreen(gs.offseasonPlan, year, myId)) : undefined}
         onOffer={os.handleContractOffer}
         onRelease={(pid) => {
           const player = ownedPlayers(myTeam).find(entry => entry.id === pid);
-          if (!player || !renewalEligible(player, year)) return;
+          if (!player || !renewalEligible(player, year)) return false;
           gs.upd(myId, team => releaseWaiverPlayers(team, [pid], year, POP_RELEASE_PENALTY, POP_RELEASE_SALARY_THRESHOLD));
           gs.setFaPool(prev => prev.some(p => p.id === pid) ? prev : [...prev, { ...player, isFA: true, isWaiverReleased: true,
             contractYearsLeft: 0, marketEntryReason: '自由契約', departureReason: 'release', marketLastStats: player.stats,
             faEnteredYear: year, faOriginTeamId: myId, faOriginTeamName: myTeam.name,
             faOriginRoster: myTeam.farm?.some(p => p.id === pid) ? 'farm' : 'active' }]);
           gs.notify('選手を自由契約にしました', 'warn');
+          return true;
         }}
       />
     );
@@ -378,15 +394,23 @@ export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTab
     return (
       <HubScoutTab
         myTeam={myTeam}
+        teams={teams}
+        capacityContext={draftCapacityContext(gs.offseasonPlan, year, teams)}
         scoutRegions={SCOUT_REGIONS}
         onSendScout={gs.sendScout}
         onSignPlayer={gs.signPlayer}
-        onRemoveScoutResult={(index) =>
+        onPlayerClick={gs.handlePlayerClick}
+        onToggleCompare={comparison?.onToggle}
+        comparePlayerIds={comparison?.players?.map(player => player.id) || []}
+        onRemoveScoutResult={(index) => {
+          const id = myTeam.scoutResults[index]?.id;
+          if (id == null) return false;
           gs.upd(myId, (team) => ({
             ...team,
-            scoutResults: team.scoutResults.filter((_, i) => i !== index),
-          }))
-        }
+            scoutResults: team.scoutResults.filter(p => p.id !== id),
+          }));
+          return true;
+        }}
       />
     );
   }

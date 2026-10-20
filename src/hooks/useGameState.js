@@ -1001,26 +1001,28 @@ export function useGameState() {
   },[upd,myId,notify]);
 
   const sendScout = useCallback((region)=>{
-    if(!myTeam||myTeam.budget<region.cost){notify("予算不足","warn");return;}
+    if(!myTeam||!Number.isFinite(myTeam.budget)||myTeam.budget<region.cost){notify("予算不足","warn");return false;}
     upd(myId,t=>({...t,budget:t.budget-region.cost,scoutMissions:[...t.scoutMissions,{id:uid(),name:region.name,weeksLeft:region.weeks,qMin:region.qMin,qMax:region.qMax,cost:region.cost,foreign:region.foreign,regionFactor:region.regionFactor||1.0}]}));
     notify(`${region.name}へスカウト派遣！`,"ok");
     setTimeout(()=>{
       loadPlayerModule().then((playerMod)=>{upd(myId,t=>{const mis=t.scoutMissions.find(m=>m.name===region.name);if(!mis) return t;const np=playerMod.makePlayer(Math.random()<0.4?"先発":POSITIONS[rng(0,7)],rng(mis.qMin,mis.qMax),Math.random()<0.4,undefined,mis.foreign&&Math.random()<0.7);return{...t,scoutMissions:t.scoutMissions.filter(m=>m!==mis),scoutResults:[...t.scoutResults,{...np,_scoutRegionFactor:mis.regionFactor||1.0,_scoutBudgetFactor:t.budget>300000?0.7:t.budget>150000?0.85:1.0}]};});}).catch((error)=>{console.error('Failed to resolve scout result:', error);notify("スカウト結果の生成に失敗しました","error");});
       notify("スカウト報告が届きました！","ok");
     },3000);
+    return true;
   },[myTeam,upd,myId,notify]);
 
   const signPlayer = useCallback((idx)=>{
     const current=rosterCommandRef.current, team=current.teams.find(t=>t.id===current.myId);
     const intendedId=myTeam?.scoutResults[idx]?.id;
-    if(intendedId==null) return;
+    if(intendedId==null) return false;
     const p=team?.scoutResults.find(candidate=>candidate.id===intendedId);
-    if(!p) return;
-    if(!Number.isFinite(p.salary)||!Number.isFinite(team.budget)||team.budget<p.salary){notify("予算不足","warn");return;}
+    if(!p) return false;
+    if(!Number.isFinite(p.salary)||!Number.isFinite(team.budget)||team.budget<p.salary){notify("予算不足","warn");return false;}
     const error=marketRosterError(team,p,current.teams,draftCapacityContext(current.offseasonPlan,current.year,current.teams));
-    if(error){notify(error,"warn");return;}
+    if(error){notify(error,"warn");return false;}
     commitRosterCommand(current,{...team,budget:team.budget-p.salary,farm:[...team.farm,{...p,contractYearsLeft:2}],scoutResults:team.scoutResults.filter(candidate=>candidate.id!==intendedId)});
     notify(`${p.name}を獲得！`,"ok");
+    return true;
   },[myTeam,setTeams,notify]);
 
   const handlePressAnswer = useCallback((choiceIdx) => {

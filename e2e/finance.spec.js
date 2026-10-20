@@ -79,7 +79,12 @@ async function openFinance(page, mobile) {
 }
 async function openContracts(page) {
   await page.getByRole('navigation', { name: '経営メニュー' }).getByRole('button', { name: /^契約/ }).click();
+  await showContractPayroll(page);
   await expect(page.getByRole('region', { name: '年俸上位（所属選手）', exact: true })).toBeVisible();
+}
+async function showContractPayroll(page) {
+  const summary = page.locator('[data-hub-route="contract"] summary').filter({ hasText: '所属選手の年俸内訳・年俸上位' });
+  if (await summary.locator('..').getAttribute('open') === null) await summary.click();
 }
 for (const width of [360,390,1440]) {
   test(`finance coach salary reference ${width}px preserves the saved clubs through disclosure and reload`, async ({page}, testInfo) => {
@@ -112,6 +117,7 @@ for (const width of [360,390,1440]) {
   });
 }
 async function assertPayroll(page) {
+  await showContractPayroll(page);
   const region = page.getByRole('region', { name: '選手契約年俸（年額）', exact: true });
   await expect(region).toBeVisible();
   for (const [category, value] of [['active','400万円'],['farm','200万円'],['development','50万円'],['total','650万円']]) {

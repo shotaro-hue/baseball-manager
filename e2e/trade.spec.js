@@ -41,12 +41,14 @@ for(const cpu of [false,true]) {
     if(cpu) {
       await page.getByText('取引検証',{exact:true}).click();
       await page.getByRole('button',{name:'✅ 承諾する',exact:true}).click();
+      await page.getByRole('button',{name:'承諾を確定する',exact:true}).click();
     }
     else {
-      await page.getByText(f.other.name,{exact:false}).click();
-      await page.getByText('取引対象野手',{exact:true}).first().locator('..').locator('..').locator('..').click();
+      await page.getByRole('button',{name:`${f.other.name}と交渉する`,exact:true}).click();
+      await page.getByLabel('取引対象野手を獲得候補に選ぶ',{exact:true}).check();
       await page.locator('input[type="number"]').fill('500');
-      await page.getByRole('button',{name:'📨 トレードを提案する',exact:true}).click();
+      await page.getByRole('button',{name:'トレードを提案する',exact:true}).click();
+      await page.getByRole('button',{name:'確認して提案する',exact:true}).click();
       await expect(page.getByText('トレード成立！',{exact:true})).toBeVisible();
     }
     const first=summary(await saveHub(page),f);
@@ -87,6 +89,7 @@ test('trade rejects an exchange that would overfill the other recipient at 70 at
  await reloadAndLoad(page);
  await page.getByRole('button',{name:/^通知（未読/}).click();
  await page.getByText('取引検証',{exact:true}).click();await page.getByRole('button',{name:'✅ 承諾する',exact:true}).click();
+ await page.getByRole('button',{name:'承諾を確定する',exact:true}).click();
  await expect(page.getByText('支配下登録枠（70人）を超えます',{exact:true})).toBeVisible();
  const after=await saveHub(page);expect(after.teams).toEqual(before.teams);expect(after.seasonHistory).toEqual(before.seasonHistory);
  expect(after.mailbox.find(m=>m.id==='trade-test').resolved).toBe(false);
