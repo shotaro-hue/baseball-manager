@@ -41,7 +41,7 @@ export function DecisionConfirmation({ title, children, onCancel, onConfirm, con
     heading.current?.focus({ preventScroll: true });
     heading.current?.scrollIntoView?.({ block: 'nearest' });
     return () => {
-      const available = node => node?.isConnected && !node.closest('[hidden]') && node.getClientRects().length > 0;
+      const available = node => node?.isConnected && !node.matches(':disabled') && !node.closest('[hidden]') && node.getClientRects().length > 0;
       const target = available(opener) ? opener : available(fallbackFocus?.current) ? fallbackFocus.current : null;
       target?.focus({ preventScroll: true });
     };

@@ -9,7 +9,7 @@ export default function HubScoutTab({ myTeam, teams = [myTeam], capacityContext 
   const [selectedId, setSelectedId] = useState(null), [snapshot, setSnapshot] = useState(null);
   const [search, setSearch] = useState(''), [confirmation, setConfirmation] = useState(null);
   const [receipt, setReceipt] = useState(null), [error, setError] = useState(null);
-  const busy = useRef(false), current = useRef(null);
+  const busy = useRef(false), current = useRef(null), dispatchHeading = useRef(null);
   const focus = useDecisionReturn(selectedId);
   const candidates = myTeam?.scoutResults || [];
   const selected = selectedId != null ? candidates.find(p => p.id === selectedId) || snapshot : null;
@@ -69,13 +69,13 @@ export default function HubScoutTab({ myTeam, teams = [myTeam], capacityContext 
       </>}
     </section></div>
     {error && <p className="decision-error" role="alert">{error}</p>}
-    {confirmation && <DecisionConfirmation fallbackFocus={focus.heading} title={confirmation.kind === 'dispatch' ? 'スカウト派遣の確認' : confirmation.kind === 'sign' ? 'スカウト契約の最終確認' : '候補削除の確認'}
+    {confirmation && <DecisionConfirmation fallbackFocus={confirmation.kind === 'dispatch' ? dispatchHeading : focus.heading} title={confirmation.kind === 'dispatch' ? 'スカウト派遣の確認' : confirmation.kind === 'sign' ? 'スカウト契約の最終確認' : '候補削除の確認'}
       onCancel={() => setConfirmation(null)} onConfirm={confirm} confirmLabel={confirmation.kind === 'dispatch' ? '派遣を確定する' : confirmation.kind === 'sign' ? '契約を確定する' : '候補から外すことを確定'} error={issue} danger={confirmation.kind === 'remove'}>
       {confirmation.kind === 'dispatch' ? <><p>{confirmation.region.name} · 派遣費用 {money(confirmation.region.cost)}</p><p>派遣後の予算 {money(myTeam.budget - confirmation.region.cost)}</p><p>確定時に派遣費用を差し引きます。派遣の取消・返金はできません。</p></>
         : <><p>{selected?.name}</p>{confirmation.kind === 'sign' ? <><p>年俸 {salaryText(selected?.salary)} · 契約残り2年 · ファーム配属</p><p>確定時の控除 {money(selected?.salary)} · 獲得後の予算 {money(myTeam.budget - selected?.salary)}</p></> : <p>この候補を報告一覧から削除します。所属・予算は変わりません。削除の取消はできません。</p>}</>}
     </DecisionConfirmation>}
     {receipt?.kind === 'dispatch' && <p className="decision-receipt" role="status">{receipt.region.name}へ派遣しました。報告が届くと候補一覧へ追加されます。</p>}
-    <section aria-label="スカウト派遣先"><h2>スカウト派遣</h2><div className="decision-teams">
+    <section aria-label="スカウト派遣先"><h2 ref={dispatchHeading} tabIndex={-1}>スカウト派遣</h2><div className="decision-teams">
       {scoutRegions.map(region => <div key={region.id}><h3>{region.name}</h3><p>費用 {money(region.cost)}</p><p className="decision-note">候補の能力帯 Lv{region.qMin}–{region.qMax}（能力・成果を保証する値ではありません）</p>
         <Button variant="secondary" disabled={!Number.isFinite(myTeam?.budget) || myTeam.budget < region.cost} onClick={() => open({ kind: 'dispatch', region })}>{region.name}への派遣を検討</Button>
         {(!Number.isFinite(myTeam?.budget) || myTeam.budget < region.cost) && <p className="decision-note">予算不足・未記録のため派遣できません。</p>}</div>)}

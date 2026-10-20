@@ -64,6 +64,22 @@ test('management decisions scout signing commits once and survives save/reload',
   await reloadAndLoad(page); expect((await saveHub(page)).teams).toEqual(saved.teams);
 });
 
+test('management decisions scout dispatch restores focus when spending the remaining budget disables its opener', async ({ page }) => {
+  test.setTimeout(60000); await page.setViewportSize({ width: 390, height: 844 });
+  const f = managementFixture(); f.mine.budget = 3000;
+  await loadManagementFixture(page, f.fixture); await open(page, 'scout');
+  const scout = active(page, 'scout');
+  const opener = scout.getByRole('button', { name: '国内独立リーグへの派遣を検討', exact: true });
+  await opener.focus(); await page.keyboard.press('Enter');
+  await expect(scout.getByRole('heading', { name: 'スカウト派遣の確認', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab'); await page.keyboard.press('Tab'); await page.keyboard.press('Enter');
+  await expect(scout.getByRole('status').filter({ hasText: '国内独立リーグへ派遣しました' })).toBeVisible();
+  await expect(opener).toBeDisabled();
+  await expect(scout.getByRole('heading', { name: 'スカウト派遣', exact: true })).toBeFocused();
+  const saved = await saveHub(page);
+  expect(saved.teams.find(t => t.id === f.mine.id).budget).toBe(0);
+});
+
 test('management decisions contract offer persists as waiting without immediate payroll or budget mutation', async ({ page }) => {
   test.setTimeout(60000); await page.setViewportSize({ width: 390, height: 844 });
   const f = managementFixture(); await loadManagementFixture(page, f.fixture); const before = await saveHub(page);
