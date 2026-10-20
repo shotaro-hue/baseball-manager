@@ -15,12 +15,18 @@ function setup(extra={}){
     update:team=>act(()=>view.update(React.createElement(FinanceTab,{...props,team}))) };
 }
 it('keeps price draft through blur and cancel and calls the existing handler only on explicit confirmation',()=>{
-  const h=setup();h.change('3300');const input=view.root.findByType('input');
+  const h=setup();
+  // Club 0 defaults to 3,300 yen: verify a real price change, not a disabled no-op.
+  const current = Number(view.root.findByType('input').props.value);
+  const proposed = current === 3300 ? 3400 : 3300;
+  h.change(String(proposed));
+  expect(h.button('価格変更を確認').props.disabled).toBe(false);
+  const input=view.root.findByType('input');
   act(()=>input.props.onBlur?.());expect(h.props.onTicketPriceChange).not.toHaveBeenCalled();
   act(()=>h.button('価格変更を確認').props.onClick());expect(text(view.root)).toContain('価格変更の確認');
   act(()=>h.button('価格の確認を閉じる').props.onClick());expect(view.root.findByType('input').props.value).toBe('3300');
   act(()=>h.button('価格変更を確認').props.onClick());const commit=h.button('この価格で確定').props.onClick;
-  act(()=>{commit();commit();});expect(h.props.onTicketPriceChange).toHaveBeenCalledTimes(1);expect(h.props.onTicketPriceChange).toHaveBeenCalledWith(3300);
+  act(()=>{commit();commit();});expect(h.props.onTicketPriceChange).toHaveBeenCalledTimes(1);expect(h.props.onTicketPriceChange).toHaveBeenCalledWith(proposed);
 });
 it.each([
   ['自動価格', {}],
