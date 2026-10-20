@@ -1,0 +1,662 @@
+{
+  "recordedAt": "2026-10-20T22:56:28.353008+00:00",
+  "retries": 0,
+  "note": "Initial failures are retained. Targeted final cases keep original assertions. Submitted-head CI is the final full-suite gate; see PR description.",
+  "reports": [
+    {
+      "run": "chromium-lists",
+      "stats": {
+        "startTime": "2026-10-20T22:43:04.440Z",
+        "duration": 444114.094,
+        "expected": 37,
+        "skipped": 0,
+        "unexpected": 1,
+        "flaky": 0
+      },
+      "cases": [
+        {
+          "title": "management decisions 360px read-only selection, compare, cancel and return",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 12155
+        },
+        {
+          "title": "management decisions 390px read-only selection, compare, cancel and return",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 12475
+        },
+        {
+          "title": "management decisions 1440px read-only selection, compare, cancel and return",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 12978
+        },
+        {
+          "title": "management decisions scout signing commits once and survives save/reload",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 14955
+        },
+        {
+          "title": "management decisions scout dispatch restores focus when spending the remaining budget disables its opener",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 9575
+        },
+        {
+          "title": "management decisions contract offer persists as waiting without immediate payroll or budget mutation",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 12752
+        },
+        {
+          "title": "management decisions notification opens exact proposal, resolves it once, and restores the original draft",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 10056
+        },
+        {
+          "title": "management decisions breakpoint boundaries preserve readable routes and saved clubs",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 12794
+        },
+        {
+          "title": "management lists FA 360px suspends only hidden rows and restores the deep filtered row",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 9534,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 296,
+              "rows": 0,
+              "listDisplay": "none"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA 390px suspends only hidden rows and restores the deep filtered row",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 9300,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 326,
+              "rows": 0,
+              "listDisplay": "none"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA 760px suspends only hidden rows and restores the deep filtered row",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 8173,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 696,
+              "rows": 0,
+              "listDisplay": "none"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA 761px suspends only hidden rows and restores the deep filtered row",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 8763,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 713,
+              "rows": 0,
+              "listDisplay": "none"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA 780px suspends only hidden rows and restores the deep filtered row",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 8294,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 732,
+              "rows": 0,
+              "listDisplay": "none"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA 799px suspends only hidden rows and restores the deep filtered row",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 9209,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 751,
+              "rows": 0,
+              "listDisplay": "none"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA 800px suspends only hidden rows and restores the deep filtered row",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 8461,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 752,
+              "rows": 0,
+              "listDisplay": "none"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA 801px suspends only hidden rows and restores the deep filtered row",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 8961,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 753,
+              "rows": 0,
+              "listDisplay": "none"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA 1023px suspends only hidden rows and restores the deep filtered row",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 8885,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 932,
+              "rows": 100,
+              "listDisplay": "block"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA 1024px suspends only hidden rows and restores the deep filtered row",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 8693,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 664,
+              "rows": 0,
+              "listDisplay": "none"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA 1440px suspends only hidden rows and restores the deep filtered row",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 10617,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 1080,
+              "rows": 100,
+              "listDisplay": "block"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA embedded 500px uses container width for DOM and layout",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 740,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 500,
+              "rows": 0,
+              "listDisplay": "none"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA embedded 799px uses container width for DOM and layout",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 627,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 799,
+              "rows": 0,
+              "listDisplay": "none"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA embedded 799.5px uses container width for DOM and layout",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 795,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 799.5,
+              "rows": 0,
+              "listDisplay": "none"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA embedded 800px uses container width for DOM and layout",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 737,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 800,
+              "rows": 30,
+              "listDisplay": "block"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA embedded 801px uses container width for DOM and layout",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 767,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 801,
+              "rows": 30,
+              "listDisplay": "block"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA observes container-only resize while retaining the selected candidate",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 1067,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 801,
+              "rows": 30,
+              "listDisplay": "block"
+            },
+            {
+              "width": 799.5,
+              "rows": 0,
+              "listDisplay": "none"
+            },
+            {
+              "width": 800,
+              "rows": 30,
+              "listDisplay": "block"
+            },
+            {
+              "width": 500,
+              "rows": 0,
+              "listDisplay": "none"
+            },
+            {
+              "width": 801,
+              "rows": 30,
+              "listDisplay": "block"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA embedded candidate removed restores the next filtered row",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 921,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 799,
+              "rows": 0,
+              "listDisplay": "none"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA embedded candidate signed restores the next filtered row",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 785,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 799,
+              "rows": 0,
+              "listDisplay": "none"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA foreign negotiation and signing stay available between viewport breakpoints",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 611,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 748,
+              "rows": 0,
+              "listDisplay": "none"
+            }
+          ]
+        },
+        {
+          "title": "management lists 360px preserve deep row, filters and focus while unmounting mobile rows",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 20352
+        },
+        {
+          "title": "management lists 390px preserve deep row, filters and focus while unmounting mobile rows",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 20850
+        },
+        {
+          "title": "management lists 1440px preserve deep row, filters and focus while unmounting mobile rows",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 27849
+        },
+        {
+          "title": "management lists trade searches both clubs, retains selection and compares only selected players",
+          "project": "chromium",
+          "status": "timedOut",
+          "durationMs": 102423,
+          "errors": [
+            "Test timeout of 90000ms exceeded.",
+            "Error: page.evaluate: Test timeout of 90000ms exceeded.\n\n   at helpers/management-fixture.js:29\n\n  27 | export async function loadManagementFixture(page, fixture) {\n  28 |   await page.goto('/');\n> 29 |   await page.evaluate(async fixture => {\n     |              ^\n  30 |     const { saveGame } = await import('/baseball-manager/src/engine/saveload.js');\n  31 |     if (!(await saveGame(fixture)).ok) throw Error('management fixture save failed');\n  32 |   }, fixture);\n    at loadManagementFixture (/workspace/scratch/b1b9cfd7481b/baseball-manager/e2e/helpers/management-fixture.js:29:14)\n    at /workspace/scratch/b1b9cfd7481b/baseball-manager/e2e/management-lists.spec.js:171:38"
+          ]
+        },
+        {
+          "title": "management lists scout deletion restores the next stable candidate at the original position",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 19227
+        },
+        {
+          "title": "management lists contract badge matches actionable active, farm and ikusei players",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 8443
+        },
+        {
+          "title": "management lists breakpoint boundaries keep page scrolling and no horizontal overflow",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 12296
+        },
+        {
+          "title": "management lists notification for a departed ID replaces the previous contract detail safely",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 10075
+        },
+        {
+          "title": "management lists scout dispatch roundtrip preserves the report row focus on return",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 7766
+        },
+        {
+          "title": "management lists trade comparison reachable from a deep picker and side switches keep keyboard context",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 7717
+        }
+      ]
+    },
+    {
+      "run": "chromium-lifecycle",
+      "stats": {
+        "startTime": "2026-10-20T22:47:25.579Z",
+        "duration": 134078.95799999998,
+        "expected": 0,
+        "skipped": 0,
+        "unexpected": 2,
+        "flaky": 0
+      },
+      "cases": [
+        {
+          "title": "management lists FA restores the saved embedded detail and filters after reload",
+          "project": "chromium",
+          "status": "timedOut",
+          "durationMs": 111997,
+          "errors": [
+            "Test timeout of 90000ms exceeded.",
+            "Error: locator.click: Test timeout of 90000ms exceeded.\nCall log:\n  - waiting for getByRole('button', { name: '続きから', exact: true })\n\n\n   at helpers/progression.js:97\n\n   95 | export async function reloadAndLoad(page) {\n   96 |   await page.reload();\n>  97 |   await page.getByRole('button', { name: '続きから', exact: true }).click();\n      |                                                                 ^\n   98 | }\n   99 | export function progressSignature(save, playerId) {\n  100 |   const team = save.teams.find(t => t.id === save.myId);\n    at reloadAndLoad (/workspace/scratch/b1b9cfd7481b/baseball-manager/e2e/helpers/progression.js:97:65)\n    at /workspace/scratch/b1b9cfd7481b/baseball-manager/e2e/management-lists.spec.js:157:3"
+          ]
+        },
+        {
+          "title": "management lists FA observer lifecycle handles loading teams and hidden retained routes",
+          "project": "chromium",
+          "status": "failed",
+          "durationMs": 18026,
+          "errors": [
+            "Error: expect(locator).toHaveText(expected) failed\n\nLocator: locator('[data-hub-route=\"fa\"]:not([hidden])').locator('[data-ds=\"fa-market\"]').locator('.fa-player-heading h3')\nExpected: \"市場候補022\"\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect \"toHaveText\" with timeout 5000ms\n  - waiting for locator('[data-hub-route=\"fa\"]:not([hidden])').locator('[data-ds=\"fa-market\"]').locator('.fa-player-heading h3')\n\n\n  186 |   await expect(page.locator('[data-hub-route=\"fa\"]')).toBeHidden();\n  187 |   await open(page, 'fa');\n> 188 |   await expect(market.locator('.fa-player-heading h3')).toHaveText('市場候補022');\n      |                                                         ^\n  189 |   await faDetailLayout(market, 240, testInfo);\n  190 |   await expect(market.locator('[data-player-id=\"load-fa-22\"]')).toHaveAttribute('aria-current', 'true');\n  191 |   await market.getByRole('button', { name: '← 選手一覧に戻る', exact: true }).click();\n    at /workspace/scratch/b1b9cfd7481b/baseball-manager/e2e/management-lists.spec.js:188:57"
+          ],
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 799,
+              "rows": 0,
+              "listDisplay": "none"
+            },
+            {
+              "width": 800,
+              "rows": 30,
+              "listDisplay": "block"
+            },
+            {
+              "width": 1080,
+              "rows": 240,
+              "listDisplay": "block"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run": "chromium-targeted-final",
+      "stats": {
+        "startTime": "2026-10-20T22:51:06.571Z",
+        "duration": 45261.29,
+        "expected": 3,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "cases": [
+        {
+          "title": "management lists FA restores the saved embedded detail and filters after reload",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 13040,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 748,
+              "rows": 0,
+              "listDisplay": "none"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA observer lifecycle handles loading teams and hidden retained routes",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 9990,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 799,
+              "rows": 0,
+              "listDisplay": "none"
+            },
+            {
+              "width": 800,
+              "rows": 30,
+              "listDisplay": "block"
+            },
+            {
+              "width": 1080,
+              "rows": 240,
+              "listDisplay": "block"
+            },
+            {
+              "width": 1080,
+              "rows": 240,
+              "listDisplay": "block"
+            }
+          ]
+        },
+        {
+          "title": "management lists trade searches both clubs, retains selection and compares only selected players",
+          "project": "chromium",
+          "status": "passed",
+          "durationMs": 20156
+        }
+      ]
+    },
+    {
+      "run": "webkit-lists",
+      "status": "snapshot before PR submission; full result is tracked by the PR CI",
+      "lastProgress": [
+        "  ✓  29 [mobile-webkit] › e2e/management-lists.spec.js:288:39 › management lists 360px preserve deep row, filters and focus while unmounting mobile rows (31.6s)",
+        "  ✓  30 [mobile-webkit] › e2e/management-lists.spec.js:288:39 › management lists 390px preserve deep row, filters and focus while unmounting mobile rows (32.0s)",
+        "  ✓  31 [mobile-webkit] › e2e/management-lists.spec.js:288:39 › management lists 1440px preserve deep row, filters and focus while unmounting mobile rows (36.5s)",
+        "  ✓  32 [mobile-webkit] › e2e/management-lists.spec.js:336:1 › management lists trade searches both clubs, retains selection and compares only selected players (34.1s)",
+        "  ✓  33 [mobile-webkit] › e2e/management-lists.spec.js:395:1 › management lists scout deletion restores the next stable candidate at the original position (23.2s)",
+        "  ✓  34 [mobile-webkit] › e2e/management-lists.spec.js:438:1 › management lists contract badge matches actionable active, farm and ikusei players (16.3s)"
+      ]
+    },
+    {
+      "run": "webkit-lifecycle",
+      "stats": {
+        "startTime": "2026-10-20T22:47:27.476Z",
+        "duration": 144425.70500000002,
+        "expected": 0,
+        "skipped": 0,
+        "unexpected": 2,
+        "flaky": 0
+      },
+      "cases": [
+        {
+          "title": "management lists FA restores the saved embedded detail and filters after reload",
+          "project": "mobile-webkit",
+          "status": "timedOut",
+          "durationMs": 108070,
+          "errors": [
+            "Test timeout of 90000ms exceeded.",
+            "Error: page.evaluate: Test timeout of 90000ms exceeded.\n\n   at helpers/planning-app-cases.js:7\n\n   5 |  // navigate away from an unrelated lazy-loaded postseason screen.\n   6 |  await loadFixture(page,'draw-complete',{resume:false});\n>  7 |  const info=await page.evaluate(async()=>{\n     |                        ^\n   8 |   const {loadGame,saveGame}=await import('/baseball-manager/src/engine/saveload.js');const s=await loadGame(),my=s.teams.find(t=>t.id===s.myId);\n   9 |   const owned=[...my.players,...my.farm];owned.forEach(p=>{p.contractYearsLeft=3;p.contractYears=3;});const targets=my.players.slice(0,3);targets.forEach(p=>p.contractYearsLeft=1);\n  10 |   const candidate={...targets[0],id:'ui03a-market',name:'編成確認FA候補',salary:900,contractYears:1,contractYearsLeft:0,isFA:true,isForeign:false,marketEntryReason:'自由契約',faEnteredYear:s.year,faOriginTeamId:s.teams.find(t=>t.id!==s.myId).id,stats:{...targets[0].stats,PA:400,AB:350,H:100,HR:20}};\n    at seedPlanning (/workspace/scratch/b1b9cfd7481b/baseball-manager/e2e/helpers/planning-app-cases.js:7:24)\n    at /workspace/scratch/b1b9cfd7481b/baseball-manager/e2e/management-lists.spec.js:149:3"
+          ]
+        },
+        {
+          "title": "management lists FA observer lifecycle handles loading teams and hidden retained routes",
+          "project": "mobile-webkit",
+          "status": "failed",
+          "durationMs": 30291,
+          "errors": [
+            "Error: expect(locator).toHaveText(expected) failed\n\nLocator: locator('[data-hub-route=\"fa\"]:not([hidden])').locator('[data-ds=\"fa-market\"]').locator('.fa-player-heading h3')\nExpected: \"市場候補022\"\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect \"toHaveText\" with timeout 5000ms\n  - waiting for locator('[data-hub-route=\"fa\"]:not([hidden])').locator('[data-ds=\"fa-market\"]').locator('.fa-player-heading h3')\n\n\n  186 |   await expect(page.locator('[data-hub-route=\"fa\"]')).toBeHidden();\n  187 |   await open(page, 'fa');\n> 188 |   await expect(market.locator('.fa-player-heading h3')).toHaveText('市場候補022');\n      |                                                         ^\n  189 |   await faDetailLayout(market, 240, testInfo);\n  190 |   await expect(market.locator('[data-player-id=\"load-fa-22\"]')).toHaveAttribute('aria-current', 'true');\n  191 |   await market.getByRole('button', { name: '← 選手一覧に戻る', exact: true }).click();\n    at /workspace/scratch/b1b9cfd7481b/baseball-manager/e2e/management-lists.spec.js:188:57"
+          ],
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 799,
+              "rows": 0,
+              "listDisplay": "none"
+            },
+            {
+              "width": 800,
+              "rows": 30,
+              "listDisplay": "block"
+            },
+            {
+              "width": 1080,
+              "rows": 240,
+              "listDisplay": "block"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run": "webkit-targeted-final",
+      "stats": {
+        "startTime": "2026-10-20T22:51:51.560Z",
+        "duration": 46301.513999999996,
+        "expected": 2,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "cases": [
+        {
+          "title": "management lists FA restores the saved embedded detail and filters after reload",
+          "project": "mobile-webkit",
+          "status": "passed",
+          "durationMs": 24618,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 748,
+              "rows": 0,
+              "listDisplay": "none"
+            }
+          ]
+        },
+        {
+          "title": "management lists FA observer lifecycle handles loading teams and hidden retained routes",
+          "project": "mobile-webkit",
+          "status": "passed",
+          "durationMs": 19723,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 799,
+              "rows": 0,
+              "listDisplay": "none"
+            },
+            {
+              "width": 800,
+              "rows": 30,
+              "listDisplay": "block"
+            },
+            {
+              "width": 1080,
+              "rows": 240,
+              "listDisplay": "block"
+            },
+            {
+              "width": 1080,
+              "rows": 240,
+              "listDisplay": "block"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run": "webkit-boundary-final",
+      "stats": {
+        "startTime": "2026-10-20T22:55:14.974Z",
+        "duration": 20138.238,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "cases": [
+        {
+          "title": "management lists FA 761px suspends only hidden rows and restores the deep filtered row",
+          "project": "mobile-webkit",
+          "status": "passed",
+          "durationMs": 18577,
+          "layoutObservationsBeforeAssertions": [
+            {
+              "width": 713,
+              "rows": 0,
+              "listDisplay": "none"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

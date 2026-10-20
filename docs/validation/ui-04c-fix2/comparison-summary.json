@@ -1,0 +1,101 @@
+{
+  "base": "a1d07b803ea1a3b2f167a8612d7a57dfcf2142f4",
+  "browser": "141.0.7390.37",
+  "font": "Noto Sans JP",
+  "fontSha256": "c2f3b4d463500a2ddcd3849cded1fceeb9fd6d1c32e6cbecd568453ba50fc68f",
+  "sameFixtureTeamHash": true,
+  "rows": [
+    {
+      "width": 360,
+      "before": {
+        "dom": 1005,
+        "detailDom": 80,
+        "displayMs": 274.79999999981374,
+        "detailMs": 162.29999999981374,
+        "frameP95Ms": 16.700000000000728,
+        "heapBytes": 12362980,
+        "returnDelta": 0,
+        "longTasks": 0
+      },
+      "after": {
+        "dom": 1005,
+        "detailDom": 80,
+        "displayMs": 249.79999999981374,
+        "detailMs": 148,
+        "frameP95Ms": 16.700000000000273,
+        "heapBytes": 12381280,
+        "returnDelta": 0,
+        "longTasks": 0
+      }
+    },
+    {
+      "width": 390,
+      "before": {
+        "dom": 1005,
+        "detailDom": 80,
+        "displayMs": 241.40000000037253,
+        "detailMs": 144,
+        "frameP95Ms": 16.700000000000273,
+        "heapBytes": 12351772,
+        "returnDelta": 0,
+        "longTasks": 0
+      },
+      "after": {
+        "dom": 1005,
+        "detailDom": 80,
+        "displayMs": 279.5,
+        "detailMs": 105.3999999994412,
+        "frameP95Ms": 16.700000000000273,
+        "heapBytes": 12366800,
+        "returnDelta": 0,
+        "longTasks": 0
+      }
+    },
+    {
+      "width": 780,
+      "before": {
+        "dom": 1005,
+        "detailDom": 1041,
+        "displayMs": 250.20000000018626,
+        "detailMs": 85.29999999981374,
+        "frameP95Ms": 16.700000000000273,
+        "heapBytes": 12354304,
+        "returnDelta": 0,
+        "longTasks": 0
+      },
+      "after": {
+        "dom": 1005,
+        "detailDom": 80,
+        "displayMs": 216.40000000037253,
+        "detailMs": 106.8999999994412,
+        "frameP95Ms": 16.700000000000273,
+        "heapBytes": 12355344,
+        "returnDelta": 0,
+        "longTasks": 0
+      }
+    },
+    {
+      "width": 1440,
+      "before": {
+        "dom": 1005,
+        "detailDom": 1041,
+        "displayMs": 297,
+        "detailMs": 199.79999999981374,
+        "frameP95Ms": 16.799999999999727,
+        "heapBytes": 12345152,
+        "returnDelta": 0,
+        "longTasks": 0
+      },
+      "after": {
+        "dom": 1005,
+        "detailDom": 1041,
+        "displayMs": 251,
+        "detailMs": 219.8999999994412,
+        "frameP95Ms": 16.700000000000273,
+        "heapBytes": 12363612,
+        "returnDelta": 0,
+        "longTasks": 0
+      }
+    }
+  ]
+}

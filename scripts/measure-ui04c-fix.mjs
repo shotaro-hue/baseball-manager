@@ -12,8 +12,11 @@ import { managementLoadFixture } from '../e2e/helpers/management-load-fixture.js
 
 const [stage, dist] = process.argv.slice(2);
 const captureOnly = process.env.UI04C_CAPTURE_ONLY === '1';
+const compactBaseline = stage === 'after' || process.env.UI04C_BASELINE === '487';
+const widths = process.env.UI04C_WIDTHS?.split(',').map(Number) || [360, 390, 760, 761, 1023, 1024, 1440];
+const tabs = process.env.UI04C_TABS?.split(',') || ['contract', 'trade', 'scout', 'fa'];
 if (!['before', 'after'].includes(stage) || !dist) throw Error('usage: before|after absolute-dist');
-const out = resolve('docs/validation/ui-04c-fix'); mkdirSync(out, { recursive: true });
+const out = resolve(process.env.UI04C_OUTPUT_DIR || 'docs/validation/ui-04c-fix'); mkdirSync(out, { recursive: true });
 const seed = await build({ entryPoints: ['src/engine/saveload.js'], bundle: true, write: false, format: 'iife', globalName: '__fixtureStorage', define: { 'import.meta.env': '{"DEV":false}' } });
 const server = spawn(process.execPath, [resolve('node_modules/vite/bin/vite.js'), 'preview', '--outDir', resolve(dist), '--host', '127.0.0.1', '--port', '5197', '--strictPort'], { stdio: 'ignore' });
 let browser;
@@ -25,7 +28,7 @@ try {
     await pause(100);
   }
   browser = await chromium.launch();
-  for (const width of captureOnly ? [360, 390, 1440] : [360, 390, 760, 761, 1023, 1024, 1440]) {
+  for (const width of captureOnly ? [360, 390, 1440] : widths) {
     for (let run = 0; run < (width === 390 && !captureOnly ? 3 : 1); run++) {
       const height = width === 360 ? 800 : width === 390 ? 844 : 900;
       const context = await browser.newContext({ viewport: { width, height }, hasTouch: true });
@@ -41,7 +44,7 @@ try {
       await cdp.send('Performance.enable'); await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
       const main = width < 1024 ? page.getByRole('navigation', { name: 'メインメニュー' }) : page.getByRole('complementary', { name: '監督メニュー' });
       await main.getByRole('button', { name: /^経営/ }).click();
-      for (const tab of ['contract', 'trade', 'scout', 'fa']) {
+      for (const tab of tabs) {
         const nav = page.getByRole('navigation', { name: '経営メニュー', exact: true });
         await nav.getByRole('button', { name: '概要', exact: true }).click();
         const trace = !captureOnly && width === 390 && run === 0;
@@ -55,8 +58,8 @@ try {
         const displayMs = (await page.evaluate(() => performance.now())) - start;
         await page.evaluate(() => scrollTo(0, 0));
         if (captureOnly) {
-          const list = route.locator(tab === 'fa' ? '.fa-list' : tab === 'trade' && stage === 'before' ? '.decision-exchange' : '.decision-list').first();
-          await list.evaluate((el, offset) => scrollTo(0, scrollY + el.getBoundingClientRect().top - offset), tab === 'trade' && stage === 'after' ? 140 : 8);
+          const list = route.locator(tab === 'fa' ? '.fa-list' : tab === 'trade' && !compactBaseline ? '.decision-exchange' : '.decision-list').first();
+          await list.evaluate((el, offset) => scrollTo(0, scrollY + el.getBoundingClientRect().top - offset), tab === 'trade' && compactBaseline ? 140 : 8);
           await page.screenshot({ path: `${out}/${stage}-${tab}-${width}.png` });
           console.log(`${stage} ${width}px ${tab}: captured list controls and compact rows`);
           continue;
@@ -64,8 +67,8 @@ try {
         if (run === 0 && [360, 390, 1440].includes(width)) await page.screenshot({ path: `${out}/${stage}-${tab}-${width}.png` });
         const layout = await route.evaluate(el => ({ dom: el.querySelectorAll('*').length, height: el.scrollHeight, overflow: document.documentElement.scrollWidth > innerWidth,
           nestedScrollers: [...el.querySelectorAll('*')].filter(n => n.scrollHeight > n.clientHeight + 1 && ['auto', 'scroll'].includes(getComputedStyle(n).overflowY)).length }));
-        const scrollTarget = tab === 'trade' && stage === 'before' ? route.locator('.decision-trade-players').first() : route;
-        if (tab === 'trade' && stage === 'before') await scrollTarget.scrollIntoViewIfNeeded();
+        const scrollTarget = tab === 'trade' && !compactBaseline ? route.locator('.decision-trade-players').first() : route;
+        if (tab === 'trade' && !compactBaseline) await scrollTarget.scrollIntoViewIfNeeded();
         await page.evaluate(() => {
           window.__scrollSamples = { frames: [], tasks: [], samplingStart: performance.now() }; let last = performance.now();
           window.__scrollObserver = new PerformanceObserver(list => __scrollSamples.tasks.push(...list.getEntries().map(e => ({ duration: e.duration, startTime: e.startTime }))));
@@ -74,7 +77,7 @@ try {
           function frame(t) { if (!__sampling) return; __scrollSamples.frames.push(t - last); last = t; requestAnimationFrame(frame); } requestAnimationFrame(frame);
         });
         const actualBox = await scrollTarget.boundingBox();
-        const gesture = { x: tab === 'trade' && stage === 'before' ? Math.round(actualBox.x + actualBox.width / 2) : Math.round(width / 2), y: tab === 'trade' && stage === 'before' ? Math.round(Math.min(700, actualBox.y + actualBox.height / 2)) : 650, speed: 1200, gestureSourceType: 'mouse' };
+        const gesture = { x: tab === 'trade' && !compactBaseline ? Math.round(actualBox.x + actualBox.width / 2) : Math.round(width / 2), y: tab === 'trade' && !compactBaseline ? Math.round(Math.min(700, actualBox.y + actualBox.height / 2)) : 650, speed: 1200, gestureSourceType: 'mouse' };
         const position = () => scrollTarget.evaluate(el => ({ page: scrollY, list: el.scrollTop }));
         const scrollStart = await position();
         await cdp.send('Input.synthesizeScrollGesture', { ...gesture, yDistance: -1500 });
@@ -93,7 +96,7 @@ try {
         await cdp.send('HeapProfiler.collectGarbage');
         const perf = await cdp.send('Performance.getMetrics'); const heap = perf.metrics.find(m => m.name === 'JSHeapUsedSize')?.value;
         let detailMs = null, detailDom = null, returnDelta = null;
-        const selector = stage === 'after' ? '.player-list-row' : ['contract', 'scout'].includes(tab) ? '.decision-select' : tab === 'fa' ? '.fa-row' : null;
+        const selector = compactBaseline ? '.player-list-row' : ['contract', 'scout'].includes(tab) ? '.decision-select' : tab === 'fa' ? '.fa-row' : null;
         if (selector) {
           const button = route.locator(selector).first(); await button.scrollIntoViewIfNeeded();
           // Playwright can move a covered row again when clicking below a sticky

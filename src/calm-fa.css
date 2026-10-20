@@ -21,7 +21,6 @@
 .fa-market[data-ds] > header > p { color:var(--ds-muted); font-size:14px; }
 .fa-summary { display:flex; flex-wrap:wrap; gap:8px 24px; padding:12px 16px; background:var(--ds-navy); color:var(--ds-inverse); border-radius:6px; font-size:14px; }
 .fa-summary strong { font-size:22px; }
-.fa-body { container:fa-market / inline-size; }
 .fa-layout { display:block; }
 .fa-list { padding:0; }
 .fa-filters { display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; margin-bottom:12px; }
@@ -65,10 +64,8 @@
 .fa-dialog[data-ds] :is(h2,h3) { color:var(--ds-text); margin:0 0 12px; font-size:18px; }
 .fa-dialog[data-ds] .fa-actions { margin-top:16px; }
 .fa-dialog[data-ds] li { margin:8px 0; font-size:14px; }
-@container fa-market (min-width:800px) {
- .fa-selected .fa-layout { display:grid; grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr); gap:24px; }
- .fa-selected .fa-list { display:block; align-self:start; padding:4px; }
-}
+.fa-selected.fa-split .fa-layout { display:grid; grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr); gap:24px; }
+.fa-selected.fa-split .fa-list { display:block; align-self:start; padding:4px; }
 .fa-market[data-ds] .player-list-row { border:0; border-bottom:1px solid var(--ds-divider); border-radius:0; padding:10px 8px; }
 .fa-market[data-ds] .player-list-row strong { font-size:16px; }
 .fa-market[data-ds] .player-list-row[aria-current=true] { background:var(--ds-selected); }
