@@ -24,7 +24,10 @@ it('keeps price draft through blur and cancel and calls the existing handler onl
   const input=view.root.findByType('input');
   act(()=>input.props.onBlur?.());expect(h.props.onTicketPriceChange).not.toHaveBeenCalled();
   act(()=>h.button('価格変更を確認').props.onClick());expect(text(view.root)).toContain('価格変更の確認');
-  act(()=>h.button('価格の確認を閉じる').props.onClick());expect(view.root.findByType('input').props.value).toBe('3300');
+  act(()=>h.button('価格の確認を閉じる').props.onClick());expect(view.root.findByType('input').props.value).toBe(String(proposed));
+  // Closing the confirmation preserves the draft; only the separate discard action reverts it.
+  act(()=>h.button('下書きを取り消す').props.onClick());expect(view.root.findByType('input').props.value).toBe(String(current));
+  h.change(String(proposed));
   act(()=>h.button('価格変更を確認').props.onClick());const commit=h.button('この価格で確定').props.onClick;
   act(()=>{commit();commit();});expect(h.props.onTicketPriceChange).toHaveBeenCalledTimes(1);expect(h.props.onTicketPriceChange).toHaveBeenCalledWith(proposed);
 });
