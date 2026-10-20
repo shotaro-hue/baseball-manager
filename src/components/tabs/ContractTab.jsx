@@ -1,28 +1,34 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ACCEPT_THRESHOLD } from '../../constants';
-import { ownedPlayers, renewalEligible, ikuseiContractYears, validContractOffer } from '../../engine/renewalRules';
+import { renewalEligible, ikuseiContractYears, validContractOffer } from '../../engine/renewalRules';
 import { evalOffer, calcPlayerDemand } from '../../engine/contract';
 import { isPendingContractReply } from '../../engine/contractReplies';
 import { contractPayroll, contractSalaryStatus } from '../../engine/contractPayroll';
 import { ContractPayroll } from './ContractPayroll';
-import { Button, MetricBand, StateLabel } from '../design-system/primitives';
+import { Button, MetricBand } from '../design-system/primitives';
 import { payrollText } from './financeView';
 import { DecisionConfirmation, PlayerActions, PlayerFacts, money, moneyMetric, salaryText, useDecisionReturn } from '../management/DecisionParts';
+import { PlayerFilters, PlayerList, useMobileDetail } from '../management/PlayerList';
+import { CONTRACT_STATES, DEFAULT_PLAYER_FILTERS, contractEntries, filterPlayerEntries, isCurrentContractMail } from '../management/playerListModel';
 
 export function ContractTab({ team, allTeams = [team], onOffer, onRelease, year, gameDay, mailbox = [],
   onPlayerClick, onToggleCompare, comparePlayerIds, focusRequest, onResumeOffseason, active = true }) {
   const [selectedId, setSelectedId] = useState(null), [snapshot, setSnapshot] = useState(null);
-  const [filter, setFilter] = useState('expiring'), [search, setSearch] = useState('');
+  const [filters, setFilters] = useState({ ...DEFAULT_PLAYER_FILTERS, state: 'actionable' });
+  const [payrollOpen, setPayrollOpen] = useState(false);
   const [salary, setSalary] = useState(0), [years, setYears] = useState(1);
   const [performanceBonusRate, setPerformanceBonusRate] = useState(0), [titleBonus, setTitleBonus] = useState(0), [optOut, setOptOut] = useState(false);
   const [confirmation, setConfirmation] = useState(null), [receipt, setReceipt] = useState(null), [error, setError] = useState(null);
   const [editingReply, setEditingReply] = useState(false);
   const busy = useRef(false), current = useRef(null);
-  const owned = ownedPlayers(team), expiring = owned.filter(p => renewalEligible(p, year));
+  const entries = useMemo(() => contractEntries(team, mailbox, year), [team, mailbox, year]);
+  const owned = useMemo(() => entries.map(e => e.player), [entries]);
+  const expiring = entries.filter(e => ['actionable', 'waiting'].includes(e.state));
+  const actionable = entries.filter(e => e.state === 'actionable').length;
+  const visible = useMemo(() => filterPlayerEntries(entries, filters), [entries, filters]);
+  const mobileDetail = useMobileDetail(selectedId);
   const live = owned.find(p => p.id === selectedId), selected = selectedId != null ? live || snapshot : null;
-  const relevantMail = mailbox.filter(m => m.decision?.playerId === selectedId
-    && (m.decision.teamId == null || m.decision.teamId === team?.id)
-    && (m.decision.offeredYear == null || m.decision.offeredYear === year));
+  const relevantMail = mailbox.filter(m => m.decision?.playerId === selectedId && isCurrentContractMail(m, team?.id, year));
   const pending = relevantMail.find(isPendingContractReply);
   const reply = [...relevantMail].reverse().find(m => m.type === 'contract_reply');
   const waiting = pending || (!reply && receipt?.kind === 'offer' && receipt.player.id === selectedId ? receipt : null);
@@ -33,14 +39,15 @@ export function ContractTab({ team, allTeams = [team], onOffer, onRelease, year,
   const preview = valid ? evalOffer(live, terms, team, allTeams) : null;
   const demand = eligible ? calcPlayerDemand(live, { team, year }) : null;
   const focus = useDecisionReturn(selectedId, active);
-  const select = (p, event) => {
+  const select = useCallback((p, event) => {
     focus.remember(event); setSelectedId(p.id); setSnapshot(p); setSalary(Math.max(1000, Math.round(p.salary / 100) * 100));
     setYears(1); setPerformanceBonusRate(0); setTitleBonus(0); setOptOut(false); setConfirmation(null); setReceipt(null); setError(null); setEditingReply(false); busy.current = false;
-  };
+  }, [focus]);
   useEffect(() => {
     if (focusRequest?.id == null) return;
     const p = owned.find(p => p.id === focusRequest.id);
     if (p) select(p);
+    else { focus.remember(); setSelectedId(focusRequest.id); setSnapshot(null); setConfirmation(null); setReceipt(null); setError(null); }
     // A new explicit link selects its target once; ordinary roster updates preserve drafts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusRequest?.token]);
@@ -65,27 +72,19 @@ export function ContractTab({ team, allTeams = [team], onOffer, onRelease, year,
     }
     setConfirmation(null); setError(null);
   };
-  const status = p => p.contractSignedYear === year ? '当年契約済み'
-    : mailbox.some(m => isPendingContractReply(m) && m.decision?.playerId === p.id && (m.decision.teamId == null || m.decision.teamId === team.id) && (m.decision.offeredYear == null || m.decision.offeredYear === year)) ? '回答待ち'
-      : renewalEligible(p, year) ? '今季満了' : '継続契約';
-  const visible = owned.filter(p => p.name?.includes(search.trim()) && (filter === 'all' || filter === 'expiring' && renewalEligible(p, year)
-    || filter === 'waiting' && status(p) === '回答待ち' || filter === 'signed' && p.contractSignedYear === year));
-  const payroll = contractPayroll(team);
+  const payroll = useMemo(() => contractPayroll(team), [team]);
   return <main className={`management-decisions ${selectedId != null ? 'decision-selected' : ''}`} data-ds="contract-management">
-    <h1>契約状況</h1><p>現契約と回答状況を確認し、満了選手の条件を検討します。</p>
-    <MetricBand items={[moneyMetric('編成予算の残枠', money(team?.budget)), moneyMetric('契約年俸総額 / 年', payrollText(payroll.total)), { label: '今季満了', value: expiring.length, unit: '人' }]} />
+    <h1>契約状況</h1><p>契約状態で絞り込み、選手を選びます。</p>
+    <MetricBand items={[moneyMetric('編成予算の残枠', money(team?.budget)), { label: '要対応', value: actionable, unit: '人' }, { label: '回答待ち', value: entries.filter(e => e.state === 'waiting').length, unit: '人' }]} />
     {onResumeOffseason && <div className="decision-warning"><p>契約更改の進行中です。合意済みの条件と対応待ちは、オフシーズンの同じ一覧で扱います。</p><Button onClick={onResumeOffseason}>オフシーズンの契約更改へ戻る</Button></div>}
-    <div className="decision-layout"><section className="decision-list" aria-label="所属選手の契約一覧">
-      <h2>契約満了選手 ({expiring.length}人)</h2>
-      <div className="decision-filters"><label>契約状態<select value={filter} onChange={e => setFilter(e.target.value)}><option value="expiring">今季満了</option><option value="all">全所属選手</option><option value="waiting">回答待ち</option><option value="signed">当年契約済み</option></select></label><label>選手名<input type="search" value={search} onChange={e => setSearch(e.target.value)} /></label></div>
-      {!visible.length && <p>{expiring.length === 0 && filter === 'expiring' ? '今季満了の選手はいません' : 'この条件に該当する選手はいません。絞り込みを変更してください。'}</p>}
-      {visible.map(p => <article key={p.id} className="decision-row" aria-current={p.id === selectedId}>
-        <div><button className="decision-select" aria-label={`${p.name}の契約を確認`} onClick={e => select(p, e)}>{p.name}</button>
-          <p className="decision-note">{team?.farm?.some(f => f.id === p.id) ? 'ファーム' : '登録選手'} · {p.pos} · {p.age ?? '未記録'}歳</p><StateLabel>{status(p)}</StateLabel></div>
-        <div className="decision-row-money"><strong>{salaryText(p.salary)}</strong><p className="decision-note">残り {Number.isFinite(p.contractYearsLeft) ? `${p.contractYearsLeft}年` : '未記録'}</p></div>
-      </article>)}
+    <div className="decision-layout"><section ref={focus.list} className="decision-list" aria-label="所属選手の契約一覧">
+      <h2>{filters.state === 'all' ? '全所属選手' : CONTRACT_STATES[filters.state]} ({visible.length}人)</h2>
+      <PlayerFilters entries={entries} filters={filters} onChange={setFilters} expiry>
+        <label>契約状態<select aria-label="契約状態" value={filters.state} onChange={e => setFilters({ ...filters, state: e.target.value })}>{['actionable', 'waiting', 'signed', 'all'].map(state => <option key={state} value={state}>{state === 'all' ? '全所属選手' : `${CONTRACT_STATES[state]} (${entries.filter(e => e.state === state).length}人)`}</option>)}</select></label>
+      </PlayerFilters>
+      <PlayerList suspended={mobileDetail} entries={visible} selectedId={selectedId} onSelect={select} actionLabel="の契約を確認" />
     </section><section className="decision-detail" aria-label="選んだ選手の契約条件">
-      {!selected ? <p>選手を選ぶと成績・年俸・契約条件を確認できます。</p> : <>
+      {selectedId != null && !selected ? <><Button variant="secondary" onClick={() => setSelectedId(null)}>← 選手一覧に戻る</Button><h3 ref={focus.heading} tabIndex={-1}>この選手は現在所属していません</h3><p>通知の対象は退団済み、または現在の所属一覧にありません。契約操作はできません。</p></> : !selected ? <p>選手を選ぶと成績・年俸・契約条件を確認できます。</p> : <>
         <Button variant="secondary" onClick={() => { setSelectedId(null); setConfirmation(null); }}>← 選手一覧に戻る</Button>
         <h3 ref={focus.heading} tabIndex={-1}>{selected.name}</h3><PlayerFacts player={selected} />
         <PlayerActions player={live || selected} teamName={team.name} {...{ onPlayerClick, onToggleCompare, comparePlayerIds }} />
@@ -118,7 +117,7 @@ export function ContractTab({ team, allTeams = [team], onOffer, onRelease, year,
         </DecisionConfirmation>}
       </>}
     </section></div>
-    <details><summary>所属選手の年俸内訳・年俸上位</summary><ContractPayroll team={team} leaders onPlayerClick={onPlayerClick} /></details>
+    <details onToggle={e => setPayrollOpen(e.currentTarget.open)}><summary>所属選手の年俸内訳・年俸上位（年俸総額 {payrollText(payroll.total)}）</summary>{payrollOpen && <><p className="decision-note">今季満了 {expiring.length}人（要対応＋回答待ち） / 全所属 {owned.length}人</p><ContractPayroll team={team} leaders onPlayerClick={onPlayerClick} /></>}</details>
     <p className="decision-note">一軍成績の0は実測値。「未記録」は欠測、「—」は分母不足などで算出できない状態です。提示の辞退だけでは所属と現契約は変わりません。</p>
   </main>;
 }

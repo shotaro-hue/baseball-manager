@@ -1,5 +1,6 @@
 import { regularSeasonProgress, regularSeasonRequest } from '../../engine/seasonProgress';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { contractEntries } from '../management/playerListModel';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { RetireModal } from '../RetireModal';
 import { PlayerModal } from '../PlayerModal';
@@ -48,9 +49,12 @@ export default function HubShell({ state, flows, app }) {
   const navigationScope = `${gs.saveId}:${gs.myId}:${year}`;
   const navigation = useHubNavigation(tab, setTab, navigationScope);
   const { currentPrimarySection } = navigation;
-  const notifications = notificationSummary({ mailbox: gs.getMailboxBySelector?.() ?? gs.mailbox,
+  const mailbox = gs.getMailboxBySelector?.() ?? gs.mailbox;
+  const notifications = notificationSummary({ mailbox,
     news: gs.getNewsBySelector?.() ?? gs.news, gameDay, unreadCount: gs.getUnreadMailboxCount?.(gameDay) });
-  const uiBadges = { ...tabBadges, trade: notifications.trades > 0 ? { n: notifications.trades, label: '要対応', color: '#855200' } : null };
+  const actionableContracts = useMemo(() => contractEntries(myTeam, mailbox, year).filter(e => e.state === 'actionable').length, [myTeam, mailbox, year]);
+  const uiBadges = { ...tabBadges, contract: actionableContracts > 0 ? { n: actionableContracts, label: '要対応', color: '#855200' } : null,
+    trade: notifications.trades > 0 ? { n: notifications.trades, label: '要対応', color: '#855200' } : null };
   const [comparePlayers, setComparePlayers] = useState([]);
   const [compareOpen, setCompareOpen] = useState(false);
   useEffect(() => { setComparePlayers([]); setCompareOpen(false); }, [year]);

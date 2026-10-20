@@ -105,10 +105,10 @@ it('scout dispatch and report removal require explicit confirmation and can be c
   const onSendScout = vi.fn(() => true), onRemoveScoutResult = vi.fn(() => true);
   const region = { id: 1, name: '関東', cost: 100, weeks: 2, qMin: 40, qMax: 60 };
   const ui = mount(HubScoutTab, { myTeam: { ...mine, scoutResults: [player(8)] }, scoutRegions: [region], onSendScout, onRemoveScoutResult });
-  ui.click('関東への派遣を検討'); expect(onSendScout).not.toHaveBeenCalled();
+  ui.click('派遣先・調査中'); ui.click('関東への派遣を検討'); expect(onSendScout).not.toHaveBeenCalled();
   ui.click('戻って見直す'); expect(onSendScout).not.toHaveBeenCalled();
   ui.click('関東への派遣を検討'); ui.click('派遣を確定する'); expect(onSendScout).toHaveBeenCalledWith(region);
-  ui.click('選手8の条件を見る'); ui.click('候補から外す'); expect(onRemoveScoutResult).not.toHaveBeenCalled();
+  ui.click('報告済み候補'); ui.click('選手8の条件を見る'); ui.click('候補から外す'); expect(onRemoveScoutResult).not.toHaveBeenCalled();
   ui.click('戻って見直す'); expect(onRemoveScoutResult).not.toHaveBeenCalled();
 });
 
@@ -116,6 +116,7 @@ it('trade proposal confirms player and cash effects without executing, and check
   const onTrade = vi.fn(() => true);
   const ui = mount(TradeTab, { myTeam: mine, teams: [mine, other], cpuOffers: [], onTrade });
   ui.click('相手球団と交渉する');
+  ui.click('獲得候補を選ぶ');
   const incoming = view.root.findAllByType('input').find(n => n.props['aria-label'] === '選手1を獲得候補に選ぶ');
   act(() => incoming.props.onChange({ target: { checked: true } }));
   const cash = view.root.findAllByType('input').find(n => n.props['aria-label'] === '支払金額（万円）');

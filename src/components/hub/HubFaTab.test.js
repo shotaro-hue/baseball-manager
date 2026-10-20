@@ -82,21 +82,20 @@ describe('FA market saved data and signing rules', () => {
 });
 
 describe('mobile FA decision flow', () => {
-  it('compares recorded performance and yearly salary directly in the candidate rows', () => {
+  it('keeps rows compact and shows recorded performance including zero in the selected detail', () => {
     const ui = setup([player(0, { stats: { AB: 10, H: 0, HR: 0 } }), player(1, { isPitcher: true, stats: { IP: 9, ER: 0 } })]);
-    const rows = ui.view.root.findAllByProps({ className: 'fa-row' });
-    expect(text(rows[0])).toContain('打率 0.000');
-    expect(text(rows[0])).toContain('本塁打 0');
-    expect(text(rows[1])).toContain('防御率 0.00');
-    expect(text(rows[1])).toContain('投球回 9.0');
+    const rows = ui.view.root.findAllByProps({ className: 'player-list-row' });
+    expect(text(rows[0])).not.toContain('打率');
     expect(text(rows[0])).toContain('1,000万円');
+    ui.select(0); expect(text(ui.view.root)).toContain('打率 0.000'); expect(text(ui.view.root)).toContain('本塁打 0');
+    ui.select(1); expect(text(ui.view.root)).toContain('防御率 0.00'); expect(text(ui.view.root)).toContain('投球回 9.0');
   });
   it('shares the renewal return action and keeps saved filters after selecting a candidate', () => {
     const changes = vi.fn();
     const ui = setup([player(0)], { savedView: { role: 'batter', search: '候補', sort: 'salary' }, onViewChange: changes });
     ui.select(0); ui.click('← 選手一覧に戻る');
     expect(changes).toHaveBeenLastCalledWith(expect.objectContaining({ selectedId: null, role: 'batter', search: '候補', sort: 'salary' }));
-    expect(ui.view.root.findAllByProps({ className: 'fa-row' })).toHaveLength(1);
+    expect(ui.view.root.findAllByProps({ className: 'player-list-row' })).toHaveLength(1);
   });
   it('uses the parent planning budget overview when embedded and preserves the contract cost', () => {
     const ui = setup([player(0)], { embedded: true });
@@ -109,7 +108,7 @@ describe('mobile FA decision flow', () => {
   it('keeps ID 0 selectable, detail/comparison entrances, and confirmation before signing', () => {
     const ui = setup(); ui.select(0);
     ui.click('選手詳細・年度別成績'); expect(ui.props.onPlayerClick).toHaveBeenCalledWith(ui.props.faPool[0], 'FA市場');
-    act(() => ui.view.root.findByProps({ className: 'fa-actions' }).findAllByType('button').find(n => text(n) === '比較に追加').props.onClick());
+    ui.click('比較に追加');
     expect(ui.props.onToggleCompare).toHaveBeenCalledWith(ui.props.faPool[0], 'FA市場');
     ui.click('契約条件を確認する'); expect(ui.props.upd).not.toHaveBeenCalled();
     expect(text(ui.view.root.findByProps({ role: 'dialog' }))).toContain('契約後の予算');
@@ -171,10 +170,10 @@ describe('mobile FA decision flow', () => {
     const ui = setup([player(0, { salary: undefined }), player(1, { isForeign: true, isPitcher: true }), player(2, { salary: 500 })]);
     const selects = ui.view.root.findAllByType('select');
     act(() => selects[2].props.onChange({ target: { value: 'salary' } }));
-    expect(ui.view.root.findAllByProps({ className: 'fa-row' }).map(n => n.props['aria-label'])).toEqual(['候補2の条件を見る', '候補1の条件を見る', '候補0の条件を見る']);
+    expect(ui.view.root.findAllByProps({ className: 'player-list-row' }).map(n => n.props['aria-label'])).toEqual(['候補2の条件を見る', '候補1の条件を見る', '候補0の条件を見る']);
     act(() => selects[0].props.onChange({ target: { value: 'foreign' } }));
     act(() => selects[1].props.onChange({ target: { value: 'pitcher' } }));
-    expect(ui.view.root.findAllByProps({ className: 'fa-row' })).toHaveLength(1);
+    expect(ui.view.root.findAllByProps({ className: 'player-list-row' })).toHaveLength(1);
     act(() => ui.view.root.findByType('input').props.onChange({ target: { value: '該当なし' } }));
     expect(text(ui.view.root)).toContain('絞り込みを変更'); expect(ui.props.setFaPool).not.toHaveBeenCalled();
   });

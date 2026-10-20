@@ -67,6 +67,9 @@
 .fa-dialog[data-ds] li { margin:8px 0; font-size:14px; }
 @container fa-market (min-width:800px) {
  .fa-selected .fa-layout { display:grid; grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr); gap:24px; }
- .fa-selected .fa-list { display:block; max-height:75dvh; overflow:auto; align-self:start; padding:4px; }
+ .fa-selected .fa-list { display:block; align-self:start; padding:4px; }
 }
+.fa-market[data-ds] .player-list-row { border:0; border-bottom:1px solid var(--ds-divider); border-radius:0; padding:10px 8px; }
+.fa-market[data-ds] .player-list-row strong { font-size:16px; }
+.fa-market[data-ds] .player-list-row[aria-current=true] { background:var(--ds-selected); }
 @media(min-width:1024px) { .fa-market[data-ds]:not(.fa-embedded):not(.offseason-fa-screen .fa-market) { padding:24px 32px 40px; } .fa-dialog[data-ds] { padding:24px; } }

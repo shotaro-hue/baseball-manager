@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { rngf } from '../../utils';
 import { tradeValue, evalTradeForCpu, analyzeTeamNeeds } from '../../engine/trade';
 import { applyTradeTransaction } from '../../engine/tradeTransaction';
 import { evaluateRosterCapacity } from '../../engine/rosterCapacity';
 import { Button, MetricBand, StateLabel } from '../design-system/primitives';
 import { DecisionConfirmation, PlayerActions, PlayerFacts, money, moneyMetric } from '../management/DecisionParts';
+import { TradePlayerPicker, TradeSelectionSummary, initialTradeView } from '../management/TradePlayerPicker';
 
 function TradeTerms({ mine, target, outgoing = [], incoming = [], cash, preview, capacityContext }) {
   const after = preview?.ok ? preview.teams.find(t => t.id === mine.id) : null;
@@ -18,17 +19,6 @@ function TradeTerms({ mine, target, outgoing = [], incoming = [], cash, preview,
   </>;
 }
 
-function TradePlayers({ team, selected, onToggle, incoming, onPlayerClick, onToggleCompare, comparePlayerIds }) {
-  return <section><h3>{incoming ? '相手から受け取る' : '自分が出す選手（任意）'}</h3>
-    <p className="decision-note">{incoming ? '能力欄はスカウト評価で誤差を含みます。' : '選手を出さず、金銭だけの提案もできます。'}</p>
-    <div className="decision-trade-players">{(team?.players || []).map(p => <article key={p.id}>
-      <label><input type="checkbox" aria-label={`${p.name}を${incoming ? '獲得候補' : '放出候補'}に選ぶ`} checked={selected.some(s => s.id === p.id)} onChange={() => onToggle(p)} /><strong>{p.name}</strong></label>
-      <PlayerFacts player={p} noisy={incoming} /><p className="decision-note">取引評価 {tradeValue(p)}</p>
-      <PlayerActions player={p} teamName={team.name} {...{ onPlayerClick, onToggleCompare, comparePlayerIds }} />
-    </article>)}</div>
-  </section>;
-}
-
 export function TradeTab({ myTeam, teams, onTrade, cpuOffers = [], offerMails, onAcceptOffer, onDeclineOffer,
   deadlinePassed = false, onPlayerClick, onToggleCompare, comparePlayerIds, capacityContext = {}, focusRequest, active = true }) {
   const [phase, setPhase] = useState('top'), [targetId, setTargetId] = useState(null);
@@ -36,13 +26,18 @@ export function TradeTab({ myTeam, teams, onTrade, cpuOffers = [], offerMails, o
   const [tradeResult, setTradeResult] = useState(null), [counter, setCounter] = useState(null), [counterRound, setCounterRound] = useState(0), [cpuReasons, setCpuReasons] = useState([]);
   const [confirmation, setConfirmation] = useState(null), [error, setError] = useState(null);
   const [selectedMailId, setSelectedMailId] = useState(null), [mailReceipt, setMailReceipt] = useState(null);
+  const [pickerView, setPickerView] = useState(initialTradeView), [comparing, setComparing] = useState(false);
   const busy = useRef(false), current = useRef(null), handled = useRef(new Set());
-  const caseHeading = useRef(null), negotiationHeading = useRef(null);
+  const caseHeading = useRef(null), negotiationHeading = useRef(null), comparisonHeading = useRef(null), wasComparing = useRef(false);
+  useEffect(() => {
+    const opened = comparing && !wasComparing.current; wasComparing.current = comparing;
+    if (opened && active) { comparisonHeading.current?.focus({ preventScroll: true }); comparisonHeading.current?.scrollIntoView?.({ block: 'start' }); }
+  }, [comparing, active]);
   const offers = offerMails ?? cpuOffers.map((offer, index) => ({ id: `cpu-${index}`, title: `${offer.from?.name}からのオファー`, offer }));
   const selectedMail = offers.find(m => m.id === selectedMailId);
   const targetTeam = teams.find(t => t.id === targetId);
   const others = teams.filter(t => t.id !== myTeam.id);
-  const reset = () => { setPhase('top'); setTargetId(null); setMyOut([]); setTheirIn([]); setMyCash(0); setTradeResult(null); setCounter(null); setCounterRound(0); setCpuReasons([]); setConfirmation(null); setSelectedMailId(null); setMailReceipt(null); setError(null); busy.current = false; };
+  const reset = () => { setPhase('top'); setTargetId(null); setMyOut([]); setTheirIn([]); setMyCash(0); setTradeResult(null); setCounter(null); setCounterRound(0); setCpuReasons([]); setConfirmation(null); setSelectedMailId(null); setMailReceipt(null); setError(null); setPickerView(initialTradeView()); setComparing(false); busy.current = false; };
   const open = action => { setError(null); busy.current = false; setConfirmation(action); };
   useEffect(() => {
     if (focusRequest?.id == null) return;
@@ -105,10 +100,12 @@ export function TradeTab({ myTeam, teams, onTrade, cpuOffers = [], offerMails, o
     setConfirmation(null);
   };
   const selection = (setter, p) => { setConfirmation(null); setter(prev => prev.some(x => x.id === p.id) ? prev.filter(x => x.id !== p.id) : [...prev, p]); };
+  const toggleOutgoing = useCallback(p => selection(setMyOut, p), []);
+  const toggleIncoming = useCallback(p => selection(setTheirIn, p), []);
   const mailDone = selectedMail?.resolved || mailReceipt?.id === selectedMailId || handled.current.has(selectedMailId);
   const capacity = evaluateRosterCapacity(myTeam, { ...capacityContext, teams });
   return <main className="management-decisions" data-ds="trade-management">
-    <h1>トレード</h1><p>選手・契約・金銭を比較し、両球団への影響を確認して提案します。</p>
+    <h1>トレード</h1><p>選手と金銭条件を比べて提案します。</p>
     <MetricBand items={[moneyMetric('編成予算の残枠', money(myTeam.budget)), { label: '残り支配下枠', value: capacity.ok ? capacity.remainingSlots : null, unit: '人', state: 'unavailable' }, { label: '未解決の提案', value: offers.filter(m => !m.resolved).length, unit: '件' }]} />
     {offers.length > 0 && <section aria-label="受信したトレード提案"><h2>受信した提案</h2><div className="decision-actions">{offers.filter(m => !m.resolved || m.id === selectedMailId).map(m => <Button key={m.id} variant="secondary" aria-pressed={selectedMailId === m.id}
       onClick={() => { setSelectedMailId(m.id); setConfirmation(null); setMailReceipt(null); setError(null); }}>{m.title || `${m.offer.from?.name}からのオファー`}</Button>)}</div></section>}
@@ -133,8 +130,9 @@ export function TradeTab({ myTeam, teams, onTrade, cpuOffers = [], offerMails, o
       </section> : targetTeam && <section>
         <Button variant="secondary" onClick={reset}>← 球団選択に戻る</Button><h2 ref={negotiationHeading} tabIndex={-1}>{targetTeam.name}との交渉</h2>
         {!tradeResult ? <>
-          <div className="decision-exchange"><TradePlayers team={myTeam} selected={myOut} onToggle={p => selection(setMyOut, p)} {...{ onPlayerClick, onToggleCompare, comparePlayerIds }} />
-            <TradePlayers team={targetTeam} selected={theirIn} incoming onToggle={p => selection(setTheirIn, p)} {...{ onPlayerClick, onToggleCompare, comparePlayerIds }} /></div>
+          <TradeSelectionSummary outgoing={myOut} incoming={theirIn} comparing={comparing} onCompare={() => setComparing(v => !v)} />
+          {comparing && <section className="decision-compare-selected" aria-label="選択済み選手の比較"><h3 ref={comparisonHeading} tabIndex={-1}>選択済み選手の比較</h3><div className="decision-exchange">{[...myOut.map(p => ({ p, team: myTeam, incoming: false })), ...theirIn.map(p => ({ p, team: targetTeam, incoming: true }))].map(({ p, team, incoming }) => <section key={p.id}><h3>{p.name}</h3><p className="decision-note">{team.name} · {incoming ? '獲得候補' : '放出候補'}</p><PlayerFacts player={p} noisy={incoming} /><PlayerActions player={p} teamName={team.name} {...{ onPlayerClick, onToggleCompare, comparePlayerIds }} /></section>)}</div></section>}
+          <TradePlayerPicker mine={myTeam} target={targetTeam} outgoing={myOut} incoming={theirIn} onOutgoing={toggleOutgoing} onIncoming={toggleIncoming} view={pickerView} onViewChange={setPickerView} {...{ active, onPlayerClick, onToggleCompare, comparePlayerIds }} />
           <label>支払金額（万円）<input type="number" aria-label="支払金額（万円）" value={myCash} step="100" min="0" onChange={e => { setMyCash(e.target.value === '' ? '' : Math.max(0, Number(e.target.value))); setConfirmation(null); }} /></label>
           <p>放出 {myOut.length}人 / 獲得 {theirIn.length}人 · 支払金額 {money(Number(myCash))}</p>
           <Button disabled={!theirIn.length || deadlinePassed || !Number.isFinite(Number(myCash))} onClick={() => open({ kind: 'proposal', outgoing: myOut, incoming: theirIn, cash: Number(myCash) })}>トレードを提案する</Button>

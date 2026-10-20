@@ -24,7 +24,7 @@ export function registerFaMarketCases() {
       await page.goto(`${fixture}?state=${state}&embedded`);
       await expect(page.locator('.fa-list')).toBeVisible(); await layout(page);
       if (state === 'empty') { await expect(page.locator('.fa-list')).toContainText('市場に候補はいません'); continue; }
-      const row = page.locator('.fa-row').first(); await row.click();
+      const row = page.locator('.player-list-row').first(); await row.click();
       await expect(page.locator('.fa-player-heading h3')).toBeFocused(); await layout(page);
       if (['zero', 'missing', 'budget'].includes(state)) {
         await expect(page.getByRole('button', { name: '契約条件を確認する', exact: true })).toBeDisabled();
@@ -74,7 +74,7 @@ export function registerFaMarketCases() {
     await market.getByLabel('選手名', { exact: true }).fill('編成確認'); await market.getByLabel('並び順', { exact: true }).selectOption('salary');
     await page.getByRole('button', { name: '編成確認FA候補の条件を見る', exact: true }).click();
     await market.getByLabel('契約年数', { exact: true }).selectOption('3');
-    await page.locator('.fa-profile > summary').click(); await page.locator('.fa-profile').getByRole('button', { name: '比較に追加', exact: true }).click();
+    await market.getByRole('button', { name: '比較に追加', exact: true }).click();
     await page.locator('.fa-own-comparison > summary').click();
     await page.getByLabel('比較する自球団の選手', { exact: true }).selectOption(JSON.stringify([typeof info.targets[0].id, info.targets[0].id]));
     await page.getByRole('button', { name: `${info.targets[0].name}を比較に追加`, exact: true }).click();

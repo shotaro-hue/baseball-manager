@@ -45,6 +45,7 @@ for(const cpu of [false,true]) {
     }
     else {
       await page.getByRole('button',{name:`${f.other.name}と交渉する`,exact:true}).click();
+      await page.getByRole('button',{name:'獲得候補を選ぶ',exact:true}).click();
       await page.getByLabel('取引対象野手を獲得候補に選ぶ',{exact:true}).check();
       await page.locator('input[type="number"]').fill('500');
       await page.getByRole('button',{name:'トレードを提案する',exact:true}).click();
