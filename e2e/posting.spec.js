@@ -46,7 +46,7 @@ for (const legacy of [false, true]) {
     await expect(page.getByText(/球団受取移籍金: 2000万円/)).toBeVisible();
     await page.getByRole('complementary', { name: '監督メニュー' }).getByRole('button', { name: /^経営/ }).click();
     await page.getByRole('navigation', { name: '経営メニュー' }).getByRole('button', { name: '財務', exact: true }).click();
-    const budgetCard = page.locator('.card').filter({ has: page.getByText('予算 / 年俸上位', { exact: true }) });
+    const budgetCard = page.locator('.finance-tab [data-ds="metrics"] > div').filter({ has: page.getByText('編成予算の残枠', { exact: true }) });
     await expect(budgetCard).toContainText('3,000万円');
     const before = await saveHub(page);
     expect(before.teams.find(t => t.id === before.myId).budget).toBe(3000);

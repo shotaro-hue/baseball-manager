@@ -102,7 +102,7 @@ export default function HubShell({ state, flows, app }) {
   }, [gs, navigation.open]);
 
   return (
-    <div className={`app calm-shell ${tab === 'dashboard' ? 'calm-home' : ''} ${['management', 'reinforcement', 'settings'].includes(tab) ? 'hub-entry-shell' : ''}`}
+    <div className={`app calm-shell ${tab === 'dashboard' ? 'calm-home' : ''} ${['management', 'reinforcement', 'settings', 'finance'].includes(tab) ? 'hub-entry-shell' : ''}`}
       data-ds={tab === 'dashboard' ? 'home-shell' : undefined}
       data-initialization-state={gs.newGameInitializationStatus}>
       <div className="app-layout">

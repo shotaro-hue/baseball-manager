@@ -4,6 +4,8 @@
 
 ## 結論・運用の原則
 
+UI-04B追加（2026-10-20）: `financeView.test.js`で既存エンジンとの価格/投資同条件比較・通年換算・手動価格維持・欠測と負予算を確認。`FinanceActions.test.js`/`HubManagementTab.test.js`で下書き・明示確定・取消・二重実行・要対応と共通枠を検証。`finance.spec.js`の既存年俸/保存assertは契約への移設後も保持し、3幅の価格/全12球団hash・投資/保存再開・無効入力・負予算とフォーカス回帰を追加。`PlayerModal.salary.test.js`の5入力は契約の年俸上位から詳細を開き、参照/給与表示/全体不変を維持する。既存の通常CI `posting-and-finance` とWebKit対象に含む。[実行記録](./validation/ui-04b/README.md)。
+
 FIX-M2追加（2026-10-19）: `regularGameUpdates.finance.test.js` で試合前需要と結果後の人気差分、ホーム/アウェーと視点、旧セーブ分岐を検証。`clubFinance.lifecycle.test.js` で実際のシーズンWorker初日の計上を試合前見積りと突合。`clubFinance.test.js` と `tradeTransaction.test.js` で赤字予算の継続進行・無金銭取引・追加支出禁止を確認。通常CIの既存Worker/保存/財務/取引E2Eで回帰を判定する。[検証記録](./validation/fix-m2/README.md)。
 
 UI-04A追加（2026-10-19）: `e2e/hub-navigation.spec.js` を通常CIの独立 `hub-navigation` グループへ追加。Chromiumとmobile-webkitで360/390/1440および760/761・1023/1024px、全9機能、通知/元画面/フォーカス/スクロール/ブラウザ戻る、既読と要対応、配達前除外、保存前後不変、編成エラー中の閲覧・試合開始検証を確認する。既存finance/posting/tradeは入口だけを新ナビへ更新し、取引/所属/金額/保存の検証を保持。下の件数は過去計測のまま。[UI-04A記録](./validation/ui-04a/README.md)が今回の結果。

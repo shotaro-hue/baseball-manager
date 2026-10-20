@@ -2,17 +2,62 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { FinanceTab } from './FinanceTab';
+import { ContractTab } from './ContractTab';
 import { fmtSal } from '../../utils';
 import { startClubFinance, applyClubGameFinance, forecastClubFinance } from '../../engine/clubFinance';
 const player = (id, salary, extra = {}) => ({ id, salary, name: `選手${id}`, pos: '捕手', contractYearsLeft: 2, ...extra });
 const team = (extra = {}) => ({ id: 0, name: '球団', wins: 0, losses: 0, budget: 1000, coaches: [], players: [player(0, 100), player(1, 300)], farm: [player(2, 200), player(3, 50, { 育成: true })], ...extra });
+const drawContract = t => renderToStaticMarkup(React.createElement(ContractTab, { team: t, year: 2026 }));
 const draw = t => renderToStaticMarkup(React.createElement(FinanceTab, { team: t, gameDay: 1 }));
 const freeze = obj => { Object.values(obj).forEach(v => { if (v && typeof v === 'object') freeze(v); }); return Object.freeze(obj); };
 describe('FinanceTab contract salary', () => {
+  it('preserves the coach salary reference without changing player payroll, reference surplus or saved data', () => {
+    const t = freeze(startClubFinance(team({ budget: 500000, coaches: [{ salary: 120 }, { salary: 0 }, { salary: 240 }] }), 2026));
+    const before = JSON.stringify(t), html = draw(t), forecast = forecastClubFinance(t);
+    expect(html).toContain('コーチ給与（参考）');
+    expect(html).toContain('コーチ給与合計（参考）</dt><dd>360万円</dd>');
+    expect(html).toContain('契約給与・支払済み額ではありません');
+    expect(html).toContain('コーチ給与は選手の契約年俸総額・参考収支には含みません');
+    expect(html).toContain('契約年俸控除後の参考収支（年間）</dt><dd>' + fmtSal(forecast.operatingSurplus.min - 650));
+    expect(html).toContain(fmtSal(t.budget));
+    expect(JSON.stringify(t)).toBe(before);
+  });
+  it.each([
+    [[], '0万円'],
+    [[{ salary: 0 }], '0万円'],
+    [undefined, '— 未記録'],
+    [[{ salary: 120 }, { salary: null }], '— 算出不可'],
+    [[{ salary: 120 }, { salary: '240' }], '— 算出不可'],
+    [[{ salary: -1 }], '— 算出不可'],
+  ])('does not present missing or invalid coach salaries as recorded zero (%j)', (coaches, expected) => {
+    expect(draw(team({ coaches }))).toContain(`コーチ給与合計（参考）</dt><dd>${expected}</dd>`);
+  });
   it('shows estimated receipts, operating costs and the distinct spending envelope for the new model', () => {
     const t = startClubFinance(team({ budget: 500000 }), 2026), html = draw(t);
-    for (const text of ['主催試合の収入', '運営費', '放映権', '会員', '編成予算', '現金残高', '推定値']) expect(html).toContain(text);
+    for (const text of ['主催売上', '運営費', '放映権', '会員', '編成予算', '現金残高', '推定値']) expect(html).toContain(text);
     expect(html).toContain('10.00億円');
+  });
+  it('restores the annual salary-adjusted reference without subtracting payroll from the spending budget', () => {
+    const t = startClubFinance(team({ budget: 500000 }), 2026);
+    const forecast = forecastClubFinance(t);
+    const expected = forecast.operatingSurplus.min === forecast.operatingSurplus.max
+      ? fmtSal(forecast.operatingSurplus.min - 650)
+      : `${fmtSal(forecast.operatingSurplus.min - 650)} 〜 ${fmtSal(forecast.operatingSurplus.max - 650)}`;
+    const html = draw(t);
+    expect(html).toContain(`契約年俸控除後の参考収支（年間）</dt><dd>${expected}</dd>`);
+    expect(html).toContain('支払済み額でも編成予算の残枠でもありません');
+    expect(html).toContain(fmtSal(t.budget));
+  });
+  it('shows unavailable when any annual payroll is missing or invalid, but preserves recorded zero', () => {
+    const missing = startClubFinance(team({ players: [player(0, 0), player(1, null), player(4, -1)], farm: [player(2, 100)] }), 2026);
+    expect(draw(missing)).toContain('契約年俸控除後の参考収支（年間）</dt><dd>— 算出不可</dd>');
+    expect(draw(missing)).toContain('年俸を全員分集計できないため算出不可');
+    const zero = startClubFinance(team({ players: [player(0, 0)], farm: [] }), 2026);
+    const forecast = forecastClubFinance(zero);
+    const html = draw(zero);
+    expect(html).toContain(`契約年俸控除後の参考収支（年間）</dt><dd>${fmtSal(forecast.operatingSurplus.min)}`);
+    expect(html).not.toContain('年俸を全員分集計できないため算出不可');
+    expect(draw(team())).not.toContain('契約年俸控除後の参考収支（年間）');
   });
   it('uses actual schedule and ledger games, not an unrelated gameDay or a second home-only scaling', () => {
     const t = applyClubGameFinance(startClubFinance(team(), 2026), { year: 2026, gameDay: 1, isHomeTeam: true });
@@ -26,7 +71,7 @@ describe('FinanceTab contract salary', () => {
   });
   it('describes stadium improvements as a baseline price change when a manual price is fixed', () => {
     const html = draw(startClubFinance(team({ customAvgTicketPrice: 3300 }), 2026));
-    expect(html).toContain('基準単価+3.5%');
+    expect(html).toContain('改修1段階につき+3.5%');
     expect(html).toContain('手動設定中のチケット価格は維持されます');
     expect(html).toContain('3,300円/枚');
   });
@@ -36,7 +81,7 @@ describe('FinanceTab contract salary', () => {
     expect(draw(t)).toContain(fmtSal(1430000));
   });
   it('shows every owned category and total, including farm in salary leaders', () => {
-    const html = draw(team());
+    const html = drawContract(team());
     for (const value of ['選手契約年俸（年額）', '一軍支配下', '二軍支配下', '育成', fmtSal(650), '選手2', '選手3', '支払済み額ではありません']) expect(html).toContain(value);
     expect(html.indexOf('選手1')).toBeLessThan(html.indexOf('選手2'));
     expect(html.indexOf('選手2')).toBeLessThan(html.indexOf('選手0'));
@@ -53,9 +98,9 @@ describe('FinanceTab contract salary', () => {
     expect(html).not.toContain('NaN');
   });
   it('renders an empty club and deduplicates farm overlaps', () => {
-    const html = draw(team({ players: [], farm: [] }));
+    const html = drawContract(team({ players: [], farm: [] }));
     expect(html).toContain('所属選手はいません');
     const t = team(); t.farm.push(t.players[0], t.farm[1]);
-    expect(draw(t)).toContain(fmtSal(650));
+    expect(drawContract(t)).toContain(fmtSal(650));
   });
 });

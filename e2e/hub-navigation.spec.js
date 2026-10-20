@@ -78,14 +78,21 @@ test('hub navigation reading an unresolved offer keeps it actionable and does no
   expect(offer.read).toBe(true); expect(offer.resolved).toBe(false);
   expect(after.teams).toEqual(before.teams);
 });
-test('hub navigation entry surfaces use the readable DES-01 canvas and full-width budget', async ({ page }) => {
+test('hub navigation entry surfaces use the readable DES-01 canvas and responsive budget and roster metrics', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 }); await prepare(page); await management(page, 390);
   await expect(page.locator('.calm-shell')).toHaveCSS('background-color', 'rgb(244, 246, 249)');
   const band = active(page).locator('[data-ds="metrics"]');
-  const metricWidth = await band.locator('dd').evaluate(n => n.getBoundingClientRect().width);
-  const bandWidth = await band.evaluate(n => n.getBoundingClientRect().width);
-  expect(metricWidth).toBeGreaterThan(bandWidth / 2);
+  await expect(band.locator('dt')).toHaveText(['編成予算の残枠', '契約年俸総額 / 年', '支配下登録', '残り登録枠']);
+  await expect(band.locator('dd').first()).toHaveText('65.00億円');
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await band.evaluate(n => getComputedStyle(n).gridTemplateColumns.split(' ').length)).toBe(width < 1024 ? 2 : 4);
+    const clipped = await band.locator('dd').evaluateAll(nodes => nodes.filter(n => n.scrollWidth > n.clientWidth || n.getBoundingClientRect().right > n.closest('dl').getBoundingClientRect().right).map(n => n.textContent));
+    expect(clipped).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
 });
+
 async function prepare(page, { unreadOffer = false } = {}) {
   const fixture = JSON.parse(gunzipSync(readFileSync(new URL('./fixtures/new-game.json.gz', import.meta.url))));
   const mine = fixture.teams.find(t => t.id === fixture.myId), other = fixture.teams.find(t => t.id !== fixture.myId);

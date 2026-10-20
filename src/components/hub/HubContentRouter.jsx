@@ -77,7 +77,7 @@ export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTab
 
   const request = regularSeasonRequest({ teams, myId, year, gameDay, schedule, offseasonPlan: gs.offseasonPlan, gameResultsMap: gs.gameResultsMap }, 1);
   const canSim = request.count > 0;
-  if (tab === 'management' || tab === 'reinforcement') return <HubManagementTab team={myTeam} recruitment={tab === 'reinforcement'} onNavigate={onTabChange} notifications={notifications} />;
+  if (tab === 'management' || tab === 'reinforcement') return <HubManagementTab team={myTeam} recruitment={tab === 'reinforcement'} onNavigate={onTabChange} onOpen={onOpen} notifications={notifications} capacityContext={draftCapacityContext(gs.offseasonPlan, year, teams)} />;
   if (tab === 'settings') return <HubSettingsTab onNavigate={onOpen} />;
   if (tab === 'dashboard') {
     const rankingContext = standingsContext(gs.getSeasonHistory(), gs.allTeamResultsMap, year);
@@ -330,6 +330,7 @@ export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTab
       <ContractTab
         team={myTeam}
         allTeams={teams}
+        onPlayerClick={gs.handlePlayerClick}
         year={year}
         onOffer={os.handleContractOffer}
         onRelease={(pid) => {
@@ -399,7 +400,7 @@ export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTab
           onTicketPriceChange={gs.handleSetTicketPrice}
           gameDay={gameDay}
           schedule={schedule}
-          onPlayerClick={gs.handlePlayerClick}
+          onNavigate={onTabChange}
         />
       </DeferredHubTab>
     );

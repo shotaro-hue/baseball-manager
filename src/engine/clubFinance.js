@@ -118,7 +118,8 @@ export function forecastClubFinance(team, schedule) {
     homeGames: range(f.homeGames + minHomes, f.homeGames + maxHomes),
     revenue: range(a.revenue, b.revenue), operatingCosts: range(a.operatingCosts, b.operatingCosts),
     operatingSurplus: range(a.operatingSurplus, b.operatingSurplus),
-    income: Object.fromEntries(INCOME_KEYS.map(key => [key, range(a.income[key], b.income[key])])) };
+    income: Object.fromEntries(INCOME_KEYS.map(key => [key, range(a.income[key], b.income[key])])),
+    costs: Object.fromEntries(COST_KEYS.map(key => [key, range(a.costs[key], b.costs[key])])) };
 }
 
 export function nextClubBudget(team, nextRoster, myId) {
