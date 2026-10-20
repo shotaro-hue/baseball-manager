@@ -114,5 +114,5 @@ try {
       await context.close();
     }
   }
-  if (!captureOnly) writeFileSync(`${out}/${stage}-metrics.json`, JSON.stringify({ stage, browser: browser.version(), production: true, cpuThrottle: 4, gesture: 'CDP synthetic mouse wheel; actual iPhone touch scrolling is not verified', rows }, null, 2) + '\n');
+  if (!captureOnly) writeFileSync(`${out}/${stage}-metrics.json`, JSON.stringify({ stage, browser: browser.version(), production: true, cpuThrottle: 4, hashScope: 'fixture.teams (including scoutResults); global faPool is fixed by management-load-fixture.js', gesture: 'CDP synthetic mouse wheel; actual iPhone touch scrolling is not verified', rows }, null, 2) + '\n');
 } finally { await browser?.close(); server.kill(); }

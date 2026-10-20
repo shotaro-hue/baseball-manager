@@ -39,7 +39,7 @@
 | FIX-M2 | — | [#484](https://github.com/shotaro-hue/baseball-manager/pull/484)マージ済み | #483後のmain。試合前需要で収益計上、主催区分/Worker一致、負予算下の無金銭トレード・支出制約・年度/保存。[要件](./docs/implementation/fix-m2.md) |
 | UI-04B | — | [#485](https://github.com/shotaro-hue/baseball-manager/pull/485)マージ済み。[記録](./docs/validation/ui-04b/README.md) | A-FIX・FIX-M2マージ。経営指標、実績/予測/欠測、価格下書き→比較→確定、投資比較・保存再開 |
 | UI-04C | — | [#486](https://github.com/shotaro-hue/baseball-manager/pull/486)マージ済み。[記録](./docs/validation/ui-04c/README.md) | 補強/契約の判断・確認・結果、通知対象・解決済み表示 |
-| UI-04C-FIX | P0/P1 | この独立PRで実装・検証（未マージ）。[要件](./docs/implementation/ui-04c-fix.md)・[性能/画面/回帰](./docs/validation/ui-04c-fix/README.md) | #486後。軽量一覧・検索/所属/ポジション/年俸/満了ソート、選択後の詳細だけ描画、片側トレード選択/比較、派遣と報告の分離、通知・ID・位置/フォーカス復帰。ゲーム/保存/金銭/CPUを維持 |
+| UI-04C-FIX | P0/P1 | [#487](https://github.com/shotaro-hue/baseball-manager/pull/487)で実装・検証（未マージ）。[要件](./docs/implementation/ui-04c-fix.md)・[性能/画面/回帰](./docs/validation/ui-04c-fix/README.md) | #486後。軽量一覧・検索/所属/ポジション/年俸/満了ソート、選択後の詳細だけ描画、片側トレード選択/比較、派遣と報告の分離、通知・ID・位置/フォーカス復帰。後置の保存成功通知によるWebKitの59pxずれも修正。ゲーム/保存/金銭/CPUを維持 |
 | UI-04D | P2 | 要件確定、コード未着手 | Cマージ。通知/ニュース/球団史/設定の旧本文移行。既読/要対応/対応済み、実在する設定のみ |
 | QA-04 | P1 | 全体未着手。A/FIXの回帰のみ先行 | 全工程レビュー・マージ後。新規/全機能/試合/財務/取引/オフシーズン/年度/保存。360/390/760/761/1023/1024/1440、Chromium/WebKit・キーボード/タッチ |
 

@@ -17,12 +17,12 @@ afterEach(() => { if (view) act(() => view.unmount()); view = null; });
 const text = n => typeof n === 'string' ? n : (n.children || []).map(text).join('');
 const button = (label, parent = view.root) => parent.findAllByType('button').find(n => text(n) === label || n.props['aria-label'] === label);
 const click = label => { const b = button(label); expect(b, `button ${label}`).toBeTruthy(); act(() => b.props.onClick()); };
-function mount({ initialTab = 'dashboard', mailbox = [], news = [], year = 2026, saveId = 'navigation' } = {}) {
+function mount({ initialTab = 'dashboard', mailbox = [], news = [], year = 2026, saveId = 'navigation', notif = null, saveResult = null } = {}) {
   const setTabSpy = vi.fn();
   function Harness({ year, saveId }) {
     const [tab, update] = useState(initialTab);
     const gs = { myTeam: team, teams: [team, opponent], myId: 0, year, gameDay: 1, schedule,
-      gameResultsMap: {}, tab, tabBadges: {}, saveId, mailbox, news,
+      gameResultsMap: {}, tab, tabBadges: {}, saveId, mailbox, news, notif, saveResult,
       getMailboxBySelector: () => mailbox, getNewsBySelector: () => news,
       getUnreadMailboxCount: () => mailbox.filter(m => !m.read && (m.deliverOnDay ?? 0) <= 1).length,
       setTab: id => { setTabSpy(id); update(id); }, notify: vi.fn() };
@@ -86,4 +86,20 @@ it.each([{ year: 2027 }, { saveId: 'another-save' }])('clears mounted drafts whe
   act(() => view.root.findByProps({ 'data-test-tab': 'trade' }).findByType('input').props.onChange({ target: { value: '前セッションの条件' } }));
   changed.setScope(scope);
   expect(view.root.findByProps({ 'data-test-tab': 'trade' }).findByType('input').props.value).toBe('');
+});
+it.each(['contract', 'trade', 'scout', 'fa'])('keeps successful autosave feedback in the header without inserting a row above %s', initialTab => {
+  mount({ initialTab, notif: { type: 'ok', msg: '💾 オートセーブ' }, saveResult: { ok: true } });
+  expect(view.root.findAll(n => typeof n.type === 'string' && n.props.className === 'notif nok')).toHaveLength(0);
+  expect(text(view.root.findByProps({ 'data-ds': 'home-header' }))).toContain('保存済み');
+});
+it.each([{ type: 'warn', msg: '保存失敗' }, { type: 'ok', msg: '💾 セーブしました' }, { type: 'ok', msg: '獲得が成立しました' }])('retains nonredundant feedback on decision pages: %s', notif => {
+  mount({ initialTab: 'scout', notif, saveResult: { ok: true } });
+  expect(view.root.find(n => typeof n.type === 'string' && n.props.className?.startsWith('notif ')).children).toContain(notif.msg);
+});
+it('keeps autosave feedback when the header cannot yet confirm the save, and on other Hub pages', () => {
+  mount({ initialTab: 'contract', notif: { type: 'ok', msg: '💾 オートセーブ' } });
+  expect(text(view.root)).toContain('💾 オートセーブ');
+  act(() => view.unmount()); view = null;
+  mount({ initialTab: 'dashboard', notif: { type: 'ok', msg: '💾 オートセーブ' }, saveResult: { ok: true } });
+  expect(text(view.root)).toContain('💾 オートセーブ');
 });

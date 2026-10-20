@@ -1,0 +1,50 @@
+{
+  "run": "https://github.com/shotaro-hue/baseball-manager/actions/runs/39438274822",
+  "commit": "b998e9e07a1be3396ae1f76e6309ea713b830079",
+  "artifactId": 12275296424,
+  "traceSha256": "1342658ba3363ade3b7cac31b429380fc0f592aa374639005d4dcb45c04498de",
+  "test": "mobile-webkit management lists scout deletion",
+  "positionErrorPx": 59,
+  "tolerancePx": 4,
+  "restoredFocusId": "load-scout-51",
+  "focusPassed": true,
+  "observations": [
+    {
+      "snapshot": "after@call@3703",
+      "wallTime": 1792507378693,
+      "scrollY": 3946,
+      "autoSaveInlineNotice": false
+    },
+    {
+      "snapshot": "input@call@3707",
+      "wallTime": 1792507378849,
+      "scrollY": 3946,
+      "autoSaveInlineNotice": false
+    },
+    {
+      "snapshot": "after@call@3715",
+      "wallTime": 1792507382091,
+      "scrollY": 3946,
+      "autoSaveInlineNotice": false
+    },
+    {
+      "snapshot": "after@call@3717",
+      "wallTime": 1792507382125,
+      "scrollY": 3946,
+      "autoSaveInlineNotice": false
+    },
+    {
+      "snapshot": "before@call@3719",
+      "wallTime": 1792507382134,
+      "scrollY": 3946,
+      "autoSaveInlineNotice": false
+    },
+    {
+      "snapshot": "after@call@3719",
+      "wallTime": 1792507382167,
+      "scrollY": 3946,
+      "autoSaveInlineNotice": true
+    }
+  ],
+  "domDifference": "div.notif.nok with 💾 オートセーブ inserted above route after focus restoration; header saved label updated. Candidate50 deleted,51 restored."
+}

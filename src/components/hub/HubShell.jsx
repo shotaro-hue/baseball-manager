@@ -49,6 +49,10 @@ export default function HubShell({ state, flows, app }) {
   const navigationScope = `${gs.saveId}:${gs.myId}:${year}`;
   const navigation = useHubNavigation(tab, setTab, navigationScope);
   const { currentPrimarySection } = navigation;
+  // The header already announces this save. A second, late inline row shifts
+  // the restored player in browsers without automatic scroll anchoring.
+  const redundantAutoSave = ['contract', 'trade', 'scout', 'fa'].includes(tab)
+    && notif?.type === 'ok' && notif.msg === '💾 オートセーブ' && gs.saveResult?.ok === true;
   const mailbox = gs.getMailboxBySelector?.() ?? gs.mailbox;
   const notifications = notificationSummary({ mailbox,
     news: gs.getNewsBySelector?.() ?? gs.news, gameDay, unreadCount: gs.getUnreadMailboxCount?.(gameDay) });
@@ -177,7 +181,7 @@ export default function HubShell({ state, flows, app }) {
           </section>}
 
           {(!progress.valid || (!canSim && remain > 0)) && <p role="status">成績・日程・進行フェーズを確認できないため試合を開始できません。保存データを読み直してください。</p>}
-          {notif && (
+          {notif && !redundantAutoSave && (
             <div
               className={`notif ${
                 notif.type === 'ok'
