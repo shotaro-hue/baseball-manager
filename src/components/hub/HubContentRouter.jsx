@@ -394,6 +394,7 @@ export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTab
     return (
       <HubScoutTab
         myTeam={myTeam}
+        active={active}
         teams={teams}
         capacityContext={draftCapacityContext(gs.offseasonPlan, year, teams)}
         scoutRegions={SCOUT_REGIONS}

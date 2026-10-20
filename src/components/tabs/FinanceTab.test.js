@@ -1,13 +1,25 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { act, create } from 'react-test-renderer';
 import { describe, expect, it } from 'vitest';
 import { FinanceTab } from './FinanceTab';
 import { ContractTab } from './ContractTab';
+import { ContractPayroll } from './ContractPayroll';
 import { fmtSal } from '../../utils';
 import { startClubFinance, applyClubGameFinance, forecastClubFinance } from '../../engine/clubFinance';
 const player = (id, salary, extra = {}) => ({ id, salary, name: `選手${id}`, pos: '捕手', contractYearsLeft: 2, ...extra });
 const team = (extra = {}) => ({ id: 0, name: '球団', wins: 0, losses: 0, budget: 1000, coaches: [], players: [player(0, 100), player(1, 300)], farm: [player(2, 200), player(3, 50, { 育成: true })], ...extra });
-const drawContract = t => renderToStaticMarkup(React.createElement(ContractTab, { team: t, year: 2026 }));
+const drawContract = t => {
+  let view;
+  act(() => { view = create(React.createElement(ContractTab, { team: t, year: 2026 })); });
+  expect(view.root.findAllByType(ContractPayroll)).toHaveLength(0);
+  const disclosure = view.root.findAllByType('details').find(n => n.props.onToggle);
+  act(() => disclosure.props.onToggle({ currentTarget: { open: true } }));
+  const payroll = view.root.findByType(ContractPayroll);
+  const html = renderToStaticMarkup(React.createElement(ContractPayroll, payroll.props));
+  act(() => view.unmount());
+  return html;
+};
 const draw = t => renderToStaticMarkup(React.createElement(FinanceTab, { team: t, gameDay: 1 }));
 const freeze = obj => { Object.values(obj).forEach(v => { if (v && typeof v === 'object') freeze(v); }); return Object.freeze(obj); };
 describe('FinanceTab contract salary', () => {

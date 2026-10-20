@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { fmtSal, scoutNoise } from '../../utils';
 import { contractSalaryStatus } from '../../engine/contractPayroll';
 import { marketMetrics } from '../hub/faMarket';
@@ -57,7 +57,8 @@ export function DecisionConfirmation({ title, children, onCancel, onConfirm, con
 }
 
 export function useDecisionReturn(selected, active = true) {
-  const heading = useRef(null), opener = useRef(null), scroll = useRef(0);
+  const heading = useRef(null), list = useRef(null), opener = useRef(null), scroll = useRef(0);
+  const origin = useRef(null);
   const previous = useRef(selected);
   useEffect(() => {
     if (typeof window === 'undefined' || !active || previous.current === selected) return;
@@ -66,9 +67,26 @@ export function useDecisionReturn(selected, active = true) {
       heading.current?.focus({ preventScroll: true });
       heading.current?.scrollIntoView?.({ block: 'nearest' });
     } else {
-      if (opener.current?.isConnected && !opener.current.closest('[hidden]')) opener.current.focus({ preventScroll: true });
-      window.scrollTo(0, scroll.current);
+      const from = origin.current;
+      const scope = from?.list?.isConnected ? from.list : list.current;
+      const rows = [...(scope?.querySelectorAll('button[data-player-id]') || [])];
+      const controls = list.current || (from?.section?.isConnected ? from.section : null);
+      const target = from?.id != null
+        ? rows.find(node => node.dataset.playerId === from.id) || rows[Math.min(from.index, rows.length - 1)] || controls?.querySelector('input[type=search],select')
+        : opener.current?.isConnected ? opener.current : controls?.querySelector('input[type=search],select');
+      if (target?.isConnected && !target.closest('[hidden]')) {
+        target.focus({ preventScroll: true });
+        if (Number.isFinite(from?.top) && rows.includes(target)) window.scrollBy(0, target.getBoundingClientRect().top - from.top);
+        else window.scrollTo(0, scroll.current);
+      } else window.scrollTo(0, scroll.current);
     }
   }, [selected, active]);
-  return { heading, remember: event => { opener.current = event?.currentTarget; scroll.current = typeof window === 'undefined' ? 0 : window.scrollY; } };
+  const remember = useCallback(event => {
+    const node = event?.currentTarget;
+    opener.current = node; scroll.current = typeof window === 'undefined' ? 0 : window.scrollY;
+    const list = node?.closest?.('[data-player-list]');
+    origin.current = { list, section: node?.closest?.('section'), id: node?.dataset?.playerId,
+      index: list ? [...list.querySelectorAll('button[data-player-id]')].indexOf(node) : 0, top: node?.getBoundingClientRect?.().top };
+  }, []);
+  return useMemo(() => ({ heading, list, remember }), [remember]);
 }

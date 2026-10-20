@@ -1,0 +1,1378 @@
+{
+  "stage": "after",
+  "browser": "141.0.7390.37",
+  "production": true,
+  "cpuThrottle": 4,
+  "gesture": "CDP synthetic mouse wheel; actual iPhone touch scrolling is not verified",
+  "rows": [
+    {
+      "width": 360,
+      "viewportHeight": 800,
+      "run": 0,
+      "tab": "contract",
+      "displayMs": 321.0999999977648,
+      "dom": 345,
+      "height": 5449,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000728,
+      "frameMaxMs": 16.800000000000182,
+      "frames": 141,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 2354.10000000149,
+      "samplingEnd": 4701.199999999255,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12203672,
+      "detailMs": 214.10000000149012,
+      "detailDom": 120,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 360,
+      "viewportHeight": 800,
+      "run": 0,
+      "tab": "trade",
+      "displayMs": 584.5,
+      "dom": 636,
+      "height": 5938,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.799999999999272,
+      "frameMaxMs": 33.30000000000018,
+      "frames": 137,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 6344.60000000149,
+      "samplingEnd": 8653,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12674216,
+      "detailMs": 168.59999999776483,
+      "detailDom": 94,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 360,
+      "viewportHeight": 800,
+      "run": 0,
+      "tab": "scout",
+      "displayMs": 372.80000000074506,
+      "dom": 522,
+      "height": 8857,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.799999999999272,
+      "frameMaxMs": 16.80000000000109,
+      "frames": 134,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 9895.300000000745,
+      "samplingEnd": 12132.800000000745,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12706660,
+      "detailMs": 100.69999999925494,
+      "detailDom": 68,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 360,
+      "viewportHeight": 800,
+      "run": 0,
+      "tab": "fa",
+      "displayMs": 495,
+      "dom": 1005,
+      "height": 15514,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.799999999999272,
+      "frameMaxMs": 16.80000000000109,
+      "frames": 134,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 13388.89999999851,
+      "samplingEnd": 15638,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 13011388,
+      "detailMs": 164.20000000298023,
+      "detailDom": 80,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 390,
+      "viewportHeight": 844,
+      "run": 0,
+      "tab": "contract",
+      "displayMs": 360.1000000014901,
+      "dom": 345,
+      "height": 5421,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000728,
+      "frameMaxMs": 16.800000000000182,
+      "frames": 140,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 2598.7999999970198,
+      "samplingEnd": 4944.79999999702,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12223364,
+      "detailMs": 218,
+      "detailDom": 120,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 390,
+      "viewportHeight": 844,
+      "run": 0,
+      "tab": "trade",
+      "displayMs": 645.8999999985099,
+      "dom": 636,
+      "height": 5859,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.799999999999272,
+      "frameMaxMs": 33.399999999999636,
+      "frames": 134,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 6929,
+      "samplingEnd": 9200.199999999255,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12732420,
+      "detailMs": 189.39999999850988,
+      "detailDom": 94,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 390,
+      "viewportHeight": 844,
+      "run": 0,
+      "tab": "scout",
+      "displayMs": 268.5,
+      "dom": 522,
+      "height": 8829,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000728,
+      "frameMaxMs": 16.80000000000109,
+      "frames": 133,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 10365.199999999255,
+      "samplingEnd": 12598.599999997765,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12758640,
+      "detailMs": 102.10000000149012,
+      "detailDom": 68,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 390,
+      "viewportHeight": 844,
+      "run": 0,
+      "tab": "fa",
+      "displayMs": 470.30000000074506,
+      "dom": 1005,
+      "height": 15495,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000728,
+      "frameMaxMs": 16.799999999999272,
+      "frames": 134,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 13866.39999999851,
+      "samplingEnd": 16106.89999999851,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 13060672,
+      "detailMs": 116.89999999850988,
+      "detailDom": 80,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 390,
+      "viewportHeight": 844,
+      "run": 1,
+      "tab": "contract",
+      "displayMs": 256.69999999925494,
+      "dom": 345,
+      "height": 5421,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.799999999999727,
+      "frameMaxMs": 16.800000000000182,
+      "frames": 137,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 1986.5,
+      "samplingEnd": 4277.800000000745,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12170292,
+      "detailMs": 136.89999999850988,
+      "detailDom": 120,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 390,
+      "viewportHeight": 844,
+      "run": 1,
+      "tab": "trade",
+      "displayMs": 402.8999999985099,
+      "dom": 636,
+      "height": 5859,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.800000000000182,
+      "frameMaxMs": 16.800000000000182,
+      "frames": 135,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 5298.800000000745,
+      "samplingEnd": 7578.5,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12643384,
+      "detailMs": 188.09999999776483,
+      "detailDom": 94,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 390,
+      "viewportHeight": 844,
+      "run": 1,
+      "tab": "scout",
+      "displayMs": 257.20000000298023,
+      "dom": 522,
+      "height": 8829,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000728,
+      "frameMaxMs": 16.80000000000109,
+      "frames": 134,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 8471.5,
+      "samplingEnd": 10717.60000000149,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12676316,
+      "detailMs": 99.89999999850988,
+      "detailDom": 68,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 390,
+      "viewportHeight": 844,
+      "run": 1,
+      "tab": "fa",
+      "displayMs": 426.5,
+      "dom": 1005,
+      "height": 15495,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.799999999999272,
+      "frameMaxMs": 16.80000000000109,
+      "frames": 134,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 11802.70000000298,
+      "samplingEnd": 14047,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12977368,
+      "detailMs": 123,
+      "detailDom": 80,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 390,
+      "viewportHeight": 844,
+      "run": 2,
+      "tab": "contract",
+      "displayMs": 308.8999999985099,
+      "dom": 345,
+      "height": 5421,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000273,
+      "frameMaxMs": 16.800000000000182,
+      "frames": 140,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 2359.60000000149,
+      "samplingEnd": 4693.60000000149,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12166080,
+      "detailMs": 115.5,
+      "detailDom": 120,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 390,
+      "viewportHeight": 844,
+      "run": 2,
+      "tab": "trade",
+      "displayMs": 474,
+      "dom": 636,
+      "height": 5859,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000728,
+      "frameMaxMs": 16.800000000000182,
+      "frames": 135,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 5874.10000000149,
+      "samplingEnd": 8142.70000000298,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12639404,
+      "detailMs": 185.80000000074506,
+      "detailDom": 94,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 390,
+      "viewportHeight": 844,
+      "run": 2,
+      "tab": "scout",
+      "displayMs": 302,
+      "dom": 522,
+      "height": 8829,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.799999999999272,
+      "frameMaxMs": 16.80000000000109,
+      "frames": 135,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 9291.70000000298,
+      "samplingEnd": 11561.70000000298,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12672076,
+      "detailMs": 135.60000000149012,
+      "detailDom": 68,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 390,
+      "viewportHeight": 844,
+      "run": 2,
+      "tab": "fa",
+      "displayMs": 529.5,
+      "dom": 1005,
+      "height": 15495,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000728,
+      "frameMaxMs": 16.80000000000109,
+      "frames": 133,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 12923.900000002235,
+      "samplingEnd": 15141.400000002235,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12974204,
+      "detailMs": 148,
+      "detailDom": 80,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 760,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "contract",
+      "displayMs": 280.5,
+      "dom": 345,
+      "height": 5379,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.799999999999727,
+      "frameMaxMs": 16.800000000000182,
+      "frames": 139,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 2474.5,
+      "samplingEnd": 4787.400000002235,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12174816,
+      "detailMs": 175.80000000074506,
+      "detailDom": 120,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 760,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "trade",
+      "displayMs": 459.80000000074506,
+      "dom": 636,
+      "height": 5859,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.800000000000182,
+      "frameMaxMs": 16.800000000000182,
+      "frames": 134,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 6003.699999999255,
+      "samplingEnd": 8284.60000000149,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12645352,
+      "detailMs": 103.10000000149012,
+      "detailDom": 94,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 760,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "scout",
+      "displayMs": 276.69999999925494,
+      "dom": 522,
+      "height": 8810,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.799999999999272,
+      "frameMaxMs": 16.80000000000109,
+      "frames": 134,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 9142,
+      "samplingEnd": 11385.60000000149,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12676940,
+      "detailMs": 125.90000000223517,
+      "detailDom": 68,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 760,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "fa",
+      "displayMs": 542.6000000014901,
+      "dom": 1005,
+      "height": 15442,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000728,
+      "frameMaxMs": 16.80000000000109,
+      "frames": 136,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 12715.300000000745,
+      "samplingEnd": 14979.900000002235,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12979252,
+      "detailMs": 182.60000000149012,
+      "detailDom": 80,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 761,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "contract",
+      "displayMs": 278.9000000022352,
+      "dom": 345,
+      "height": 5384,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.799999999999727,
+      "frameMaxMs": 16.800000000000182,
+      "frames": 139,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 2004.699999999255,
+      "samplingEnd": 4311.199999999255,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12170744,
+      "detailMs": 153.69999999925494,
+      "detailDom": 400,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 761,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "trade",
+      "displayMs": 558.8999999985099,
+      "dom": 636,
+      "height": 5885,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000728,
+      "frameMaxMs": 16.800000000000182,
+      "frames": 142,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 5527.900000002235,
+      "samplingEnd": 7900.199999999255,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12647600,
+      "detailMs": 108.30000000074506,
+      "detailDom": 654,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 761,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "scout",
+      "displayMs": 314.1000000014901,
+      "dom": 522,
+      "height": 8815,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000728,
+      "frameMaxMs": 16.80000000000109,
+      "frames": 134,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 8832.699999999255,
+      "samplingEnd": 11075.900000002235,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12680940,
+      "detailMs": 99.89999999850988,
+      "detailDom": 548,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 761,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "fa",
+      "displayMs": 446.30000000074506,
+      "dom": 1005,
+      "height": 15442,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000728,
+      "frameMaxMs": 16.80000000000109,
+      "frames": 135,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 12002.10000000149,
+      "samplingEnd": 14257,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12989460,
+      "detailMs": 151.80000000074506,
+      "detailDom": 1041,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 1023,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "contract",
+      "displayMs": 256.0999999977648,
+      "dom": 345,
+      "height": 5364,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.800000000000182,
+      "frameMaxMs": 16.800000000000182,
+      "frames": 139,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 2082.7000000029802,
+      "samplingEnd": 4402.900000002235,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12191240,
+      "detailMs": 137.30000000074506,
+      "detailDom": 400,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 1023,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "trade",
+      "displayMs": 442.29999999701977,
+      "dom": 636,
+      "height": 5865,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000728,
+      "frameMaxMs": 16.800000000000182,
+      "frames": 139,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 5460,
+      "samplingEnd": 7796.5,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12667920,
+      "detailMs": 125.5,
+      "detailDom": 654,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 1023,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "scout",
+      "displayMs": 273.80000000074506,
+      "dom": 522,
+      "height": 8815,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.799999999999272,
+      "frameMaxMs": 16.80000000000109,
+      "frames": 133,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 8680,
+      "samplingEnd": 10916.800000000745,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12699592,
+      "detailMs": 104.5,
+      "detailDom": 548,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 1023,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "fa",
+      "displayMs": 546.0999999977648,
+      "dom": 1005,
+      "height": 15442,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.799999999999272,
+      "frameMaxMs": 16.80000000000109,
+      "frames": 136,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 12009.20000000298,
+      "samplingEnd": 14282.400000002235,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 13009104,
+      "detailMs": 427.29999999701977,
+      "detailDom": 1041,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 1024,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "contract",
+      "displayMs": 452.19999999925494,
+      "dom": 345,
+      "height": 5406,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000728,
+      "frameMaxMs": 33.29999999999973,
+      "frames": 138,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 3037.199999999255,
+      "samplingEnd": 5363.5,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12177280,
+      "detailMs": 212,
+      "detailDom": 400,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 1024,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "trade",
+      "displayMs": 527,
+      "dom": 636,
+      "height": 5906,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000728,
+      "frameMaxMs": 16.80000000000109,
+      "frames": 137,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 6687.89999999851,
+      "samplingEnd": 8965.60000000149,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12659824,
+      "detailMs": 103.10000000149012,
+      "detailDom": 654,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 1024,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "scout",
+      "displayMs": 382.3999999985099,
+      "dom": 522,
+      "height": 8837,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000728,
+      "frameMaxMs": 50,
+      "frames": 138,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 9929.800000000745,
+      "samplingEnd": 12274.800000000745,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12694536,
+      "detailMs": 247,
+      "detailDom": 548,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 1024,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "fa",
+      "displayMs": 695.8000000007451,
+      "dom": 1005,
+      "height": 15454,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000728,
+      "frameMaxMs": 16.80000000000109,
+      "frames": 136,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 13850,
+      "samplingEnd": 16127.699999999255,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 13001080,
+      "detailMs": 163.10000000149012,
+      "detailDom": 1041,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 1440,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "contract",
+      "displayMs": 436,
+      "dom": 345,
+      "height": 5386,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.800000000000182,
+      "frameMaxMs": 33.30000000000018,
+      "frames": 138,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 3295.89999999851,
+      "samplingEnd": 5617.300000000745,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12192304,
+      "detailMs": 183.19999999925494,
+      "detailDom": 400,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 1440,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "trade",
+      "displayMs": 510.0999999977648,
+      "dom": 636,
+      "height": 5886,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000728,
+      "frameMaxMs": 16.800000000000182,
+      "frames": 136,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 7075,
+      "samplingEnd": 9346.599999997765,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12668216,
+      "detailMs": 100.89999999850988,
+      "detailDom": 654,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 1440,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "scout",
+      "displayMs": 278.8999999985099,
+      "dom": 522,
+      "height": 8837,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000728,
+      "frameMaxMs": 16.80000000000109,
+      "frames": 135,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 10326.800000000745,
+      "samplingEnd": 12582.599999997765,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12699220,
+      "detailMs": 119.60000000149012,
+      "detailDom": 548,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 1440,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "fa",
+      "displayMs": 492.3999999985099,
+      "dom": 1005,
+      "height": 15454,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000728,
+      "frameMaxMs": 16.80000000000109,
+      "frames": 136,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 13815.300000000745,
+      "samplingEnd": 16085.800000000745,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 13007368,
+      "detailMs": 447.80000000074506,
+      "detailDom": 1041,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    }
+  ],
+  "hashScope": "fixture.teams (including scoutResults); global faPool is fixed by management-load-fixture.js"
+}

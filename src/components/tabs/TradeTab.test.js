@@ -13,6 +13,7 @@ function setup(result = true) {
   const text = node => typeof node === 'string' ? node : (node.children || []).map(text).join('');
   const clickText = label => act(() => view.root.findAll(n => n.type === 'button').find(n => text(n).includes(label)).props.onClick());
   clickText('相手球団と交渉する');
+  clickText('獲得候補を選ぶ');
   act(() => view.root.findAllByType('input').find(n => n.props['aria-label'] === '選手1を獲得候補に選ぶ').props.onChange({ target: { checked: true } }));
   return { onTrade, clickText, text: () => text(view.root) };
 }

@@ -32,11 +32,13 @@ for (const width of [360, 390, 1440]) test(`management decisions ${width}px read
   await expect(scout.getByRole('region', { name: 'スカウト契約の最終確認' })).toContainText('ファーム配属');
   await scout.getByRole('button', { name: '戻って見直す', exact: true }).click();
   await open(page, 'fa'); const fa = active(page, 'fa');
+  await fa.getByRole('button', { name: 'FA比較候補の条件を見る', exact: true }).click();
   await fa.getByRole('button', { name: '比較に追加', exact: true }).first().click();
   await page.getByRole('button', { name: '2人を比較', exact: true }).click();
   await expect(page.getByRole('dialog', { name: /選手比較/ })).toBeVisible(); await page.keyboard.press('Escape');
   await open(page, 'trade');
   await active(page, 'trade').getByRole('button', { name: `${f.other.name}と交渉する`, exact: true }).click();
+  await active(page, 'trade').getByRole('button', { name: '獲得候補を選ぶ', exact: true }).click();
   await active(page, 'trade').getByLabel(`${f.incoming.name}を獲得候補に選ぶ`, { exact: true }).check();
   await active(page, 'trade').getByLabel('支払金額（万円）', { exact: true }).fill('500');
   await active(page, 'trade').getByRole('button', { name: 'トレードを提案する', exact: true }).click();
@@ -69,6 +71,7 @@ test('management decisions scout dispatch restores focus when spending the remai
   const f = managementFixture(); f.mine.budget = 3000;
   await loadManagementFixture(page, f.fixture); await open(page, 'scout');
   const scout = active(page, 'scout');
+  await scout.getByRole('button', { name: '派遣先・調査中', exact: true }).click();
   const opener = scout.getByRole('button', { name: '国内独立リーグへの派遣を検討', exact: true });
   await opener.focus(); await page.keyboard.press('Enter');
   await expect(scout.getByRole('heading', { name: 'スカウト派遣の確認', exact: true })).toBeFocused();
@@ -94,6 +97,7 @@ test('management decisions contract offer persists as waiting without immediate 
   const pending = saved.mailbox.filter(m => m.type === 'contract_decision_pending' && m.decision.playerId === f.contract.id);
   expect(pending).toHaveLength(1); expect(pending[0].decision).toMatchObject({ salary: 1200, years: 2 });
   await reloadAndLoad(page); await open(page, 'contract');
+  await active(page, 'contract').getByLabel('契約状態', { exact: true }).selectOption('waiting');
   await active(page, 'contract').getByRole('button', { name: `${f.contract.name}の契約を確認`, exact: true }).click();
   await expect(active(page, 'contract').getByRole('status').filter({ hasText: '回答待ち' })).toContainText('1,200万円');
 });

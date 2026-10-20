@@ -11,6 +11,7 @@ export default function HubTabsNav({ activeSection, tab, tabBadges = {}, onTabCh
               {label}
               {tabBadges[id] && (
                 <span style={{ marginLeft: 4, background: tabBadges[id].color, color: '#fff', borderRadius: 8, padding: '0 5px', fontSize: 9, fontWeight: 700 }}>
+                  {id === 'contract' && <span className="sr-only">要対応 </span>}
                   {tabBadges[id].n}
                 </span>
               )}

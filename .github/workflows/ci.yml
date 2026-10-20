@@ -46,7 +46,7 @@ jobs:
           - name: roster-settings
             files: roster-settings.spec.js player-detail.spec.js first-team-stats.spec.js leaderboard.spec.js league-rankings.spec.js farm-rankings.spec.js farm-development.spec.js
           - name: posting-and-finance
-            files: posting.spec.js finance.spec.js trade.spec.js club-comparison.spec.js management-decisions.spec.js
+            files: posting.spec.js finance.spec.js trade.spec.js club-comparison.spec.js management-decisions.spec.js management-lists.spec.js
           - name: hub-navigation
             files: hub-navigation.spec.js
           - name: save-integrity

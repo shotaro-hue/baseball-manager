@@ -1,17 +1,23 @@
-import { useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { marketRosterError } from '../../engine/marketRoster';
 import { evaluateRosterCapacity } from '../../engine/rosterCapacity';
-import { Button, MetricBand, StateLabel } from '../design-system/primitives';
+import { Button, MetricBand } from '../design-system/primitives';
 import { DecisionConfirmation, PlayerActions, PlayerFacts, money, moneyMetric, salaryText, useDecisionReturn } from '../management/DecisionParts';
+import { PlayerFilters, PlayerList, useMobileDetail } from '../management/PlayerList';
+import { DEFAULT_PLAYER_FILTERS, filterPlayerEntries } from '../management/playerListModel';
 
 export default function HubScoutTab({ myTeam, teams = [myTeam], capacityContext = {}, scoutRegions = [], onSendScout,
-  onSignPlayer, onRemoveScoutResult, onPlayerClick, onToggleCompare, comparePlayerIds }) {
+  onSignPlayer, onRemoveScoutResult, onPlayerClick, onToggleCompare, comparePlayerIds, active = true }) {
   const [selectedId, setSelectedId] = useState(null), [snapshot, setSnapshot] = useState(null);
-  const [search, setSearch] = useState(''), [confirmation, setConfirmation] = useState(null);
+  const [filters, setFilters] = useState(DEFAULT_PLAYER_FILTERS), [confirmation, setConfirmation] = useState(null);
+  const [section, setSection] = useState('reports');
   const [receipt, setReceipt] = useState(null), [error, setError] = useState(null);
   const busy = useRef(false), current = useRef(null), dispatchHeading = useRef(null);
-  const focus = useDecisionReturn(selectedId);
+  const focus = useDecisionReturn(selectedId, active);
   const candidates = myTeam?.scoutResults || [];
+  const entries = useMemo(() => candidates.map(player => ({ player, status: '未契約' })), [candidates]);
+  const visible = useMemo(() => filterPlayerEntries(entries, filters), [entries, filters]);
+  const mobileDetail = useMobileDetail(selectedId);
   const selected = selectedId != null ? candidates.find(p => p.id === selectedId) || snapshot : null;
   const capacity = evaluateRosterCapacity(myTeam, { ...capacityContext, teams });
   const signingError = (team, p, results) => {
@@ -25,7 +31,7 @@ export default function HubScoutTab({ myTeam, teams = [myTeam], capacityContext 
     : confirmation?.kind === 'sign' ? signingError(myTeam, selected, candidates)
       : confirmation && !candidates.some(p => p.id === confirmation.playerId) ? 'この候補は現在の報告一覧にいません。' : null;
   current.current = { myTeam, candidates, confirmation, issue };
-  const select = (p, event) => { focus.remember(event); setSelectedId(p.id); setSnapshot(p); setConfirmation(null); setReceipt(null); setError(null); busy.current = false; };
+  const select = useCallback((p, event) => { focus.remember(event); setSelectedId(p.id); setSnapshot(p); setConfirmation(null); setReceipt(null); setError(null); busy.current = false; }, [focus]);
   const confirm = () => {
     const c = current.current;
     if (busy.current || !c.confirmation || c.issue) return;
@@ -42,16 +48,13 @@ export default function HubScoutTab({ myTeam, teams = [myTeam], capacityContext 
     setConfirmation(null); setError(null);
   };
   const open = action => { busy.current = false; setReceipt(null); setError(null); setConfirmation(action); };
-  return <main className={`management-decisions ${selectedId != null ? 'decision-selected' : ''}`} data-ds="scouting-management">
-    <h1>スカウト</h1><p>発掘した候補を比較し、獲得費用と登録枠を確認します。</p>
+  return <main className={`management-decisions ${selectedId != null && section === 'reports' ? 'decision-selected' : ''}`} data-ds="scouting-management">
+    <h1>スカウト</h1><p>候補を選び、獲得条件を確認します。</p>
     <MetricBand items={[moneyMetric('編成予算の残枠', money(myTeam?.budget)), { label: '報告済みの候補', value: candidates.length, unit: '人' }, { label: '残り支配下枠', value: capacity.ok ? capacity.remainingSlots : null, unit: '人', state: 'unavailable' }]} />
-    <div className="decision-layout"><section className="decision-list" aria-label="スカウト候補一覧"><h2>スカウト結果</h2>
-      <label>候補の選手名<input type="search" value={search} onChange={e => setSearch(e.target.value)} /></label>
-      {candidates.filter(p => p.name?.includes(search.trim())).map(p => <article key={p.id} className="decision-row" aria-current={p.id === selectedId}>
-        <div><button className="decision-select" aria-label={`${p.name}の条件を見る`} onClick={e => select(p, e)}>{p.name}</button><p className="decision-note">{p.pos} · {p.age ?? '未記録'}歳</p><StateLabel>未契約</StateLabel></div>
-        <div className="decision-row-money"><strong>{salaryText(p.salary)}</strong><p className="decision-note">／年</p></div>
-      </article>)}
-      {!candidates.length ? <p>現在、報告済みの候補はいません。派遣先を選ぶと調査を依頼できます。</p> : !candidates.some(p => p.name?.includes(search.trim())) && <p>この条件の候補はいません。選手名を変更してください。</p>}
+    <div className="decision-picker-tabs" role="group" aria-label="スカウトの表示"><Button variant="secondary" aria-pressed={section === 'reports'} onClick={() => setSection('reports')}>報告済み候補</Button><Button variant="secondary" aria-pressed={section === 'dispatch'} onClick={() => { setSection('dispatch'); setConfirmation(null); }}>派遣先・調査中</Button></div>
+    <div hidden={section !== 'reports'} className="decision-layout"><section ref={focus.list} className="decision-list" aria-label="スカウト候補一覧"><h2>報告済み候補 ({visible.length}人)</h2>
+      <PlayerFilters entries={entries} filters={filters} onChange={setFilters} groups={false} searchLabel="候補の選手名" />
+      <PlayerList suspended={mobileDetail || section !== 'reports'} entries={visible} selectedId={selectedId} onSelect={select} empty={!candidates.length ? '現在、報告済みの候補はいません。派遣先を選ぶと調査を依頼できます。' : undefined} />
     </section><section className="decision-detail" aria-label="スカウト候補の契約条件">
       {!selected ? <p>候補を選ぶと能力・成績・契約条件を確認できます。</p> : <>
         <Button variant="secondary" onClick={() => { setSelectedId(null); setConfirmation(null); }}>← 選手一覧に戻る</Button>
@@ -75,12 +78,12 @@ export default function HubScoutTab({ myTeam, teams = [myTeam], capacityContext 
         : <><p>{selected?.name}</p>{confirmation.kind === 'sign' ? <><p>年俸 {salaryText(selected?.salary)} · 契約残り2年 · ファーム配属</p><p>確定時の控除 {money(selected?.salary)} · 獲得後の予算 {money(myTeam.budget - selected?.salary)}</p></> : <p>この候補を報告一覧から削除します。所属・予算は変わりません。削除の取消はできません。</p>}</>}
     </DecisionConfirmation>}
     {receipt?.kind === 'dispatch' && <p className="decision-receipt" role="status">{receipt.region.name}へ派遣しました。報告が届くと候補一覧へ追加されます。</p>}
-    <section aria-label="スカウト派遣先"><h2 ref={dispatchHeading} tabIndex={-1}>スカウト派遣</h2><div className="decision-teams">
+    {section === 'dispatch' && <><section aria-label="スカウト派遣先"><h2 ref={dispatchHeading} tabIndex={-1}>スカウト派遣</h2><div className="decision-teams">
       {scoutRegions.map(region => <div key={region.id}><h3>{region.name}</h3><p>費用 {money(region.cost)}</p><p className="decision-note">候補の能力帯 Lv{region.qMin}–{region.qMax}（能力・成果を保証する値ではありません）</p>
         <Button variant="secondary" disabled={!Number.isFinite(myTeam?.budget) || myTeam.budget < region.cost} onClick={() => open({ kind: 'dispatch', region })}>{region.name}への派遣を検討</Button>
         {(!Number.isFinite(myTeam?.budget) || myTeam.budget < region.cost) && <p className="decision-note">予算不足・未記録のため派遣できません。</p>}</div>)}
     </div></section>
-    {(myTeam?.scoutMissions || []).length > 0 && <section><h2>調査中</h2>{myTeam.scoutMissions.map((m, i) => <p key={m.id ?? i}>{m.name} · 報告待ち</p>)}</section>}
+    {(myTeam?.scoutMissions || []).length > 0 && <section><h2>調査中</h2>{myTeam.scoutMissions.map((m, i) => <p key={m.id ?? i}>{m.name} · 報告待ち</p>)}</section>}</>}
     <p className="decision-note">保存された報告を表示しています。成績の0は実測値、「未記録」は欠測、「—」は算出できない率です。</p>
   </main>;
 }

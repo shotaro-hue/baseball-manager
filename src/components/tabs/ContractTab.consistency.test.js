@@ -12,7 +12,7 @@ it('shows farm ID 0, excludes signed contracts, and keeps invalid ikusei years o
   const team = { id: 0, players: [p(1, { contractSignedYear: 2026 })], farm: [p(0, { 育成: true, ikuseiYears: 2 })], wins: 0, losses: 0 };
   const onOffer = vi.fn(() => false);
   act(() => { view = create(React.createElement(ContractTab, { team, allTeams: [team], year: 2026, onOffer, onRelease: vi.fn() })); });
-  expect(text(view.root)).toContain('契約満了選手 (1人)'); expect(text(view.root.findByProps({ 'aria-label': '所属選手の契約一覧' }))).not.toContain('選手1');
+  expect(text(view.root)).toContain('要対応 (1人)'); expect(text(view.root.findByProps({ 'aria-label': '所属選手の契約一覧' }))).not.toContain('選手1');
   act(() => view.root.findByProps({ 'aria-label': '選手0の契約を確認' }).props.onClick());
   expect(view.root.findAllByType('select').find(n => n.children.some(c => c.type === 'option' && text(c) === '1年')).children.map(text)).toEqual(['1年']);
   act(() => view.root.findAllByType('button').find(n => text(n) === '提示条件を確認する').props.onClick());

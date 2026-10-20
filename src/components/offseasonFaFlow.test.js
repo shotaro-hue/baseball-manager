@@ -45,7 +45,9 @@ it('shows own FA declaration reasons and allows a stay through the existing mark
   expect(updater(team()).players[0]).toMatchObject({ id: 0, isFA: false, contractSignedYear: 2026 });
 });
 it('compares a market candidate against own player ID 0 in the offseason screen', () => {
-  const ui = setup(); ui.click('比較に追加');
+  const ui = setup();
+  act(() => ui.view.root.findByProps({ 'aria-label': '選手1の条件を見る' }).props.onClick());
+  ui.click('比較に追加');
   const select = ui.view.root.findByProps({ 'aria-label': '比較する自球団の選手' });
   act(() => select.props.onChange({ target: { value: JSON.stringify(['number', 0]) } }));
   ui.click('選手0を比較に追加'); ui.click('2人を比較');

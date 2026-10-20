@@ -15,6 +15,8 @@ it.each([[null,'— 未記録'],[undefined,'— 未記録'],[-1,'— 不正値']
     selected = player;
     view.update(React.createElement(PlayerModal, { player, teamName: team.name, initialSection: 'profile', onClose: () => {} }));
   } })); });
+  const payroll = view.root.findAllByType('details').find(n => n.props.onToggle);
+  act(() => payroll.props.onToggle({ currentTarget: { open: true } }));
   act(() => view.root.findAllByType('button').find(n => text(n) === p.name).props.onClick());
   expect(selected).toBe(p); expect(text(view.root)).toContain(`年俸${label}`);
   expect(JSON.stringify(team)).toBe(before);
