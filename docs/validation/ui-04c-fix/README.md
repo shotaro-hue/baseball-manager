@@ -63,6 +63,8 @@ Long Task（スクロール観測区間、50ms超）の観測は以下。ルー�
 - ローカルWebKitはシステムライブラリ不足で起動不能。CIは依存をインストールして同じmanagement specをChromium/WebKitで実行する。実行結果はPR本文に記載。FAの埋め込み/代理人/配属/保存は通常CIの既存UI-03Cケースも維持。
 - `npm run build`成功（既存chunkサイズ警告）。`src/engine`/`src/hooks`/保存形式/金銭・CPU判断に差分なし。UIモデルはゲームstateを変更しない。
 
+初回CI [#456](https://github.com/shotaro-hue/baseball-manager/actions/runs/39438274822)（`b998e9e`）は全単体で8件失敗/1583件成功/既存skip2件。失敗は年俸内訳の遅延描画とFA詳細への比較移動に追従していない既存3specだった。内訳を開く/候補詳細を開く手順へ更新し、年俸・欠測/不正値・並び順・元データ不変・ID0との比較の期待値を維持。ローカルで同じ8件のREDと、3spec全28件のGREENを確認した（[RED](./ci-compat-red.log.gz) / [GREEN](./ci-compat-green.log.gz)）。この追補はテストと記録のみで、上記性能測定から製品コードに変更はない。最終提出headのCIはPR本文で追跡する。
+
 ログ: [単体RED](./review-mail-red.log.gz) / [ブラウザRED](./review-focus-red.log.gz) / [単体GREEN](./focused-unit-green.log.gz) / [ブラウザGREEN](./review-focus-green.log.gz) / [初回21件](./browser-initial.log.gz) / [fixture修正1件](./badge-fixture-green.log.gz) / [build](./build.log.gz)。
 
 再計測: 基準commitのproduction buildを別ディレクトリで用意し、このブランチで`node scripts/measure-ui04c-fix.mjs before /absolute/baseline-dist`、`npm run build`、`node scripts/measure-ui04c-fix.mjs after /absolute/final-dist`を直列で実行。画像のみの一覧撮影は同じコマンドに`UI04C_CAPTURE_ONLY=1`を付ける。最終表の時刻/幅別値はJSON、CIの対象commitはPRで確認する。
