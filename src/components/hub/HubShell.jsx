@@ -58,7 +58,7 @@ export default function HubShell({ state, flows, app }) {
   const [caseTarget, setCaseTarget] = useState(null);
   const openCase = (target, id) => {
     setCaseTarget(previous => ({ tab: target, id, token: (previous?.token ?? 0) + 1, scope: navigationScope }));
-    navigation.open(target);
+    navigation.open(target, { restorePosition: false });
   };
 
   const handleTabChange = (newTab) => {

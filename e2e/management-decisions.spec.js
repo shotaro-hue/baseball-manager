@@ -108,6 +108,9 @@ test('management decisions notification opens exact proposal, resolves it once, 
   await active(page, 'mailbox').getByRole('button', { name: 'トレード画面で検討する', exact: true }).click();
   const decision = active(page, 'trade').getByRole('region', { name: '選択したトレード案件' });
   await expect(decision.getByRole('heading', { name: '今回検討する案件', exact: true })).toBeVisible();
+  // Let the navigation's scheduled position restoration settle before checking
+  // the explicit case target, rather than accepting a transient focus.
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await expect(decision.getByRole('heading', { name: '今回検討する案件', exact: true })).toBeFocused();
   await decision.getByRole('button', { name: '承諾内容を確認する', exact: true }).click();
   await active(page, 'trade').getByRole('button', { name: '承諾を確定する', exact: true }).evaluate(b => { b.click(); b.click(); });
