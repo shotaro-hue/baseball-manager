@@ -12,16 +12,18 @@ function setup(result = true) {
   act(() => { view = create(React.createElement(TradeTab, { myTeam: mine, teams: [mine, other], onTrade, cpuOffers: [] })); });
   const text = node => typeof node === 'string' ? node : (node.children || []).map(text).join('');
   const clickText = label => act(() => view.root.findAll(n => n.type === 'button').find(n => text(n).includes(label)).props.onClick());
-  act(() => view.root.findAll(n => n.type === 'div' && n.props.onClick).find(n => text(n).includes('相手球団')).props.onClick());
-  act(() => view.root.findAll(n => n.type === 'div' && n.props.onClick).find(n => text(n).includes('選手1')).props.onClick());
+  clickText('相手球団と交渉する');
+  act(() => view.root.findAllByType('input').find(n => n.props['aria-label'] === '選手1を獲得候補に選ぶ').props.onChange({ target: { checked: true } }));
   return { onTrade, clickText, text: () => text(view.root) };
 }
 it('a counteroffer asks for a player from my club and sends that player to the CPU', () => {
   const h = setup();
   vi.spyOn(Math, 'random').mockReturnValueOnce(.9).mockReturnValue(.1);
   h.clickText('トレードを提案する');
+  expect(h.onTrade).not.toHaveBeenCalled();h.clickText('確認して提案する');
   expect(h.text()).toContain('選手0も一緒に欲しい');
   h.clickText('受け入れる');
+  expect(h.onTrade).not.toHaveBeenCalled();h.clickText('逆提案を確定する');
   expect(h.onTrade.mock.calls[0][0].map(p => p.id)).toEqual([0]);
   expect(h.onTrade.mock.calls[0][1].map(p => p.id)).toEqual([1]);
 });
@@ -29,6 +31,7 @@ it('does not display a successful trade when final execution rejects it', () => 
   const h = setup(false);
   vi.spyOn(Math, 'random').mockReturnValue(.1);
   h.clickText('トレードを提案する');
+  h.clickText('確認して提案する');
   expect(h.onTrade).toHaveBeenCalledOnce();
   expect(h.text()).not.toContain('トレード成立！');
 });

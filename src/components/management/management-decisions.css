@@ -1,0 +1,56 @@
+/* UI-04C: all rules are opt-in. The shell's 760/1024px boundaries are unchanged. */
+.management-decisions { color: #162b3d; font: 16px/1.65 'Noto Sans JP',sans-serif; min-width: 0; padding: 16px 0; }
+.management-decisions h1 { font-size: 26px; line-height: 1.3; margin: 0 0 12px; color: #162b3d; }
+.management-decisions h2,.management-decisions h3 { color: #162b3d; font-size: 18px; line-height: 1.4; margin: 0 0 12px; overflow-wrap: anywhere; }
+.management-decisions p { margin: 8px 0 12px; }
+.management-decisions button,.management-decisions input,.management-decisions select { font: inherit; }
+.decision-note { color: #526778; font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
+.decision-facts { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.management-decisions [data-ds=metrics] dd small { display: inline-block; }
+.decision-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }
+.management-decisions label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; margin: 8px 0; min-width: 0; }
+.management-decisions :is(input:not([type=checkbox]),select) { box-sizing: border-box; min-height: 44px; width: 100%; padding: 8px; border: 1px solid #70889b; border-radius: 4px; color: #162b3d; background: #fff; }
+.management-decisions input[type=checkbox] { width: 20px; height: 20px; flex: 0 0 auto; accent-color: #1766da; }
+.management-decisions :is(button,input,select,summary,[tabindex]):focus-visible,.management-decisions h3:focus { outline: 3px solid #1766da; outline-offset: 3px; }
+.decision-layout { display: grid; gap: 24px; align-items: start; }
+.decision-list,.decision-detail { min-width: 0; }
+.decision-detail { background: #fff; border: 1px solid #d6dfe7; border-radius: 6px; padding: 16px; }
+.decision-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; padding: 12px 0; border-bottom: 1px solid #d6dfe7; }
+.decision-row > div { min-width: 0; }
+.decision-row button.decision-select { width: 100%; min-height: 44px; border: 0; background: transparent; color: #1766da; text-align: left; padding: 8px 0; cursor: pointer; font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
+.decision-row[aria-current=true] { background: #e9f1fd; }
+.decision-row-money { text-align: right; font-variant-numeric: tabular-nums; font-size: 14px; }
+.decision-confirm { margin: 16px 0; padding: 16px; border: 1px solid #70889b; border-left: 4px solid #1766da; background: #e9f1fd; overflow-wrap: anywhere; }
+.decision-warning { color: #855200; background: #fff1d6; border-left: 3px solid #855200; padding: 12px; font-size: 14px; }
+.decision-error { color: #b12c38; background: #fae9eb; padding: 12px; }
+.decision-receipt { color: #17634a; background: #e7f3ec; padding: 12px; }
+.management-decisions [data-danger=true] { background: #b12c38; border-color: #b12c38; }
+.decision-filters,.decision-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px 16px; }
+.management-decisions details { border-top: 1px solid #d6dfe7; margin-top: 16px; padding-top: 8px; min-width: 0; }
+.management-decisions summary { min-height: 44px; padding: 10px 0; box-sizing: border-box; cursor: pointer; font-weight: 700; font-size: 14px; }
+.decision-teams { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.decision-teams [data-ds=button] { justify-content: start; text-align: left; }
+.decision-exchange { display: grid; gap: 24px; }
+.decision-exchange > section { min-width: 0; }
+.decision-trade-players { max-height: 430px; overflow-y: auto; padding: 4px; }
+.decision-trade-players article { border-bottom: 1px solid #d6dfe7; padding: 8px 0; min-width: 0; }
+.decision-trade-players label { display: flex; flex-direction: row; align-items: center; min-height: 44px; cursor: pointer; }
+.decision-trade-players label strong { overflow-wrap: anywhere; }
+.decision-trade-players .decision-actions [data-ds=button] { font-size: 14px; padding: 8px; }
+.decision-terms { display: grid; grid-template-columns: minmax(0,1fr); gap: 12px; }
+.decision-terms > div { border-bottom: 1px solid #d6dfe7; padding: 8px 0; }
+.decision-terms ul { margin: 4px 0; padding-left: 20px; }
+.decision-terms li { overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .management-decisions [data-ds=metrics] dd { font-size: 20px; }
+  .decision-selected > .decision-layout > .decision-list { display: none; }
+}
+@media (min-width: 761px) {
+  .decision-layout { grid-template-columns: minmax(0,1fr) minmax(0,1.25fr); gap: 24px; }
+  .decision-exchange,.decision-terms { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (min-width: 1024px) {
+  .management-decisions { padding: 24px 0; }
+  .management-decisions h1 { font-size: 28px; }
+  .decision-layout { gap: 32px; }
+}

@@ -1,0 +1,54 @@
+# UI-04C 補強・契約の判断フロー
+
+作成日：2026-10-20。基準main：`f687fc13d5599b9f2d2541b49347d22ee1f1e6f0`（#485マージ後）。#485最終head `e88716c` のCI #39396571467は全ジョブ成功を確認した。本Cは独立PRで提出し、マージ・自動マージは行わない。Dの本文全面移行とQA-04全体の完了ではない。
+
+## 実装範囲
+
+- 契約：所属一覧の条件絞り込み、年俸/残年/実測一軍成績/能力、詳細/共通比較、提示条件→確認→回答待ち。通常更改は提示時に予算を控除しない。実メールの回答結果を優先する。自由契約は別の明示確認にする。欠測年俸は提示禁止とし、対象選手の自由契約は維持する。有効なオフシーズン進行中は既存の更改/編成計画へ戻す。
+- トレード：球団→候補→詳細/比較→金銭→両球団の予算/登録枠→確認して提案→結果。逆提案も追加選手/金銭を含めて再確認する。既存の `applyTradeTransaction` で見積り、実行は従来のハンドラ。CPU評価/乱数/交渉条件は変えない。
+- スカウト：候補→詳細/比較→費用/配属→確認→結果。獲得は年俸1年分を控除、契約残り2年でファーム配属。FAの複数年先払いと区別する。確定直前に最新IDから候補の位置を引き直し、予算/枠/候補消失を再検証。派遣/削除も確認を付ける。派遣タイマーと報告生成の仕組みは変えない。
+- 通知：トレードメールID、契約回答の選手IDを一時UIの判断対象へ渡す。解決済みを参照でき、再確定しない。受信箱で直接承諾/辞退する経路にも確認を付ける。既読化で取引を実行しない。元画面の下書きを保持する。
+- 共通：DES-01の44px操作、キーボード、確認取消、一覧復帰、成功後に消えた操作から対象見出しへのフォーカス復帰。一般ニュースの未読保存や新しい永続stateは追加しない。
+
+## RED → GREEN
+
+`managementDecisions.test.js` の13ケースを追加。最初の7ケースで確認、取消不変、二重実行、最新予算/候補index、メールIDによる案件選択を検証。独立レビューの指摘から追加した6ケースは修正前に失敗し、修正後に成功した。
+
+1. 回答メールが受諾/辞退へ変わってもローカルの「回答待ち」が残る：実メールの結果を優先する。
+2. 契約/スカウトで一覧へ戻ると、前の詳細が「所属していない」と残る：未選択時はsnapshotを描画しない。
+3. 年俸欠測/不正の満了選手で自由契約まで消える：提示と自由契約の適格条件を分離する。
+
+実ブラウザでも、スカウト契約確定後と通知から該当トレード案件を開いた直後のフォーカス喪失をRED化。生きている対象見出しへ復帰し、経路が表示されてから対象案件にフォーカスする修正後、2ケースが成功した。
+
+既存テストはdiv/tdクリックからbutton/checkbox/確認操作へ更新。ID 0、育成年数、所属/予算/履歴、市場重複防止、拒否時に成功表示しないassertは維持。テスト削除、追加skip、閾値・再試行の緩和はない。
+
+## 実行記録
+
+- 着手前：関連5ファイル38件、既存トレードE2E 3件成功。
+- 関連単体：最終修正を含む11ファイル91件成功。契約/スカウト/取引/通知/FA/復帰/既存ハンドラを確認。
+- `npm test`：ローカルの最初の全件実行は206ファイル/1,579件成功、既存の条件付き2skip。`scripts/qa-d1-offseason.test.js` のワーカーが異常終了しexit 1。全件成功とは扱わない。未完了ファイルだけを1 workerで再実行し、3年進行・保存再開の1件が成功（406秒）。テスト内容・timeoutは変更しない。
+- 新規Chromium：7件成功（1.6分）。360/390/1440pxの読取/比較/取消/一覧復帰、スカウト獲得/二重実行/保存再開、契約提示/保存後の回答待ち、通知→該当案件/取引/元の金額下書き、760/761・1023/1024pxの境界。
+- 既存Chromium：42件成功（9.6分）。`trade.spec.js posting.spec.js finance.spec.js hub-navigation.spec.js`。導線だけを変更し、金銭・所属・全12球団・保存・復帰のassertを維持。
+- `npm run build`：成功。既存の500kB超chunk警告を維持し、制限値は変更しない。
+- 新specは通常CI `posting-and-finance` とmobile-webkitへ追加。最新提出commitのCI全ジョブ成功を最終ゲートとし、実行中/未実行を成功扱いにしない。
+
+## 同じfixtureによる画面比較
+
+入力は `e2e/helpers/management-fixture.js`。全12球団を含む実セーブへ同じ対象選手・契約・候補・提案を設定し、閲覧・下書きだけで比較。両方とも同じ日本語フォールバック（Noto Sans CJK JP）で再撮影した。Chromiumで外部Google Fontsは両方とも遮断。iPhone実機の字形確認ではない。
+
+| 画面 | 360px 前 / 後 | 390px 前 / 後 | 1440px 前 / 後 |
+|---|---|---|---|
+| 補強トップ（入口を維持） | [前](before-reinforcement-360.png) / [後](after-reinforcement-360.png) | [前](before-reinforcement-390.png) / [後](after-reinforcement-390.png) | [前](before-reinforcement-1440.png) / [後](after-reinforcement-1440.png) |
+| 契約一覧 | [前](before-contract-360.png) / [後](after-contract-360.png) | [前](before-contract-390.png) / [後](after-contract-390.png) | [前](before-contract-1440.png) / [後](after-contract-1440.png) |
+| スカウト一覧 | [前](before-scout-360.png) / [後](after-scout-360.png) | [前](before-scout-390.png) / [後](after-scout-390.png) | [前](before-scout-1440.png) / [後](after-scout-1440.png) |
+| トレード下書き（同じ獲得候補・500万円） | [前](before-trade-360.png) / [後](after-trade-360.png) | [前](before-trade-390.png) / [後](after-trade-390.png) | [前](before-trade-1440.png) / [後](after-trade-1440.png) |
+
+新しい集中表示：[契約360](after-contract-detail-360.png) / [390](after-contract-detail-390.png) / [1440](after-contract-detail-1440.png)、[スカウト360](after-scout-detail-360.png) / [390](after-scout-detail-390.png) / [1440](after-scout-detail-1440.png)。変更前にこの集中表示はないため、架空の比較は作らない。
+
+[変更前の状態/overflow/hash](before-comparison.json) / [変更後](after-comparison.json)。30画像でdocument横はみ出し0、pageerror 0。基準/変更後/全幅で保存された全12球団のSHA-256は一意で一致。画像は全ページ撮影で、固定ナビの位置は撮影時のスクロールに依存する。実際の表示/操作はE2Eも参照する。
+
+再現：`node scripts/capture-ui04c.mjs before /tmp/ui04c-before`、`node scripts/capture-ui04c.mjs after .`。基準は上記mainの `src public index.html package.json package-lock.json vite.config.js` を展開し、依存だけ共有する。日本語フォントのない環境は先に導入し、豆腐字形の画像を合格証拠にしない。
+
+## 未検証・次工程
+
+実機iPhone、スクリーンリーダー、全loading/error、全console、全年度・全オフシーズンを横断するQA-04は未完了。スカウト派遣の3秒タイマー/再読込後の持続性は従来のまま。旧セーブの新規移行は受入対象外。受信箱/ニュース/球団史/設定本文の全面移行はUI-04Dで扱う。局所成功をQA-04全体の完了に読み替えない。

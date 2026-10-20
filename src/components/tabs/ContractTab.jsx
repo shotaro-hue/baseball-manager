@@ -1,260 +1,124 @@
-import React, { useMemo, useState } from "react";
-import { PVAL_DEFS, ACCEPT_THRESHOLD } from '../../constants';
-import { fmtSal } from '../../utils';
+import React, { useEffect, useRef, useState } from 'react';
+import { ACCEPT_THRESHOLD } from '../../constants';
 import { ownedPlayers, renewalEligible, ikuseiContractYears, validContractOffer } from '../../engine/renewalRules';
-import { evalOffer } from '../../engine/contract';
-import { PersonalityView } from '../ui';
+import { evalOffer, calcPlayerDemand } from '../../engine/contract';
+import { isPendingContractReply } from '../../engine/contractReplies';
+import { contractPayroll, contractSalaryStatus } from '../../engine/contractPayroll';
 import { ContractPayroll } from './ContractPayroll';
-import { contractSalaryStatus } from '../../engine/contractPayroll';
+import { Button, MetricBand, StateLabel } from '../design-system/primitives';
+import { payrollText } from './financeView';
+import { DecisionConfirmation, PlayerActions, PlayerFacts, money, moneyMetric, salaryText, useDecisionReturn } from '../management/DecisionParts';
 
-const salaryLabel = salary => contractSalaryStatus(salary) === 'recorded' ? fmtSal(salary)
-  : contractSalaryStatus(salary) === 'missing' ? '— 未記録' : '— 不正値';
-
-function getReactionTone(total){
-  if(total >= ACCEPT_THRESHOLD + 10) return "excited";
-  if(total >= ACCEPT_THRESHOLD) return "positive";
-  if(total >= 55) return "consider";
-  if(total >= 40) return "tough";
-  return "reject";
-}
-
-function formatExpirySeason(year, yearsLeft){
-  const safeYear = Number(year) || 0;
-  const safeLeft = Math.max(0, Number(yearsLeft) || 0);
-  return `${safeYear + Math.max(0, safeLeft - 1)}年シーズン満了まで`;
-}
-
-function formatIncentiveSummary(incentives = {}){
-  const parts = [];
-  if ((Number(incentives.performanceBonusRate) || 0) > 0) parts.push(`出来高+${incentives.performanceBonusRate}%`);
-  if ((Number(incentives.titleBonus) || 0) > 0) parts.push(`タイトルボーナス${fmtSal(incentives.titleBonus)}`);
-  if (incentives.optOut) parts.push("オプトアウト条項");
-  return parts.length ? parts.join(" / ") : "なし";
-}
-
-function makeNegotiationChat(player, offerSal, offerYrs, preview, incentives){
-  if(!player || !preview) return [];
-  const tone = getReactionTone(preview.total);
-  const delta = offerSal - (player.salary || 0);
-  const deltaText = delta >= 0 ? `+${fmtSal(delta)}` : `-${fmtSal(Math.abs(delta))}`;
-  const salaryScore = preview?.breakdown?.money?.score ?? 0;
-  const yearScore = preview?.breakdown?.stability?.score ?? 0;
-  const rivalScore = preview?.breakdown?.market?.score ?? 0;
-
-  const opening = {
-    gm: `来季は ${offerYrs}年 / ${fmtSal(offerSal)} で残留してほしい。現状年俸から${deltaText}の提示だ。出来高は「${formatIncentiveSummary(incentives)}」でどうだろう。`,
-    player: `${player.name}「提示ありがとうございます。条件、しっかり確認します。」`,
+export function ContractTab({ team, allTeams = [team], onOffer, onRelease, year, gameDay, mailbox = [],
+  onPlayerClick, onToggleCompare, comparePlayerIds, focusRequest, onResumeOffseason, active = true }) {
+  const [selectedId, setSelectedId] = useState(null), [snapshot, setSnapshot] = useState(null);
+  const [filter, setFilter] = useState('expiring'), [search, setSearch] = useState('');
+  const [salary, setSalary] = useState(0), [years, setYears] = useState(1);
+  const [performanceBonusRate, setPerformanceBonusRate] = useState(0), [titleBonus, setTitleBonus] = useState(0), [optOut, setOptOut] = useState(false);
+  const [confirmation, setConfirmation] = useState(null), [receipt, setReceipt] = useState(null), [error, setError] = useState(null);
+  const [editingReply, setEditingReply] = useState(false);
+  const busy = useRef(false), current = useRef(null);
+  const owned = ownedPlayers(team), expiring = owned.filter(p => renewalEligible(p, year));
+  const live = owned.find(p => p.id === selectedId), selected = selectedId != null ? live || snapshot : null;
+  const relevantMail = mailbox.filter(m => m.decision?.playerId === selectedId
+    && (m.decision.teamId == null || m.decision.teamId === team?.id)
+    && (m.decision.offeredYear == null || m.decision.offeredYear === year));
+  const pending = relevantMail.find(isPendingContractReply);
+  const reply = [...relevantMail].reverse().find(m => m.type === 'contract_reply');
+  const waiting = pending || (!reply && receipt?.kind === 'offer' && receipt.player.id === selectedId ? receipt : null);
+  const canRelease = live && renewalEligible(live, year) && !onResumeOffseason;
+  const eligible = canRelease && contractSalaryStatus(live.salary) === 'recorded';
+  const terms = { salary: Number(salary), years, incentives: { performanceBonusRate, titleBonus, optOut } };
+  const valid = eligible && String(salary).trim() !== '' && validContractOffer(live, terms.salary, years);
+  const preview = valid ? evalOffer(live, terms, team, allTeams) : null;
+  const demand = eligible ? calcPlayerDemand(live, { team, year }) : null;
+  const focus = useDecisionReturn(selectedId, active);
+  const select = (p, event) => {
+    focus.remember(event); setSelectedId(p.id); setSnapshot(p); setSalary(Math.max(1000, Math.round(p.salary / 100) * 100));
+    setYears(1); setPerformanceBonusRate(0); setTitleBonus(0); setOptOut(false); setConfirmation(null); setReceipt(null); setError(null); setEditingReply(false); busy.current = false;
   };
-
-  const reactions = {
-    excited: [
-      `${player.name}「この条件なら前向きです！チームへの思いに応えたいです。」`,
-      `代理人「年俸評価(${salaryScore})・契約安定(${yearScore})ともに高水準。合意は目前です。」`,
-    ],
-    positive: [
-      `${player.name}「かなり良い条件ですね。細部がまとまれば決められそうです。」`,
-      `代理人「市場評価(${rivalScore})と比べても悪くありません。前向きに進めましょう。」`,
-    ],
-    consider: [
-      `${player.name}「気持ちはありますが、もう一声あると安心できます。」`,
-      `代理人「単年リスクと市場価格の差が気になります。条件調整の余地があります。」`,
-    ],
-    tough: [
-      `${player.name}「正直、迷います…。この条件では決断が難しいです。」`,
-      `代理人「提示は把握しましたが、評価が不足しています。再提示を推奨します。」`,
-    ],
-    reject: [
-      `${player.name}「この条件では厳しいです。納得できません。」`,
-      `代理人「現時点では合意困難です。年俸か年数の大幅見直しが必要です。」`,
-    ],
+  useEffect(() => {
+    if (focusRequest?.id == null) return;
+    const p = owned.find(p => p.id === focusRequest.id);
+    if (p) select(p);
+    // A new explicit link selects its target once; ordinary roster updates preserve drafts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusRequest?.token]);
+  current.current = { live, eligible, canRelease, valid, terms, preview, confirmation };
+  const confirm = () => {
+    const c = current.current;
+    if (busy.current || !c.confirmation || !c.live || c.live.id !== c.confirmation.playerId) return;
+    if (c.confirmation.kind === 'release' ? !c.canRelease : !c.eligible) return;
+    if (c.confirmation.kind === 'offer' && !c.valid) return;
+    busy.current = true;
+    const p = c.live;
+    if (c.confirmation.kind === 'release') {
+      if (onRelease?.(p.id) !== true) { busy.current = false; setConfirmation(null); setError('自由契約を確定できませんでした。現在の所属・契約を確認してください。'); return; }
+      setReceipt({ kind: 'release', player: p });
+    } else {
+      const responseAfterDays = c.preview.total >= ACCEPT_THRESHOLD ? 2 : c.preview.total >= 55 ? 3 : 4;
+      if (onOffer?.(p.id, c.terms.salary, c.terms.years, { score: c.preview.total, responseAfterDays, incentives: c.terms.incentives }) !== true) {
+        busy.current = false; setConfirmation(null); setError('提示を送れませんでした。所属・金額・契約年数を確認してください。'); return;
+      }
+      setReceipt({ kind: 'offer', player: p, ...c.terms, deliverOnDay: Number.isFinite(gameDay) ? gameDay + responseAfterDays : null });
+      setEditingReply(false);
+    }
+    setConfirmation(null); setError(null);
   };
-
-  return [
-    { speaker: "GM", text: opening.gm, align: "right", color: "#60a5fa" },
-    { speaker: player.name, text: opening.player, align: "left", color: "#f5c842" },
-    ...reactions[tone].map((text, idx)=>({
-      speaker: idx === 0 ? player.name : "代理人",
-      text,
-      align: "left",
-      color: idx === 0 ? "#f5c842" : "#c084fc",
-    })),
-  ];
-}
-
-export function ContractTab({team,allTeams,onOffer,onRelease,year,onPlayerClick}){
-  const [selId,setSelId]=useState(null);
-  const [offerSal,setOfferSal]=useState(0);
-  const [offerYrs,setOfferYrs]=useState(1);
-  const [perfBonusRate, setPerfBonusRate] = useState(0);
-  const [titleBonus, setTitleBonus] = useState(0);
-  const [optOut, setOptOut] = useState(false);
-  const [negotiationLogs, setNegotiationLogs] = useState({});
-  const [offerRounds, setOfferRounds] = useState({});
-  const expiring=ownedPlayers(team).filter(p=>renewalEligible(p, year));
-  const sel=expiring.find(p=>p.id===selId);
-  const salaryOptions=sel
-    ? Array.from(new Set([
-        2000, 3000, 5000,
-        Math.max(1000, Math.round(sel.salary * 0.8 / 100) * 100),
-        Math.max(1000, Math.round(sel.salary / 100) * 100),
-        Math.max(1000, Math.round(sel.salary * 1.2 / 100) * 100),
-        Math.max(1000, Math.round(sel.salary * 1.5 / 100) * 100),
-        Math.max(1000, Math.round(sel.salary * 2.0 / 100) * 100),
-      ])).sort((a,b)=>a-b)
-    : [];
-  const incentives = { performanceBonusRate: perfBonusRate, titleBonus, optOut };
-  const preview=sel?evalOffer(sel,{salary:offerSal,years:offerYrs,incentives},team,allTeams):null;
-  const chat = sel ? (negotiationLogs[sel.id] || []) : [];
-  const currentRound = sel ? (offerRounds[sel.id] || 0) : 0;
-  const ac=preview?.total>=ACCEPT_THRESHOLD?"#34d399":preview?.total>=40?"#f5c842":"#f87171";
-
-  const finalOfferDisabled = useMemo(() => {
-    if (!sel) return true;
-    if (!validContractOffer(sel, offerSal, offerYrs)) return true;
-    const logs = negotiationLogs[sel.id] || [];
-    return logs.some(line => line.tag === "final-offer");
-  }, [negotiationLogs, sel, offerSal, offerYrs]);
-
-  const appendOfferRally = () => {
-    if(!sel || !preview) return;
-    const tone = getReactionTone(preview.total);
-    const nextRound = (offerRounds[sel.id] || 0) + 1;
-    const roundLabel = `第${nextRound}ラリー`;
-    const desiredSalary = Math.max(1000, Math.round((sel.salary || 0) * (tone === "reject" ? 1.5 : tone === "tough" ? 1.3 : tone === "consider" ? 1.2 : 1.05) / 100) * 100);
-    const desiredYears = tone === "reject" ? Math.max(offerYrs, 3) : tone === "tough" ? Math.max(offerYrs, 2) : offerYrs;
-
-    const rally = [
-      { speaker: "GM", text: `${roundLabel}：${offerYrs}年 / ${fmtSal(offerSal)}（出来高: ${formatIncentiveSummary(incentives)}）を正式提示する。`, align: "right", color: "#60a5fa" },
-      { speaker: sel.name, text: `${sel.name}「条件を受け取りました。率直に返答します。」`, align: "left", color: "#f5c842" },
-      { speaker: "代理人", text: tone === "excited" || tone === "positive"
-        ? `代理人「かなり前向きです。このままなら合意できる見込みです。」`
-        : `代理人「現時点では ${desiredYears}年 / ${fmtSal(desiredSalary)} 付近が妥結ラインです。」`, align: "left", color: "#c084fc" },
-      { speaker: sel.name, text: tone === "excited" || tone === "positive"
-        ? `${sel.name}「次の提示で最終判断できます。」`
-        : `${sel.name}「もう少し条件が上がれば、残留を真剣に考えます。」`, align: "left", color: "#f5c842" },
-    ];
-
-    setNegotiationLogs(prev => ({
-      ...prev,
-      [sel.id]: [...(prev[sel.id] || []), ...rally],
-    }));
-    setOfferRounds(prev => ({ ...prev, [sel.id]: nextRound }));
-  };
-
-  const handleFinalOffer = () => {
-    if (!sel || !preview) return;
-    if (finalOfferDisabled) return;
-    const tone = getReactionTone(preview.total);
-    const responseAfterDays = tone === "excited" || tone === "positive" ? 2 : tone === "consider" ? 3 : 4;
-    const finalReaction = [
-      { speaker: "GM", text: `この条件で最終オファーを送る。${offerYrs}年 / ${fmtSal(offerSal)}（出来高: ${formatIncentiveSummary(incentives)}）。`, align: "right", color: "#60a5fa", tag: "final-offer" },
-      { speaker: sel.name, text: tone === "excited" || tone === "positive"
-        ? `${sel.name}「最終提示、受け取りました。前向きに最終判断します。」`
-        : `${sel.name}「最終条件として受け取りました。慎重に判断して返答します。」`, align: "left", color: "#f5c842", tag: "final-offer" },
-      { speaker: "代理人", text: `代理人「最終回答は数日後に受信箱へお送りします。」`, align: "left", color: "#c084fc", tag: "final-offer" },
-    ];
-
-    const submitted = onOffer(sel.id, offerSal, offerYrs, {
-      score: preview.total,
-      responseAfterDays,
-      summary: tone,
-      incentives,
-    });
-    if (submitted === false) return;
-    setNegotiationLogs(prev => ({ ...prev, [sel.id]: [...(prev[sel.id] || []), ...finalReaction] }));
-  };
-
-  return(
-    <div>
-      <ContractPayroll team={team} leaders onPlayerClick={onPlayerClick} />
-      <div className="card">
-        <div className="card-h">契約満了選手 ({expiring.length}人)</div>
-        <p style={{color:"#2a3a4c",fontSize:13}}>登録・ファームの選手が対象です。提示を辞退されても所属と現契約は維持し、満了時の処理はシーズン終了後に行います。</p>
-        {expiring.some(p=>contractSalaryStatus(p.salary)!=='recorded')&&<p className="finance-warning">年俸が未記録・不正値の選手は、年俸を確認するまで契約条件を提示できません。</p>}
-        {expiring.length===0&&<p style={{color:"#2a3a4c",fontSize:12}}>今季満了の選手はいません</p>}
-        <div style={{overflowX:"auto"}}>{expiring.length>0&&(
-          <table className="tbl">
-            <thead><tr><th>選手名</th><th>守備</th><th>年齢</th><th>現年俸</th><th>契約期限</th><th></th></tr></thead>
-            <tbody>{expiring.map(p=>(
-              <tr key={p.id} style={{background:selId===p.id?"rgba(245,200,66,.04)":undefined}}>
-                <td style={{fontWeight:700,cursor:contractSalaryStatus(p.salary)==='recorded'?"pointer":"default",color:selId===p.id?"#f5c842":undefined}} onClick={()=>{if(contractSalaryStatus(p.salary)!=='recorded')return;setSelId(p.id);setOfferSal(Math.max(1000,Math.round(p.salary/100)*100));setOfferYrs(1);setPerfBonusRate(0);setTitleBonus(0);setOptOut(false);}}>{p.name}</td>
-                <td style={{fontSize:10,color:"#374151"}}>{p.pos}</td><td className="mono">{p.age}</td>
-                <td className="mono">{salaryLabel(p.salary)}</td>
-                <td className="mono" style={{color:p.contractYearsLeft===0?"#f87171":"#f5c842"}}>{formatExpirySeason(year, p.contractYearsLeft)}</td>
-                <td><button className="bsm bgr" onClick={()=>onRelease(p.id)}>放出</button></td>
-              </tr>
-            ))}</tbody>
-          </table>
-        )}</div>
-      </div>
-      {sel&&(
-        <div className="card">
-          <div className="card-h">{sel.name} — 契約交渉</div>
-          <div className="g2">
-            <div><div style={{fontSize:11,color:"#374151",marginBottom:6}}>選手の価値観</div><PersonalityView p={sel}/></div>
-            <div>
-              <div style={{marginBottom:10}}>
-                <label style={{fontSize:11,color:"#4b5563",display:"block",marginBottom:4}}>年俸オファー</label>
-                <select value={offerSal} onChange={e=>setOfferSal(Number(e.target.value)||0)} style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:6,padding:"6px 10px",color:"#e0d4bf",fontFamily:"'Share Tech Mono',monospace",width:"100%"}}>
-                  {salaryOptions.map(v=><option key={v} value={v} style={{background:"#0b1220"}}>{fmtSal(v)}</option>)}
-                </select>
-                <div style={{fontSize:10,color:"#374151",marginTop:2}}>現在値: {fmtSal(sel.salary)}</div>
-              </div>
-              <div style={{marginBottom:12}}>
-                <label style={{fontSize:11,color:"#4b5563",display:"block",marginBottom:4}}>契約年数</label>
-                <div style={{display:"flex",gap:6}}>{[1,2,3,4,5].filter(y => !sel.育成 || y <= ikuseiContractYears(sel)).map(y=><button key={y} className={`bsm ${offerYrs===y?"bgy":"bgb"}`} onClick={()=>setOfferYrs(y)}>{y}年</button>)}</div>
-              </div>
-              <div style={{marginBottom:12}}>
-                <label style={{fontSize:11,color:"#4b5563",display:"block",marginBottom:4}}>インセンティブ（出来高）</label>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                  <select value={perfBonusRate} onChange={e=>setPerfBonusRate(Number(e.target.value)||0)} style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:6,padding:"6px 10px",color:"#e0d4bf",fontFamily:"'Share Tech Mono',monospace"}}>
-                    {[0,5,10,15,20].map(v=><option key={v} value={v} style={{background:"#0b1220"}}>出来高 {v}%</option>)}
-                  </select>
-                  <select value={titleBonus} onChange={e=>setTitleBonus(Number(e.target.value)||0)} style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:6,padding:"6px 10px",color:"#e0d4bf",fontFamily:"'Share Tech Mono',monospace"}}>
-                    {[0,300,500,800,1000].map(v=><option key={v} value={v} style={{background:"#0b1220"}}>タイトル {fmtSal(v)}</option>)}
-                  </select>
-                </div>
-                <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"#94a3b8",marginTop:8,cursor:"pointer"}}>
-                  <input type="checkbox" checked={optOut} onChange={e=>setOptOut(e.target.checked)} />
-                  オプトアウト条項を付与
-                </label>
-              </div>
-              {preview&&(
-                <div style={{background:"rgba(0,0,0,.3)",borderRadius:8,padding:10,marginBottom:10}}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
-                    <div className="score-ring" style={{borderColor:ac,color:ac,width:46,height:46,fontSize:16}}>{preview.total}</div>
-                    <div style={{fontSize:12,fontWeight:700,color:ac}}>{preview.total>=ACCEPT_THRESHOLD?"✅ 受諾見込み":preview.total>=40?"⚠️ 微妙":"❌ 拒否の可能性大"}</div>
-                  </div>
-                  {Object.entries(preview.breakdown).map(([k,v])=>{const def=PVAL_DEFS.find(d=>d.k===k);return(<div key={k} style={{display:"flex",alignItems:"center",gap:5,marginBottom:2}}><span style={{fontSize:9,color:"#374151",width:80}}>{def?.lbl}</span><div style={{flex:1,height:4,background:"rgba(255,255,255,.06)",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${v.score}%`,background:def?.color||"#60a5fa"}}/></div><span style={{fontFamily:"monospace",fontSize:10,color:"#374151",width:22}}>{v.score}</span><span style={{fontSize:9,color:"#1e2d3d",width:28}}>×{v.weight}</span></div>);})}
-                </div>
-              )}
-              {chat.length>0&&(
-                <div style={{background:"rgba(15,23,42,.6)",border:"1px solid rgba(148,163,184,.2)",borderRadius:8,padding:10,marginBottom:10}}>
-                  <div style={{fontSize:10,color:"#94a3b8",marginBottom:8,letterSpacing:".08em"}}>NEGOTIATION TALK {currentRound>0?`/ ${currentRound} ROUNDS`:""}</div>
-                  <div style={{display:"flex",flexDirection:"column",gap:7}}>
-                    {chat.map((line,idx)=>(
-                      <div key={`${line.speaker}-${idx}`} style={{display:"flex",justifyContent:line.align==="right"?"flex-end":"flex-start"}}>
-                        <div style={{maxWidth:"92%",background:line.align==="right"?"rgba(37,99,235,.2)":"rgba(30,41,59,.9)",border:`1px solid ${line.color}55`,borderRadius:10,padding:"7px 9px"}}>
-                          <div style={{fontSize:9,color:line.color,fontWeight:700,marginBottom:2}}>{line.speaker}</div>
-                          <div style={{fontSize:11,color:"#e2e8f0",lineHeight:1.45}}>{line.text}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div style={{display:"grid",gap:8}}>
-                <button className="btn btn-gold" style={{width:"100%"}} onClick={()=>{
-                  appendOfferRally();
-                  const scripted = makeNegotiationChat(sel, offerSal, offerYrs, preview, incentives);
-                  setNegotiationLogs(prev => ({ ...prev, [sel.id]: [...(prev[sel.id] || []), ...scripted] }));
-                }}>オファーを送る（会話）</button>
-                <button className="btn" style={{width:"100%",opacity:finalOfferDisabled?0.6:1}} disabled={finalOfferDisabled} onClick={handleFinalOffer}>この条件で最終オファー</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  const status = p => p.contractSignedYear === year ? '当年契約済み'
+    : mailbox.some(m => isPendingContractReply(m) && m.decision?.playerId === p.id && (m.decision.teamId == null || m.decision.teamId === team.id) && (m.decision.offeredYear == null || m.decision.offeredYear === year)) ? '回答待ち'
+      : renewalEligible(p, year) ? '今季満了' : '継続契約';
+  const visible = owned.filter(p => p.name?.includes(search.trim()) && (filter === 'all' || filter === 'expiring' && renewalEligible(p, year)
+    || filter === 'waiting' && status(p) === '回答待ち' || filter === 'signed' && p.contractSignedYear === year));
+  const payroll = contractPayroll(team);
+  return <main className={`management-decisions ${selectedId != null ? 'decision-selected' : ''}`} data-ds="contract-management">
+    <h1>契約状況</h1><p>現契約と回答状況を確認し、満了選手の条件を検討します。</p>
+    <MetricBand items={[moneyMetric('編成予算の残枠', money(team?.budget)), moneyMetric('契約年俸総額 / 年', payrollText(payroll.total)), { label: '今季満了', value: expiring.length, unit: '人' }]} />
+    {onResumeOffseason && <div className="decision-warning"><p>契約更改の進行中です。合意済みの条件と対応待ちは、オフシーズンの同じ一覧で扱います。</p><Button onClick={onResumeOffseason}>オフシーズンの契約更改へ戻る</Button></div>}
+    <div className="decision-layout"><section className="decision-list" aria-label="所属選手の契約一覧">
+      <h2>契約満了選手 ({expiring.length}人)</h2>
+      <div className="decision-filters"><label>契約状態<select value={filter} onChange={e => setFilter(e.target.value)}><option value="expiring">今季満了</option><option value="all">全所属選手</option><option value="waiting">回答待ち</option><option value="signed">当年契約済み</option></select></label><label>選手名<input type="search" value={search} onChange={e => setSearch(e.target.value)} /></label></div>
+      {!visible.length && <p>{expiring.length === 0 && filter === 'expiring' ? '今季満了の選手はいません' : 'この条件に該当する選手はいません。絞り込みを変更してください。'}</p>}
+      {visible.map(p => <article key={p.id} className="decision-row" aria-current={p.id === selectedId}>
+        <div><button className="decision-select" aria-label={`${p.name}の契約を確認`} onClick={e => select(p, e)}>{p.name}</button>
+          <p className="decision-note">{team?.farm?.some(f => f.id === p.id) ? 'ファーム' : '登録選手'} · {p.pos} · {p.age ?? '未記録'}歳</p><StateLabel>{status(p)}</StateLabel></div>
+        <div className="decision-row-money"><strong>{salaryText(p.salary)}</strong><p className="decision-note">残り {Number.isFinite(p.contractYearsLeft) ? `${p.contractYearsLeft}年` : '未記録'}</p></div>
+      </article>)}
+    </section><section className="decision-detail" aria-label="選んだ選手の契約条件">
+      {!selected ? <p>選手を選ぶと成績・年俸・契約条件を確認できます。</p> : <>
+        <Button variant="secondary" onClick={() => { setSelectedId(null); setConfirmation(null); }}>← 選手一覧に戻る</Button>
+        <h3 ref={focus.heading} tabIndex={-1}>{selected.name}</h3><PlayerFacts player={selected} />
+        <PlayerActions player={live || selected} teamName={team.name} {...{ onPlayerClick, onToggleCompare, comparePlayerIds }} />
+        {receipt?.kind === 'release' ? <div className="decision-receipt" role="status">自由契約にしました。自由契約市場から確認できます。</div>
+          : !live ? <p role="status">この選手は現在所属していません。契約操作はできません。</p> : <>
+          {waiting && <div className="decision-warning" role="status"><strong>回答待ち</strong><p>最終提示：{money(waiting.decision?.salary ?? waiting.salary)} / {waiting.decision?.years ?? waiting.years}年</p>
+            <p>{Number.isFinite(waiting.deliverOnDay) ? `第${waiting.deliverOnDay}日以降に受信箱へ回答が届きます。` : '数日後に受信箱へ回答が届きます。'}</p>
+            {!editingReply && eligible && <Button variant="secondary" onClick={() => { busy.current = false; setEditingReply(true); }}>条件を見直して再提示する</Button>}</div>}
+          {reply && <details><summary>最新の契約回答</summary><p>{reply.body}</p></details>}
+          {eligible && (!waiting || editingReply) ? <>
+            <h3>契約交渉</h3><p>現年俸 {salaryText(live.salary)} · 要求年俸の参考 {money(demand?.demandSalary)}</p>
+            <div className="decision-fields"><label>提示年俸（万円）<input type="number" min="1" step="100" value={salary} onChange={e => { setSalary(e.target.value); setConfirmation(null); }} /></label>
+              <label>契約年数<select aria-label="契約年数" value={years} onChange={e => { setYears(Number(e.target.value)); setConfirmation(null); }}>{[1, 2, 3, 4, 5].filter(y => !live.育成 || y <= ikuseiContractYears(live)).map(y => <option key={y} value={y}>{y}年</option>)}</select></label></div>
+            <p className="decision-note">通常更改の年俸は、この画面の提示時に予算から差し引きません。参考要求額は成績に基づく目安で、シーズン中の交渉の確定条件ではありません。</p>
+            <details><summary>出来高・条項</summary><div className="decision-fields">
+              <label>出来高<select value={performanceBonusRate} onChange={e => { setPerformanceBonusRate(Number(e.target.value)); setConfirmation(null); }}>{[0, 5, 10, 15, 20].map(v => <option key={v} value={v}>{v}%</option>)}</select></label>
+              <label>タイトルボーナス（万円）<select value={titleBonus} onChange={e => { setTitleBonus(Number(e.target.value)); setConfirmation(null); }}>{[0, 300, 500, 800, 1000].map(v => <option key={v} value={v}>{v}</option>)}</select></label></div>
+              <label><input type="checkbox" checked={optOut} onChange={e => { setOptOut(e.target.checked); setConfirmation(null); }} />オプトアウト条項を付与</label></details>
+            {preview && <p>反応の目安：{preview.total >= ACCEPT_THRESHOLD ? '受諾見込み' : '条件の見直しを推奨'}（評価 {preview.total}）</p>}
+            <Button disabled={!valid} onClick={() => { busy.current = false; setError(null); setConfirmation({ kind: 'offer', playerId: live.id }); }}>提示条件を確認する</Button>
+            {!valid && <p className="decision-warning">提示年俸と契約年数を確認してください。</p>}
+          </> : !eligible && <p className="decision-note">{onResumeOffseason ? '進行中の更改画面から判断してください。' : contractSalaryStatus(live.salary) !== 'recorded' ? '現年俸が未記録・不正値のため提示できません。' : '当年契約済み・継続契約のため、今季の更改対象ではありません。'}</p>}
+          {canRelease && <details><summary>自由契約にする</summary><p>所属から外れ、自由契約市場へ移ります。主力の放出で人気が下がる場合があります。</p><Button variant="secondary" onClick={() => { busy.current = false; setConfirmation({ kind: 'release', playerId: live.id }); }}>自由契約の影響を確認</Button></details>}
+        </>}
+        {error && <p className="decision-error" role="alert">{error}</p>}
+        {confirmation && <DecisionConfirmation fallbackFocus={focus.heading} title={confirmation.kind === 'offer' ? '提示条件の最終確認' : '自由契約の最終確認'} onCancel={() => setConfirmation(null)} onConfirm={confirm}
+          confirmLabel={confirmation.kind === 'offer' ? 'この条件で最終オファー' : '自由契約を確定する'} danger={confirmation.kind === 'release'} error={!(confirmation.kind === 'release' ? canRelease : eligible) ? '所属または契約状況が変わっています。選び直してください。' : confirmation.kind === 'offer' && !valid ? '提示条件を確認してください。' : null}>
+          <p><strong>{selected.name}</strong></p>{confirmation.kind === 'offer' ? <><p>年俸 {money(terms.salary)} / {years}年</p><p>出来高 {performanceBonusRate}% · タイトル {money(titleBonus)} · オプトアウト {optOut ? 'あり' : 'なし'}</p><p>提示時の予算控除はありません。数日後の回答で契約が確定します。{waiting && '現在の回答予定を取り消して、この条件へ置き換えます。'}</p></>
+            : <p>自由契約市場へ移し、所属・起用から外します。取消はできません。編成予算の払い戻しはありません。</p>}
+        </DecisionConfirmation>}
+      </>}
+    </section></div>
+    <details><summary>所属選手の年俸内訳・年俸上位</summary><ContractPayroll team={team} leaders onPlayerClick={onPlayerClick} /></details>
+    <p className="decision-note">一軍成績の0は実測値。「未記録」は欠測、「—」は分母不足などで算出できない状態です。提示の辞退だけでは所属と現契約は変わりません。</p>
+  </main>;
 }

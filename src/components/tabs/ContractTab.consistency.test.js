@@ -12,12 +12,13 @@ it('shows farm ID 0, excludes signed contracts, and keeps invalid ikusei years o
   const team = { id: 0, players: [p(1, { contractSignedYear: 2026 })], farm: [p(0, { 育成: true, ikuseiYears: 2 })], wins: 0, losses: 0 };
   const onOffer = vi.fn(() => false);
   act(() => { view = create(React.createElement(ContractTab, { team, allTeams: [team], year: 2026, onOffer, onRelease: vi.fn() })); });
-  expect(text(view.root)).toContain('契約満了選手 (1人)'); expect(text(view.root.findAllByProps({ className: 'card' }).find(n => text(n).includes('契約満了選手')))).not.toContain('選手1');
-  act(() => view.root.findAllByType('td').find(n => text(n) === '選手0').props.onClick());
-  expect(view.root.findAllByType('button').some(n => text(n) === '2年')).toBe(false);
+  expect(text(view.root)).toContain('契約満了選手 (1人)'); expect(text(view.root.findByProps({ 'aria-label': '所属選手の契約一覧' }))).not.toContain('選手1');
+  act(() => view.root.findByProps({ 'aria-label': '選手0の契約を確認' }).props.onClick());
+  expect(view.root.findAllByType('select').find(n => n.children.some(c => c.type === 'option' && text(c) === '1年')).children.map(text)).toEqual(['1年']);
+  act(() => view.root.findAllByType('button').find(n => text(n) === '提示条件を確認する').props.onClick());
   const offer = () => view.root.findAllByType('button').find(n => text(n) === 'この条件で最終オファー');
   act(() => offer().props.onClick());
-  expect(onOffer.mock.calls[0][0]).toBe(0); expect(offer().props.disabled).toBe(false);
+  expect(onOffer.mock.calls[0][0]).toBe(0); expect(view.root.findAllByType('button').find(n => text(n) === '提示条件を確認する').props.disabled).toBe(false);
 });
 
 it('explicit farm release uses the shared release path, cleans references, and does not duplicate history or market entries', () => {
@@ -37,6 +38,7 @@ it('renders missing and invalid salaries in the migrated contract destination wi
   const team={id:0,name:'自球団',players:[p(1,{salary:null}),p(2,{salary:'200'})],farm:[],wins:0,losses:0};
   act(()=>{view=create(React.createElement(ContractTab,{team,allTeams:[team],year:2026,onPlayerClick:vi.fn()}));});
   expect(text(view.root)).toContain('未記録');expect(text(view.root)).toContain('不正値');expect(text(view.root)).not.toContain('NaN');
-  const row=view.root.findAllByType('td').find(n=>text(n)==='選手1');act(()=>row.props.onClick());
+  act(()=>view.root.findByProps({'aria-label':'選手1の契約を確認'}).props.onClick());
   expect(text(view.root)).not.toContain('契約交渉');
+  expect(view.root.findAllByType('button').some(n=>text(n)==='提示条件を確認する')).toBe(false);
 });

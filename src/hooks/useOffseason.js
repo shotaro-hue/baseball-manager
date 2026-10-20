@@ -474,7 +474,7 @@ export function useOffseason(gs) {
         }
       }
       setMailbox(prev=>prev.map(m=>m.id===id?{...m,resolved:true,read:true}:m));
-      return;
+      return true;
     }
 
     if(!mail.offer || handledTradeMails.current.has(id)) return;
