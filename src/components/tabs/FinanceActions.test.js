@@ -22,6 +22,29 @@ it('keeps price draft through blur and cancel and calls the existing handler onl
   act(()=>h.button('価格変更を確認').props.onClick());const commit=h.button('この価格で確定').props.onClick;
   act(()=>{commit();commit();});expect(h.props.onTicketPriceChange).toHaveBeenCalledTimes(1);expect(h.props.onTicketPriceChange).toHaveBeenCalledWith(3300);
 });
+it.each([
+  ['自動価格', {}],
+  ['手動設定価格', { customAvgTicketPrice: 2800 }],
+])('does not submit an unchanged numeric %s even when formatted differently', (_name, extra) => {
+  const h = setup(extra), initial = view.root.findByType('input').props.value;
+  h.change(`0${initial}`);
+  expect(view.root.findByType('input').props.value).toBe(`0${initial}`);
+  expect(h.button('価格変更を確認').props.disabled).toBe(true);
+  expect(h.button('この価格で確定')).toBeUndefined();
+  expect(h.button('下書きを取り消す')).toBeTruthy();
+  expect(text(view.root)).not.toContain('未確定');
+  expect(h.props.onTicketPriceChange).not.toHaveBeenCalled();
+});
+it('disables and guards an open confirmation when the current price catches up with the draft', () => {
+  const h = setup();
+  h.change('3500');
+  act(() => h.button('価格変更を確認').props.onClick());
+  h.update({ ...h.props.team, customAvgTicketPrice: 3500 });
+  const commit = h.button('この価格で確定');
+  expect(commit.props.disabled).toBe(true);
+  act(() => commit.props.onClick());
+  expect(h.props.onTicketPriceChange).not.toHaveBeenCalled();
+});
 it.each(['','499','5001','2.5'])('blocks invalid draft %s without calling the handler',value=>{
   const h=setup();h.change(value);expect(text(view.root)).toContain('500〜5,000円の整数');
   expect(h.button('価格変更を確認').props.disabled).toBe(true);expect(h.props.onTicketPriceChange).not.toHaveBeenCalled();

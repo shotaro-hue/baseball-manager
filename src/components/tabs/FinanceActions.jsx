@@ -38,6 +38,8 @@ export function FinanceActions({ team, schedule, model, onTicketPriceChange, onS
     }
   }, [stadiumConfirm]);
   const preview = ticketPreview(team, schedule, draft), investment = stadiumPreview(team, schedule);
+  // A formatting-only edit (e.g. 4100 -> 04100) must not lock an automatic price.
+  const priceChanged = preview.ok && preview.price !== model.quote?.avgTicketPrice;
   const priceRows = preview.ok ? [
     ['動員 / 主催1試合', people(preview.before.quote.attendance), people(preview.after.quote.attendance)],
     ['主催売上 / 1試合', moneyText(preview.before.hostRevenue), moneyText(preview.after.hostRevenue)],
@@ -46,7 +48,7 @@ export function FinanceActions({ team, schedule, model, onTicketPriceChange, onS
   const closePrice = (target = 'button') => { priceRestore.current = target; setPriceConfirm(false); };
   const closeStadium = (target = 'button') => { stadiumRestore.current = target; setStadiumConfirm(false); };
   const commitPrice = () => {
-    if (!priceConfirm || !preview.ok || priceSent.current) return;
+    if (!priceConfirm || !priceChanged || priceSent.current) return;
     priceSent.current = true;
     onTicketPriceChange?.(preview.price);
     dirty.current = false;
@@ -66,7 +68,7 @@ export function FinanceActions({ team, schedule, model, onTicketPriceChange, onS
       <div className="finance-price-field"><input ref={priceInput} id={priceId} type="text" inputMode="numeric" pattern="[0-9]*" value={draft}
         aria-invalid={!preview.ok} aria-describedby={`${priceId}-help`} disabled={!model.quote}
         onChange={e => { dirty.current = true; priceSent.current = false; setDraft(e.target.value); setPriceConfirm(false); }} />
-        {draft !== initial && <StateLabel tone="warning">未確定</StateLabel>}
+        {priceChanged && <StateLabel tone="warning">未確定</StateLabel>}
       </div>
       <p className="finance-note" id={`${priceId}-help`}>{preview.ok ? '設定範囲: 500〜5,000円。入力・フォーカス移動では確定しません。' : preview.error}</p>
       {preview.ok && <>
@@ -77,9 +79,9 @@ export function FinanceActions({ team, schedule, model, onTicketPriceChange, onS
       {priceConfirm ? <div className="finance-confirm" role="region" aria-label="価格変更の確認">
         <h4 ref={priceHeading} tabIndex={-1}>価格変更の確認</h4>
         <p>{model.quote?.avgTicketPrice.toLocaleString()}円 → <strong>{preview.ok ? preview.price.toLocaleString() : '—'}円</strong>。確定後の主催試合に適用します。</p>
-        <div className="finance-buttons"><Button onClick={commitPrice} disabled={!preview.ok || !onTicketPriceChange}>この価格で確定</Button><Button variant="secondary" onClick={() => closePrice()}>価格の確認を閉じる</Button></div>
+        <div className="finance-buttons"><Button onClick={commitPrice} disabled={!priceChanged || !onTicketPriceChange}>この価格で確定</Button><Button variant="secondary" onClick={() => closePrice()}>価格の確認を閉じる</Button></div>
       </div> : <div className="finance-buttons" ref={priceButton}>
-        <Button disabled={!preview.ok || !onTicketPriceChange || draft === initial} onClick={() => { priceSent.current = false; setPriceConfirm(true); }}>価格変更を確認</Button>
+        <Button disabled={!priceChanged || !onTicketPriceChange} onClick={() => { priceSent.current = false; setPriceConfirm(true); }}>価格変更を確認</Button>
         {draft !== initial && <Button variant="secondary" onClick={() => { dirty.current = false; setDraft(initial); priceInput.current?.focus(); }}>下書きを取り消す</Button>}
       </div>}
     </section>

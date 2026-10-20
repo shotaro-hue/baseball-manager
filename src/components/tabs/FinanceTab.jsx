@@ -18,6 +18,8 @@ function LedgerTable({ label, rows }) {
 export function FinanceTab({ team, onStadiumUpgrade, onTicketPriceChange, schedule, onNavigate }) {
   const model = useMemo(() => financeView(team, schedule), [team, schedule]);
   const payroll = contractPayroll(team), f = model.forecast;
+  const annualAfterPayroll = f && payroll.total.missing === 0 && payroll.total.invalid === 0 && Number.isFinite(payroll.total.amount)
+    ? { min: f.operatingSurplus.min - payroll.total.amount, max: f.operatingSurplus.max - payroll.total.amount } : null;
   const metric = (label, value, extra = {}) => ({ label, value, ...extra });
   return <main className="club-management finance-tab" data-ds="finance">
     <h1>財務</h1><p>実績と残り試合の予測から、価格と投資を判断します。</p>
@@ -42,6 +44,10 @@ export function FinanceTab({ team, onStadiumUpgrade, onTicketPriceChange, schedu
           ['運営費（選手給与を除く）', model.actual.operatingCosts, f.operatingCosts],
           ['運営差額（選手給与控除前）', model.actual.operatingSurplus, f.operatingSurplus],
         ]} />
+        <dl className="finance-rows" aria-label="契約年俸控除後の参考収支">
+          <div><dt>契約年俸控除後の参考収支（年間）</dt><dd>{rangeText(annualAfterPayroll)}</dd></div>
+        </dl>
+        <p className="finance-note">年間運営差額見込みから全所属選手の契約年俸を引いた参考値です。支払済み額でも編成予算の残枠でもありません。{!annualAfterPayroll && '年俸を全員分集計できないため算出不可です。'}</p>
         {[['チケット・飲食・物販', incomeRows.slice(0,3), 'income'], ['スポンサー・放映権・会員', incomeRows.slice(3), 'income'], ['固定費・興行費・商品原価', costRows, 'costs']].map(([label, rows, group]) => <details key={label}>
           <summary>{label}</summary><LedgerTable label={label} rows={rows.map(([key, title]) => [title, model.actual[group][key], f[group][key]])} />
         </details>)}

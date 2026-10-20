@@ -16,6 +16,28 @@ describe('FinanceTab contract salary', () => {
     for (const text of ['主催売上', '運営費', '放映権', '会員', '編成予算', '現金残高', '推定値']) expect(html).toContain(text);
     expect(html).toContain('10.00億円');
   });
+  it('restores the annual salary-adjusted reference without subtracting payroll from the spending budget', () => {
+    const t = startClubFinance(team({ budget: 500000 }), 2026);
+    const forecast = forecastClubFinance(t);
+    const expected = forecast.operatingSurplus.min === forecast.operatingSurplus.max
+      ? fmtSal(forecast.operatingSurplus.min - 650)
+      : `${fmtSal(forecast.operatingSurplus.min - 650)} 〜 ${fmtSal(forecast.operatingSurplus.max - 650)}`;
+    const html = draw(t);
+    expect(html).toContain(`契約年俸控除後の参考収支（年間）</dt><dd>${expected}</dd>`);
+    expect(html).toContain('支払済み額でも編成予算の残枠でもありません');
+    expect(html).toContain(fmtSal(t.budget));
+  });
+  it('shows unavailable when any annual payroll is missing or invalid, but preserves recorded zero', () => {
+    const missing = startClubFinance(team({ players: [player(0, 0), player(1, null), player(4, -1)], farm: [player(2, 100)] }), 2026);
+    expect(draw(missing)).toContain('契約年俸控除後の参考収支（年間）</dt><dd>— 算出不可</dd>');
+    expect(draw(missing)).toContain('年俸を全員分集計できないため算出不可');
+    const zero = startClubFinance(team({ players: [player(0, 0)], farm: [] }), 2026);
+    const forecast = forecastClubFinance(zero);
+    const html = draw(zero);
+    expect(html).toContain(`契約年俸控除後の参考収支（年間）</dt><dd>${fmtSal(forecast.operatingSurplus.min)}`);
+    expect(html).not.toContain('年俸を全員分集計できないため算出不可');
+    expect(draw(team())).not.toContain('契約年俸控除後の参考収支（年間）');
+  });
   it('uses actual schedule and ledger games, not an unrelated gameDay or a second home-only scaling', () => {
     const t = applyClubGameFinance(startClubFinance(team(), 2026), { year: 2026, gameDay: 1, isHomeTeam: true });
     const schedule = [null, ...Array.from({ length: 143 }, (_, i) => ({ matchups: [i % 2 ? { homeId: 1, awayId: 0 } : { homeId: 0, awayId: 1 }] }))];
