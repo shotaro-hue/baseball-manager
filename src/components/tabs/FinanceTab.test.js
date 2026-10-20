@@ -11,6 +11,27 @@ const drawContract = t => renderToStaticMarkup(React.createElement(ContractTab, 
 const draw = t => renderToStaticMarkup(React.createElement(FinanceTab, { team: t, gameDay: 1 }));
 const freeze = obj => { Object.values(obj).forEach(v => { if (v && typeof v === 'object') freeze(v); }); return Object.freeze(obj); };
 describe('FinanceTab contract salary', () => {
+  it('preserves the coach salary reference without changing player payroll, reference surplus or saved data', () => {
+    const t = freeze(startClubFinance(team({ budget: 500000, coaches: [{ salary: 120 }, { salary: 0 }, { salary: 240 }] }), 2026));
+    const before = JSON.stringify(t), html = draw(t), forecast = forecastClubFinance(t);
+    expect(html).toContain('コーチ給与（参考）');
+    expect(html).toContain('コーチ給与合計（参考）</dt><dd>360万円</dd>');
+    expect(html).toContain('契約給与・支払済み額ではありません');
+    expect(html).toContain('コーチ給与は選手の契約年俸総額・参考収支には含みません');
+    expect(html).toContain('契約年俸控除後の参考収支（年間）</dt><dd>' + fmtSal(forecast.operatingSurplus.min - 650));
+    expect(html).toContain(fmtSal(t.budget));
+    expect(JSON.stringify(t)).toBe(before);
+  });
+  it.each([
+    [[], '0万円'],
+    [[{ salary: 0 }], '0万円'],
+    [undefined, '— 未記録'],
+    [[{ salary: 120 }, { salary: null }], '— 算出不可'],
+    [[{ salary: 120 }, { salary: '240' }], '— 算出不可'],
+    [[{ salary: -1 }], '— 算出不可'],
+  ])('does not present missing or invalid coach salaries as recorded zero (%j)', (coaches, expected) => {
+    expect(draw(team({ coaches }))).toContain(`コーチ給与合計（参考）</dt><dd>${expected}</dd>`);
+  });
   it('shows estimated receipts, operating costs and the distinct spending envelope for the new model', () => {
     const t = startClubFinance(team({ budget: 500000 }), 2026), html = draw(t);
     for (const text of ['主催売上', '運営費', '放映権', '会員', '編成予算', '現金残高', '推定値']) expect(html).toContain(text);

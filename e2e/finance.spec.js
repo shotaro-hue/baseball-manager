@@ -81,6 +81,36 @@ async function openContracts(page) {
   await page.getByRole('navigation', { name: '経営メニュー' }).getByRole('button', { name: /^契約/ }).click();
   await expect(page.getByRole('region', { name: '年俸上位（所属選手）', exact: true })).toBeVisible();
 }
+for (const width of [360,390,1440]) {
+  test(`finance coach salary reference ${width}px preserves the saved clubs through disclosure and reload`, async ({page}, testInfo) => {
+    test.setTimeout(60_000);
+    await page.setViewportSize({width,height:900});
+    await loadPayrollFixture(page,false,false,true);
+    await page.evaluate(async () => {
+      const {loadGame,saveGame}=await import('/baseball-manager/src/engine/saveload.js');
+      const save=await loadGame();
+      save.teams.find(t=>t.id===save.myId).coaches=[
+        {type:'pitching',typeName:'投手コーチ',name:'コーチ甲',grade:1,salary:120},
+        {type:'batting',typeName:'打撃コーチ',name:'コーチ乙',grade:1,salary:240},
+      ];
+      if (!(await saveGame(save)).ok) throw Error('coach fixture save failed');
+    });
+    await reloadAndLoad(page); await openFinance(page,width<1024);
+    const before=await saveSnapshot(page);
+    const detail=page.locator('.finance-tab details').filter({has:page.locator('summary').filter({hasText:'コーチ給与（参考）'})});
+    await detail.locator('summary').click();
+    await expect(detail.locator('dd')).toHaveText('360万円');
+    await expect(detail).toContainText('契約給与・支払済み額ではありません');
+    await expect(page.locator('.finance-tab [data-ds="metrics"]')).toContainText('650万円');
+    await detail.screenshot({path:testInfo.outputPath('finance-coach-reference.png')});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    expect(await saveSnapshot(page)).toBe(before);
+    await reloadAndLoad(page); await openFinance(page,width<1024);
+    await detail.locator('summary').click();
+    await expect(detail.locator('dd')).toHaveText('360万円');
+    expect(await saveSnapshot(page)).toBe(before);
+  });
+}
 async function assertPayroll(page) {
   const region = page.getByRole('region', { name: '選手契約年俸（年額）', exact: true });
   await expect(region).toBeVisible();

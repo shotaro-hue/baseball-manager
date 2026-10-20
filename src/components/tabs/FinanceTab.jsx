@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Button, DataTableFrame, MetricBand, Section } from '../design-system/primitives';
-import { contractPayroll } from '../../engine/contractPayroll';
+import { contractPayroll, contractSalaryStatus } from '../../engine/contractPayroll';
 import { financeView, moneyText, payrollText, rangeText } from './financeView';
 import { FinanceActions } from './FinanceActions';
 import { ContractPayroll } from './ContractPayroll';
@@ -18,6 +18,8 @@ function LedgerTable({ label, rows }) {
 export function FinanceTab({ team, onStadiumUpgrade, onTicketPriceChange, schedule, onNavigate }) {
   const model = useMemo(() => financeView(team, schedule), [team, schedule]);
   const payroll = contractPayroll(team), f = model.forecast;
+  const coachPayroll = Array.isArray(team.coaches) && team.coaches.every(coach => contractSalaryStatus(coach?.salary) === 'recorded')
+    ? team.coaches.reduce((total, coach) => total + coach.salary, 0) : null;
   const annualAfterPayroll = f && payroll.total.missing === 0 && payroll.total.invalid === 0 && Number.isFinite(payroll.total.amount)
     ? { min: f.operatingSurplus.min - payroll.total.amount, max: f.operatingSurplus.max - payroll.total.amount } : null;
   const metric = (label, value, extra = {}) => ({ label, value, ...extra });
@@ -62,6 +64,10 @@ export function FinanceTab({ team, onStadiumUpgrade, onTicketPriceChange, schedu
     </Section>
     <Section title="契約・関連情報">
       <details><summary>契約年俸の内訳</summary><ContractPayroll team={team} onNavigate={onNavigate} /></details>
+      <details><summary>コーチ給与（参考）</summary>
+        <dl className="finance-rows"><div><dt>コーチ給与合計（参考）</dt><dd>{team.coaches == null ? '— 未記録' : coachPayroll == null ? '— 算出不可' : moneyText(coachPayroll)}</dd></div></dl>
+        <p className="finance-note">現在所属するコーチの参考額です。契約給与・支払済み額ではありません。コーチ給与は選手の契約年俸総額・参考収支には含みません。</p>
+      </details>
       {onNavigate && <Button variant="secondary" onClick={() => onNavigate('contract')}>契約状況を確認</Button>}
       <details><summary>予測の前提・予算の仕組み</summary>
         <p className="finance-note">球団別の動員基準と推定値による簡易収支です。主催球団だけにチケット・飲食・物販と興行費を計上し、年間契約と固定費は全試合に配賦します。</p>
