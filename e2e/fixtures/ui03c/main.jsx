@@ -16,15 +16,16 @@ if (state === 'declared') pool[0] = player(0, { marketEntryReason: '国内FA宣�
 if (state === 'foreign' || state === 'deadline') pool = [player(0, { isForeign: true }), player(1)];
 const owned = Array.from({ length: state === 'full' ? 28 : 3 }, (_, i) => player(`own-${i}`, { name: `所属${i}`, isFA: false, contractYearsLeft: 3 }));
 function Fixture() {
+  const [loading, setLoading] = useState(query.has('loading'));
   const [teams, setTeams] = useState([{ id: 9, name: '自球団', players: owned, farm: [], budget: state === 'budget' ? 1 : 10000, history: [] }]);
   const [faPool, setFaPool] = useState(pool), [faYears, setFaYears] = useState({}), [plan, setOffseasonPlan] = useState({ marketView: null });
   const gs = { teams, faPool, faYears, setFaYears, setFaPool, offseasonPlan: plan, setOffseasonPlan, year: 2026,
     gameDay: state === 'deadline' ? 101 : ['foreign'].includes(state) ? 100 : 143, notify: () => {},
     upd: (id, update) => { document.body.dataset.signs = String(Number(document.body.dataset.signs || 0) + 1); setTeams(current => current.map(t => t.id === id ? update(t) : t)); } };
-  window.marketFixture = { snapshot: () => ({ teams, faPool, faYears, plan }), remove: id => setFaPool(current => current.filter(p => p.id !== id)) };
+  window.marketFixture = { snapshot: () => ({ teams, faPool, faYears, plan }), remove: id => setFaPool(current => current.filter(p => p.id !== id)), load: () => setLoading(false) };
   const season = ['foreign', 'deadline'].includes(state), embedded = query.has('embedded');
   return <div style={{ maxWidth: query.get('container') ? `${query.get('container')}px` : undefined, margin: '0 auto', paddingTop: query.has('spacer') ? 600 : 0 }}>
-    {season ? <HubFaTab myTeam={teams[0]} myId={9} year={2026} {...gs} marketMode="season" /> : <OffseasonFaPhaseScreen gs={gs} os={{ handleFaPhaseNext: () => { document.body.dataset.next = 'true'; } }} myTeam={teams[0]} myId={9} year={2026} embedded={embedded} />}
+    {season ? <HubFaTab myTeam={loading ? null : teams[0]} myId={9} year={2026} {...gs} marketMode="season" /> : <OffseasonFaPhaseScreen gs={gs} os={{ handleFaPhaseNext: () => { document.body.dataset.next = 'true'; } }} myTeam={loading ? null : teams[0]} myId={9} year={2026} embedded={embedded} />}
   </div>;
 }
 createRoot(document.getElementById('root')).render(<Fixture />);

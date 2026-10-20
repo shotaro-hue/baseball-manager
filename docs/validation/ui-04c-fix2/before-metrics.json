@@ -1,0 +1,238 @@
+{
+  "stage": "before",
+  "browser": "141.0.7390.37",
+  "production": true,
+  "cpuThrottle": 4,
+  "hashScope": "fixture.teams (including scoutResults); global faPool is fixed by management-load-fixture.js",
+  "gesture": "CDP synthetic mouse wheel; actual iPhone touch scrolling is not verified",
+  "rows": [
+    {
+      "width": 360,
+      "viewportHeight": 800,
+      "run": 0,
+      "tab": "fa",
+      "displayMs": 274.79999999981374,
+      "dom": 1005,
+      "height": 15514,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000728,
+      "frameMaxMs": 16.800000000000182,
+      "frames": 138,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 2101.4000000003725,
+      "samplingEnd": 4411.300000000745,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12362980,
+      "detailMs": 162.29999999981374,
+      "detailDom": 80,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 390,
+      "viewportHeight": 844,
+      "run": 0,
+      "tab": "fa",
+      "displayMs": 249.70000000018626,
+      "dom": 1005,
+      "height": 15495,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.799999999999727,
+      "frameMaxMs": 16.800000000000182,
+      "frames": 135,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 2062.2999999998137,
+      "samplingEnd": 4322.600000000559,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12383652,
+      "detailMs": 113.90000000037253,
+      "detailDom": 80,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 390,
+      "viewportHeight": 844,
+      "run": 1,
+      "tab": "fa",
+      "displayMs": 241.40000000037253,
+      "dom": 1005,
+      "height": 15495,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000273,
+      "frameMaxMs": 16.800000000000182,
+      "frames": 137,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 2024.7999999998137,
+      "samplingEnd": 4314.199999999255,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12351256,
+      "detailMs": 144,
+      "detailDom": 80,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 390,
+      "viewportHeight": 844,
+      "run": 2,
+      "tab": "fa",
+      "displayMs": 234.90000000037253,
+      "dom": 1005,
+      "height": 15495,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000273,
+      "frameMaxMs": 16.800000000000182,
+      "frames": 139,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 1778.8999999994412,
+      "samplingEnd": 4097.0999999996275,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12351772,
+      "detailMs": 161.5,
+      "detailDom": 80,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 780,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "fa",
+      "displayMs": 250.20000000018626,
+      "dom": 1005,
+      "height": 15442,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.700000000000273,
+      "frameMaxMs": 16.799999999999727,
+      "frames": 138,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 1928.6000000005588,
+      "samplingEnd": 4240.200000000186,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12354304,
+      "detailMs": 85.29999999981374,
+      "detailDom": 1041,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    },
+    {
+      "width": 1440,
+      "viewportHeight": 900,
+      "run": 0,
+      "tab": "fa",
+      "displayMs": 297,
+      "dom": 1005,
+      "height": 15454,
+      "overflow": false,
+      "nestedScrollers": 0,
+      "frameP95Ms": 16.799999999999727,
+      "frameMaxMs": 16.800000000000182,
+      "frames": 137,
+      "longTasks": 0,
+      "longestTaskMs": 0,
+      "taskSamples": [],
+      "samplingStart": 2127.899999999441,
+      "samplingEnd": 4411.200000000186,
+      "scrollY": 500,
+      "scrollStart": {
+        "page": 0,
+        "list": 0
+      },
+      "scrollDown": {
+        "page": 1500,
+        "list": 0
+      },
+      "scrollUp": {
+        "page": 500,
+        "list": 0
+      },
+      "heapBytes": 12345152,
+      "detailMs": 199.79999999981374,
+      "detailDom": 1041,
+      "returnDelta": 0,
+      "errors": [],
+      "inputHash": "f4bfab3ea4935e15e009cc25331f1ad80385dda4f87e6f0ae5d6b16c08928439"
+    }
+  ]
+}

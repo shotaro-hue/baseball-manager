@@ -1,13 +1,13 @@
 import { RosterCapacitySummary } from '../RosterCapacitySummary';
 import { draftCapacityContext, evaluateRosterCapacity } from '../../engine/rosterCapacity';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { fmtSal, rngf } from '../../utils';
 import { MAX_ROSTER, FOREIGN_AGENT_ACCEPT_PROB, FOREIGN_AGENT_SALARY_RATIO, FOREIGN_DEADLINE_DAY, MIN_ACTIVE_CATCHERS, TARGET_ACTIVE_CATCHERS, MIN_TOTAL_BY_POS } from '../../constants';
 import { useResultDialog } from '../useResultDialog';
 import { marketMetrics, marketNeeds, marketPlacement, validateMarketContract, addMarketSigning } from './faMarket';
 import { planningPlayer } from '../../engine/offseasonPlanning';
 import { Button, StateLabel } from '../design-system/primitives';
-import { PlayerList, useMobileDetail } from '../management/PlayerList';
+import { PlayerList } from '../management/PlayerList';
 import { filterPlayerEntries } from '../management/playerListModel';
 import '../../calm-fa.css';
 
@@ -43,7 +43,19 @@ export default function HubFaTab({ myTeam, faPool = [], faYears = {}, setFaYears
   const filterControls = useRef(null);
   const scroll = useRef({ window: 0, list: 0 });
   const returning = useRef(null);
-  const mobileDetail = useMobileDetail(selectedId);
+  const body = useRef(null);
+  const [splitView, setSplitView] = useState(true);
+  // Use the same content-width decision for layout and row generation, also
+  // when an embedded market resizes without a viewport change.
+  useLayoutEffect(() => {
+    const node = body.current;
+    if (!node) return;
+    const update = width => setSplitView(width >= 800);
+    update(node.getBoundingClientRect().width);
+    const observer = new ResizeObserver(([entry]) => update(entry.contentRect.width));
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [myTeam != null]);
   const entries = useMemo(() => faPool.map(player => ({ player, status: player.marketEntryReason || (player.isForeign ? '外国人FA' : '国内FA・自由契約') })), [faPool]);
   const visibleEntries = useMemo(() => filterPlayerEntries(entries.filter(({ player: p }) => (type === 'all' || (type === 'foreign' ? p.isForeign : !p.isForeign)) && (role === 'all' || (role === 'pitcher' ? p.isPitcher : !p.isPitcher))), { search, sort: sort === 'salary' ? 'salary-asc' : sort }), [entries, type, role, search, sort]);
   const ledger = useRef({ budget: myTeam?.budget, spent: 0 });
@@ -118,15 +130,15 @@ export default function HubFaTab({ myTeam, faPool = [], faYears = {}, setFaYears
   const placement = selected ? marketPlacement(myTeam, selected) : null;
   const needs = marketNeeds(myTeam);
   const canOffer = onMarket && (!selected.isForeign || n?.stage === 'years') && !error;
-  return <section data-ds="fa-market" className={`fa-market ${selectedId != null ? 'fa-selected' : ''} ${embedded ? 'fa-embedded' : ''}`}>
+  return <section data-ds="fa-market" className={`fa-market ${selectedId != null ? 'fa-selected' : ''} ${splitView ? 'fa-split' : ''} ${embedded ? 'fa-embedded' : ''}`}>
     <header><h2>FA・自由契約市場</h2><p>補強候補を比較し、条件と配属先を確認して契約します。</p>
       {!embedded && <div className="fa-summary"><span>予算 <strong>{money(budget)}</strong></span><span>登録 {myTeam.players.length}/{MAX_ROSTER}人</span><span>外国人 {Number.isFinite(foreignActiveCount) ? foreignActiveCount : myTeam.players.filter(p => p.isForeign).length}/4人</span><span>市場 {faPool.length}人</span></div>}
       <RosterCapacitySummary capacity={evaluateRosterCapacity(myTeam,draftContext)} className="fa-note"/>
       {marketMode !== 'offseason' && <p className="fa-note">外国人補強：{gameDay > FOREIGN_DEADLINE_DAY ? '期限終了' : Number.isFinite(gameDay) ? `期限まであと${FOREIGN_DEADLINE_DAY - gameDay}日（第${FOREIGN_DEADLINE_DAY}日まで）` : '日程未記録'}</p>}
     </header>
-    <div className="fa-body"><div className="fa-layout"><section className="fa-list" ref={list} tabIndex={-1} aria-label="市場の候補一覧">
+    <div className="fa-body" ref={body}><div className="fa-layout"><section className="fa-list" ref={list} tabIndex={-1} aria-label="市場の候補一覧">
       <div className="fa-filters" ref={filterControls}><label>市場<select aria-label="市場" value={type} onChange={e => setType(e.target.value)}><option value="all">全員</option><option value="domestic">国内FA・自由契約</option><option value="foreign" disabled={marketMode === 'offseason'}>外国人FA{marketMode === 'offseason' ? '（翌シーズン）' : ''}</option></select></label><label>役割<select aria-label="役割" value={role} onChange={e => setRole(e.target.value)}><option value="all">全役割</option><option value="pitcher">投手</option><option value="batter">野手</option></select></label><label>並び順<select aria-label="並び順" value={sort} onChange={e => setSort(e.target.value)}><option value="default">市場の順</option><option value="salary">年俸が安い順</option><option value="age">年齢が若い順</option></select></label><label>選手名<input type="search" value={search} onChange={e => setSearch(e.target.value)} /></label></div>
-      <p>{visibleEntries.length}人を表示</p>{!mobileDetail && <PlayerList entries={visibleEntries} selectedId={selectedId} onSelect={select} empty={faPool.length ? undefined : '現在、市場に候補はいません。'} />}
+      <p>{visibleEntries.length}人を表示</p>{(splitView || selectedId == null) && <PlayerList entries={visibleEntries} selectedId={selectedId} onSelect={select} empty={faPool.length ? undefined : '現在、市場に候補はいません。'} />}
     </section><section className="fa-detail" ref={detail} aria-label="候補の条件と交渉">
       {selectedId == null || !selected ? <p>候補を選ぶと成績・契約条件を確認できます。「比較に追加」で候補同士や自チームの選手と比べられます。</p> : <>
         <button className="fa-back" onClick={back}>← 選手一覧に戻る</button>

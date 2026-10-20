@@ -1,0 +1,14 @@
+{
+  "base": "a1d07b803ea1a3b2f167a8612d7a57dfcf2142f4",
+  "browser": "Chromium 141",
+  "failures": [
+    {
+      "trace": "management-lists-managemen-6aa4e-er-width-for-DOM-and-layout-chromium",
+      "error": "Error: expect(locator).toHaveCount(expected) failed\n\nLocator:  locator('[data-ds=\"fa-market\"]').locator('.player-list-row')\nExpected: 0\nReceived: 30\nTimeout:  5000ms\n\nCall log:\n  - Expect \"toHaveCount\" with timeout 5000ms\n  - waiting for locator('[data-ds=\"fa-market\"]').locator('.player-list-row')\n    9 × locator resolved to 30 elements\n      - unexpected value \"30\"\n"
+    },
+    {
+      "trace": "management-lists-managemen-51725-tores-the-deep-filtered-row-chromium",
+      "error": "Error: expect(locator).toHaveCount(expected) failed\n\nLocator:  locator('[data-hub-route=\"fa\"]:not([hidden])').locator('[data-ds=\"fa-market\"]').locator('.player-list-row')\nExpected: 0\nReceived: 100\nTimeout:  5000ms\n\nCall log:\n  - Expect \"toHaveCount\" with timeout 5000ms\n  - waiting for locator('[data-hub-route=\"fa\"]:not([hidden])').locator('[data-ds=\"fa-market\"]').locator('.player-list-row')\n    9 × locator resolved to 100 elements\n      - unexpected value \"100\"\n"
+    }
+  ]
+}
