@@ -242,3 +242,28 @@ for (const timing of ['during', 'after']) {
     await page.reload(); await resume(page).click(); await expect(page.locator('.topbar')).toBeVisible();
   });
 }
+
+test('core reliability resume helper waits for a delayed read before diagnostic reads', async ({page}) => {
+  const fixture = fresh();
+  fixture.teams = fixture.teams.map(team => ({...team, players:[], farm:[]}));
+  await saveFixture(page,fixture);
+  await page.addInitScript(() => {
+    const original = IDBDatabase.prototype.transaction;
+    let held=false;
+    IDBDatabase.prototype.transaction = function(stores,mode,...rest) {
+      const tx=original.call(this,stores,mode,...rest);
+      if (!held && stores==='save_chunks' && mode==='readonly') {
+        held=true;
+        Object.defineProperty(tx,'oncomplete',{set(callback) {
+          tx.addEventListener('complete',event=>setTimeout(()=>callback.call(tx,event),500));
+        }});
+      }
+      return tx;
+    };
+  });
+  await reloadAndLoad(page);
+  const saved=await readSave(page);
+  expect(saved.saveId).toBe(fixture.saveId);
+  await expect(page.locator('.topbar')).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});

@@ -93,3 +93,10 @@
 - RED: 新規/強化した読込・App・remove+rollback例外検証は28件中7失敗、21成功。旧テストが期待していた「旧stateを返し保存時に拒否」を「旧stateを返さず、保存時の拒否も維持し、明示再読込で最新rootへ復帰」に強化。テストの削除/skip/期待値緩和なし。
 - GREEN: save-delete-load / App.deleteLoad / App.loadError / save-generations / farm-save-generations / saveload / saveloadScopes の7ファイル81件成功。production build成功（既存の大きなchunk警告あり）。
 - 実iPhoneの元障害reasonは未確定。この修正から実機障害の解消は主張しない。両PR統合検証は#491側の追補を参照。最新headの通常CI結果はPR本文が正本。
+
+
+### 初回CI #467で判明したE2E読込ヘルパーの競合
+
+初回head `5f35a24` のbuild/全単体統合1,691件/保存整合性49件は成功。一方、複数の既存E2Eが「続きから」のクリック直後、Appの非同期読込が終わる前に検証用`readSave()`を開始し、今回の読込attempt世代でApp側が正しく無効化されていた。CI artifactでタイトルに留まることと連続した読込開始を確認。`reloadAndLoad()`はクリック完了と画面反映完了を区別していなかった。
+
+`reloadAndLoad()`に続きからボタンがDOMから消えるまでのassertionを追加し、その後だけ検証用読込へ進む。既存の保存内容assertion・タイムアウト・retry設定は緩和していない。実IndexedDBの最初の読込completeだけを500ms遅延させた専用E2Eを追加し、旧helperでRED（タイトルに残る）、修正後ChromiumでGREENを確認。WebKitと最新head通常CIはPR本文に結果を記載する。初回CIとローカルでの時間切れ/共有ライブラリ不足は成功数へ含めず、最新CIを受入ゲートとする。
