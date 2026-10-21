@@ -17,6 +17,8 @@ export default function TitleScreen({
   getInitializationAttempt = () => 0,
   onLoad,
   onSelectTeam,
+  onSaveDeletionStart,
+  onSaveDeletionEnd,
   onSaveDeleted,
 }) {
   const [saveMeta, setSaveMeta] = useState(null);
@@ -72,18 +74,20 @@ export default function TitleScreen({
     if (actionsLocked()) return;
     const attempt = getInitializationAttempt();
     if (!window.confirm('セーブデータを削除しますか？')) return;
-    const mod = await loadTitleSaveModule();
     if (actionsLocked() || attempt !== getInitializationAttempt()) return;
     deletionInProgress.current = true;
     setDeleting(true);
     setDeletionError(null);
+    onSaveDeletionStart?.();
     try {
+      const mod = await loadTitleSaveModule();
+      if (initializing || isInitializationInProgress?.() || attempt !== getInitializationAttempt()) return;
       const result = await mod.deleteSave();
       if (result?.ok === false) { setDeletionError('セーブの削除に失敗しました。再試行してください。'); return; }
       setSaveMeta(null);
       onSaveDeleted();
     } catch { setDeletionError('セーブの削除に失敗しました。再試行してください。'); }
-    finally { deletionInProgress.current = false; setDeleting(false); }
+    finally { deletionInProgress.current = false; setDeleting(false); onSaveDeletionEnd?.(); }
   };
 
   return (

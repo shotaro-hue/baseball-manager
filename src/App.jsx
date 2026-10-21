@@ -37,13 +37,19 @@ export default function App() {
   // A failed resume must outlive the general notification's 3.5-second timer.
   const [loadError, setLoadError] = useState(null);
   const titleLoadEpoch = useRef(0);
+  const titleDeletionInProgress = useRef(false);
   const clearLoadError = () => {
     titleLoadEpoch.current += 1;
     setLoadError(null);
   };
+  const handleSaveDeletionStart = () => {
+    titleDeletionInProgress.current = true;
+    titleLoadEpoch.current += 1;
+  };
+  const handleSaveDeletionEnd = () => { titleDeletionInProgress.current = false; };
 
   const handleLoad = async () => {
-    if (gs.isNewGameInitializing()) return;
+    if (titleDeletionInProgress.current || gs.isNewGameInitializing()) return;
     const attempt = gs.getNewGameInitializationAttempt();
     const epoch = titleLoadEpoch.current;
     const loadIsStale = () => epoch !== titleLoadEpoch.current || gs.isNewGameInitializing() || attempt !== gs.getNewGameInitializationAttempt();
@@ -143,10 +149,10 @@ export default function App() {
           setLoadError('セーブデータを読み込めませんでした。再試行してください');
         }
       }
-    });
+    }, epoch);
   };
 
-  const app = { gs, sf, os, handleLoad, loadError, clearLoadError };
+  const app = { gs, sf, os, handleLoad, loadError, clearLoadError, handleSaveDeletionStart, handleSaveDeletionEnd };
   const hubProps = {
     state: { gs },
     flows: { sf, os },

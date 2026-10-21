@@ -218,12 +218,17 @@ export function useGameState() {
   const newGameInitializationRef = useRef(false);
   const newGameInitializationAttemptRef = useRef(0);
   const titleLoadPromiseRef = useRef(null);
+  const titleLoadKeyRef = useRef(null);
   const isNewGameInitializing = useCallback(() => newGameInitializationRef.current, []);
   const getNewGameInitializationAttempt = useCallback(() => newGameInitializationAttemptRef.current, []);
-  const runTitleLoad = useCallback(async operation => {
-    if (titleLoadPromiseRef.current) return titleLoadPromiseRef.current;
-    const task = Promise.resolve().then(operation);
+  const runTitleLoad = useCallback(async (operation, key) => {
+    const previous = titleLoadPromiseRef.current;
+    if (previous && titleLoadKeyRef.current === key) return previous;
+    // A retry after confirmed deletion must not join the invalidated request.
+    // Still wait for that read, preserving new-game initialization's load barrier.
+    const task = (previous ? previous.catch(() => {}) : Promise.resolve()).then(operation);
     titleLoadPromiseRef.current = task;
+    titleLoadKeyRef.current = key;
     try { return await task; }
     finally { if (titleLoadPromiseRef.current === task) titleLoadPromiseRef.current = null; }
   }, []);

@@ -13,7 +13,7 @@
 
 ゲーム中の保存結果は既存HubHeaderのsaveResultで「保存失敗」「保存済み・一部履歴は要確認」等が保持され、保存ボタンで再試行できる。本PRは警告の保持が不足していたタイトル側を直す。失敗した読込を一般通知へ重複登録すると成功直後のhubにも古い警告が出るため、読込失敗だけを専用エラーへ移す。正常な一般通知とバックアップ復旧成功の通知は既存どおり。
 
-製品変更はNewsTab、App、AppScreenRouterの3ファイル。明示削除/新規選択でApp内の読込世代を更新し、その後に到着する古い読込の成功/失敗を既存のloadIsStaleで無効化する。トレード/CPU/金額単位・保存形式/保存キー/マニフェスト/世代・loadGame/deleteSave・CSS/幅判定を変更しない。削除は従来の明示確認操作のみ。今回の復旧確認で破損候補を自動削除・修復しない。
+初回実装の製品変更はNewsTab、App、AppScreenRouterの3ファイル。明示削除/新規選択でApp内の読込世代を更新する方式は、後述のPR #490レビュー追補で削除開始時へ修正した。追補ではTitleScreenとloadGame/deleteSaveの競合処理も変更する。トレード/CPU/金額単位・保存形式/保存キー/マニフェスト/保存世代形式・CSS/幅判定は変更しない。削除は従来の明示確認操作のみ。今回の復旧確認で破損候補を自動削除・修復しない。
 
 ## 受入テストとRED→GREEN
 
@@ -63,3 +63,24 @@
 ## 独立レビューの追加検証
 
 削除成功後に未完了の読込が返ると、警告が再発したり既に削除したゲームを画面へ適用する経路を独立レビューのP2指摘として追加3テストでRED確認した。App内の読込世代を明示削除/新規選択で進め、既存の初期化attempt検査と合わせて古いcontinuationを拒否する最小修正でGREEN。ストレージの削除・読み書き・キューを作り直していない。独立レビューでは元の差分に他の対応必須指摘はなかった。修正自体は親担当がRED→GREENで検証し、再レビューは行っていない。最終提出前の全テストは同一head CIが正本。
+
+## PR #490レビュー追補 — 削除開始と遅延IndexedDB読込
+
+対象基点: `2f782c0629f9301482a32d5c40e53f9a067722c9`。remote mainは引き続き`46d75e21b1f6e27c0f60274a38cd7619a80d951d`。初回のcallback-onlyテストでは削除完了前の競合と保存エンジンのキャッシュ再生を検出できていなかったため、実App/Router/Title・実`deleteSave()`・実保存世代読込を通す統合テストへ追加した。
+
+- **P1:** 確認ダイアログの承認後、動的importや保存ロック待ちに入る前にAppの読込世代を更新し、同期refで新しい読込も禁止する。取消時は世代を進めない。失敗時はタイトルと再試行操作を維持し、削除前に開始した読込は成功/欠損/IDB例外のいずれでも画面や警告へ反映しない。既存警告の解除は削除成功時のまま。`useGameState.runTitleLoad`は同じepochのみ重複実行を抑止し、失敗削除後の別epochの再試行は古い読込に続けて実行する。新規初期化もこの直列tailの完了を待つ。
+- **P2:** 読込開始時のstorage・削除epoch・primary/backupのraw値を保持し、非同期読込後のobservations、validatedRoots、validatedRawRoots、chunk metadata、lastLoadResultの公開を検査する。削除epochが変化した読込はnullで終了。別タブのroot変更時はキャッシュ公開を避け、既存観測で確実に`save_conflict`になる場合だけ以前の返却互換性を保つ。新しい読込で保存が許可済みの場合や最初のstorage例外で観測がない場合は古いstateを返さずnullにする。
+- **削除失敗:** 全キー削除の成功後だけキャッシュを初期化する。途中のremove失敗では消したroot/metaを戻し、既存観測を保持して再試行可能にする。ロック・保存形式・世代manifest・保存対象は追加しない。localStorage自体が復元のsetItemも拒否する場合の完全な原子性は保証しない（既存の複数キーAPIの限界）。
+
+### 追加検証
+
+`tests/save-delete-load.test.js`と`src/App.deleteLoad.integration.test.js`の20件は修正前に**17失敗/3成功**、修正後に**20成功**。本物のfake-indexeddbトランザクションのcomplete/abort通知だけを保留し、`readGeneration`や`deleteSave`はmockしない。削除中/削除後の成功・欠損・例外、取消、削除失敗後の再開、4箇所のremove失敗とroot/meta保持、削除直後の新規保存/再読込、古い読込が新しいキャッシュを上書きしないこと、cold tabのprimary/backup変更による競合を検査する。初回RED実行で未解放ロックが後続テストを止めたため、test helperに失敗時も解放するteardownを追加してから上記件数を採用した。
+
+- 別agentの新規レビューで、古い返却stateによる新しいrootの上書き、削除失敗直後のretryが古いpromiseへ合流して消える問題、cold storageの初回getItem例外で観測がない状態での上書きを指摘。3ケースをそれぞれRED確認後に修正し、追加テストは合計**23件成功**。最終差分の再レビューで対応必須指摘なし（reviewer自身のテスト再実行はなく、実装担当が下記を実行）。
+- `npx vitest run tests/save-delete-load.test.js src/App.deleteLoad.integration.test.js src/App.loadError.test.js src/App.initialization.test.js src/components/TitleScreen.initialization.test.js src/components/TitleScreen.resume.test.js tests/save-generations.test.js --maxWorkers=2 --minWorkers=1`: 最終差分で**7ファイル84件成功**。
+- `npm run test:e2e -- core-reliability.spec.js --project=chromium --grep 'deletion rejects' --workers=1 --retries=0`: **2件成功**。ブラウザのIndexedDB通知とnative Web Lockを保留し、実際の削除確認・途中の操作禁止・遅延読込後のhub/警告非復活・fresh save・reload/resumeを確認した。既存CIでこのspecのChromium/WebKitも実行対象。
+- レビュー修正後も削除2件は成功。既存`unrecoverable roots`を加えた実行は、他の重い比較検証と並行中にその1件だけ30秒timeoutとなった。変更・retry設定の緩和なしで同ケースを単独実行すると**1件成功（19.5秒）**。最初のtimeoutを隠さず、通常CIで再確認する。
+- `npm run build`: **成功**。既存の500kB超chunk警告あり。
+- 追加の保存/通算/二軍/移籍表示回帰12ファイル: **81成功/1失敗**。失敗は`farmRuntime.integration.test.js`の`manual save retains an adopted farm round after failure, and retries without re-simulation`（line54、`loadGame()`がnull）。無変更の基点`2f782c0`を別worktreeに作り同ファイル全体を実行すると**同じ箇所で1失敗/2成功**。修正後の同ファイル再実行は**3成功**、両treeの対象1件単独実行も成功。順序/タイミング依存の既存失敗として記録し、このPRで期待値・skip・保存fixtureを変更していない。比較は`--testTimeout=60000 --maxWorkers=1 --minWorkers=1`で実行（最初のbaseline単独実行は既定10秒timeoutで比較不能だったため）。
+
+同一commitの全件Vitest・通常CI・WebKitはPR側の品質ゲートで確認し、ローカルの部分検証を全件成功と表現しない。実iPhone、10年/20年QA、SAVE-01A以降の実装は対象外。

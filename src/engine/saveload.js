@@ -900,17 +900,36 @@ export function getSavePerfSummary() {
 
 export async function loadGame() {
   const loadGameStart = isDevEnv ? performance.now() : 0;
+  const storage = globalThis.localStorage;
+  const deletionEpoch = deletionEpochs.get(storage) ?? 0;
+  const deletionChanged = () => deletionEpoch !== (deletionEpochs.get(storage) ?? 0);
   lastLoadResult = { status: 'none' };
   let foundCandidate = false;
   let primaryAtLoad;
   let backupsAtLoad;
-  try { primaryAtLoad = localStorage.getItem(SAVE_KEY); backupsAtLoad = [localStorage.getItem(BACKUP_KEY_1), localStorage.getItem(BACKUP_KEY_2)]; } catch { primaryAtLoad = null; backupsAtLoad = []; }
+  try {
+    primaryAtLoad = storage.getItem(SAVE_KEY);
+    backupsAtLoad = [storage.getItem(BACKUP_KEY_1), storage.getItem(BACKUP_KEY_2)];
+    // A cold tab must remember what it read even if another tab changes roots
+    // before validation completes, so a later save still fails closed.
+    if (!observations.has(storage)) observations.set(storage, primaryAtLoad);
+    if (!backupObservations.has(storage)) backupObservations.set(storage, backupsAtLoad);
+  } catch { primaryAtLoad = null; backupsAtLoad = []; }
+  const canPublish = () => {
+    try {
+      return !deletionChanged() && storage === globalThis.localStorage
+        && storage.getItem(SAVE_KEY) === primaryAtLoad
+        && backupsAtLoad.length === 2
+        && backupsAtLoad.every((raw, index) => storage.getItem([BACKUP_KEY_1, BACKUP_KEY_2][index]) === raw);
+    } catch { return false; }
+  };
   const candidates = [
     { key: SAVE_KEY,     label: 'primary' },
     { key: BACKUP_KEY_1, label: 'backup-1' },
     { key: BACKUP_KEY_2, label: 'backup-2' },
   ];
   for (const { key, label } of candidates) {
+    if (deletionChanged()) return null;
     try {
       const getItemStart = isDevEnv ? performance.now() : 0;
       const raw = localStorage.getItem(key);
@@ -936,6 +955,7 @@ export async function loadGame() {
           console.warn('IndexedDB load failed. Fallback to localStorage payload.', e);
         }
       }
+      if (deletionChanged()) return null;
       if(!(state?.saveDataVersion >= GENERATION_VERSION)) legacyCareerSeeds.set(state,captureInlineCareerLogs(state));
       for (const team of (state?.teams || [])) {
         for (const bucket of ['players', 'farm']) {
@@ -953,12 +973,24 @@ export async function loadGame() {
       }
       const result = validateAndMigrateSave(state);
       if (result.ok) {
+        if(legacyCareerSeeds.has(state)) legacyCareerSeeds.set(result.state,legacyCareerSeeds.get(state));
+        // Never let a delayed read undo deletion or replace newer observations,
+        // validated roots, chunk metadata, or the latest reported load result.
+        if (!canPublish()) {
+          if (storage !== globalThis.localStorage || !observations.has(storage)) return null;
+          const currentPrimary = storage.getItem(SAVE_KEY);
+          const backupChanged = currentPrimary === null && (backupObservations.get(storage) ?? [])
+            .some((observed, index) => observed !== storage.getItem([BACKUP_KEY_1, BACKUP_KEY_2][index]));
+          // Preserve the historical return only while these observations ensure
+          // save_conflict. A newer successful load may already authorize a save;
+          // handing it this older state would otherwise allow a lost update.
+          return observations.get(storage) !== currentPrimary || backupChanged ? result.state : null;
+        }
         if (key !== SAVE_KEY) console.warn(`Loaded from ${label}`);
         logPerf('loadGame', loadGameStart);
         observations.set(localStorage, primaryAtLoad);
         backupObservations.set(localStorage, backupsAtLoad);
         validatedRoots.set(localStorage, result.state);
-        if(legacyCareerSeeds.has(state)) legacyCareerSeeds.set(result.state,legacyCareerSeeds.get(state));
         validatedRawRoots.set(localStorage, raw);
         try { rememberChunkRoot(raw, result.state); }
         catch (error) { console.warn('Load succeeded; root cache failed:', error); }
@@ -967,10 +999,11 @@ export async function loadGame() {
       }
       console.warn(`Validation failed for ${label}`);
     } catch (e) {
+      if (deletionChanged()) return null;
       console.error(`Load from ${label} failed:`, e);
     }
   }
-  lastLoadResult = { status: foundCandidate ? 'unrecoverable' : 'none' };
+  if (canPublish()) lastLoadResult = { status: foundCandidate ? 'unrecoverable' : 'none' };
   return null;
 }
 
@@ -1080,11 +1113,8 @@ export function getSaveMeta() {
 }
 
 function deleteSaveImpl() {
-  chunkRootCache.delete(localStorage);
-  observations.set(localStorage, null);
-  backupObservations.set(localStorage, [null, null]);
-  validatedRoots.delete(localStorage);
-  validatedRawRoots.delete(localStorage);
+  const keys = [SAVE_KEY, META_KEY, BACKUP_KEY_1, BACKUP_KEY_2];
+  const before = keys.map(key => localStorage.getItem(key));
   let saveId = null;
   try {
     const raw = localStorage.getItem(SAVE_KEY);
@@ -1092,10 +1122,22 @@ function deleteSaveImpl() {
   } catch {
     saveId = null;
   }
-  localStorage.removeItem(SAVE_KEY);
-  localStorage.removeItem(META_KEY);
-  localStorage.removeItem(BACKUP_KEY_1);
-  localStorage.removeItem(BACKUP_KEY_2);
+  try {
+    for (const key of keys) localStorage.removeItem(key);
+  } catch (error) {
+    // localStorage has no multi-key transaction. Restore removed values before
+    // reporting failure, keeping the existing save and retry observations intact.
+    keys.forEach((key, index) => {
+      if (before[index] !== null && localStorage.getItem(key) === null) localStorage.setItem(key, before[index]);
+    });
+    throw error;
+  }
+  chunkRootCache.delete(localStorage);
+  observations.set(localStorage, null);
+  backupObservations.set(localStorage, [null, null]);
+  validatedRoots.delete(localStorage);
+  validatedRawRoots.delete(localStorage);
+  lastLoadResult = { status: 'none' };
   if (saveId) {
     import('./battedBallArchive')
       .then((mod) => mod.deleteBattedBallArchiveBySaveId(saveId))

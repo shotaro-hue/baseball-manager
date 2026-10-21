@@ -185,3 +185,60 @@ test('core reliability empty transfer history survives save and reload', async (
   await reloadAndLoad(page); await openNews(page);
   await expect(active(page).getByText('この年度の移籍ログはまだありません', { exact: true })).toBeVisible();
 });
+
+for (const timing of ['during', 'after']) {
+  test(`core reliability deletion rejects a delayed IndexedDB load ${timing} the delete lock`, async ({ page }) => {
+    const fixture = fresh();
+    // Keep actual generation reads and App migration, with no compressed career
+    // archive needed for this ordering test.
+    fixture.teams = fixture.teams.map(team => ({ ...team, players: [], farm: [] }));
+    await saveFixture(page, fixture); await page.reload();
+    await expect(resume(page)).toBeVisible();
+    await page.evaluate(() => {
+      const original = IDBDatabase.prototype.transaction;
+      window.releaseRead = new Promise(resolve => { window.finishRead = resolve; });
+      IDBDatabase.prototype.transaction = function(stores, mode, ...rest) {
+        const tx = original.call(this, stores, mode, ...rest);
+        if (stores === 'save_chunks' && mode === 'readonly') {
+          IDBDatabase.prototype.transaction = original;
+          Object.defineProperty(tx, 'oncomplete', { set(callback) {
+            tx.addEventListener('complete', async event => {
+              window.readHeld = true;
+              await window.releaseRead;
+              callback.call(tx, event);
+            });
+          } });
+        }
+        return tx;
+      };
+      window.deleteBlocker = navigator.locks.request('baseball-manager-save', () => new Promise(resolve => {
+        window.finishDeleteLock = resolve; window.deleteLockHeld = true;
+      }));
+    });
+    await expect.poll(() => page.evaluate(() => !!window.deleteLockHeld)).toBe(true);
+    await resume(page).click();
+    await expect.poll(() => page.evaluate(() => !!window.readHeld)).toBe(true);
+    page.once('dialog', dialog => dialog.accept());
+    await page.getByRole('button', { name: '削除', exact: true }).click();
+    await expect(resume(page)).toBeDisabled();
+    if (timing === 'during') {
+      await page.evaluate(async () => { window.finishRead(); await new Promise(requestAnimationFrame); });
+      await expect(page.locator('.topbar')).toHaveCount(0);
+      await expect(page.getByRole('alert')).toHaveCount(0);
+      await expect(resume(page)).toBeDisabled();
+    }
+    await page.evaluate(async () => { window.finishDeleteLock(); await window.deleteBlocker; });
+    await expect(resume(page)).toHaveCount(0);
+    if (timing === 'after') await page.evaluate(async () => { window.finishRead(); await new Promise(requestAnimationFrame); });
+    await expect(page.locator('.topbar')).toHaveCount(0);
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect(await page.evaluate(roots => roots.map(key => localStorage.getItem(key)), roots)).toEqual([null, null, null]);
+    const result = await page.evaluate(async fixture => {
+      const mod = await import('/baseball-manager/src/engine/saveload.js');
+      const saved = await mod.saveGame({ ...fixture, saveId: 'fresh-after-delete' });
+      return { saved, loadedId: (await mod.loadGame())?.saveId };
+    }, fixture);
+    expect(result.saved.ok).toBe(true); expect(result.loadedId).toBe('fresh-after-delete');
+    await page.reload(); await resume(page).click(); await expect(page.locator('.topbar')).toBeVisible();
+  });
+}

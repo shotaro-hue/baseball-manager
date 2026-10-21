@@ -116,7 +116,7 @@ function DeferredScreenFrame({ screen, children, gs }) {
 }
 
 export default function AppScreenRouter({ app }) {
-  const { gs, sf, os, handleLoad, loadError, clearLoadError } = app;
+  const { gs, sf, os, handleLoad, loadError, clearLoadError, handleSaveDeletionStart, handleSaveDeletionEnd } = app;
   const [draftAutoSkip, setDraftAutoSkip] = useState(false);
   const savePreview = useCallback(value => os.saveDraftView('preview', value), [os.saveDraftView]);
   const saveLottery = useCallback(value => os.saveDraftView('lottery', value), [os.saveDraftView]);
@@ -147,6 +147,8 @@ export default function AppScreenRouter({ app }) {
         getInitializationAttempt={gs.getNewGameInitializationAttempt}
         onLoad={handleLoad}
         onSelectTeam={id => { clearLoadError?.(); return gs.handleSelect(id); }}
+        onSaveDeletionStart={handleSaveDeletionStart}
+        onSaveDeletionEnd={handleSaveDeletionEnd}
         onSaveDeleted={() => { setSaveExists(false); clearLoadError?.(); }}
       />
     );
