@@ -29,6 +29,8 @@ function PlanningSaveStatus({gs}) {
   const [lastFailure, setLastFailure] = useState(null);
   const inFlight = useRef(false);
   const sharedResult = useRef(gs.saveResult);
+  const settledRevision = useRef(0);
+  if (sharedResult.current !== gs.saveResult && gs.saveResult != null) settledRevision.current += 1;
   sharedResult.current = gs.saveResult;
   useEffect(() => {
     // A later reset to null must not revive a superseded local attempt.
@@ -48,8 +50,9 @@ function PlanningSaveStatus({gs}) {
   const save = async () => {
     if (inFlight.current || saving) return;
     inFlight.current = true; setPending(true);
+    const revisionAtStart = settledRevision.current;
     const rememberAttempt = next => {
-      if (sharedResult.current && sharedResult.current !== gs.saveResult) return;
+      if (settledRevision.current !== revisionAtStart) return;
       setAttempt({ source: sharedResult.current, result: next });
       setLastFailure(next.ok ? null : next);
     };

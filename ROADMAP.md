@@ -26,9 +26,7 @@
 
 ## 1. 現在地サマリ
 
-2026-10-21 保存障害の優先対応: 基準main `46d75e21b1f6e27c0f60274a38cd7619a80d951d`（#489）。#490の削除・読込競合は同PRで対応し、mainにも存在するオフシーズン保存失敗の理由表示・診断を独立PRで修正。実iPhoneの元障害は未再現で、解決認定は保留。[調査・実装・回帰・限界](./docs/validation/offseason-save-failure/README.md)を参照。両PRとも未マージ・レビュー待ちとし、SAVE-01A/01B等の後続には進まない。
-
-照合日：2026-10-21。基準main：`305e87149247cf5d886dcc0d0c4d59fa6e3df485`（PR #488マージ後）。GitHubのmainとマージ状態を確認。QA-D1は#472、FIX-S3は#473、捕手不足の原因分析は#474、捕手層の編成方針は#475、一軍空き枠の補足修正は#476、共通人数基盤は#477、可変ドラフトは#478、65人方針は#479、AI-03は#480、球団収支FIX-M1は#481でマージ済み。各工程の対象範囲・実測・限界は[QA-D1](./docs/implementation/qa-d1.md)・[FIX-S3](./docs/implementation/fix-s3.md)・[捕手不足の原因分析](./docs/implementation/farm-catcher-shortage.md)・[捕手層のレビューと次工程](./docs/implementation/catcher-depth-review.md)・[収支検証](./docs/validation/club-finance/README.md)を参照。全機能・全年度・実機の完了認定ではない。
+照合日：2026-10-21。基準main：`46d75e21b1f6e27c0f60274a38cd7619a80d951d`（PR #489マージ後）。GitHubのmainとマージ状態を確認。QA-D1は#472、FIX-S3は#473、捕手不足の原因分析は#474、捕手層の編成方針は#475、一軍空き枠の補足修正は#476、共通人数基盤は#477、可変ドラフトは#478、65人方針は#479、AI-03は#480、球団収支FIX-M1は#481でマージ済み。各工程の対象範囲・実測・限界は[QA-D1](./docs/implementation/qa-d1.md)・[FIX-S3](./docs/implementation/fix-s3.md)・[捕手不足の原因分析](./docs/implementation/farm-catcher-shortage.md)・[捕手層のレビューと次工程](./docs/implementation/catcher-depth-review.md)・[収支検証](./docs/validation/club-finance/README.md)を参照。全機能・全年度・実機の完了認定ではない。
 
 ### UI-04 球団経営・ナビゲーション刷新（今回確定）
 
@@ -143,6 +141,8 @@ PR #432は未マージでクローズ。テスト運用の成果は#431として
 **現時点の方針**: 大型機能の前に、プレイ体験の信頼性と「考える楽しさ」を優先する。
 
 ---
+
+2026-10-21 保存障害の優先対応: 基準main `46d75e21b1f6e27c0f60274a38cd7619a80d951d`（#489）。#490の削除・読込競合は同PRで対応し、mainにも存在するオフシーズン保存失敗の理由表示・診断を独立PRで修正。最終P2では原因別の復旧案内と、共有成功後に届く古い手動保存エラーの非復活を検証。#490→#491の統合と最新head CIが受入条件。実iPhoneの元障害は未再現で、解決認定は保留。[調査・実装・回帰・限界](./docs/validation/offseason-save-failure/README.md)を参照。両PRとも未マージ・レビュー待ちとし、SAVE-01A/01B等の後続には進まない。
 
 ## 2. 当初の直近フォーカス（2026-05-01時点の履歴）
 

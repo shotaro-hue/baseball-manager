@@ -19,7 +19,9 @@ for(const width of [360,390]) test(`offseason save real 2026 DeNA progression an
  await reloadAndLoad(page);
  await page.getByRole('button',{name:'残り全試合をまとめてシム',exact:true}).click();
  await page.getByRole('button',{name:'引退・シーズン終了後の手続きへ',exact:true}).click();
- const next=page.getByRole('button',{name:'引退結果を確認して次へ',exact:true});await expect(next).toBeVisible();
+ const next=page.getByRole('button',{name:'引退結果を確認して次へ',exact:true});
+ // Wait for the lazy phase and bring its footer into the mobile viewport before inspecting it.
+ await next.scrollIntoViewIfNeeded();await expect(next).toBeVisible();
  const retire=page.getByRole('button',{name:'引退を受け入れる',exact:true});while(await retire.count())await retire.first().click();
  await next.click();await page.getByRole('dialog').getByRole('button',{name:'確定して国内FA補強へ',exact:true}).click();
  const panel=page.locator('.planning-save');await expect(panel).toBeVisible({timeout:90000});

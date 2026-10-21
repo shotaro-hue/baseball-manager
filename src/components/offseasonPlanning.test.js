@@ -349,3 +349,15 @@ it('edits reinforcement goals without changing ownership or budget and restores 
  expect(latest.gs.offseasonPlan.reinforcements).toMatchObject({draftGoal:4,faGoal:2});expect(latest.gs.myTeam.players).toHaveLength(1);expect(latest.gs.myTeam.budget).toBe(10000);
  const saved=JSON.parse(JSON.stringify({teams:latest.gs.teams,plan:latest.gs.offseasonPlan}));act(()=>ui.view.unmount());const restored=setup(saved);restored.click('補強予定を編集');expect(restored.view.root.findByProps({'aria-label':'ドラフト予定人数'}).props.value).toBe(4);
 });
+
+it('does not revive a pending manual failure after a newer shared success and another save starts', async () => {
+ let finish;
+ const saveState = {saveResult:null};
+ const ui = setup({saveState,handleSave:() => new Promise(resolve => {finish=resolve;})});
+ let pending; act(() => {pending=ui.button('編成内容を保存する').props.onClick();});
+ saveState.saveResult={ok:true}; ui.click('交渉・補強を始める');
+ saveState.saveResult=null; saveState.saveQueueState={isSaving:true}; ui.click('自球団');
+ await act(async () => {finish({ok:false,reason:'save_conflict'}); await pending;});
+ expect(ui.view.root.findAllByProps({className:'planning-save-failure'})).toHaveLength(0);
+ expect(text(ui.view.root.findByProps({className:'planning-save'}))).toContain('保存中');
+});
