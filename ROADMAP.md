@@ -42,7 +42,7 @@
 | UI-04C-FIX | — | [#487](https://github.com/shotaro-hue/baseball-manager/pull/487)マージ済み。[要件](./docs/implementation/ui-04c-fix.md)・[性能/画面/回帰](./docs/validation/ui-04c-fix/README.md) | #486後。軽量一覧・検索/所属/ポジション/年俸/満了ソート、選択後の詳細だけ描画、片側トレード選択/比較、派遣と報告の分離、通知・ID・位置/フォーカス復帰。後置の保存成功通知によるWebKitの59pxずれも修正。ゲーム/保存/金銭/CPUを維持 |
 | UI-04C-FIX2 | — | [#488](https://github.com/shotaro-hue/baseball-manager/pull/488)マージ済み。[検証](./docs/validation/ui-04c-fix2/README.md) | FA領域800pxを単一基準としてCSS/行生成を整合。761〜799px・狭い埋め込み・領域のみのリサイズ・一覧復帰を検証。実iPhoneの指追従確認は未完了 |
 | FIX-CORE-01 | — | [#489](https://github.com/shotaro-hue/baseball-manager/pull/489)マージ済み。[原因/検証](./docs/validation/fix-core-01/README.md) | メタデータなしの再開、記者会見の重複効果防止、保存移籍履歴の表示 |
-| FIX-CORE-02 | P1/P2 | この独立PRで修正・回帰検証、未マージ。[原因/検証](./docs/validation/fix-core-02/README.md) | 移籍金額の有限値検査、再開失敗警告、確認済み削除と遅延読込の競合・削除後キャッシュ再生を修正。最終headとCIはPR本文が正本 |
+| FIX-CORE-02 | P1/P2 | この独立PRで修正・回帰検証、未マージ。[原因/検証](./docs/validation/fix-core-02/README.md) | 移籍金額の有限値検査、再開失敗警告、確認済み削除と遅延読込の競合・削除後キャッシュ再生を修正。最終P2: 古い読込は競合警告で拒否、primary最後の削除で復元失敗時も最新セーブを保全。最終headとCIはPR本文が正本 |
 | SAVE-01A | P1 | 次工程。設計承認前。調査・設計のみ先行可 | 分離保存/通算/打球/世代を棚卸し、A単一ファイル/Bアーカイブ/C複数ファイルを比較。iPhone・10/20年規模・既存セーブ保護・途中失敗を含む設計を独立PRでレビュー |
 | SAVE-01B | P1 | コード未着手 | CORE-02マージとSAVE-01A設計の承認後。完全バックアップ、プレビュー、明示復元、新世代への段階投入・再検証・成功時のみ参照切替。直接上書きだけの復元は不可 |
 | QA-04A | P1 | SAVE-01B後、未着手 | 新規→通常/手動/まとめシム→一軍/二軍成績→契約/FA/取引/スカウト→ドラフト/年度→保存再開。失敗/復旧/競合、CPU編成。通常CI外E2Eを評価し必要なゲートを選ぶ |

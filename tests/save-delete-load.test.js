@@ -89,8 +89,9 @@ it.each(['primary', 'backup'])('preserves cross-tab conflict protection for a co
   const changed = JSON.stringify({ ...JSON.parse(rows.get(changedKey)), gameDay: 99 });
   rows.set(changedKey, changed);
   read.release(); const loaded = await loading;
-  expect(loaded.gameDay).toBe(1);
-  expect(await save(loaded)).toMatchObject({ ok: false, reason: 'save_conflict' });
+  expect(loaded).toBeNull();
+  expect(getLastLoadResult()).toMatchObject({ status: 'conflict', reason: 'load_conflict' });
+  expect(await save(state())).toMatchObject({ ok: false, reason: 'save_conflict' });
   expect(rows.get(changedKey)).toBe(changed);
 });
 
@@ -109,4 +110,30 @@ it.each(keys)('retains roots and metadata after deletion of %s fails, and permit
   expect(await deleteSave()).toEqual({ ok: true });
   expect((await save(state(1, 'fresh'))).ok).toBe(true);
   expect((await loadGame()).saveId).toBe('fresh');
+});
+
+// A later read owns publication even when the root bytes did not change.
+it('does not return an older read after a newer read of the same root completes', async () => {
+  await save(state());
+  const read = deferNextSaveRead(), oldLoad = loadGame(); await read.ready;
+  const latest = await loadGame(), status = getLastLoadResult();
+  read.release(); expect(await oldLoad).toBeNull();
+  expect(getLastLoadResult()).toEqual(status);
+  expect(latest.gameDay).toBe(1);
+});
+
+it.each(keys)('retains the latest primary when removing %s and all rollback writes fail', async failingKey => {
+  await save(state()); await save(state(2)); rows.set(keys[3], rows.get(keys[2]));
+  const latest = rows.get(primary), remove = localStorage.removeItem;
+  vi.spyOn(localStorage, 'removeItem').mockImplementation(key => {
+    if (key === failingKey) throw new Error('remove failed');
+    return remove(key);
+  });
+  vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw new Error('restore failed'); });
+  expect(await deleteSave()).toMatchObject({ ok: false, reason: 'delete_failed' });
+  expect(rows.get(primary)).toBe(latest);
+  expect((await loadGame()).gameDay).toBe(2);
+  vi.restoreAllMocks();
+  expect((await save(state(3))).ok).toBe(true);
+  expect((await loadGame()).gameDay).toBe(3);
 });

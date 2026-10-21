@@ -64,7 +64,10 @@ export default function App() {
         const saved = await loadGame();
         if (loadIsStale()) return;
         if (!saved) {
-          setLoadError(getLastLoadResult?.().status === 'unrecoverable' ? 'セーブとバックアップを復旧できませんでした。必要な履歴が欠損・破損しています。' : 'セーブデータが見つかりません');
+          const status = getLastLoadResult?.().status;
+          setLoadError(status === 'conflict'
+            ? '読込中にセーブが更新されたため、再開を止めました。別タブの保存完了を確認し、「続きから」で最新の保存を読み込んでください。'
+            : status === 'unrecoverable' ? 'セーブとバックアップを復旧できませんでした。必要な履歴が欠損・破損しています。' : 'セーブデータが見つかりません');
           return;
         }
 

@@ -119,8 +119,9 @@ it('a primary changed during async load does not grant a stale state permission 
  vi.spyOn(IDBObjectStore.prototype,'get').mockImplementation(function(...args){
   const req=get.apply(this,args);if(this.name==='save_chunks'&&!changed){changed=true;rows.set(primary,JSON.stringify({...JSON.parse(old),gameDay:99}));}return req;
  });
- const loaded=await loadGame();expect(loaded.gameDay).toBe(1);
- expect(await save(loaded)).toMatchObject({ok:false,reason:'save_conflict'});expect(parsed().gameDay).toBe(99);
+ const loaded=await loadGame();expect(loaded).toBeNull();
+ expect(await save(state(1))).toMatchObject({ok:false,reason:'save_conflict'});
+ expect((await loadGame()).gameDay).toBe(99);expect(parsed().gameDay).toBe(99);
 });
 it('rotation due on a failed commit leaves both previous backup roots untouched', async () => {
  await save(state(1));await save(state(2));rows.set(primary+'_last_rotate_at','0');await save(state(3));

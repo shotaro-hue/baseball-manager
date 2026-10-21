@@ -94,3 +94,14 @@ it.each(['no-data', 'rejected', 'saved'])('ignores a pending load settling as %s
   expect(mock.app.gs.teams).toEqual([]); expect(mock.app.gs.saveExists).toBe(false);
   expect(view.root.findAllByProps({ role: 'alert' })).toHaveLength(0);
 });
+
+it('keeps a read-conflict warning and retries from the latest root without applying stale state', async () => {
+  mock.status = 'conflict'; await mount(); await load();
+  expect(message()).toContain('読込中にセーブが更新');
+  expect(message()).toContain('続きから');
+  expect(mock.app.gs.screen).toBe('title'); expect(mock.app.gs.teams).toEqual([]);
+  await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+  expect(message()).toContain('読込中にセーブが更新');
+  mock.status = 'primary'; mock.load.mockResolvedValue(saved()); await load();
+  expect(mock.app.gs.screen).toBe('hub'); expect(mock.app.loadError).toBeNull();
+});

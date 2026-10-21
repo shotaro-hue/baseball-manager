@@ -84,3 +84,12 @@
 - 追加の保存/通算/二軍/移籍表示回帰12ファイル: **81成功/1失敗**。失敗は`farmRuntime.integration.test.js`の`manual save retains an adopted farm round after failure, and retries without re-simulation`（line54、`loadGame()`がnull）。無変更の基点`2f782c0`を別worktreeに作り同ファイル全体を実行すると**同じ箇所で1失敗/2成功**。修正後の同ファイル再実行は**3成功**、両treeの対象1件単独実行も成功。順序/タイミング依存の既存失敗として記録し、このPRで期待値・skip・保存fixtureを変更していない。比較は`--testTimeout=60000 --maxWorkers=1 --minWorkers=1`で実行（最初のbaseline単独実行は既定10秒timeoutで比較不能だったため）。
 
 同一commitの全件Vitest・通常CI・WebKitはPR側の品質ゲートで確認し、ローカルの部分検証を全件成功と表現しない。実iPhone、10年/20年QA、SAVE-01A以降の実装は対象外。
+
+
+## 2026-10-21 最終P2修正（#490）
+
+- P2-A: 競合時に旧stateを返す互換分岐を廃止。storageごとの読込attempt世代を検査し、新しい読込が同一rootを読んだ場合も古い結果を返さない。最新attemptだけが`conflict/load_conflict`を公開し、Appはタイトルに理由と「続きから」で最新保存を読む経路を保持する。既存observationsは勝手に更新せず、旧状態のsave_conflictを維持する。通常読込・バックアップ復旧は変更しない。
+- P2-B: meta→backup2→backup1→primaryの順で削除。途中失敗は全キーの復元を個別に試み、一つの復元失敗で他の復元を止めない。各removeItemが例外時に対象キーを変更しないlocalStorageの仕様を前提に、最後のprimaryは失敗時に残る。複数キー全体の原子性、ブラウザによる領域消去や外部改変、失敗時の全バックアップ復元までは保証しない。
+- RED: 新規/強化した読込・App・remove+rollback例外検証は28件中7失敗、21成功。旧テストが期待していた「旧stateを返し保存時に拒否」を「旧stateを返さず、保存時の拒否も維持し、明示再読込で最新rootへ復帰」に強化。テストの削除/skip/期待値緩和なし。
+- GREEN: save-delete-load / App.deleteLoad / App.loadError / save-generations / farm-save-generations / saveload / saveloadScopes の7ファイル81件成功。production build成功（既存の大きなchunk警告あり）。
+- 実iPhoneの元障害reasonは未確定。この修正から実機障害の解消は主張しない。両PR統合検証は#491側の追補を参照。最新headの通常CI結果はPR本文が正本。

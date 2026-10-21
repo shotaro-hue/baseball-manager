@@ -766,6 +766,7 @@ const backupObservations = new WeakMap();
 const validatedRoots = new WeakMap();
 const validatedRawRoots = new WeakMap();
 const deletionEpochs = new WeakMap();
+const loadEpochs = new WeakMap();
 const chunkRootCache = new WeakMap();
 const legacyCareerSeeds = new WeakMap();
 let localSaveTail = Promise.resolve();
@@ -901,6 +902,9 @@ export function getSavePerfSummary() {
 export async function loadGame() {
   const loadGameStart = isDevEnv ? performance.now() : 0;
   const storage = globalThis.localStorage;
+  const loadEpoch = (loadEpochs.get(storage) ?? 0) + 1;
+  loadEpochs.set(storage, loadEpoch);
+  const ownsLoad = () => storage === globalThis.localStorage && loadEpochs.get(storage) === loadEpoch;
   const deletionEpoch = deletionEpochs.get(storage) ?? 0;
   const deletionChanged = () => deletionEpoch !== (deletionEpochs.get(storage) ?? 0);
   lastLoadResult = { status: 'none' };
@@ -917,7 +921,7 @@ export async function loadGame() {
   } catch { primaryAtLoad = null; backupsAtLoad = []; }
   const canPublish = () => {
     try {
-      return !deletionChanged() && storage === globalThis.localStorage
+      return !deletionChanged() && ownsLoad()
         && storage.getItem(SAVE_KEY) === primaryAtLoad
         && backupsAtLoad.length === 2
         && backupsAtLoad.every((raw, index) => storage.getItem([BACKUP_KEY_1, BACKUP_KEY_2][index]) === raw);
@@ -977,14 +981,8 @@ export async function loadGame() {
         // Never let a delayed read undo deletion or replace newer observations,
         // validated roots, chunk metadata, or the latest reported load result.
         if (!canPublish()) {
-          if (storage !== globalThis.localStorage || !observations.has(storage)) return null;
-          const currentPrimary = storage.getItem(SAVE_KEY);
-          const backupChanged = currentPrimary === null && (backupObservations.get(storage) ?? [])
-            .some((observed, index) => observed !== storage.getItem([BACKUP_KEY_1, BACKUP_KEY_2][index]));
-          // Preserve the historical return only while these observations ensure
-          // save_conflict. A newer successful load may already authorize a save;
-          // handing it this older state would otherwise allow a lost update.
-          return observations.get(storage) !== currentPrimary || backupChanged ? result.state : null;
+          if (ownsLoad() && !deletionChanged()) lastLoadResult = { status: 'conflict', reason: 'load_conflict' };
+          return null;
         }
         if (key !== SAVE_KEY) console.warn(`Loaded from ${label}`);
         logPerf('loadGame', loadGameStart);
@@ -1004,6 +1002,7 @@ export async function loadGame() {
     }
   }
   if (canPublish()) lastLoadResult = { status: foundCandidate ? 'unrecoverable' : 'none' };
+  else if (ownsLoad() && !deletionChanged()) lastLoadResult = { status: 'conflict', reason: 'load_conflict' };
   return null;
 }
 
@@ -1113,7 +1112,8 @@ export function getSaveMeta() {
 }
 
 function deleteSaveImpl() {
-  const keys = [SAVE_KEY, META_KEY, BACKUP_KEY_1, BACKUP_KEY_2];
+  // Keep the latest committed root until every auxiliary removal has succeeded.
+  const keys = [META_KEY, BACKUP_KEY_2, BACKUP_KEY_1, SAVE_KEY];
   const before = keys.map(key => localStorage.getItem(key));
   let saveId = null;
   try {
@@ -1125,10 +1125,12 @@ function deleteSaveImpl() {
   try {
     for (const key of keys) localStorage.removeItem(key);
   } catch (error) {
-    // localStorage has no multi-key transaction. Restore removed values before
-    // reporting failure, keeping the existing save and retry observations intact.
+    // Best effort only: a failed rollback must not stop restoration of other keys.
+    // Individual removeItem calls are atomic, but this sequence is not a transaction.
     keys.forEach((key, index) => {
-      if (before[index] !== null && localStorage.getItem(key) === null) localStorage.setItem(key, before[index]);
+      try {
+        if (before[index] !== null && localStorage.getItem(key) === null) localStorage.setItem(key, before[index]);
+      } catch { /* The primary was removed last and remains usable on failure. */ }
     });
     throw error;
   }
