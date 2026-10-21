@@ -33,3 +33,22 @@ it('closes details when the selected article no longer exists', () => {
   act(() => view.update(React.createElement(NewsTab, { news: [] })));
   expect(text()).not.toContain('今後の方針は？'); expect(text()).not.toContain(option.text);
 });
+
+it.each([undefined, null, 0, -0, NaN, Infinity, -Infinity, 'invalid', '0', '', true, false, [500], {}])('omits cash labels for absent, zero or nonfinite cash %s without mutating history', cash => {
+  const transfers = [{ id: 'cpu', year: 2026, headline: 'CPU間トレード', playersIn: ['加入'], playersOut: ['放出'], cash }];
+  const before = structuredClone(transfers);
+  act(() => { view = create(React.createElement(NewsTab, { news: [], transfers })); });
+  expect(text()).toContain('CPU間トレード'); expect(text()).toContain('加入'); expect(text()).toContain('放出');
+  expect(text()).not.toMatch(/金銭|NaN|Infinity/);
+  expect(transfers).toEqual(before);
+});
+it('omits cash for CPU history with no cash property', () => {
+  const transfers = [{ id: 'cpu', year: 2026, headline: 'CPU間トレード' }];
+  act(() => { view = create(React.createElement(NewsTab, { news: [], transfers })); });
+  expect(text()).not.toMatch(/金銭|NaN/); expect(transfers[0]).not.toHaveProperty('cash');
+});
+it.each([[1250, '金銭支払い 1,250万円'], [-1250, '金銭受取 1,250万円'], ['500', '金銭支払い 500万円'], ['-500', '金銭受取 500万円']])('preserves signed cash %s in 万円, including saved numeric strings', (cash, label) => {
+  const transfers = [{ id: 'player', year: 2026, cash }];
+  act(() => { view = create(React.createElement(NewsTab, { news: [], transfers })); });
+  expect(text()).toContain(label); expect(transfers[0].cash).toBe(cash);
+});

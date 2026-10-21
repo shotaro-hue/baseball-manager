@@ -66,11 +66,28 @@ test('core reliability no roots does not offer resume despite stale metadata', a
 });
 test('core reliability unrecoverable roots stay intact after failed resume', async ({ page }) => {
   await page.goto('/');
+  await page.clock.install();
   await page.evaluate(roots => roots.forEach(key => localStorage.setItem(key, 'broken')), roots);
   await page.reload(); await resume(page).click();
   await expect(page.getByText('セーブとバックアップを復旧できませんでした。必要な履歴が欠損・破損しています。', { exact: true })).toBeVisible();
   await expect(page.locator('.topbar')).toHaveCount(0); await expect(resume(page)).toBeVisible();
   expect(await page.evaluate(roots => roots.map(key => localStorage.getItem(key)), roots)).toEqual(['broken', 'broken', 'broken']);
+  // Move beyond the ordinary toast's lifetime, without waiting in real time.
+  await page.clock.runFor(5000);
+  await expect(page.getByRole('alert')).toContainText('セーブとバックアップを復旧できませんでした');
+  await expect(resume(page)).toBeEnabled();
+  await resume(page).click();
+  await expect(page.getByRole('alert')).toContainText('セーブとバックアップを復旧できませんでした');
+  expect(await page.evaluate(roots => roots.map(key => localStorage.getItem(key)), roots)).toEqual(['broken', 'broken', 'broken']);
+  const fixture = fresh();
+  // Repair the fixture in place, keeping the failed title mounted for the retry.
+  expect(await page.evaluate(async fixture => {
+    const mod = await import('/baseball-manager/src/engine/saveload.js');
+    return (await mod.saveGame(fixture)).ok;
+  }, fixture)).toBe(true);
+  await resume(page).click(); await expect(page.locator('.topbar')).toBeVisible();
+  await expect(page.getByText('セーブとバックアップを復旧できませんでした。必要な履歴が欠損・破損しています。', { exact: true })).toHaveCount(0);
+  expect((await readSave(page)).saveId).toBe(fixture.saveId);
 });
 
 async function openNews(page) {
@@ -87,6 +104,11 @@ function newsFixture() {
   fixture.seasonHistory.transfers = [
     { id: 'core-old', year: fixture.year - 1, day: 12, headline: 'CORE 昨季移籍', playersIn: ['加入選手A'], playersOut: ['放出選手B'], cash: 0 },
     { id: 'core-current', year: fixture.year, day: 1, headline: 'CORE 今季移籍', playersIn: ['加入選手C'], playersOut: [], cash: 500 },
+    { id: 'core-cpu', year: fixture.year, day: 1, headline: 'CORE CPU間金額なし', playersIn: ['CPU加入'], playersOut: ['CPU放出'] },
+    { id: 'core-null', year: fixture.year, day: 1, headline: 'CORE 未記録金額', cash: null },
+    { id: 'core-invalid', year: fixture.year, day: 1, headline: 'CORE 不正金額', cash: 'invalid' },
+    { id: 'core-negative', year: fixture.year, day: 1, headline: 'CORE 金銭受取', cash: -1250 },
+    { id: 'core-legacy', year: fixture.year - 1, day: 12, headline: 'CORE 旧金額文字列', cash: '750' },
   ];
   return fixture;
 }
@@ -101,9 +123,16 @@ for (const width of [360, 390, 1440]) {
     await openNews(page);
     await expect(active(page).getByText('CORE 昨季移籍', { exact: true })).toBeVisible();
     await expect(active(page).getByText('CORE 今季移籍', { exact: true })).toBeVisible();
+    await expect(active(page)).not.toContainText('NaN');
+    await expect(active(page).getByText('金銭支払い 500万円', { exact: true })).toBeVisible();
+    await expect(active(page).getByText('金銭受取 1,250万円', { exact: true })).toBeVisible();
+    await expect(active(page).getByText('金銭支払い 750万円', { exact: true })).toBeVisible();
+    expect(await active(page).getByText(/金銭(?:支払い|受取) [\d,]+万円/).count()).toBe(3);
     await active(page).getByRole('combobox').selectOption(String(fixture.year - 1));
     await expect(active(page).getByText('CORE 今季移籍', { exact: true })).toHaveCount(0);
     await expect(active(page).getByText('CORE 昨季移籍', { exact: true })).toBeVisible();
+    await expect(active(page).getByText('金銭支払い 750万円', { exact: true })).toBeVisible();
+    await expect(active(page).getByText('金銭受取 1,250万円', { exact: true })).toHaveCount(0);
     await active(page).getByRole('combobox').selectOption('all');
     await active(page).getByText('CORE 回答済み会見', { exact: true }).click();
     await expect(active(page).getByText('回答済み', { exact: true })).toBeVisible();
@@ -138,6 +167,12 @@ for (const width of [360, 390, 1440]) {
     await active(page).getByRole('combobox').selectOption(String(fixture.year));
     await expect(active(page).getByText('CORE 今季移籍', { exact: true })).toBeVisible();
     await expect(active(page).getByText('CORE 昨季移籍', { exact: true })).toHaveCount(0);
+    await expect(active(page)).not.toContainText('NaN');
+    await expect(active(page).getByText('金銭受取 1,250万円', { exact: true })).toBeVisible();
+    const persisted = (await readSave(page)).seasonHistory.transfers;
+    expect(persisted.find(t => t.id === 'core-cpu')).not.toHaveProperty('cash');
+    expect(persisted.find(t => t.id === 'core-null').cash).toBeNull();
+    expect(persisted.find(t => t.id === 'core-invalid').cash).toBe('invalid');
     expect((await saveHub(page)).teams).toEqual(after.teams);
     expect(errors).toEqual([]);
   });

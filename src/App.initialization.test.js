@@ -41,5 +41,5 @@ for(const failure of ['read','preparation'])it('keeps title state intact when sa
   await act(async()=>{view=create(React.createElement(App));});
   await act(async()=>{await mock.app.handleLoad();});
   expect(mock.app.gs.screen).toBe('title');expect(mock.app.gs.teams).toEqual([]);expect(mock.app.gs.myId).toBeNull();
-  expect(mock.app.gs.notif).toMatchObject({type:'warn',msg:expect.stringContaining('読み込めませんでした')});
+  expect(mock.app.loadError).toContain('読み込めませんでした');
 });

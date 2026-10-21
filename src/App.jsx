@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import {migrateFarmCompetition} from './engine/farmMigration';
 import './styles.css';
 import { SEASON_PARAMS, getDefaultParams } from './data/scheduleParams.js';
@@ -33,11 +34,19 @@ export default function App() {
   const gs = useGameState();
   const sf = useSeasonFlow(gs);
   const os = useOffseason(gs);
+  // A failed resume must outlive the general notification's 3.5-second timer.
+  const [loadError, setLoadError] = useState(null);
+  const titleLoadEpoch = useRef(0);
+  const clearLoadError = () => {
+    titleLoadEpoch.current += 1;
+    setLoadError(null);
+  };
 
   const handleLoad = async () => {
     if (gs.isNewGameInitializing()) return;
     const attempt = gs.getNewGameInitializationAttempt();
-    const loadIsStale = () => gs.isNewGameInitializing() || attempt !== gs.getNewGameInitializationAttempt();
+    const epoch = titleLoadEpoch.current;
+    const loadIsStale = () => epoch !== titleLoadEpoch.current || gs.isNewGameInitializing() || attempt !== gs.getNewGameInitializationAttempt();
     return gs.runTitleLoad(async () => {
       try {
         const [{ loadGame, getLastLoadResult }, scheduleMod, playerMod] = await Promise.all([
@@ -49,7 +58,7 @@ export default function App() {
         const saved = await loadGame();
         if (loadIsStale()) return;
         if (!saved) {
-          gs.notify(getLastLoadResult?.().status === 'unrecoverable' ? 'セーブとバックアップを復旧できませんでした。必要な履歴が欠損・破損しています。' : 'セーブデータが見つかりません', 'warn');
+          setLoadError(getLastLoadResult?.().status === 'unrecoverable' ? 'セーブとバックアップを復旧できませんでした。必要な履歴が欠損・破損しています。' : 'セーブデータが見つかりません');
           return;
         }
 
@@ -124,19 +133,20 @@ export default function App() {
         sf.setPlayoff(null);
         os.resetTransientOffseason();
 
+        setLoadError(null);
         gs.setTab('dashboard');
         gs.setScreen(planningResumeScreen(saved.offseasonPlan, saved.year, saved.myId));
         if (getLastLoadResult?.().status === 'recovered') gs.notify('バックアップから復旧しました。その後の未保存の変更は含まれません。', 'warn');
       } catch (error) {
         if (!loadIsStale()) {
           console.error('セーブデータの読み込みに失敗しました:', error);
-          gs.notify('セーブデータを読み込めませんでした。再試行してください', 'warn');
+          setLoadError('セーブデータを読み込めませんでした。再試行してください');
         }
       }
     });
   };
 
-  const app = { gs, sf, os, handleLoad };
+  const app = { gs, sf, os, handleLoad, loadError, clearLoadError };
   const hubProps = {
     state: { gs },
     flows: { sf, os },

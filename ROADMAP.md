@@ -1,6 +1,6 @@
 # ROADMAP — NPB Franchise Manager
 
-> 最終更新: 2026-10-21（#488マージ反映、FIX-CORE-01と信頼性改善の後続順を確定）
+> 最終更新: 2026-10-21（#489マージ反映、FIX-CORE-02・保存設計/実装・総合QAの工程を分離）
 > 目的: **OOTP / Football Manager のように「何年も遊べる、意思決定が積み重なる経営シミュレーション」**を作る。
 
 > 現在の進捗は第1節を参照。第2・3・5節の旧チェックリストと期日は2026-05-01時点の履歴であり、現在の完了認定ではない。UI/UX改革の一次監査・推奨PR分割は [全体改革の青写真 v1](./docs/REFORM_BLUEPRINT_V1.md)、現行の設計方針は [UI/UX設計基準](./docs/DESIGN_SYSTEM.md) を参照。着手時には最新mainと再照合する。
@@ -26,7 +26,7 @@
 
 ## 1. 現在地サマリ
 
-照合日：2026-10-21。基準main：`305e87149247cf5d886dcc0d0c4d59fa6e3df485`（PR #488マージ後）。GitHubのmainとマージ状態を確認。QA-D1は#472、FIX-S3は#473、捕手不足の原因分析は#474、捕手層の編成方針は#475、一軍空き枠の補足修正は#476、共通人数基盤は#477、可変ドラフトは#478、65人方針は#479、AI-03は#480、球団収支FIX-M1は#481でマージ済み。各工程の対象範囲・実測・限界は[QA-D1](./docs/implementation/qa-d1.md)・[FIX-S3](./docs/implementation/fix-s3.md)・[捕手不足の原因分析](./docs/implementation/farm-catcher-shortage.md)・[捕手層のレビューと次工程](./docs/implementation/catcher-depth-review.md)・[収支検証](./docs/validation/club-finance/README.md)を参照。全機能・全年度・実機の完了認定ではない。
+照合日：2026-10-21。基準main：`46d75e21b1f6e27c0f60274a38cd7619a80d951d`（PR #489マージ後）。GitHubのmainとマージ状態を確認。QA-D1は#472、FIX-S3は#473、捕手不足の原因分析は#474、捕手層の編成方針は#475、一軍空き枠の補足修正は#476、共通人数基盤は#477、可変ドラフトは#478、65人方針は#479、AI-03は#480、球団収支FIX-M1は#481でマージ済み。各工程の対象範囲・実測・限界は[QA-D1](./docs/implementation/qa-d1.md)・[FIX-S3](./docs/implementation/fix-s3.md)・[捕手不足の原因分析](./docs/implementation/farm-catcher-shortage.md)・[捕手層のレビューと次工程](./docs/implementation/catcher-depth-review.md)・[収支検証](./docs/validation/club-finance/README.md)を参照。全機能・全年度・実機の完了認定ではない。
 
 ### UI-04 球団経営・ナビゲーション刷新（今回確定）
 
@@ -41,13 +41,15 @@
 | UI-04C | — | [#486](https://github.com/shotaro-hue/baseball-manager/pull/486)マージ済み。[記録](./docs/validation/ui-04c/README.md) | 補強/契約の判断・確認・結果、通知対象・解決済み表示 |
 | UI-04C-FIX | — | [#487](https://github.com/shotaro-hue/baseball-manager/pull/487)マージ済み。[要件](./docs/implementation/ui-04c-fix.md)・[性能/画面/回帰](./docs/validation/ui-04c-fix/README.md) | #486後。軽量一覧・検索/所属/ポジション/年俸/満了ソート、選択後の詳細だけ描画、片側トレード選択/比較、派遣と報告の分離、通知・ID・位置/フォーカス復帰。後置の保存成功通知によるWebKitの59pxずれも修正。ゲーム/保存/金銭/CPUを維持 |
 | UI-04C-FIX2 | — | [#488](https://github.com/shotaro-hue/baseball-manager/pull/488)マージ済み。[検証](./docs/validation/ui-04c-fix2/README.md) | FA領域800pxを単一基準としてCSS/行生成を整合。761〜799px・狭い埋め込み・領域のみのリサイズ・一覧復帰を検証。実iPhoneの指追従確認は未完了 |
-| FIX-CORE-01 | P1/P2 | この独立PRで修正・回帰検証、未マージ。[原因/検証/後続](./docs/validation/fix-core-01/README.md) | メタデータなしの再開、記者会見の重複効果防止、保存移籍履歴の表示。提出headと最終CIはPR本文を正本とする |
-| SAVE-01 | P1 | 次工程。設計・コード未着手 | FIX-CORE-01の独立レビュー/マージ後。保存本体と分離長期履歴を外部バックアップ/整合復元する。既存セーブへの直接上書きだけの復元は不可 |
-| QA-04A | P1 | SAVE-01後、未着手 | 新規→通常/手動/まとめシム→一軍/二軍成績→契約/FA/取引/スカウト→ドラフト/年度→保存再開。失敗/復旧/競合、CPU編成。通常CI外E2Eを評価し必要なゲートを選ぶ |
+| FIX-CORE-01 | — | [#489](https://github.com/shotaro-hue/baseball-manager/pull/489)マージ済み。[原因/検証](./docs/validation/fix-core-01/README.md) | メタデータなしの再開、記者会見の重複効果防止、保存移籍履歴の表示 |
+| FIX-CORE-02 | P1/P2 | この独立PRで修正・回帰検証、未マージ。[原因/検証](./docs/validation/fix-core-02/README.md) | 移籍金額の有限値検査、失敗した再開の警告保持・再試行・成功時解除。最終headとCIはPR本文が正本 |
+| SAVE-01A | P1 | 次工程。設計承認前。調査・設計のみ先行可 | 分離保存/通算/打球/世代を棚卸し、A単一ファイル/Bアーカイブ/C複数ファイルを比較。iPhone・10/20年規模・既存セーブ保護・途中失敗を含む設計を独立PRでレビュー |
+| SAVE-01B | P1 | コード未着手 | CORE-02マージとSAVE-01A設計の承認後。完全バックアップ、プレビュー、明示復元、新世代への段階投入・再検証・成功時のみ参照切替。直接上書きだけの復元は不可 |
+| QA-04A | P1 | SAVE-01B後、未着手 | 新規→通常/手動/まとめシム→一軍/二軍成績→契約/FA/取引/スカウト→ドラフト/年度→保存再開。失敗/復旧/競合、CPU編成。通常CI外E2Eを評価し必要なゲートを選ぶ |
 | UI-04D | P2 | QA-04A後。コード未着手 | 通知/ニュース/球団史/OB/設定をDES-01へ移行。既読/要対応/対応済み、実在する設定、一覧/詳細/元の位置。今回の接続・回答修正と区別 |
 | QA-04B | P1 | UI-04D後、未着手。**実iPhone確認未完了** | 360/390/760/761/799/800/1023/1024/1440px、Chromium/WebKit、キーボード、保存/復帰。実iPhoneのタッチ・連続スワイプ・速度は別途実施 |
 
-実施順は **FIX-CORE-01 → SAVE-01 → QA-04A → UI-04D → QA-04B**。各工程は前工程の独立レビュー/マージ後の最新mainから別PRとする。今回のコード変更はFIX-CORE-01までで停止し、後続の実装は開始しない。UI-04A〜Cの既存回帰はQA-04A/B全体の完了を意味しない。
+実施順は **FIX-CORE-02 → SAVE-01A → SAVE-01B → QA-04A → UI-04D → QA-04B**。各工程は前工程の独立レビュー/マージ後の最新mainから別PRとする。設計・調査のみ依存を壊さない範囲で先行可。今回の製品コードはFIX-CORE-02まで。SAVE-01Bは設計承認まで開始しない。QA-04Aでは通常の年間旅程に加え、固定seedの10年/20年と複数seedの傾向を分け、CPU編成/指名停止/財務/年俸/成績/保存サイズ/処理時間をP0〜P3で評価する。UI-04A〜Cの既存回帰は総合QAの完了を意味しない。
 
 **二軍の実測基盤は実装・マージ済み。CPUの編成判断は段階的に改善中。新デザインの全画面移行と長期バランスの完了には至っていない。**
 
