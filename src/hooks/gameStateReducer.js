@@ -1,3 +1,5 @@
+import { clamp } from '../utils';
+
 export const G = {
   APPLY_PROGRESS: 'APPLY_PROGRESS',
   SET_FARM_COMPETITION: 'SET_FARM_COMPETITION',
@@ -7,7 +9,17 @@ export const G = {
   SET_YEAR:     'SET_YEAR',
   SET_MY_ID:    'SET_MY_ID',
   SET_SAVE_ID:  'SET_SAVE_ID',
+  SET_NEWS: 'SET_NEWS',
+  ANSWER_INTERVIEW: 'ANSWER_INTERVIEW',
 };
+
+// Accept only a choice actually offered by the current, unanswered article.
+export function interviewChoice(article, option) {
+  if (article?.type !== 'interview' || article.answered || !option) return null;
+  return article.options?.find(choice => choice && typeof choice.text === 'string'
+    && Number.isFinite(choice.popMod) && Number.isFinite(choice.moraleMod)
+    && choice.text === option.text && choice.popMod === option.popMod && choice.moraleMod === option.moraleMod) ?? null;
+}
 
 /**
  * @param {{ teams: any[], gameDay: number, year: number, myId: string|null }} state
@@ -15,6 +27,24 @@ export const G = {
  */
 export function gameStateReducer(state, action) {
   switch (action.type) {
+    case G.SET_NEWS:
+      return { ...state, news: typeof action.news === 'function' ? action.news(state.news) : action.news };
+    case G.ANSWER_INTERVIEW: {
+      if (state.myId == null || state.myId !== action.myId || state.saveId !== action.saveId
+        || !state.teams.some(team => team.id === state.myId)) return state;
+      const choice = interviewChoice(state.news.find(article => article.id === action.newsId), action.option);
+      if (!choice) return state;
+      // One pure transition: queued/replayed decisions see answered before effects.
+      return {
+        ...state,
+        teams: state.teams.map(team => team.id === state.myId ? {
+          ...team,
+          popularity: clamp((team.popularity || 50) + choice.popMod, 0, 100),
+          players: team.players.map(player => ({ ...player, morale: clamp((player.morale || 60) + choice.moraleMod, 0, 100) })),
+        } : team),
+        news: state.news.map(article => article.id === action.newsId ? { ...article, answered: true } : article),
+      };
+    }
     case G.APPLY_PROGRESS:
       return {...state,...Object.fromEntries(['teams','gameDay','year','myId','saveId','farmCompetition'].filter(k=>k in action.candidate).map(k=>[k,action.candidate[k]]))};
     case G.SET_FARM_COMPETITION:

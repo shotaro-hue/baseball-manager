@@ -4,6 +4,8 @@
 
 ## 結論・運用の原則
 
+FIX-CORE-01追加（2026-10-21）: TitleScreen.resume、useGameState.interview、NewsTab、HubContentRouter.newsの実装テストで保存メタデータ欠損/破損/書込失敗・連続回答・正式answered・移籍接続をRED→GREENで確認する。`core-reliability.spec.js`は通常CI `save-integrity` に追加し、Chromiumとmobile-webkitでタイトルの全保存候補、回答/通知移動/保存再開、移籍の年度絞込み/空表示を実行する。既存CIの範囲・期待値・リトライ0を維持。関連の保存/ナビ/一覧/進行回帰は同一headの通常CI結果を再利用し、実iPhone確認と区別する。[検証記録](./validation/fix-core-01/README.md)。
+
 UI-04C追加（2026-10-20）：`managementDecisions.test.js`で契約/スカウト/取引の確認・取消・二重実行・最新状態・案件ID・回答結果/一覧復帰/欠測年俸の放出を検証。`management-decisions.spec.js`は通常CI posting-and-finance とmobile-webkitで、3幅の比較/取消/復帰、獲得/提示/保存再開、通知案件の特定、キーボードの成功後フォーカス、境界4幅を実行する。旧finance/posting/trade/hub-navigationは確認操作と選択UIだけを更新し、全12球団/金銭/所属/履歴/保存のassertを維持。[実行記録](./validation/ui-04c/README.md)。
 
 UI-04B追加（2026-10-20）: `financeView.test.js`で既存エンジンとの価格/投資同条件比較・通年換算・手動価格維持・欠測と負予算を確認。`FinanceActions.test.js`/`HubManagementTab.test.js`で下書き・明示確定・取消・二重実行・要対応と共通枠を検証。`finance.spec.js`の既存年俸/保存assertは契約への移設後も保持し、3幅の価格/全12球団hash・投資/保存再開・無効入力・負予算とフォーカス回帰を追加。`PlayerModal.salary.test.js`の5入力は契約の年俸上位から詳細を開き、参照/給与表示/全体不変を維持する。既存の通常CI `posting-and-finance` とWebKit対象に含む。[実行記録](./validation/ui-04b/README.md)。

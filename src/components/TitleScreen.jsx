@@ -11,6 +11,7 @@ function loadTitleSaveModule() {
 export default function TitleScreen({
   saveExists,
   initializationError,
+  loadError,
   initializationStatus = 'idle',
   isInitializationInProgress,
   getInitializationAttempt = () => 0,
@@ -96,7 +97,7 @@ export default function TitleScreen({
         </div>
         <div className="tsub">NPB SIMULATION v2.1 - TACTICAL MODE</div>
 
-        {saveMeta && (
+        {saveExists && (
           <div
             style={{
               background: 'rgba(74,222,128,.08)',
@@ -126,7 +127,7 @@ export default function TitleScreen({
                 gap: 8,
               }}
             >
-              <div>
+              {saveMeta ? <div>
                 <div style={{ fontWeight: 700, fontSize: 15 }}>
                   {saveMeta.teamEmoji} {saveMeta.teamName}
                 </div>
@@ -143,7 +144,9 @@ export default function TitleScreen({
                 >
                   {saveMeta.savedAt}
                 </div>
-              </div>
+              </div> : <div style={{ fontSize: 12, color: '#94a3b8' }}>
+                保存データあり・詳細未取得
+              </div>}
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <button
                   className="sim-btn"
@@ -191,9 +194,9 @@ export default function TitleScreen({
           style={initializing ? {background:'#eff6ff',border:'1px solid #365f92',borderRadius:7,padding:12,marginBottom:10,color:'#17243a',fontSize:16,textAlign:'left'} : undefined}>
           {initializing ? '新規ゲームを初期化中です。完了までお待ちください。' : deleting ? 'セーブを削除中です。完了までお待ちください。' : null}
         </div>
-        {(initializationError || deletionError) && (
+        {(initializationError || deletionError || loadError) && (
           <div role="alert" style={{background:'#fff0f1',border:'1px solid #b42332',borderRadius:7,padding:'12px',marginBottom:10,color:'#b42332',fontSize:14,textAlign:'left'}}>
-            {initializationError || deletionError}
+            {initializationError || deletionError || loadError}
           </div>
         )}
 
