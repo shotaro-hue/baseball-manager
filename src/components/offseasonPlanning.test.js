@@ -19,7 +19,7 @@ const plan = extra => ({ version: 1, myId: 0, year: 2026, stage: 'planning', tab
   demands: { 0: { demandSalary: 1500, minAcceptSalary: 1200 } }, releasedIds: [], growth: { growth: [], decline: [], breakout: [] }, ...extra });
 const text = n => typeof n === 'string' ? n : (n.children || []).map(text).join('');
 const views = []; let latest;
-afterEach(() => { for (const v of views.splice(0)) act(() => v.unmount()); vi.clearAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { for (const v of views.splice(0)) act(() => v.unmount()); vi.clearAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 function setup(options = {}) {
   function Harness() {
     const [teams, setTeams] = useState(options.teams || [team()]);
@@ -154,6 +154,84 @@ for (const [saveState,label] of [
 ]) it(`reports the actual planning save status ${label}`,()=>{
  const ui=setup({saveState});expect(text(ui.view.root.findByProps({className:'planning-save'}))).toContain(label);
  expect(ui.button('編成内容を保存する').props.disabled).toBe(Boolean(saveState.saveQueueState?.isSaving||saveState.saveQueueState?.hasQueuedSave));
+});
+it('keeps the save reason and unsaved risk visible after the notification fades and the view rerenders', async () => {
+ vi.useFakeTimers();
+ const saveState = {saveDirty:true,saveResult:{ok:false,reason:'indexeddb_write_failed'},notification:'temporary save notification'};
+ const ui = setup({saveState});
+ const failure = () => ui.view.root.findByProps({className:'planning-save-failure'});
+ expect(text(failure())).toContain('ブラウザ内データベース');
+ expect(text(failure())).toContain('未保存');
+ expect(text(failure())).toContain('画面を閉じる');
+ await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+ saveState.notification = null;
+ ui.click('交渉・補強を始める');
+ expect(text(failure())).toContain('indexeddb_write_failed');
+ expect(text(failure())).toContain('再試行');
+ expect(latest.gs.offseasonPlan.stage).toBe('open');
+});
+it('keeps a returned failure visible until a successful retry even when no shared result was published', async () => {
+ let nextResult = {ok:false,reason:'transition_in_progress'};
+ const ui = setup({handleSave:async () => nextResult});
+ await act(async () => { await ui.button('編成内容を保存する').props.onClick(); });
+ expect(text(ui.view.root.findByProps({className:'planning-save'}))).toContain('保存失敗');
+ expect(text(ui.view.root.findByProps({className:'planning-save-failure'}))).toContain('画面の切り替え');
+ nextResult = {ok:true};
+ await act(async () => { await ui.button('編成内容を保存する').props.onClick(); });
+ expect(ui.view.root.findAllByProps({className:'planning-save-failure'})).toHaveLength(0);
+ expect(text(ui.view.root.findByProps({className:'planning-save'}))).toContain('保存済み');
+});
+it('disables retry while its promise is pending even before the shared save queue updates', async () => {
+ let complete;
+ const saveState = {saveResult:{ok:false,reason:'save_lock_unavailable'}};
+ const ui = setup({saveState,handleSave:() => new Promise(resolve => {complete=resolve;})});
+ let pending;
+ act(() => { pending = ui.button('編成内容を保存する').props.onClick(); });
+ expect(ui.button('編成内容を保存する').props.disabled).toBe(true);
+ expect(text(ui.view.root.findByProps({className:'planning-save'}))).toContain('保存中');
+ saveState.saveResult = null;
+ ui.click('交渉・補強を始める');
+ expect(text(ui.view.root.findByProps({className:'planning-save-failure'}))).toContain('保存ロック');
+ await act(async () => { complete({ok:true}); await pending; });
+ expect(ui.button('編成内容を保存する').props.disabled).toBe(false);
+ expect(ui.view.root.findAllByProps({className:'planning-save-failure'})).toHaveLength(0);
+});
+it('keeps unexpected save rejections visible without exposing exception messages', async () => {
+ const ui = setup({handleSave:async () => {throw Error('PRIVATE SAVE CONTENT');}});
+ await act(async () => { await ui.button('編成内容を保存する').props.onClick(); });
+ const failure = text(ui.view.root.findByProps({className:'planning-save-failure'}));
+ expect(failure).toContain('原因を特定できませんでした');
+ expect(failure).toContain('未保存');
+ expect(failure).not.toContain('PRIVATE SAVE CONTENT');
+});
+it('replaces a local failure with a later shared save result and preserves archive warning meaning', async () => {
+ const saveState = {saveResult:null};
+ const ui = setup({saveState,handleSave:async () => ({ok:false,reason:'transition_in_progress'})});
+ await act(async () => { await ui.button('編成内容を保存する').props.onClick(); });
+ expect(ui.view.root.findAllByProps({className:'planning-save-failure'})).toHaveLength(1);
+ saveState.saveResult = {ok:true,archive:{ok:false}};
+ ui.click('交渉・補強を始める');
+ expect(ui.view.root.findAllByProps({className:'planning-save-failure'})).toHaveLength(0);
+ expect(text(ui.view.root.findByProps({className:'planning-save'}))).toContain('保存済み・一部履歴は要確認');
+ saveState.saveResult = null;
+ saveState.saveQueueState = {isSaving:true};
+ ui.click('自球団');
+ expect(text(ui.view.root.findByProps({className:'planning-save'}))).toContain('保存中');
+ expect(ui.view.root.findAllByProps({className:'planning-save-failure'})).toHaveLength(0);
+});
+it('keeps the latest shared failure when a later save clears the shared result', async () => {
+ const saveState = {saveResult:null};
+ const ui = setup({saveState,handleSave:async () => ({ok:false,reason:'transition_in_progress'})});
+ await act(async () => { await ui.button('編成内容を保存する').props.onClick(); });
+ saveState.saveResult = {ok:false,reason:'quota_exceeded'};
+ ui.click('交渉・補強を始める');
+ expect(text(ui.view.root.findByProps({className:'planning-save-failure'}))).toContain('保存容量が不足しています');
+ saveState.saveResult = null;
+ saveState.saveQueueState = {isSaving:true};
+ ui.click('自球団');
+ const failure = text(ui.view.root.findByProps({className:'planning-save-failure'}));
+ expect(failure).toContain('保存容量が不足しています');
+ expect(failure).not.toContain('画面の切り替え');
 });
 it('filters release drafts without changing players, budget or live contracts',()=>{
  const ui=setup({teams:[team([p(0),p(1),p(2,{contractYearsLeft:3})])]});ui.intent(0,'release');

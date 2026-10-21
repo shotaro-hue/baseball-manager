@@ -15,6 +15,12 @@
 .planning-screen[data-ds] .planning-overview .planning-note { margin:4px 0; line-height:1.4; }
 .planning-screen[data-ds] .planning-save { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:8px; }
 .planning-screen[data-ds] .planning-save button { margin-left:auto; padding:8px 12px; font-size:14px; }
+.planning-screen[data-ds] .planning-save-failure { flex-basis:100%; min-width:0; padding:8px 12px; border-left:3px solid var(--ds-danger); background:var(--ds-danger-surface); color:var(--ds-text); font-size:14px; overflow-wrap:anywhere; }
+.planning-screen[data-ds] .planning-save-failure p { margin:4px 0 8px; }
+.planning-screen[data-ds] .planning-save-risk { font-weight:700; }
+.planning-screen[data-ds] .planning-save-failure summary { min-height:44px; padding:8px 0; box-sizing:border-box; cursor:pointer; }
+.planning-screen[data-ds] .planning-save-failure summary:focus-visible { outline:3px solid var(--ds-focus); outline-offset:3px; }
+.planning-screen[data-ds] .planning-save-failure code { font-size:12px; }
 .planning-screen[data-ds] .planning-tabs { position:sticky; top:0; z-index:5; background:var(--ds-canvas); padding:8px 0; border-bottom:1px solid var(--ds-divider); }
 .planning-screen[data-ds] .planning-tab-buttons { display:flex; gap:8px; }
 .planning-screen[data-ds] .planning-tab-buttons button { min-height:48px; flex:1; border:0; border-bottom:3px solid transparent; border-radius:0; background:transparent; color:var(--ds-muted); padding:8px; font-size:14px; }
