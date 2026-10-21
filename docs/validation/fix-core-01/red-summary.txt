@@ -1,0 +1,100 @@
+FIX-CORE-01 initial RED evidence (base 305e87149247cf5d886dcc0d0c4d59fa6e3df485)
+Expectations unchanged after implementation.
+
+
+--- red-title.log ---
+     → expected undefined to be defined
+     → expected undefined to be defined
+     → expected '{"type":"div","props":{"className":"a…' to contain '保存データあり・詳細未取得'
+     → expected '{"type":"div","props":{"className":"a…' to contain '保存データあり・詳細未取得'
+     → expected '{"type":"div","props":{"className":"a…' to contain '保存データあり・詳細未取得'
+     → expected '{"type":"div","props":{"className":"a…' to contain '保存データあり・詳細未取得'
+     → Can't access .root on unmounted test renderer
+     → expected undefined to be defined
+     → expected undefined to be defined
+     → expected undefined to be defined
+     → expected undefined to be defined
+ FAIL  src/components/TitleScreen.resume.test.js > keeps resume available for metadata null without loading histories on the title
+ FAIL  src/components/TitleScreen.resume.test.js > keeps resume available for metadata {broken without loading histories on the title
+AssertionError: expected undefined to be defined
+ FAIL  src/components/TitleScreen.resume.test.js > keeps resume available for metadata {} without loading histories on the title
+ FAIL  src/components/TitleScreen.resume.test.js > keeps resume available for metadata [] without loading histories on the title
+ FAIL  src/components/TitleScreen.resume.test.js > keeps resume available for metadata true without loading histories on the title
+ FAIL  src/components/TitleScreen.resume.test.js > keeps resume available for metadata "broken" without loading histories on the title
+AssertionError: expected '{"type":"div","props":{"className":"a…' to contain '保存データあり・詳細未取得'
+ FAIL  src/components/TitleScreen.resume.test.js > keeps resume available for metadata {"teamName":{},"year":2026} without loading histories on the title
+ FAIL  src/components/TitleScreen.resume.test.js > keeps a successfully written payload accessible when metadata writing fails
+AssertionError: expected undefined to be defined
+ FAIL  src/components/TitleScreen.resume.test.js > offers backup recovery with primary broken and no metadata
+ FAIL  src/components/TitleScreen.resume.test.js > offers backup recovery with primary null and no metadata
+AssertionError: expected undefined to be defined
+ FAIL  src/components/TitleScreen.resume.test.js > keeps corrupt candidates intact and delegates failure to the existing loader
+AssertionError: expected undefined to be defined
+ Test Files  1 failed (1)
+      Tests  11 failed | 2 passed (13)
+   Duration  1.83s (transform 724ms, setup 0ms, collect 1.09s, tests 327ms, environment 0ms, prepare 125ms)
+
+--- red-interview.log ---
+     → expected '{"type":"div","props":{"style":{"disp…' to contain '回答済み'
+     → expected '{"type":"div","props":{"style":{"disp…' to contain '回答済み'
+     → expected '{"type":"div","props":{"style":{"disp…' not to contain '今後の方針は？'
+     → expected [ 52, 69 ] to deeply equal [ 55, 67 ]
+     → expected [ 57, 76 ] to deeply equal [ 52, 69 ]
+     → expected { teams: [ { id: +0, …(9) } ], …(1) } to deeply equal { teams: [ { id: +0, …(9) } ], …(1) }
+     → expected { teams: [ { id: +0, …(9) } ], …(1) } to deeply equal { teams: [ { id: +0, …(9) } ], …(1) }
+     → expected { teams: [ { id: +0, …(9) } ], …(1) } to deeply equal { teams: [ { id: +0, …(9) } ], …(1) }
+     → Cannot read properties of null (reading 'popMod')
+     → expected { teams: [ { id: +0, …(9) } ], …(1) } to deeply equal { teams: [ { id: +0, …(9) } ], …(1) }
+     → expected { teams: [ { id: +0, …(9) } ], …(1) } to deeply equal { teams: [ { id: +0, …(9) } ], …(1) }
+     → expected [ 55, 67 ] to deeply equal [ 50, 60 ]
+     → expected [ 52, 69 ] to deeply equal [ 55, 67 ]
+ FAIL  src/hooks/useGameState.interview.test.js > rejects two calls to the same ID before React renders, including different choices
+AssertionError: expected [ 52, 69 ] to deeply equal [ 55, 67 ]
+ FAIL  src/hooks/useGameState.interview.test.js > applies different news independently within one React batch
+AssertionError: expected [ 57, 76 ] to deeply equal [ 52, 69 ]
+ FAIL  src/hooks/useGameState.interview.test.js > leaves gameplay unchanged for invalid interview missing / {"text":"前向きに進みます","popMod":5,"moraleMod":7}
+ FAIL  src/hooks/useGameState.interview.test.js > leaves gameplay unchanged for invalid interview ordinary / {"text":"前向きに進みます","popMod":5,"moraleMod":7}
+ FAIL  src/hooks/useGameState.interview.test.js > leaves gameplay unchanged for invalid interview done / {"text":"前向きに進みます","popMod":5,"moraleMod":7}
+ FAIL  src/hooks/useGameState.interview.test.js > leaves gameplay unchanged for invalid interview one / {"text":"前向きに進みます","popMod":100,"moraleMod":7}
+ FAIL  src/hooks/useGameState.interview.test.js > leaves gameplay unchanged for invalid interview one / {"text":"前向きに進みます","popMod":5,"moraleMod":null}
+AssertionError: expected { teams: [ { id: +0, …(9) } ], …(1) } to deeply equal { teams: [ { id: +0, …(9) } ], …(1) }
+ FAIL  src/hooks/useGameState.interview.test.js > leaves gameplay unchanged for invalid interview one / null
+TypeError: Cannot read properties of null (reading 'popMod')
+ FAIL  src/hooks/useGameState.interview.test.js > rechecks current news even when the handler was captured before hydration
+AssertionError: expected [ 55, 67 ] to deeply equal [ 50, 60 ]
+ FAIL  src/hooks/useGameState.interview.test.js > preserves answered through actual save/load and a fresh hook instance
+AssertionError: expected [ 52, 69 ] to deeply equal [ 55, 67 ]
+ FAIL  src/components/tabs/NewsTab.test.js > uses persisted answered state on initial render and never guesses an unsaved answer
+AssertionError: expected '{"type":"div","props":{"style":{"disp…' to contain '回答済み'
+ FAIL  src/components/tabs/NewsTab.test.js > derives selected detail from refreshed news after answering or hydration
+AssertionError: expected '{"type":"div","props":{"style":{"disp…' to contain '回答済み'
+ FAIL  src/components/tabs/NewsTab.test.js > closes details when the selected article no longer exists
+AssertionError: expected '{"type":"div","props":{"style":{"disp…' not to contain '今後の方針は？'
+ Test Files  2 failed (2)
+      Tests  13 failed | 3 passed (16)
+   Duration  1.50s (transform 653ms, setup 0ms, collect 1000ms, tests 261ms, environment 0ms, prepare 205ms)
+
+--- red-transfers.log ---
+     → expected '{"type":"div","props":{"style":{"disp…' to contain '昨季の移籍'
+ FAIL  src/components/hub/HubContentRouter.news.test.js > renders saved transfers from the current selector and filters by year
+AssertionError: expected '{"type":"div","props":{"style":{"disp…' to contain '昨季の移籍'
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Duration  4.27s (transform 883ms, setup 0ms, collect 3.92s, tests 23ms, environment 0ms, prepare 75ms)
+
+--- supplemental RED: title load warning ---
+ FAIL  src/components/TitleScreen.resume.test.js > shows the existing loader warning on the title without hiding resume or changing roots
+Error: No instances found with props: {"role":"alert"}
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 skipped (14)
+   Duration  2.03s (transform 839ms, setup 0ms, collect 1.36s, tests 181ms, environment 0ms, prepare 114ms)
+
+--- independent-review RED (before acceptance/session guard) ---
+ FAIL  src/hooks/useGameState.interview.test.js > notifies and dirties only the accepted choice when two answers arrive before render
+AssertionError: expected { msg: '回答しました！ 人気-3 モラル+2', …(1) } to deeply equal { type: 'ok', …(1) }
+ FAIL  src/hooks/useGameState.interview.test.js > invalidates an old interview handler when the same save is loaded into a new session
+AssertionError: expected [ 55, 67 ] to deeply equal [ 50, 60 ]
+ FAIL  src/hooks/useGameState.interview.test.js > does not report success for news or team changes queued before an old command
+AssertionError: expected { msg: '回答しました！ 人気+5 モラル+7', …(1) } to be null
+ Test Files  1 failed (1)
+      Tests  3 failed | 12 skipped (15)

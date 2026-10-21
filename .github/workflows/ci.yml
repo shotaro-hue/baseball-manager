@@ -50,7 +50,7 @@ jobs:
           - name: hub-navigation
             files: hub-navigation.spec.js
           - name: save-integrity
-            files: save-generations.spec.js career-generations.spec.js ai03-roster-cycle.spec.js
+            files: save-generations.spec.js career-generations.spec.js ai03-roster-cycle.spec.js core-reliability.spec.js
     steps:
       - name: Checkout
         uses: actions/checkout@v4

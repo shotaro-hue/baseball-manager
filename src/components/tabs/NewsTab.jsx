@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react";
 
 export function NewsTab({ news, transfers = [], onInterview, currentYear }){
-  const [sel,setSel]=useState(null);
-  const [answered,setAnswered]=useState({});
+  const [selectedId,setSelectedId]=useState(null);
+  const sel=news.find(article=>article.id===selectedId)??null;
   const [transferYear,setTransferYear]=useState("all");
   const icon=t=>t==="game"?"⚾":t==="trade"?"🔄":t==="draft"?"📋":t==="interview"?"🎤":t==="season"?"🏆":"📰";
   const col=t=>t==="game"?"#60a5fa":t==="trade"?"#f97316":t==="draft"?"#a78bfa":t==="interview"?"#f5c842":t==="season"?"#34d399":"#94a3b8";
@@ -12,8 +12,6 @@ export function NewsTab({ news, transfers = [], onInterview, currentYear }){
   ), [transferYear, transfers]);
   const handleAnswer=(newsId,opt)=>{
     onInterview(newsId,opt);
-    setAnswered(prev=>({...prev,[newsId]:opt}));
-    setSel(prev=>prev?{...prev,_answered:opt}:null);
   };
   return(
     <div style={{display:"grid",gridTemplateColumns:sel?"1fr 1fr":"1fr",gap:8}}>
@@ -21,8 +19,8 @@ export function NewsTab({ news, transfers = [], onInterview, currentYear }){
         <div className="card-h">📰 スポーツニュース</div>
         {news.length===0&&<p style={{fontSize:11,color:"#374151",padding:"12px 0"}}>試合を進めるとニュースが届きます</p>}
         {news.map(n=>{
-          const needsAnswer=n.type==="interview"&&!answered[n.id];
-          return(<div key={n.id} onClick={()=>setSel(n)} style={{padding:"8px 10px",marginBottom:4,borderRadius:6,cursor:"pointer",background:sel?.id===n.id?"rgba(245,200,66,.08)":needsAnswer?"rgba(245,200,66,.03)":"rgba(255,255,255,.02)",border:sel?.id===n.id?"1px solid rgba(245,200,66,.3)":needsAnswer?"1px solid rgba(245,200,66,.15)":"1px solid rgba(255,255,255,.04)"}}>
+          const needsAnswer=n.type==="interview"&&!n.answered;
+          return(<div key={n.id} onClick={()=>setSelectedId(n.id)} style={{padding:"8px 10px",marginBottom:4,borderRadius:6,cursor:"pointer",background:sel?.id===n.id?"rgba(245,200,66,.08)":needsAnswer?"rgba(245,200,66,.03)":"rgba(255,255,255,.02)",border:sel?.id===n.id?"1px solid rgba(245,200,66,.3)":needsAnswer?"1px solid rgba(245,200,66,.15)":"1px solid rgba(255,255,255,.04)"}}>
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
               <span style={{fontSize:11,color:col(n.type)}}>{icon(n.type)}</span>
               {needsAnswer&&<span style={{fontSize:8,background:"#f5c842",color:"#000",borderRadius:4,padding:"1px 5px",fontWeight:700}}>回答待ち</span>}
@@ -59,12 +57,12 @@ export function NewsTab({ news, transfers = [], onInterview, currentYear }){
         <div className="card" style={{padding:"12px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
             <span style={{fontSize:10,color:col(sel.type),fontWeight:700}}>{icon(sel.type)} {sel.source}</span>
-            <button className="bsm bga" onClick={()=>setSel(null)}>✕</button>
+            <button className="bsm bga" onClick={()=>setSelectedId(null)}>✕</button>
           </div>
           <div style={{fontWeight:700,fontSize:13,lineHeight:1.5,marginBottom:4}}>{sel.headline}</div>
           <div style={{fontSize:9,color:"#374151",marginBottom:10}}>{sel.dateLabel}</div>
           <div style={{fontSize:12,color:"#e0d4bf",lineHeight:1.8,marginBottom:12,whiteSpace:"pre-wrap"}}>{sel.body}</div>
-          {sel.type==="interview"&&!answered[sel.id]&&!sel._answered&&(
+          {sel.type==="interview"&&!sel.answered&&(
             <div style={{borderTop:"1px solid rgba(255,255,255,.08)",paddingTop:10}}>
               <div style={{fontSize:11,color:"#f5c842",fontWeight:700,marginBottom:8}}>🎤 記者: 「{sel.question}」</div>
               <div style={{fontSize:10,color:"#374151",marginBottom:8}}>あなたの回答を選んでください（球団人気・選手モラルに影響）</div>
@@ -76,11 +74,9 @@ export function NewsTab({ news, transfers = [], onInterview, currentYear }){
               ))}
             </div>
           )}
-          {(answered[sel.id]||sel._answered)&&sel.type==="interview"&&(
+          {sel.answered&&sel.type==="interview"&&(
             <div style={{borderTop:"1px solid rgba(255,255,255,.08)",paddingTop:10}}>
-              <div style={{fontSize:10,color:"#374151",marginBottom:4}}>あなたの回答：</div>
-              <div style={{fontSize:11,color:"#f5c842",fontStyle:"italic",lineHeight:1.6}}>{(answered[sel.id]||sel._answered)?.text}</div>
-              <div style={{fontSize:9,color:"#34d399",marginTop:6}}>人気 {(answered[sel.id]||sel._answered)?.popMod>=0?"+":""}{(answered[sel.id]||sel._answered)?.popMod} ／ モラル {(answered[sel.id]||sel._answered)?.moraleMod>=0?"+":""}{(answered[sel.id]||sel._answered)?.moraleMod}</div>
+              <div style={{fontSize:10,color:"#374151"}}>回答済み</div>
             </div>
           )}
         </div>

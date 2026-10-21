@@ -1,0 +1,86 @@
+[
+  {
+    "stage": "before",
+    "width": 360,
+    "screen": "news",
+    "pending": 1,
+    "knownAnswerHidden": false,
+    "transfers": 0
+  },
+  {
+    "stage": "before",
+    "width": 360,
+    "screen": "title",
+    "resume": 0
+  },
+  {
+    "stage": "before",
+    "width": 390,
+    "screen": "news",
+    "pending": 1,
+    "knownAnswerHidden": false,
+    "transfers": 0
+  },
+  {
+    "stage": "before",
+    "width": 390,
+    "screen": "title",
+    "resume": 0
+  },
+  {
+    "stage": "before",
+    "width": 1440,
+    "screen": "news",
+    "pending": 1,
+    "knownAnswerHidden": false,
+    "transfers": 0
+  },
+  {
+    "stage": "before",
+    "width": 1440,
+    "screen": "title",
+    "resume": 0
+  },
+  {
+    "stage": "after",
+    "width": 360,
+    "screen": "news",
+    "pending": 0,
+    "knownAnswerHidden": true,
+    "transfers": 1
+  },
+  {
+    "stage": "after",
+    "width": 360,
+    "screen": "title",
+    "resume": 1
+  },
+  {
+    "stage": "after",
+    "width": 390,
+    "screen": "news",
+    "pending": 0,
+    "knownAnswerHidden": true,
+    "transfers": 1
+  },
+  {
+    "stage": "after",
+    "width": 390,
+    "screen": "title",
+    "resume": 1
+  },
+  {
+    "stage": "after",
+    "width": 1440,
+    "screen": "news",
+    "pending": 0,
+    "knownAnswerHidden": true,
+    "transfers": 1
+  },
+  {
+    "stage": "after",
+    "width": 1440,
+    "screen": "title",
+    "resume": 1
+  }
+]

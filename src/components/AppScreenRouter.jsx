@@ -141,6 +141,7 @@ export default function AppScreenRouter({ app }) {
       <TitleScreen
         saveExists={saveExists}
         initializationError={gs.newGameInitializationError}
+        loadError={gs.notif?.type === 'warn' ? gs.notif.msg : null}
         initializationStatus={gs.newGameInitializationStatus}
         isInitializationInProgress={gs.isNewGameInitializing}
         getInitializationAttempt={gs.getNewGameInitializationAttempt}

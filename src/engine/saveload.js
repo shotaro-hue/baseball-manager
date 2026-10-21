@@ -1065,7 +1065,15 @@ export function hasSave() {
 export function getSaveMeta() {
   try {
     const raw = localStorage.getItem(META_KEY);
-    return raw ? JSON.parse(raw) : null;
+    const meta = raw ? JSON.parse(raw) : null;
+    // Metadata is an optional title summary, never evidence that a root is valid.
+    if (!meta || typeof meta !== 'object' || Array.isArray(meta)
+      || typeof meta.teamName !== 'string' || !meta.teamName.trim()
+      || !['year', 'gameDay', 'wins', 'losses'].every(key => Number.isInteger(meta[key]) && meta[key] >= 0)
+      || meta.year < 1 || meta.gameDay < 1
+      || (meta.teamEmoji != null && typeof meta.teamEmoji !== 'string')
+      || (meta.savedAt != null && typeof meta.savedAt !== 'string')) return null;
+    return meta;
   } catch {
     return null;
   }

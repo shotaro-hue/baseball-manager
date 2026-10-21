@@ -278,7 +278,7 @@ export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTab
       <NewsTab
         news={newsForView}
         onInterview={gs.handleInterview}
-        seasonHistory={gs.seasonHistory}
+        transfers={gs.getSeasonHistory().transfers || []}
         currentYear={year}
       />
     );

@@ -7,7 +7,7 @@ import { saveFeedback } from '../engine/saveFeedback';
 import { useState, useReducer, useMemo, useCallback, useEffect, useRef } from "react";
 import { contractReplyIsDue, resolveContractReplies } from '../engine/contractReplies';
 import { yieldToBrowser } from '../engine/yieldToBrowser';
-import { gameStateReducer, G } from './gameStateReducer';
+import { gameStateReducer, G, interviewChoice } from './gameStateReducer';
 import { MATCH_HISTORY_FIELDS, matchHistorySnapshot, mergeMatchResultPatch } from '../engine/matchHistory';
 import { createSaveDirtyTracker } from '../state/saveDirtyTracker';
 import { OFFSEASON_SAVE_SCREENS } from '../engine/offseasonResume';
@@ -141,9 +141,16 @@ export function useGameState() {
   const [gameState, dispatch] = useReducer(
     gameStateReducer,
     undefined,
-    () => ({ teams: [], gameDay: 1, year: 2026, myId: null, saveId: createSaveId() }),
+    () => ({ teams: [], news: [], gameDay: 1, year: 2026, myId: null, saveId: createSaveId() }),
   );
-  const { teams, gameDay, year, myId, saveId, farmCompetition } = gameState;
+  const { teams, news, gameDay, year, myId, saveId, farmCompetition } = gameState;
+  const rosterCommandRef = useRef(gameState);
+  const setNewsState = useCallback(value => {
+    const current = rosterCommandRef.current;
+    const nextNews = typeof value === 'function' ? value(current.news) : value;
+    rosterCommandRef.current = { ...current, news: nextNews };
+    dispatch({ type: G.SET_NEWS, news: nextNews });
+  }, []);
   const farmFields = farmCompetition ? {farmCompetition,farmCompetitionVersion:1} : {};
   const progressTokenRef = useRef(0);
   const progressSessionRef = useRef(0);
@@ -189,7 +196,6 @@ export function useGameState() {
   const [seasonHistory, setSeasonHistoryState] = useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[],transfers:[]});
   const [saveExists, setSaveExists] = useState(false);
   const [schedule, setSchedule] = useState(null);
-  const [news, setNewsState] = useState([]);
   const [mailbox, setMailboxState] = useState([]);
   const [recentResults, setRecentResultsState] = useState([]);
   const [gameResultsMap, setGameResultsMapState] = useState({});
@@ -475,8 +481,7 @@ export function useGameState() {
 
   const myTeam = useMemo(()=>teams.find(t=>t.id===myId),[teams,myId]);
   // Command snapshot also advances synchronously to reject repeated clicks.
-  const rosterCommandRef = useRef(null);
-  rosterCommandRef.current = { teams, myId, year, offseasonPlan };
+  rosterCommandRef.current = { teams, myId, year, offseasonPlan, news, saveId, progressToken: getProgressToken() };
   const commitRosterCommand = (current, nextTeam) => {
     const nextTeams = current.teams.map(t => t.id === current.myId ? nextTeam : t);
     rosterCommandRef.current = { ...current, teams: nextTeams };
@@ -775,11 +780,22 @@ export function useGameState() {
     notify(`${p.name}「${TALK_LABELS[talkType]}」— モラル${delta >= 0 ? "+" : ""}${delta}`, delta >= 0 ? "ok" : "warn");
   }, [myTeam, gameDay, upd, myId, notify]);
 
+  const interviewSession = getProgressSessionToken();
   const handleInterview = useCallback((newsId,opt)=>{
-    upd(myId,t=>({...t,popularity:clamp((t.popularity||50)+opt.popMod,0,100),players:t.players.map(p=>({...p,morale:clamp((p.morale||60)+opt.moraleMod,0,100)}))}));
-    setNews(prev=>prev.map(n=>n.id===newsId?{...n,answered:true}:n));
-    notify("回答しました！ 人気"+(opt.popMod>=0?"+":"")+opt.popMod+" モラル"+(opt.moraleMod>=0?"+":"")+opt.moraleMod,"ok");
-  },[upd,myId,notify,setNews]);
+    const current = rosterCommandRef.current;
+    if (interviewSession !== getProgressSessionToken() || current.progressToken !== getProgressToken()) return false;
+    const choice = interviewChoice(current.news.find(article => article.id === newsId), opt);
+    if (!choice) return false;
+    const action = { type: G.ANSWER_INTERVIEW, newsId, option: choice, myId: current.myId, saveId: current.saveId };
+    const next = gameStateReducer(current, action);
+    if (next === current) return false;
+    progressDispatch(action);
+    // Reuse the existing synchronous command snapshot; rejected calls have no side effects.
+    rosterCommandRef.current = { ...next, progressToken: getProgressToken() };
+    markSaveDirty(['news']);
+    notify("回答しました！ 人気"+(choice.popMod>=0?"+":"")+choice.popMod+" モラル"+(choice.moraleMod>=0?"+":"")+choice.moraleMod,"ok");
+    return true;
+  },[interviewSession,getProgressSessionToken,getProgressToken,progressDispatch,markSaveDirty,notify]);
 
   const toggleLineup = useCallback((pid)=>{
     if(!myTeam) return;
