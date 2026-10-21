@@ -100,3 +100,14 @@
 初回head `5f35a24` のbuild/全単体統合1,691件/保存整合性49件は成功。一方、複数の既存E2Eが「続きから」のクリック直後、Appの非同期読込が終わる前に検証用`readSave()`を開始し、今回の読込attempt世代でApp側が正しく無効化されていた。CI artifactでタイトルに留まることと連続した読込開始を確認。`reloadAndLoad()`はクリック完了と画面反映完了を区別していなかった。
 
 `reloadAndLoad()`に続きからボタンがDOMから消えるまでのassertionを追加し、その後だけ検証用読込へ進む。既存の保存内容assertion・タイムアウト・retry設定は緩和していない。実IndexedDBの最初の読込completeだけを500ms遅延させた専用E2Eを追加し、旧helperでRED（タイトルに残る）、修正後ChromiumでGREENを確認。WebKitと最新head通常CIはPR本文に結果を記載する。初回CIとローカルでの時間切れ/共有ライブラリ不足は成功数へ含めず、最新CIを受入ゲートとする。
+
+
+### バックアップだけが正常な削除状態の追加保全
+
+最終レビューで、primaryが欠損/破損してbackupだけが正常な場合にはprimary最後だけでは不十分と確認。primary削除失敗とrollback書込失敗が重なると、唯一の正常backupが既に消えていた。cold tab / 復旧済みtab × primaryなし/不正JSON/必須chunk欠損、backup2のみ、検証中のroot更新、IDB AbortErrorで9件REDを確認した。
+
+既存hydrationを副作用のないprivate helperへ共通化し、同じ削除ロック内でprimary→backup1→backup2の順に現在の世代/chunk/データを読み取り検証。最初に読めた正常rootを最後に削除する。環境エラーや検証中のroot変更では、removeItemを一度も呼ばず停止する。loadGameを呼ばないため、observations/cache/load世代/statusは検証だけでは変わらない。正常rootの判別不能を破損とみなさず、gzip復号機能が使えない場合も停止する。コードレビューで見つかった復号非対応と非ブラウザfallbackの例外結果も2件RED→GREENへ追加した。
+
+破損が明確なrootだけの明示削除は維持。保存形式・generation・Web Lock名は変更しない。個別キーのAPIが失敗時に対象値を変更しないことを前提に正常rootを残すが、複数キー全体の原子性・全backup/meta復元・ブラウザ自身の消去/外部改変は保証しない。
+
+最終ローカル保存/読込/削除/backup/通算/二軍回帰は8ファイル110件成功・skip0、production build成功。最初の大きな並行実行は最終summaryを得られず受入数へ含めず、JSON reporterで終端結果を確認した再実行を採用。ブラウザ削除/読込と最新head CIはPR本文の結果を参照。

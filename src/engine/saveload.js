@@ -899,6 +899,32 @@ export function getSavePerfSummary() {
   return { count: logs.length, average, slowest };
 }
 
+// Hydrate a private decoded candidate without publishing cache, observations or load status.
+async function hydrateSaveCandidate(state, { strict = false } = {}) {
+  if (state?.saveDataVersion >= LEGACY_GENERATION_VERSION) {
+    Object.assign(state, await readGeneration(state));
+  } else if (state?.saveDataVersion >= INDEXED_DB_LARGE_DATA_VERSION) {
+    try {
+      state.seasonHistory = (await idbRead(IDB_STORES.chunks, 'seasonHistory')) ?? state.seasonHistory;
+      state.news = (await idbRead(IDB_STORES.chunks, 'news')) ?? state.news;
+      state.mailbox = (await idbRead(IDB_STORES.chunks, 'mailbox')) ?? state.mailbox;
+      if (state.matchHistoryStored) {
+        const history = await idbRead(IDB_STORES.chunks, 'matchHistory');
+        if (!history) throw new Error('missing_match_history');
+        Object.assign(state, matchHistorySnapshot(history));
+      }
+      state.saveRevision = sanitizeNumber(state.saveRevision, 0);
+    } catch (e) {
+      if (strict || state.matchHistoryStored) throw e;
+      console.warn('IndexedDB load failed. Fallback to localStorage payload.', e);
+    }
+  }
+}
+
+function provenCorruptCandidate(error) {
+  return error instanceof SyntaxError || /^(invalid_save_manifest|invalid_chunk(?:_reference)?:(news|mailbox|seasonHistory|matchHistory|careerLogs)|invalid_career_(encoding|payload)|missing_match_history)$/.test(error?.message ?? '');
+}
+
 export async function loadGame() {
   const loadGameStart = isDevEnv ? performance.now() : 0;
   const storage = globalThis.localStorage;
@@ -941,24 +967,7 @@ export async function loadGame() {
       if (!raw) continue;
       foundCandidate = true;
       const state = decompress(raw);
-      if (state?.saveDataVersion >= LEGACY_GENERATION_VERSION) {
-        Object.assign(state, await readGeneration(state));
-      } else if (state?.saveDataVersion >= INDEXED_DB_LARGE_DATA_VERSION) {
-        try {
-          state.seasonHistory = (await idbRead(IDB_STORES.chunks, 'seasonHistory')) ?? state.seasonHistory;
-          state.news = (await idbRead(IDB_STORES.chunks, 'news')) ?? state.news;
-          state.mailbox = (await idbRead(IDB_STORES.chunks, 'mailbox')) ?? state.mailbox;
-          if (state.matchHistoryStored) {
-            const history = await idbRead(IDB_STORES.chunks, 'matchHistory');
-            if (!history) throw new Error('missing_match_history');
-            Object.assign(state, matchHistorySnapshot(history));
-          }
-          state.saveRevision = sanitizeNumber(state.saveRevision, 0);
-        } catch (e) {
-          if (state.matchHistoryStored) throw e;
-          console.warn('IndexedDB load failed. Fallback to localStorage payload.', e);
-        }
-      }
+      await hydrateSaveCandidate(state);
       if (deletionChanged()) return null;
       if(!(state?.saveDataVersion >= GENERATION_VERSION)) legacyCareerSeeds.set(state,captureInlineCareerLogs(state));
       for (const team of (state?.teams || [])) {
@@ -1111,26 +1120,43 @@ export function getSaveMeta() {
   }
 }
 
-function deleteSaveImpl() {
-  // Keep the latest committed root until every auxiliary removal has succeeded.
+async function deleteSaveImpl() {
+  const storage = globalThis.localStorage;
   const keys = [META_KEY, BACKUP_KEY_2, BACKUP_KEY_1, SAVE_KEY];
-  const before = keys.map(key => localStorage.getItem(key));
-  let saveId = null;
-  try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (raw) saveId = decompress(raw)?.saveId ?? null;
-  } catch {
-    saveId = null;
+  const before = keys.map(key => storage.getItem(key));
+  let retainedKey = null, saveId = null;
+  // A missing/corrupt primary is common during backup recovery. Retain the first
+  // currently recoverable candidate, not simply the key named primary.
+  for (const key of [SAVE_KEY, BACKUP_KEY_1, BACKUP_KEY_2]) {
+    const raw = before[keys.indexOf(key)];
+    if (raw === null) continue;
+    let state;
+    try { state = decompress(raw); }
+    catch (error) { if (provenCorruptCandidate(error)) continue; throw error; }
+    try { await hydrateSaveCandidate(state, { strict: true }); }
+    catch (error) {
+      if (provenCorruptCandidate(error)) continue;
+      // I/O failure is not evidence of corrupt data: stop before any removal.
+      throw error;
+    }
+    let result;
+    try { result = validateAndMigrateSave(state); }
+    catch { continue; } // Pure state validation; no storage operations.
+    if (result.ok) { retainedKey = key; saveId = result.state.saveId; break; }
   }
+  if (storage !== globalThis.localStorage || keys.some((key, index) => storage.getItem(key) !== before[index])) {
+    throw new Error('delete_roots_changed');
+  }
+  const removalOrder = retainedKey ? [...keys.filter(key => key !== retainedKey), retainedKey] : keys;
   try {
-    for (const key of keys) localStorage.removeItem(key);
+    for (const key of removalOrder) storage.removeItem(key);
   } catch (error) {
     // Best effort only: a failed rollback must not stop restoration of other keys.
     // Individual removeItem calls are atomic, but this sequence is not a transaction.
     keys.forEach((key, index) => {
       try {
-        if (before[index] !== null && localStorage.getItem(key) === null) localStorage.setItem(key, before[index]);
-      } catch { /* The primary was removed last and remains usable on failure. */ }
+        if (before[index] !== null && storage.getItem(key) === null) storage.setItem(key, before[index]);
+      } catch { /* The verified candidate was removed last and remains usable. */ }
     });
     throw error;
   }
@@ -1155,7 +1181,7 @@ export function deleteSave() {
     try {
       if (globalThis.navigator?.locks?.request) return await navigator.locks.request('baseball-manager-save', deleteSaveImpl);
       if (typeof window !== 'undefined') return { ok: false, reason: 'save_lock_unavailable' };
-      return deleteSaveImpl();
+      return await deleteSaveImpl();
     } catch { return { ok: false, reason: 'delete_failed' }; }
   };
   const result = localSaveTail.then(run, run);

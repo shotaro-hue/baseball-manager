@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
-import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
+import { IDBFactory, IDBKeyRange, IDBDatabase, IDBObjectStore } from 'fake-indexeddb';
 import { saveGame, loadGame, deleteSave, getLastLoadResult, hasSave } from '../src/engine/saveload';
 import { openBaseballManagerDb } from '../src/engine/baseballManagerDb';
 import { deferNextSaveRead, holdSaveLock, releaseDeferredSaveOperations } from './helpers/deferredSaveRead';
@@ -136,4 +136,78 @@ it.each(keys)('retains the latest primary when removing %s and all rollback writ
   vi.restoreAllMocks();
   expect((await save(state(3))).ok).toBe(true);
   expect((await loadGame()).gameDay).toBe(3);
+});
+
+
+it.each(['cold','recovered'].flatMap(mode => ['absent','malformed','missing-chunk'].map(kind => [mode,kind])))(
+ 'preserves the only valid backup on removal plus rollback failure (%s / %s)', async (mode,kind) => {
+  await save(state()); await save(state(2)); rows.set(keys[3],'broken');
+  if (kind==='absent') rows.delete(primary);
+  else if (kind==='malformed') rows.set(primary,'broken');
+  else {
+   const key=JSON.parse(rows.get(primary)).saveManifest.chunks.news.key;
+   const db=await openBaseballManagerDb();
+   await new Promise(resolve => {const tx=db.transaction('save_chunks','readwrite');tx.objectStore('save_chunks').delete(key);tx.oncomplete=resolve;});db.close();
+  }
+  if(mode==='cold') vi.stubGlobal('localStorage',storage());
+  else expect((await loadGame()).gameDay).toBe(1);
+  const backup=rows.get(keys[2]),status=getLastLoadResult(),remove=localStorage.removeItem;
+  vi.spyOn(localStorage,'removeItem').mockImplementation(key=>{if(key===primary)throw Error('remove failed');return remove(key);});
+  vi.spyOn(localStorage,'setItem').mockImplementation(()=>{throw Error('rollback failed');});
+  expect(await deleteSave()).toMatchObject({ok:false,reason:'delete_failed'});
+  expect(rows.get(keys[2])).toBe(backup);expect(getLastLoadResult()).toEqual(status);
+  expect((await loadGame()).gameDay).toBe(1);
+  vi.restoreAllMocks();expect(await deleteSave()).toEqual({ok:true});
+  expect((await save(state(1,'fresh'))).ok).toBe(true);expect((await loadGame()).saveId).toBe('fresh');
+});
+it('retains backup2 when both earlier roots are malformed and rollback writes fail', async()=>{
+ await save(state()); const backup=rows.get(primary); rows.set(keys[3],backup);rows.set(primary,'broken');rows.set(keys[2],'broken');
+ const remove=localStorage.removeItem;
+ vi.spyOn(localStorage,'removeItem').mockImplementation(key=>{if(key===primary)throw Error('remove failed');return remove(key);});
+ vi.spyOn(localStorage,'setItem').mockImplementation(()=>{throw Error('rollback failed');});
+ expect(await deleteSave()).toMatchObject({ok:false});expect(rows.get(keys[3])).toBe(backup);
+ expect((await loadGame()).gameDay).toBe(1);
+});
+it('does not remove any root when current validation encounters an environmental read failure',async()=>{
+ await save(state());await save(state(2));const before=keys.map(key=>rows.get(key));
+ const tx=IDBDatabase.prototype.transaction;
+ vi.spyOn(IDBDatabase.prototype,'transaction').mockImplementation(function(...args){
+  if(args[0]==='save_chunks'&&args[1]==='readonly')throw new DOMException('temporary','AbortError');
+  return tx.apply(this,args);
+ });
+ expect(await deleteSave()).toMatchObject({ok:false,reason:'delete_failed'});
+ expect(keys.map(key=>rows.get(key))).toEqual(before);
+});
+it('does not remove roots changed while deletion validates them',async()=>{
+ await save(state());let changed=false;const get=IDBObjectStore.prototype.get;
+ vi.spyOn(IDBObjectStore.prototype,'get').mockImplementation(function(...args){
+  const request=get.apply(this,args);
+  if(this.name==='save_chunks'&&!changed){changed=true;rows.set(primary,JSON.stringify({...JSON.parse(rows.get(primary)),gameDay:99}));}
+  return request;
+ });
+ expect(await deleteSave()).toMatchObject({ok:false,reason:'delete_failed'});
+ expect(JSON.parse(rows.get(primary)).gameDay).toBe(99);
+});
+it('still permits explicit deletion when all roots are malformed JSON',async()=>{
+ keys.filter(key=>key!==keys[1]).forEach(key=>rows.set(key,'broken'));
+ expect(await deleteSave()).toEqual({ok:true});expect(hasSave()).toBe(false);
+});
+
+it('retains every root when gzip career history cannot be decoded in the current environment',async()=>{
+ await save(state());
+ const latest=state(2);latest.teams[0].players=[{id:'long-history',name:'長期選手',stats:{}}];
+ const entries=Array.from({length:300},(_,i)=>({year:1900+i,teamId:0,teamName:'保存球団',stats:{HR:i,AB:500,H:130}}));
+ expect((await save(latest,{initialCareerLogs:[{playerId:'long-history',careerEntries:entries}]})).ok).toBe(true);
+ const before=keys.map(key=>rows.get(key)),decode=globalThis.DecompressionStream;
+ vi.stubGlobal('DecompressionStream',undefined);
+ expect(await deleteSave()).toMatchObject({ok:false,reason:'delete_failed'});
+ expect(keys.map(key=>rows.get(key))).toEqual(before);
+ vi.stubGlobal('DecompressionStream',decode);
+ expect((await loadGame()).gameDay).toBe(2);
+});
+it('returns delete_failed rather than rejecting when the no-lock Node fallback fails',async()=>{
+ await save(state());vi.stubGlobal('navigator',{});
+ vi.spyOn(localStorage,'removeItem').mockImplementation(()=>{throw Error('remove failed');});
+ await expect(deleteSave()).resolves.toMatchObject({ok:false,reason:'delete_failed'});
+ expect((await loadGame()).gameDay).toBe(1);
 });
