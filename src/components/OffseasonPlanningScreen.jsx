@@ -6,6 +6,7 @@ import OffseasonFaPhaseScreen from './OffseasonFaPhaseScreen';
 import { GrowthSummaryScreen } from './OffseasonReviewScreens';
 import { compactRenewalSession, planningSummary, reconcileRenewalSession } from '../engine/offseasonPlanning';
 import { renewalEligible } from '../engine/renewalRules';
+import { saveFeedback } from '../engine/saveFeedback';
 import { fmtSal } from '../utils';
 import { useResultDialog } from './useResultDialog';
 import { Button, MetricBand, StateLabel } from './design-system/primitives';
@@ -23,15 +24,56 @@ function Confirm({ children, title, onClose, onConfirm, busy, fallbackFocus }) {
   </section></div>;
 }
 function PlanningSaveStatus({gs}) {
-  const saving = Boolean(gs.saveQueueState?.isSaving || gs.saveQueueState?.hasQueuedSave);
-  const partial = gs.saveResult?.archive?.ok === false || gs.saveResult?.warnings?.length > 0;
-  const label = saving ? '保存中' : gs.saveResult?.ok === false ? '保存失敗' : gs.saveDirty ? '保存待ち' : gs.saveResult?.ok === true ? gs.saveResult.archive?.ok === false ? '保存済み・一部履歴は要確認' : partial ? '保存済み・保存情報は要確認' : '保存済み' : '保存状態未確認';
-  const tone = saving ? 'processing' : gs.saveResult?.ok === false ? 'danger' : gs.saveDirty || partial ? 'warning' : gs.saveResult?.ok === true ? 'success' : 'neutral';
+  const [pending, setPending] = useState(false);
+  const [attempt, setAttempt] = useState(null);
+  const [lastFailure, setLastFailure] = useState(null);
+  const inFlight = useRef(false);
+  const sharedResult = useRef(gs.saveResult);
+  const settledRevision = useRef(0);
+  if (sharedResult.current !== gs.saveResult && gs.saveResult != null) settledRevision.current += 1;
+  sharedResult.current = gs.saveResult;
+  useEffect(() => {
+    // A later reset to null must not revive a superseded local attempt.
+    if (gs.saveResult != null) setAttempt(null);
+    if (gs.saveResult?.ok === false) setLastFailure(gs.saveResult);
+    else if (gs.saveResult?.ok === true) setLastFailure(null);
+  }, [gs.saveResult]);
+  // Early returns and unexpected rejections may not publish a shared save result.
+  // A newer shared result always supersedes this local presentation state.
+  const result = (attempt && attempt.source === gs.saveResult ? attempt.result : gs.saveResult) ?? lastFailure;
+  const saving = Boolean(pending || gs.saveQueueState?.isSaving || gs.saveQueueState?.hasQueuedSave);
+  const failed = result?.ok === false;
+  const partial = result?.archive?.ok === false || result?.warnings?.length > 0;
+  const feedback = failed ? saveFeedback(result) : null;
+  const label = saving ? '保存中' : failed ? '保存失敗' : gs.saveDirty ? '保存待ち' : result?.ok === true ? result.archive?.ok === false ? '保存済み・一部履歴は要確認' : partial ? '保存済み・保存情報は要確認' : '保存済み' : '保存状態未確認';
+  const tone = saving ? 'processing' : failed ? 'danger' : gs.saveDirty || partial ? 'warning' : result?.ok === true ? 'success' : 'neutral';
   const save = async () => {
-    try { await gs.handleSave(); }
-    catch { gs.notify?.('編成内容の保存に失敗しました。保存ボタンで再試行してください', 'warn'); }
+    if (inFlight.current || saving) return;
+    inFlight.current = true; setPending(true);
+    const revisionAtStart = settledRevision.current;
+    const rememberAttempt = next => {
+      if (settledRevision.current !== revisionAtStart) return;
+      setAttempt({ source: sharedResult.current, result: next });
+      setLastFailure(next.ok ? null : next);
+    };
+    try {
+      const next = await gs.handleSave();
+      rememberAttempt(typeof next?.ok === 'boolean' ? next : { ok: false });
+    } catch {
+      const failure = { ok: false };
+      rememberAttempt(failure);
+      gs.notify?.(saveFeedback(failure).message, 'warn');
+    } finally { inFlight.current = false; setPending(false); }
   };
-  return <div className="planning-save"><StateLabel tone={tone}>{label}</StateLabel><Button variant="secondary" onClick={save} disabled={saving}>編成内容を保存する</Button></div>;
+  return <div className="planning-save">
+    <StateLabel tone={tone} role={failed && !saving ? 'none' : undefined}>{label}</StateLabel>
+    <Button variant="secondary" onClick={save} disabled={saving} aria-describedby={failed ? 'planning-save-failure' : undefined}>編成内容を保存する</Button>
+    {failed && <div id="planning-save-failure" className="planning-save-failure" role="alert">
+      <p>{feedback.cause}{feedback.recovery}</p>
+      <p className="planning-save-risk">{feedback.risk}</p>
+      <details><summary>保存エラーの詳細</summary><p>理由コード：<code>{feedback.reason}</code></p></details>
+    </div>}
+  </div>;
 }
 export default function OffseasonPlanningScreen({ gs, os, myTeam, myId, year }) {
   const plan = gs.offseasonPlan;

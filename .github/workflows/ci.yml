@@ -35,8 +35,8 @@ jobs:
       fail-fast: false
       matrix:
         suite:
-          # CI #428 reached the job limit after 122/123 successes. Balance the
-          # same 318 cases across the same six suites; keep workers/timeouts.
+          # CI #470 hit the 30-minute job cap after 132/132 and 131/132 successes.
+          # Split the same management cases; keep assertions, workers and timeouts.
           - name: initialization-and-progression
             files: progression.smoke.spec.js initialization.spec.js
           - name: qa-d1-draft-browser
@@ -46,11 +46,15 @@ jobs:
           - name: roster-settings
             files: roster-settings.spec.js player-detail.spec.js first-team-stats.spec.js leaderboard.spec.js league-rankings.spec.js farm-rankings.spec.js farm-development.spec.js
           - name: posting-and-finance
-            files: posting.spec.js finance.spec.js trade.spec.js club-comparison.spec.js management-decisions.spec.js management-lists.spec.js
+            files: posting.spec.js finance.spec.js trade.spec.js club-comparison.spec.js
+          - name: management-ui
+            files: management-decisions.spec.js management-lists.spec.js
           - name: hub-navigation
             files: hub-navigation.spec.js
           - name: save-integrity
             files: save-generations.spec.js career-generations.spec.js ai03-roster-cycle.spec.js core-reliability.spec.js
+          - name: offseason-save
+            files: offseason-save-feedback.spec.js offseason-save-progression.spec.js
     steps:
       - name: Checkout
         uses: actions/checkout@v4

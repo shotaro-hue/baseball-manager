@@ -158,6 +158,8 @@ export function useGameState() {
   const progressDispatch = useCallback(action => {progressTokenRef.current++;dispatch(action);},[]);
   const getProgressToken = useCallback(()=>progressTokenRef.current,[]);
   const [saveDirty, setSaveDirty] = useState(false);
+  const saveDirtyRef = useRef(saveDirty);
+  saveDirtyRef.current = saveDirty;
   const [lastAutoSaveAt, setLastAutoSaveAt] = useState(0);
   const [saveRevision, setSaveRevision] = useState(0);
   const saveDirtyTrackerRef = useRef(null);
@@ -427,7 +429,14 @@ export function useGameState() {
           return { ...result, archive: { ok: false } };
         }
       })
-      .then((result) => { if (isCurrent()) setSaveResult(result ?? { ok: false }); return result; })
+      .then((result) => {
+        if (result?.ok === false && result.diagnostics) {
+          result = { ...result, diagnostics: { ...result.diagnostics, dirty: saveDirtyRef.current } };
+          console.warn('[SaveStatusDiagnostic]', result.diagnostics);
+        }
+        if (isCurrent()) setSaveResult(result ?? { ok: false });
+        return result;
+      })
       .catch((error) => { if (isCurrent()) setSaveResult({ ok: false }); throw error; })
       .finally(() => {
         pendingSaveRequestsRef.current.delete(requestId);

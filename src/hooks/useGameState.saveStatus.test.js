@@ -75,3 +75,12 @@ it('forwards batch persistence options without replacing the dirty scope tracker
  await setup();await act(async()=>{await gs.handleSave({silent:true,payload:{gameDay:11,gameResultsMap:{10:{log:[]}}},saveOptions:{skipBackupRotation:true,preferMainSave:true}});});
  expect(enqueueSaveGame.mock.lastCall[1]).toMatchObject({skipBackupRotation:true,preferMainSave:true,dirtyScopes:expect.arrayContaining(['matchHistory'])});
 });
+
+it('adds current dirty state to safe local failure diagnostics',async()=>{
+ await setup();const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+ enqueueSaveGame.mockResolvedValueOnce({ok:false,reason:'quota_exceeded',diagnostics:{version:1,reason:'quota_exceeded',quota:true}});
+ await act(async()=>{await gs.handleSave({silent:true});});
+ expect(gs.saveResult.diagnostics).toMatchObject({dirty:true,reason:'quota_exceeded'});
+ expect(warn).toHaveBeenCalledWith('[SaveStatusDiagnostic]',expect.objectContaining({dirty:true}));
+ warn.mockRestore();
+});

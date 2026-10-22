@@ -1,3 +1,4 @@
+import { saveFailure } from './saveDiagnostics';
 import { validateFarmSaveState } from './farmMigration';
 import { validateClubFinance } from './clubFinance';
 import { GENERATION_VERSION, LEGACY_GENERATION_VERSION, prepareGeneration, readGeneration, readCareerGeneration, collectUnusedChunks } from './saveGenerations';
@@ -610,7 +611,7 @@ async function saveGameImpl(state, options = {}) {
   // ⚠️ 入力値検証: 想定外の形式を保存しない（破損セーブ防止）
   if (!state || typeof state !== 'object' || !Array.isArray(state.teams)) {
     console.error('Save failed: invalid state payload');
-    return { ok: false, quota: false, reason: 'invalid_state' };
+    return failedSave('invalid_state', 'validate_state', 'saveGame');
   }
   const saveGameStart = isDevEnv ? performance.now() : 0;
   const skipCompression = options?.skipCompression === true;
@@ -624,20 +625,22 @@ async function saveGameImpl(state, options = {}) {
     validateFarmSaveState(safeState);
   } catch (e) {
     console.error('Save failed: sanitize state error', e);
-    return { ok: false, quota: false, reason: 'sanitize_state_failed' };
+    return failedSave('sanitize_state_failed', 'validate_state', 'validateFarmSaveState', e);
   }
+  let currentRaw;
+  try { currentRaw = localStorage.getItem(SAVE_KEY); }
+  catch (error) { return failedSave('storage_read_failed', 'validate_previous', 'localStorage.getItem', error); }
   try {
     const indexedDbStart = isDevEnv ? performance.now() : 0;
     let previous = null;
-    const currentRaw = localStorage.getItem(SAVE_KEY);
     const known = validatedRoots.get(localStorage);
     if (known?.saveId === safeState.saveId) previous = known;
     else try { if (currentRaw) previous = decompress(currentRaw); } catch { /* recovery */ }
     if(previous?.saveId===safeState.saveId && Number(previous.year)>Number(safeState.year)) {
-      return {ok:false,quota:false,reason:'stale_save'};
+      return failedSave('stale_save', 'validate_previous', 'saveGame');
     }
     if(previous?.saveId===safeState.saveId && previous.farmCompetitionVersion===1 && safeState.farmCompetitionVersion!==1) {
-      return {ok:false,quota:false,reason:'farm_payload_missing'};
+      return failedSave('farm_payload_missing', 'validate_previous', 'saveGame');
     }
     let generationDirtyScopes=options?.dirtyScopes;
     if(safeState.farmCompetition && previous?.farmCompetition?.archiveSignature!==safeState.farmCompetition.archiveSignature
@@ -658,7 +661,7 @@ async function saveGameImpl(state, options = {}) {
     perfBreakdown.indexedDbWriteCount = prepared.writeCount;
   } catch (e) {
     console.error('Save failed: IndexedDB write error', e);
-    return { ok: false, quota: e?.name === 'QuotaExceededError', reason: 'indexeddb_write_failed' };
+    return failedSave('indexeddb_write_failed', 'prepare_generation', 'IndexedDB', e);
   }
   for (const key of MATCH_HISTORY_FIELDS) delete safeState[key];
   safeState.matchHistoryStored = true;
@@ -683,13 +686,16 @@ async function saveGameImpl(state, options = {}) {
   const serializeStart = isDevEnv ? performance.now() : 0;
   logTopLevelSaveSize(safeState);
   logTeamsBreakdownSize(safeState);
-  const json = JSON.stringify(safeState);
+  let json;
+  try { json = JSON.stringify(safeState); }
+  catch (error) { return failedSave('serialization_failed', 'serialize_state', 'JSON.stringify', error); }
   logPerf('saveGame.stringify', serializeStart);
   let compressed = json;
   let compressedLength = json.length;
   if (!skipCompression) {
     const compressStart = isDevEnv ? performance.now() : 0;
-    compressed = LZString.compressToUTF16(json);
+    try { compressed = LZString.compressToUTF16(json); }
+    catch (error) { return failedSave('compression_failed', 'compress_state', 'LZString.compressToUTF16', error); }
     compressedLength = compressed?.length ?? 0;
     logPerf('saveGame.compressToUTF16', compressStart);
   }
@@ -708,6 +714,8 @@ async function saveGameImpl(state, options = {}) {
     }));
     perfBreakdown.writeMetaMs = safeElapsedMs(metaStart);
   };
+  let commitStep = 'prepare_rotation';
+  let commitApi = 'localStorage.getItem';
   try {
     // Stage rotation without modifying roots. Failed primary writes leave both backups untouched.
     let rotationRaw = null;
@@ -726,6 +734,8 @@ async function saveGameImpl(state, options = {}) {
       } catch { /* Never rotate a corrupt primary over a valid backup. */ }
     }
     const setItemStart = isDevEnv ? performance.now() : 0;
+    commitStep = 'commit_root';
+    commitApi = 'localStorage.setItem';
     localStorage.setItem(SAVE_KEY, compressed);
     perfBreakdown.writeMainSaveMs = safeElapsedMs(setItemStart);
     logPerf('saveGame.localStorage.setItem', setItemStart);
@@ -753,10 +763,10 @@ async function saveGameImpl(state, options = {}) {
     const quota = e instanceof DOMException && e.name === 'QuotaExceededError';
     if (quota) {
       console.error('Save failed: storage quota exceeded; committed generations retained');
-      return { ok: false, quota: true, reason: 'quota_exceeded' };
+      return failedSave('quota_exceeded', commitStep, commitApi, e);
     }
     console.error('Save failed:', e);
-    return { ok: false, quota: false };
+    return failedSave(commitStep === 'prepare_rotation' ? 'storage_read_failed' : 'storage_write_failed', commitStep, commitApi, e);
   }
 }
 
@@ -800,28 +810,34 @@ async function cleanupSaveChunks() {
 }
 export function saveGame(state, options = {}) {
   try { return saveOwnedSnapshot(structuredClone(state), structuredClone(options)); }
-  catch { return Promise.resolve({ ok: false, quota: false, reason: 'snapshot_failed' }); }
+  catch (error) { return Promise.resolve(failedSave('snapshot_failed', 'snapshot', 'structuredClone', error)); }
 }
 function saveOwnedSnapshot(snapshot, safeOptions, deletionEpoch = deletionEpochs.get(localStorage) ?? 0) {
   try {
     if (!observations.has(localStorage)) observePrimary();
-  } catch { return Promise.resolve({ ok: false, quota: false, reason: 'snapshot_failed' }); }
+  } catch (error) { return Promise.resolve(failedSave('storage_read_failed', 'observe_root', 'localStorage.getItem', error)); }
   const run = async () => {
     const locked = async () => {
       try {
-        const currentPrimary = localStorage.getItem(SAVE_KEY);
-        const backupChanged = currentPrimary === null && (backupObservations.get(localStorage) ?? []).some((raw, index) => raw !== localStorage.getItem([BACKUP_KEY_1, BACKUP_KEY_2][index]));
+        let currentPrimary, backupChanged;
+        try {
+          currentPrimary = localStorage.getItem(SAVE_KEY);
+          backupChanged = currentPrimary === null && (backupObservations.get(localStorage) ?? []).some((raw, index) => raw !== localStorage.getItem([BACKUP_KEY_1, BACKUP_KEY_2][index]));
+        } catch (error) { return failedSave('storage_read_failed', 'check_conflict', 'localStorage.getItem', error); }
         if (deletionEpoch !== (deletionEpochs.get(localStorage) ?? 0) || observations.get(localStorage) !== currentPrimary || backupChanged) {
-          return { ok: false, quota: false, reason: 'save_conflict' };
+          return failedSave('save_conflict', 'check_conflict', 'localStorage.getItem');
         }
         return await saveGameImpl(snapshot, safeOptions);
       } catch (error) {
-        return { ok: false, quota: error?.name === 'QuotaExceededError', reason: 'save_failed' };
+        return failedSave('save_failed', 'save', 'saveGame', error);
       }
     };
-    if (globalThis.navigator?.locks?.request) return navigator.locks.request('baseball-manager-save', locked);
+    if (globalThis.navigator?.locks?.request) {
+      try { return await navigator.locks.request('baseball-manager-save', locked); }
+      catch (error) { return failedSave('save_lock_failed', 'acquire_lock', 'navigator.locks.request', error); }
+    }
     // A browser without origin-wide locking must fail closed instead of silently racing tabs.
-    if (typeof window !== 'undefined') return { ok: false, quota: false, reason: 'save_lock_unavailable' };
+    if (typeof window !== 'undefined') return failedSave('save_lock_unavailable', 'acquire_lock', 'navigator.locks.request');
     return locked();
   };
   const result = localSaveTail.then(run, run);
@@ -832,7 +848,11 @@ const sharedSaveQueue = createSaveRequestQueue(({ state, options, deletionEpoch 
 
 export function enqueueSaveGame(state, options = {}) {
   try { return sharedSaveQueue.enqueue({ state: structuredClone(state), options: structuredClone(options), deletionEpoch: deletionEpochs.get(localStorage) ?? 0 }); }
-  catch { return Promise.resolve({ ok: false, quota: false, reason: 'snapshot_failed' }); }
+  catch (error) { return Promise.resolve(failedSave('snapshot_failed', 'snapshot', 'structuredClone', error)); }
+}
+
+function failedSave(reason, step, api, error) {
+  return saveFailure(reason, { step, api, error, queue: sharedSaveQueue.getSnapshot() });
 }
 
 export function getLastLoadResult() { return { ...lastLoadResult }; }
