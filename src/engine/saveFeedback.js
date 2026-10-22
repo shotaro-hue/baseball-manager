@@ -1,4 +1,5 @@
 const SAVE_FAILURE_CAUSES = {
+  save_verification_failed: '保存データの読み戻し検証に失敗しました。前回の正常セーブは保持しています。',
   save_lock_unavailable: '現在の環境では保存ロックを使えず、安全に保存できません。',
   save_lock_failed: '保存ロックの処理に失敗しました。',
   save_conflict: '別タブで保存が更新されたため、上書きを止めました。',

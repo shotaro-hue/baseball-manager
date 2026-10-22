@@ -1,4 +1,5 @@
 import LZString from 'lz-string';
+import { ROOT_BODY_PREFIX } from './saveRootBodies';
 import { openBaseballManagerDb, BASEBALL_MANAGER_DB_STORES } from './baseballManagerDb';
 import { createSaveId } from './saveIdentity';
 import { matchHistoryForSave, matchHistorySnapshot } from './matchHistory';
@@ -150,6 +151,7 @@ export async function prepareGeneration(state, previous, dirtyScopes, careerData
 export async function collectUnusedChunks(roots) {
   const protectedKeys = new Set();
   for (const root of roots) {
+    if (root.rootBodyKey) protectedKeys.add(root.rootBodyKey);
     if (root.saveDataVersion >= LEGACY_GENERATION_VERSION) {
       const m = validateManifest(root);
       for (const scope of scopesFor(m.version)) protectedKeys.add(m.chunks[scope].key);
@@ -163,7 +165,7 @@ export async function collectUnusedChunks(roots) {
     const req = store.openKeyCursor(); let deleted = 0;
     req.onsuccess = () => {
       const cursor = req.result; if (!cursor) return;
-      if (typeof cursor.key === 'string' && (cursor.key.startsWith(PREFIX) || CHUNK_SCOPES.includes(cursor.key))
+      if (typeof cursor.key === 'string' && (cursor.key.startsWith(PREFIX) || cursor.key.startsWith(ROOT_BODY_PREFIX) || CHUNK_SCOPES.includes(cursor.key))
           && !protectedKeys.has(cursor.key)) { store.delete(cursor.key); deleted++; }
       cursor.continue();
     };

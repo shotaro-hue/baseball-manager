@@ -1,0 +1,46 @@
+{
+  "main": "756af98dafb219f9e4d3f540c69148be38cb389f",
+  "realHanshin106Size": {
+    "ok": true,
+    "year": 2026,
+    "gameDay": 106,
+    "scheduleDate": {
+      "month": 8,
+      "day": 1
+    },
+    "rootBytes": 2043048
+  },
+  "nativeWebKitLegacyEndSeason": {
+    "runs": [
+      {
+        "ok": true,
+        "warnings": [],
+        "bytes": [
+          2244846,
+          0,
+          0
+        ]
+      },
+      {
+        "ok": true,
+        "warnings": [],
+        "bytes": [
+          2244890,
+          2244846,
+          0
+        ]
+      },
+      {
+        "ok": true,
+        "warnings": [
+          "backup_failed"
+        ],
+        "bytes": [
+          2244898,
+          2244846,
+          0
+        ]
+      }
+    ]
+  }
+}

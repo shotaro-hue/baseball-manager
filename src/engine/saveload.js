@@ -1,4 +1,5 @@
 import { saveFailure } from './saveDiagnostics';
+import { prepareRootBody, readRootBody, rootBodyReference, compressRootJson, decodeRootJson, rootCompressionApi } from './saveRootBodies';
 import { validateFarmSaveState } from './farmMigration';
 import { validateClubFinance } from './clubFinance';
 import { GENERATION_VERSION, LEGACY_GENERATION_VERSION, prepareGeneration, readGeneration, readCareerGeneration, collectUnusedChunks } from './saveGenerations';
@@ -161,10 +162,9 @@ function safeElapsedMs(startedAt) {
 
 // ── バックアップローテーション ──────────────────
 // 保存前に呼ぶ: bk1→bk2, 現在→bk1
-function rotateBk(cur) {
+function rotateBk(cur, backup1) {
   try {
-    const bk1 = localStorage.getItem(BACKUP_KEY_1);
-    if (bk1) localStorage.setItem(BACKUP_KEY_2, bk1);
+    if (backup1) localStorage.setItem(BACKUP_KEY_2, backup1);
     if (cur) localStorage.setItem(BACKUP_KEY_1, cur);
     localStorage.setItem(LAST_BACKUP_ROTATE_KEY, String(Date.now()));
     return true;
@@ -630,12 +630,15 @@ async function saveGameImpl(state, options = {}) {
   let currentRaw;
   try { currentRaw = localStorage.getItem(SAVE_KEY); }
   catch (error) { return failedSave('storage_read_failed', 'validate_previous', 'localStorage.getItem', error); }
+  // Reclaim only previously unreferenced rows BEFORE staging a new generation.
+  // A failed publication can otherwise leave enough orphan body bytes to strand retries.
+  try { await cleanupSaveChunks(); } catch { /* Unknown/corrupt roots prohibit reclamation. */ }
   try {
     const indexedDbStart = isDevEnv ? performance.now() : 0;
     let previous = null;
     const known = validatedRoots.get(localStorage);
     if (known?.saveId === safeState.saveId) previous = known;
-    else try { if (currentRaw) previous = decompress(currentRaw); } catch { /* recovery */ }
+    else try { if (currentRaw) previous = await readSaveRoot(currentRaw); } catch { /* recovery */ }
     if(previous?.saveId===safeState.saveId && Number(previous.year)>Number(safeState.year)) {
       return failedSave('stale_save', 'validate_previous', 'saveGame');
     }
@@ -694,10 +697,10 @@ async function saveGameImpl(state, options = {}) {
   let compressedLength = json.length;
   if (!skipCompression) {
     const compressStart = isDevEnv ? performance.now() : 0;
-    try { compressed = LZString.compressToUTF16(json); }
-    catch (error) { return failedSave('compression_failed', 'compress_state', 'LZString.compressToUTF16', error); }
+    try { compressed = await compressRootJson(json); }
+    catch (error) { return failedSave('compression_failed', 'compress_state', rootCompressionApi(json), error); }
     compressedLength = compressed?.length ?? 0;
-    logPerf('saveGame.compressToUTF16', compressStart);
+    logPerf('saveGame.compressRoot', compressStart);
   }
   const jsonLength = json.length;
   const writeMeta = () => {
@@ -714,24 +717,29 @@ async function saveGameImpl(state, options = {}) {
     }));
     perfBreakdown.writeMetaMs = safeElapsedMs(metaStart);
   };
-  let commitStep = 'prepare_rotation';
-  let commitApi = 'localStorage.getItem';
+  let commitStep = 'prepare_root_body';
+  let commitApi = 'IndexedDB';
   try {
+    compressed = await prepareRootBody(compressed);
+    commitStep = 'verify_root';
+    const verified = await readSaveRoot(compressed);
+    await hydrateSaveCandidate(verified, { strict: true });
+    if (!validateAndMigrateSave(verified).ok) throw new Error('save_verification_failed');
+    commitStep = 'prepare_rotation';
+    commitApi = 'localStorage.getItem';
     // Stage rotation without modifying roots. Failed primary writes leave both backups untouched.
     let rotationRaw = null;
+    let rotationBackup1 = null;
     if (!skipBackupRotation && shouldRotateBackupNow()) {
       const raw = localStorage.getItem(SAVE_KEY);
-      try {
-        if (raw) {
-          const previous = validatedRawRoots.get(localStorage) === raw ? validatedRoots.get(localStorage) : decompress(raw);
-          if (Array.isArray(previous.teams) && hasSelectedTeam(previous.teams, previous.myId) && previous.year) {
-            const hydratedPrevious = previous.saveDataVersion >= LEGACY_GENERATION_VERSION
-              ? { ...previous, ...await readGeneration(previous) } : previous;
-            validateFarmSaveState(hydratedPrevious);
-            rotationRaw = raw;
-          }
-        }
-      } catch { /* Never rotate a corrupt primary over a valid backup. */ }
+      commitApi = 'IndexedDB';
+      rotationRaw = raw ? await prepareRotationRoot(raw) : null;
+      if (rotationRaw) {
+        commitApi = 'localStorage.getItem';
+        const backup1 = localStorage.getItem(BACKUP_KEY_1);
+        commitApi = 'IndexedDB';
+        rotationBackup1 = backup1 ? await prepareRotationRoot(backup1) : null;
+      }
     }
     const setItemStart = isDevEnv ? performance.now() : 0;
     commitStep = 'commit_root';
@@ -746,7 +754,7 @@ async function saveGameImpl(state, options = {}) {
     try { rememberChunkRoot(compressed, safeState); }
     catch (error) { warnings.push('root_cache_failed'); console.warn('Save committed; root cache failed:', error); }
     const rotateStart = isDevEnv ? performance.now() : 0;
-    if (rotationRaw && !rotateBk(rotationRaw)) warnings.push('backup_failed');
+    if (rotationRaw && !rotateBk(rotationRaw, rotationBackup1)) warnings.push('backup_failed');
     perfBreakdown.rotateBackupMs = safeElapsedMs(rotateStart);
     try { writeMeta(); } catch (error) { warnings.push('metadata_failed'); console.warn('Save committed; metadata failed:', error); }
     const cleanupStart = isDevEnv ? performance.now() : 0;
@@ -766,7 +774,7 @@ async function saveGameImpl(state, options = {}) {
       return failedSave('quota_exceeded', commitStep, commitApi, e);
     }
     console.error('Save failed:', e);
-    return failedSave(commitStep === 'prepare_rotation' ? 'storage_read_failed' : 'storage_write_failed', commitStep, commitApi, e);
+    return failedSave((commitApi === 'IndexedDB') ? 'save_verification_failed' : commitStep === 'prepare_rotation' ? 'storage_read_failed' : 'storage_write_failed', commitStep, commitApi, e);
   }
 }
 
@@ -790,7 +798,7 @@ function rememberChunkRoot(raw, root) {
   if (!cache) { cache = new Map(); chunkRootCache.set(localStorage, cache); }
   // Own only the metadata: callers may subsequently mutate loaded game state.
   const compact = structuredClone({ saveDataVersion: root.saveDataVersion,
-    saveId: root.saveId, saveManifest: root.saveManifest });
+    saveId: root.saveId, saveManifest: root.saveManifest, rootBodyKey: rootBodyReference(raw)?.key });
   cache.set(raw, compact);
   if (cache.size > 4) cache.delete(cache.keys().next().value);
   return compact;
@@ -800,12 +808,12 @@ async function cleanupSaveChunks() {
   const cache = chunkRootCache.get(localStorage);
   // Prune even when a corrupt root later makes cleanup fail conservatively.
   if (cache) for (const raw of cache.keys()) if (!raws.includes(raw)) cache.delete(raw);
-  const roots = raws.map(raw => {
+  const roots = await Promise.all(raws.map(async raw => {
     if (cache?.has(raw)) return cache.get(raw);
-    const root = decompress(raw);
+    const root = await readSaveRoot(raw);
     // A cache miss must still protect the decoded persistent root if caching fails.
-    try { return rememberChunkRoot(raw, root); } catch { return root; }
-  });
+    try { return rememberChunkRoot(raw, root); } catch { return { ...root, rootBodyKey: rootBodyReference(raw)?.key }; }
+  }));
   return collectUnusedChunks(roots);
 }
 export function saveGame(state, options = {}) {
@@ -920,6 +928,25 @@ export function getSavePerfSummary() {
 }
 
 // Hydrate a private decoded candidate without publishing cache, observations or load status.
+async function readSaveRoot(raw) {
+  const body=await readRootBody(raw),json=await decodeRootJson(body);
+  return json===null?decompress(body):JSON.parse(json);
+}
+
+async function prepareRotationRoot(raw) {
+  let state;
+  try {
+    state = await readSaveRoot(raw);
+    await hydrateSaveCandidate(state, { strict: true });
+  } catch (error) {
+    if (provenCorruptCandidate(error)) return null;
+    throw error; // I/O failure is never evidence that a recoverable root may be discarded.
+  }
+  try { if (!validateAndMigrateSave(state).ok) return null; }
+  catch { return null; } // Pure semantic validation, no storage operations.
+  return prepareRootBody(raw); // Staging failures abort before any root is published.
+}
+
 async function hydrateSaveCandidate(state, { strict = false } = {}) {
   if (state?.saveDataVersion >= LEGACY_GENERATION_VERSION) {
     Object.assign(state, await readGeneration(state));
@@ -942,7 +969,7 @@ async function hydrateSaveCandidate(state, { strict = false } = {}) {
 }
 
 function provenCorruptCandidate(error) {
-  return error instanceof SyntaxError || /^(invalid_save_manifest|invalid_chunk(?:_reference)?:(news|mailbox|seasonHistory|matchHistory|careerLogs)|invalid_career_(encoding|payload)|missing_match_history)$/.test(error?.message ?? '');
+  return error instanceof SyntaxError || /^(invalid_root_(body|reference|encoding)|invalid_save_manifest|invalid_chunk(?:_reference)?:(news|mailbox|seasonHistory|matchHistory|careerLogs)|invalid_career_(encoding|payload)|missing_match_history)$/.test(error?.message ?? '');
 }
 
 export async function loadGame() {
@@ -986,7 +1013,7 @@ export async function loadGame() {
       logPerf('loadGame.localStorage.getItem', getItemStart);
       if (!raw) continue;
       foundCandidate = true;
-      const state = decompress(raw);
+      const state = await readSaveRoot(raw);
       await hydrateSaveCandidate(state);
       if (deletionChanged()) return null;
       if(!(state?.saveDataVersion >= GENERATION_VERSION)) legacyCareerSeeds.set(state,captureInlineCareerLogs(state));
@@ -1151,7 +1178,7 @@ async function deleteSaveImpl() {
     const raw = before[keys.indexOf(key)];
     if (raw === null) continue;
     let state;
-    try { state = decompress(raw); }
+    try { state = await readSaveRoot(raw); }
     catch (error) { if (provenCorruptCandidate(error)) continue; throw error; }
     try { await hydrateSaveCandidate(state, { strict: true }); }
     catch (error) {

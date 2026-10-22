@@ -2,6 +2,7 @@ import { generateSeasonSchedule } from '../src/engine/scheduleGen';
 import { beforeEach,afterEach,it,expect,vi } from 'vitest';
 import { IDBFactory,IDBObjectStore } from 'fake-indexeddb';
 import { saveGame,loadGame,enqueueSaveGame,getLastLoadResult } from '../src/engine/saveload';
+import { readRootBody } from '../src/engine/saveRootBodies';
 import { openBaseballManagerDb } from '../src/engine/baseballManagerDb';
 import { migrateFarmCompetition,advanceFarmYear } from '../src/engine/farmMigration';
 import { applyFarmRound } from '../src/engine/farmRecords';
@@ -49,7 +50,7 @@ it('failed root write and retry never double apply records; backup retains its o
 });
 it('corrupt/missing farm root field restores old root rather than accepting zeros or future records',async()=>{
   const s=initial();await save(s);await save(played(s));
-  const primary=JSON.parse(rows.get(key));delete primary.farmCompetition;rows.set(key,JSON.stringify(primary));
+  const primary=JSON.parse(await readRootBody(rows.get(key)));delete primary.farmCompetition;rows.set(key,JSON.stringify(primary));
   expect((await loadGame()).farmCompetition.nextRound).toBe(1);expect(getLastLoadResult().status).toBe('recovered');
 });
 it('year archive is forced dirty even with empty scopes; failed year save preserves old root and GC references',async()=>{
@@ -61,7 +62,7 @@ it('year archive is forced dirty even with empty scopes; failed year save preser
   const retained=await loadGame();expect(retained.year).toBe(2026);expect(retained.schedule).toEqual(old.schedule);expect(retained.scheduleArchive).toEqual([]);expect(retained.seasonHistory.farmArchives).toBeUndefined();
   vi.restoreAllMocks();expect((await save(next,{dirtyScopes:[]})).ok).toBe(true);
   const loaded=await loadGame();expect(loaded.year).toBe(2027);expect(loaded.seasonHistory.farmArchives).toHaveLength(1);expect(loaded.schedule).toEqual(generateSeasonSchedule(2027,old.teams));expect(loaded.scheduleArchive.at(-1)).toMatchObject({year:2026,schedule:old.schedule,gameResultsMap:old.gameResultsMap});
-  const ref=JSON.parse(rows.get(key)).saveManifest.chunks.seasonHistory;
+  const ref=JSON.parse(await readRootBody(rows.get(key))).saveManifest.chunks.seasonHistory;
   const db=await openBaseballManagerDb();await new Promise(res=>{const tx=db.transaction('save_chunks','readwrite');tx.objectStore('save_chunks').delete(ref.key);tx.oncomplete=res;});db.close();
   const backup=await loadGame();expect(backup.year).toBe(2026);expect(backup.farmCompetition.year).toBe(2026);
 });
@@ -78,7 +79,7 @@ it.each(['inline','v5'])('legacy %s load alone writes nothing; explicit migratio
   const s=source(4);s.teams[0].farm[0].stats2={PA:100,H:31,IP:9.2};
   if(format==='inline')rows.set(key,JSON.stringify(s));
   else {
-    await save(s);const root=JSON.parse(rows.get(key));root.saveDataVersion=5;root.saveManifest.version=5;
+    await save(s);const root=JSON.parse(await readRootBody(rows.get(key)));root.saveDataVersion=5;root.saveManifest.version=5;
     delete root.saveManifest.chunks.careerLogs;
     const db=await openBaseballManagerDb();await new Promise(resolve=>{
       const tx=db.transaction('save_chunks','readwrite'),store=tx.objectStore('save_chunks');
@@ -95,19 +96,19 @@ it.each(['inline','v5'])('legacy %s load alone writes nothing; explicit migratio
 
 it('rejects a corrupted independent ledger and archive even if the raw JSON still parses',async()=>{
   const s=initial();await save(s);await save(played(s));
-  const raw=JSON.parse(rows.get(key));raw.farmCompetition.usage.find(u=>u.recentPitching.length).recentPitching[0].BF++;
+  const raw=JSON.parse(await readRootBody(rows.get(key)));raw.farmCompetition.usage.find(u=>u.recentPitching.length).recentPitching[0].BF++;
   rows.set(key,JSON.stringify(raw));expect((await loadGame()).farmCompetition.nextRound).toBe(1);
   const old=migrateFarmCompetition(source(144));
   expect((await save(old,{skipBackupRotation:true})).ok).toBe(true);
   const next=advanceFarmYear(old,{year:2027,nextSchedule:generateSeasonSchedule(2027,old.teams),teams:old.teams.map(t=>({...t,wins:0}))});
   await save(next);
-  const header=JSON.parse(rows.get(key));header.farmCompetition.archiveSignature='incorrect';
+  const header=JSON.parse(await readRootBody(rows.get(key)));header.farmCompetition.archiveSignature='incorrect';
   rows.set(key,JSON.stringify(header));expect((await loadGame()).year).toBe(2026);
 });
 
 it('recovery save preserves valid backup instead of rotating farm-corrupt primary',async()=>{
   const s=initial();await save(s);await save(played(s));
-  const validBackup=rows.get(bk),primary=JSON.parse(rows.get(key));
+  const validBackup=rows.get(bk),primary=JSON.parse(await readRootBody(rows.get(key)));
   delete primary.farmCompetition;rows.set(key,JSON.stringify(primary));
   const recovered=await loadGame();expect(getLastLoadResult().status).toBe('recovered');
   rows.delete('baseball_manager_v1_last_rotate_at');

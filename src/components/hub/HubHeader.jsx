@@ -2,6 +2,7 @@ import { regularSeasonProgress } from '../../engine/seasonProgress';
 import { Button, StateLabel } from '../design-system/primitives';
 import { gameDayToDate } from '../../utils';
 import { Bell, Gear } from '@phosphor-icons/react';
+import SaveDiagnosticDetails from '../SaveDiagnosticDetails';
 
 export default function HubHeader({
   myTeam,
@@ -30,7 +31,7 @@ export default function HubHeader({
           <span><Bell size={20} aria-hidden="true" /> 通知</span><small>未読 {notifications.unread} · 要対応 {notifications.actionable}</small>
         </button>
         <button className="hub-settings-button" onClick={onSettings} aria-label="設定"><Gear size={22} aria-hidden="true" /></button>
-        <div className="home-save"><StateLabel tone={tone}>{label}</StateLabel><Button variant="secondary" onClick={onSave} disabled={Boolean(saving)}>保存</Button></div>
+        <div className="home-save"><StateLabel tone={tone}>{label}</StateLabel><Button variant="secondary" onClick={onSave} disabled={Boolean(saving)}>保存</Button>{saveResult?.ok===false&&<SaveDiagnosticDetails result={saveResult}/>}</div>
       </div>
     </header>;
 }
