@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import App from './App';
 import { saveGame, loadGame, hasSave, getLastLoadResult } from './engine/saveload';
+import { readRootBody } from './engine/saveRootBodies';
 import { openBaseballManagerDb } from './engine/baseballManagerDb';
 import { deferNextSaveRead, holdSaveLock, releaseDeferredSaveOperations } from '../tests/helpers/deferredSaveRead';
 
@@ -40,7 +41,7 @@ const assertTitle = (exists = true) => {
 };
 async function beginLoad(outcome = 'saved') {
   if (outcome === 'missing') {
-    const key = JSON.parse(rows.get(primary)).saveManifest.chunks.news.key;
+    const key = JSON.parse(await readRootBody(rows.get(primary))).saveManifest.chunks.news.key;
     const db = await openBaseballManagerDb();
     await new Promise(resolve => { const tx = db.transaction('save_chunks', 'readwrite'); tx.objectStore('save_chunks').delete(key); tx.oncomplete = resolve; }); db.close();
   }

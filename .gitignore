@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+/e2e/fixtures/save-capacity-generated.json.gz
 
 # Build output
 dist/

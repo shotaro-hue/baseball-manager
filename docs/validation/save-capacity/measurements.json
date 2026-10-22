@@ -1,0 +1,562 @@
+{
+  "basis": "Generated real Hanshin gameDay106; 10/20-year capacity fixtures, not multi-year simulation",
+  "nativeCompressionBrowserRun": {
+    "startTime": "2026-10-22T11:44:04.823Z",
+    "duration": 132342.12,
+    "expected": 8,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "samples": [
+    {
+      "engine": "chromium",
+      "yearsEquivalent": 0,
+      "durationMs": 10203,
+      "rootBytes": [
+        216,
+        218,
+        218
+      ],
+      "diagnostics": {
+        "version": 2,
+        "reason": "unknown_save_failure",
+        "step": null,
+        "api": null,
+        "exceptionName": null,
+        "dirty": null,
+        "queue": {
+          "isSaving": false,
+          "hasQueuedSave": false
+        },
+        "localStorage": {
+          "available": true,
+          "unit": "UTF16-estimate",
+          "totalBytes": 2828,
+          "primaryBytes": 216,
+          "backup1Bytes": 218,
+          "backup2Bytes": 218
+        },
+        "indexedDB": {
+          "available": true,
+          "unit": "JSON-UTF16-estimate",
+          "stores": {
+            "save_chunks": {
+              "rows": 16,
+              "jsonBytes": 41720124,
+              "rootBodies": 3,
+              "generations": 13,
+              "rootBodyBytes": 15605050,
+              "generationBytes": 26115074,
+              "scopeBytes": {
+                "careerLogs": 251990,
+                "mailbox": 6921498,
+                "matchHistory": 18868788,
+                "news": 64236,
+                "seasonHistory": 8562
+              }
+            },
+            "career_logs": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            },
+            "batted_ball_batches": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            },
+            "batted_ball_aggregates": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            },
+            "batted_ball_meta": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            }
+          }
+        },
+        "originEstimate": {
+          "usage": 10009903,
+          "quota": 645791200
+        }
+      },
+      "hashesEqual": true,
+      "careerYearsRestored": 0
+    },
+    {
+      "engine": "chromium",
+      "yearsEquivalent": 10,
+      "durationMs": 17575,
+      "rootBytes": [
+        218,
+        218,
+        218
+      ],
+      "diagnostics": {
+        "version": 2,
+        "reason": "unknown_save_failure",
+        "step": null,
+        "api": null,
+        "exceptionName": null,
+        "dirty": null,
+        "queue": {
+          "isSaving": false,
+          "hasQueuedSave": false
+        },
+        "localStorage": {
+          "available": true,
+          "unit": "UTF16-estimate",
+          "totalBytes": 2856,
+          "primaryBytes": 218,
+          "backup1Bytes": 218,
+          "backup2Bytes": 218
+        },
+        "indexedDB": {
+          "available": true,
+          "unit": "JSON-UTF16-estimate",
+          "stores": {
+            "save_chunks": {
+              "rows": 16,
+              "jsonBytes": 172074242,
+              "rootBodies": 3,
+              "generations": 13,
+              "rootBodyBytes": 34638498,
+              "generationBytes": 137435744,
+              "scopeBytes": {
+                "mailbox": 6921498,
+                "matchHistory": 120682242,
+                "news": 64236,
+                "seasonHistory": 9343578,
+                "careerLogs": 424190
+              }
+            },
+            "career_logs": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            },
+            "batted_ball_batches": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            },
+            "batted_ball_aggregates": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            },
+            "batted_ball_meta": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            }
+          }
+        },
+        "originEstimate": {
+          "usage": 22697584,
+          "quota": 529783828
+        }
+      },
+      "hashesEqual": true,
+      "careerYearsRestored": 10
+    },
+    {
+      "engine": "chromium",
+      "yearsEquivalent": 20,
+      "durationMs": 27560,
+      "rootBytes": [
+        218,
+        216,
+        218
+      ],
+      "diagnostics": {
+        "version": 2,
+        "reason": "unknown_save_failure",
+        "step": null,
+        "api": null,
+        "exceptionName": null,
+        "dirty": null,
+        "queue": {
+          "isSaving": false,
+          "hasQueuedSave": false
+        },
+        "localStorage": {
+          "available": true,
+          "unit": "UTF16-estimate",
+          "totalBytes": 2868,
+          "primaryBytes": 218,
+          "backup1Bytes": 216,
+          "backup2Bytes": 218
+        },
+        "indexedDB": {
+          "available": true,
+          "unit": "JSON-UTF16-estimate",
+          "stores": {
+            "save_chunks": {
+              "rows": 16,
+              "jsonBytes": 200503834,
+              "rootBodies": 3,
+              "generations": 13,
+              "rootBodyBytes": 53524242,
+              "generationBytes": 146979592,
+              "scopeBytes": {
+                "careerLogs": 633118,
+                "mailbox": 6921498,
+                "matchHistory": 120682242,
+                "news": 64236,
+                "seasonHistory": 18678498
+              }
+            },
+            "career_logs": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            },
+            "batted_ball_batches": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            },
+            "batted_ball_aggregates": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            },
+            "batted_ball_meta": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            }
+          }
+        },
+        "originEstimate": {
+          "usage": 33769761,
+          "quota": 680299402
+        }
+      },
+      "hashesEqual": true,
+      "careerYearsRestored": 20
+    },
+    {
+      "engine": "mobile-webkit",
+      "yearsEquivalent": 0,
+      "durationMs": 13093,
+      "rootBytes": [
+        218,
+        218,
+        216
+      ],
+      "diagnostics": {
+        "version": 2,
+        "reason": "unknown_save_failure",
+        "step": null,
+        "api": null,
+        "exceptionName": null,
+        "dirty": null,
+        "queue": {
+          "isSaving": false,
+          "hasQueuedSave": false
+        },
+        "localStorage": {
+          "available": true,
+          "unit": "UTF16-estimate",
+          "totalBytes": 2510,
+          "primaryBytes": 218,
+          "backup1Bytes": 218,
+          "backup2Bytes": 216
+        },
+        "indexedDB": {
+          "available": true,
+          "unit": "JSON-UTF16-estimate",
+          "stores": {
+            "save_chunks": {
+              "rows": 16,
+              "jsonBytes": 42717404,
+              "rootBodies": 3,
+              "generations": 13,
+              "rootBodyBytes": 16571042,
+              "generationBytes": 26146362,
+              "scopeBytes": {
+                "mailbox": 6921498,
+                "matchHistory": 18868788,
+                "news": 64236,
+                "seasonHistory": 8562,
+                "careerLogs": 283278
+              }
+            },
+            "career_logs": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            },
+            "batted_ball_batches": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            },
+            "batted_ball_aggregates": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            },
+            "batted_ball_meta": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            }
+          }
+        },
+        "originEstimate": null
+      },
+      "hashesEqual": true,
+      "careerYearsRestored": 0
+    },
+    {
+      "engine": "mobile-webkit",
+      "yearsEquivalent": 10,
+      "durationMs": 19097,
+      "rootBytes": [
+        218,
+        218,
+        218
+      ],
+      "diagnostics": {
+        "version": 2,
+        "reason": "unknown_save_failure",
+        "step": null,
+        "api": null,
+        "exceptionName": null,
+        "dirty": null,
+        "queue": {
+          "isSaving": false,
+          "hasQueuedSave": false
+        },
+        "localStorage": {
+          "available": true,
+          "unit": "UTF16-estimate",
+          "totalBytes": 2480,
+          "primaryBytes": 218,
+          "backup1Bytes": 218,
+          "backup2Bytes": 218
+        },
+        "indexedDB": {
+          "available": true,
+          "unit": "JSON-UTF16-estimate",
+          "stores": {
+            "save_chunks": {
+              "rows": 16,
+              "jsonBytes": 174063266,
+              "rootBodies": 3,
+              "generations": 13,
+              "rootBodyBytes": 36568978,
+              "generationBytes": 137494288,
+              "scopeBytes": {
+                "mailbox": 6921498,
+                "matchHistory": 120682242,
+                "news": 64236,
+                "seasonHistory": 9343578,
+                "careerLogs": 482734
+              }
+            },
+            "career_logs": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            },
+            "batted_ball_batches": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            },
+            "batted_ball_aggregates": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            },
+            "batted_ball_meta": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            }
+          }
+        },
+        "originEstimate": null
+      },
+      "hashesEqual": true,
+      "careerYearsRestored": 10
+    },
+    {
+      "engine": "mobile-webkit",
+      "yearsEquivalent": 20,
+      "durationMs": 24197,
+      "rootBytes": [
+        218,
+        216,
+        218
+      ],
+      "diagnostics": {
+        "version": 2,
+        "reason": "unknown_save_failure",
+        "step": null,
+        "api": null,
+        "exceptionName": null,
+        "dirty": null,
+        "queue": {
+          "isSaving": false,
+          "hasQueuedSave": false
+        },
+        "localStorage": {
+          "available": true,
+          "unit": "UTF16-estimate",
+          "totalBytes": 2532,
+          "primaryBytes": 218,
+          "backup1Bytes": 216,
+          "backup2Bytes": 218
+        },
+        "indexedDB": {
+          "available": true,
+          "unit": "JSON-UTF16-estimate",
+          "stores": {
+            "save_chunks": {
+              "rows": 16,
+              "jsonBytes": 203461770,
+              "rootBodies": 3,
+              "generations": 13,
+              "rootBodyBytes": 56377642,
+              "generationBytes": 147084128,
+              "scopeBytes": {
+                "mailbox": 6921498,
+                "matchHistory": 120682242,
+                "news": 64236,
+                "seasonHistory": 18678498,
+                "careerLogs": 737654
+              }
+            },
+            "career_logs": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            },
+            "batted_ball_batches": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            },
+            "batted_ball_aggregates": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            },
+            "batted_ball_meta": {
+              "rows": 0,
+              "jsonBytes": 0,
+              "rootBodies": 0,
+              "generations": 0,
+              "rootBodyBytes": 0,
+              "generationBytes": 0,
+              "scopeBytes": {}
+            }
+          }
+        },
+        "originEstimate": null
+      },
+      "hashesEqual": true,
+      "careerYearsRestored": 20
+    }
+  ]
+}

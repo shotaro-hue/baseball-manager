@@ -194,12 +194,15 @@ it('deletion during chunk writing prevents active and queued saves from resurrec
 it('cleanup reuses immutable root metadata instead of decompressing unchanged committed roots', async () => {
  const {default:LZString}=await import('lz-string');
  await saveGame(state(1));
+ const oldRaw=rows.get(primary);
  const read=vi.spyOn(LZString,'decompressFromUTF16');
- expect((await saveGame(state(2))).ok).toBe(true);
- expect(read).not.toHaveBeenCalled();
+ expect((await saveGame(state(2),{skipBackupRotation:true})).ok).toBe(true);
+ // A fresh readback of the NEW body is required; unchanged old roots use cached metadata.
+ expect(read).toHaveBeenCalledTimes(1);
+ expect(read.mock.calls[0][0]).not.toBe(oldRaw);
  read.mockRestore();expect((await loadGame()).news).toEqual([{day:2}]);
  rows.set(bk1,'corrupt');
- const third=await saveGame(state(3));expect(third).toMatchObject({ok:true,warnings:['cleanup_failed']});
+ const third=await saveGame(state(3),{skipBackupRotation:true});expect(third).toMatchObject({ok:true,warnings:['cleanup_failed']});
 });
 it('loaded state mutation cannot change the roots protected by cleanup',async()=>{
  await saveGame(state(1));rows.set(bk1,rows.get(primary));
@@ -212,9 +215,13 @@ it('loaded state mutation cannot change the roots protected by cleanup',async()=
 });
 it('an optional metadata cache clone error cannot undo a committed save',async()=>{
  await save(state(1));
- const loaded=await loadGame();
- // JSON persistence omits extra functions, but a metadata structuredClone rejects them.
- loaded.saveManifest.chunks.news.extra=()=>{};
+ await loadGame();
+ // Inject the actual optional-cache failure; loaded state no longer aliases the owned cache.
+ const clone=globalThis.structuredClone;
+ vi.spyOn(globalThis,'structuredClone').mockImplementation(value=>{
+  if(value?.saveManifest && !value?.teams)throw new DOMException('cache unavailable','DataCloneError');
+  return clone(value);
+ });
  const result=await save(state(2),{dirtyScopes:['mailbox']});
  expect(result).toMatchObject({ok:true,warnings:['root_cache_failed']});
  expect(parsed().gameDay).toBe(2);

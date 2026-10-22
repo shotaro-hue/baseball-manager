@@ -7,6 +7,7 @@ import { GrowthSummaryScreen } from './OffseasonReviewScreens';
 import { compactRenewalSession, planningSummary, reconcileRenewalSession } from '../engine/offseasonPlanning';
 import { renewalEligible } from '../engine/renewalRules';
 import { saveFeedback } from '../engine/saveFeedback';
+import SaveDiagnosticDetails from './SaveDiagnosticDetails';
 import { fmtSal } from '../utils';
 import { useResultDialog } from './useResultDialog';
 import { Button, MetricBand, StateLabel } from './design-system/primitives';
@@ -71,7 +72,7 @@ function PlanningSaveStatus({gs}) {
     {failed && <div id="planning-save-failure" className="planning-save-failure" role="alert">
       <p>{feedback.cause}{feedback.recovery}</p>
       <p className="planning-save-risk">{feedback.risk}</p>
-      <details><summary>保存エラーの詳細</summary><p>理由コード：<code>{feedback.reason}</code></p></details>
+      <p>理由コード：<code>{feedback.reason}</code></p><SaveDiagnosticDetails result={result}/>
     </div>}
   </div>;
 }
