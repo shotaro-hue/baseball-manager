@@ -39,9 +39,11 @@ native圧縮のChromium/mobile WebKit各4件・計8件成功（132秒、retry0�
 - native圧縮1件、inline gzip破損2件、診断コピー/アクセス拒否/秘密混入防止/内訳: RED→GREEN。
 - 最終の保存・二軍・career・削除読込・診断9ファイル121件成功。build成功（既存500kB chunk警告）。
 - 初回全Vitestは1750成功・7失敗・2skip。7件はrootが常にinline JSONとのテスト前提だった。readRootBodyで解決後、従来どおり破損注入する形へ直し期待値を維持。該当回帰114件成功。
-- 最終全Vitestのローカル並列実行は1763成功・2skipの後、`scripts/qa-d1-offseason.test.js` がNodeの2GBヒープ上限に到達。単独でも再現した。原因はテスト用fake-indexeddb 6.2.5の完了済transaction保持で、公式[6.2.6リリース](https://github.com/dumbmatter/fakeIndexedDB/releases/tag/v6.2.6)（2026-10-16）の修正を確認しdevDependency/lockを更新。テスト・期待値・heap上限を緩めず全件再検証する。追加ブラウザ回帰・確定CIは修正PR本文/Checksを参照。
+- 初期の全Vitestは1763成功・2skipの後、`scripts/qa-d1-offseason.test.js` がNodeの2GBヒープ上限に到達。単独でも再現した。テスト用fake-indexeddb 6.2.5の完了済transaction保持を確認し、公式[6.2.6リリース](https://github.com/dumbmatter/fakeIndexedDB/releases/tag/v6.2.6)（2026-10-16）の修正へdevDependency/lockを更新。更新後のブラウザ併走・並列実行では作業環境8GB上限にも到達したため成功と数えない。補助処理対応後は、期待値・heap上限を緩めず通常CIで221ファイル1765成功・2skip（222.6秒）、ローカル1 workerでも1765成功・2skip（533.2秒）。確定CIは修正PR本文/Checksを参照。
 - 保存側もv6の検証済みキャッシュを所有した小さいmanifest/年度情報へ変更。legacyのinline career情報は保持する。公開前検証の一時コピーを短い関数scopeに限定し、JSON本文を早期解放する。呼出側のmanifest変更が内部キャッシュへ混入しないことを追加RED→GREENで検証した。
 - 6.2.6更新後のCIで、既存の手動transaction解放補助と新adapterの自動解放が競合する1失敗・3非同期例外を検出。補助APIは互換用のno-opとし、adapter内部を変更しない。自動解放後にtransaction参照が残らないこと、保存値・active transaction・commit/abort・versionchange rollbackの検証を保持してRED→GREEN。全回帰・CIの最終結果は修正PRを正本とする。
+- CI #477では容量14件と経営画面以外の全jobが成功。経営画面はAzureのUbuntu配布元への接続待ちを繰り返し、導入22分43秒、42/80件成功後に30分のjob上限で中断。同一HEADの再実行も導入に約28分を消費した。CIのAPT参照先だけをUbuntu公式HTTPSアーカイブへ変更する。署名検証、80件、1 worker/retry0、30分上限は維持。
+- ローカルの経営画面80件は79成功・1失敗（WebKit 1440px、契約一覧へ戻る際のfocus判定）。単独反復は未変更mainで8/8、修正側でも8/8成功。原因未解明のため初回失敗を取り消さず、本修正の回帰かは断定しない。捕手E6の初回CI失敗は、未変更mainでも20反復中1件同一失敗を再現した。これらのUI/CPU期待値と処理は本件で変更していない。
 
 ## 実iPhone Safari確認手順 — 未実施
 
