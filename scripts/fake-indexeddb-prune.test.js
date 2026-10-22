@@ -4,13 +4,13 @@ import {releaseCompletedTransactions} from './fake-indexeddb-prune';
 const open=async factory=>new Promise((resolve,reject)=>{const request=factory.open('prune',1);request.onupgradeneeded=()=>request.result.createObjectStore('data');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
 const finish=tx=>new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
 const read=db=>new Promise((resolve,reject)=>{const request=db.transaction('data').objectStore('data').get('key');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
-it('releases completed adapter transactions and their rollback closures without changing stored values',async()=>{
+const settled=async()=>{await new Promise(resolve=>setTimeout(resolve,0));await new Promise(resolve=>setTimeout(resolve,0));};
+it('lets the adapter release completed transactions and rollback closures without changing stored values',async()=>{
  const factory=new IDBFactory(),db=await open(factory);
  for(let i=0;i<12;i++){const tx=db.transaction('data','readwrite');tx.objectStore('data').put({revision:i,payload:'x'.repeat(100000)},'key');await finish(tx);}
- const raw=factory._databases.get('prune');expect(raw.transactions.length).toBeGreaterThanOrEqual(12);
- expect(raw.transactions.some(tx=>tx._rollbackLog.length>0)).toBe(true);
- const upgrades=raw.transactions.filter(tx=>tx.mode==='versionchange');
- expect(releaseCompletedTransactions(factory)).toBeGreaterThanOrEqual(12);expect(raw.transactions).toEqual(upgrades);
+ const raw=factory._databases.get('prune'),transactions=raw.transactions;
+ expect(releaseCompletedTransactions(factory)).toBe(0);expect(raw.transactions).toBe(transactions);
+ await settled();expect(raw.transactions).toHaveLength(0);
  expect(await read(db)).toEqual({revision:11,payload:'x'.repeat(100000)});db.close();
 });
 it('never removes active transactions and preserves commit and rollback semantics after housekeeping',async()=>{

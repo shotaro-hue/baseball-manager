@@ -28,7 +28,7 @@ Linux Playwright WebKit 26.0 / iPhone 13設定でmain年度末データを5分�
 
 10/20年相当は実2026年データから、全現役選手の年度成績、12球団×毎年8人のOB、二軍年次記録、既存方針どおり5年の試合履歴を積んだ容量fixture。20年相当はJSON約81.5MB・現役/OB計2700人。**20年の全経営ロジックを実行した試験とは区別する。**
 
-native圧縮のChromium/mobile WebKit各4件・計8件成功（132秒、retry0）。2026/10年/20年を各3世代保存し、cold reload後にID・年俸・契約・成績・OB・履歴・二軍・メール・ニュース・FAのSHA-256一致、年度別careerの復元年数を確認。大容量の古い別タブはsave_conflictで最新を維持。WebKit20年相当は約24秒。
+native圧縮のChromium/mobile WebKit各4件・計8件成功（132秒、retry0）。2026/10年/20年を各3世代保存し、cold reload後にID・年俸・契約・成績・OB・履歴・二軍・メール・ニュース・FAのSHA-256一致、年度別careerの復元年数を確認。大容量の古い別タブはsave_conflictで最新を維持。WebKit20年相当は約24秒。最終アプリコードでも容量8件＋診断画面6件、計14件が両エンジンで成功（3.9分、1 worker、retry0）。診断画面は360/390/1440pxとClipboard拒否を含む。
 
 初回LZ方式はChromium3件・WebKit2件成功、WebKit20年相当は約41秒の同期圧縮後にcontext消失。原因を断定せず失敗として記録し、nativeへ変更して両エンジンで再検証した。測定8件の後にinline gzipチェックサムを追加したため、**最終コミットの確定結果は修正PRのexact-head CIを正本**とする。
 
@@ -41,6 +41,7 @@ native圧縮のChromium/mobile WebKit各4件・計8件成功（132秒、retry0�
 - 初回全Vitestは1750成功・7失敗・2skip。7件はrootが常にinline JSONとのテスト前提だった。readRootBodyで解決後、従来どおり破損注入する形へ直し期待値を維持。該当回帰114件成功。
 - 最終全Vitestのローカル並列実行は1763成功・2skipの後、`scripts/qa-d1-offseason.test.js` がNodeの2GBヒープ上限に到達。単独でも再現した。原因はテスト用fake-indexeddb 6.2.5の完了済transaction保持で、公式[6.2.6リリース](https://github.com/dumbmatter/fakeIndexedDB/releases/tag/v6.2.6)（2026-10-16）の修正を確認しdevDependency/lockを更新。テスト・期待値・heap上限を緩めず全件再検証する。追加ブラウザ回帰・確定CIは修正PR本文/Checksを参照。
 - 保存側もv6の検証済みキャッシュを所有した小さいmanifest/年度情報へ変更。legacyのinline career情報は保持する。公開前検証の一時コピーを短い関数scopeに限定し、JSON本文を早期解放する。呼出側のmanifest変更が内部キャッシュへ混入しないことを追加RED→GREENで検証した。
+- 6.2.6更新後のCIで、既存の手動transaction解放補助と新adapterの自動解放が競合する1失敗・3非同期例外を検出。補助APIは互換用のno-opとし、adapter内部を変更しない。自動解放後にtransaction参照が残らないこと、保存値・active transaction・commit/abort・versionchange rollbackの検証を保持してRED→GREEN。全回帰・CIの最終結果は修正PRを正本とする。
 
 ## 実iPhone Safari確認手順 — 未実施
 
