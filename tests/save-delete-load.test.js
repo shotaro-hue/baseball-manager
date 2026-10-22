@@ -1,0 +1,213 @@
+import { beforeEach, afterEach, it, expect, vi } from 'vitest';
+import { IDBFactory, IDBKeyRange, IDBDatabase, IDBObjectStore } from 'fake-indexeddb';
+import { saveGame, loadGame, deleteSave, getLastLoadResult, hasSave } from '../src/engine/saveload';
+import { openBaseballManagerDb } from '../src/engine/baseballManagerDb';
+import { deferNextSaveRead, holdSaveLock, releaseDeferredSaveOperations } from './helpers/deferredSaveRead';
+
+const primary = 'baseball_manager_v1';
+const keys = [primary, `${primary}_meta`, `${primary}_bk1`, `${primary}_bk2`];
+const state = (day = 1, saveId = 'old') => ({ saveId, teams: [{ id: 0, name: '保存球団', players: [], farm: [] }],
+  myId: 0, year: 2026, gameDay: day, news: [{ day }], mailbox: [], seasonHistory: {} });
+const save = (s, options = {}) => saveGame(s, { skipCompression: true, ...options });
+let rows;
+const storage = () => ({ getItem: key => rows.get(key) ?? null,
+  setItem: (key, value) => rows.set(key, String(value)), removeItem: key => rows.delete(key) });
+beforeEach(() => {
+  rows = new Map();
+  vi.stubGlobal('indexedDB', new IDBFactory());
+  vi.stubGlobal('IDBKeyRange', IDBKeyRange);
+  vi.stubGlobal('localStorage', storage());
+  vi.stubGlobal('navigator', { locks: { request: (_name, operation) => Promise.resolve().then(operation) } });
+});
+afterEach(async () => { await releaseDeferredSaveOperations(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+it.each(['during', 'after'])('does not publish an old successful read %s actual deletion', async timing => {
+  await save(state());
+  const read = deferNextSaveRead(), loading = loadGame(); await read.ready;
+  const lock = holdSaveLock(), deleting = deleteSave(); await lock.ready;
+  if (timing === 'during') { read.release(); expect(await loading).toBeNull(); }
+  await lock.release(); expect(await deleting).toEqual({ ok: true });
+  if (timing === 'after') { read.release(); expect(await loading).toBeNull(); }
+  expect(getLastLoadResult().status).toBe('none'); expect(hasSave()).toBe(false);
+  expect((await save(state(1, 'fresh'))).ok).toBe(true);
+  expect((await loadGame()).saveId).toBe('fresh');
+});
+
+it.each(['missing', 'error'])('does not resurrect an unrecoverable status from a late %s read', async outcome => {
+  await save(state());
+  if (outcome === 'missing') {
+    const key = JSON.parse(rows.get(primary)).saveManifest.chunks.news.key;
+    const db = await openBaseballManagerDb();
+    await new Promise(resolve => { const tx = db.transaction('save_chunks', 'readwrite'); tx.objectStore('save_chunks').delete(key); tx.oncomplete = resolve; });
+    db.close();
+  }
+  const read = deferNextSaveRead({ abort: outcome === 'error' }), loading = loadGame(); await read.ready;
+  expect(await deleteSave()).toEqual({ ok: true });
+  read.release(); expect(await loading).toBeNull();
+  expect(getLastLoadResult().status).toBe('none');
+  expect((await save(state(1, 'fresh'))).ok).toBe(true);
+  expect((await loadGame()).saveId).toBe('fresh');
+});
+
+it('does not overwrite a newer successful load or its cache with an older completion', async () => {
+  await save(state());
+  const read = deferNextSaveRead(), oldLoad = loadGame(); await read.ready;
+  await save(state(2)); const latest = await loadGame(), latestResult = getLastLoadResult();
+  read.release(); await oldLoad;
+  expect(getLastLoadResult()).toEqual(latestResult);
+  expect((await save({ ...latest, gameDay: 3 }, { dirtyScopes: [] })).ok).toBe(true);
+  expect((await loadGame()).news).toEqual([{ day: 2 }]);
+});
+
+it('does not return a stale state authorized by a newer successful load', async () => {
+  await save(state());
+  const read = deferNextSaveRead(), oldLoad = loadGame(); await read.ready;
+  await save(state(2)); await loadGame();
+  read.release(); const stale = await oldLoad;
+  expect(stale).toBeNull();
+  expect((await save(stale)).ok).toBe(false);
+  expect((await loadGame()).gameDay).toBe(2);
+});
+
+it('rejects a stale cold read when an initial storage error prevented observation', async () => {
+  await save(state()); vi.stubGlobal('localStorage', storage());
+  vi.spyOn(localStorage, 'getItem').mockImplementationOnce(() => { throw new Error('temporary read failure'); });
+  const read = deferNextSaveRead(), loading = loadGame(); await read.ready;
+  rows.set(primary, JSON.stringify({ ...JSON.parse(rows.get(primary)), gameDay: 99 }));
+  read.release(); const stale = await loading;
+  expect(stale).toBeNull();
+  expect((await save(stale)).ok).toBe(false);
+  expect(JSON.parse(rows.get(primary)).gameDay).toBe(99);
+});
+
+it.each(['primary', 'backup'])('preserves cross-tab conflict protection for a cold %s read', async candidate => {
+  await save(state());
+  if (candidate === 'backup') { rows.set(keys[2], rows.get(primary)); rows.delete(primary); }
+  vi.stubGlobal('localStorage', storage()); // A new tab has no cached observation yet.
+  const read = deferNextSaveRead(), loading = loadGame(); await read.ready;
+  const changedKey = candidate === 'primary' ? primary : keys[2];
+  const changed = JSON.stringify({ ...JSON.parse(rows.get(changedKey)), gameDay: 99 });
+  rows.set(changedKey, changed);
+  read.release(); const loaded = await loading;
+  expect(loaded).toBeNull();
+  expect(getLastLoadResult()).toMatchObject({ status: 'conflict', reason: 'load_conflict' });
+  expect(await save(state())).toMatchObject({ ok: false, reason: 'save_conflict' });
+  expect(rows.get(changedKey)).toBe(changed);
+});
+
+it.each(keys)('retains roots and metadata after deletion of %s fails, and permits retry', async failingKey => {
+  await save(state()); await save(state(2)); rows.set(keys[3], rows.get(keys[2]));
+  const before = keys.map(key => rows.get(key));
+  const remove = localStorage.removeItem;
+  vi.spyOn(localStorage, 'removeItem').mockImplementation(key => {
+    if (key === failingKey) throw new Error('remove failed');
+    return remove(key);
+  });
+  expect(await deleteSave()).toMatchObject({ ok: false, reason: 'delete_failed' });
+  expect(keys.map(key => rows.get(key))).toEqual(before);
+  expect((await save(state(3))).ok).toBe(true);
+  vi.restoreAllMocks();
+  expect(await deleteSave()).toEqual({ ok: true });
+  expect((await save(state(1, 'fresh'))).ok).toBe(true);
+  expect((await loadGame()).saveId).toBe('fresh');
+});
+
+// A later read owns publication even when the root bytes did not change.
+it('does not return an older read after a newer read of the same root completes', async () => {
+  await save(state());
+  const read = deferNextSaveRead(), oldLoad = loadGame(); await read.ready;
+  const latest = await loadGame(), status = getLastLoadResult();
+  read.release(); expect(await oldLoad).toBeNull();
+  expect(getLastLoadResult()).toEqual(status);
+  expect(latest.gameDay).toBe(1);
+});
+
+it.each(keys)('retains the latest primary when removing %s and all rollback writes fail', async failingKey => {
+  await save(state()); await save(state(2)); rows.set(keys[3], rows.get(keys[2]));
+  const latest = rows.get(primary), remove = localStorage.removeItem;
+  vi.spyOn(localStorage, 'removeItem').mockImplementation(key => {
+    if (key === failingKey) throw new Error('remove failed');
+    return remove(key);
+  });
+  vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw new Error('restore failed'); });
+  expect(await deleteSave()).toMatchObject({ ok: false, reason: 'delete_failed' });
+  expect(rows.get(primary)).toBe(latest);
+  expect((await loadGame()).gameDay).toBe(2);
+  vi.restoreAllMocks();
+  expect((await save(state(3))).ok).toBe(true);
+  expect((await loadGame()).gameDay).toBe(3);
+});
+
+
+it.each(['cold','recovered'].flatMap(mode => ['absent','malformed','missing-chunk'].map(kind => [mode,kind])))(
+ 'preserves the only valid backup on removal plus rollback failure (%s / %s)', async (mode,kind) => {
+  await save(state()); await save(state(2)); rows.set(keys[3],'broken');
+  if (kind==='absent') rows.delete(primary);
+  else if (kind==='malformed') rows.set(primary,'broken');
+  else {
+   const key=JSON.parse(rows.get(primary)).saveManifest.chunks.news.key;
+   const db=await openBaseballManagerDb();
+   await new Promise(resolve => {const tx=db.transaction('save_chunks','readwrite');tx.objectStore('save_chunks').delete(key);tx.oncomplete=resolve;});db.close();
+  }
+  if(mode==='cold') vi.stubGlobal('localStorage',storage());
+  else expect((await loadGame()).gameDay).toBe(1);
+  const backup=rows.get(keys[2]),status=getLastLoadResult(),remove=localStorage.removeItem;
+  vi.spyOn(localStorage,'removeItem').mockImplementation(key=>{if(key===primary)throw Error('remove failed');return remove(key);});
+  vi.spyOn(localStorage,'setItem').mockImplementation(()=>{throw Error('rollback failed');});
+  expect(await deleteSave()).toMatchObject({ok:false,reason:'delete_failed'});
+  expect(rows.get(keys[2])).toBe(backup);expect(getLastLoadResult()).toEqual(status);
+  expect((await loadGame()).gameDay).toBe(1);
+  vi.restoreAllMocks();expect(await deleteSave()).toEqual({ok:true});
+  expect((await save(state(1,'fresh'))).ok).toBe(true);expect((await loadGame()).saveId).toBe('fresh');
+});
+it('retains backup2 when both earlier roots are malformed and rollback writes fail', async()=>{
+ await save(state()); const backup=rows.get(primary); rows.set(keys[3],backup);rows.set(primary,'broken');rows.set(keys[2],'broken');
+ const remove=localStorage.removeItem;
+ vi.spyOn(localStorage,'removeItem').mockImplementation(key=>{if(key===primary)throw Error('remove failed');return remove(key);});
+ vi.spyOn(localStorage,'setItem').mockImplementation(()=>{throw Error('rollback failed');});
+ expect(await deleteSave()).toMatchObject({ok:false});expect(rows.get(keys[3])).toBe(backup);
+ expect((await loadGame()).gameDay).toBe(1);
+});
+it('does not remove any root when current validation encounters an environmental read failure',async()=>{
+ await save(state());await save(state(2));const before=keys.map(key=>rows.get(key));
+ const tx=IDBDatabase.prototype.transaction;
+ vi.spyOn(IDBDatabase.prototype,'transaction').mockImplementation(function(...args){
+  if(args[0]==='save_chunks'&&args[1]==='readonly')throw new DOMException('temporary','AbortError');
+  return tx.apply(this,args);
+ });
+ expect(await deleteSave()).toMatchObject({ok:false,reason:'delete_failed'});
+ expect(keys.map(key=>rows.get(key))).toEqual(before);
+});
+it('does not remove roots changed while deletion validates them',async()=>{
+ await save(state());let changed=false;const get=IDBObjectStore.prototype.get;
+ vi.spyOn(IDBObjectStore.prototype,'get').mockImplementation(function(...args){
+  const request=get.apply(this,args);
+  if(this.name==='save_chunks'&&!changed){changed=true;rows.set(primary,JSON.stringify({...JSON.parse(rows.get(primary)),gameDay:99}));}
+  return request;
+ });
+ expect(await deleteSave()).toMatchObject({ok:false,reason:'delete_failed'});
+ expect(JSON.parse(rows.get(primary)).gameDay).toBe(99);
+});
+it('still permits explicit deletion when all roots are malformed JSON',async()=>{
+ keys.filter(key=>key!==keys[1]).forEach(key=>rows.set(key,'broken'));
+ expect(await deleteSave()).toEqual({ok:true});expect(hasSave()).toBe(false);
+});
+
+it('retains every root when gzip career history cannot be decoded in the current environment',async()=>{
+ await save(state());
+ const latest=state(2);latest.teams[0].players=[{id:'long-history',name:'長期選手',stats:{}}];
+ const entries=Array.from({length:300},(_,i)=>({year:1900+i,teamId:0,teamName:'保存球団',stats:{HR:i,AB:500,H:130}}));
+ expect((await save(latest,{initialCareerLogs:[{playerId:'long-history',careerEntries:entries}]})).ok).toBe(true);
+ const before=keys.map(key=>rows.get(key)),decode=globalThis.DecompressionStream;
+ vi.stubGlobal('DecompressionStream',undefined);
+ expect(await deleteSave()).toMatchObject({ok:false,reason:'delete_failed'});
+ expect(keys.map(key=>rows.get(key))).toEqual(before);
+ vi.stubGlobal('DecompressionStream',decode);
+ expect((await loadGame()).gameDay).toBe(2);
+});
+it('returns delete_failed rather than rejecting when the no-lock Node fallback fails',async()=>{
+ await save(state());vi.stubGlobal('navigator',{});
+ vi.spyOn(localStorage,'removeItem').mockImplementation(()=>{throw Error('remove failed');});
+ await expect(deleteSave()).resolves.toMatchObject({ok:false,reason:'delete_failed'});
+ expect((await loadGame()).gameDay).toBe(1);
+});

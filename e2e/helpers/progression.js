@@ -94,7 +94,11 @@ export async function saveHub(page, options = {}) {
 
 export async function reloadAndLoad(page) {
   await page.reload();
-  await page.getByRole('button', { name: '続きから', exact: true }).click();
+  const resume = page.getByRole('button', { name: '続きから', exact: true });
+  await resume.click();
+  // A click only starts App's asynchronous read. Diagnostic readSave() calls
+  // must not supersede that pending read before the resumed screen is applied.
+  await expect(resume).toHaveCount(0, { timeout: 15_000 });
 }
 export function progressSignature(save, playerId) {
   const team = save.teams.find(t => t.id === save.myId);

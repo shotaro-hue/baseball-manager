@@ -39,7 +39,9 @@ export function NewsTab({ news, transfers = [], onInterview, currentYear }){
           </select>
         </div>
         {shownTransfers.length===0&&<p style={{fontSize:11,color:"#374151",padding:"8px 0"}}>この年度の移籍ログはまだありません</p>}
-        {shownTransfers.map(item=>(
+        {shownTransfers.map(item=>{
+          const cash = typeof item.cash === 'number' || typeof item.cash === 'string' ? Number(item.cash) : NaN;
+          return (
           <div key={item.id} style={{padding:"8px 10px",marginBottom:5,borderRadius:6,background:"rgba(249,115,22,.06)",border:"1px solid rgba(249,115,22,.2)"}}>
             <div style={{display:"flex",justifyContent:"space-between",gap:6,alignItems:"center"}}>
               <div style={{fontSize:11,fontWeight:700,color:"#f97316"}}>{item.headline||"トレード"}</div>
@@ -47,11 +49,12 @@ export function NewsTab({ news, transfers = [], onInterview, currentYear }){
             </div>
             <div style={{fontSize:10,color:"#d1d5db",marginTop:4}}>
               IN: {(item.playersIn||[]).join("、")||"なし"} / OUT: {(item.playersOut||[]).join("、")||"なし"}
-              {Number(item.cash)!==0&&<span style={{marginLeft:6,color:"#f5c842"}}>{Number(item.cash)>0?`金銭支払い ${Math.abs(item.cash).toLocaleString()}万円`:`金銭受取 ${Math.abs(item.cash).toLocaleString()}万円`}</span>}
+              {Number.isFinite(cash)&&cash!==0&&<span style={{marginLeft:6,color:"#f5c842"}}>{cash>0?`金銭支払い ${Math.abs(cash).toLocaleString()}万円`:`金銭受取 ${Math.abs(cash).toLocaleString()}万円`}</span>}
             </div>
             {item.detail&&<div style={{fontSize:9,color:"#94a3b8",marginTop:3,whiteSpace:"pre-wrap"}}>{item.detail}</div>}
           </div>
-        ))}
+          );
+        })}
       </div>
       {sel&&(
         <div className="card" style={{padding:"12px"}}>

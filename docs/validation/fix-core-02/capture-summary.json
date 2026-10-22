@@ -1,0 +1,98 @@
+[
+  {
+    "stage": "before",
+    "width": 360,
+    "screen": "news",
+    "invalidCashLabels": 2,
+    "validPayment": 1,
+    "validReceipt": 1
+  },
+  {
+    "stage": "before",
+    "width": 360,
+    "screen": "title-after-5s",
+    "alerts": 0,
+    "resume": 1,
+    "rootsIntact": true
+  },
+  {
+    "stage": "before",
+    "width": 390,
+    "screen": "news",
+    "invalidCashLabels": 2,
+    "validPayment": 1,
+    "validReceipt": 1
+  },
+  {
+    "stage": "before",
+    "width": 390,
+    "screen": "title-after-5s",
+    "alerts": 0,
+    "resume": 1,
+    "rootsIntact": true
+  },
+  {
+    "stage": "before",
+    "width": 1440,
+    "screen": "news",
+    "invalidCashLabels": 2,
+    "validPayment": 1,
+    "validReceipt": 1
+  },
+  {
+    "stage": "before",
+    "width": 1440,
+    "screen": "title-after-5s",
+    "alerts": 0,
+    "resume": 1,
+    "rootsIntact": true
+  },
+  {
+    "stage": "after",
+    "width": 360,
+    "screen": "news",
+    "invalidCashLabels": 0,
+    "validPayment": 1,
+    "validReceipt": 1
+  },
+  {
+    "stage": "after",
+    "width": 360,
+    "screen": "title-after-5s",
+    "alerts": 1,
+    "resume": 1,
+    "rootsIntact": true
+  },
+  {
+    "stage": "after",
+    "width": 390,
+    "screen": "news",
+    "invalidCashLabels": 0,
+    "validPayment": 1,
+    "validReceipt": 1
+  },
+  {
+    "stage": "after",
+    "width": 390,
+    "screen": "title-after-5s",
+    "alerts": 1,
+    "resume": 1,
+    "rootsIntact": true
+  },
+  {
+    "stage": "after",
+    "width": 1440,
+    "screen": "news",
+    "invalidCashLabels": 0,
+    "validPayment": 1,
+    "validReceipt": 1
+  },
+  {
+    "stage": "after",
+    "width": 1440,
+    "screen": "title-after-5s",
+    "alerts": 1,
+    "resume": 1,
+    "rootsIntact": true
+  }
+]

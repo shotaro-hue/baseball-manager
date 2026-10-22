@@ -766,6 +766,7 @@ const backupObservations = new WeakMap();
 const validatedRoots = new WeakMap();
 const validatedRawRoots = new WeakMap();
 const deletionEpochs = new WeakMap();
+const loadEpochs = new WeakMap();
 const chunkRootCache = new WeakMap();
 const legacyCareerSeeds = new WeakMap();
 let localSaveTail = Promise.resolve();
@@ -898,19 +899,67 @@ export function getSavePerfSummary() {
   return { count: logs.length, average, slowest };
 }
 
+// Hydrate a private decoded candidate without publishing cache, observations or load status.
+async function hydrateSaveCandidate(state, { strict = false } = {}) {
+  if (state?.saveDataVersion >= LEGACY_GENERATION_VERSION) {
+    Object.assign(state, await readGeneration(state));
+  } else if (state?.saveDataVersion >= INDEXED_DB_LARGE_DATA_VERSION) {
+    try {
+      state.seasonHistory = (await idbRead(IDB_STORES.chunks, 'seasonHistory')) ?? state.seasonHistory;
+      state.news = (await idbRead(IDB_STORES.chunks, 'news')) ?? state.news;
+      state.mailbox = (await idbRead(IDB_STORES.chunks, 'mailbox')) ?? state.mailbox;
+      if (state.matchHistoryStored) {
+        const history = await idbRead(IDB_STORES.chunks, 'matchHistory');
+        if (!history) throw new Error('missing_match_history');
+        Object.assign(state, matchHistorySnapshot(history));
+      }
+      state.saveRevision = sanitizeNumber(state.saveRevision, 0);
+    } catch (e) {
+      if (strict || state.matchHistoryStored) throw e;
+      console.warn('IndexedDB load failed. Fallback to localStorage payload.', e);
+    }
+  }
+}
+
+function provenCorruptCandidate(error) {
+  return error instanceof SyntaxError || /^(invalid_save_manifest|invalid_chunk(?:_reference)?:(news|mailbox|seasonHistory|matchHistory|careerLogs)|invalid_career_(encoding|payload)|missing_match_history)$/.test(error?.message ?? '');
+}
+
 export async function loadGame() {
   const loadGameStart = isDevEnv ? performance.now() : 0;
+  const storage = globalThis.localStorage;
+  const loadEpoch = (loadEpochs.get(storage) ?? 0) + 1;
+  loadEpochs.set(storage, loadEpoch);
+  const ownsLoad = () => storage === globalThis.localStorage && loadEpochs.get(storage) === loadEpoch;
+  const deletionEpoch = deletionEpochs.get(storage) ?? 0;
+  const deletionChanged = () => deletionEpoch !== (deletionEpochs.get(storage) ?? 0);
   lastLoadResult = { status: 'none' };
   let foundCandidate = false;
   let primaryAtLoad;
   let backupsAtLoad;
-  try { primaryAtLoad = localStorage.getItem(SAVE_KEY); backupsAtLoad = [localStorage.getItem(BACKUP_KEY_1), localStorage.getItem(BACKUP_KEY_2)]; } catch { primaryAtLoad = null; backupsAtLoad = []; }
+  try {
+    primaryAtLoad = storage.getItem(SAVE_KEY);
+    backupsAtLoad = [storage.getItem(BACKUP_KEY_1), storage.getItem(BACKUP_KEY_2)];
+    // A cold tab must remember what it read even if another tab changes roots
+    // before validation completes, so a later save still fails closed.
+    if (!observations.has(storage)) observations.set(storage, primaryAtLoad);
+    if (!backupObservations.has(storage)) backupObservations.set(storage, backupsAtLoad);
+  } catch { primaryAtLoad = null; backupsAtLoad = []; }
+  const canPublish = () => {
+    try {
+      return !deletionChanged() && ownsLoad()
+        && storage.getItem(SAVE_KEY) === primaryAtLoad
+        && backupsAtLoad.length === 2
+        && backupsAtLoad.every((raw, index) => storage.getItem([BACKUP_KEY_1, BACKUP_KEY_2][index]) === raw);
+    } catch { return false; }
+  };
   const candidates = [
     { key: SAVE_KEY,     label: 'primary' },
     { key: BACKUP_KEY_1, label: 'backup-1' },
     { key: BACKUP_KEY_2, label: 'backup-2' },
   ];
   for (const { key, label } of candidates) {
+    if (deletionChanged()) return null;
     try {
       const getItemStart = isDevEnv ? performance.now() : 0;
       const raw = localStorage.getItem(key);
@@ -918,24 +967,8 @@ export async function loadGame() {
       if (!raw) continue;
       foundCandidate = true;
       const state = decompress(raw);
-      if (state?.saveDataVersion >= LEGACY_GENERATION_VERSION) {
-        Object.assign(state, await readGeneration(state));
-      } else if (state?.saveDataVersion >= INDEXED_DB_LARGE_DATA_VERSION) {
-        try {
-          state.seasonHistory = (await idbRead(IDB_STORES.chunks, 'seasonHistory')) ?? state.seasonHistory;
-          state.news = (await idbRead(IDB_STORES.chunks, 'news')) ?? state.news;
-          state.mailbox = (await idbRead(IDB_STORES.chunks, 'mailbox')) ?? state.mailbox;
-          if (state.matchHistoryStored) {
-            const history = await idbRead(IDB_STORES.chunks, 'matchHistory');
-            if (!history) throw new Error('missing_match_history');
-            Object.assign(state, matchHistorySnapshot(history));
-          }
-          state.saveRevision = sanitizeNumber(state.saveRevision, 0);
-        } catch (e) {
-          if (state.matchHistoryStored) throw e;
-          console.warn('IndexedDB load failed. Fallback to localStorage payload.', e);
-        }
-      }
+      await hydrateSaveCandidate(state);
+      if (deletionChanged()) return null;
       if(!(state?.saveDataVersion >= GENERATION_VERSION)) legacyCareerSeeds.set(state,captureInlineCareerLogs(state));
       for (const team of (state?.teams || [])) {
         for (const bucket of ['players', 'farm']) {
@@ -953,12 +986,18 @@ export async function loadGame() {
       }
       const result = validateAndMigrateSave(state);
       if (result.ok) {
+        if(legacyCareerSeeds.has(state)) legacyCareerSeeds.set(result.state,legacyCareerSeeds.get(state));
+        // Never let a delayed read undo deletion or replace newer observations,
+        // validated roots, chunk metadata, or the latest reported load result.
+        if (!canPublish()) {
+          if (ownsLoad() && !deletionChanged()) lastLoadResult = { status: 'conflict', reason: 'load_conflict' };
+          return null;
+        }
         if (key !== SAVE_KEY) console.warn(`Loaded from ${label}`);
         logPerf('loadGame', loadGameStart);
         observations.set(localStorage, primaryAtLoad);
         backupObservations.set(localStorage, backupsAtLoad);
         validatedRoots.set(localStorage, result.state);
-        if(legacyCareerSeeds.has(state)) legacyCareerSeeds.set(result.state,legacyCareerSeeds.get(state));
         validatedRawRoots.set(localStorage, raw);
         try { rememberChunkRoot(raw, result.state); }
         catch (error) { console.warn('Load succeeded; root cache failed:', error); }
@@ -967,10 +1006,12 @@ export async function loadGame() {
       }
       console.warn(`Validation failed for ${label}`);
     } catch (e) {
+      if (deletionChanged()) return null;
       console.error(`Load from ${label} failed:`, e);
     }
   }
-  lastLoadResult = { status: foundCandidate ? 'unrecoverable' : 'none' };
+  if (canPublish()) lastLoadResult = { status: foundCandidate ? 'unrecoverable' : 'none' };
+  else if (ownsLoad() && !deletionChanged()) lastLoadResult = { status: 'conflict', reason: 'load_conflict' };
   return null;
 }
 
@@ -1079,23 +1120,52 @@ export function getSaveMeta() {
   }
 }
 
-function deleteSaveImpl() {
+async function deleteSaveImpl() {
+  const storage = globalThis.localStorage;
+  const keys = [META_KEY, BACKUP_KEY_2, BACKUP_KEY_1, SAVE_KEY];
+  const before = keys.map(key => storage.getItem(key));
+  let retainedKey = null, saveId = null;
+  // A missing/corrupt primary is common during backup recovery. Retain the first
+  // currently recoverable candidate, not simply the key named primary.
+  for (const key of [SAVE_KEY, BACKUP_KEY_1, BACKUP_KEY_2]) {
+    const raw = before[keys.indexOf(key)];
+    if (raw === null) continue;
+    let state;
+    try { state = decompress(raw); }
+    catch (error) { if (provenCorruptCandidate(error)) continue; throw error; }
+    try { await hydrateSaveCandidate(state, { strict: true }); }
+    catch (error) {
+      if (provenCorruptCandidate(error)) continue;
+      // I/O failure is not evidence of corrupt data: stop before any removal.
+      throw error;
+    }
+    let result;
+    try { result = validateAndMigrateSave(state); }
+    catch { continue; } // Pure state validation; no storage operations.
+    if (result.ok) { retainedKey = key; saveId = result.state.saveId; break; }
+  }
+  if (storage !== globalThis.localStorage || keys.some((key, index) => storage.getItem(key) !== before[index])) {
+    throw new Error('delete_roots_changed');
+  }
+  const removalOrder = retainedKey ? [...keys.filter(key => key !== retainedKey), retainedKey] : keys;
+  try {
+    for (const key of removalOrder) storage.removeItem(key);
+  } catch (error) {
+    // Best effort only: a failed rollback must not stop restoration of other keys.
+    // Individual removeItem calls are atomic, but this sequence is not a transaction.
+    keys.forEach((key, index) => {
+      try {
+        if (before[index] !== null && storage.getItem(key) === null) storage.setItem(key, before[index]);
+      } catch { /* The verified candidate was removed last and remains usable. */ }
+    });
+    throw error;
+  }
   chunkRootCache.delete(localStorage);
   observations.set(localStorage, null);
   backupObservations.set(localStorage, [null, null]);
   validatedRoots.delete(localStorage);
   validatedRawRoots.delete(localStorage);
-  let saveId = null;
-  try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (raw) saveId = decompress(raw)?.saveId ?? null;
-  } catch {
-    saveId = null;
-  }
-  localStorage.removeItem(SAVE_KEY);
-  localStorage.removeItem(META_KEY);
-  localStorage.removeItem(BACKUP_KEY_1);
-  localStorage.removeItem(BACKUP_KEY_2);
+  lastLoadResult = { status: 'none' };
   if (saveId) {
     import('./battedBallArchive')
       .then((mod) => mod.deleteBattedBallArchiveBySaveId(saveId))
@@ -1111,7 +1181,7 @@ export function deleteSave() {
     try {
       if (globalThis.navigator?.locks?.request) return await navigator.locks.request('baseball-manager-save', deleteSaveImpl);
       if (typeof window !== 'undefined') return { ok: false, reason: 'save_lock_unavailable' };
-      return deleteSaveImpl();
+      return await deleteSaveImpl();
     } catch { return { ok: false, reason: 'delete_failed' }; }
   };
   const result = localSaveTail.then(run, run);

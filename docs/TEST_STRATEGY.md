@@ -4,6 +4,8 @@
 
 ## 結論・運用の原則
 
+FIX-CORE-02追加（2026-10-21）: `NewsTab.test.js`で欠損/非有限/ゼロの金額非表示・正負/数値文字列・入力不変を検査。`App.loadError.test.js`は実App/Router/Titleと既存hookで通知寿命・無関係通知・再試行・成功/削除/新規選択時解除を検査する。既存`core-reliability.spec.js`のChromium/mobile-webkitに保存済み金額・年度・不変の再保存と、全破損→5秒後も警告→再失敗→同一タイトルから成功する旅程を追加。CI構成とretry0を維持し、実iPhone確認は別扱い。[検証記録](./validation/fix-core-02/README.md)。
+
 FIX-CORE-01追加（2026-10-21）: TitleScreen.resume、useGameState.interview、NewsTab、HubContentRouter.newsの実装テストで保存メタデータ欠損/破損/書込失敗・連続回答・正式answered・移籍接続をRED→GREENで確認する。`core-reliability.spec.js`は通常CI `save-integrity` に追加し、Chromiumとmobile-webkitでタイトルの全保存候補、回答/通知移動/保存再開、移籍の年度絞込み/空表示を実行する。既存CIの範囲・期待値・リトライ0を維持。関連の保存/ナビ/一覧/進行回帰は同一headの通常CI結果を再利用し、実iPhone確認と区別する。[検証記録](./validation/fix-core-01/README.md)。
 
 UI-04C追加（2026-10-20）：`managementDecisions.test.js`で契約/スカウト/取引の確認・取消・二重実行・最新状態・案件ID・回答結果/一覧復帰/欠測年俸の放出を検証。`management-decisions.spec.js`は通常CI posting-and-finance とmobile-webkitで、3幅の比較/取消/復帰、獲得/提示/保存再開、通知案件の特定、キーボードの成功後フォーカス、境界4幅を実行する。旧finance/posting/trade/hub-navigationは確認操作と選択UIだけを更新し、全12球団/金銭/所属/履歴/保存のassertを維持。[実行記録](./validation/ui-04c/README.md)。

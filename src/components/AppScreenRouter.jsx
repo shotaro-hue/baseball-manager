@@ -116,7 +116,7 @@ function DeferredScreenFrame({ screen, children, gs }) {
 }
 
 export default function AppScreenRouter({ app }) {
-  const { gs, sf, os, handleLoad } = app;
+  const { gs, sf, os, handleLoad, loadError, clearLoadError, handleSaveDeletionStart, handleSaveDeletionEnd } = app;
   const [draftAutoSkip, setDraftAutoSkip] = useState(false);
   const savePreview = useCallback(value => os.saveDraftView('preview', value), [os.saveDraftView]);
   const saveLottery = useCallback(value => os.saveDraftView('lottery', value), [os.saveDraftView]);
@@ -141,13 +141,15 @@ export default function AppScreenRouter({ app }) {
       <TitleScreen
         saveExists={saveExists}
         initializationError={gs.newGameInitializationError}
-        loadError={gs.notif?.type === 'warn' ? gs.notif.msg : null}
+        loadError={loadError}
         initializationStatus={gs.newGameInitializationStatus}
         isInitializationInProgress={gs.isNewGameInitializing}
         getInitializationAttempt={gs.getNewGameInitializationAttempt}
         onLoad={handleLoad}
-        onSelectTeam={gs.handleSelect}
-        onSaveDeleted={() => setSaveExists(false)}
+        onSelectTeam={id => { clearLoadError?.(); return gs.handleSelect(id); }}
+        onSaveDeletionStart={handleSaveDeletionStart}
+        onSaveDeletionEnd={handleSaveDeletionEnd}
+        onSaveDeleted={() => { setSaveExists(false); clearLoadError?.(); }}
       />
     );
   }

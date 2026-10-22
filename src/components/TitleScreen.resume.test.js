@@ -87,11 +87,11 @@ it('keeps corrupt candidates intact and delegates failure to the existing loader
   expect([...rows]).toEqual(before);
 });
 
-it('shows the existing loader warning on the title without hiding resume or changing roots', async () => {
+it('shows the dedicated loader warning independently of ordinary notifications without changing roots', async () => {
   roots.forEach(key => rows.set(key, 'broken')); const before = [...rows];
   const message = 'セーブとバックアップを復旧できませんでした。必要な履歴が欠損・破損しています。';
   await act(async () => { view = create(React.createElement(AppScreenRouter, { app: {
-    gs: { screen: 'title', saveExists: true, notif: { type: 'warn', msg: message } }, sf: {}, os: {},
+    gs: { screen: 'title', saveExists: true, notif: { type: 'ok', msg: '通常の通知' } }, sf: {}, os: {}, loadError: message,
   } })); });
   expect(view.root.findByProps({ role: 'alert' }).children).toEqual([message]);
   expect(view.root.findAllByType('button').some(b => b.children.join('') === '続きから')).toBe(true);

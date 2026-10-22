@@ -66,11 +66,28 @@ test('core reliability no roots does not offer resume despite stale metadata', a
 });
 test('core reliability unrecoverable roots stay intact after failed resume', async ({ page }) => {
   await page.goto('/');
+  await page.clock.install();
   await page.evaluate(roots => roots.forEach(key => localStorage.setItem(key, 'broken')), roots);
   await page.reload(); await resume(page).click();
   await expect(page.getByText('セーブとバックアップを復旧できませんでした。必要な履歴が欠損・破損しています。', { exact: true })).toBeVisible();
   await expect(page.locator('.topbar')).toHaveCount(0); await expect(resume(page)).toBeVisible();
   expect(await page.evaluate(roots => roots.map(key => localStorage.getItem(key)), roots)).toEqual(['broken', 'broken', 'broken']);
+  // Move beyond the ordinary toast's lifetime, without waiting in real time.
+  await page.clock.runFor(5000);
+  await expect(page.getByRole('alert')).toContainText('セーブとバックアップを復旧できませんでした');
+  await expect(resume(page)).toBeEnabled();
+  await resume(page).click();
+  await expect(page.getByRole('alert')).toContainText('セーブとバックアップを復旧できませんでした');
+  expect(await page.evaluate(roots => roots.map(key => localStorage.getItem(key)), roots)).toEqual(['broken', 'broken', 'broken']);
+  const fixture = fresh();
+  // Repair the fixture in place, keeping the failed title mounted for the retry.
+  expect(await page.evaluate(async fixture => {
+    const mod = await import('/baseball-manager/src/engine/saveload.js');
+    return (await mod.saveGame(fixture)).ok;
+  }, fixture)).toBe(true);
+  await resume(page).click(); await expect(page.locator('.topbar')).toBeVisible();
+  await expect(page.getByText('セーブとバックアップを復旧できませんでした。必要な履歴が欠損・破損しています。', { exact: true })).toHaveCount(0);
+  expect((await readSave(page)).saveId).toBe(fixture.saveId);
 });
 
 async function openNews(page) {
@@ -87,6 +104,11 @@ function newsFixture() {
   fixture.seasonHistory.transfers = [
     { id: 'core-old', year: fixture.year - 1, day: 12, headline: 'CORE 昨季移籍', playersIn: ['加入選手A'], playersOut: ['放出選手B'], cash: 0 },
     { id: 'core-current', year: fixture.year, day: 1, headline: 'CORE 今季移籍', playersIn: ['加入選手C'], playersOut: [], cash: 500 },
+    { id: 'core-cpu', year: fixture.year, day: 1, headline: 'CORE CPU間金額なし', playersIn: ['CPU加入'], playersOut: ['CPU放出'] },
+    { id: 'core-null', year: fixture.year, day: 1, headline: 'CORE 未記録金額', cash: null },
+    { id: 'core-invalid', year: fixture.year, day: 1, headline: 'CORE 不正金額', cash: 'invalid' },
+    { id: 'core-negative', year: fixture.year, day: 1, headline: 'CORE 金銭受取', cash: -1250 },
+    { id: 'core-legacy', year: fixture.year - 1, day: 12, headline: 'CORE 旧金額文字列', cash: '750' },
   ];
   return fixture;
 }
@@ -101,9 +123,16 @@ for (const width of [360, 390, 1440]) {
     await openNews(page);
     await expect(active(page).getByText('CORE 昨季移籍', { exact: true })).toBeVisible();
     await expect(active(page).getByText('CORE 今季移籍', { exact: true })).toBeVisible();
+    await expect(active(page)).not.toContainText('NaN');
+    await expect(active(page).getByText('金銭支払い 500万円', { exact: true })).toBeVisible();
+    await expect(active(page).getByText('金銭受取 1,250万円', { exact: true })).toBeVisible();
+    await expect(active(page).getByText('金銭支払い 750万円', { exact: true })).toBeVisible();
+    expect(await active(page).getByText(/金銭(?:支払い|受取) [\d,]+万円/).count()).toBe(3);
     await active(page).getByRole('combobox').selectOption(String(fixture.year - 1));
     await expect(active(page).getByText('CORE 今季移籍', { exact: true })).toHaveCount(0);
     await expect(active(page).getByText('CORE 昨季移籍', { exact: true })).toBeVisible();
+    await expect(active(page).getByText('金銭支払い 750万円', { exact: true })).toBeVisible();
+    await expect(active(page).getByText('金銭受取 1,250万円', { exact: true })).toHaveCount(0);
     await active(page).getByRole('combobox').selectOption('all');
     await active(page).getByText('CORE 回答済み会見', { exact: true }).click();
     await expect(active(page).getByText('回答済み', { exact: true })).toBeVisible();
@@ -138,6 +167,12 @@ for (const width of [360, 390, 1440]) {
     await active(page).getByRole('combobox').selectOption(String(fixture.year));
     await expect(active(page).getByText('CORE 今季移籍', { exact: true })).toBeVisible();
     await expect(active(page).getByText('CORE 昨季移籍', { exact: true })).toHaveCount(0);
+    await expect(active(page)).not.toContainText('NaN');
+    await expect(active(page).getByText('金銭受取 1,250万円', { exact: true })).toBeVisible();
+    const persisted = (await readSave(page)).seasonHistory.transfers;
+    expect(persisted.find(t => t.id === 'core-cpu')).not.toHaveProperty('cash');
+    expect(persisted.find(t => t.id === 'core-null').cash).toBeNull();
+    expect(persisted.find(t => t.id === 'core-invalid').cash).toBe('invalid');
     expect((await saveHub(page)).teams).toEqual(after.teams);
     expect(errors).toEqual([]);
   });
@@ -149,4 +184,86 @@ test('core reliability empty transfer history survives save and reload', async (
   expect((await saveHub(page)).seasonHistory.transfers).toEqual([]);
   await reloadAndLoad(page); await openNews(page);
   await expect(active(page).getByText('この年度の移籍ログはまだありません', { exact: true })).toBeVisible();
+});
+
+for (const timing of ['during', 'after']) {
+  test(`core reliability deletion rejects a delayed IndexedDB load ${timing} the delete lock`, async ({ page }) => {
+    const fixture = fresh();
+    // Keep actual generation reads and App migration, with no compressed career
+    // archive needed for this ordering test.
+    fixture.teams = fixture.teams.map(team => ({ ...team, players: [], farm: [] }));
+    await saveFixture(page, fixture); await page.reload();
+    await expect(resume(page)).toBeVisible();
+    await page.evaluate(() => {
+      const original = IDBDatabase.prototype.transaction;
+      window.releaseRead = new Promise(resolve => { window.finishRead = resolve; });
+      IDBDatabase.prototype.transaction = function(stores, mode, ...rest) {
+        const tx = original.call(this, stores, mode, ...rest);
+        if (stores === 'save_chunks' && mode === 'readonly') {
+          IDBDatabase.prototype.transaction = original;
+          Object.defineProperty(tx, 'oncomplete', { set(callback) {
+            tx.addEventListener('complete', async event => {
+              window.readHeld = true;
+              await window.releaseRead;
+              callback.call(tx, event);
+            });
+          } });
+        }
+        return tx;
+      };
+      window.deleteBlocker = navigator.locks.request('baseball-manager-save', () => new Promise(resolve => {
+        window.finishDeleteLock = resolve; window.deleteLockHeld = true;
+      }));
+    });
+    await expect.poll(() => page.evaluate(() => !!window.deleteLockHeld)).toBe(true);
+    await resume(page).click();
+    await expect.poll(() => page.evaluate(() => !!window.readHeld)).toBe(true);
+    page.once('dialog', dialog => dialog.accept());
+    await page.getByRole('button', { name: '削除', exact: true }).click();
+    await expect(resume(page)).toBeDisabled();
+    if (timing === 'during') {
+      await page.evaluate(async () => { window.finishRead(); await new Promise(requestAnimationFrame); });
+      await expect(page.locator('.topbar')).toHaveCount(0);
+      await expect(page.getByRole('alert')).toHaveCount(0);
+      await expect(resume(page)).toBeDisabled();
+    }
+    await page.evaluate(async () => { window.finishDeleteLock(); await window.deleteBlocker; });
+    await expect(resume(page)).toHaveCount(0);
+    if (timing === 'after') await page.evaluate(async () => { window.finishRead(); await new Promise(requestAnimationFrame); });
+    await expect(page.locator('.topbar')).toHaveCount(0);
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect(await page.evaluate(roots => roots.map(key => localStorage.getItem(key)), roots)).toEqual([null, null, null]);
+    const result = await page.evaluate(async fixture => {
+      const mod = await import('/baseball-manager/src/engine/saveload.js');
+      const saved = await mod.saveGame({ ...fixture, saveId: 'fresh-after-delete' });
+      return { saved, loadedId: (await mod.loadGame())?.saveId };
+    }, fixture);
+    expect(result.saved.ok).toBe(true); expect(result.loadedId).toBe('fresh-after-delete');
+    await page.reload(); await resume(page).click(); await expect(page.locator('.topbar')).toBeVisible();
+  });
+}
+
+test('core reliability resume helper waits for a delayed read before diagnostic reads', async ({page}) => {
+  const fixture = fresh();
+  fixture.teams = fixture.teams.map(team => ({...team, players:[], farm:[]}));
+  await saveFixture(page,fixture);
+  await page.addInitScript(() => {
+    const original = IDBDatabase.prototype.transaction;
+    let held=false;
+    IDBDatabase.prototype.transaction = function(stores,mode,...rest) {
+      const tx=original.call(this,stores,mode,...rest);
+      if (!held && stores==='save_chunks' && mode==='readonly') {
+        held=true;
+        Object.defineProperty(tx,'oncomplete',{set(callback) {
+          tx.addEventListener('complete',event=>setTimeout(()=>callback.call(tx,event),500));
+        }});
+      }
+      return tx;
+    };
+  });
+  await reloadAndLoad(page);
+  const saved=await readSave(page);
+  expect(saved.saveId).toBe(fixture.saveId);
+  await expect(page.locator('.topbar')).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
 });
