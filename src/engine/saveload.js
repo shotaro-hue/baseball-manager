@@ -703,6 +703,7 @@ async function saveGameImpl(state, options = {}) {
     logPerf('saveGame.compressRoot', compressStart);
   }
   const jsonLength = json.length;
+  json = null; // Do not retain the full JSON during readback and rotation.
   const writeMeta = () => {
     const metaStart = isDevEnv ? performance.now() : 0;
     const myTeam = safeState.teams?.find(t => t.id === safeState.myId);
@@ -722,9 +723,7 @@ async function saveGameImpl(state, options = {}) {
   try {
     compressed = await prepareRootBody(compressed);
     commitStep = 'verify_root';
-    const verified = await readSaveRoot(compressed);
-    await hydrateSaveCandidate(verified, { strict: true });
-    if (!validateAndMigrateSave(verified).ok) throw new Error('save_verification_failed');
+    await verifySaveRoot(compressed);
     commitStep = 'prepare_rotation';
     commitApi = 'localStorage.getItem';
     // Stage rotation without modifying roots. Failed primary writes leave both backups untouched.
@@ -748,7 +747,7 @@ async function saveGameImpl(state, options = {}) {
     perfBreakdown.writeMainSaveMs = safeElapsedMs(setItemStart);
     logPerf('saveGame.localStorage.setItem', setItemStart);
     observations.set(localStorage, compressed);
-    validatedRoots.set(localStorage, safeState);
+    validatedRoots.set(localStorage, validatedRootMetadata(safeState));
     validatedRawRoots.set(localStorage, compressed);
     const warnings = [];
     try { rememberChunkRoot(compressed, safeState); }
@@ -787,6 +786,14 @@ const deletionEpochs = new WeakMap();
 const loadEpochs = new WeakMap();
 const chunkRootCache = new WeakMap();
 const legacyCareerSeeds = new WeakMap();
+function validatedRootMetadata(state) {
+  // Legacy career migration still needs its inline player records until explicit save.
+  if (!(state.saveDataVersion >= GENERATION_VERSION)) return state;
+  return { saveId: state.saveId, year: state.year, saveDataVersion: state.saveDataVersion,
+    farmCompetitionVersion: state.farmCompetitionVersion,
+    farmCompetition: state.farmCompetition ? {archiveSignature:state.farmCompetition.archiveSignature} : undefined,
+    saveManifest: JSON.parse(JSON.stringify(state.saveManifest)) };
+}
 let localSaveTail = Promise.resolve();
 let lastLoadResult = { status: 'none' };
 function observePrimary() {
@@ -933,6 +940,13 @@ async function readSaveRoot(raw) {
   return json===null?decompress(body):JSON.parse(json);
 }
 
+async function verifySaveRoot(raw) {
+  // Scope the hydrated copy to this call; retaining it through rotation multiplies peak heap.
+  const state = await readSaveRoot(raw);
+  await hydrateSaveCandidate(state, { strict: true });
+  if (!validateAndMigrateSave(state).ok) throw new Error('save_verification_failed');
+}
+
 async function prepareRotationRoot(raw) {
   let state;
   try {
@@ -1044,7 +1058,7 @@ export async function loadGame() {
         logPerf('loadGame', loadGameStart);
         observations.set(localStorage, primaryAtLoad);
         backupObservations.set(localStorage, backupsAtLoad);
-        validatedRoots.set(localStorage, result.state);
+        validatedRoots.set(localStorage, validatedRootMetadata(result.state));
         validatedRawRoots.set(localStorage, raw);
         try { rememberChunkRoot(raw, result.state); }
         catch (error) { console.warn('Load succeeded; root cache failed:', error); }

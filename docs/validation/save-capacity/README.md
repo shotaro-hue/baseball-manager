@@ -37,9 +37,10 @@ native圧縮のChromium/mobile WebKit各4件・計8件成功（132秒、retry0�
 - 容量・中断・本文破損・backup復元・再読込不能な保存: 初回7件RED→GREEN。
 - 独立レビューの旧primary/backup変換失敗2件、孤立行quota1件: 3件RED→GREEN。
 - native圧縮1件、inline gzip破損2件、診断コピー/アクセス拒否/秘密混入防止/内訳: RED→GREEN。
-- 最終の保存・二軍・career・削除読込・診断9ファイル120件成功。build成功（既存500kB chunk警告）。
+- 最終の保存・二軍・career・削除読込・診断9ファイル121件成功。build成功（既存500kB chunk警告）。
 - 初回全Vitestは1750成功・7失敗・2skip。7件はrootが常にinline JSONとのテスト前提だった。readRootBodyで解決後、従来どおり破損注入する形へ直し期待値を維持。該当回帰114件成功。
-- 最終全Vitestのローカル並列実行は1763成功・2skipの後、`scripts/qa-d1-offseason.test.js` のworkerが予期せず終了（1 unhandled error）。合格扱いにせず、同ファイルの単独実行とexact-head CIで確認する。追加ブラウザ回帰・確定CIは修正PR本文/Checksを参照。
+- 最終全Vitestのローカル並列実行は1763成功・2skipの後、`scripts/qa-d1-offseason.test.js` がNodeの2GBヒープ上限に到達。単独でも再現した。原因はテスト用fake-indexeddb 6.2.5の完了済transaction保持で、公式[6.2.6リリース](https://github.com/dumbmatter/fakeIndexedDB/releases/tag/v6.2.6)（2026-10-16）の修正を確認しdevDependency/lockを更新。テスト・期待値・heap上限を緩めず全件再検証する。追加ブラウザ回帰・確定CIは修正PR本文/Checksを参照。
+- 保存側もv6の検証済みキャッシュを所有した小さいmanifest/年度情報へ変更。legacyのinline career情報は保持する。公開前検証の一時コピーを短い関数scopeに限定し、JSON本文を早期解放する。呼出側のmanifest変更が内部キャッシュへ混入しないことを追加RED→GREENで検証した。
 
 ## 実iPhone Safari確認手順 — 未実施
 

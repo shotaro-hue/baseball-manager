@@ -215,9 +215,13 @@ it('loaded state mutation cannot change the roots protected by cleanup',async()=
 });
 it('an optional metadata cache clone error cannot undo a committed save',async()=>{
  await save(state(1));
- const loaded=await loadGame();
- // JSON persistence omits extra functions, but a metadata structuredClone rejects them.
- loaded.saveManifest.chunks.news.extra=()=>{};
+ await loadGame();
+ // Inject the actual optional-cache failure; loaded state no longer aliases the owned cache.
+ const clone=globalThis.structuredClone;
+ vi.spyOn(globalThis,'structuredClone').mockImplementation(value=>{
+  if(value?.saveManifest && !value?.teams)throw new DOMException('cache unavailable','DataCloneError');
+  return clone(value);
+ });
  const result=await save(state(2),{dirtyScopes:['mailbox']});
  expect(result).toMatchObject({ok:true,warnings:['root_cache_failed']});
  expect(parsed().gameDay).toBe(2);

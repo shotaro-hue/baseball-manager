@@ -113,3 +113,9 @@ it.each(['###','AAAA'])('a corrupt inline gzip primary %s does not block a verif
   expect((await saveGame({...restored,gameDay:3})).ok).toBe(true);
   expect(rows.get(key+'_bk1')).toBe(backup);expect((await loadGame()).gameDay).toBe(3);
 });
+it('keeps only owned immutable root metadata when callers mutate a loaded full state',async()=>{
+  await save(state(1));const loaded=await loadGame();
+  loaded.saveManifest.chunks.news.key='changed-by-caller';
+  expect((await saveGame({...loaded,gameDay:2},{skipCompression:true,dirtyScopes:[]})).ok).toBe(true);
+  expect((await loadGame()).news).toEqual([{day:1}]);
+});
