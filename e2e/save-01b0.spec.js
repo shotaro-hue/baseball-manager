@@ -34,38 +34,170 @@ test('backup probe current archive writer bypasses save lock and replaces same b
   } finally { await page.evaluate(() => window.releaseSaveLock()); await other.close(); }
 });
 
-test('backup probe proposed origin archive lock serializes a cooperating second page', async ({ page, context }) => {
-  await page.goto('/baseball-manager/');
+// Resolve barriers from the test; no sleeps or scheduling-dependent close.
+async function interruptedPublisher(page) {
+  await page.goto(PROBE);
+  await page.evaluate(async path => {
+    const j = await import(path + 'journal.js');
+    localStorage.setItem(j.PROBE_PRIMARY_KEY, 'before');
+    localStorage.setItem('baseball_manager_v1', 'production sentinel');
+    await j.prepareProbeRestore({ year: 2046, checksumSentinel: 'persisted' });
+    const db = await new Promise(resolve => { const r = indexedDB.open(j.PROBE_DB_NAME); r.onsuccess = () => resolve(r.result); });
+    try {
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction('rows', 'readwrite'); tx.objectStore('rows').put('unrelated sentinel', 'unrelated');
+        tx.oncomplete = resolve; tx.onabort = () => reject(tx.error);
+      });
+    } finally { db.close(); }
+    window.publicationOutcome = 'pending';
+    void j.publishProbeRestore({ afterPrimaryPublished: () => {
+      window.afterPublication = true;
+      return new Promise(() => {}); // destroyed with the page, never resolved
+    } }).then(() => { window.publicationOutcome = 'completed'; }, error => { window.publicationOutcome = error.message; });
+  }, PROBE);
+  await expect.poll(() => page.evaluate(() => Boolean(window.afterPublication))).toBe(true);
+  expect(await page.evaluate(() => window.publicationOutcome)).toBe('pending');
+  await page.close();
+}
+async function probeState(page) {
+  return page.evaluate(async path => {
+    const j = await import(path + 'journal.js'), state = await j.inspectProbeRestore();
+    const db = await new Promise(resolve => { const r = indexedDB.open(j.PROBE_DB_NAME); r.onsuccess = () => resolve(r.result); });
+    try {
+      const rows = await new Promise((resolve, reject) => {
+        const tx = db.transaction('rows', 'readonly'), store = tx.objectStore('rows');
+        const candidate = store.get('candidate'), unrelated = store.get('unrelated');
+        tx.oncomplete = () => resolve({ candidate: candidate.result, unrelated: unrelated.result });
+        tx.onabort = () => reject(tx.error);
+      });
+      return { state, rows, primary: localStorage.getItem(j.PROBE_PRIMARY_KEY), production: localStorage.getItem('baseball_manager_v1') };
+    } finally { db.close(); }
+  }, PROBE);
+}
+async function holdSnapshot(page) {
+  await page.goto(PROBE);
   await page.evaluate(async path => {
     const { withProbeSnapshot } = await import(path + 'locks.js');
-    void withProbeSnapshot(async () => { window.probeHeld = true; await new Promise(resolve => { window.releaseProbe = resolve; }); });
+    window.probeOperation = withProbeSnapshot(async () => {
+      window.probeHeld = true; await new Promise(resolve => { window.releaseProbe = resolve; });
+    });
   }, PROBE);
-  await expect.poll(() => page.evaluate(() => window.probeHeld)).toBe(true);
-  const other = await context.newPage(); await other.goto('/baseball-manager/');
-  await other.evaluate(async path => {
-    const { ARCHIVE_PROBE_LOCK } = await import(path + 'locks.js'); window.archiveEntered = false;
-    void navigator.locks.request(ARCHIVE_PROBE_LOCK, () => { window.archiveEntered = true; });
+  await expect.poll(() => page.evaluate(() => Boolean(window.probeHeld))).toBe(true);
+}
+async function queueSnapshot(page) {
+  await page.goto(PROBE);
+  await page.evaluate(async path => {
+    const { withProbeSnapshot } = await import(path + 'locks.js'); window.archiveEntered = false;
+    window.probeOperation = withProbeSnapshot(() => { window.archiveEntered = true; return 'second'; });
   }, PROBE);
-  await expect.poll(() => other.evaluate(async () => (await navigator.locks.query()).pending.length)).toBeGreaterThan(0);
-  expect(await other.evaluate(() => window.archiveEntered)).toBe(false);
-  await page.evaluate(() => window.releaseProbe());
-  await expect.poll(() => other.evaluate(() => window.archiveEntered)).toBe(true); await other.close();
+  await expect.poll(() => page.evaluate(async () => (await navigator.locks.query()).pending
+    .some(lock => lock.name === 'baseball-manager-save'))).toBe(true);
+  expect(await page.evaluate(() => window.archiveEntered)).toBe(false);
+}
+
+test('backup probe two common-lock callers wait on save then execute after release', async ({ page, context }) => {
+  await holdSnapshot(page);
+  const other = await context.newPage(); await queueSnapshot(other);
+  const locks = await other.evaluate(() => navigator.locks.query());
+  expect(locks.held.map(lock => lock.name).sort()).toEqual(['baseball-manager-backup-archive-probe', 'baseball-manager-save']);
+  expect(locks.pending.map(lock => lock.name)).toEqual(['baseball-manager-save']);
+  await page.evaluate(async () => { window.releaseProbe(); await window.probeOperation; });
+  expect(await other.evaluate(() => window.probeOperation)).toBe('second');
+  expect(await other.evaluate(() => window.archiveEntered)).toBe(true); await other.close();
 });
 
-test('backup probe publication survives closing the page before journal phase update', async ({ page, context }) => {
-  await page.goto('/baseball-manager/');
+test('backup probe common locks release after synchronous callback throw', async ({ page, context }) => {
+  await page.goto(PROBE);
+  expect(await page.evaluate(async path => {
+    const { withProbeSnapshot } = await import(path + 'locks.js');
+    try { await withProbeSnapshot(() => { throw new Error('injected_sync'); }); }
+    catch (error) { return error.message; }
+  }, PROBE)).toBe('injected_sync');
+  const other = await context.newPage(); await other.goto(PROBE);
+  expect(await other.evaluate(async path => (await import(path + 'locks.js')).withProbeSnapshot(() => 'peer'), PROBE)).toBe('peer');
+  expect(await page.evaluate(async path => (await import(path + 'locks.js')).withProbeSnapshot(() => 'same-page'), PROBE)).toBe('same-page');
+  await other.close();
+});
+
+test('backup probe rejected async callback releases a waiting common-lock caller', async ({ page, context }) => {
+  await page.goto(PROBE);
   await page.evaluate(async path => {
-    const j = await import(path + 'journal.js'); localStorage.setItem(j.PROBE_PRIMARY_KEY, 'before');
-    await j.prepareProbeRestore({ year: 2046, checksumSentinel: 'persisted' }); await j.publishProbeRestore();
+    const { withProbeSnapshot } = await import(path + 'locks.js');
+    window.probeOperation = withProbeSnapshot(async () => {
+      window.probeHeld = true; await new Promise(resolve => { window.releaseProbe = resolve; });
+      throw new Error('injected_async');
+    }).catch(error => error.message);
   }, PROBE);
-  await page.close();
-  const cold = await context.newPage(); await cold.goto('/baseball-manager/');
-  const result = await cold.evaluate(async path => {
-    const j = await import(path + 'journal.js'), state = await j.inspectProbeRestore();
-    await j.rollbackProbeRestore(); return { state, primary: localStorage.getItem(j.PROBE_PRIMARY_KEY) };
+  await expect.poll(() => page.evaluate(() => Boolean(window.probeHeld))).toBe(true);
+  const other = await context.newPage(); await queueSnapshot(other);
+  expect(await page.evaluate(async () => { window.releaseProbe(); return window.probeOperation; })).toBe('injected_async');
+  expect(await other.evaluate(() => window.probeOperation)).toBe('second');
+  expect(await page.evaluate(async path => (await import(path + 'locks.js')).withProbeSnapshot(() => 'recovered'), PROBE)).toBe('recovered');
+  await other.close();
+});
+
+test('backup probe archive-first raw caller creates an inversion; aborting it restores progress', async ({ page, context }) => {
+  await page.goto(PROBE);
+  await page.evaluate(async path => {
+    const { ARCHIVE_PROBE_LOCK } = await import(path + 'locks.js');
+    window.inverted = navigator.locks.request(ARCHIVE_PROBE_LOCK, async () => {
+      window.archiveHeld = true;
+      await new Promise(resolve => { window.requestReverseSave = resolve; });
+      window.reverseAbort = new AbortController();
+      try { await navigator.locks.request('baseball-manager-save', { signal: window.reverseAbort.signal }, () => { window.reverseEntered = true; }); }
+      catch (error) { window.reverseError = error.name; }
+    });
   }, PROBE);
-  expect(result.state).toMatchObject({ status: 'published', phase: 'verified', payload: { year: 2046, checksumSentinel: 'persisted' } });
-  expect(result.primary).toBe('before'); await cold.close();
+  await expect.poll(() => page.evaluate(() => Boolean(window.archiveHeld))).toBe(true);
+  const other = await context.newPage(); await other.goto(PROBE);
+  await other.evaluate(async path => {
+    window.forward = (await import(path + 'locks.js')).withProbeSnapshot(() => { window.forwardEntered = true; return 'forward'; });
+  }, PROBE);
+  await expect.poll(() => other.evaluate(async () => (await navigator.locks.query()).pending
+    .some(lock => lock.name === 'baseball-manager-backup-archive-probe'))).toBe(true);
+  await page.evaluate(() => window.requestReverseSave());
+  await expect.poll(() => page.evaluate(async () => (await navigator.locks.query()).pending.map(lock => lock.name).sort()))
+    .toEqual(['baseball-manager-backup-archive-probe', 'baseball-manager-save']);
+  expect(await other.evaluate(() => Boolean(window.forwardEntered))).toBe(false);
+  expect(await page.evaluate(() => Boolean(window.reverseEntered))).toBe(false);
+  await page.evaluate(async () => { window.reverseAbort.abort(); await window.inverted; });
+  expect(await page.evaluate(() => window.reverseError)).toBe('AbortError');
+  expect(await other.evaluate(() => window.forward)).toBe('forward'); await other.close();
+});
+
+test('backup probe cold page recovers publication interrupted before promise completion', async ({ page, context }) => {
+  await interruptedPublisher(page);
+  const cold = await context.newPage(); await cold.goto(PROBE);
+  const before = await probeState(cold);
+  expect(before.state).toMatchObject({ status: 'published', phase: 'verified', payload: { year: 2046, checksumSentinel: 'persisted' } });
+  expect(before.primary).toBe(before.state.newPrimary);
+  expect(before.rows.candidate).toBe(JSON.stringify(before.state.payload));
+  await cold.evaluate(async path => (await import(path + 'journal.js')).rollbackProbeRestore(), PROBE);
+  const after = await probeState(cold);
+  expect(after).toEqual({ state: { status: 'none' }, primary: 'before', production: 'production sentinel',
+    rows: { candidate: undefined, unrelated: 'unrelated sentinel' } }); await cold.close();
+});
+
+test('backup probe cold recovery refuses stale rollback after another participating tab updates primary', async ({ page, context }) => {
+  await interruptedPublisher(page);
+  const writer = await context.newPage(); await writer.goto(PROBE);
+  await writer.evaluate(async path => {
+    const { withProbeSnapshot } = await import(path + 'locks.js'), j = await import(path + 'journal.js');
+    await withProbeSnapshot(() => localStorage.setItem(j.PROBE_PRIMARY_KEY, 'newer-tab-primary'));
+  }, PROBE);
+  const cold = await context.newPage(); await cold.goto(PROBE);
+  const before = await probeState(cold);
+  expect(before.state).toMatchObject({ status: 'conflict', phase: 'verified' });
+  expect(await cold.evaluate(async path => {
+    const j = await import(path + 'journal.js'), errors = [];
+    for (const operation of [j.rollbackProbeRestore, j.publishProbeRestore, j.discardProbeStage]) {
+      try { await operation(); errors.push('unexpected success'); } catch (error) { errors.push(error.message); }
+    }
+    return errors;
+  }, PROBE)).toEqual(['probe_conflict', 'probe_conflict', 'probe_conflict']);
+  expect(await probeState(cold)).toEqual(before);
+  expect(before.primary).toBe('newer-tab-primary'); expect(before.rows.unrelated).toBe('unrelated sentinel');
+  expect(before.production).toBe('production sentinel'); await cold.close(); await writer.close();
 });
 
 test('backup probe ZIP prepares first, then a separate click downloads an independently verified file', async ({ page }, testInfo) => {

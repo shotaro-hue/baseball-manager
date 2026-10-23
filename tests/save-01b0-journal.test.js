@@ -39,12 +39,27 @@ it('unpublished stage preserves primary and only its own rows can be discarded',
   expect(await readProbeRow('unrelated')).toBe('unrelated probe row');
   expect(localStorage.getItem('baseball_manager_v1')).toBe('production sentinel');
 });
-it('actual primary identifies publication even when journal phase was not updated', async () => {
+it('actual primary identifies publication with an unchanged verified journal', async () => {
   localStorage.setItem(PROBE_PRIMARY_KEY, old);
   const prepared = await prepareProbeRestore({ year: 2046 });
   localStorage.setItem(PROBE_PRIMARY_KEY, prepared.newPrimary); // abrupt termination window
   expect(await inspectProbeRestore()).toMatchObject({ status: 'published', payload: { year: 2046 }, phase: 'verified' });
   await rollbackProbeRestore(); expect(localStorage.getItem(PROBE_PRIMARY_KEY)).toBe(old);
+});
+it('publication can be held after durable primary write before its promise completes', async () => {
+  localStorage.setItem(PROBE_PRIMARY_KEY, old);
+  const prepared = await prepareProbeRestore({ year: 2046 });
+  let entered = false, completed = false, release;
+  const barrier = new Promise(resolve => { release = resolve; });
+  const pending = publishProbeRestore({ afterPrimaryPublished: async () => { entered = true; await barrier; } });
+  pending.then(() => { completed = true; });
+  try {
+    await vi.waitFor(() => expect(entered).toBe(true), { timeout: 1000 });
+    expect(completed).toBe(false);
+    expect(localStorage.getItem(PROBE_PRIMARY_KEY)).toBe(prepared.newPrimary);
+  } finally { release(); await pending; }
+  expect(completed).toBe(true);
+  expect(await inspectProbeRestore()).toMatchObject({ status: 'published', phase: 'verified' });
 });
 it('changed primary rejects both publication and stale rollback', async () => {
   localStorage.setItem(PROBE_PRIMARY_KEY, old); await prepareProbeRestore({ year: 2046 });

@@ -36,4 +36,4 @@ const result = { baseMain: '7dc29c0809526ce937e9948b9a0940c7287dc38d',
   attempts, latestProjects: [...latest.values()] };
 writeFileSync('docs/validation/save-01b0/browser-evidence.json', JSON.stringify(result, null, 2) + '\n');
 console.log(JSON.stringify(result.latestProjects.map(({ project, passed, failed, skipped }) => ({ project, passed, failed, skipped }))));
-if (result.latestProjects.length !== 2 || result.latestProjects.some(p => p.failed || p.skipped || p.passed !== 10)) process.exitCode = 1;
+if (result.latestProjects.length !== 2 || result.latestProjects.some(p => p.failed || p.skipped || p.passed !== 14)) process.exitCode = 1;

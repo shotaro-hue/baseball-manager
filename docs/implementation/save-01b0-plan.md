@@ -22,9 +22,20 @@
 
 1. Same batch ID and count can conceal a content replacement across tabs.
 2. Legacy numeric/string player IDs can collide with the destination's global career store.
-3. Termination after primary publication but before journal phase update must be recognized from real primary.
+3. Termination after primary publication but before Promise completion must be recognized from real primary; this prototype has no phase-update operation.
 4. A stale rollback must never overwrite a newer primary; failed stages must not destroy pre-existing rows.
 5. Async ZIP generation must finish before an explicit new share tap; cancellation and unsupported sharing must remain retryable.
+
+## PR #495 review follow-up (2026-10-23)
+
+Scope: the user's review-fix specification; keep the existing PR and #494 design authority. Execute inline without changing production storage/UI. The existing protocol has **no phase-update operation**: interrupt after primary publication but before function completion, and classify using actual primary plus the unchanged `verified` journal.
+
+- [x] Recovery: add `publishProbeRestore({ afterPrimaryPublished })`, a probe-only barrier after setItem; first add a failing unit test proving the promise is still pending at that boundary. Replace the close-after-completion browser test with a real interrupted promise. Cold-page assertions cover real primary, journal, explicit rollback, unrelated rows and another tab's newer primary.
+- [x] Locks: both pages call `withProbeSnapshot(task)`; inspect granted/pending lock names, then release the barrier and verify order. Cover synchronous throw followed by later peer/same-page progress, and async rejection with a waiting page. Demonstrate archive→save inversion with abortable raw Web Locks; abort the inverted waiter and verify forward progress. The common helper always acquires save→archive; it cannot protect nonparticipating/old tabs or callers holding raw locks.
+- [x] CI: reproduce the missed `mirror+file:/etc/apt/apt-mirrors.txt` indirection with a fixture test, then replace only Ubuntu archive URIs while retaining suites/signatures/signing settings/timeouts/retries. Record the original 30-minute dependency-install timeout and failed aggregate gate separately from product/test failures.
+- [x] Run npm ci, focused Vitest (21 probe / 23 with CI cases), complete probe E2E (Chromium 14/14, mobile WebKit 14/14), build, and update browser evidence. Independent review found no Critical/Important/Minor findings; self-review preserves the page-close/power-loss distinction.
+
+Final gate: execute the full local Vitest suite and require every exact-head CI job to succeed; the final outcome and immutable SHA are recorded in [PR #495](https://github.com/shotaro-hue/baseball-manager/pull/495). Feed these results and remaining product/device gates into #494. No new PR, main push, merge, format freeze or product-completion claim. A cancelled/skipped test job cannot satisfy this gate.
 
 ## Task 1 — Characterize current storage
 
@@ -38,9 +49,9 @@ Files: `scripts/save-01b0/journal.js`, `scripts/save-01b0/locks.js`, `tests/save
 
 Interfaces: `withProbeSnapshot(task)` obtains save then archive Web Locks. `prepareProbeRestore(payload)` writes an owned stage/journal in a separate probe DB. `publishProbeRestore()` compares current primary and verifies staged bytes before one probe-primary setItem. `inspectProbeRestore()` classifies none/unpublished/published/conflict/invalid. `rollbackProbeRestore()` compares expected primary under the same locks before restoring the old probe primary. `discardProbeStage()` removes only owned unpublished probe rows.
 
-- [x] Write tests first: unpublished cleanup, published-but-phase-not-updated cold reopen, tampered stage, absent old primary, conflict, cancellation and rollback CAS.
+- [x] Write tests first: unpublished cleanup, published-with-unchanged-verified-journal cold reopen, tampered stage, absent old primary, conflict, cancellation and rollback CAS.
 - [x] Run the tests RED, then implement the minimal probe and verify GREEN with real fake-indexeddb transactions.
-- [x] Browser tests use a newly created page after closing the publisher, and two pages to show a participating archive writer waits behind a snapshot lock.
+- [x] Browser tests now close a publisher with a pending post-primary barrier, then use a cold page. Both competing pages call the common helper; inversion and exception release are explicitly covered.
 
 ## Task 3 — ZIP output and explicit handoff probe
 

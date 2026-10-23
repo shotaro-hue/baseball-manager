@@ -62,14 +62,16 @@ export function prepareProbeRestore(value) {
     return journal;
   });
 }
-export function publishProbeRestore() {
+export function publishProbeRestore({ afterPrimaryPublished } = {}) {
   return withProbeSnapshot(async () => {
     const candidate = await inspect();
     if (candidate.status === 'conflict') throw new Error('probe_conflict');
     if (candidate.status !== 'unpublished') throw new Error('probe_stage_invalid');
-    // A crash after this single operation leaves phase='verified'. Reopen must
-    // infer publication from actual primary, never just trust the phase field.
+    // This prototype never updates phase: inspect actual primary, not phase.
     localStorage.setItem(PROBE_PRIMARY_KEY, candidate.newPrimary);
+    // Probe-only deterministic interruption/failure injection, while still
+    // holding both locks and before the publication Promise completes.
+    if (afterPrimaryPublished) await afterPrimaryPublished();
     return candidate.newPrimary;
   });
 }

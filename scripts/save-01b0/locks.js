@@ -1,6 +1,9 @@
 // Proposed coordination, used only by the isolated probe. Existing game writers
 // do NOT acquire ARCHIVE_PROBE_LOCK. Passing this probe is not production safety.
 export const ARCHIVE_PROBE_LOCK = 'baseball-manager-backup-archive-probe';
+// All participants acquire save -> archive. Never call from inside either raw
+// lock: archive -> save can deadlock against this order; Web Locks do not detect
+// cycles or support reentrancy. Existing/old game tabs remain nonparticipants.
 let tail = Promise.resolve();
 export function withProbeSnapshot(task) {
   const run = async () => {

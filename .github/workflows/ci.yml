@@ -72,18 +72,9 @@ jobs:
       # Azure's Ubuntu mirror repeatedly stalled for 30s per package in CI #477,
       # consuming 22m43s before tests. Keep Ubuntu's signed archive and test budget.
       - name: Use Ubuntu archive for browser dependencies
-        run: |
-          sudo python3 - <<'PY'
-          from pathlib import Path
-          sources = Path('/etc/apt/sources.list.d')
-          for path in [Path('/etc/apt/sources.list'), *sources.glob('*.sources'), *sources.glob('*.list')]:
-              if not path.is_file():
-                  continue
-              original = path.read_text()
-              updated = original.replace('http://azure.archive.ubuntu.com/ubuntu', 'https://archive.ubuntu.com/ubuntu').replace('https://azure.archive.ubuntu.com/ubuntu', 'https://archive.ubuntu.com/ubuntu')
-              if updated != original:
-                  path.write_text(updated)
-          PY
+        # Hosted images can use mirror+file:/etc/apt/apt-mirrors.txt; replacing
+        # only .sources/.list silently left the slow Azure endpoint active.
+        run: sudo python3 scripts/ci/use-ubuntu-archive.py
       - name: Install Chromium and WebKit
         run: npx playwright install --with-deps chromium webkit
       - name: Run E2E subset (one worker, no retries)

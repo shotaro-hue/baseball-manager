@@ -30,12 +30,33 @@
       "passed": 10,
       "failed": 0,
       "skipped": 0
+    },
+    {
+      "report": "probe-standard.json",
+      "project": "chromium",
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "report": "probe-standard.json",
+      "project": "mobile-webkit",
+      "passed": 0,
+      "failed": 14,
+      "skipped": 0
+    },
+    {
+      "report": "probe-webkit.json",
+      "project": "mobile-webkit",
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0
     }
   ],
   "latestProjects": [
     {
       "project": "chromium",
-      "passed": 10,
+      "passed": 14,
       "failed": 0,
       "skipped": 0,
       "benchmarks": {
@@ -49,7 +70,7 @@
           "outputBytes": 16794445,
           "entries": 64,
           "maxInputEntryBytes": 262144,
-          "elapsedMs": 4691.799999999814,
+          "elapsedMs": 3908.5,
           "peakHeapBytes": null,
           "bytes": 16794445,
           "memoryObservation": "No peak-memory measurement; not real iPhone evidence"
@@ -59,7 +80,7 @@
           "outputBytes": 67177540,
           "entries": 256,
           "maxInputEntryBytes": 262144,
-          "elapsedMs": 10192.600000000559,
+          "elapsedMs": 12149.599999999627,
           "peakHeapBytes": null,
           "bytes": 67177540,
           "memoryObservation": "No peak-memory measurement; not real iPhone evidence"
@@ -71,7 +92,7 @@
           "encodedRootCharacters": 8920668,
           "decodedRootBytes": 44193331,
           "decodedCareerBytes": 16100157,
-          "sourceReadMs": 2644.9000000003725,
+          "sourceReadMs": 2872.0999999996275,
           "peakHeapBytes": null,
           "scope": "source sizing only; no complete portable export or real-iPhone claim"
         }
@@ -79,7 +100,7 @@
     },
     {
       "project": "mobile-webkit",
-      "passed": 10,
+      "passed": 14,
       "failed": 0,
       "skipped": 0,
       "benchmarks": {
@@ -93,7 +114,7 @@
           "outputBytes": 16794445,
           "entries": 64,
           "maxInputEntryBytes": 262144,
-          "elapsedMs": 1965,
+          "elapsedMs": 2539,
           "peakHeapBytes": null,
           "bytes": 16794445,
           "memoryObservation": "No peak-memory measurement; not real iPhone evidence"
@@ -103,7 +124,7 @@
           "outputBytes": 67177540,
           "entries": 256,
           "maxInputEntryBytes": 262144,
-          "elapsedMs": 13828,
+          "elapsedMs": 10804,
           "peakHeapBytes": null,
           "bytes": 67177540,
           "memoryObservation": "No peak-memory measurement; not real iPhone evidence"
@@ -112,10 +133,10 @@
           "fixture": "one real 2026 season; 20 equivalent historical years, not 20 simulated seasons",
           "year": 2026,
           "gameDay": 106,
-          "encodedRootCharacters": 9396228,
+          "encodedRootCharacters": 9396231,
           "decodedRootBytes": 44193331,
           "decodedCareerBytes": 16100157,
-          "sourceReadMs": 2397,
+          "sourceReadMs": 3668,
           "peakHeapBytes": null,
           "scope": "source sizing only; no complete portable export or real-iPhone claim"
         }
