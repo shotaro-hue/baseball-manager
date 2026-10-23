@@ -2,6 +2,10 @@
 
 Date: 2026-10-23. Base main: `7dc29c0809526ce937e9948b9a0940c7287dc38d`.
 
+## Follow-up after #495 merge
+
+The statements below describe the isolated #495 evidence at its recorded head. The subsequent [SAVE-01B-0A](../archive-lock/README.md) integrates updated production mutations with `baseball-manager-archive`. This is a different name from the isolated probe lock; existing `withProbeSnapshot` results still do not certify production snapshot safety. Old tabs/raw writers, same-ID replacement and root/archive correspondence remain unresolved. The historical save-lock-only bypass characterization is retained because that observation is still true.
+
 ## Decision
 
 Keep design PR [#494](https://github.com/shotaro-hue/baseball-manager/pull/494) open. These executable experiments inform that design; they do not freeze the package format or complete SAVE-01B-0's real-device gate. The game import graph, production save code, DB schema and existing saves are unchanged.

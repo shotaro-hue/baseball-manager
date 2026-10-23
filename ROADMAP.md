@@ -1,6 +1,6 @@
 # ROADMAP — NPB Franchise Manager
 
-> 最終更新: 2026-10-21（#489マージ反映、FIX-CORE-02・保存設計/実装・総合QAの工程を分離）
+> 最終更新: 2026-10-23（#495マージ反映、SAVE-01B-0A共通archive排他を独立実装。完全バックアップの公開条件は未完了）
 > 目的: **OOTP / Football Manager のように「何年も遊べる、意思決定が積み重なる経営シミュレーション」**を作る。
 
 > 現在の進捗は第1節を参照。第2・3・5節の旧チェックリストと期日は2026-05-01時点の履歴であり、現在の完了認定ではない。UI/UX改革の一次監査・推奨PR分割は [全体改革の青写真 v1](./docs/REFORM_BLUEPRINT_V1.md)、現行の設計方針は [UI/UX設計基準](./docs/DESIGN_SYSTEM.md) を参照。着手時には最新mainと再照合する。
@@ -28,6 +28,8 @@
 
 照合日：2026-10-21。基準main：`46d75e21b1f6e27c0f60274a38cd7619a80d951d`（PR #489マージ後）。GitHubのmainとマージ状態を確認。QA-D1は#472、FIX-S3は#473、捕手不足の原因分析は#474、捕手層の編成方針は#475、一軍空き枠の補足修正は#476、共通人数基盤は#477、可変ドラフトは#478、65人方針は#479、AI-03は#480、球団収支FIX-M1は#481でマージ済み。各工程の対象範囲・実測・限界は[QA-D1](./docs/implementation/qa-d1.md)・[FIX-S3](./docs/implementation/fix-s3.md)・[捕手不足の原因分析](./docs/implementation/farm-catcher-shortage.md)・[捕手層のレビューと次工程](./docs/implementation/catcher-depth-review.md)・[収支検証](./docs/validation/club-finance/README.md)を参照。全機能・全年度・実機の完了認定ではない。
 
+保存工程の最新照合: 2026-10-23、main `beb79823828642617b9044edb6a3abec24523a80`（#495マージ後）。#490の信頼性修正、#491〜#493の保存修正はmainへ反映済み。実iPhoneでの保存/再読込確認は未完了。完全バックアップ設計の正本は未マージの[#494](https://github.com/shotaro-hue/baseball-manager/pull/494)。以下の保存工程が現在の進行条件である。
+
 ### UI-04 球団経営・ナビゲーション刷新（今回確定）
 
 「ホーム／編成／日程／成績／経営」を承認済み方針として採用。既存9機能を経営・共通通知・記録/球団史・設定へ再配置する。[要件/画面遷移/完了条件](./docs/implementation/ui-04.md)／[390・1440px構成案](./docs/design/ui04/wireframes.html)／[UI-04A検証記録](./docs/validation/ui-04a/README.md)。
@@ -42,14 +44,16 @@
 | UI-04C-FIX | — | [#487](https://github.com/shotaro-hue/baseball-manager/pull/487)マージ済み。[要件](./docs/implementation/ui-04c-fix.md)・[性能/画面/回帰](./docs/validation/ui-04c-fix/README.md) | #486後。軽量一覧・検索/所属/ポジション/年俸/満了ソート、選択後の詳細だけ描画、片側トレード選択/比較、派遣と報告の分離、通知・ID・位置/フォーカス復帰。後置の保存成功通知によるWebKitの59pxずれも修正。ゲーム/保存/金銭/CPUを維持 |
 | UI-04C-FIX2 | — | [#488](https://github.com/shotaro-hue/baseball-manager/pull/488)マージ済み。[検証](./docs/validation/ui-04c-fix2/README.md) | FA領域800pxを単一基準としてCSS/行生成を整合。761〜799px・狭い埋め込み・領域のみのリサイズ・一覧復帰を検証。実iPhoneの指追従確認は未完了 |
 | FIX-CORE-01 | — | [#489](https://github.com/shotaro-hue/baseball-manager/pull/489)マージ済み。[原因/検証](./docs/validation/fix-core-01/README.md) | メタデータなしの再開、記者会見の重複効果防止、保存移籍履歴の表示 |
-| FIX-CORE-02 | P1/P2 | この独立PRで修正・回帰検証、未マージ。[原因/検証](./docs/validation/fix-core-02/README.md) | 移籍金額の有限値検査、再開失敗警告、確認済み削除と遅延読込の競合・削除後キャッシュ再生を修正。最終P2: 古い読込は競合警告で拒否、正常rootを現時点で検証して最後に削除し、primary破損・バックアップのみ・復元失敗時も再開可能なセーブを保全。最終headとCIはPR本文が正本 |
-| SAVE-01A | P1 | 次工程。設計承認前。調査・設計のみ先行可 | 分離保存/通算/打球/世代を棚卸し、A単一ファイル/Bアーカイブ/C複数ファイルを比較。iPhone・10/20年規模・既存セーブ保護・途中失敗を含む設計を独立PRでレビュー |
-| SAVE-01B | P1 | コード未着手 | CORE-02マージとSAVE-01A設計の承認後。完全バックアップ、プレビュー、明示復元、新世代への段階投入・再検証・成功時のみ参照切替。直接上書きだけの復元は不可 |
+| FIX-CORE-02 | — | [#490](https://github.com/shotaro-hue/baseball-manager/pull/490)マージ済み | [原因/検証](./docs/validation/fix-core-02/README.md)。#491〜#493の保存容量修正もmain反映済み。実機受入は別途 |
+| SAVE-01A | P1 | [#494](https://github.com/shotaro-hue/baseball-manager/pull/494)で設計継続、未マージ | ZIP第一候補。B-0の限定受入と設計確定/v1凍結を分離。root/不変archive対応、旧版タブ、全展開メモリ、実iPhone/Files、完全復元とGC保護は未完了 |
+| SAVE-01B-0 | — | [#495](https://github.com/shotaro-hue/baseball-manager/pull/495)限定実証マージ済み | [証跡](./docs/validation/save-01b0/README.md)。隔離journal・共通ロック参加probe・16/64 MiB ZIPの独立全バイト検証。製品完全バックアップの完成ではない |
+| SAVE-01B-0A | P1 | この独立PRで製品archive共通排他を実装、未マージ | [計画](./docs/implementation/save-archive-locks-plan.md)・[検証](./docs/validation/archive-lock/README.md)。write/retry/backfill/deleteを共通archiveロックへ統合。旧版タブのfenceとroot対応は未解決。B-1開始とは区別 |
+| SAVE-01B-1 / B-2 | P1 | 未着手、前提条件未完了 | #494の設計・v1凍結と残ゲート解消後。完全書出し→厳密検査/プレビュー→journal付き隔離復元→冷起動/試合進行。直接上書きだけの復元は不可 |
 | QA-04A | P1 | SAVE-01B後、未着手 | 新規→通常/手動/まとめシム→一軍/二軍成績→契約/FA/取引/スカウト→ドラフト/年度→保存再開。失敗/復旧/競合、CPU編成。通常CI外E2Eを評価し必要なゲートを選ぶ |
 | UI-04D | P2 | QA-04A後。コード未着手 | 通知/ニュース/球団史/OB/設定をDES-01へ移行。既読/要対応/対応済み、実在する設定、一覧/詳細/元の位置。今回の接続・回答修正と区別 |
 | QA-04B | P1 | UI-04D後、未着手。**実iPhone確認未完了** | 360/390/760/761/799/800/1023/1024/1440px、Chromium/WebKit、キーボード、保存/復帰。実iPhoneのタッチ・連続スワイプ・速度は別途実施 |
 
-実施順は **FIX-CORE-02 → SAVE-01A → SAVE-01B → QA-04A → UI-04D → QA-04B**。各工程は前工程の独立レビュー/マージ後の最新mainから別PRとする。設計・調査のみ依存を壊さない範囲で先行可。今回の製品コードはFIX-CORE-02まで。SAVE-01Bは設計承認まで開始しない。QA-04Aでは通常の年間旅程に加え、固定seedの10年/20年と複数seedの傾向を分け、CPU編成/指名停止/財務/年俸/成績/保存サイズ/処理時間をP0〜P3で評価する。UI-04A〜Cの既存回帰は総合QAの完了を意味しない。
+実施順は **SAVE-01B-0A（共通排他）→ root/不変archive対応・旧版タブ対策・源データ展開メモリ/実機実証 → #494設計確定・v1凍結 → SAVE-01B-1/B-2 → QA-04A → UI-04D → QA-04B**。B-0Aは#494第9節の保存基盤を独立修正する工程で、B-1の前提を解消済みとは扱わない。各工程は専用PR、人間がマージ判断。QA-04Aの固定seed10年/20年と複数seed比較は別途実施する。#495のCIで観測したDHなし先発8人の編成エラーは原因未特定の別信頼性課題として残し、今回へ混入させない。
 
 **二軍の実測基盤は実装・マージ済み。CPUの編成判断は段階的に改善中。新デザインの全画面移行と長期バランスの完了には至っていない。**
 
