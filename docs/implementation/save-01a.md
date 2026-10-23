@@ -208,8 +208,21 @@ WebKitは容量上限だけでなくWebサイトデータの自動削除・サ�
 
 - 現行コードで、root保存失敗後の先行打球と、別タブによる同ID/同件数のbatch内容更新を再現した。archiveMutationTail/件数照合だけでは4.1節の境界は成立しない。
 - 共通ロックに参加する実証ページの排他、隔離journalの公開直後にページを閉じた後の再判定/旧primary復帰、v3–v5通算捕捉後のdestination数値0/文字列'0'衝突を検証した。**製品コードへの統合・全旧形式の完全往復ではない**。
-- 独立Python検証を通る合成ZIPの実ダウンロード、共有非対応/取消/準備取消/再試行を検証した。焦点を絞ったVitest 20件、Chromium/WebKit各10件が成功。WebKitの初回環境起動失敗も記録し、後の実ブラウザ成功と区別した。
-- 64 MiBの非圧縮性合成データは67,177,540 bytesのZIPとなり、Chromium約10.19秒/WebKit約13.83秒で生成できた。ただし**実iPhoneのOS受渡し・Files保存・ピークメモリは未測定**で、合成ZIPをゲームの完全バックアップと称さない。
+- 独立Python検証を通る合成ZIPの実ダウンロード、共有非対応/取消/準備取消/再試行を検証した。レビュー修正後の焦点Vitestはprobe 21件（CIミラー回帰を含め23件）、Chromium/WebKit各14件が成功。WebKitの初回環境起動失敗も記録し、後の実ブラウザ成功と区別した。
+- 64 MiBの非圧縮性合成データは67,177,540 bytesのZIPとなり、今回の再測定ではChromium約12.15秒/WebKit約10.80秒で生成できた。ただし**実iPhoneのOS受渡し・Files保存・ピークメモリは未測定**で、合成ZIPをゲームの完全バックアップと称さない。
 - 2026年阪神106戦目由来のfixtureへ20年相当履歴を追加すると、展開後root JSONは44,193,331 UTF-8 bytes、通算JSONは16,100,157 UTF-8 bytesだった。**20年の実シミュレーションでも、RAMの実測値でもない**。既存root/career全行の展開はZIP分割の前に起こるため、4.1節のコミット対応と並んでB-1前の実装判断に残す。
 
 結論: 実証コードを置いたことだけでB-0全体を完了にしない。実際の更新経路/旧版タブ、rootと不変archiveの対応、実iPhoneの全工程メモリとファイル往復が未確認のため、**ZIP v1の凍結と完全復旧機能のリリース認定は保留**する。
+
+
+## 13. #495レビュー修正による保証範囲の明確化（2026-10-23）
+
+実証コミット: [`56abedad5013fcda058ec5e32dd5fbdecd055d2f`](https://github.com/shotaro-hue/baseball-manager/commit/56abedad5013fcda058ec5e32dd5fbdecd055d2f)。[検証記録](https://github.com/shotaro-hue/baseball-manager/blob/56abedad5013fcda058ec5e32dd5fbdecd055d2f/docs/validation/save-01b0/README.md)と#495の最新head Checks/最終報告を参照する。以下のローカル成功はCI未完了の代用にしない。
+
+- **中断境界**: `primary`公開直後のテスト専用barrierで`publishProbeRestore()`を未完了のまま止め、ページを閉じる。新ページが永続journal・本文hash・実primaryから公開済みと判定し、明示的に旧primaryへ戻せる。無関係なprobe行と製品キーのsentinelを維持する。
+- **phaseの限界**: このprobeにはphase更新処理が存在しない。`verified`が残った状態と実primaryの照合を検証したのであり、「phase更新前の中断を全段階で保証」とはしない。同一contextでのページ終了であって、ブラウザプロセスkill・OS強制終了・電源断の耐久性証明でもない。製品journal各段階の実装/失敗注入は5節・8節に残る。
+- **競合拒否**: 中断後に別の共通ロック参加タブがprimaryを更新した場合、新ページのrollback/publication/discardはいずれも競合拒否し、新primary・journal・行を変更しない。
+- **排他の限界**: 2ページが共に`withProbeSnapshot`を利用し、save→archiveを保持する先行処理の間、後続がsave待機し、解放後に正常実行する。同期例外後の後続参加、非同期例外で既に待機中の参加処理の再開も確認した。逆順のraw archive→saveでは循環待機を再現でき、逆順要求をabortすると進行が復旧する。これは逆順取得の安全性や自動検出の証明ではない。全参加者の順序統一・rawロック内からの再入禁止が必要で、現行製品writer/旧版タブは参加していない。
+- **CI判定**: 旧headのprobe E2Eは依存導入が30分上限に達してキャンセルされ、テスト本体は未実行。集約gateの失敗は正しい動作だった。`apt-mirrors.txt`参照経路の修正とfixture回帰を追加したが、最終のCI成功は#495の正確なheadで別途確認する。キャンセルを成功としない。
+
+**判定を分離する**: 限定された隔離実証のレビュー修正は、probe/full回帰と最新head CI成功により受入可能。一方、本設計の確定・v1凍結・SAVE-01B-1製品実装の前提は引き続き未完了である。root保存時点と不変archiveの対応、同ID上書き/旧版タブ、root/career全展開、実iPhoneのピークメモリとFiles実保存、全依存領域の完全import→再読込→試合進行、旧保存とGC/遅延削除の保護を解消するまで製品の完全バックアップ完成としない。

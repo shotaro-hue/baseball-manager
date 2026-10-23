@@ -44,7 +44,7 @@
 | FIX-CORE-01 | — | [#489](https://github.com/shotaro-hue/baseball-manager/pull/489)マージ済み。[原因/検証](./docs/validation/fix-core-01/README.md) | メタデータなしの再開、記者会見の重複効果防止、保存移籍履歴の表示 |
 | FIX-CORE-02 | — | [#490](https://github.com/shotaro-hue/baseball-manager/pull/490)マージ済み。[原因/検証](./docs/validation/fix-core-02/README.md) | 移籍金額の有限値検査、再開失敗警告、確認済み削除と遅延読込の競合・削除後キャッシュ再生を修正。最終P2: 古い読込は競合警告で拒否、正常rootを現時点で検証して最後に削除し、primary破損・バックアップのみ・復元失敗時も再開可能なセーブを保全。最終headとCIはPR本文が正本 |
 | SAVE-01A | P1 | #494を開いたまま設計更新。#495の実証結果を反映。製品コード未変更 | [設計正本](./docs/implementation/save-01a.md)。主/バックアップ/履歴5スコープ/旧通算/打球を棚卸し。単一ZIPを第一候補とし、読取専用export・候補別取込・journal/全ストア保護を規定。仕様凍結はB-0の未完了ゲート解消後 |
-| SAVE-01B | P1 | [#495](https://github.com/shotaro-hue/baseball-manager/pull/495)で隔離実証コード・20件の焦点単体試験・Chromium/WebKit各10件。Draft、製品機能は未実装 | B-0は#494未マージの最新mainから並行実証。現行archiveの先行/同ID上書きとsource展開44 MB/通算16 MBを確認。root/archive対応・製品統合・実iPhone/ピーク/完全往復は未完了。B-1/B-2は設計確定後。実機で完全往復検証するまで完成扱いしない |
+| SAVE-01B | P1 | [#495](https://github.com/shotaro-hue/baseball-manager/pull/495)で隔離実証コード・probe 21件（CI回帰込み23件）の焦点単体試験・Chromium/WebKit各14件。Draft、製品機能は未実装 | B-0は#494未マージの最新mainから並行実証。未完了barrierでの中断・冷起動判定/競合拒否、共通2ページの待機/例外解放と逆順循環を確認。現行archiveの先行/同ID上書きとsource展開44 MB/通算16 MBも維持。root/archive対応・製品統合・実iPhone/ピーク/完全往復は未完了。B-1/B-2は設計確定後。実機で完全往復検証するまで完成扱いしない |
 | QA-04A | P1 | SAVE-01B後、未着手 | 新規→通常/手動/まとめシム→一軍/二軍成績→契約/FA/取引/スカウト→ドラフト/年度→保存再開。失敗/復旧/競合、CPU編成。通常CI外E2Eを評価し必要なゲートを選ぶ |
 | UI-04D | P2 | QA-04A後。コード未着手 | 通知/ニュース/球団史/OB/設定をDES-01へ移行。既読/要対応/対応済み、実在する設定、一覧/詳細/元の位置。今回の接続・回答修正と区別 |
 | QA-04B | P1 | UI-04D後、未着手。**実iPhone確認未完了** | 360/390/760/761/799/800/1023/1024/1440px、Chromium/WebKit、キーボード、保存/復帰。実iPhoneのタッチ・連続スワイプ・速度は別途実施 |
