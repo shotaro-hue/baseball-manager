@@ -3,7 +3,7 @@
 作成日: 2026-10-23  
 対象: shotaro-hue/baseball-manager  
 初回基準main: 7dc29c0809526ce937e9948b9a0940c7287dc38d（#493マージ後）  
-最新照合main: beb79823828642617b9044edb6a3abec24523a80（#495マージ後、2026-10-23）  
+最新照合main: 66a8dda77132892946f0da69c323db853dbac4b9（#496マージ後、2026-10-23）  
 工程: SAVE-01A（設計のみ）。本書は実装完了・実機動作保証ではない。
 
 ## 1. 目的と実際の成功条件
@@ -173,7 +173,9 @@ WebKitは容量上限だけでなくWebサイトデータの自動削除・サ�
 
 **SAVE-01B-0（#495の限定隔離実証はマージ済み、以下の製品/実機ゲートは継続）**: 全タブ共通archive排他/コミット対応、Safariの具体的な出力先と2操作でのファイル受渡し、既存root/career行を含むピーク、v3–v6からの候補別正規化、journal中断復帰を先行検証。ライブラリ/codec/分割上限/累積展開予算/意味比較規則を記録してv1を凍結する。実機を確認できなければ未完了とし、B-1のリリース判断に進まない。必要な保存基盤変更は独立差分としてレビューし、単なるZIP writerへ混入させない。
 
-**SAVE-01B-0A（#496、独立の保存基盤修正）**: 製品の通常write/retry/backfill/deleteをorigin共通archiveロックへ統合する。14節の限定範囲を確認し、旧版タブfence・不変archive・root対応・実機/全工程メモリの未完了を維持する。B-1開始やv1凍結とは別の前提整備である。
+**SAVE-01B-0A（#496マージ済み、独立の保存基盤修正）**: 製品の通常write/retry/backfill/deleteをorigin共通archiveロックへ統合する。14節の限定範囲を確認し、旧版タブfence・不変archive・root対応・実機/全工程メモリの未完了を維持する。B-1開始やv1凍結とは別の前提整備である。
+
+**SAVE-01B-0B（#497、独立の保存基盤修正）**: 第15節のDB v4接続境界を先行実装。版指定の旧接続を拒否し、blocked/待機/旧版を安全に失敗させる。root/不変archive対応、残る旧版公開、実機/全工程メモリは後続に残し、B-1開始やv1凍結とは区別する。
 
 **SAVE-01B-1（実証後の書き出しPR）**: 凍結したフォーマットv1 writer、root/chunk/打球の完全書き出し、SHA検証、タイトル書き出しUI、復元コードが読むのと同等の**独立パーサー検証テスト**。実ファイルをまだ復元できない段階は「完全復旧機能完成」と呼ばない。
 
@@ -251,3 +253,31 @@ WebKitは容量上限だけでなくWebサイトデータの自動削除・サ�
 | 未解決 | **旧版/非参加タブのfence、raw IDB、同IDの不変version、rootとのcommit対応**。saveロックだけではarchiveを止めない観測は今も正しく、advisory characterizationを保持する |
 
 **進行条件**: #496は製品writerの排他参加までであり、B-0全ゲート合格・SAVE-01A設計確定・ZIP v1凍結・B-1開始・完全バックアップ完成を意味しない。次はroot/不変archiveの対応と旧版タブ移行方針を実証し、全展開/実iPhone/Filesの測定を進める。厳密reader、全依存領域の隔離import、journal/GC/遅延削除保護、復元→冷起動→試合進行→再保存も未完了の受入として残す。旧データを削除/上書きして実証しない。
+
+
+## 15. #496マージ後のDB接続境界とroot対応の設計判断（2026-10-23）
+
+[#496](https://github.com/shotaro-hue/baseball-manager/pull/496)はマージ済み（main `66a8dda77132892946f0da69c323db853dbac4b9`）。最終head `e3a90c47478c3b8972f1d4489b7427d6adb75790` のCI13ジョブ成功を確認した。第14節の「未確認CI/次のPR」は当時の記録であり、現行writerは製品archiveロックへ参加済み。
+
+次の前提整備 [#497](https://github.com/shotaro-hue/baseball-manager/pull/497)（SAVE-01B-0B）は、**版指定DB接続のfence**を独立実装する。製品差分と受入の正本は同PR、設計判断の正本は引き続き本書である。
+
+### 15.1 DB v4で保護する境界
+
+- DB版を3→4へ進め、既存5ストア/索引/全行を維持。適用後は版3以下を指定する旧コードの再openをVersionErrorで拒否する。通知やWeb Locksへの自主参加だけに依存しない。
+- 閉じない旧接続があれば最新側をblocked失敗とし、失敗した要求の遅延upgradeをabortする。別realmのblocked要求の後ろでイベントが来ないnative要求には10秒のアプリtimer予算を設け、遅い成功を返さず遅延接続を閉じる。呼出全体の10秒保証ではなく、ブラウザのtimer停止やnative最終結果の不確実性も残る。最新helper所有接続はversionchangeで閉じる。
+- **無版指定raw IDB・localStorage直接書込・既に進行した旧root公開への万能fenceではない。** DB4へ進めた後はDB3用コードへそのままrollbackできず、互換loaderが必要。
+- #497のローカル検証は焦点89件、追加保存回帰86件、Chromium/WebKit各4件、build成功、独立レビューCritical/Importantなし。追加86件は最後のasync API修正前、焦点/ブラウザは修正後。実iPhone・完全往復の証拠にはしない。最新head CIは#497で別確認。
+
+### 15.2 root対応には採用済み進行receiptが必要
+
+現行の通常経路 `useSeasonFlow.archiveNormalGame` とWorkerの `ARCHIVE_CHUNK` は、`applyProgressCandidate` が進行結果を採用する前にも履歴を書き得る。中止したWorker/古いbaseTokenの結果・root保存失敗でもarchiveが先行し得る。**saveId、保存日付、gameId一覧、件数、最新archive snapshotだけから保存時点との対応を推測してはならない。**
+
+後続実装では以下を一組の受入とする。
+
+1. 各進行runが生成した具体的なbatch/versionに対するreceiptを結果と共に渡す。通常進行とWorkerを同じ規則で扱い、採用した進行だけがreducerへ原子的にreceiptを反映する。取消・stale結果のreceiptは採用しない。
+2. receiptは世代ごとの**不変bytes/version identity**を参照し、同じgameId/同件数の再生成でも既存versionを変更しない。state/Worker結果/reducer/自動・手動保存/ロード/年度遷移を通して参照を維持する。
+3. rootが参照するversionだけを厳密に捕捉し、欠損・不一致を0件成功や「完全」へ変換しない。必要時のlock順はsave→archiveを維持する。archive失敗を主ゲーム保存成功と混同しない既存方針も保つ。
+4. 対応を証明できないlegacy/先行行は**未検証または隔離**とし、日付から帰属を補完せず、有効な復元先集計へ自動混入させない。従来データは削除しない。保証限界を候補別に表示する。
+5. 3rootと復元journal・保護参照・未公開の進行runが必要とするversionを、GC/遅延削除/冷起動回収が誤って消さない設計を先に決める。root公開と複数ストアの一括原子性を仮定しない。
+
+**#497は上記receipt/不変格納を実装していない。** この段階で不完全なsnapshotを完全バックアップとして公開せず、root対応の実証、旧版の進行済み公開対策、源データ展開と実iPhone/Files、厳密reader/隔離復元/journal/GCの判断を継続する。SAVE-01A設計確定・ZIP v1凍結・B-1開始・完全復旧の完成認定はいずれも未完了。
