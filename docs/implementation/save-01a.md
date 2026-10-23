@@ -281,3 +281,28 @@ WebKitは容量上限だけでなくWebサイトデータの自動削除・サ�
 5. 3rootと復元journal・保護参照・未公開の進行runが必要とするversionを、GC/遅延削除/冷起動回収が誤って消さない設計を先に決める。root公開と複数ストアの一括原子性を仮定しない。
 
 **#497は上記receipt/不変格納を実装していない。** この段階で不完全なsnapshotを完全バックアップとして公開せず、root対応の実証、旧版の進行済み公開対策、源データ展開と実iPhone/Files、厳密reader/隔離復元/journal/GCの判断を継続する。SAVE-01A設計確定・ZIP v1凍結・B-1開始・完全復旧の完成認定はいずれも未完了。
+
+
+## 16. #497マージ後の採用receipt・不変履歴の実装（2026-10-23）
+
+[#497](https://github.com/shotaro-hue/baseball-manager/pull/497)はマージ済み（main `3599dcbbb0ad6f4af49c6483371bfddc021cff0e`）。最終head `21147b5f59b5415e8d1a8c3751df5c3195b96de4` の全13 CIジョブ成功を確認。第15節のCI待ち/後続実装は当時の記録であり、現在地は本節を用いる。
+
+独立実装は [#498 / SAVE-01B-0C](https://github.com/shotaro-hue/baseball-manager/pull/498)、head `8a769c3a71a49ea8cb9d7b1a593a4096fb7ee817`。設計正本は本PRのまま維持する。製品差分・最新CI/マージ判断は#498で行う。
+
+| 項目 | 実装と保証境界 |
+|---|---|
+| 採用とrun | 通常auto・手動・1日Worker・まとめ進行が一意なrun ID/連続chunk index/実件数summaryを生成。採用後だけreceiptを同じreducer更新へ保持し、mutable集計へ反映。取消・stale・unmountは採用しない |
+| 不変identity | 既存save_chunksの専用prefixへadd-onlyで圧縮JSONを保存。SHA-256参照でchunk/run/前receiptを連結し、root参照は定長。DB4/既存5ストアを維持。衝突で既存行を置換/他所有行を削除しない |
+| 厳密capture | 指定rootの鎖だけを辿り、異save/循環/欠損/SHA/順番/件数を検査。同一logical batchは新しい採用版を一度だけ返す。途中callbackは暫定であり、最終reject時は全出力を捨てる |
+| provenance | 新規開始のみempty/complete。対応不明legacyは未検証。日付・件数から完全を推定しない。coverageは永続化完了の証明ではなく、厳密な全鎖読取で確認する |
+| 保存 | 初期/自動/手動/batch、load/年度/別saveへ接続。新コードは同saveのreceipt欠落/head喪失を拒否。主ゲーム保存と履歴失敗を分離。保存時flushはhead/chunksだけ、完全captureは鎖全体を検査 |
+| review修正 | 古い失敗projectionの再試行による新集計の巻戻り、StrictMode初回手動試合、seal中に採用拒否された通常結果/ニュース/取引/メールの先行公開をRED→GREENで修正 |
+| 限定検証 | 関連26files/233tests、本番build、Chromium/WebKit各9件、default発見18件。実アプリ新規→batch→保存/reload→1日→保存と2tab排他を含む。独立reviewは1回、Important3件修正、Minor1件保留。最新head CIは#498で別確認 |
+
+### 16.1 保守的保持と次の前提
+
+**採用済み不変versionは現在のsave削除後も残す。** 3root/未公開/不明参照を失わない保守的方針であり、回収完了ではない。既存mutable集計との重複容量・process crash orphanが残る。さらにsealのrun-node書込とdiscardが重なると取消metadataが未参照で残り得る（保留Minor）。採用/集計/他rootは変わらないが、取消時の全バイト回収を保証しない。
+
+次は保護参照を考慮したGC・明示削除回収・journal/import保護と長期容量/工程メモリを実証する。圧縮fixtureのserialized量は物理IDB使用量や20年/実iPhone容量の証拠ではない。読取は1chunk payloadずつでも訪問ID集合を持ち、pending writeも残るため、全工程のメモリ上限を認定しない。
+
+旧DB4/raw/versionless/localStorage writerの完全排除、選択した過去rootからactive分析集計を再構築する経路、全ZIP/他依存領域の厳密readerと隔離import、復元journal/GC、復元→冷起動→試合進行→保存、実iPhone/Filesは未完了。#498の厳密履歴captureを完成した完全export/importや実機受入と混同しない。設計確定/v1凍結/B-1開始の判定は引き続き保留する。

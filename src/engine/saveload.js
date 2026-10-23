@@ -10,6 +10,7 @@ import { resolveInitialContractYears } from './realplayer';
 import {
   BASEBALL_MANAGER_DB_STORES,
   openBaseballManagerDb,
+  storageAccessFailureReason,
 } from './baseballManagerDb';
 import { ensureSaveId } from './saveIdentity';
 import { MAX_BATTED_BALL_EVENTS, MAX_SPRAY_POINTS } from '../constants';
@@ -867,7 +868,8 @@ export function enqueueSaveGame(state, options = {}) {
 }
 
 function failedSave(reason, step, api, error) {
-  return saveFailure(reason, { step, api, error, queue: sharedSaveQueue.getSnapshot() });
+  return saveFailure(api === 'IndexedDB' ? storageAccessFailureReason(error, reason) : reason,
+    { step, api, error, queue: sharedSaveQueue.getSnapshot() });
 }
 
 export function getLastLoadResult() { return { ...lastLoadResult }; }

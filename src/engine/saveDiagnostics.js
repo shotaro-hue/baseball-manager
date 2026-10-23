@@ -4,7 +4,7 @@ import {openBaseballManagerDb,BASEBALL_MANAGER_DB_STORES} from './baseballManage
 // stacks or player/club data; diagnostics are not sent to a server.
 const exceptionNames = new Set(['Error', 'TypeError', 'RangeError', 'DataCloneError',
   'QuotaExceededError', 'SecurityError', 'AbortError', 'UnknownError', 'InvalidStateError',
-  'TransactionInactiveError', 'ConstraintError', 'NotFoundError', 'VersionError', 'NotAllowedError']);
+  'TransactionInactiveError', 'ConstraintError', 'NotFoundError', 'VersionError', 'NotAllowedError', 'StorageUpgradeBlockedError', 'StorageOpenTimeoutError']);
 
 export function saveFailure(reason, { step, api, error, queue, quota = false } = {}) {
   let storage = { rootBytes: null, backupBytes: null };
@@ -22,7 +22,8 @@ export function saveFailure(reason, { step, api, error, queue, quota = false } =
 
 const reasons = new Set(['invalid_state','sanitize_state_failed','storage_read_failed','stale_save','farm_payload_missing',
   'indexeddb_write_failed','serialization_failed','compression_failed','quota_exceeded','storage_write_failed','save_conflict',
-  'save_failed','save_lock_failed','save_lock_unavailable','snapshot_failed','save_verification_failed','session_changed','transition_in_progress']);
+  'save_failed','save_lock_failed','save_lock_unavailable','snapshot_failed','save_verification_failed','session_changed','transition_in_progress',
+  'storage_upgrade_blocked','storage_version_outdated','storage_open_timeout']);
 const steps = new Set(['validate_state','validate_previous','prepare_generation','serialize_state','compress_state','prepare_root_body',
   'verify_root','prepare_rotation','commit_root','snapshot','observe_root','check_conflict','save','acquire_lock']);
 const apis = new Set(['saveGame','validateFarmSaveState','localStorage.getItem','localStorage.setItem','IndexedDB','JSON.stringify','LZString.compressToUTF16','CompressionStream','structuredClone','navigator.locks.request']);
