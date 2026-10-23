@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
-  testDir: '../../e2e', testMatch: '**/save-01b0.spec.js', fullyParallel: false,
+  testDir: '../../e2e', testMatch: 'save-01b0.spec.js', testIgnore: '**/characterization/**', fullyParallel: false,
+  metadata: { suite: 'regression' },
   timeout: 120_000, expect: { timeout: 10_000 }, retries: 0, workers: 1,
   reporter: [['list'], ['json', { outputFile: '../../test-results/save-01b0/results.json' }]], outputDir: '../../test-results/save-01b0',
   use: { baseURL: 'http://127.0.0.1:5193', actionTimeout: 10_000, trace: 'retain-on-failure', screenshot: 'only-on-failure' },

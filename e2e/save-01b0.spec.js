@@ -1,37 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync, unlinkSync } from 'node:fs';
 const PROBE = '/baseball-manager/scripts/save-01b0/';
 test.beforeAll(() => {
   test.setTimeout(240_000);
   if (!existsSync('e2e/fixtures/save-capacity-generated.json.gz')) {
     execFileSync(process.execPath, ['scripts/generate-save-capacity-fixture.mjs'], { timeout: 240_000, stdio: 'pipe' });
   }
-});
-
-test('backup probe current archive writer bypasses save lock and replaces same batch ID', async ({ page, context }) => {
-  await page.goto('/baseball-manager/');
-  await page.evaluate(async () => {
-    const a = await import('/baseball-manager/src/engine/battedBallArchive.js');
-    a.enqueueBattedBallBatches([{ id: 'probe:2026:g:p', saveId: 'probe', year: 2026, gameId: 'g',
-      playerId: 'p', events: [{ result: 's', evKmh: 140, laDeg: 15 }] }]); await a.flushBattedBallQueue();
-    void navigator.locks.request('baseball-manager-save', async () => {
-      window.saveLockHeld = true; await new Promise(resolve => { window.releaseSaveLock = resolve; });
-    });
-  });
-  await expect.poll(() => page.evaluate(() => window.saveLockHeld)).toBe(true);
-  const other = await context.newPage(); await other.goto('/baseball-manager/');
-  try {
-    const result = await other.evaluate(async () => {
-      const a = await import('/baseball-manager/src/engine/battedBallArchive.js');
-      a.enqueueBattedBallBatches([{ id: 'probe:2026:g:p', saveId: 'probe', year: 2026, gameId: 'g',
-        playerId: 'p', events: [{ result: 's', evKmh: 180, laDeg: 15 }] }]);
-      await a.flushBattedBallQueue();
-      const meta = await a.loadBattedBallArchiveMeta('probe'), events = await a.loadGameBattedBalls('probe', 2026, 'g');
-      return { count: meta.estimatedEventCount, velocity: events[0].events[0].evKmh };
-    });
-    expect(result).toEqual({ count: 1, velocity: 180 });
-  } finally { await page.evaluate(() => window.releaseSaveLock()); await other.close(); }
 });
 
 // Resolve barriers from the test; no sleeps or scheduling-dependent close.
@@ -252,16 +227,35 @@ test('backup probe preparation cancellation allows a fresh smaller ZIP', async (
   await expect(page.getByRole('link', { name: 'ZIPをダウンロード' })).toBeVisible();
 });
 
-for (const mib of [16, 64]) test(`backup probe synthetic ${mib} MiB output has bounded source entries`, async ({ page }, testInfo) => {
+for (const mib of [16, 64]) test(`backup probe synthetic ${mib} MiB output has bounded source entries and independently verified content`, async ({ page }, testInfo) => {
   await page.goto('/baseball-manager/');
   const result = await page.evaluate(async ({ path, mib }) => {
     const zip = await import(path + 'zip.js');
     const { file, metrics } = await zip.createProbeZip({ entries: zip.syntheticProbeEntries(mib * 1024 * 1024) });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(file); link.download = `capacity-${mib}.zip`;
+    link.dataset.testid = 'capacity-file'; link.textContent = 'Download generated capacity file';
+    document.body.append(link);
     return { ...metrics, bytes: file.size, memoryObservation: 'No peak-memory measurement; not real iPhone evidence' };
   }, { path: PROBE, mib });
   expect(result.inputBytes).toBe(mib * 1024 * 1024); expect(result.maxInputEntryBytes).toBe(256 * 1024);
   expect(result.bytes).toBeGreaterThan(mib * 1024 * 1024 * 0.95); expect(result.peakHeapBytes).toBeNull();
+  const downloadReady = page.waitForEvent('download');
+  await page.getByTestId('capacity-file').click();
+  const path = testInfo.outputPath(`capacity-${mib}.zip`);
+  await (await downloadReady).saveAs(path);
+  expect(statSync(path).size).toBe(result.bytes);
+  // Python reads 64 KiB blocks; no whole File arrayBuffer/base64/unzip in the browser.
+  result.independentVerification = JSON.parse(execFileSync('python3', [
+    'scripts/save-01b0/verify-zip.py', path, '--synthetic-bytes', String(mib * 1024 * 1024),
+  ], { encoding: 'utf8', timeout: 90_000 }));
+  expect(result.independentVerification).toEqual({ verified: true, entries: mib * 4,
+    inputBytes: mib * 1024 * 1024, sourceVerified: true });
+  await page.getByTestId('capacity-file').evaluate(link => { URL.revokeObjectURL(link.href); link.remove(); });
   await testInfo.attach(`capacity-${mib}`, { body: JSON.stringify(result, null, 2), contentType: 'application/json' });
+  // Successful deterministic payloads are reproducible; retain JSON evidence,
+  // not 160 MiB of incompressible ZIPs per CI run. Failures keep their files.
+  unlinkSync(path);
 });
 
 test('backup probe sizes actual Hanshin source root and 20-equivalent-year career before transport', async ({ page }, testInfo) => {

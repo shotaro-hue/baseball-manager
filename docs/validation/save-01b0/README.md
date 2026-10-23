@@ -8,7 +8,35 @@ Keep design PR [#494](https://github.com/shotaro-hue/baseball-manager/pull/494) 
 
 The next implementation decisions must address **archive/root commit correspondence** and **source decoding memory**, before calling any ZIP a complete portable backup.
 
-## Validation status
+## Latest P2/P3 follow-up validation (2026-10-23)
+
+- Focused permanent Vitest **21/21**; explicit historical characterization **2/2**; Ubuntu mirror regression **2/2**. Earlier focused total was 21 including 2 unsafe observations; this change relocates those 2 and adds 2 permanent oracle cases. No assertion is removed or weakened and no skip is added.
+- Final separate browser runs: permanent probes **Chromium 13/13, mobile WebKit 13/13**, historical writer observation **1/1 per browser**. Total coverage remains **14 per browser**, split by responsibility. All use **1 worker / retry 0**. The first combined run also passed 28/28 before final collection exclusions were corrected; it is not the separate-suite evidence.
+- Production build passed with only the existing large-chunk warning. Product storage code and schema are unchanged.
+- RED→GREEN: a structurally valid ZIP with self-consistent CRC/manifest hashes but incorrect expected source initially passed the Python oracle. It now fails `probe_source_mismatch`; correct multi-entry input and partial tail pass, wrong size fails. Missing/unlisted/duplicate ZIP entries, duplicate manifest rows and changed content/hash are rejected.
+- Local full Vitest on Node 20.20.2 / 1 worker stopped making progress at existing `src/App.deleteLoad.integration.test.js`; interrupted (exit 130), **not passed**. That unchanged file separately passed **10/10** in 4.94 s. Cause is not established. The prior successful configuration (maxWorkers=2/minWorkers=1) and exact-head GitHub CI are separate completion gates; their final outcomes/SHA are recorded in [PR #495](https://github.com/shotaro-hue/baseball-manager/pull/495). Earlier counts below must not stand in for these results.
+
+### Characterization ownership and retirement
+
+| Responsibility | Files | CI result policy |
+|---|---|---|
+| Permanent correctness (legacy isolation/strict reads, journal, lock order/release/recovery, ZIP/handoff) | `tests/save-01b0-*.test.js`, `e2e/save-01b0.spec.js` | Required regression gate; failure/cancellation/nonexecution is not success |
+| Known root/archive mismatch and same-ID mutable archive | `tests/characterization/save-01b0-storage.test.js` | Explicit advisory step on every PR, all assertions retained, separate JSON report |
+| Known writer bypassing save lock across tabs | `e2e/characterization/save-01b0.spec.js` | Explicit advisory step in both browsers on every PR, separate JSON/trace report |
+
+The default Vitest and Playwright configs exclude only the historical characterization directory. Dedicated configs include it explicitly. CI reuses the existing probe matrix job/browser install and uploads both reports. Only the two characterization steps use `continue-on-error`; their **raw `outcome`** (not the rewritten conclusion) is displayed in the job summary, and any failure/skipped/cancelled outcome emits a visible warning. A changed observation is **not** a successful reproduction or proof of a fix. All ordinary regression/build steps and the aggregate gate retain hard failures. At this head the unsafe behavior still reproduces successfully; no existing defect is claimed fixed or hidden.
+
+When an immutable archive or participating writer corrects these behaviors, inspect the report, add positive regression coverage for committed root/archive correspondence, same-ID immutability or actual cross-tab exclusion, then retire/update the obsolete characterization in the **same reviewed fix**. Do not make the old bug a required product behavior, change its expectation just for green checks, or skip its execution. Infrastructure failures also require inspection of the advisory report; green job status alone cannot prove successful reproduction.
+
+### Actual 16/64 MiB ZIP readback
+
+Both browsers now download the **actual generated File** via a Blob URL. Python `zipfile` reads 64 KiB blocks and verifies every manifest path, exact set/count (including duplicate/missing/unlisted detection), uncompressed size, CRC and SHA-256, then independently reconstructs the deterministic xorshift32 source and compares **every restored byte**. A self-consistent but wrong ZIP is therefore rejected. Neither the browser nor Python expands the entire ZIP. The source generator retains state across all 256 KiB entries.
+
+For each browser, 64 MiB input produced **67,177,540 bytes, 256 data entries + manifest**, and every source/hash check passed; 16 MiB produced **16,794,445 bytes, 64 data entries + manifest**. Final 64 MiB cases including generation/download/Python took about **27.9 s Chromium / 31.7 s WebKit** on this host. Measurements are observations under concurrent host workload, not performance thresholds or RAM measurements. The normal probe CI runs both sizes/readbacks in both browsers; there is no manual-only integrity gap. Successfully verified deterministic capacity ZIPs are removed after JSON evidence is attached, avoiding 160 MiB of redundant incompressible artifacts per CI run; failures retain downloaded files. The 1 MiB handoff ZIP evidence is retained.
+
+`browser-evidence.json` separates the latest regression and characterization results and retains the previous head's environment failures under `previousEvidence`. Local WebKit uses the existing official binary plus the previously extracted Ubuntu library lookup wrapper, as before. This is **not real iPhone evidence**, Files persistence, complete save export/import, peak-memory measurement or a 20-year real simulation. No new design fact requires changing #494; it remains the design authority.
+
+## Prior review results (`56abedad`, historical)
 
 - Focused Vitest: **21/21 passed** across the three probe files; **23/23** including the two CI mirror regression cases. Before the barrier implementation, the new unit case failed (8 passed / 1 failed) and Chromium cold-recovery case failed waiting for the missing boundary. Both are GREEN after implementation.
 - Browser: **Chromium 14/14, mobile WebKit 14/14**, one worker, no retries. The separate successful WebKit run followed an initial host-library launch failure; both attempts are retained in the machine-readable evidence.
@@ -32,7 +60,7 @@ The isolated B-0 review fix can be accepted when these focused/full regressions 
 - Two pages both call the common `withProbeSnapshot` helper: the first holds save and archive, the second is observed pending on save, and executes after release. Synchronous throw permits later peer/same-page operations; asynchronous rejection releases an already waiting peer. A deliberately archive-first raw caller reproduces a lock cycle; aborting that raw save request releases archive and lets the common helper finish. All participants must acquire save→archive and never nest the helper inside either raw lock. There is no automatic deadlock prevention for outside callers. Production writers and pre-existing old-version tabs do not participate, so this result does not establish production snapshot consistency.
 - The isolated journal survives closing the publishing page **while `publishProbeRestore()` is still pending**, held by a probe-only `afterPrimaryPublished` barrier immediately after primary setItem. The prototype has **no phase-update operation**; `verified` intentionally remains unchanged. A new page reads journal/staged bytes and actual primary, identifies publication, and explicitly restores the old primary without removing an unrelated row or a production-key sentinel. After another participating tab changes primary, cold-page rollback/publication/discard all reject conflict and leave journal/rows/primary unchanged. This proves page-lifecycle interruption and byte-level publication mechanics in the same browser context, not browser-process kill, full game semantic validation or power-loss durability.
 - v3/v4/v5 career capture reads numeric player ID 0. After capture, destination numeric `0` and string `'0'` legacy rows are populated with conflicting histories. A new v6 generation retains the captured source history without modifying any destination legacy row. This is a focused career probe, not a full legacy save migration/roundtrip certification.
-- ZIP generation uses <=256 KiB source entries, SHA-256 manifests and Blob parts. A separate later click performs share/download. Browser-downloaded 1 MiB files are checked by Python `zipfile`/`hashlib`, independently of fflate. Forced unsupported sharing, simulated native cancellation, preparation cancellation and retry are covered. Actual iOS sharing and Files persistence remain untested.
+- ZIP generation uses <=256 KiB source entries, SHA-256 manifests and Blob parts. A separate later click performs share/download. At the prior head, browser-downloaded 1 MiB files were checked by Python `zipfile`/`hashlib`, independently of fflate. Forced unsupported sharing, simulated native cancellation, preparation cancellation and retry are covered. Actual iOS sharing and Files persistence remain untested.
 - A synchronous journal-write exception initially committed an unowned staged row. A failing retry test exposed it; explicitly aborting the transaction fixes it. A duplicate-manifest fixture similarly exposed a weakness in the independent oracle; it now rejects duplicate manifest paths.
 
 The journal prototype uses only `baseball_manager_backup_probe_v1` and `baseball_manager_backup_probe_primary`. Browser characterization uses fresh Playwright profiles and generated fixtures, never a user's profile or supplied save. No probe is reachable from the game UI or production build.
@@ -73,8 +101,10 @@ The probe format is deliberately marked `probeFormat: 1`; it is **not** the game
 ```bash
 npm ci
 npx playwright install --with-deps chromium webkit
-npx vitest run tests/save-01b0-storage.test.js tests/save-01b0-journal.test.js tests/save-01b0-zip.test.js
+npx vitest run tests/save-01b0-storage.test.js tests/save-01b0-journal.test.js tests/save-01b0-zip.test.js --maxWorkers=1 --minWorkers=1
+npx vitest run --config scripts/save-01b0/vitest.characterization.config.js
 npx playwright test --config scripts/save-01b0/playwright.config.js --workers=1 --retries=0
+npx playwright test --config scripts/save-01b0/playwright.characterization.config.js --workers=1 --retries=0
 npm run build
 npm test -- --maxWorkers=2 --minWorkers=1
 ```

@@ -57,3 +57,51 @@ it('independent Python oracle rejects duplicate manifest rows even with valid ZI
     expect(result.error).toBeUndefined(); expect(result.status).not.toBe(0);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+it('independent oracle compares restored bytes with the expected synthetic input, beyond self-consistent hashes', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'save-01b0-source-oracle-'));
+  const verify = (name, archive, total) => {
+    const file = join(dir, name); writeFileSync(file, archive);
+    return spawnSync('python3', ['scripts/save-01b0/verify-zip.py', file, '--synthetic-bytes', String(total)], { encoding: 'utf8' });
+  };
+  try {
+    // Structurally valid, CRC and manifest hashes agree, but not the requested input.
+    const wrong = await createProbeZip({ entries: [{ path: 'archive/000000.bin', bytes: new Uint8Array(32) }] });
+    const rejected = verify('wrong-input.zip', new Uint8Array(await wrong.file.arrayBuffer()), 32);
+    expect(rejected.error).toBeUndefined(); expect(rejected.status).not.toBe(0);
+    expect(rejected.stderr).toContain('probe_source_mismatch');
+    // Cross an entry boundary and a partial last read, retaining generator state.
+    const total = PROBE_ENTRY_LIMIT + 7;
+    const correct = await createProbeZip({ entries: syntheticProbeEntries(total) });
+    const accepted = verify('correct-input.zip', new Uint8Array(await correct.file.arrayBuffer()), total);
+    expect(accepted.error).toBeUndefined(); expect(accepted.status, accepted.stderr).toBe(0);
+    expect(JSON.parse(accepted.stdout)).toEqual({ verified: true, entries: 2, inputBytes: total, sourceVerified: true });
+    expect(verify('wrong-length.zip', new Uint8Array(await correct.file.arrayBuffer()), total + 1).status).not.toBe(0);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+it('independent oracle rejects missing, unlisted, duplicate and hash-mismatched ZIP payloads', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'save-01b0-invalid-oracle-'));
+  const source = new TextEncoder().encode('original');
+  const sha256 = Buffer.from(await crypto.subtle.digest('SHA-256', source)).toString('hex');
+  const manifest = new TextEncoder().encode(JSON.stringify({ probeFormat: 1,
+    entries: [{ path: 'archive/a.bin', bytes: source.length, sha256 }] }));
+  const valid = zipSync({ 'archive/a.bin': source, 'manifest.json': manifest });
+  try {
+    const cases = {
+      missing: zipSync({ 'manifest.json': manifest }),
+      unlisted: zipSync({ 'archive/a.bin': source, 'archive/b.bin': source, 'manifest.json': manifest }),
+      hash: zipSync({ 'archive/a.bin': new TextEncoder().encode('modified'), 'manifest.json': manifest }),
+      // Two equally sized names rewritten in both local/central headers, preserving CRC.
+      duplicate: Buffer.from(zipSync({ 'archive/a.bin': source, 'archive/b.bin': source, 'manifest.json': manifest }))
+        .map((value, i, bytes) => value === 98 && bytes.subarray(i - 8, i + 5).toString() === 'archive/b.bin' ? 97 : value),
+    };
+    for (const [name, bytes] of Object.entries({ valid, ...cases })) {
+      const file = join(dir, `${name}.zip`); writeFileSync(file, bytes);
+      const result = spawnSync('python3', ['scripts/save-01b0/verify-zip.py', file], { encoding: 'utf8' });
+      expect(result.error).toBeUndefined();
+      if (name === 'valid') expect(result.status, result.stderr).toBe(0);
+      else expect(result.status, name).not.toBe(0);
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

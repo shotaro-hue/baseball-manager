@@ -65,3 +65,14 @@ Interfaces: `createProbeZip({entries, signal, onProgress})` consumes an async se
 - [x] Run Chromium/WebKit at 390px, share-cancel/unsupported cases and 1/16/64 MiB synthetic capacity output. Report actual sizes/times and unavailable memory metrics honestly.
 - [x] Run production build and full Vitest suite; include the new focused E2E in CI without weakening existing gates.
 - [x] Write measured findings, library tradeoffs, next decisions and real-iPhone checklist. Create an independent draft PR from main, feed its concrete results into #494, leave release/spec-freeze blocked by unverified gates.
+
+## Final review P2/P3 follow-up (2026-10-23)
+
+Authority: user's final-review specification, reviewed head `56abedad`. Execute on existing #495 without merge or B-1 implementation.
+
+- [x] P2: move only two unsafe-storage unit observations to `tests/characterization/save-01b0-storage.test.js` and one cross-tab observation to `e2e/characterization/save-01b0.spec.js`, preserving every assertion. Permanent legacy v3–v5 and strict-read tests stay in `tests/save-01b0-storage.test.js`; common fixture setup lives in `tests/helpers/save-01b0-storage.js`.
+- [x] Exclude those observations from default regression collection, explicitly execute them on every PR in the existing probe CI job (no added job/browser install), keep raw JSON/trace artifacts and warn on any non-success outcome. Only these historical observations use advisory steps; normal unit/E2E/build and aggregate gates still fail normally. Future storage fixes require positive regression tests and evidence before retiring/updating characterization, never a blanket expectation change or skip.
+- [x] P3 RED→GREEN: the Python oracle previously accepted a self-consistent ZIP with wrong synthetic bytes. Add `--synthetic-bytes` and bounded independent source comparison; test exact input, wrong input/length, partial tail/cross-entry generator continuity, missing/unlisted/duplicate ZIP entries, duplicate manifest and hashes.
+- [x] Download actual 16/64 MiB browser Files without whole-File JS arrayBuffer/base64/unzip. Run Python in both browsers in ordinary CI; check every manifest entry and expected source byte, size and entry count. Remove only successfully verified deterministic capacity ZIPs after retaining JSON, to avoid 160 MiB of redundant CI artifacts per run.
+- [ ] Record final separate regression/characterization browser runs, full unit suite, build and exact-head CI results in the validation README and PR. Retain earlier environment failures separately.
+- [ ] Independent final review of exact final commit, existing PR update and all-job CI confirmation. Keep Draft/unmerged; leave #494 design gates open. No new design facts beyond stronger validation are assumed.

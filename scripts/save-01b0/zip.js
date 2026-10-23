@@ -49,6 +49,8 @@ export async function createProbeZip({ entries, signal, onProgress, maxOutputByt
 
 export async function* syntheticProbeEntries(totalBytes) {
   if (!Number.isSafeInteger(totalBytes) || totalBytes < 0) throw new Error('probe_fixture_size');
+  // Fixture contract: xorshift32, seed 20261023, high byte, continuous across
+  // entries. The Python oracle independently reconstructs this input in blocks.
   let seed = 20261023;
   for (let offset = 0, i = 0; offset < totalBytes; offset += PROBE_ENTRY_LIMIT, i++) {
     const bytes = new Uint8Array(Math.min(PROBE_ENTRY_LIMIT, totalBytes - offset));
