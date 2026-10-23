@@ -46,7 +46,9 @@ export function gameStateReducer(state, action) {
       };
     }
     case G.APPLY_PROGRESS:
-      return {...state,...Object.fromEntries(['teams','gameDay','year','myId','saveId','farmCompetition'].filter(k=>k in action.candidate).map(k=>[k,action.candidate[k]]))};
+      return {...state,
+        ...(action.candidate.saveId && action.candidate.saveId !== state.saveId ? { battedBallReceipt: null } : {}),
+        ...Object.fromEntries(['teams','gameDay','year','myId','saveId','farmCompetition','battedBallReceipt'].filter(k=>k in action.candidate).map(k=>[k,action.candidate[k]]))};
     case G.SET_FARM_COMPETITION:
       return {...state,farmCompetition:action.competition};
     case G.SET_TEAMS:
@@ -60,7 +62,7 @@ export function gameStateReducer(state, action) {
     case G.SET_MY_ID:
       return { ...state, myId: action.myId };
     case G.SET_SAVE_ID:
-      return { ...state, saveId: action.saveId };
+      return { ...state, saveId: action.saveId, battedBallReceipt: action.saveId === state.saveId ? state.battedBallReceipt : null };
     default:
       return state;
   }

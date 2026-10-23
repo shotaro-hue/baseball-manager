@@ -24,7 +24,8 @@ it('routes one adopted batch through shared tracked saving with the actual state
  expect(workers).toHaveLength(1);
  const nextState={teams,saveId:'save',myId:gs.myId,year:2026,gameDay:2,saveRevision:1,news:[],mailbox:[],seasonHistory:{},faPool:[]};
  const batchResults=[{gameNo:1,score:{my:3,opp:1}}];
- await act(async()=>{const worker=workers[0];worker.onmessage({data:{type:'DONE',payload:{taskId:worker.message.payload.taskId,result:{nextState,batchResults,batchMeta:{}}}}});});
+ await act(async()=>{const worker=workers[0];worker.onmessage({data:{type:'DONE',payload:{taskId:worker.message.payload.taskId,result:{nextState,batchResults,batchMeta:{}}}}});
+  await vi.waitFor(()=>expect(gs.handleSave).toHaveBeenCalledTimes(1));});
  expect(gs.handleSave).toHaveBeenCalledTimes(1);
  expect(gs.handleSave.mock.calls[0][0]).toMatchObject({payload:{...nextState,...nextHistory},saveOptions:{skipBackupRotation:true,preferMainSave:true}});
  expect(api.batchResults).toBe(batchResults);

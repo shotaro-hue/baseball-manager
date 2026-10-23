@@ -42,7 +42,7 @@ function isValidId(value) {
   return typeof value === 'string' && value.trim().length > 0 && value.length <= 300;
 }
 
-function sanitizeBatchRecord(record) {
+export function sanitizeBatchRecord(record) {
   if (!record || typeof record !== 'object') return null;
   const events = (Array.isArray(record.events) ? record.events : [])
     .map((event) => normalizeBattedBallEvent(event))

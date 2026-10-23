@@ -105,7 +105,7 @@ export default function App() {
         );
         const shouldBackfillForeignFa =
           (saved.faPool?.length ?? 0) === 0 && saved.gameDay === 1;
-        gs.applyProgressCandidate(migrated);
+        gs.applyProgressCandidate({ ...migrated, battedBallReceipt: saved.battedBallReceipt ?? null });
         gs.setMyId(saved.myId);
         gs.setSaveId(saved.saveId);
         gs.setGameDay(saved.gameDay);

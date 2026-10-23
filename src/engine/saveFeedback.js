@@ -13,6 +13,7 @@ const SAVE_FAILURE_CAUSES = {
   serialization_failed: '保存用データを変換できませんでした。',
   compression_failed: '保存用データを圧縮できませんでした。',
   farm_payload_missing: '保存に必要な二軍データがそろっていません。',
+  archive_receipt_missing: '打球履歴と保存時点の対応情報が欠けているため、上書きを止めました。',
   transition_in_progress: '画面の切り替え処理中のため、保存を開始できませんでした。',
   snapshot_failed: '現在の編成から保存用の写しを作れませんでした。',
   storage_write_failed: 'ブラウザの保存領域への書き込みに失敗しました。',

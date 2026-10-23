@@ -23,7 +23,7 @@ export function saveFailure(reason, { step, api, error, queue, quota = false } =
 const reasons = new Set(['invalid_state','sanitize_state_failed','storage_read_failed','stale_save','farm_payload_missing',
   'indexeddb_write_failed','serialization_failed','compression_failed','quota_exceeded','storage_write_failed','save_conflict',
   'save_failed','save_lock_failed','save_lock_unavailable','snapshot_failed','save_verification_failed','session_changed','transition_in_progress',
-  'storage_upgrade_blocked','storage_version_outdated','storage_open_timeout']);
+  'storage_upgrade_blocked','storage_version_outdated','storage_open_timeout','archive_receipt_missing']);
 const steps = new Set(['validate_state','validate_previous','prepare_generation','serialize_state','compress_state','prepare_root_body',
   'verify_root','prepare_rotation','commit_root','snapshot','observe_root','check_conflict','save','acquire_lock']);
 const apis = new Set(['saveGame','validateFarmSaveState','localStorage.getItem','localStorage.setItem','IndexedDB','JSON.stringify','LZString.compressToUTF16','CompressionStream','structuredClone','navigator.locks.request']);

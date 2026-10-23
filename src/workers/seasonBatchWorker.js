@@ -28,6 +28,7 @@ self.onmessage = (event) => {
       count,
       autoManageMyTeam,
       gameContext,
+      archiveRunId,
     } = message.payload || {};
     if (!taskId) {
       throw new Error('taskId is required');
@@ -37,6 +38,7 @@ self.onmessage = (event) => {
     cancelRequested = false;
 
     const commonArgs = {
+      archiveRunId,
       isCancelled: () => cancelRequested || activeTaskId !== taskId,
       onProgress: (progress) => {
         if (cancelRequested || activeTaskId !== taskId) return;
