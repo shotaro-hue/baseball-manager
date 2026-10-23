@@ -13,7 +13,7 @@ The next implementation decisions must address **archive/root commit corresponde
 - Focused Vitest: **20/20 passed** across the three new files.
 - Browser: **Chromium 10/10, mobile WebKit 10/10**, one worker, no retries. The separate successful WebKit run followed an initial host-library launch failure; both attempts are retained in the machine-readable evidence.
 - Production build: passed. Vite's existing large-chunk warnings remain; the probe is outside the production import graph.
-- Full existing unit/integration suite: result recorded after the ongoing long-season cases complete; no success claim based on partial output.
+- Full existing unit/integration suite: **224 files / 1,784 tests passed**, with two pre-existing opt-in benchmark skips (`fa-economy-benchmark` and `salary-demand-benchmark`). Command: `npm test -- --maxWorkers=2 --minWorkers=1`; duration 1,190.53 s, including three actual generated seasons for each of seeds 20261015/16/17. The later oracle duplicate-manifest case and strengthened collision/row checks were additionally verified in the final focused **20/20** run; exact-head CI remains a separate gate.
 - Independent source review: no remaining Critical/Important source defect. Destination collision coverage, forced unsupported-share coverage and unrelated probe-row preservation were added. The Python duplicate-manifest finding was verified RED→GREEN.
 
 ## Verified behavior

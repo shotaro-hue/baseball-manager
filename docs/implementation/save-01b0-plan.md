@@ -52,5 +52,5 @@ Interfaces: `createProbeZip({entries, signal, onProgress})` consumes an async se
 - [x] Pin fflate as a dev dependency, implement bounded per-entry output to Blob parts, then verify GREEN. Never call whole-ZIP unzip in the browser probe.
 - [x] Use Python zipfile and hashlib to independently validate the browser-downloaded file, including every manifest entry.
 - [x] Run Chromium/WebKit at 390px, share-cancel/unsupported cases and 1/16/64 MiB synthetic capacity output. Report actual sizes/times and unavailable memory metrics honestly.
-- [ ] Run production build and full Vitest suite; include the new focused E2E in CI without weakening existing gates.
-- [ ] Write measured findings, library tradeoffs, next decisions and real-iPhone checklist. Create an independent draft PR from main, feed its concrete results into #494, leave release/spec-freeze blocked by unverified gates.
+- [x] Run production build and full Vitest suite; include the new focused E2E in CI without weakening existing gates.
+- [x] Write measured findings, library tradeoffs, next decisions and real-iPhone checklist. Create an independent draft PR from main, feed its concrete results into #494, leave release/spec-freeze blocked by unverified gates.
