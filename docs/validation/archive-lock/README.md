@@ -26,6 +26,8 @@ Independent code review found **no Critical/Important/Minor issues** in the prod
 
 CI runs the new two-browser suite as a **required step** in the existing `save-portable-backup-probe` matrix job, retaining all previous suites, assertions and aggregate gating. No retry/timeout or advisory-policy relaxation. Existing `test-results/**` artifacts include its JSON/trace output. The default extended browser run also includes both projects. Full unit/integration and existing save/browser regressions are enforced by the exact-head CI; their result and source SHA are recorded in the linked implementation PR. Local focus/build success does not substitute for a pending/failed CI.
 
+A final artifact audit found that Playwright resolved the JSON reporter path relative to `scripts/`, outside the uploaded directory. The config was corrected to `../test-results/archive-lock/results.json`; a fresh two-browser run passed **14/14** and an independent filesystem/JSON check confirmed that exact CI-uploaded path with expected=14, unexpected=0, skipped=0, flaky=0. This configuration-only follow-up does not change production code.
+
 ## Mutation inventory
 
 | Public path | Protected operation |
