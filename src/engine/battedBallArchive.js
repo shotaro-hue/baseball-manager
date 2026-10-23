@@ -1,4 +1,5 @@
 import { MAX_BATTED_BALL_CHART_POINTS } from '../constants';
+import { withBattedBallArchiveLock } from './archiveLock';
 import {
   BATTED_BALL_SCHEMA_VERSION,
   normalizeBattedBallEvent,
@@ -29,7 +30,10 @@ let lastError = null;
 let retryCount = 0;
 
 function runArchiveMutation(task) {
-  const current = archiveMutationTail.then(task, task);
+  // Lock the entire read/modify/write operation, including backfill's source
+  // reads. The local tail still orders this tab's mutations after failures.
+  const run = () => withBattedBallArchiveLock(task);
+  const current = archiveMutationTail.then(run, run);
   archiveMutationTail = current.catch(() => {});
   return current;
 }
