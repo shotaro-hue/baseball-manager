@@ -6,8 +6,8 @@ import * as playerRules from '../engine/player';
 import { applyRegularSeasonTeamUpdate } from '../engine/regularGameUpdates';
 import { quickSimGame } from '../engine/simulation';
 import { computeBoxScore } from '../engine/postGame';
+import { createBattedBallRunEmitter } from '../engine/battedBallRun';
 import {
-  createBattedBallArchiveChunker,
   createBattedBallBatchRecords,
 } from '../engine/battedBallProfile';
 import {
@@ -508,6 +508,7 @@ export function simulateSeasonBatch({
   autoManageMyTeam = false,
   onProgress,
   onArchiveChunk,
+  archiveRunId,
   isCancelled,
 }) {
   const request = regularSeasonRequest(snapshot, count);
@@ -525,7 +526,7 @@ export function simulateSeasonBatch({
 
   const startedAt = Date.now();
   const progressState = createSeasonBatchProgressState();
-  const archiveChunker = createBattedBallArchiveChunker(onArchiveChunk);
+  const archiveChunker = createBattedBallRunEmitter(onArchiveChunk, { runId: archiveRunId });
   const archiveGame = (log, gameDay, firstTeam, secondTeam) => {
     const gameId = `${gameDay}:${firstTeam?.id ?? 'team1'}:${secondTeam?.id ?? 'team2'}`;
     archiveChunker.add(createBattedBallBatchRecords(log, {
@@ -758,7 +759,7 @@ export function simulateSeasonBatch({
   }
 
   ensureNotCancelled(isCancelled);
-  archiveChunker.flush();
+  const archiveRun = archiveChunker.finish();
   emitProgress({
     progressState,
     startedAt,
@@ -874,6 +875,7 @@ export function simulateSeasonBatch({
 
   return {
     nextState,
+    archiveRun,
     batchResults: gameResults.map(buildBatchResultSummary),
     batchMeta: {
       beforeRank,

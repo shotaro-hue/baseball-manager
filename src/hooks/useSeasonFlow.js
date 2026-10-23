@@ -15,6 +15,9 @@ import { standingsContext } from '../engine/standings';
 import { processCpuFaBids } from '../engine/contract';
 import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, MAX_ROSTER } from '../constants';
 import { createBattedBallBatchRecords } from '../engine/battedBallProfile';
+import { createSaveId } from '../engine/saveIdentity';
+import { createBattedBallRunEmitter } from '../engine/battedBallRun';
+import { createBattedBallReceiptRun } from '../engine/battedBallReceipts';
 import {
   applyEmergencyRosterMaintenance,
   applyManagementPolicy,
@@ -27,7 +30,6 @@ const MAX_FOREIGN_ACTIVE = 4;
 let seasonPlayerModulePromise = null;
 let seasonScheduleModulePromise = null;
 let seasonAllStarModulePromise = null;
-let seasonBattedBallArchiveModulePromise = null;
 
 function loadSeasonPlayerModule() {
   if (!seasonPlayerModulePromise) seasonPlayerModulePromise = import('../engine/player');
@@ -44,12 +46,6 @@ function loadSeasonAllStarModule() {
   return seasonAllStarModulePromise;
 }
 
-function loadSeasonBattedBallArchiveModule() {
-  if (!seasonBattedBallArchiveModulePromise) {
-    seasonBattedBallArchiveModulePromise = import('../engine/battedBallArchive');
-  }
-  return seasonBattedBallArchiveModulePromise;
-}
 
 export function buildSafeGameResult(rawResult, { oppTeam = null, gameNo = null, source } = {}) {
   const score = {
@@ -136,9 +132,20 @@ export function useSeasonFlow(gs) {
     return request.count;
   };
   const isBatchCancelledRef = useRef(false);
+  const mountedRef = useRef(false);
   const seasonProgressWorkerRef = useRef(null);
   const seasonProgressTaskIdRef = useRef(null);
-  const archiveNormalGame = (log, firstTeam, secondTeam, archiveGameDay = gameDay) => {
+  const activeArchiveRunRef = useRef(null);
+  const workerResolveRef = useRef(null);
+  const newArchiveRun = runId => saveId ? createBattedBallReceiptRun({
+    saveId, runId, previousReceipt: gs.battedBallReceipt ?? null,
+  }) : null;
+  const newNormalArchive = () => {
+    const runId = createSaveId(), run = newArchiveRun(runId);
+    return { run, emitter: createBattedBallRunEmitter(chunk => run?.append(chunk), { runId }) };
+  };
+  const canAdopt = baseToken => mountedRef.current && !isBatchCancelledRef.current && (baseToken == null || baseToken === gs.getProgressToken?.());
+  const archiveNormalGame = (archive, log, firstTeam, secondTeam, archiveGameDay = gameDay) => {
     const records = createBattedBallBatchRecords(log, {
       saveId,
       year,
@@ -147,10 +154,7 @@ export function useSeasonFlow(gs) {
       teams: [firstTeam, secondTeam],
       source: 'normal',
     });
-    if (records.length === 0) return;
-    loadSeasonBattedBallArchiveModule()
-      .then((mod) => mod.enqueueBattedBallBatches(records))
-      .catch((error) => console.warn("打球アーカイブのキュー投入に失敗しました", error));
+    archive.emitter.add(records);
   };
 
   const prevMyPlayersRef = useRef(null);
@@ -165,8 +169,15 @@ export function useSeasonFlow(gs) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[teams]);
 
-  useEffect(() => () => {
-    isBatchCancelledRef.current = true;
+  useEffect(() => {
+    mountedRef.current = true;
+    isBatchCancelledRef.current = false;
+    return () => {
+      mountedRef.current = false;
+      isBatchCancelledRef.current = true;
+      workerResolveRef.current?.(null);
+      void activeArchiveRunRef.current?.discard();
+    };
   }, []);
   useEffect(()=>{
     if(!myTeam) return;
@@ -368,8 +379,11 @@ export function useSeasonFlow(gs) {
 
     const startedAt = Date.now();
     const taskId = uid();
+    const archiveRunId = createSaveId(), archiveRun = newArchiveRun(archiveRunId);
+    activeArchiveRunRef.current = archiveRun;
     const baseToken = gs.getProgressToken?.();
     const snapshot = {
+      battedBallReceipt: gs.battedBallReceipt,
       ...(gs.farmCompetition ? {farmCompetition:gs.farmCompetition,farmCompetitionVersion:1} : {}),
       teams,
       saveId,
@@ -391,6 +405,8 @@ export function useSeasonFlow(gs) {
     };
 
     const cleanupWorker = () => {
+      workerResolveRef.current = null;
+      void archiveRun?.discard(); activeArchiveRunRef.current = null;
       if (seasonProgressWorkerRef.current) {
         seasonProgressWorkerRef.current.terminate();
         seasonProgressWorkerRef.current = null;
@@ -419,6 +435,7 @@ export function useSeasonFlow(gs) {
       seasonProgressWorkerRef.current = worker;
 
       const result = await new Promise((resolve, reject) => {
+        workerResolveRef.current = resolve;
         worker.onerror = () => reject(new Error("Single-day worker crashed"));
         worker.onmessage = (event) => {
           const message = event?.data;
@@ -426,11 +443,9 @@ export function useSeasonFlow(gs) {
           const payload = message.payload || {};
           if (payload.taskId !== seasonProgressTaskIdRef.current) return;
 
-          if(baseToken!=null&&baseToken!==gs.getProgressToken?.()) { resolve(null); return; }
+          if(!canAdopt(baseToken)) { resolve(null); return; }
           if (message.type === "ARCHIVE_CHUNK") {
-            loadSeasonBattedBallArchiveModule()
-              .then((mod) => mod.enqueueBattedBallBatches(payload.chunk?.records))
-              .catch((error) => console.warn("打球アーカイブのキュー投入に失敗しました", error));
+            archiveRun?.append(payload.chunk);
             return;
           }
 
@@ -465,6 +480,7 @@ export function useSeasonFlow(gs) {
           type: "START",
           payload: {
             taskId,
+            archiveRunId,
             mode: "singleDay",
             snapshot,
             gameContext: {
@@ -493,7 +509,10 @@ export function useSeasonFlow(gs) {
       } = result;
 
       if(baseToken!=null&&baseToken!==gs.getProgressToken?.()) {notify("編成またはロードが変更されたため古い試合結果を破棄しました", "warn");return;}
+      nextState.battedBallReceipt = await archiveRun?.seal(result.archiveRun) ?? null;
+      if (!canAdopt(baseToken)) return;
       if(gs.applyProgressCandidate && !gs.applyProgressCandidate(nextState,{baseToken}))return;
+      if (gs.applyProgressCandidate) archiveRun?.adopt();
       setNews(nextState.news);
       setMailbox(nextState.mailbox);
       setSeasonHistory(nextState.seasonHistory);
@@ -616,6 +635,10 @@ export function useSeasonFlow(gs) {
     const baseToken = gs.getProgressToken?.();
     const myT=teams.find(t=>t.id===myId);
     if(!myT) return;
+    const normalArchive = newNormalArchive();
+    const stagedEffects = [];
+    const publishAfterAdoption = (effect, ...args) => stagedEffects.push(() => effect(...args));
+    try {
     const isHome = currentGameTeams?.isHome ?? true;
     const [playerMod, scheduleMod, allStarMod] = await Promise.all([
       loadSeasonPlayerModule(),
@@ -623,13 +646,13 @@ export function useSeasonFlow(gs) {
       loadSeasonAllStarModule(),
     ]);
     const won=r.score.my>r.score.opp;
-    archiveNormalGame(r.log || [], myT, currentOpp);
+    archiveNormalGame(normalArchive, r.log || [], myT, currentOpp);
     if(baseToken!=null&&baseToken!==gs.getProgressToken?.())return;
     const farmProgress = prepareFarmProgress(gs,teams,gameDay);
     const myUpdate = applyRegularSeasonTeamUpdate(myT, r, { isFirstTeam: true, isHomeTeam: isHome, gameDay, year }, playerMod);
     myUpdate.injuries.filter(i => i.days >= 7).forEach(i => {
       const p = myUpdate.team.players.find(p => p.id === i.id);
-      if (p) addNews({type:"season",headline:`${p.name} injured`,source:"Team News",dateLabel:`${year} Year Day ${gameDay}`,body:`${p.name} is expected to miss ${i.days} days due to ${i.type}. The roster will be adjusted.`});
+      if (p) publishAfterAdoption(addNews, {type:"season",headline:`${p.name} injured`,source:"Team News",dateLabel:`${year} Year Day ${gameDay}`,body:`${p.name} is expected to miss ${i.days} days due to ${i.type}. The roster will be adjusted.`});
     });
     let updatedTeams = teams.map(t => t.id === myId
       ? applyEmergencyRosterMaintenance(myUpdate.team)
@@ -648,7 +671,7 @@ export function useSeasonFlow(gs) {
       if(!a||!b) continue;
       const useDh=!!a.dhEnabled;
       const cr=quickSimGame(applyDhToTeam(a,useDh),applyDhToTeam(b,useDh));
-      archiveNormalGame(cr.log || [], a, b);
+      archiveNormalGame(normalArchive, cr.log || [], a, b);
       cpuSimResults.push({matchup,cr,homeTeam:a,awayTeam:b,useDh});
     }
     for (const { matchup, cr } of cpuSimResults) {
@@ -660,7 +683,7 @@ export function useSeasonFlow(gs) {
     }
     updatedTeams = finishFarmProgress(updatedTeams,farmProgress,gameDay);
     updatedTeams = applyScheduledCpuManagement(updatedTeams, gameDay, myId, farmProgress?.competition ?? gs.farmCompetition);
-    setAllTeamResultsMap(prev=>{
+    publishAfterAdoption(setAllTeamResultsMap, prev=>{
       const next={...prev};
       const recordGame=(homeId,awayId,cr,hPlayers,aPlayers,oppHName,oppAName)=>{
         const bs=computeBoxScore(cr.log||[],cr.inningSummary||[],hPlayers,aPlayers,cr.score.my,cr.score.opp);
@@ -673,15 +696,15 @@ export function useSeasonFlow(gs) {
       }
       return next;
     });
-    setGameResult({score:r.score,won,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:currentOpp,gameNo:gameDay,isHome});
+    publishAfterAdoption(setGameResult, {score:r.score,won,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:currentOpp,gameNo:gameDay,isHome});
     const autoDate = gameDayToDate(gameDay, schedule);
     if (autoDate && autoDate.month === TRADE_DEADLINE_MONTH) {
       const liveTeams = updatedTeams.map((t) => ({ ...t, players: [...(t.players || [])] }));
       const newsItem = tryCpuCpuDeadlineTrade(liveTeams, gameDay);
       if (newsItem) {
         updatedTeams = liveTeams;
-        addNews({ type: 'trade', headline: newsItem.headline, source: 'Baseball Times', dateLabel: `${year}年 ${gameDay}日目`, body: newsItem.body });
-        addTransferLog({
+        publishAfterAdoption(addNews, { type: 'trade', headline: newsItem.headline, source: 'Baseball Times', dateLabel: `${year}年 ${gameDay}日目`, body: newsItem.body });
+        publishAfterAdoption(addTransferLog, {
           year,
           day: gameDay,
           type: "trade",
@@ -694,12 +717,17 @@ export function useSeasonFlow(gs) {
         });
       }
     }
-    tryGenerateCpuOffer(updatedTeams);
+    const receipt = await normalArchive.run?.seal(normalArchive.emitter.finish()) ?? null;
+    if (!canAdopt(baseToken)) return;
     if(gs.applyProgressCandidate) {
       const candidate={teams:updatedTeams,myId,saveId:gs.saveId,year,gameDay:gameDay+1,schedule,seasonHistory:getSeasonHistory?.()??gs.seasonHistory,
+        battedBallReceipt: receipt,
         ...(farmProgress?{farmCompetition:farmProgress.competition,farmCompetitionVersion:1}:{})};
       if(!gs.applyProgressCandidate(candidate,{baseToken}))return;
+      normalArchive.run?.adopt();
     } else setTeams(updatedTeams);
+    stagedEffects.forEach(effect => effect());
+    tryGenerateCpuOffer(updatedTeams);
     if(Math.random()<0.04&&myTeam){
       const cands=myTeam.players.filter(p=>p.age>=35&&!p._retireNow&&playerMod.calcRetireWill(p)>=40);
       if(cands.length>0){
@@ -735,6 +763,7 @@ export function useSeasonFlow(gs) {
       pendingPlayoffRef.current=true;
     }
     else setScreen("result");
+    } finally { void normalArchive.run?.discard(); }
   };
 
   const handleBatchSim = (count, autoManageMyTeam=false) => {
@@ -779,6 +808,8 @@ export function useSeasonFlow(gs) {
 
     const startedAt = Date.now();
     const taskId = uid();
+    const archiveRunId = createSaveId(), archiveRun = newArchiveRun(archiveRunId);
+    activeArchiveRunRef.current = archiveRun;
     const baseToken = gs.getProgressToken?.();
     const currentSeasonHistory = getSeasonHistory();
     const currentNews = getNewsBySelector({ limit: 1000 });
@@ -786,6 +817,7 @@ export function useSeasonFlow(gs) {
     const currentGameResultsMap = getGameResultsMap();
     const currentScheduleArchive = getScheduleArchive();
     const snapshot = {
+      battedBallReceipt: gs.battedBallReceipt,
       ...(gs.farmCompetition ? {farmCompetition:gs.farmCompetition,farmCompetitionVersion:1} : {}),
       teams,
       saveId,
@@ -807,6 +839,8 @@ export function useSeasonFlow(gs) {
     };
 
     const cleanupWorker = () => {
+      workerResolveRef.current = null;
+      void archiveRun?.discard(); activeArchiveRunRef.current = null;
       if (seasonProgressWorkerRef.current) {
         seasonProgressWorkerRef.current.terminate();
         seasonProgressWorkerRef.current = null;
@@ -837,6 +871,7 @@ export function useSeasonFlow(gs) {
       seasonProgressWorkerRef.current = worker;
 
       const result = await new Promise((resolve, reject) => {
+        workerResolveRef.current = resolve;
         worker.onerror = () => {
           reject(new Error("Season batch worker crashed"));
         };
@@ -846,11 +881,9 @@ export function useSeasonFlow(gs) {
           const payload = message.payload || {};
           if (payload.taskId !== seasonProgressTaskIdRef.current) return;
 
-          if(baseToken!=null&&baseToken!==gs.getProgressToken?.()) { resolve(null); return; }
+          if(!canAdopt(baseToken)) { resolve(null); return; }
           if (message.type === "ARCHIVE_CHUNK") {
-            loadSeasonBattedBallArchiveModule()
-              .then((mod) => mod.enqueueBattedBallBatches(payload.chunk?.records))
-              .catch((error) => console.warn("打球アーカイブのキュー投入に失敗しました", error));
+            archiveRun?.append(payload.chunk);
             return;
           }
 
@@ -885,6 +918,7 @@ export function useSeasonFlow(gs) {
           type: "START",
           payload: {
             taskId,
+            archiveRunId,
             snapshot,
             count: safeCount,
             autoManageMyTeam,
@@ -906,7 +940,10 @@ export function useSeasonFlow(gs) {
       } = result;
 
       if(baseToken!=null&&baseToken!==gs.getProgressToken?.()) {notify("編成またはロードが変更されたため古い試合結果を破棄しました", "warn");return;}
+      nextState.battedBallReceipt = await archiveRun?.seal(result.archiveRun) ?? null;
+      if (!canAdopt(baseToken)) return;
       if(gs.applyProgressCandidate && !gs.applyProgressCandidate(nextState,{baseToken}))return;
+      if (gs.applyProgressCandidate) archiveRun?.adopt();
       setNews(nextState.news);
       setMailbox(nextState.mailbox);
       setSeasonHistory(nextState.seasonHistory);
@@ -968,6 +1005,9 @@ export function useSeasonFlow(gs) {
       return;
     }
     let gsResult = null;
+    const normalArchive = newNormalArchive();
+    const stagedEffects = [];
+    const publishAfterAdoption = (effect, ...args) => stagedEffects.push(() => effect(...args));
     try {
       gsResult = buildSafeGameResult(rawGameResult, {
         oppTeam: currentOpp,
@@ -995,7 +1035,7 @@ export function useSeasonFlow(gs) {
     if(baseToken!=null&&baseToken!==gs.getProgressToken?.())return;
     const farmProgress = prepareFarmProgress(gs,gameTeams,gameDay);
     const playedOpponent = gameTeams.find(team => team.id === currentOpp.id);
-    archiveNormalGame(gsResult.log || [], myTeam, playedOpponent);
+    archiveNormalGame(normalArchive, gsResult.log || [], myTeam, playedOpponent);
     const myUpdate = applyRegularSeasonTeamUpdate(myTeam, gsResult, { isFirstTeam: true, isHomeTeam: isHome, gameDay, year }, playerMod);
     let updatedTeams = gameTeams.map(t => t.id === myId
       ? applyEmergencyRosterMaintenance(myUpdate.team)
@@ -1015,7 +1055,7 @@ export function useSeasonFlow(gs) {
         quickSimGame(applyDhToTeam(a,useDh),applyDhToTeam(b,useDh)),
         { oppTeam: b, gameNo: gameDay },
       );
-      archiveNormalGame(cr.log || [], a, b);
+      archiveNormalGame(normalArchive, cr.log || [], a, b);
       tCpuSimResults.push({matchup,cr,homeTeam:a,awayTeam:b});
     }
     for (const { matchup, cr } of tCpuSimResults) {
@@ -1027,7 +1067,7 @@ export function useSeasonFlow(gs) {
     }
     updatedTeams = finishFarmProgress(updatedTeams,farmProgress,gameDay);
     updatedTeams = applyScheduledCpuManagement(updatedTeams, gameDay, myId, farmProgress?.competition ?? gs.farmCompetition);
-    setAllTeamResultsMap(prev=>{
+    publishAfterAdoption(setAllTeamResultsMap, prev=>{
       try {
         const next={...prev};
         const recordGame=(homeId,awayId,cr,hPlayers,aPlayers,oppHName,oppAName)=>{
@@ -1062,15 +1102,15 @@ export function useSeasonFlow(gs) {
         return prev;
       }
     });
-    setGameResult({ ...gsResult, isHome });
+    publishAfterAdoption(setGameResult, { ...gsResult, isHome });
     const _tmpl=won?NEWS_TEMPLATES_WIN:NEWS_TEMPLATES_LOSE;
     const _scoreStr=gsResult.score.my+"-"+gsResult.score.opp;
     const _hl=_tmpl[rng(0,_tmpl.length-1)].replace("{team}",myTeam?.name||"自チーム").replace("{opp}",currentOpp?.name||"相手").replace("{score}",_scoreStr);
-    addNews({type:"game",headline:_hl,source:"スポーツ報知",dateLabel:`${year}年 ${gameDay}日目`,body:(won?`${myTeam?.name}が${currentOpp?.name}に${_scoreStr}で勝利しました。`:`${myTeam?.name}は${currentOpp?.name}に${_scoreStr}で敗れました。`)});
+    publishAfterAdoption(addNews, {type:"game",headline:_hl,source:"スポーツ報知",dateLabel:`${year}年 ${gameDay}日目`,body:(won?`${myTeam?.name}が${currentOpp?.name}に${_scoreStr}で勝利しました。`:`${myTeam?.name}は${currentOpp?.name}に${_scoreStr}で敗れました。`)});
     if(Math.random()<0.35){
       const _qs=won?INTERVIEW_QUESTIONS_WIN:INTERVIEW_QUESTIONS_LOSE;
       const _opts=won?INTERVIEW_OPTIONS_WIN:INTERVIEW_OPTIONS_LOSE;
-      addNews({type:"interview",headline:`インタビュー ${myTeam?.name||""}戦後会見`,source:"球団広報",dateLabel:`${year}年 ${gameDay}日目`,body:"試合後、監督にコメントを求められた。",question:_qs[rng(0,_qs.length-1)],options:_opts});
+      publishAfterAdoption(addNews, {type:"interview",headline:`インタビュー ${myTeam?.name||""}戦後会見`,source:"球団広報",dateLabel:`${year}年 ${gameDay}日目`,body:"試合後、監督にコメントを求められた。",question:_qs[rng(0,_qs.length-1)],options:_opts});
     }
     const tacticalDate = gameDayToDate(gameDay, schedule);
     if (tacticalDate && tacticalDate.month === TRADE_DEADLINE_MONTH) {
@@ -1078,8 +1118,8 @@ export function useSeasonFlow(gs) {
       const newsItem = tryCpuCpuDeadlineTrade(liveTeams, gameDay);
       if (newsItem) {
         updatedTeams = liveTeams;
-        addNews({ type: 'trade', headline: newsItem.headline, source: 'Baseball Times', dateLabel: `${year}年 ${gameDay}日目`, body: newsItem.body });
-        addTransferLog({
+        publishAfterAdoption(addNews, { type: 'trade', headline: newsItem.headline, source: 'Baseball Times', dateLabel: `${year}年 ${gameDay}日目`, body: newsItem.body });
+        publishAfterAdoption(addTransferLog, {
           year,
           day: gameDay,
           type: "trade",
@@ -1092,12 +1132,17 @@ export function useSeasonFlow(gs) {
         });
       }
     }
-    tryGenerateCpuOffer(updatedTeams);
+    const receipt = await normalArchive.run?.seal(normalArchive.emitter.finish()) ?? null;
+    if (!canAdopt(baseToken)) return;
     if(gs.applyProgressCandidate) {
       const candidate={teams:updatedTeams,myId,saveId:gs.saveId,year,gameDay:gameDay+1,schedule,seasonHistory:getSeasonHistory?.()??gs.seasonHistory,
+        battedBallReceipt: receipt,
         ...(farmProgress?{farmCompetition:farmProgress.competition,farmCompetitionVersion:1}:{})};
       if(!gs.applyProgressCandidate(candidate,{baseToken}))return;
+      normalArchive.run?.adopt();
     } else setTeams(updatedTeams);
+    stagedEffects.forEach(effect => effect());
+    tryGenerateCpuOffer(updatedTeams);
     pushResult(won,drew,currentOpp?.name||"",gsResult.score.my,gsResult.score.opp,gameDay);
     gs.pushGameResult(gameDay,{won,drew,isHome,oppName:currentOpp?.name||"",myScore:gsResult.score.my,oppScore:gsResult.score.opp,log:gsResult.log,inningSummary:gsResult.inningSummary,oppTeam:currentOpp});
     if(!gs.applyProgressCandidate)setGameDay(d=>d+1);
@@ -1128,7 +1173,7 @@ export function useSeasonFlow(gs) {
       setGameResult({ ...gsResult, isHome: currentGameTeams?.isHome ?? true });
       setScreen("result");
       notify("試合後処理でエラーが発生したため、一部の集計をスキップして結果画面へ遷移しました。", "warn");
-    }
+    } finally { void normalArchive.run?.discard(); }
   };
 
   return {

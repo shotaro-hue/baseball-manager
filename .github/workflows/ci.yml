@@ -89,6 +89,9 @@ jobs:
       - name: Verify storage epoch migration and old-version exclusion
         if: ${{ matrix.suite.name == 'save-portable-backup-probe' }}
         run: npm run test:e2e -- --config=scripts/storage-version-fence.playwright.config.js --workers=1 --retries=0
+      - name: Verify accepted-progress archive receipts in both browsers
+        if: ${{ matrix.suite.name == 'save-portable-backup-probe' }}
+        run: npm run test:e2e -- --config=scripts/batted-ball-receipts.playwright.config.js --workers=1 --retries=0
       # Only historical unsafe observations are advisory. Keep every assertion
       # and run them explicitly; a future correct writer must not fail the gate.
       - name: Characterize known unsafe storage (advisory, not a correctness gate)

@@ -13,6 +13,7 @@ import {
   storageAccessFailureReason,
 } from './baseballManagerDb';
 import { ensureSaveId } from './saveIdentity';
+import { validateBattedBallReceipt } from './battedBallRun';
 import { MAX_BATTED_BALL_EVENTS, MAX_SPRAY_POINTS } from '../constants';
 import {
   createEmptyBattedBallProfile,
@@ -624,6 +625,7 @@ async function saveGameImpl(state, options = {}) {
     safeState = sanitizeSaveState(state);
     safeState.saveId = ensureSaveId(safeState.saveId);
     validateFarmSaveState(safeState);
+    validateBattedBallReceipt(safeState.battedBallReceipt, safeState.saveId);
   } catch (e) {
     console.error('Save failed: sanitize state error', e);
     return failedSave('sanitize_state_failed', 'validate_state', 'validateFarmSaveState', e);
@@ -645,6 +647,10 @@ async function saveGameImpl(state, options = {}) {
     }
     if(previous?.saveId===safeState.saveId && previous.farmCompetitionVersion===1 && safeState.farmCompetitionVersion!==1) {
       return failedSave('farm_payload_missing', 'validate_previous', 'saveGame');
+    }
+    if (previous?.saveId === safeState.saveId && previous.battedBallReceipt
+      && (!safeState.battedBallReceipt || (previous.battedBallReceipt.head && !safeState.battedBallReceipt.head))) {
+      return failedSave('archive_receipt_missing', 'validate_previous', 'saveGame');
     }
     let generationDirtyScopes=options?.dirtyScopes;
     if(safeState.farmCompetition && previous?.farmCompetition?.archiveSignature!==safeState.farmCompetition.archiveSignature
@@ -791,6 +797,7 @@ function validatedRootMetadata(state) {
   // Legacy career migration still needs its inline player records until explicit save.
   if (!(state.saveDataVersion >= GENERATION_VERSION)) return state;
   return { saveId: state.saveId, year: state.year, saveDataVersion: state.saveDataVersion,
+    battedBallReceipt: state.battedBallReceipt ? structuredClone(state.battedBallReceipt) : null,
     farmCompetitionVersion: state.farmCompetitionVersion,
     farmCompetition: state.farmCompetition ? {archiveSignature:state.farmCompetition.archiveSignature} : undefined,
     saveManifest: JSON.parse(JSON.stringify(state.saveManifest)) };

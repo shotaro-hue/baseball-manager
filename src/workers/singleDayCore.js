@@ -8,8 +8,8 @@ import { calcRetireWill } from '../engine/player';
 import { applyRegularSeasonTeamUpdate } from '../engine/regularGameUpdates';
 import { quickSimGame } from '../engine/simulation';
 import { computeBoxScore } from '../engine/postGame';
+import { createBattedBallRunEmitter } from '../engine/battedBallRun';
 import {
-  createBattedBallArchiveChunker,
   createBattedBallBatchRecords,
 } from '../engine/battedBallProfile';
 import { generateCpuOffer, generateCpuCpuTrade, classifyTeam, evaluateFrontOfficePlan } from '../engine/trade';
@@ -266,6 +266,7 @@ export function simulateSingleDay({
   isCancelled,
   onProgress,
   onArchiveChunk,
+  archiveRunId,
 }) {
   const request = regularSeasonRequest(snapshot, 1);
   if (!request.count) throw new Error(request.reason);
@@ -285,7 +286,7 @@ export function simulateSingleDay({
 
   emitProgress(onProgress, '試合シム');
   ensureNotCancelled(isCancelled);
-  const archiveChunker = createBattedBallArchiveChunker(onArchiveChunk);
+  const archiveChunker = createBattedBallRunEmitter(onArchiveChunk, { runId: archiveRunId });
   const archiveGame = (log, firstTeam, secondTeam) => {
     archiveChunker.add(createBattedBallBatchRecords(log, {
       saveId: safeSnapshot.saveId,
@@ -469,10 +470,11 @@ export function simulateSingleDay({
   };
 
   emitProgress(onProgress, '完了', true);
-  archiveChunker.flush();
+  const archiveRun = archiveChunker.finish();
 
   return {
     nextState,
+    archiveRun,
     userGameResult: {
       ...userGameResult,
       oppTeam: currentOpp,

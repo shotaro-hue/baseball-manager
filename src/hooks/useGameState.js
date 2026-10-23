@@ -4,6 +4,7 @@ import { marketRosterError } from '../engine/marketRoster';
 import {createFarmCompetition} from '../engine/farmRecords';
 import {validateFarmSaveState} from '../engine/farmMigration';
 import { saveFeedback } from '../engine/saveFeedback';
+import { emptyBattedBallReceipt, validateBattedBallReceipt } from '../engine/battedBallRun';
 import { useState, useReducer, useMemo, useCallback, useEffect, useRef } from "react";
 import { contractReplyIsDue, resolveContractReplies } from '../engine/contractReplies';
 import { yieldToBrowser } from '../engine/yieldToBrowser';
@@ -143,7 +144,7 @@ export function useGameState() {
     undefined,
     () => ({ teams: [], news: [], gameDay: 1, year: 2026, myId: null, saveId: createSaveId() }),
   );
-  const { teams, news, gameDay, year, myId, saveId, farmCompetition } = gameState;
+  const { teams, news, gameDay, year, myId, saveId, farmCompetition, battedBallReceipt } = gameState;
   const rosterCommandRef = useRef(gameState);
   const setNewsState = useCallback(value => {
     const current = rosterCommandRef.current;
@@ -180,6 +181,7 @@ export function useGameState() {
   const applyProgressCandidate = useCallback((candidate,{baseToken}={}) => {
     if(baseToken!=null&&baseToken!==progressTokenRef.current)return false;
     validateFarmSaveState(candidate);
+    if ('battedBallReceipt' in candidate) validateBattedBallReceipt(candidate.battedBallReceipt, candidate.saveId ?? rosterCommandRef.current.saveId);
     progressDispatch({type:G.APPLY_PROGRESS,candidate:{...candidate,teams:slimTeamsForState(candidate.teams)}});
     markSaveDirty();return true;
   },[progressDispatch,markSaveDirty]);
@@ -412,6 +414,8 @@ export function useGameState() {
         pendingCareerEntriesRef.current=pendingCareerEntriesRef.current.filter(entry=>!committed.has(entry));
         try {
           const archive = await import('../engine/battedBallArchive');
+          const receipts = await import('../engine/battedBallReceipts');
+          const receiptResult = await receipts.flushBattedBallReceipts(state.battedBallReceipt);
           const status = archive.getBattedBallQueueStatus();
           let archiveResult = status.failedRecords > 0
             ? await archive.retryFailedBattedBallWrites()
@@ -423,7 +427,7 @@ export function useGameState() {
             archiveResult = await archive.flushBattedBallQueue();
             settled = archive.getBattedBallQueueStatus();
           }
-          return { ...result, archive: { ...archiveResult, ok: archiveResult?.ok !== false && !(settled.failedRecords > 0) } };
+          return { ...result, archive: { ...archiveResult, ok: receiptResult.ok && archiveResult?.ok !== false && !(settled.failedRecords > 0) } };
         } catch (error) {
           console.warn('打球アーカイブのフラッシュに失敗しました。試合セーブは完了しています。', error);
           return { ...result, archive: { ok: false } };
@@ -614,7 +618,7 @@ export function useGameState() {
       }
       const request = beginTrackedSave();
       return queueSave(
-        {teams,myId,gameDay,year,saveId,schedule,...farmFields,faPool,faYears,seasonHistory,news,mailbox,saveRevision,offseasonPlan,...getMatchHistorySnapshot()},
+        {teams,myId,gameDay,year,saveId,battedBallReceipt,schedule,...farmFields,faPool,faYears,seasonHistory,news,mailbox,saveRevision,offseasonPlan,...getMatchHistorySnapshot()},
         request.options,
         request.snapshot,
       ).then((result) => ({ result, snapshot: request.snapshot }));
@@ -644,7 +648,7 @@ export function useGameState() {
       request.options.dirtyScopes = [...new Set([...(request.options.dirtyScopes ?? ['seasonHistory', 'news', 'mailbox']), 'matchHistory'])];
     }
     const result=await queueSave(
-      {teams,myId,gameDay,year,saveId,schedule,...farmFields,faPool,faYears,seasonHistory,news,mailbox,saveRevision,...getMatchHistorySnapshot(),
+      {teams,myId,gameDay,year,saveId,battedBallReceipt,schedule,...farmFields,faPool,faYears,seasonHistory,news,mailbox,saveRevision,...getMatchHistorySnapshot(),
         offseasonPlan: offseasonPlan && { ...offseasonPlan, resumeScreen:
           offseasonPlan.stage === 'postseason' && screen === 'hub' ? offseasonPlan.resumeScreen : screen }, ...options.payload},
       request.options,
@@ -660,7 +664,7 @@ export function useGameState() {
     }
     return result;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[teams,myId,saveId,gameDay,year,farmCompetition,schedule,faPool,faYears,seasonHistory,news,mailbox,saveRevision,offseasonPlan,screen,isAutoSaveSuspended,notify,queueSave,beginTrackedSave,completeTrackedSave,getMatchHistorySnapshot]);
+  },[teams,myId,saveId,gameDay,year,battedBallReceipt,farmCompetition,schedule,faPool,faYears,seasonHistory,news,mailbox,saveRevision,offseasonPlan,screen,isAutoSaveSuspended,notify,queueSave,beginTrackedSave,completeTrackedSave,getMatchHistorySnapshot]);
 
   useEffect(() => {
     if (!offseasonPlan || !OFFSEASON_SAVE_SCREENS.has(screen) || !saveDirty || isAutoSaveSuspended) return;
@@ -699,8 +703,9 @@ export function useGameState() {
       const saveMod = await loadSaveModule();
       const initialHistory={awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[],transfers:[]};
       const initialFarm = createFarmCompetition({teams:nextTeams,saveId:nextSaveId,year});
+      const initialReceipt = emptyBattedBallReceipt(nextSaveId);
       const initialized = await saveMod.enqueueSaveGame({schedule:newSchedule,farmCompetition:initialFarm,farmCompetitionVersion:1,teams:nextTeams,myId:id,saveId:nextSaveId,year,gameDay:1,
-        faPool:nextFaPool,faYears:{},seasonHistory:initialHistory,news:[],mailbox:[],offseasonPlan:null,...matchHistorySnapshot({})},
+        battedBallReceipt:initialReceipt,faPool:nextFaPool,faYears:{},seasonHistory:initialHistory,news:[],mailbox:[],offseasonPlan:null,...matchHistorySnapshot({})},
         {initialCareerLogs:collectCareerLogsForIndexedDb(nextTeams)});
       if (!initialized?.ok) {
         const error=new Error('initial_career_log_persistence_failed');
@@ -709,7 +714,7 @@ export function useGameState() {
       // The initial write already succeeded; avoid an immediate redundant autosave.
       setLastAutoSaveAt(Date.now());
       pendingCareerEntriesRef.current=[];
-      applyProgressCandidate({teams:nextTeams,myId:id,saveId:nextSaveId,year,gameDay:1,farmCompetition:initialFarm,farmCompetitionVersion:1,seasonHistory:initialHistory});
+      applyProgressCandidate({teams:nextTeams,myId:id,saveId:nextSaveId,year,gameDay:1,farmCompetition:initialFarm,farmCompetitionVersion:1,seasonHistory:initialHistory,battedBallReceipt:initialReceipt});
       setFaPool(nextFaPool);
       setSaveId(nextSaveId);
       setOffseasonPlan(null);
@@ -1114,7 +1119,7 @@ export function useGameState() {
     retireRole, setRetireRole,
     teams, setTeams,
     myId, setMyId,
-    saveId, setSaveId, farmCompetition, farmCompetitionVersion: farmCompetition ? 1 : undefined, setFarmCompetition, applyProgressCandidate, getProgressToken, getProgressSessionToken,
+    saveId, setSaveId, battedBallReceipt, farmCompetition, farmCompetitionVersion: farmCompetition ? 1 : undefined, setFarmCompetition, applyProgressCandidate, getProgressToken, getProgressSessionToken,
     tab, setTab,
     gameDay, setGameDay,
     year, setYear,
