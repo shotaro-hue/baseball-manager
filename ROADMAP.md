@@ -1,6 +1,6 @@
 # ROADMAP — NPB Franchise Manager
 
-> 最終更新: 2026-10-23（#495マージ反映、SAVE-01B-0A共通archive排他を独立実装。完全バックアップの公開条件は未完了）
+> 最終更新: 2026-10-23（#496マージ反映、SAVE-01B-0Bで旧版のDB接続拒否を独立実装。完全バックアップの公開条件は未完了）
 > 目的: **OOTP / Football Manager のように「何年も遊べる、意思決定が積み重なる経営シミュレーション」**を作る。
 
 > 現在の進捗は第1節を参照。第2・3・5節の旧チェックリストと期日は2026-05-01時点の履歴であり、現在の完了認定ではない。UI/UX改革の一次監査・推奨PR分割は [全体改革の青写真 v1](./docs/REFORM_BLUEPRINT_V1.md)、現行の設計方針は [UI/UX設計基準](./docs/DESIGN_SYSTEM.md) を参照。着手時には最新mainと再照合する。
@@ -28,7 +28,7 @@
 
 照合日：2026-10-21。基準main：`46d75e21b1f6e27c0f60274a38cd7619a80d951d`（PR #489マージ後）。GitHubのmainとマージ状態を確認。QA-D1は#472、FIX-S3は#473、捕手不足の原因分析は#474、捕手層の編成方針は#475、一軍空き枠の補足修正は#476、共通人数基盤は#477、可変ドラフトは#478、65人方針は#479、AI-03は#480、球団収支FIX-M1は#481でマージ済み。各工程の対象範囲・実測・限界は[QA-D1](./docs/implementation/qa-d1.md)・[FIX-S3](./docs/implementation/fix-s3.md)・[捕手不足の原因分析](./docs/implementation/farm-catcher-shortage.md)・[捕手層のレビューと次工程](./docs/implementation/catcher-depth-review.md)・[収支検証](./docs/validation/club-finance/README.md)を参照。全機能・全年度・実機の完了認定ではない。
 
-保存工程の最新照合: 2026-10-23、main `beb79823828642617b9044edb6a3abec24523a80`（#495マージ後）。#490の信頼性修正、#491〜#493の保存修正はmainへ反映済み。実iPhoneでの保存/再読込確認は未完了。完全バックアップ設計の正本は未マージの[#494](https://github.com/shotaro-hue/baseball-manager/pull/494)。以下の保存工程が現在の進行条件である。
+保存工程の最新照合: 2026-10-23、main `66a8dda77132892946f0da69c323db853dbac4b9`（#496マージ後）。#496の最終head CI13ジョブ成功を確認。#490の信頼性修正、#491〜#493の保存修正はmainへ反映済み。実iPhoneでの保存/再読込確認は未完了。完全バックアップ設計の正本は未マージの[#494](https://github.com/shotaro-hue/baseball-manager/pull/494)。以下の保存工程が現在の進行条件である。
 
 ### UI-04 球団経営・ナビゲーション刷新（今回確定）
 
@@ -47,13 +47,14 @@
 | FIX-CORE-02 | — | [#490](https://github.com/shotaro-hue/baseball-manager/pull/490)マージ済み | [原因/検証](./docs/validation/fix-core-02/README.md)。#491〜#493の保存容量修正もmain反映済み。実機受入は別途 |
 | SAVE-01A | P1 | [#494](https://github.com/shotaro-hue/baseball-manager/pull/494)で設計継続、未マージ | ZIP第一候補。B-0の限定受入と設計確定/v1凍結を分離。root/不変archive対応、旧版タブ、全展開メモリ、実iPhone/Files、完全復元とGC保護は未完了 |
 | SAVE-01B-0 | — | [#495](https://github.com/shotaro-hue/baseball-manager/pull/495)限定実証マージ済み | [証跡](./docs/validation/save-01b0/README.md)。隔離journal・共通ロック参加probe・16/64 MiB ZIPの独立全バイト検証。製品完全バックアップの完成ではない |
-| SAVE-01B-0A | P1 | この独立PRで製品archive共通排他を実装、未マージ | [計画](./docs/implementation/save-archive-locks-plan.md)・[検証](./docs/validation/archive-lock/README.md)。write/retry/backfill/deleteを共通archiveロックへ統合。旧版タブのfenceとroot対応は未解決。B-1開始とは区別 |
+| SAVE-01B-0A | — | [#496](https://github.com/shotaro-hue/baseball-manager/pull/496)マージ済み | [検証](./docs/validation/archive-lock/README.md)。write/retry/backfill/deleteを共通archiveロックへ統合。最終head CI13ジョブ成功。旧版タブのfenceとroot対応は別工程 |
+| SAVE-01B-0B | P1 | この独立PRで版指定旧DB接続の拒否を実装、未マージ | [計画](./docs/implementation/storage-version-fence-plan.md)・[検証](./docs/validation/storage-version-fence/README.md)。DB v3→v4で全行を保全、妨害/待機/旧版を原因別に失敗。無版指定raw IDB・localStorage直接書込・進行済み旧公開は未保護。root/不変archive対応も未実装 |
 | SAVE-01B-1 / B-2 | P1 | 未着手、前提条件未完了 | #494の設計・v1凍結と残ゲート解消後。完全書出し→厳密検査/プレビュー→journal付き隔離復元→冷起動/試合進行。直接上書きだけの復元は不可 |
 | QA-04A | P1 | SAVE-01B後、未着手 | 新規→通常/手動/まとめシム→一軍/二軍成績→契約/FA/取引/スカウト→ドラフト/年度→保存再開。失敗/復旧/競合、CPU編成。通常CI外E2Eを評価し必要なゲートを選ぶ |
 | UI-04D | P2 | QA-04A後。コード未着手 | 通知/ニュース/球団史/OB/設定をDES-01へ移行。既読/要対応/対応済み、実在する設定、一覧/詳細/元の位置。今回の接続・回答修正と区別 |
 | QA-04B | P1 | UI-04D後、未着手。**実iPhone確認未完了** | 360/390/760/761/799/800/1023/1024/1440px、Chromium/WebKit、キーボード、保存/復帰。実iPhoneのタッチ・連続スワイプ・速度は別途実施 |
 
-実施順は **SAVE-01B-0A（共通排他）→ root/不変archive対応・旧版タブ対策・源データ展開メモリ/実機実証 → #494設計確定・v1凍結 → SAVE-01B-1/B-2 → QA-04A → UI-04D → QA-04B**。B-0Aは#494第9節の保存基盤を独立修正する工程で、B-1の前提を解消済みとは扱わない。各工程は専用PR、人間がマージ判断。QA-04Aの固定seed10年/20年と複数seed比較は別途実施する。#495のCIで観測したDHなし先発8人の編成エラーは原因未特定の別信頼性課題として残し、今回へ混入させない。
+実施順は **SAVE-01B-0B（版指定旧接続の拒否）→ accepted progress receiptとroot/不変archive対応・残る旧版公開対策・源データ展開メモリ/実機実証 → #494設計確定・v1凍結 → SAVE-01B-1/B-2 → QA-04A → UI-04D → QA-04B**。通常/Workerの打球は結果採用前にも書き出されるため、saveId・日付・gameId・件数から対応を推測しない。採用済み進行と同時にreceiptをstateへ保持し、不変versionへ結ぶ方式は後続で実装する。B-0A/B-0Bは#494第9節の前提整備で、B-1の開始条件を解消済みとは扱わない。各工程は専用PR、人間がマージ判断。QA-04Aの固定seed10年/20年と複数seed比較は別途実施する。#495のCIで観測したDHなし先発8人の編成エラーは原因未特定の別信頼性課題として残し、今回へ混入させない。
 
 **二軍の実測基盤は実装・マージ済み。CPUの編成判断は段階的に改善中。新デザインの全画面移行と長期バランスの完了には至っていない。**
 

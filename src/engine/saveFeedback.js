@@ -5,6 +5,9 @@ const SAVE_FAILURE_CAUSES = {
   save_conflict: '別タブで保存が更新されたため、上書きを止めました。',
   stale_save: 'より新しい年度の保存があるため、上書きを止めました。',
   indexeddb_write_failed: 'ブラウザ内データベースへの書き込みに失敗しました。',
+  storage_upgrade_blocked: '別タブの接続が残っているため、保存領域を更新できませんでした。',
+  storage_version_outdated: '保存領域が新しい版へ更新されたため、この画面からの保存を止めました。',
+  storage_open_timeout: 'ブラウザ内データベースの接続が完了せず、保存を開始できませんでした。',
   quota_exceeded: '保存容量が不足しています。前回の正常セーブは保持しています。',
   sanitize_state_failed: '保存用データの準備に失敗しました。',
   serialization_failed: '保存用データを変換できませんでした。',
@@ -23,6 +26,10 @@ const SAVE_FAILURE_CAUSES = {
 const retainEdits = 'この画面を開いたまま、未保存の変更内容を控えてください。';
 const inspectFailure = `${retainEdits}再試行を繰り返す前に、保存エラーの詳細と診断で原因を確認してください。`;
 function recoveryFor(reason, exceptionName) {
+  if (reason === 'storage_upgrade_blocked') return { retryable: true,
+    recovery: `${retainEdits}別タブの未保存変更を控え、必要な保存が済んでからそのタブを閉じてください。この画面は開いたまま、別タブの接続を解消した後に限り、保存ボタンで再試行してください。` };
+  if (reason === 'storage_version_outdated') return { retryable: false,
+    recovery: `${retainEdits}保存ボタンの再試行だけでは解消しません。未保存の変更は自動では移りません。変更内容を控えたうえで最新のアプリを開き、最後に保存できた状態を再開してください。` };
   if (reason === 'save_conflict' || reason === 'stale_save') {
     const cause = reason === 'save_conflict' ? '別タブの保存完了を確認し、' : '古い状態から上書きせず、';
     return { retryable: false, recovery: `${retainEdits}${cause}既存セーブとバックアップを保全してください。保存ボタンの再試行だけでは解消しません。画面を離れると未保存の変更は失われます。変更内容を控えたうえで、タイトルの「続きから」で最新の保存を再開してください。未保存の変更は引き継がれません。` };

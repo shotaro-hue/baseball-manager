@@ -45,8 +45,8 @@ export default defineConfig({
     },
     {
       name: 'mobile-webkit',
-      testMatch: ['**/progression.smoke.spec.js', '**/finance.spec.js', '**/save-generations.spec.js', '**/career-generations.spec.js', '**/hub-navigation.spec.js', '**/management-decisions.spec.js', '**/management-lists.spec.js', '**/core-reliability.spec.js', '**/offseason-save-feedback.spec.js', '**/offseason-save-progression.spec.js', '**/save-capacity.spec.js', '**/save-capacity-ui.spec.js', '**/archive-lock.spec.js'],
-      grep: /E1 new game|finance|save generations|career generations|hub navigation|management decisions|management lists|core reliability|offseason save|save capacity|archive lock/,
+      testMatch: ['**/progression.smoke.spec.js', '**/finance.spec.js', '**/save-generations.spec.js', '**/career-generations.spec.js', '**/hub-navigation.spec.js', '**/management-decisions.spec.js', '**/management-lists.spec.js', '**/core-reliability.spec.js', '**/offseason-save-feedback.spec.js', '**/offseason-save-progression.spec.js', '**/save-capacity.spec.js', '**/save-capacity-ui.spec.js', '**/archive-lock.spec.js', '**/storage-version-fence.spec.js'],
+      grep: /E1 new game|finance|save generations|career generations|hub navigation|management decisions|management lists|core reliability|offseason save|save capacity|archive lock|storage version fence/,
       use: { ...devices['iPhone 13'], viewport: { width: 390, height: 844 } },
     },
   ],
