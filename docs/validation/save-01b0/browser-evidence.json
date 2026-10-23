@@ -1,0 +1,125 @@
+{
+  "baseMain": "7dc29c0809526ce937e9948b9a0940c7287dc38d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "playwright": "1.56.0",
+    "browserViewport": "390x844",
+    "realIPhone": false,
+    "peakMemoryMeasured": false
+  },
+  "scope": "Isolated protocol and transport probes. No complete game export/import or frozen package schema.",
+  "attempts": [
+    {
+      "report": "browser-final.json",
+      "project": "chromium",
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "report": "browser-final.json",
+      "project": "mobile-webkit",
+      "passed": 0,
+      "failed": 10,
+      "skipped": 0
+    },
+    {
+      "report": "webkit-final.json",
+      "project": "mobile-webkit",
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0
+    }
+  ],
+  "latestProjects": [
+    {
+      "project": "chromium",
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "benchmarks": {
+        "independent-zip-verification": {
+          "verified": true,
+          "entries": 4,
+          "inputBytes": 1048576
+        },
+        "capacity-16": {
+          "inputBytes": 16777216,
+          "outputBytes": 16794445,
+          "entries": 64,
+          "maxInputEntryBytes": 262144,
+          "elapsedMs": 4691.799999999814,
+          "peakHeapBytes": null,
+          "bytes": 16794445,
+          "memoryObservation": "No peak-memory measurement; not real iPhone evidence"
+        },
+        "capacity-64": {
+          "inputBytes": 67108864,
+          "outputBytes": 67177540,
+          "entries": 256,
+          "maxInputEntryBytes": 262144,
+          "elapsedMs": 10192.600000000559,
+          "peakHeapBytes": null,
+          "bytes": 67177540,
+          "memoryObservation": "No peak-memory measurement; not real iPhone evidence"
+        },
+        "source-sizing": {
+          "fixture": "one real 2026 season; 20 equivalent historical years, not 20 simulated seasons",
+          "year": 2026,
+          "gameDay": 106,
+          "encodedRootCharacters": 8920668,
+          "decodedRootBytes": 44193331,
+          "decodedCareerBytes": 16100157,
+          "sourceReadMs": 2644.9000000003725,
+          "peakHeapBytes": null,
+          "scope": "source sizing only; no complete portable export or real-iPhone claim"
+        }
+      }
+    },
+    {
+      "project": "mobile-webkit",
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "benchmarks": {
+        "independent-zip-verification": {
+          "verified": true,
+          "entries": 4,
+          "inputBytes": 1048576
+        },
+        "capacity-16": {
+          "inputBytes": 16777216,
+          "outputBytes": 16794445,
+          "entries": 64,
+          "maxInputEntryBytes": 262144,
+          "elapsedMs": 1965,
+          "peakHeapBytes": null,
+          "bytes": 16794445,
+          "memoryObservation": "No peak-memory measurement; not real iPhone evidence"
+        },
+        "capacity-64": {
+          "inputBytes": 67108864,
+          "outputBytes": 67177540,
+          "entries": 256,
+          "maxInputEntryBytes": 262144,
+          "elapsedMs": 13828,
+          "peakHeapBytes": null,
+          "bytes": 67177540,
+          "memoryObservation": "No peak-memory measurement; not real iPhone evidence"
+        },
+        "source-sizing": {
+          "fixture": "one real 2026 season; 20 equivalent historical years, not 20 simulated seasons",
+          "year": 2026,
+          "gameDay": 106,
+          "encodedRootCharacters": 9396228,
+          "decodedRootBytes": 44193331,
+          "decodedCareerBytes": 16100157,
+          "sourceReadMs": 2397,
+          "peakHeapBytes": null,
+          "scope": "source sizing only; no complete portable export or real-iPhone claim"
+        }
+      }
+    }
+  ]
+}

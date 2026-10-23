@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SAVE-01B-0 ファイル受渡し実証</title>
+<style>
+  body { margin: 0; padding: 24px 18px; background: #f1f5f9; color: #172b45; font: 16px/1.65 system-ui,sans-serif; }
+  main { max-width: 640px; margin: auto; } h1 { font-size: 23px; line-height: 1.4; }
+  button,select,a { font: inherit; } button,select { padding: 12px; margin: 6px 8px 6px 0; }
+  button { color: white; background: #1661b0; border: 0; border-radius: 6px; } button:disabled { opacity: .45; }
+  a { color: #1056a4; display: inline-block; padding: 12px 0; } [hidden] { display: none !important; }
+  :focus-visible { outline: 3px solid #e2960c; outline-offset: 3px; } pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
+</style>
+<main>
+  <h1>SAVE-01B-0<br>ファイル受渡しの実証</h1>
+  <p>合成データだけでZIPを作成します。ゲームのセーブは読み書きしません。このファイルからゲームを復元する機能はありません。</p>
+  <label for="size">合成データのサイズ</label><br>
+  <select id="size"><option value="1">1 MiB</option><option value="16">16 MiB</option><option value="64">64 MiB</option></select>
+  <div><button id="prepare">ZIPを準備</button><button id="cancel" hidden>準備を中止</button></div>
+  <p role="status" aria-live="polite" id="status">ZIPを準備してから、保存・共有をタップしてください。</p>
+  <button id="share" disabled>保存・共有</button><br>
+  <a id="download" hidden download="save-01b0-probe.zip">ZIPをダウンロード</a>
+  <pre id="metrics"></pre>
+  <p>受渡し後は「ファイル」で保存先と実ファイルを確認してください。実iPhoneのピークメモリや保存成功は、このページの生成完了だけでは確認できません。</p>
+</main>
+<script type="module" src="./ui.js"></script>
+</html>

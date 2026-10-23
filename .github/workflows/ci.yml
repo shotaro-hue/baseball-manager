@@ -55,6 +55,8 @@ jobs:
             files: save-generations.spec.js career-generations.spec.js ai03-roster-cycle.spec.js core-reliability.spec.js
           - name: save-capacity
             files: save-capacity.spec.js save-capacity-ui.spec.js
+          - name: save-portable-backup-probe
+            files: --config=scripts/save-01b0/playwright.config.js
           - name: offseason-save
             files: offseason-save-feedback.spec.js offseason-save-progression.spec.js
     steps:
