@@ -17,6 +17,7 @@ export default defineConfig({
     exclude: [
       ...configDefaults.exclude,
       'e2e/**',
+      'tests/characterization/**', // historical unsafe observations run explicitly in CI
       'playwright.config.*',
       'node_modules/**',
       'dist/**',

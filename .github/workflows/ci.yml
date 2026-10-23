@@ -55,6 +55,8 @@ jobs:
             files: save-generations.spec.js career-generations.spec.js ai03-roster-cycle.spec.js core-reliability.spec.js
           - name: save-capacity
             files: save-capacity.spec.js save-capacity-ui.spec.js
+          - name: save-portable-backup-probe
+            files: --config=scripts/save-01b0/playwright.config.js
           - name: offseason-save
             files: offseason-save-feedback.spec.js offseason-save-progression.spec.js
     steps:
@@ -70,18 +72,9 @@ jobs:
       # Azure's Ubuntu mirror repeatedly stalled for 30s per package in CI #477,
       # consuming 22m43s before tests. Keep Ubuntu's signed archive and test budget.
       - name: Use Ubuntu archive for browser dependencies
-        run: |
-          sudo python3 - <<'PY'
-          from pathlib import Path
-          sources = Path('/etc/apt/sources.list.d')
-          for path in [Path('/etc/apt/sources.list'), *sources.glob('*.sources'), *sources.glob('*.list')]:
-              if not path.is_file():
-                  continue
-              original = path.read_text()
-              updated = original.replace('http://azure.archive.ubuntu.com/ubuntu', 'https://archive.ubuntu.com/ubuntu').replace('https://azure.archive.ubuntu.com/ubuntu', 'https://archive.ubuntu.com/ubuntu')
-              if updated != original:
-                  path.write_text(updated)
-          PY
+        # Hosted images can use mirror+file:/etc/apt/apt-mirrors.txt; replacing
+        # only .sources/.list silently left the slow Azure endpoint active.
+        run: sudo python3 scripts/ci/use-ubuntu-archive.py
       - name: Install Chromium and WebKit
         run: npx playwright install --with-deps chromium webkit
       - name: Run E2E subset (one worker, no retries)
@@ -90,6 +83,29 @@ jobs:
           QA_D1_STAGE: final-ci
           QA_D1_EVIDENCE: test-results/qa-d1-evidence
         run: npm run test:e2e -- ${{ matrix.suite.files }} --workers=1 --retries=0
+      # Only historical unsafe observations are advisory. Keep every assertion
+      # and run them explicitly; a future correct writer must not fail the gate.
+      - name: Characterize known unsafe storage (advisory, not a correctness gate)
+        id: storage-characterization
+        if: ${{ !cancelled() && matrix.suite.name == 'save-portable-backup-probe' }}
+        continue-on-error: true
+        run: npx vitest run --config scripts/save-01b0/vitest.characterization.config.js
+      - name: Characterize known unsafe cross-tab writer (advisory)
+        id: browser-characterization
+        if: ${{ !cancelled() && matrix.suite.name == 'save-portable-backup-probe' }}
+        continue-on-error: true
+        run: npm run test:e2e -- --config=scripts/save-01b0/playwright.characterization.config.js --workers=1 --retries=0
+      - name: Report historical observations separately from regressions
+        if: ${{ always() && matrix.suite.name == 'save-portable-backup-probe' }}
+        env:
+          STORAGE_OUTCOME: ${{ steps.storage-characterization.outcome }}
+          BROWSER_OUTCOME: ${{ steps.browser-characterization.outcome }}
+        run: |
+          echo "### Historical unsafe-storage characterization (advisory)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Unit: $STORAGE_OUTCOME; browser: $BROWSER_OUTCOME. Raw JSON/trace reports are in the uploaded artifact." >> "$GITHUB_STEP_SUMMARY"
+          if [ "$STORAGE_OUTCOME" != success ] || [ "$BROWSER_OUTCOME" != success ]; then
+            echo "::warning::Historical unsafe behavior was not reproduced. Inspect reports for a storage fix or infrastructure failure; update/retire characterization only with positive regression evidence. This is not a successful reproduction."
+          fi
       - name: Upload E2E report and failure evidence
         if: always()
         uses: actions/upload-artifact@v4

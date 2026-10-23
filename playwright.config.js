@@ -4,6 +4,7 @@ export default defineConfig({
   // Playwrightはe2eフォルダだけを見る
   testDir: './e2e',
   testMatch: '**/*.spec.js',
+  testIgnore: '**/characterization/**', // explicit advisory suite owns historical unsafe observations
 
   timeout: 30_000,
 

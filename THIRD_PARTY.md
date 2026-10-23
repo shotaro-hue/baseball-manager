@@ -10,6 +10,12 @@ It does **not** grant rights to third-party trademarks, logos, names, copyrighte
 
 ## External data
 
+The isolated SAVE-01B-0 development probe directly declares `fflate` 0.8.2
+(MIT, https://github.com/101arrowz/fflate) for streaming ZIP experiments.
+This matches the version already present in the application's dependency lock;
+the probe does not upgrade that runtime transitive dependency or import ZIP code
+into the game. Package license files remain distributed with npm dependencies.
+
 Some development utilities may obtain baseball data from external websites or endpoints. Users and contributors are responsible for confirming that their use of any external source complies with that source's terms, applicable licenses, and local law.
 
 Data files derived from third-party sources should not be assumed to be covered by the project's MIT License merely because they are stored in this repository.

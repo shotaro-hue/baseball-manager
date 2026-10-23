@@ -2,7 +2,8 @@
 
 作成日: 2026-10-23  
 対象: shotaro-hue/baseball-manager  
-確認したmain: 7dc29c0809526ce937e9948b9a0940c7287dc38d（#493マージ後）  
+初回基準main: 7dc29c0809526ce937e9948b9a0940c7287dc38d（#493マージ後）  
+最新照合main: beb79823828642617b9044edb6a3abec24523a80（#495マージ後、2026-10-23）  
 工程: SAVE-01A（設計のみ）。本書は実装完了・実機動作保証ではない。
 
 ## 1. 目的と実際の成功条件
@@ -170,7 +171,9 @@ WebKitは容量上限だけでなくWebサイトデータの自動削除・サ�
 
 **SAVE-01A（本PR）**: 保存領域と失敗経路の棚卸し、A/B/C比較、ZIP形式v1案・保全アルゴリズム・テスト/実機の合格条件をレビュー。製品コードは変更しない。本設計PR #494は開いたまま、最新mainから独立したB-0実証PRを並行作成する。実証結果を本書へ反映してから設計を確定・マージする。設計のマージはB-0の実機合格やB-1の仕様凍結を意味しない。
 
-**SAVE-01B-0（#494未マージで並行する実証PR）**: 全タブ共通archive排他/コミット対応、Safariの具体的な出力先と2操作でのファイル受渡し、既存root/career行を含むピーク、v3–v6からの候補別正規化、journal中断復帰を先行検証。ライブラリ/codec/分割上限/累積展開予算/意味比較規則を記録してv1を凍結する。実機を確認できなければ未完了とし、B-1のリリース判断に進まない。必要な保存基盤変更は独立差分としてレビューし、単なるZIP writerへ混入させない。
+**SAVE-01B-0（#495の限定隔離実証はマージ済み、以下の製品/実機ゲートは継続）**: 全タブ共通archive排他/コミット対応、Safariの具体的な出力先と2操作でのファイル受渡し、既存root/career行を含むピーク、v3–v6からの候補別正規化、journal中断復帰を先行検証。ライブラリ/codec/分割上限/累積展開予算/意味比較規則を記録してv1を凍結する。実機を確認できなければ未完了とし、B-1のリリース判断に進まない。必要な保存基盤変更は独立差分としてレビューし、単なるZIP writerへ混入させない。
+
+**SAVE-01B-0A（#496、独立の保存基盤修正）**: 製品の通常write/retry/backfill/deleteをorigin共通archiveロックへ統合する。14節の限定範囲を確認し、旧版タブfence・不変archive・root対応・実機/全工程メモリの未完了を維持する。B-1開始やv1凍結とは別の前提整備である。
 
 **SAVE-01B-1（実証後の書き出しPR）**: 凍結したフォーマットv1 writer、root/chunk/打球の完全書き出し、SHA検証、タイトル書き出しUI、復元コードが読むのと同等の**独立パーサー検証テスト**。実ファイルをまだ復元できない段階は「完全復旧機能完成」と呼ばない。
 
@@ -226,3 +229,25 @@ WebKitは容量上限だけでなくWebサイトデータの自動削除・サ�
 - **CI判定**: 旧headのprobe E2Eは依存導入が30分上限に達してキャンセルされ、テスト本体は未実行。集約gateの失敗は正しい動作だった。`apt-mirrors.txt`参照経路の修正とfixture回帰を追加したが、最終のCI成功は#495の正確なheadで別途確認する。キャンセルを成功としない。
 
 **判定を分離する**: 限定された隔離実証のレビュー修正は、probe/full回帰と最新head CI成功により受入可能。一方、本設計の確定・v1凍結・SAVE-01B-1製品実装の前提は引き続き未完了である。root保存時点と不変archiveの対応、同ID上書き/旧版タブ、root/career全展開、実iPhoneのピークメモリとFiles実保存、全依存領域の完全import→再読込→試合進行、旧保存とGC/遅延削除の保護を解消するまで製品の完全バックアップ完成としない。
+
+
+## 14. #495マージ後の現在地と製品排他の独立工程（2026-10-23）
+
+[#495](https://github.com/shotaro-hue/baseball-manager/pull/495)は最終head `5beb374436eda4051574d2a062c9881e3e24e947` を限定された隔離実証としてマージ済み（main `beb79823828642617b9044edb6a3abec24523a80`）。第12/13節の旧実証数は作成時点の履歴で、最終結果は以下を用いる。
+
+- 正常probeはChromium/WebKit **各13/13**、historical characterizationは **各1/1** と単体 **2/2** を別レポートへ分離した。既知の不具合を正常実装への必須期待値として固定しない。正常Vitest probe **21/21**、CIミラー **2/2**。
+- 16/64 MiBの実生成Fileをダウンロードし、独立PythonがCRC・全SHA・全manifest/entry集合と、独立再生成した入力の全バイトを検証した。64 MiBは **67,177,540 bytes / 256 data entries + manifest**。実ゲーム全領域の完全export/importや実iPhoneメモリの証明ではない。
+- 最終headの全体回帰は **225 files / 1,788 tests成功、既存benchmark skip2件**。全13 CIジョブの最新attempt成功を確認。初回match-historyでWorkerのDHなし先発8人エラーを観測し、その原因/再発条件は未解明。同一headの失敗ジョブ再実行で79/79成功した事実と、製品信頼性の残課題を分ける。再実行成功を原因解決とは扱わない。
+
+次の独立PR [#496](https://github.com/shotaro-hue/baseball-manager/pull/496)（SAVE-01B-0A）では、4.1節と9節に従う保存基盤の一部として、製品のarchive mutation入口を共通化した。設計を別PRへ分散せず、本書を正本に維持する。#496のマージ判断/CIは同PRの正確なheadで行う。
+
+| 項目 | #496の範囲と残条件 |
+|---|---|
+| 共通名 | **`baseball-manager-archive`**。更新済みwriterと将来の製品snapshot readerが同じorigin名を使用。#495隔離probeの`baseball-manager-backup-archive-probe`とは別名であり、既存probe helperは製品readerではない |
+| 対象経路 | 通常queue write、failed retry、集計backfill（source meta/raw読取から置換完了まで）、batch/meta/aggregateの削除。既存タブ内tailを維持 |
+| 取得順 | 両方必要なら **save → archive**。archive writerはsaveを追加取得しない。raw archiveロック内から同じhelperを再入したり、snapshot保持中にqueueをdrainしたりしない |
+| 非対応/失敗 | ブラウザでWeb Locks非対応ならDB変更を拒否し、queueのfailed recordを再試行用に残す。同期/非同期request失敗後もtailは再開。Nodeの単一processテストfallbackはブラウザ保証に使わない |
+| 限定検証 | 焦点51件、Chromium/WebKit各7件、build、独立差分レビューをローカルで確認。2タブの実Web Locks待機と、待機中のarchive transaction未開始・無関係save保護を検査。最新head CIは#496で別確認 |
+| 未解決 | **旧版/非参加タブのfence、raw IDB、同IDの不変version、rootとのcommit対応**。saveロックだけではarchiveを止めない観測は今も正しく、advisory characterizationを保持する |
+
+**進行条件**: #496は製品writerの排他参加までであり、B-0全ゲート合格・SAVE-01A設計確定・ZIP v1凍結・B-1開始・完全バックアップ完成を意味しない。次はroot/不変archiveの対応と旧版タブ移行方針を実証し、全展開/実iPhone/Filesの測定を進める。厳密reader、全依存領域の隔離import、journal/GC/遅延削除保護、復元→冷起動→試合進行→再保存も未完了の受入として残す。旧データを削除/上書きして実証しない。
