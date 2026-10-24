@@ -68,12 +68,15 @@ it('observes the real batch without changing state or consuming game RNG', () =>
       schedule: generateSeasonSchedule(year, teams), allStarDone: true,
       farmCompetition: createFarmCompetition({ teams, year, saveId }), farmCompetitionVersion: 1 };
     const before = structuredClone(snapshot), start = n;
-    const plain = simulateSeasonBatch({ snapshot, count: 80, autoManageMyTeam: true }), plainRng = n;
+    // Replay both simulations with the same externally supplied archive identity.
+    // Per-run UUIDs are operational metadata, independent of game RNG/state.
+    const archiveRunId = 'catcher-parity-run';
+    const plain = simulateSeasonBatch({ snapshot, count: 80, autoManageMyTeam: true, archiveRunId }), plainRng = n;
     n = start;
     const probe = createCatcherProbe(20261015);
     installCatcherProbe(vi, probe);
     probe.phase('season-start', snapshot);
-    const observed = simulateSeasonBatch({ snapshot, count: 80, autoManageMyTeam: true });
+    const observed = simulateSeasonBatch({ snapshot, count: 80, autoManageMyTeam: true, archiveRunId });
     // Timestamps are presentation metadata, not game state.
     const canonical = value => JSON.parse(JSON.stringify(value, (key, v) => key === 'timestamp' ? 0 : v));
     expect(canonical(observed)).toEqual(canonical(plain));

@@ -6,6 +6,68 @@ const SAVE = '/baseball-manager/src/engine/saveload.js';
 const NORMAL = '/baseball-manager/tests/helpers/receipt-normal-harness.jsx';
 test.beforeEach(async ({ page }) => { await page.goto(PAGE); });
 
+test('archive receipts: legacy retry during a newer projection cannot roll its batch or aggregate back', async ({ page }) => {
+  const result = await page.evaluate(async h => {
+    const f = await import(h), archive = await import('/baseball-manager/src/engine/battedBallArchive.js');
+    const receipts = await import('/baseball-manager/src/engine/battedBallReceipts.js');
+    const put = IDBObjectStore.prototype.put;
+    const a = await f.stage({ runId: 'failed-old', speed: 140, previousReceipt: f.emptyBattedBallReceipt('source') });
+    let oldStatus;
+    try {
+      IDBObjectStore.prototype.put = function(row, ...args) {
+        if (this.name === 'batted_ball_batches') throw new DOMException('injected', 'AbortError');
+        return put.call(this, row, ...args);
+      };
+      a.run.adopt(); oldStatus = await receipts.flushBattedBallReceipts(a.receipt);
+    } finally { IDBObjectStore.prototype.put = put; }
+    const b = await f.stage({ runId: 'newer', speed: 180, previousReceipt: a.receipt });
+    let release, acquired;
+    const granted = new Promise(resolve => { acquired = resolve; });
+    const held = navigator.locks.request('baseball-manager-archive', async () => {
+      acquired(); await new Promise(resolve => { release = resolve; });
+    });
+    await granted;
+    b.run.adopt();
+    // Wait until the new projection has left pending and is awaiting the lock.
+    for (let n = 0; !archive.getBattedBallQueueStatus({ saveId: 'source' }).isWriting; n++) {
+      if (n === 1000) { release(); throw new Error('replacement did not enter the writer'); }
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    const retry = archive.retryFailedBattedBallWrites();
+    release(); await held; await retry;
+    const flushed = await receipts.flushBattedBallReceipts(b.receipt);
+    return { oldStatus, flushed, speed: (await f.snapshot('batted_ball_batches'))[0][1].events[0].evKmh,
+      aggregate: (await f.snapshot('batted_ball_aggregates'))[0][1].profilesByResult.all,
+      oldCapture: await f.capture(a.receipt), currentCapture: await f.capture(b.receipt) };
+  }, H);
+  expect(result).toMatchObject({ oldStatus: { ok: false }, flushed: { ok: true }, speed: 180,
+    aggregate: { bip: 1, evSum: 180 }, oldCapture: { speeds: [140] }, currentCapture: { speeds: [180] } });
+});
+
+test('archive receipts: another save failure remains retryable without poisoning this receipt flush', async ({ page }) => {
+  const result = await page.evaluate(async h => {
+    const f = await import(h), archive = await import('/baseball-manager/src/engine/battedBallArchive.js');
+    const receipts = await import('/baseball-manager/src/engine/battedBallReceipts.js');
+    const foreign = await f.stage({ runId: 'failed-foreign', saveId: 'foreign' });
+    const own = await f.stage({ runId: 'healthy-own', previousReceipt: f.emptyBattedBallReceipt('source') });
+    const put = IDBObjectStore.prototype.put;
+    let failed, ownStatus, foreignStatus;
+    try {
+      IDBObjectStore.prototype.put = function(row, ...args) {
+        if (this.name === 'batted_ball_batches' && row.saveId === 'foreign') throw new DOMException('injected', 'AbortError');
+        return put.call(this, row, ...args);
+      };
+      foreign.run.adopt(); failed = await receipts.flushBattedBallReceipts(foreign.receipt);
+      own.run.adopt(); ownStatus = await receipts.flushBattedBallReceipts(own.receipt);
+      foreignStatus = archive.getBattedBallQueueStatus({ saveId: 'foreign' });
+    } finally { IDBObjectStore.prototype.put = put; }
+    await archive.retryFailedBattedBallWrites({ saveId: 'foreign' });
+    return { failed, ownStatus, foreignFailed: foreignStatus.failedRecords,
+      repaired: await receipts.flushBattedBallReceipts(foreign.receipt), rows: (await f.snapshot('batted_ball_batches')).length };
+  }, H);
+  expect(result).toMatchObject({ failed: { ok: false }, ownStatus: { ok: true }, foreignFailed: 1, repaired: { ok: true }, rows: 2 });
+});
+
 test('archive receipts: persisted primary and backup retain distinct bytes for the same game identity after reload', async ({ page }) => {
   const seeded = await page.evaluate(async ({ h, save }) => {
     const f = await import(h), s = await import(save);

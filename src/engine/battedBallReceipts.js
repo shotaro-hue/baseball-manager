@@ -154,9 +154,8 @@ export function createBattedBallReceiptRun({ saveId, previousReceipt = null, run
             const effective = records.filter(record => !superseded.has(record.id));
             if (!effective.length) return;
             enqueueBattedBallBatches(effective);
-            await flushBattedBallQueue();
-            let state = getBattedBallQueueStatus();
-            while (state.isWriting || state.queuedRecords) { await flushBattedBallQueue(); state = getBattedBallQueueStatus(); }
+            await flushBattedBallQueue({ saveId });
+            const state = getBattedBallQueueStatus({ saveId });
             if (state.failedRecords) throw new Error('archive_projection_failed');
           }, true);
         } finally { db.close(); }
@@ -220,8 +219,8 @@ export function createBattedBallReceiptRun({ saveId, previousReceipt = null, run
 
 // Save-time status covers retry/projection and the current run's durable head.
 // It does not certify a historical chain; the full strict reader does that.
-export async function flushBattedBallReceipts(receipt) {
-  const results = await Promise.all([...jobs()].filter(job => !receipt?.saveId || job.saveId === receipt.saveId).map(job => job.retry()));
+export async function flushBattedBallReceipts(receipt, { saveId = receipt?.saveId } = {}) {
+  const results = await Promise.all([...jobs()].filter(job => saveId == null || job.saveId === saveId).map(job => job.retry()));
   if (results.some(result => !result.ok)) return { ok: false, scope: 'head' };
   if (receipt == null) return { ok: true, scope: 'head' };
   let db;
