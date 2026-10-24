@@ -47,3 +47,5 @@ head7c2e8c4、CI40106315177では全体unit1,862件（既存benchmark2skip）と
 - management通知ケースもnative行のaccessible nameと一覧復帰/選択詳細へ追随。正確な案件heading、700万円の下書き復帰、取引1回、予算を維持。両engine2/2成功（24.2秒）。
 
 追随後の関連12件はすべて成功。製品runtime・保存処理・timeout・retry数はこの追随で変更していない。最終公開headの全体CIはPR本文で確認する。
+
+初回management-uiの全ログでは退団済み契約回答の旧完全一致locatorも残っており、同じnative行の新accessible nameへ追随した。退団済みIDの正確な確認・以前の選手情報が残らない条件と保存内容を維持し、Chromium/WebKit2/2成功（24.6秒）。この追加を含め追随対象は5ファイル・14/14成功。初回management-uiは4失敗/76成功で、いずれも通知行の旧locator。製品runtimeは引き続き不変。
