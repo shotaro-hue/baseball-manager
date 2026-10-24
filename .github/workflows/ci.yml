@@ -50,7 +50,7 @@ jobs:
           - name: management-ui
             files: management-decisions.spec.js management-lists.spec.js
           - name: hub-navigation
-            files: hub-navigation.spec.js
+            files: hub-navigation.spec.js club-reading.spec.js
           - name: save-integrity
             files: save-generations.spec.js career-generations.spec.js ai03-roster-cycle.spec.js core-reliability.spec.js
           - name: save-capacity

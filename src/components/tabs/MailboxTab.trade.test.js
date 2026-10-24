@@ -9,7 +9,7 @@ it('refreshes a selected mail after the linked trade screen resolves it', () => 
   const props = { mailbox: [mail], onRead: () => {}, onAction: vi.fn(), onNavigate: vi.fn() };
   const text = n => typeof n === 'string' ? n : (n.children || []).map(text).join('');
   act(() => { view = create(React.createElement(MailboxTab, props)); });
-  act(() => view.root.findAll(n => n.type === 'div' && n.props.onClick).find(n => text(n).includes('外部判断')).props.onClick());
+  act(() => view.root.findAll(n => n.type === 'button' && n.props.onClick).find(n => text(n).includes('外部判断')).props.onClick());
   act(() => view.update(React.createElement(MailboxTab, { ...props, mailbox: [{ ...mail, resolved: true }] })));
   expect(text(view.root)).toContain('対応済み');
   expect(view.root.findAllByType('button').some(n => text(n).includes('承諾する'))).toBe(false);
@@ -19,7 +19,7 @@ it('opens the existing trade screen without accepting a proposal', () => {
   const mail = { id: 'offer', type: 'trade', title: '提案', body: '', offer: { want: [], offer: [], cash: 0 } };
   act(() => { view = create(React.createElement(MailboxTab, { mailbox: [mail], onRead: () => {}, onAction, onNavigate })); });
   const text = n => typeof n === 'string' ? n : (n.children || []).map(text).join('');
-  const row = view.root.findAll(n => n.type === 'div' && n.props.onClick).find(n => text(n).includes('提案'));
+  const row = view.root.findAll(n => n.type === 'button' && n.props.onClick).find(n => text(n).includes('提案'));
   act(() => row.props.onClick());
   const link = view.root.findAllByType('button').find(n => text(n) === 'トレード画面で検討する');
   expect(link).toBeTruthy();
@@ -32,14 +32,14 @@ it('keeps a rejected trade mail actionable instead of locally marking it resolve
   const mail = { id: 'trade', type: 'trade', title: '取引テスト', body: '', offer: { from: {name:'相手'}, want:[], offer:[], cash:0 } };
   act(() => { view=create(React.createElement(MailboxTab, {mailbox:[mail],onRead:()=>{},onAction,teams:[],myTeam:{id:0},gameDay:1})); });
   const text=n=>typeof n==='string'?n:(n.children||[]).map(text).join('');
-  const row=view.root.findAll(n=>n.type==='div'&&n.props.onClick).find(n=>text(n).includes('取引テスト'));
+  const row=view.root.findAll(n=>n.type==='button'&&n.props.onClick).find(n=>text(n).includes('取引テスト'));
   act(()=>row.props.onClick());
   const accept=view.root.findAllByType('button').find(n=>text(n).includes('承諾する'));
   act(()=>accept.props.onClick());
   expect(onAction).not.toHaveBeenCalled();
   const confirm=view.root.findAllByType('button').find(n=>text(n)==='承諾を確定する');
   expect(confirm).toBeTruthy();act(()=>confirm.props.onClick());
-  expect(text(view.root)).not.toContain('対応済み');
+  expect(text(view.root.findByProps({className:'reading-detail'}))).not.toContain('対応済み');
   expect(view.root.findAllByType('button').some(n=>text(n).includes('承諾する'))).toBe(true);
 });
 it('requires explicit mail confirmation and preserves a failed proposal for another decision', () => {
@@ -48,10 +48,10 @@ it('requires explicit mail confirmation and preserves a failed proposal for anot
   act(() => { view = create(React.createElement(MailboxTab, { mailbox: [mail], onRead: () => {}, onAction })); });
   const text = n => typeof n === 'string' ? n : (n.children || []).map(text).join('');
   const button = label => view.root.findAllByType('button').find(n => text(n) === label);
-  act(() => view.root.findAll(n => n.type === 'div' && n.props.onClick).find(n => text(n).includes('選択案件')).props.onClick());
+  act(() => view.root.findAll(n => n.type === 'button' && n.props.onClick).find(n => text(n).includes('選択案件')).props.onClick());
   act(() => button('✅ 承諾する').props.onClick());
   expect(onAction).not.toHaveBeenCalled();
   act(() => button('戻って見直す').props.onClick()); expect(onAction).not.toHaveBeenCalled();
   act(() => button('✅ 承諾する').props.onClick()); act(() => button('承諾を確定する').props.onClick());
-  expect(onAction).toHaveBeenCalledWith('selected', 'accept'); expect(text(view.root)).not.toContain('対応済み');
+  expect(onAction).toHaveBeenCalledWith('selected', 'accept'); expect(text(view.root.findByProps({className:'reading-detail'}))).not.toContain('対応済み');
 });
