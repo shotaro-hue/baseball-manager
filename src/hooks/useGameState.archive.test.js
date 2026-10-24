@@ -16,7 +16,7 @@ it.each([false,true])('waits for every real archive chunk and reports a later ch
  const archive=await import('../engine/battedBallArchive');
  function Harness(){gs=useGameState();return null;}
  await act(async()=>{view=create(React.createElement(Harness));});
- act(()=>{gs.setMyId(0);gs.setTeams([{id:0,players:[],farm:[]}]);});
+ act(()=>{gs.setMyId(0);gs.setSaveId('multi-chunk');gs.setTeams([{id:0,players:[],farm:[]}]);});
  const record=id=>({id,saveId:'multi-chunk',year:2026,gameId:id,playerId:'batter',events:[{result:'hr',ev:160,la:27,sprayAngle:0}]});
  archive.enqueueBattedBallBatches([record('first')]);
  await vi.waitFor(()=>expect(gates).toHaveLength(1));archive.enqueueBattedBallBatches([record('second')]);

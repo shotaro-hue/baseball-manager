@@ -415,17 +415,21 @@ export function useGameState() {
         try {
           const archive = await import('../engine/battedBallArchive');
           const receipts = await import('../engine/battedBallReceipts');
-          const receiptResult = await receipts.flushBattedBallReceipts(state.battedBallReceipt);
-          const status = archive.getBattedBallQueueStatus();
+          const archiveScope = { saveId: state.saveId };
+          let receiptResult = await receipts.flushBattedBallReceipts(state.battedBallReceipt, archiveScope);
+          const status = archive.getBattedBallQueueStatus(archiveScope);
           let archiveResult = status.failedRecords > 0
-            ? await archive.retryFailedBattedBallWrites()
-            : await archive.flushBattedBallQueue();
+            ? await archive.retryFailedBattedBallWrites(archiveScope)
+            : await archive.flushBattedBallQueue(archiveScope);
           // One flush only covers its snapshot. More Worker chunks may already
           // be queued behind it; success requires those writes to settle too.
-          let settled = archive.getBattedBallQueueStatus();
+          let settled = archive.getBattedBallQueueStatus(archiveScope);
           while (settled.isWriting || settled.queuedRecords > 0) {
-            archiveResult = await archive.flushBattedBallQueue();
-            settled = archive.getBattedBallQueueStatus();
+            archiveResult = await archive.flushBattedBallQueue(archiveScope);
+            settled = archive.getBattedBallQueueStatus(archiveScope);
+          }
+          if (!receiptResult.ok && archiveResult?.ok !== false && !settled.failedRecords) {
+            receiptResult = await receipts.flushBattedBallReceipts(state.battedBallReceipt, archiveScope);
           }
           return { ...result, archive: { ...archiveResult, ok: receiptResult.ok && archiveResult?.ok !== false && !(settled.failedRecords > 0) } };
         } catch (error) {

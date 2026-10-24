@@ -20,6 +20,7 @@ import {
 
 const pendingById = new Map();
 const failedById = new Map();
+const inFlightById = new Map();
 const perfSamples = [];
 const comparisonCache = new Map();
 const aggregateReadyBySave = new Set();
@@ -92,8 +93,10 @@ function completeTransaction(transaction) {
 async function writeRecords(records) {
   const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const db = await openBaseballManagerDb();
+  let transaction, completion;
+  const readySaves = new Set();
   try {
-    const transaction = db.transaction(
+    transaction = db.transaction(
       [
         BASEBALL_MANAGER_DB_STORES.battedBallBatches,
         BASEBALL_MANAGER_DB_STORES.battedBallAggregates,
@@ -101,6 +104,9 @@ async function writeRecords(records) {
       ],
       'readwrite',
     );
+    completion = completeTransaction(transaction);
+    // Observe early aborts even while an individual request is still awaited.
+    completion.catch(() => {});
     const batchStore = transaction.objectStore(BASEBALL_MANAGER_DB_STORES.battedBallBatches);
     const aggregateStore = transaction.objectStore(
       BASEBALL_MANAGER_DB_STORES.battedBallAggregates,
@@ -152,16 +158,23 @@ async function writeRecords(records) {
       if (!existing) {
         nextMeta.aggregateSchemaVersion = BATTED_BALL_AGGREGATE_SCHEMA_VERSION;
         nextMeta.aggregateBackfilledAt = Date.now();
-        aggregateReadyBySave.add(meta.saveId);
+        readySaves.add(meta.saveId);
       } else if (
         Number(existing.aggregateSchemaVersion) >= BATTED_BALL_AGGREGATE_SCHEMA_VERSION
       ) {
-        aggregateReadyBySave.add(meta.saveId);
+        readySaves.add(meta.saveId);
       }
       metaStore.put(nextMeta);
     }
-    await completeTransaction(transaction);
+    await completion;
+    for (const saveId of readySaves) aggregateReadyBySave.add(saveId);
     comparisonCache.clear();
+  } catch (error) {
+    // Synchronous put/clone errors do not automatically abort earlier requests.
+    // Keep batch, aggregate and meta changes atomic before a retry is allowed.
+    try { transaction?.abort(); } catch { /* It may already have terminated. */ }
+    await completion?.catch(() => {});
+    throw error;
   } finally {
     db.close();
   }
@@ -179,6 +192,7 @@ async function flushInternal() {
   const records = Array.from(pendingById.values());
   if (records.length === 0) return { ok: true, written: 0 };
   records.forEach((record) => pendingById.delete(record.id));
+  records.forEach((record) => inFlightById.set(record.id, record));
   try {
     await runArchiveMutation(() => writeRecords(records));
     records.forEach((record) => failedById.delete(record.id));
@@ -186,11 +200,14 @@ async function flushInternal() {
     retryCount = 0;
     return { ok: true, written: records.length };
   } catch (error) {
-    for (const record of records) failedById.set(record.id, record);
+    // A replacement queued while this write was active owns the next attempt.
+    for (const record of records) if (!pendingById.has(record.id)) failedById.set(record.id, record);
     lastError = error instanceof Error ? error.message : 'IndexedDB write failed';
     retryCount += 1;
     console.warn('打球アーカイブの保存に失敗しました。試合セーブは継続します。', error);
     return { ok: false, written: 0, error: lastError };
+  } finally {
+    records.forEach((record) => inFlightById.delete(record.id));
   }
 }
 
@@ -199,6 +216,7 @@ export function enqueueBattedBallBatches(records) {
   for (const record of Array.isArray(records) ? records : []) {
     const safeRecord = sanitizeBatchRecord(record);
     if (!safeRecord) continue;
+    failedById.delete(safeRecord.id);
     pendingById.set(safeRecord.id, safeRecord);
     accepted += 1;
   }
@@ -211,7 +229,17 @@ export function enqueueBattedBallBatches(records) {
   return { accepted, queued: pendingById.size };
 }
 
-export async function flushBattedBallQueue() {
+export async function flushBattedBallQueue({ saveId } = {}) {
+  if (saveId != null) {
+    // The single writer remains shared; its result can belong to another save.
+    await flushBattedBallQueue();
+    let status = getBattedBallQueueStatus({ saveId });
+    while (status.isWriting || status.queuedRecords) {
+      await flushBattedBallQueue();
+      status = getBattedBallQueueStatus({ saveId });
+    }
+    return { ok: status.failedRecords === 0 };
+  }
   if (activeFlush) return activeFlush;
   activeFlush = flushInternal().finally(() => {
     activeFlush = null;
@@ -219,20 +247,26 @@ export async function flushBattedBallQueue() {
   return activeFlush;
 }
 
-export function getBattedBallQueueStatus() {
+export function getBattedBallQueueStatus({ saveId } = {}) {
+  const count = records => saveId == null ? records.size
+    : Array.from(records.values()).filter(record => record.saveId === saveId).length;
+  const failedRecords = count(failedById);
   return {
-    isWriting: Boolean(activeFlush),
-    queuedRecords: pendingById.size,
-    failedRecords: failedById.size,
-    lastError,
-    retryCount,
-    retryAfterMs: failedById.size > 0 ? Math.min(60_000, 1000 * (2 ** Math.min(6, retryCount))) : 0,
+    isWriting: saveId == null ? Boolean(activeFlush) : count(inFlightById) > 0,
+    queuedRecords: count(pendingById),
+    failedRecords,
+    lastError: saveId == null || failedRecords ? lastError : null,
+    retryCount: saveId == null || failedRecords ? retryCount : 0,
+    retryAfterMs: failedRecords > 0 ? Math.min(60_000, 1000 * (2 ** Math.min(6, retryCount))) : 0,
   };
 }
 
-export async function retryFailedBattedBallWrites() {
-  for (const record of failedById.values()) pendingById.set(record.id, record);
-  return flushBattedBallQueue();
+export async function retryFailedBattedBallWrites({ saveId } = {}) {
+  for (const record of failedById.values()) {
+    if (saveId != null && record.saveId !== saveId) continue;
+    if (!pendingById.has(record.id) && !inFlightById.has(record.id)) pendingById.set(record.id, record);
+  }
+  return flushBattedBallQueue({ saveId });
 }
 
 async function readAllFromIndex(indexName, query) {
