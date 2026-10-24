@@ -1,89 +1,66 @@
-import React, { useMemo, useState } from "react";
-
-export function NewsTab({ news, transfers = [], onInterview, currentYear }){
-  const [selectedId,setSelectedId]=useState(null);
-  const sel=news.find(article=>article.id===selectedId)??null;
-  const [transferYear,setTransferYear]=useState("all");
-  const icon=t=>t==="game"?"⚾":t==="trade"?"🔄":t==="draft"?"📋":t==="interview"?"🎤":t==="season"?"🏆":"📰";
-  const col=t=>t==="game"?"#60a5fa":t==="trade"?"#f97316":t==="draft"?"#a78bfa":t==="interview"?"#f5c842":t==="season"?"#34d399":"#94a3b8";
-  const transferYears = useMemo(() => ["all", ...new Set((transfers || []).map(item => item?.year).filter(Boolean))], [transfers]);
-  const shownTransfers = useMemo(() => (
-    transferYear==="all" ? (transfers || []) : (transfers || []).filter(item => String(item.year) === transferYear)
-  ), [transferYear, transfers]);
-  const handleAnswer=(newsId,opt)=>{
-    onInterview(newsId,opt);
+import React, { useMemo, useRef, useState } from 'react';
+import { Button, StateLabel, Section } from '../design-system/primitives';
+import { ReadingList, ReadingFilters, ReadingDetail, useReadingSelection } from '../reading/ReadingParts';
+export function NewsTab({
+  news = [],
+  transfers = [],
+  onInterview,
+  currentYear
+}) {
+  const selection = useReadingSelection(news),
+    selected = selection.selected;
+  const [filter, setFilter] = useState('all'),
+    [transferYear, setTransferYear] = useState('all'),
+    [error, setError] = useState(null);
+  const answered = useRef(new Set());
+  const years = useMemo(() => [...new Set(transfers.map(t => t?.year).filter(Boolean))].sort((a, b) => b - a), [transfers]);
+  const shown = news.filter(n => filter === 'waiting' ? n.type === 'interview' && !n.answered : filter === 'answered' ? n.type === 'interview' && n.answered : true);
+  const filteredTransfers = transfers.filter(t => transferYear === 'all' || String(t.year) === transferYear);
+  const answer = opt => {
+    if (answered.current.has(selected.id) || selected.answered) return;
+    if (onInterview?.(selected.id, opt) === true) answered.current.add(selected.id);else setError('回答を確定できませんでした。最新の記事と球団の状態を確認してください。');
   };
-  return(
-    <div style={{display:"grid",gridTemplateColumns:sel?"1fr 1fr":"1fr",gap:8}}>
-      <div className="card" style={{padding:"10px"}}>
-        <div className="card-h">📰 スポーツニュース</div>
-        {news.length===0&&<p style={{fontSize:11,color:"#374151",padding:"12px 0"}}>試合を進めるとニュースが届きます</p>}
-        {news.map(n=>{
-          const needsAnswer=n.type==="interview"&&!n.answered;
-          return(<div key={n.id} onClick={()=>setSelectedId(n.id)} style={{padding:"8px 10px",marginBottom:4,borderRadius:6,cursor:"pointer",background:sel?.id===n.id?"rgba(245,200,66,.08)":needsAnswer?"rgba(245,200,66,.03)":"rgba(255,255,255,.02)",border:sel?.id===n.id?"1px solid rgba(245,200,66,.3)":needsAnswer?"1px solid rgba(245,200,66,.15)":"1px solid rgba(255,255,255,.04)"}}>
-            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
-              <span style={{fontSize:11,color:col(n.type)}}>{icon(n.type)}</span>
-              {needsAnswer&&<span style={{fontSize:8,background:"#f5c842",color:"#000",borderRadius:4,padding:"1px 5px",fontWeight:700}}>回答待ち</span>}
-              <span style={{fontSize:11,fontWeight:needsAnswer?700:400,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{n.headline}</span>
-            </div>
-            <div style={{fontSize:9,color:"#374151",paddingLeft:18}}>{n.source} · {n.dateLabel}</div>
-          </div>);
-        })}
-      </div>
-      <div className="card" style={{padding:"10px"}}>
-        <div className="card-h">🌐 球界移籍トラッカー</div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,gap:8}}>
-          <div style={{fontSize:10,color:"#374151"}}>シーズン中の全球団トレード履歴（過去シーズン閲覧対応）</div>
-          <select value={transferYear} onChange={e=>setTransferYear(e.target.value)} style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.12)",color:"#e0d4bf",borderRadius:6,padding:"4px 6px",fontSize:10}}>
-            {transferYears.map(y=><option key={String(y)} value={String(y)}>{y==="all"?"全年度":`${y}年`}{y===currentYear?"（今季）":""}</option>)}
-          </select>
-        </div>
-        {shownTransfers.length===0&&<p style={{fontSize:11,color:"#374151",padding:"8px 0"}}>この年度の移籍ログはまだありません</p>}
-        {shownTransfers.map(item=>{
-          const cash = typeof item.cash === 'number' || typeof item.cash === 'string' ? Number(item.cash) : NaN;
-          return (
-          <div key={item.id} style={{padding:"8px 10px",marginBottom:5,borderRadius:6,background:"rgba(249,115,22,.06)",border:"1px solid rgba(249,115,22,.2)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",gap:6,alignItems:"center"}}>
-              <div style={{fontSize:11,fontWeight:700,color:"#f97316"}}>{item.headline||"トレード"}</div>
-              <div style={{fontSize:9,color:"#94a3b8"}}>{item.year}年 {item.day?`${item.day}日目`:""}</div>
-            </div>
-            <div style={{fontSize:10,color:"#d1d5db",marginTop:4}}>
-              IN: {(item.playersIn||[]).join("、")||"なし"} / OUT: {(item.playersOut||[]).join("、")||"なし"}
-              {Number.isFinite(cash)&&cash!==0&&<span style={{marginLeft:6,color:"#f5c842"}}>{cash>0?`金銭支払い ${Math.abs(cash).toLocaleString()}万円`:`金銭受取 ${Math.abs(cash).toLocaleString()}万円`}</span>}
-            </div>
-            {item.detail&&<div style={{fontSize:9,color:"#94a3b8",marginTop:3,whiteSpace:"pre-wrap"}}>{item.detail}</div>}
-          </div>
-          );
-        })}
-      </div>
-      {sel&&(
-        <div className="card" style={{padding:"12px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-            <span style={{fontSize:10,color:col(sel.type),fontWeight:700}}>{icon(sel.type)} {sel.source}</span>
-            <button className="bsm bga" onClick={()=>setSelectedId(null)}>✕</button>
-          </div>
-          <div style={{fontWeight:700,fontSize:13,lineHeight:1.5,marginBottom:4}}>{sel.headline}</div>
-          <div style={{fontSize:9,color:"#374151",marginBottom:10}}>{sel.dateLabel}</div>
-          <div style={{fontSize:12,color:"#e0d4bf",lineHeight:1.8,marginBottom:12,whiteSpace:"pre-wrap"}}>{sel.body}</div>
-          {sel.type==="interview"&&!sel.answered&&(
-            <div style={{borderTop:"1px solid rgba(255,255,255,.08)",paddingTop:10}}>
-              <div style={{fontSize:11,color:"#f5c842",fontWeight:700,marginBottom:8}}>🎤 記者: 「{sel.question}」</div>
-              <div style={{fontSize:10,color:"#374151",marginBottom:8}}>あなたの回答を選んでください（球団人気・選手モラルに影響）</div>
-              {sel.options.map((opt,i)=>(
-                <div key={i} onClick={()=>handleAnswer(sel.id,opt)} style={{padding:"10px",marginBottom:6,borderRadius:6,cursor:"pointer",background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.08)"}}>
-                  <div style={{fontSize:11,color:"#e0d4bf",marginBottom:3}}>{opt.text}</div>
-                  <div style={{fontSize:9,color:"#374151"}}>人気 {opt.popMod>=0?"+":""}{opt.popMod} ／ モラル {opt.moraleMod>=0?"+":""}{opt.moraleMod}</div>
-                </div>
-              ))}
-            </div>
-          )}
-          {sel.answered&&sel.type==="interview"&&(
-            <div style={{borderTop:"1px solid rgba(255,255,255,.08)",paddingTop:10}}>
-              <div style={{fontSize:10,color:"#374151"}}>回答済み</div>
-            </div>
-          )}
-        </div>
-      )}
+  return <main className="club-reading" data-ds="news"><h1>ニュース</h1>
+    <p className="reading-muted">球界の動向と記者会見。回答待ち {news.filter(n => n.type === 'interview' && !n.answered).length}件</p>
+    <div className="reading-workspace" data-detail={Boolean(selected)}>
+      <section className="reading-list" aria-label="ニュースの一覧">
+        <ReadingFilters label="ニュースの絞り込み" options={[['all', 'すべて'], ['waiting', '回答待ち'], ['answered', '回答済み']]} value={filter} onChange={value => {
+          setFilter(value);
+          selection.close();
+        }} />
+        <ReadingList key={filter} items={shown} label="ニュース" selection={{
+          ...selection,
+          select: item => {
+            setError(null);
+            selection.select(item);
+          }
+        }} searchText={n => [n.headline, n.source].join(' ')} renderItem={n => <><strong>{n.headline}</strong>{n.type === 'interview' && <span className="reading-status"><StateLabel tone={n.answered ? 'neutral' : 'warning'}>{n.answered ? '回答済み' : '回答待ち'}</StateLabel></span>}<small>{n.source} · {n.dateLabel}</small></>} />
+      </section>
+      {selected && <ReadingDetail selection={selection} title={selected.headline}>
+        <p className="reading-muted">{selected.source} · {selected.dateLabel}</p>
+        <p className="reading-body">{selected.body}</p>
+        {selected.type === 'interview' && (selected.answered ? <StateLabel>回答済み</StateLabel> : <>
+          <h3>記者からの質問</h3><p>{selected.question}</p><p className="reading-muted">回答は球団人気・選手モラルに影響します。</p>
+          <div className="reading-choices">{selected.options?.map((opt, i) => <Button key={i} variant="secondary" disabled={answered.current.has(selected.id)} onClick={() => answer(opt)}>
+            {opt.text}<small>人気 {opt.popMod >= 0 ? '+' : ''}{opt.popMod} ／ モラル {opt.moraleMod >= 0 ? '+' : ''}{opt.moraleMod}</small>
+          </Button>)}</div>{error && <p role="alert">{error}</p>}
+        </>)}
+      </ReadingDetail>}
     </div>
-  );
+    <Section className="reading-section" title="球界移籍トラッカー">
+      <p className="reading-muted">シーズン中の全球団トレード履歴。金銭は万円単位です。</p>
+      <label className="reading-year">移籍の年度<select value={transferYear} onChange={e => setTransferYear(e.target.value)}>
+        <option value="all">全年度</option>{years.map(y => <option key={y} value={String(y)}>{y}年{y === currentYear ? '（今季）' : ''}</option>)}
+      </select></label>
+      <ReadingList key={transferYear} items={filteredTransfers} label="移籍履歴" emptyText="この年度の移籍ログはまだありません" searchText={t => [t.headline, ...(t.playersIn ?? []), ...(t.playersOut ?? [])].join(' ')} renderItem={item => {
+        const cash = typeof item.cash === 'number' || typeof item.cash === 'string' ? Number(item.cash) : NaN;
+        return <details key={item.id}>
+        <summary>{item.headline || 'トレード'} · {item.year}年 {item.day ? `${item.day}日目` : ''}</summary>
+        <p>IN: {(item.playersIn || []).join('、') || 'なし'} / OUT: {(item.playersOut || []).join('、') || 'なし'}</p>
+        {Number.isFinite(cash) && cash !== 0 && <p>{cash > 0 ? '金銭支払い' : '金銭受取'} {Math.abs(cash).toLocaleString()}万円</p>}
+        {item.detail && <p className="reading-body">{item.detail}</p>}
+      </details>;
+      }} />
+    </Section>
+  </main>;
 }

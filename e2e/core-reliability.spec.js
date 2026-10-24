@@ -95,6 +95,17 @@ async function openNews(page) {
   await page.getByRole('navigation', { name: '通知メニュー' }).getByRole('button', { name: 'ニュース', exact: true }).click();
   await expect(active(page)).toHaveAttribute('data-hub-route', 'news');
 }
+const transferTracker = page => active(page).getByRole('region', { name: '球界移籍トラッカー', exact: true });
+const transferHeading = (page, headline) => transferTracker(page).locator('summary').filter({ hasText: headline });
+async function expandTransfers(page) {
+  for (const summary of await transferTracker(page).locator('details > summary').all()) {
+    if (!(await summary.evaluate(node => node.parentElement.open))) await summary.click();
+  }
+}
+async function openArticle(page, headline) {
+  if (await active(page).locator('.reading-detail').count()) await active(page).getByRole('button', { name: '一覧に戻る', exact: true }).click();
+  await active(page).getByRole('button', { name: new RegExp('^' + headline) }).click();
+}
 function newsFixture() {
   const fixture = fresh();
   fixture.news = [
@@ -121,36 +132,38 @@ for (const width of [360, 390, 1440]) {
     await expect(page.locator('.topbar')).toBeVisible();
     const before = await saveHub(page);
     await openNews(page);
-    await expect(active(page).getByText('CORE 昨季移籍', { exact: true })).toBeVisible();
-    await expect(active(page).getByText('CORE 今季移籍', { exact: true })).toBeVisible();
+    await expect(transferHeading(page, 'CORE 昨季移籍')).toBeVisible();
+    await expect(transferHeading(page, 'CORE 今季移籍')).toBeVisible();
     await expect(active(page)).not.toContainText('NaN');
+    await expandTransfers(page);
     await expect(active(page).getByText('金銭支払い 500万円', { exact: true })).toBeVisible();
     await expect(active(page).getByText('金銭受取 1,250万円', { exact: true })).toBeVisible();
     await expect(active(page).getByText('金銭支払い 750万円', { exact: true })).toBeVisible();
     expect(await active(page).getByText(/金銭(?:支払い|受取) [\d,]+万円/).count()).toBe(3);
-    await active(page).getByRole('combobox').selectOption(String(fixture.year - 1));
-    await expect(active(page).getByText('CORE 今季移籍', { exact: true })).toHaveCount(0);
-    await expect(active(page).getByText('CORE 昨季移籍', { exact: true })).toBeVisible();
+    await transferTracker(page).getByLabel('移籍の年度').selectOption(String(fixture.year - 1));
+    await expandTransfers(page);
+    await expect(transferHeading(page, 'CORE 今季移籍')).toHaveCount(0);
+    await expect(transferHeading(page, 'CORE 昨季移籍')).toBeVisible();
     await expect(active(page).getByText('金銭支払い 750万円', { exact: true })).toBeVisible();
     await expect(active(page).getByText('金銭受取 1,250万円', { exact: true })).toHaveCount(0);
-    await active(page).getByRole('combobox').selectOption('all');
-    await active(page).getByText('CORE 回答済み会見', { exact: true }).click();
-    await expect(active(page).getByText('回答済み', { exact: true })).toBeVisible();
+    await transferTracker(page).getByLabel('移籍の年度').selectOption('all');
+    await openArticle(page, 'CORE 回答済み会見');
+    await expect(active(page).locator('.reading-detail').getByText('回答済み', { exact: true })).toBeVisible();
     await expect(active(page).getByText('CORE 未保存の選択肢', { exact: true })).toHaveCount(0);
-    await active(page).getByRole('button', { name: '✕', exact: true }).click();
-    await active(page).getByText('CORE 回答待ち会見', { exact: true }).click();
-    const choice = active(page).getByText('CORE 優勝を目指します', { exact: true });
+    await active(page).getByRole('button', { name: '一覧に戻る', exact: true }).click();
+    await openArticle(page, 'CORE 回答待ち会見');
+    const choice = active(page).getByRole('button', { name: /^CORE 優勝を目指します/ });
     // Two synchronous DOM events exercise React batching as well as the command guard.
     await choice.evaluate(node => { node.click(); node.click(); });
-    await expect(active(page).getByText('回答済み', { exact: true })).toBeVisible();
+    await expect(active(page).locator('.reading-detail').getByText('回答済み', { exact: true })).toBeVisible();
     await expect(choice).toHaveCount(0);
-    await active(page).getByRole('button', { name: '✕', exact: true }).click();
-    await active(page).getByText('CORE 回答待ち会見', { exact: true }).click();
+    await active(page).getByRole('button', { name: '一覧に戻る', exact: true }).click();
+    await openArticle(page, 'CORE 回答待ち会見');
     await expect(choice).toHaveCount(0);
     await page.getByRole('navigation', { name: '通知メニュー' }).getByRole('button', { name: /^受信箱/ }).click();
     await page.getByRole('navigation', { name: '通知メニュー' }).getByRole('button', { name: 'ニュース', exact: true }).click();
-    await active(page).getByText('CORE 回答待ち会見', { exact: true }).click();
-    await expect(active(page).getByText('回答済み', { exact: true })).toBeVisible();
+    await openArticle(page, 'CORE 回答待ち会見');
+    await expect(active(page).locator('.reading-detail').getByText('回答済み', { exact: true })).toBeVisible();
     await expect(choice).toHaveCount(0);
     const after = await saveHub(page), oldTeam = before.teams.find(t => t.id === before.myId), mine = after.teams.find(t => t.id === after.myId);
     expect(mine.popularity).toBe(Math.min(100, (oldTeam.popularity || 50) + 5));
@@ -161,12 +174,14 @@ for (const width of [360, 390, 1440]) {
     expect(after.seasonHistory.transfers).toEqual(fixture.seasonHistory.transfers);
     await mainNavigation(page, width < 1024).getByRole('button', { name: 'ホーム', exact: true }).click();
     await reloadAndLoad(page); await openNews(page);
-    await active(page).getByText('CORE 回答待ち会見', { exact: true }).click();
-    await expect(active(page).getByText('回答済み', { exact: true })).toBeVisible();
+    await openArticle(page, 'CORE 回答待ち会見');
+    await expect(active(page).locator('.reading-detail').getByText('回答済み', { exact: true })).toBeVisible();
     await expect(choice).toHaveCount(0);
-    await active(page).getByRole('combobox').selectOption(String(fixture.year));
-    await expect(active(page).getByText('CORE 今季移籍', { exact: true })).toBeVisible();
-    await expect(active(page).getByText('CORE 昨季移籍', { exact: true })).toHaveCount(0);
+    await active(page).getByRole('button', { name: '一覧に戻る', exact: true }).click();
+    await transferTracker(page).getByLabel('移籍の年度').selectOption(String(fixture.year));
+    await expandTransfers(page);
+    await expect(transferHeading(page, 'CORE 今季移籍')).toBeVisible();
+    await expect(transferHeading(page, 'CORE 昨季移籍')).toHaveCount(0);
     await expect(active(page)).not.toContainText('NaN');
     await expect(active(page).getByText('金銭受取 1,250万円', { exact: true })).toBeVisible();
     const persisted = (await readSave(page)).seasonHistory.transfers;

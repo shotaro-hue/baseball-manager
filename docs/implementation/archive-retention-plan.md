@@ -50,7 +50,7 @@ Reference marking with native live pins is the selected implementation choice. R
 - [x] Write RED integration cases for backup-only ownership, delete reclamation, and cancellation during seal.
 - [x] Integrate save/load and execute native two-tab Chromium/WebKit cases: unsaved progress, held old root, tab close, save/reload, old explicit v4 writer rejection.
 - [x] Measure deterministic multi-year history plus abandoned runs: retained history grows only with necessary data; repeated orphan creation/collection returns to the same retained row/byte baseline. Measurements are serialized stored bytes, not physical disk or a full 20-year simulation.
-- [ ] Run focused regressions/build, one independent whole-branch review, repair Important findings RED→GREEN, publish independent PR, and confirm exact-head CI. Reuse passing baseline/CI results; do not repeat full suites without a cause.
+- [x] Run focused regressions/build, one independent whole-branch review, repair Important findings RED→GREEN, publish independent PR, and confirm exact-head CI. Reuse passing baseline/CI results; do not repeat full suites without a cause.
 
 ## Execution ledger
 
@@ -62,3 +62,5 @@ Reference marking with native live pins is the selected implementation choice. R
 - Final independent review: no product Critical/Important findings. Test readiness finding regraded as a required-gate correctness issue because a valid conservative GC could otherwise fail CI; all exited-owner scenarios now await native ownership release before collection, with exact row/byte assertions retained. No product change in this pass; no second review. Cost if wrong: test may block on a real ownership leak rather than masking it.
 - First CI: product/storage gates succeeded; existing mobile management position test failed at59px because setup's manual save notice expired during measurement (raw trace retained). Stabilize only that test's initial saved UI/notice completion before recording the origin; preserve4px/focus/filters/teams assertions and product code. New exact-head CI required after this test-only follow-up.
 - Next CI: management and all product/storage gates passed; the remaining-season test's poll callback dereferenced a transient null while root publication and old-generation cleanup overlapped its read. Raw timestamps show the legitimate conflict. Handle null only in that poll and keep the persisted143 expectation/timeout/retries; no runtime modification.
+
+- #500 merged at main bed66fb2ad1f9e3e4b94e3fdacd8727bece7287d. Exact PR head19c65b6 CI40084084038 all13 jobs succeeded; final metadata is in PR#500.
