@@ -11,6 +11,12 @@ async function open(page, tab) {
 }
 const active = (page, tab) => page.locator(`[data-hub-route="${tab}"]:not([hidden])`);
 const teamsHash = saved => JSON.stringify(saved.teams);
+async function openProposalMail(page) {
+  const mailbox = active(page, 'mailbox');
+  if (await mailbox.locator('.reading-detail').count()) await mailbox.getByRole('button', { name: '一覧に戻る', exact: true }).click();
+  await mailbox.getByRole('button', { name: /^今回検討する案件/ }).click();
+}
+
 
 for (const width of [360, 390, 1440]) test(`management decisions ${width}px read-only selection, compare, cancel and return`, async ({ page }) => {
   test.setTimeout(90000); await page.setViewportSize({ width, height: width === 360 ? 800 : width === 390 ? 844 : 900 });
@@ -108,7 +114,7 @@ test('management decisions notification opens exact proposal, resolves it once, 
   await active(page, 'trade').getByRole('button', { name: `${f.other.name}と交渉する`, exact: true }).click();
   await active(page, 'trade').getByLabel('支払金額（万円）', { exact: true }).fill('700');
   await page.getByRole('button', { name: /^通知（未読/ }).click();
-  await active(page, 'mailbox').getByRole('button', { name: '今回検討する案件', exact: true }).click();
+  await openProposalMail(page);
   await active(page, 'mailbox').getByRole('button', { name: 'トレード画面で検討する', exact: true }).click();
   const decision = active(page, 'trade').getByRole('region', { name: '選択したトレード案件' });
   await expect(decision.getByRole('heading', { name: '今回検討する案件', exact: true })).toBeVisible();
@@ -124,8 +130,8 @@ test('management decisions notification opens exact proposal, resolves it once, 
   await decision.getByRole('button', { name: '交渉画面へ戻る', exact: true }).click();
   await expect(active(page, 'trade').getByLabel('支払金額（万円）', { exact: true })).toHaveValue('700');
   await page.getByRole('button', { name: /^通知（未読/ }).click();
-  await active(page, 'mailbox').getByRole('button', { name: '今回検討する案件', exact: true }).click();
-  await expect(active(page, 'mailbox').getByText('対応済み', { exact: true })).toBeVisible();
+  await openProposalMail(page);
+  await expect(active(page, 'mailbox').locator('.reading-detail').getByText('対応済み', { exact: true })).toBeVisible();
 });
 
 test('management decisions breakpoint boundaries preserve readable routes and saved clubs', async ({ page }) => {
