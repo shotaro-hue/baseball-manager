@@ -71,7 +71,12 @@ test('UI-01B non-home remaining season action uses the native flow',async({page}
  const panel=page.locator('.flow-sim-settings');await panel.locator('summary').click();await panel.getByRole('button',{name:'残り全1試合',exact:true}).click();
  await expect(page.getByRole('heading',{name:/2026年 ポストシーズン/})).toBeVisible({timeout:30_000});
  await page.getByRole('button',{name:'進行を保存',exact:true}).click();
- await expect.poll(async()=>progressSignature(await readSave(page)).played).toBe(143);
+ await expect.poll(async()=>{
+  const saved=await readSave(page);
+  // A concurrent publication may invalidate the old generation during a read.
+  // Keep polling the persisted result instead of throwing on that transient null.
+  return saved ? progressSignature(saved).played : null;
+ }).toBe(143);
 });
 
 for(const [width,height] of [[360,800],[390,844],[1440,900]]) {
