@@ -1,6 +1,6 @@
 # ROADMAP — NPB Franchise Manager
 
-> 最終更新: 2026-10-24（#498マージ反映。履歴再試行の競合・保存別判定と単体テスト失敗を修正中。完全バックアップの公開条件は未完了）
+> 最終更新: 2026-10-24（#499マージ反映。利用者から実利用の保存改善報告あり。次工程は長期容量対策のみ。完全バックアップ・復元は保留）
 > 目的: **OOTP / Football Manager のように「何年も遊べる、意思決定が積み重なる経営シミュレーション」**を作る。
 
 > 現在の進捗は第1節を参照。第2・3・5節の旧チェックリストと期日は2026-05-01時点の履歴であり、現在の完了認定ではない。UI/UX改革の一次監査・推奨PR分割は [全体改革の青写真 v1](./docs/REFORM_BLUEPRINT_V1.md)、現行の設計方針は [UI/UX設計基準](./docs/DESIGN_SYSTEM.md) を参照。着手時には最新mainと再照合する。
@@ -28,7 +28,7 @@
 
 照合日：2026-10-21。基準main：`46d75e21b1f6e27c0f60274a38cd7619a80d951d`（PR #489マージ後）。GitHubのmainとマージ状態を確認。QA-D1は#472、FIX-S3は#473、捕手不足の原因分析は#474、捕手層の編成方針は#475、一軍空き枠の補足修正は#476、共通人数基盤は#477、可変ドラフトは#478、65人方針は#479、AI-03は#480、球団収支FIX-M1は#481でマージ済み。各工程の対象範囲・実測・限界は[QA-D1](./docs/implementation/qa-d1.md)・[FIX-S3](./docs/implementation/fix-s3.md)・[捕手不足の原因分析](./docs/implementation/farm-catcher-shortage.md)・[捕手層のレビューと次工程](./docs/implementation/catcher-depth-review.md)・[収支検証](./docs/validation/club-finance/README.md)を参照。全機能・全年度・実機の完了認定ではない。
 
-保存工程の最新照合: 2026-10-24、main `a7883f90a8c410267d1c688169ab59c828c35496`（#498マージ後）。#498はE2E等12ジョブ成功、単体/統合ジョブ失敗。main全体テストで捕手診断の実行ID比較失敗を再現し、後続修正で同一IDを入力する。#497以前の保存修正はmainへ反映済み。実iPhoneでの保存/再読込確認は未完了。完全バックアップ設計の正本は未マージの[#494](https://github.com/shotaro-hue/baseball-manager/pull/494)。以下の保存工程が現在の進行条件である。
+保存工程の最新照合: 2026-10-24、main `19dd33d0e5862c511c90c4a4cc0c767a139cdf72`（#499マージ後）。#499は履歴再試行/保存別判定・同期例外の集計部分commit・捕手診断の実行ID比較を修正し、同一headの最新CI全13ジョブ成功。初回WebKitの2件は原因未特定で、再実行成功と区別する。利用者は実利用で元の保存失敗が改善したと報告。再読込後の同一状態の確認や実機全容量の受入まで完了したとは扱わない。今回の合意は長期容量対策のみで、完全バックアップ/復元を保留する。設計の正本は未マージの[#494](https://github.com/shotaro-hue/baseball-manager/pull/494)。
 
 ### UI-04 球団経営・ナビゲーション刷新（今回確定）
 
@@ -50,13 +50,14 @@
 | SAVE-01B-0A | — | [#496](https://github.com/shotaro-hue/baseball-manager/pull/496)マージ済み | [検証](./docs/validation/archive-lock/README.md)。write/retry/backfill/deleteを共通archiveロックへ統合。最終head CI13ジョブ成功。旧版タブのfenceとroot対応は別工程 |
 | SAVE-01B-0B | — | [#497](https://github.com/shotaro-hue/baseball-manager/pull/497)マージ済み | [検証](./docs/validation/storage-version-fence/README.md)。DB v3→v4で全行を保全し版指定旧openを拒否、妨害/待機/旧版を原因別に失敗。最終head CI13ジョブ成功。無版指定raw IDB・localStorage直接書込・進行済み旧公開は別課題 |
 | SAVE-01B-0C | — | [#498](https://github.com/shotaro-hue/baseball-manager/pull/498)マージ済み、追加修正あり | [検証](./docs/validation/batted-ball-receipts/README.md)。採用receipt/不変履歴を4経路・保存再開へ接続。CI/再試行の残問題は下記修正工程で扱う |
-| SAVE-01B-0C-FIX | P1 | この独立PRで再試行と保存別判定を修正、未マージ | [計画](./docs/implementation/archive-retry-order-plan.md)・[検証](./docs/validation/archive-retry-order/README.md)。旧失敗の再投入、同期例外での集計だけのcommit、別save由来の誤警告、捕手診断の実行ID比較を修正。完全バックアップ受入とは区別 |
-| SAVE-01B-1 / B-2 | P1 | 未着手、前提条件未完了 | #494の設計・v1凍結と残ゲート解消後。完全書出し→厳密検査/プレビュー→journal付き隔離復元→冷起動/試合進行。直接上書きだけの復元は不可 |
+| SAVE-01B-0C-FIX | — | [#499](https://github.com/shotaro-hue/baseball-manager/pull/499)マージ済み | [計画](./docs/implementation/archive-retry-order-plan.md)・[検証](./docs/validation/archive-retry-order/README.md)。再試行/集計原子性/保存別警告/捕手診断を修正。PR CI全13ジョブ成功 |
+| SAVE-CAPACITY-2 | P1 | この独立PRで実装・検証中 | [計画](./docs/implementation/archive-retention-plan.md)・[検証](./docs/validation/archive-retention/README.md)。3保存root・生存タブを保護して孤立versionを回収。保持年数の変更なし |
+| SAVE-01B-1 / B-2 | 保留 | 今回は実施しない | 完全バックアップ/復元は利用者の指示で後回し。再開時は#494の設計・v1凍結と残ゲートを再確認 |
 | QA-04A | P1 | SAVE-01B後、未着手 | 新規→通常/手動/まとめシム→一軍/二軍成績→契約/FA/取引/スカウト→ドラフト/年度→保存再開。失敗/復旧/競合、CPU編成。通常CI外E2Eを評価し必要なゲートを選ぶ |
 | UI-04D | P2 | QA-04A後。コード未着手 | 通知/ニュース/球団史/OB/設定をDES-01へ移行。既読/要対応/対応済み、実在する設定、一覧/詳細/元の位置。今回の接続・回答修正と区別 |
 | QA-04B | P1 | UI-04D後、未着手。**実iPhone確認未完了** | 360/390/760/761/799/800/1023/1024/1440px、Chromium/WebKit、キーボード、保存/復帰。実iPhoneのタッチ・連続スワイプ・速度は別途実施 |
 
-実施順は **SAVE-01B-0C-FIX（再試行とCIの修正）→ 保護参照を考慮したGC/削除回収・容量/工程メモリ・残る旧版公開対策・実機実証 → #494設計確定・v1凍結 → SAVE-01B-1/B-2 → QA-04A → UI-04D → QA-04B**。saveId・日付・gameId・件数から対応を推測せず、採用したrunのSHA参照を保存する。現在は採用済みversionを削除後も保守的に残すため、回収/長期容量を未完了の前提として優先する。B-0A/B-0B/B-0Cは#494の前提整備で、B-1開始条件の解消や完全バックアップ完成とは扱わない。各工程は専用PR、人間がマージ判断。QA-04Aの固定seed10年/20年と複数seed比較は別途実施する。#495のCIで観測したDHなし先発8人の編成エラーは原因未特定の別信頼性課題として残し、今回へ混入させない。
+今回の対象は **SAVE-CAPACITY-2（参照付き回収・容量推移・保存再開）** のみ。完全バックアップ/復元・設計凍結・UI刷新は保留し、容量対策の結果を見て後続順序を判断する。saveId・日付・gameId・件数から対応を推測せず、採用runのSHA参照と生存タブを保護する。必要な履歴は進行に応じて増えるため、無制限保存とは認定しない。各工程は専用PR、人間がマージ判断。固定seed10年/20年の実ゲーム進行や、#495で観測したDHなし先発8人の編成エラーの調査は今回へ混入させない。
 
 **二軍の実測基盤は実装・マージ済み。CPUの編成判断は段階的に改善中。新デザインの全画面移行と長期バランスの完了には至っていない。**
 

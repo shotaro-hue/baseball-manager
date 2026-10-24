@@ -23,7 +23,7 @@ test('storage version fence: another realm queued behind a blocked open times ou
   } finally { await page.evaluate(() => window.legacyDb.close()); }
   await expect.poll(() => waiting.evaluate(() => window.queuedRequest.readyState)).toBe('done');
   expect(await page.evaluate(async fixture => { const db = await (await import(fixture)).openLegacyDb(); const version = db.version; db.close(); return version; }, FIXTURE)).toBe(3);
-  expect(await waiting.evaluate(async module => { const db = await (await import(module)).openBaseballManagerDb(); const version = db.version; db.close(); return version; }, DB)).toBe(4);
+  expect(await waiting.evaluate(async module => { const db = await (await import(module)).openBaseballManagerDb(); const version = db.version; db.close(); return version; }, DB)).toBe(5);
   await blocker.close(); await waiting.close();
 });
 
@@ -69,7 +69,7 @@ test('storage version fence: blocked upgrade preserves rows and roots until an e
     try { return { version: db.version, snapshot: await (await import(fixture)).readDbSnapshot(db) }; }
     finally { db.close(); }
   }, { fixture: FIXTURE, module: DB });
-  expect(preserved.version).toBe(4); expect(preserved.snapshot).toEqual(before.rows);
+  expect(preserved.version).toBe(5); expect(preserved.snapshot).toEqual(before.rows);
   const retry = await current.evaluate(async save => {
     const mod = await import(save);
     const state = JSON.parse(localStorage.getItem('baseball_manager_v1'));
@@ -88,7 +88,7 @@ test('storage version fence: a cooperative old connection closes and v3 cannot r
   }, FIXTURE);
   const current = await context.newPage(); await current.goto(PAGE);
   const version = await current.evaluate(async module => { const db = await (await import(module)).openBaseballManagerDb(); const version = db.version; db.close(); return version; }, DB);
-  expect(version).toBe(4);
+  expect(version).toBe(5);
   const denied = await page.evaluate(async fixture => {
     let heldError;
     try { window.legacyDb.transaction('batted_ball_batches', 'readwrite'); }
@@ -115,12 +115,12 @@ test('storage version fence: helper connection yields to a future version and ol
   }, { module: DB, save: SAVE });
   const newer = await context.newPage(); await newer.goto(PAGE);
   const activation = newer.evaluate(() => new Promise((resolve, reject) => {
-    const req = indexedDB.open('baseball_manager_storage', 5);
+    const req = indexedDB.open('baseball_manager_storage', 6);
     req.onblocked = () => reject(new Error('helper failed to release its connection'));
     req.onerror = () => reject(req.error);
-    req.onsuccess = () => { req.result.close(); resolve(5); };
+    req.onsuccess = () => { req.result.close(); resolve(6); };
   }));
-  expect(await activation).toBe(5);
+  expect(await activation).toBe(6);
   const result = await page.evaluate(async save => {
     const mod = await import(save), state = { saveId: 'source', year: 2026, gameDay: 2, myId: 0,
       teams: [{ id: 0, players: [], farm: [] }], news: [], mailbox: [], seasonHistory: {} };

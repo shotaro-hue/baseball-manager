@@ -3,6 +3,7 @@ import { prepareRootBody, readRootBody, rootBodyReference, compressRootJson, dec
 import { validateFarmSaveState } from './farmMigration';
 import { validateClubFinance } from './clubFinance';
 import { GENERATION_VERSION, LEGACY_GENERATION_VERSION, prepareGeneration, readGeneration, readCareerGeneration, collectUnusedChunks } from './saveGenerations';
+import { retainBattedBallReceipt, releaseCurrentBattedBallReceipt } from './battedBallRetention';
 import { prepareCareerData, captureInlineCareerLogs } from './careerGenerations';
 import { MATCH_HISTORY_FIELDS, matchHistorySnapshot, matchHistoryForSave } from './matchHistory';
 import LZString from 'lz-string';
@@ -663,7 +664,7 @@ async function saveGameImpl(state, options = {}) {
     catch (error) {
       if (error?.name !== 'QuotaExceededError') throw error;
       // Reclaim only rows proven unreferenced, then retry once. Never remove a backup root.
-      await cleanupSaveChunks();
+      await cleanupSaveChunks({ force: true });
       prepared = await prepareGeneration(safeState, previous, generationDirtyScopes, careerData);
     }
     safeState.saveManifest = prepared.manifest;
@@ -813,13 +814,16 @@ function rememberChunkRoot(raw, root) {
   if (!cache) { cache = new Map(); chunkRootCache.set(localStorage, cache); }
   // Own only the metadata: callers may subsequently mutate loaded game state.
   const compact = structuredClone({ saveDataVersion: root.saveDataVersion,
-    saveId: root.saveId, saveManifest: root.saveManifest, rootBodyKey: rootBodyReference(raw)?.key });
+    saveId: root.saveId, saveManifest: root.saveManifest, battedBallReceipt: root.battedBallReceipt,
+    rootBodyKey: rootBodyReference(raw)?.key });
   cache.set(raw, compact);
   if (cache.size > 4) cache.delete(cache.keys().next().value);
   return compact;
 }
-async function cleanupSaveChunks() {
-  const raws = [SAVE_KEY, BACKUP_KEY_1, BACKUP_KEY_2].map(key => localStorage.getItem(key)).filter(raw => raw !== null);
+async function cleanupSaveChunks(options) {
+  const keys = [SAVE_KEY, BACKUP_KEY_1, BACKUP_KEY_2];
+  const snapshot = keys.map(key => localStorage.getItem(key));
+  const raws = snapshot.filter(raw => raw !== null);
   const cache = chunkRootCache.get(localStorage);
   // Prune even when a corrupt root later makes cleanup fail conservatively.
   if (cache) for (const raw of cache.keys()) if (!raws.includes(raw)) cache.delete(raw);
@@ -829,7 +833,9 @@ async function cleanupSaveChunks() {
     // A cache miss must still protect the decoded persistent root if caching fails.
     try { return rememberChunkRoot(raw, root); } catch { return { ...root, rootBodyKey: rootBodyReference(raw)?.key }; }
   }));
-  return collectUnusedChunks(roots);
+  return collectUnusedChunks(roots, { ...options,
+    ownsSnapshot: () => keys.every((key, index) => localStorage.getItem(key) === snapshot[index]),
+  });
 }
 export function saveGame(state, options = {}) {
   try { return saveOwnedSnapshot(structuredClone(state), structuredClone(options)); }
@@ -850,7 +856,9 @@ function saveOwnedSnapshot(snapshot, safeOptions, deletionEpoch = deletionEpochs
         if (deletionEpoch !== (deletionEpochs.get(localStorage) ?? 0) || observations.get(localStorage) !== currentPrimary || backupChanged) {
           return failedSave('save_conflict', 'check_conflict', 'localStorage.getItem');
         }
-        return await saveGameImpl(snapshot, safeOptions);
+        const archivePin = await retainBattedBallReceipt(snapshot.battedBallReceipt);
+        try { return await saveGameImpl(snapshot, safeOptions); }
+        finally { archivePin.release(); }
       } catch (error) {
         return failedSave('save_failed', 'save', 'saveGame', error);
       }
@@ -1057,9 +1065,13 @@ export async function loadGame() {
       const result = validateAndMigrateSave(state);
       if (result.ok) {
         if(legacyCareerSeeds.has(state)) legacyCareerSeeds.set(result.state,legacyCareerSeeds.get(state));
+        // Acquire a native live reference before publishing a loaded snapshot.
+        // A concurrent rotation while acquiring it still fails the checks below.
+        const archivePin = await retainBattedBallReceipt(result.state.battedBallReceipt);
         // Never let a delayed read undo deletion or replace newer observations,
         // validated roots, chunk metadata, or the latest reported load result.
         if (!canPublish()) {
+          archivePin.release();
           if (ownsLoad() && !deletionChanged()) lastLoadResult = { status: 'conflict', reason: 'load_conflict' };
           return null;
         }
@@ -1072,6 +1084,7 @@ export async function loadGame() {
         try { rememberChunkRoot(raw, result.state); }
         catch (error) { console.warn('Load succeeded; root cache failed:', error); }
         lastLoadResult = { status: key === SAVE_KEY ? 'primary' : 'recovered', source: label, generation: state.saveManifest?.generation };
+        archivePin.adopt();
         return result.state;
       }
       console.warn(`Validation failed for ${label}`);
@@ -1236,6 +1249,9 @@ async function deleteSaveImpl() {
   validatedRoots.delete(localStorage);
   validatedRawRoots.delete(localStorage);
   lastLoadResult = { status: 'none' };
+  releaseCurrentBattedBallReceipt(saveId);
+  try { await cleanupSaveChunks({ force: true }); }
+  catch (error) { console.warn('Save deleted; archive cleanup deferred:', error); }
   if (saveId) {
     import('./battedBallArchive')
       .then((mod) => mod.deleteBattedBallArchiveBySaveId(saveId))

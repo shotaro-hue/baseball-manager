@@ -4,6 +4,7 @@ import { openBaseballManagerDb, BASEBALL_MANAGER_DB_STORES } from './baseballMan
 import { withBattedBallArchiveLock } from './archiveLock';
 import { sanitizeBatchRecord, enqueueBattedBallBatches, flushBattedBallQueue, getBattedBallQueueStatus } from './battedBallArchive';
 import { battedBallVersionKey, validateBattedBallReceipt, validateBattedBallVersionRef } from './battedBallRun';
+import { createBattedBallRetentionPin } from './battedBallRetention';
 
 const STORE = BASEBALL_MANAGER_DB_STORES.chunks;
 const jobsByFactory = new WeakMap();
@@ -129,21 +130,56 @@ export async function readBattedBallReceipt(receipt, { onChunk } = {}) {
   } finally { db?.close(); }
 }
 
+// GC verifies the immutable run metadata but does not inflate event chunks.
+// Shared ancestors are visited once; a conflicting SHA or cycle fails closed.
+export async function collectBattedBallReceiptKeys(receipt, refs = new Map()) {
+  if (receipt == null) return refs;
+  validateBattedBallReceipt(receipt, receipt.saveId);
+  const saveId = receipt.saveId, path = new Set();
+  const db = receipt.head ? await openBaseballManagerDb() : null;
+  try {
+    while (receipt?.head) {
+      validateBattedBallReceipt(receipt, saveId);
+      const ref = receipt.head;
+      if (path.has(ref.key)) throw new Error('cyclic_archive_reference');
+      path.add(ref.key);
+      if (refs.has(ref.key)) {
+        if (refs.get(ref.key) !== ref.digest) throw new Error('archive_reference_conflict');
+        break;
+      }
+      const node = await readData(db, ref, saveId, 'run');
+      validateBattedBallReceipt(node.previous, saveId);
+      if (!Array.isArray(node.chunks) || typeof node.complete !== 'boolean') throw new Error('invalid_archive_node');
+      refs.set(ref.key, ref.digest);
+      for (let index = 0; index < node.chunks.length; index++) {
+        const chunk = node.chunks[index], parts = validateBattedBallVersionRef(chunk, saveId, 'chunk');
+        if (parts[1] !== node.runId || parts[3] !== index) throw new Error('invalid_archive_order');
+        if (refs.has(chunk.key) && refs.get(chunk.key) !== chunk.digest) throw new Error('archive_reference_conflict');
+        refs.set(chunk.key, chunk.digest);
+      }
+      receipt = node.previous;
+    }
+    return refs;
+  } finally { db?.close(); }
+}
+
 export function createBattedBallReceiptRun({ saveId, previousReceipt = null, runId = createSaveId() }) {
   validateBattedBallReceipt(previousReceipt, saveId);
   previousReceipt = structuredClone(previousReceipt);
+  const pin = createBattedBallRetentionPin(saveId, runId, previousReceipt);
   const chunks = [], pending = new Map(), keys = [], seen = new Set(), superseded = new Set();
   let tail = Promise.resolve(), sealed = false, adopted = false, discarded = false, invalid = false;
-  let recordCount = 0, eventCount = 0, head, receipt, active = null;
+  let recordCount = 0, eventCount = 0, head, receipt, active = null, sealFinished;
   const persist = async entry => {
     pending.set(entry.ref.key, entry.row);
-    try { keys.push(...await mutateRows([[entry.ref.key, entry.row]])); pending.delete(entry.ref.key); } catch { /* Retain identical retry bytes. */ }
+    try { await pin.ready; keys.push(...await mutateRows([[entry.ref.key, entry.row]])); pending.delete(entry.ref.key); } catch { /* Retain identical retry bytes. */ }
     return entry.ref;
   };
   const retry = async () => {
     if (active) return active;
     active = (async () => {
       try {
+        await pin.ready;
         for (const entry of [...pending]) { keys.push(...await mutateRows([entry])); pending.delete(entry[0]); }
         if (!receipt?.head) return { ok: false };
         const db = await openBaseballManagerDb();
@@ -159,7 +195,7 @@ export function createBattedBallReceiptRun({ saveId, previousReceipt = null, run
             if (state.failedRecords) throw new Error('archive_projection_failed');
           }, true);
         } finally { db.close(); }
-        jobs().delete(job); return { ok: true };
+        jobs().delete(job); pin.settled(); return { ok: true };
       } catch { return { ok: false }; }
     })().finally(() => { active = null; });
     return active;
@@ -190,29 +226,35 @@ export function createBattedBallReceiptRun({ saveId, previousReceipt = null, run
     },
     async seal(summary) {
       if (sealed || discarded) throw new Error('archive_run_closed');
-      sealed = true; await tail;
-      const complete = !invalid && chunks.every(Boolean) && summary?.version === 1 && summary.runId === runId
-        && summary.chunkCount === chunks.length && summary.recordCount === recordCount && summary.eventCount === eventCount;
-      const coverage = !complete ? 'incomplete' : previousReceipt?.coverage ?? 'legacy_unverified';
-      try {
-        head = await persist(await makeRow(battedBallVersionKey(saveId, runId, 'run'),
-          { version: 1, kind: 'run', saveId, runId, previous: previousReceipt, chunks: chunks.filter(Boolean), complete, summary }));
-        receipt = { version: 1, saveId, coverage, head };
-      } catch { receipt = { version: 1, saveId, coverage: 'incomplete', head: previousReceipt?.head ?? null }; }
-      return structuredClone(receipt);
+      sealed = true;
+      sealFinished = (async () => {
+        await tail;
+        const complete = !invalid && chunks.every(Boolean) && summary?.version === 1 && summary.runId === runId
+          && summary.chunkCount === chunks.length && summary.recordCount === recordCount && summary.eventCount === eventCount;
+        const coverage = !complete ? 'incomplete' : previousReceipt?.coverage ?? 'legacy_unverified';
+        try {
+          head = await persist(await makeRow(battedBallVersionKey(saveId, runId, 'run'),
+            { version: 1, kind: 'run', saveId, runId, previous: previousReceipt, chunks: chunks.filter(Boolean), complete, summary }));
+          receipt = { version: 1, saveId, coverage, head };
+        } catch { receipt = { version: 1, saveId, coverage: 'incomplete', head: previousReceipt?.head ?? null }; }
+        return structuredClone(receipt);
+      })();
+      return sealFinished;
     },
     adopt() {
       if (!sealed || discarded) throw new Error('archive_run_not_sealed');
       if (!adopted) {
         adopted = true;
+        pin.adopt();
         for (const older of jobs()) if (older.saveId === saveId) older.supersede(seen);
         jobs().add(job); void retry();
       }
     },
     async discard() {
       if (adopted) return false; // Published references may already exist.
-      discarded = true; await tail; pending.clear();
+      discarded = true; await tail; await sealFinished?.catch(() => {}); pending.clear();
       try { await mutateRows(keys.map(key => [key]), true); return true; } catch { return false; }
+      finally { pin.release(); }
     },
   };
 }

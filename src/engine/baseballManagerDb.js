@@ -1,7 +1,7 @@
 export const BASEBALL_MANAGER_DB_NAME = 'baseball_manager_storage';
-// v4 changes the connection epoch, not the stores. Version-pinned v1-v3
-// callers cannot reopen this DB after activation (IndexedDB VersionError).
-export const BASEBALL_MANAGER_DB_VERSION = 4;
+// v5 requires live archive pins before GC. Older explicit-version writers
+// cannot reopen after activation; existing stores and rows are unchanged.
+export const BASEBALL_MANAGER_DB_VERSION = 5;
 export const STORAGE_UPGRADE_BLOCKED_ERROR = 'StorageUpgradeBlockedError';
 export const STORAGE_OPEN_TIMEOUT_MS = 10_000;
 
