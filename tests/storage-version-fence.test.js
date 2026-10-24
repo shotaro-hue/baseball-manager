@@ -37,12 +37,12 @@ it('a native open queued without any events times out instead of hanging later s
   } finally { vi.useRealTimers(); }
 });
 
-it('upgrades v3 to v4 without changing any store, mixed key, index or payload', async () => {
+it('upgrades v3 to the current epoch without changing any store, mixed key, index or payload', async () => {
   const old = await seedLegacyDb(); const before = await readDbSnapshot(old); old.close();
   localStorage.setItem(PRIMARY, 'root sentinel'); localStorage.setItem(PRIMARY + '_bk1', 'backup sentinel');
   const beforeRoots = roots(), db = await openBaseballManagerDb();
   try {
-    expect(BASEBALL_MANAGER_DB_VERSION).toBe(4); expect(db.version).toBe(4);
+    expect(db.version).toBe(BASEBALL_MANAGER_DB_VERSION);
     expect(await readDbSnapshot(db)).toEqual(before); expect(roots()).toEqual(beforeRoots);
     await expect(openLegacyDb()).rejects.toMatchObject({ name: 'VersionError' });
   } finally { db.close(); }
@@ -71,14 +71,14 @@ it('rejects a blocked upgrade, aborts its later activation and permits an explic
   expect(abandoned.error?.name).toBe('AbortError');
   const stillOld = await rawOpen(3); expect(stillOld.version).toBe(3); stillOld.close();
   const db = await openBaseballManagerDb();
-  try { expect(db.version).toBe(4); expect(await readDbSnapshot(db)).toEqual(before); }
+  try { expect(db.version).toBe(BASEBALL_MANAGER_DB_VERSION); expect(await readDbSnapshot(db)).toEqual(before); }
   finally { db.close(); }
 });
 
 it('closes helper-owned connections on versionchange so newer code can upgrade', async () => {
   const db = await openBaseballManagerDb();
   expect(typeof db.onversionchange).toBe('function');
-  const newer = await rawOpen(5);
+  const newer = await rawOpen(BASEBALL_MANAGER_DB_VERSION + 1);
   try {
     expect(() => db.transaction('save_chunks')).toThrow();
     await expect(openBaseballManagerDb()).rejects.toMatchObject({ name: 'VersionError' });
@@ -94,7 +94,7 @@ it('a synchronous schema exception aborts creation and leaves a fresh retry poss
   await expect(openBaseballManagerDb()).rejects.toThrow('injected schema error');
   vi.restoreAllMocks();
   const db = await openBaseballManagerDb();
-  try { expect(Array.from(db.objectStoreNames)).toHaveLength(5); expect(db.version).toBe(4); }
+  try { expect(Array.from(db.objectStoreNames)).toHaveLength(5); expect(db.version).toBe(BASEBALL_MANAGER_DB_VERSION); }
   finally { db.close(); }
 });
 
@@ -122,11 +122,11 @@ it('blocked save preserves existing roots and safely reports a conditional retry
 
 it('outdated save refuses a newer DB and preserves committed roots and all rows', async () => {
   expect((await saveGame(game())).ok).toBe(true);
-  const before = roots(), db = await rawOpen(5), beforeRows = await readDbSnapshot(db); db.close();
+  const before = roots(), db = await rawOpen(BASEBALL_MANAGER_DB_VERSION + 1), beforeRows = await readDbSnapshot(db); db.close();
   const result = await saveGame({ ...game(), gameDay: 2 });
   expect(result).toMatchObject({ ok: false, reason: 'storage_version_outdated', diagnostics: { exceptionName: 'VersionError' } });
   expect(roots()).toEqual(before);
-  const after = await rawOpen(5);
+  const after = await rawOpen(BASEBALL_MANAGER_DB_VERSION + 1);
   try { expect(await readDbSnapshot(after)).toEqual(beforeRows); } finally { after.close(); }
   const feedback = saveFeedback(result);
   expect(feedback.retryable).toBe(false); expect(feedback.recovery).toContain('未保存');

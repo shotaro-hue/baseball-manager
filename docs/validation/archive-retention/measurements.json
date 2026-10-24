@@ -1,0 +1,140 @@
+{
+  "date": "2026-10-24",
+  "base": "19dd33d0e5862c511c90c4a4cc0c767a139cdf72",
+  "stats": {
+    "startTime": "2026-10-24T08:57:08.913Z",
+    "duration": 13038.033000000001,
+    "expected": 10,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "measurements": [
+    {
+      "project": "chromium",
+      "kind": "synthetic-years-not-simulation",
+      "unit": "UTF-16 bytes of serialized stored version rows, not physical disk/RAM",
+      "years": [
+        {
+          "year": 2030,
+          "rows": 20,
+          "serializedBytes": 84148
+        },
+        {
+          "year": 2035,
+          "rows": 40,
+          "serializedBytes": 168362
+        },
+        {
+          "year": 2040,
+          "rows": 60,
+          "serializedBytes": 252602
+        },
+        {
+          "year": 2045,
+          "rows": 80,
+          "serializedBytes": 336852
+        }
+      ],
+      "baseline": {
+        "rows": 80,
+        "serializedBytes": 336852
+      },
+      "cycles": [
+        {
+          "before": {
+            "rows": 120,
+            "serializedBytes": 360134
+          },
+          "after": {
+            "rows": 80,
+            "serializedBytes": 336852
+          }
+        },
+        {
+          "before": {
+            "rows": 120,
+            "serializedBytes": 360108
+          },
+          "after": {
+            "rows": 80,
+            "serializedBytes": 336852
+          }
+        },
+        {
+          "before": {
+            "rows": 120,
+            "serializedBytes": 360152
+          },
+          "after": {
+            "rows": 80,
+            "serializedBytes": 336852
+          }
+        }
+      ]
+    },
+    {
+      "project": "mobile-webkit",
+      "kind": "synthetic-years-not-simulation",
+      "unit": "UTF-16 bytes of serialized stored version rows, not physical disk/RAM",
+      "years": [
+        {
+          "year": 2030,
+          "rows": 20,
+          "serializedBytes": 84148
+        },
+        {
+          "year": 2035,
+          "rows": 40,
+          "serializedBytes": 168362
+        },
+        {
+          "year": 2040,
+          "rows": 60,
+          "serializedBytes": 252602
+        },
+        {
+          "year": 2045,
+          "rows": 80,
+          "serializedBytes": 336852
+        }
+      ],
+      "baseline": {
+        "rows": 80,
+        "serializedBytes": 336852
+      },
+      "cycles": [
+        {
+          "before": {
+            "rows": 120,
+            "serializedBytes": 360134
+          },
+          "after": {
+            "rows": 80,
+            "serializedBytes": 336852
+          }
+        },
+        {
+          "before": {
+            "rows": 120,
+            "serializedBytes": 360108
+          },
+          "after": {
+            "rows": 80,
+            "serializedBytes": 336852
+          }
+        },
+        {
+          "before": {
+            "rows": 120,
+            "serializedBytes": 360152
+          },
+          "after": {
+            "rows": 80,
+            "serializedBytes": 336852
+          }
+        }
+      ]
+    }
+  ]
+}

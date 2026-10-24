@@ -195,6 +195,10 @@ test('management lists FA observer lifecycle handles loading teams and hidden re
 for (const width of [360, 390, 1440]) test(`management lists ${width}px preserve deep row, filters and focus while unmounting mobile rows`, async ({ page }) => {
   test.setTimeout(120000); await page.setViewportSize({ width, height: width === 360 ? 800 : 844 });
   const f = managementLoadFixture(); await loadManagementFixture(page, f.fixture); const before = (await saveHub(page)).teams;
+  // Compare positions after setup's transient save banner has finished. Its
+  // 3500ms expiry otherwise changes layout between the two measurements.
+  await expect(page.locator('.home-save')).toContainText('保存済み');
+  await expect(page.locator('.notif.nok').filter({ hasText: '💾 セーブしました' })).toHaveCount(0);
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   for (const tab of ['contract', 'scout', 'fa']) {
     const route = await open(page, tab); await layout(route, page);

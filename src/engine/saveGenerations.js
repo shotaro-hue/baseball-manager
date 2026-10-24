@@ -3,6 +3,7 @@ import { ROOT_BODY_PREFIX } from './saveRootBodies';
 import { openBaseballManagerDb, BASEBALL_MANAGER_DB_STORES } from './baseballManagerDb';
 import { createSaveId } from './saveIdentity';
 import { matchHistoryForSave, matchHistorySnapshot } from './matchHistory';
+import { collectUnusedBattedBallVersions } from './battedBallGarbageCollection';
 
 export const CHUNK_SCOPES = ['seasonHistory', 'news', 'mailbox', 'matchHistory', 'careerLogs'];
 export const LEGACY_GENERATION_VERSION = 5;
@@ -148,7 +149,7 @@ export async function prepareGeneration(state, previous, dirtyScopes, careerData
 }
 
 // Called only under the save lock. Unknown/invalid roots are retained conservatively.
-export async function collectUnusedChunks(roots) {
+export async function collectUnusedChunks(roots, options) {
   const protectedKeys = new Set();
   for (const root of roots) {
     if (root.rootBodyKey) protectedKeys.add(root.rootBodyKey);
@@ -160,7 +161,7 @@ export async function collectUnusedChunks(roots) {
     }
   }
   const db = await openBaseballManagerDb();
-  return new Promise((resolve, reject) => {
+  const deleted = await new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite'), store = tx.objectStore(STORE);
     const req = store.openKeyCursor(); let deleted = 0;
     req.onsuccess = () => {
@@ -172,4 +173,6 @@ export async function collectUnusedChunks(roots) {
     tx.oncomplete = () => { db.close(); resolve(deleted); };
     tx.onabort = tx.onerror = () => { db.close(); reject(tx.error || new Error('cleanup_failed')); };
   });
+  const archive = await collectUnusedBattedBallVersions(roots, options);
+  return deleted + archive.deleted;
 }
