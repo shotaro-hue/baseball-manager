@@ -425,35 +425,31 @@ function buildGameResultsMapPatch(gameResults) {
   return patch;
 }
 
-function buildAllTeamResultsPatch(batchBoxScores) {
-  const patches = {};
-  for (const box of batchBoxScores) {
-    const hWon = box.gameResult.won;
-    const drew = box.gameResult.score.my === box.gameResult.score.opp;
-    if (!patches[box.homeId]) patches[box.homeId] = {};
-    patches[box.homeId][box.dayNo] = makeTeamResultSummary({
-      won: hWon,
-      drew,
-      myScore: box.gameResult.score.my,
-      oppScore: box.gameResult.score.opp,
-      oppName: box.awayName,
-      oppId: box.awayId,
-      homeId: box.homeId,
-      awayId: box.awayId,
-    });
-    if (!patches[box.awayId]) patches[box.awayId] = {};
-    patches[box.awayId][box.dayNo] = makeTeamResultSummary({
-      won: !hWon && !drew,
-      drew,
-      myScore: box.gameResult.score.opp,
-      oppScore: box.gameResult.score.my,
-      oppName: box.homeName,
-      oppId: box.homeId,
-      homeId: box.homeId,
-      awayId: box.awayId,
-    });
-  }
-  return patches;
+function appendAllTeamResult(patches, box) {
+  const hWon = box.gameResult.won;
+  const drew = box.gameResult.score.my === box.gameResult.score.opp;
+  if (!patches[box.homeId]) patches[box.homeId] = {};
+  patches[box.homeId][box.dayNo] = makeTeamResultSummary({
+    won: hWon,
+    drew,
+    myScore: box.gameResult.score.my,
+    oppScore: box.gameResult.score.opp,
+    oppName: box.awayName,
+    oppId: box.awayId,
+    homeId: box.homeId,
+    awayId: box.awayId,
+  });
+  if (!patches[box.awayId]) patches[box.awayId] = {};
+  patches[box.awayId][box.dayNo] = makeTeamResultSummary({
+    won: !hWon && !drew,
+    drew,
+    myScore: box.gameResult.score.opp,
+    oppScore: box.gameResult.score.my,
+    oppName: box.homeName,
+    oppId: box.homeId,
+    homeId: box.homeId,
+    awayId: box.awayId,
+  });
 }
 
 function buildAllTeamBoxScoresPatch(batchBoxScores) {
@@ -561,6 +557,8 @@ export function simulateSeasonBatch({
   const batchNewsItems = [];
   let batchAllStarNewsItems = [];
   const batchBoxScores = [];
+  // Keep every compact score even when old detailed box scores are evicted.
+  const allTeamResultsPatch = {};
   const batchInjuries = [];
   const cpuHighlights = [];
 
@@ -611,7 +609,7 @@ export function simulateSeasonBatch({
       );
       archiveGame(sim.log, newDay, homeTeam, awayTeam);
       const box = computeBoxScore(sim.log || [], sim.inningSummary || [], homePlayersSnap, awayPlayersSnap, sim.score.my, sim.score.opp);
-      batchBoxScores.push(makeCompactBoxScoreRecord({
+      const boxRecord = makeCompactBoxScoreRecord({
         homeId: homeTeam.id,
         awayId: awayTeam.id,
         dayNo: newDay,
@@ -619,7 +617,9 @@ export function simulateSeasonBatch({
         bs: box,
         homeName: homeTeam.name,
         awayName: awayTeam.name,
-      }));
+      });
+      appendAllTeamResult(allTeamResultsPatch, boxRecord);
+      batchBoxScores.push(boxRecord);
       if (batchBoxScores.length > MAX_BATCH_BOX_SCORE_KEEP) {
         batchBoxScores.splice(0, batchBoxScores.length - MAX_BATCH_BOX_SCORE_KEEP);
       }
@@ -669,7 +669,7 @@ export function simulateSeasonBatch({
             won: sim.score.opp > sim.score.my,
             score: { my: sim.score.opp, opp: sim.score.my },
           };
-      batchBoxScores.push(makeCompactBoxScoreRecord({
+      const boxRecord = makeCompactBoxScoreRecord({
         homeId: scheduleMatchup.isHome ? myTeam.id : opp.id,
         awayId: scheduleMatchup.isHome ? opp.id : myTeam.id,
         dayNo: newDay,
@@ -677,7 +677,9 @@ export function simulateSeasonBatch({
         bs: null,
         homeName: scheduleMatchup.isHome ? myTeam.name : opp.name,
         awayName: scheduleMatchup.isHome ? opp.name : myTeam.name,
-      }));
+      });
+      appendAllTeamResult(allTeamResultsPatch, boxRecord);
+      batchBoxScores.push(boxRecord);
       if (batchBoxScores.length > MAX_BATCH_BOX_SCORE_KEEP) {
         batchBoxScores.splice(0, batchBoxScores.length - MAX_BATCH_BOX_SCORE_KEEP);
       }
@@ -887,7 +889,7 @@ export function simulateSeasonBatch({
     },
     recentResults: gameResults.map(buildRecentResult).reverse().slice(0, 5),
     gameResultsMapPatch: buildGameResultsMapPatch(gameResults),
-    allTeamResultsPatch: buildAllTeamResultsPatch(batchBoxScores),
+    allTeamResultsPatch,
     allTeamBoxScoresPatch: buildAllTeamBoxScoresPatch(batchBoxScores),
     nextAllStarDone: allStarDoneLocal,
     allStarPayload,

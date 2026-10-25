@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { startNewGame, runBatch } from './helpers/progression';
+import { startNewGame, runBatch, saveHub, progressSignature } from './helpers/progression';
 
 test.describe('バッチシム（5試合）', () => {
   test.beforeEach(async ({page}) => startNewGame(page));
@@ -9,7 +9,8 @@ test.describe('バッチシム（5試合）', () => {
   });
   test('バッチシム後に勝敗表示が更新される', async ({page}) => {
     await runBatch(page, false);
-    await expect(page.locator('.chip.cg').filter({hasText:/^\d+勝$/})).toHaveCount(1);
-    await expect(page.locator('.chip.cr').filter({hasText:/^\d+敗$/})).toHaveCount(1);
+    const saved = progressSignature(await saveHub(page, { progressOnly: true }));
+    expect(saved.played).toBe(5);
+    await expect(page.locator('.topbar')).toContainText(`${saved.wins}勝${saved.losses}敗${saved.draws}分`);
   });
 });

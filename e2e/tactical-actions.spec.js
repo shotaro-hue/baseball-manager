@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { openBatch } from './helpers/progression';
+import { startSingle, waitForNewGameReady } from './helpers/progression';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -8,19 +8,17 @@ test.beforeEach(async ({ page }) => {
   });
   await page.goto('/baseball-manager/');
   await page.getByRole('button', { name: '阪神タイガース', exact: true }).click();
-  await expect(page.getByRole('button', { name: /ホーム/ })).toBeVisible({ timeout: 15000 });
+  await waitForNewGameReady(page, '阪神タイガース');
 });
 
-test('opening dashboard uses the same game number and date as the sim button', async ({ page }) => {
-  await openBatch(page, false);
-  const simText = await page.getByRole('button', { name: /^1試合/ }).innerText();
-  const date = simText.match(/\d+\/\d+/)[0];
-  await expect(page.getByRole('region', { name: '本日の試合', exact:true })).toContainText(`${date} Game 1`);
+test('opening dashboard and header agree on the scheduled game number and date', async ({ page }) => {
+  await expect(page.locator('.topbar')).toContainText('2026年 · 3/27 · 第1戦');
+  await expect(page.getByRole('region', { name: '本日の試合', exact:true })).toContainText('2026年3月27日 · 第1戦');
+  await expect(page.locator('.desktop-dashboard').getByRole('button', { name: '試合へ進む', exact:true })).toBeEnabled();
 });
 
 test('manual pause exposes tactics, and an advisory stop can execute a command', async ({ page }) => {
-  await openBatch(page, false);
-  await page.getByRole('button', { name: /^1試合/ }).click();
+  await startSingle(page, false);
   await page.getByRole('button', { name: /🎮 試合モード/ }).click();
   const tactics = page.getByRole('button', { name: '🎯 作戦', exact: true });
   await expect(tactics).toBeVisible();
