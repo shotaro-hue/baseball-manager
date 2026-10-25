@@ -37,6 +37,8 @@ jobs:
         suite:
           # CI #470 hit the 30-minute job cap after 132/132 and 131/132 successes.
           # Split the same management cases; keep assertions, workers and timeouts.
+          - name: annual-and-extended
+            files: annual-journey.spec.js batch-100.spec.js batch.spec.js contract-renewal.spec.js game.spec.js hub.spec.js tactical-actions.spec.js title.spec.js ui-foundation.spec.js
           - name: initialization-and-progression
             files: progression.smoke.spec.js initialization.spec.js
           - name: qa-d1-draft-browser
