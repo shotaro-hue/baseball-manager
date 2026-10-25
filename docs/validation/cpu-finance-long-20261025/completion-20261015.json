@@ -1,0 +1,11 @@
+{
+  "sourceCommit": "9e97a3f49345c4312a1966f478589abc9968ddef",
+  "seeds": [
+    20261015
+  ],
+  "variant": "finance-current",
+  "exitCode": 0,
+  "signal": null,
+  "report": "/workspace/scratch/c7b475f5d37a/cpu-finance-20261025/seed-20261015/vitest-20261015.json",
+  "finishedAt": "2026-10-25T07:02:52.120Z"
+}
