@@ -1,6 +1,6 @@
 # ROADMAP — NPB Franchise Manager
 
-> 最終更新: 2026-10-25（#501マージ反映。QA-04Aの実進行・保存再開検証へ。完全バックアップ・復元は保留）
+> 最終更新: 2026-10-25（#502マージ反映。利用者の選択でCPU・財務を現行mainの3seed×10年で検証。完全バックアップ・復元は保留）
 > 目的: **OOTP / Football Manager のように「何年も遊べる、意思決定が積み重なる経営シミュレーション」**を作る。
 
 > 現在の進捗は第1節を参照。第2・3・5節の旧チェックリストと期日は2026-05-01時点の履歴であり、現在の完了認定ではない。UI/UX改革の一次監査・推奨PR分割は [全体改革の青写真 v1](./docs/REFORM_BLUEPRINT_V1.md)、現行の設計方針は [UI/UX設計基準](./docs/DESIGN_SYSTEM.md) を参照。着手時には最新mainと再照合する。
@@ -26,7 +26,7 @@
 
 ## 1. 現在地サマリ
 
-最新照合：2026-10-25、main `e1cb7ab0511bd36a8ee81a9a7789a606a62efb7c`（#501マージ済み）。UI-04Dの対象画面移行を完了し、利用者の継続指示で[QA-04A](./docs/implementation/qa-04a.md)へ着手。下記の過去照合と最新状態を区別する。
+最新照合：2026-10-25、main `632a19c7ef51fe36ace02ee3a855f6cc33ff5454`（#502マージ済み）。UI-04DとQA-04A後、利用者が③「CPU・財務の長期品質」を選択。[現行mainの3seed×10年検証](./docs/validation/cpu-finance-long-20261025/README.md)で360球団年度の収支・330 CPU球団年度の予算・保存再開140回を確認した。単年の打席/対戦打者0が2人年度あり、健康状態・選出理由を含む個別診断が次の候補。下記の過去照合と最新状態を区別する。
 
 照合日：2026-10-21。基準main：`46d75e21b1f6e27c0f60274a38cd7619a80d951d`（PR #489マージ後）。GitHubのmainとマージ状態を確認。QA-D1は#472、FIX-S3は#473、捕手不足の原因分析は#474、捕手層の編成方針は#475、一軍空き枠の補足修正は#476、共通人数基盤は#477、可変ドラフトは#478、65人方針は#479、AI-03は#480、球団収支FIX-M1は#481でマージ済み。各工程の対象範囲・実測・限界は[QA-D1](./docs/implementation/qa-d1.md)・[FIX-S3](./docs/implementation/fix-s3.md)・[捕手不足の原因分析](./docs/implementation/farm-catcher-shortage.md)・[捕手層のレビューと次工程](./docs/implementation/catcher-depth-review.md)・[収支検証](./docs/validation/club-finance/README.md)を参照。全機能・全年度・実機の完了認定ではない。
 
@@ -55,11 +55,11 @@
 | SAVE-01B-0C-FIX | — | [#499](https://github.com/shotaro-hue/baseball-manager/pull/499)マージ済み | [計画](./docs/implementation/archive-retry-order-plan.md)・[検証](./docs/validation/archive-retry-order/README.md)。再試行/集計原子性/保存別警告/捕手診断を修正。PR CI全13ジョブ成功 |
 | SAVE-CAPACITY-2 | — | [#500](https://github.com/shotaro-hue/baseball-manager/pull/500)マージ済み | [計画](./docs/implementation/archive-retention-plan.md)・[検証](./docs/validation/archive-retention/README.md)。3保存root・生存タブを保護して孤立versionを回収。保持年数の変更なし |
 | SAVE-01B-1 / B-2 | 保留 | 今回は実施しない | 完全バックアップ/復元は利用者の指示で後回し。再開時は#494の設計・v1凍結と残ゲートを再確認 |
-| QA-04A | P1 | [#502](https://github.com/shotaro-hue/baseball-manager/pull/502)で修正と検証、提出CIを確認。[要件](./docs/implementation/qa-04a.md)・[検証](./docs/validation/qa-04a/README.md) | 新規→通常/手動/まとめシム→一軍/二軍成績→契約/FA/取引/スカウト→ドラフト/年度→保存再開。失敗/復旧/競合、CPU編成。通常CI外E2Eを評価し必要なゲートを選ぶ |
+| QA-04A | — | [#502](https://github.com/shotaro-hue/baseball-manager/pull/502)マージ済み。[要件](./docs/implementation/qa-04a.md)・[検証](./docs/validation/qa-04a/README.md) | 新規の実143試合・年度更新・保存再開と通常CI外E2Eを検証。長いまとめ処理の全球団スコア欠落を修正。最終head CI全14ジョブ成功 |
 | UI-04D | — | [#501](https://github.com/shotaro-hue/baseball-manager/pull/501)マージ済み | [要件](./docs/implementation/ui-04d.md)・[検証](./docs/validation/ui-04d/README.md)。通知/ニュース/記録/OB/設定の本文をDES-01へ移行。既読と要対応、選択詳細と一覧復帰、保存された旧年度を維持 |
 | QA-04B | P1 | UI-04D後、未着手。**実iPhone確認未完了** | 360/390/760/761/799/800/1023/1024/1440px、Chromium/WebKit、キーボード、保存/復帰。実iPhoneのタッチ・連続スワイプ・速度は別途実施 |
 
-今回の対象は **QA-04A（UI刷新後の進行・年度更新・保存再開）**。通常CIで保護済みの機能は同一sourceの結果を再利用し、通常CI外8spec/20件と新規から143試合を実進行するChromium/WebKit旅程2件がローカル成功。長いまとめ処理の全球団スコア欠落も修正。最終headのCI結果は#502を参照。実機iPhone・複数年耐久・全seedのバランスは別途。完全バックアップ/復元と#494の設計凍結は保留を維持する。各工程は専用PR、人間がマージ判断。
+今回の対象は **CPU・財務の現行main長期検証**。既存の本番エンジン/hookハーネスを変更せず3seed×10年を完走。二軍未実施・負予算・新人初年度/複数年連続の出場機会0は0、補強後捕手6〜9人、指名0の連続は最長1年だった。途中年度の単年出場機会0が2人年度あるため、全員毎年の出場を保証したとは扱わない。[原本・集計・次課題](./docs/validation/cpu-finance-long-20261025/README.md)。Nodeの検証用保存先と固定利用者方針による診断であり、実App/プレーオフ/immutable receiptを含む複数年耐久と実iPhoneのQA-04Bは別途。完全バックアップ/復元と#494の設計凍結は保留を維持する。各工程は専用PR、人間がマージ判断。
 
 **二軍の実測基盤は実装・マージ済み。CPUの編成判断は段階的に改善中。新デザインの全画面移行と長期バランスの完了には至っていない。**
 

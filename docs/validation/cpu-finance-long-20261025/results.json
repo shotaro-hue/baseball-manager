@@ -1,0 +1,1206 @@
+{
+  "status": "passed",
+  "date": "2026-10-25",
+  "mainCommit": "632a19c7ef51fe36ace02ee3a855f6cc33ff5454",
+  "mainTree": "ae32cdb87000a33e5f99c302cd3add759e6ad20c",
+  "localSourceCommit": "9e97a3f49345c4312a1966f478589abc9968ddef",
+  "auditSourceHashes": {
+    "docs/validation/cpu-finance-long-20261025/audit.mjs": "779420c980c18a8cd2f91f70326af85ca6eb77013a99abcd317a1b826095f2d4",
+    "scripts/ai03-summary.mjs": "5dc6c19a317519b2981081406bd9dd668a604292cdcdd375e7e752d71dd259b1",
+    "scripts/summarize-farm-opportunities.mjs": "2e682229ed3607080b6a04944622da61abe11c8bf9421e04621647a69ada9f90"
+  },
+  "scope": "Current-main CPU and finance diagnostic; three seeds x ten generated seasons, real hooks and season engine.",
+  "units": "万円",
+  "seeds": [
+    20261015,
+    20261016,
+    20261017
+  ],
+  "years": {
+    "start": 2026,
+    "end": 2035
+  },
+  "checks": {
+    "completedRuns": 3,
+    "completedSeasons": 30,
+    "financeClubSeasons": 360,
+    "cpuBudgetFormulaChecks": 330,
+    "rosterPhaseChecks": 2160,
+    "checkpoints": 140,
+    "firstTeamGames": 25740,
+    "farmPlayed": 25740,
+    "farmUnplayed": 0,
+    "aboveTargetDraftChecks": 149
+  },
+  "cpu": {
+    "completedSeasons": 30,
+    "cpuClubSeasons": 330,
+    "checkpoints": 140,
+    "controlledDistribution": {
+      "64": 4,
+      "65": 14,
+      "66": 60,
+      "67": 148,
+      "68": 57,
+      "69": 33,
+      "70": 14
+    },
+    "seventyRate": 0.04242424242424243,
+    "nominations": {
+      "min": 0,
+      "max": 8,
+      "mean": 4.054545454545455
+    },
+    "totalNominations": 1338,
+    "accepted": {
+      "min": 0,
+      "max": 8,
+      "mean": 4.054545454545455
+    },
+    "longestZeroDraft": 1,
+    "fourYearZeroOccurrences": 0,
+    "contingencyReasons": {
+      "future-upgrade": 136,
+      "current-upgrade": 13
+    },
+    "zeroFutureBaselineContingencies": 0,
+    "ageMean": {
+      "min": 24.176470588235293,
+      "max": 30.47761194029851,
+      "mean": 27.271638610611195
+    },
+    "ageBands": {
+      "18-24": 6398,
+      "25-29": 9147,
+      "30-34": 5158,
+      "35+": 1472
+    },
+    "payroll": {
+      "min": 146658,
+      "max": 460500,
+      "mean": 215552.22727272726
+    },
+    "budget": {
+      "min": 205764,
+      "max": 1034170,
+      "mean": 547732.8333333334
+    },
+    "catchers": {
+      "min": 6,
+      "max": 9,
+      "mean": 6.793939393939394
+    },
+    "pitchers": {
+      "min": 24,
+      "max": 37,
+      "mean": 31.14848484848485
+    },
+    "marketSignings": 577,
+    "marketSpending": 3687100,
+    "departures": 1958,
+    "departureReasons": {
+      "引退": 80,
+      "戦力外": 1183,
+      "FA宣言": 572,
+      "unrecorded": 123
+    },
+    "observedRookieCohorts": 1234,
+    "rookieFirstZero": 0,
+    "rookieMultipleZero": 0,
+    "longestRookieZero": 1,
+    "unplayedFarmCards": 0,
+    "negativeBudget": 0,
+    "decisionCounts": {
+      "renewal-plan:recorded": 330,
+      "renewal:operating-core": 7266,
+      "renewal:no-accessible-upgrade": 8793,
+      "renewal:ongoing-contract": 4333,
+      "renewal:rookie-current-upgrade": 840,
+      "renewal-complete:recorded": 330,
+      "renewal:rookie-future-upgrade": 343,
+      "market-plan:recorded": 36608,
+      "market-sign:normal-target": 377,
+      "market-sign:future-upgrade": 103,
+      "draft-nomination:current-upgrade": 543,
+      "draft-nomination:future-upgrade": 897,
+      "draft-nomination:organization-shortage": 5,
+      "draft-end:no-upgrade": 179,
+      "draft-end:normal-target": 137,
+      "draft-complete:recorded": 330,
+      "market-sign:current-upgrade": 35,
+      "market-sign:operating-shortage": 39,
+      "market-sign:catcher-depth-shortage": 23,
+      "renewal:overseas-fa": 2,
+      "draft-end:roster-full": 1
+    }
+  },
+  "rookies": {
+    "cpuCohortsWithFollowingYear": 1234,
+    "cpuFirstYearZero": 0,
+    "cpuMultipleYearZero": 0,
+    "cpuLongestZero": 0,
+    "cpuAnyMultipleYearZero": 0,
+    "cpuLongestAnyZero": 1,
+    "prolongedCpuPlayers": [],
+    "firstYearBatterPA": {
+      "count": 863,
+      "min": 11,
+      "p10": 95,
+      "median": 344,
+      "p90": 607,
+      "max": 691,
+      "mean": 348.4125144843569
+    },
+    "firstYearPitcherBF": {
+      "count": 371,
+      "min": 12,
+      "p10": 189,
+      "median": 369,
+      "p90": 746,
+      "max": 874,
+      "mean": 434.77358490566036
+    }
+  },
+  "laterYearZeroOpportunities": [
+    {
+      "seed": 20261016,
+      "draftedYear": 2026,
+      "originalTeamId": 4,
+      "year": 2032,
+      "teamId": 4,
+      "id": "3zfngtp",
+      "age": 28,
+      "pos": "中継ぎ",
+      "subtype": "中継ぎ",
+      "isPitcher": true,
+      "development": false,
+      "roster": "active",
+      "rookie": false,
+      "serviceYears": 6,
+      "salary": 4400,
+      "potential": 60,
+      "current": 60.059999999999995,
+      "PA": 0,
+      "BF": 0,
+      "IP": 0,
+      "farmRecorded": false,
+      "farmPA": 0,
+      "farmBF": 0,
+      "farmOuts": 0
+    },
+    {
+      "seed": 20261017,
+      "draftedYear": 2031,
+      "originalTeamId": 8,
+      "year": 2035,
+      "teamId": 8,
+      "id": "r4it9zr",
+      "age": 26,
+      "pos": "二塁手",
+      "subtype": null,
+      "isPitcher": false,
+      "development": false,
+      "roster": "farm",
+      "rookie": false,
+      "serviceYears": 4,
+      "salary": 459,
+      "potential": 93,
+      "current": 51.78999999999999,
+      "PA": 0,
+      "BF": 0,
+      "IP": 0,
+      "farmRecorded": false,
+      "farmPA": 0,
+      "farmBF": 0,
+      "farmOuts": 0
+    }
+  ],
+  "decisionEvidence": {
+    "canonical": "full seed JSON seasons[].cpuDecisions",
+    "supplementalStreams": [
+      {
+        "seed": 20261015,
+        "canonicalSource": "seed-20261015.json:seasons[].cpuDecisions",
+        "canonicalCount": 19541,
+        "streamedCount": 18759,
+        "omittedCount": 782,
+        "complete": false,
+        "orderedCorrespondence": true
+      },
+      {
+        "seed": 20261016,
+        "canonicalSource": "seed-20261016.json:seasons[].cpuDecisions",
+        "canonicalCount": 21074,
+        "streamedCount": 21073,
+        "omittedCount": 1,
+        "complete": false,
+        "orderedCorrespondence": true
+      },
+      {
+        "seed": 20261017,
+        "canonicalSource": "seed-20261017.json:seasons[].cpuDecisions",
+        "canonicalCount": 21040,
+        "streamedCount": 21007,
+        "omittedCount": 33,
+        "complete": false,
+        "orderedCorrespondence": true
+      }
+    ]
+  },
+  "catcherPhases": {
+    "start": {
+      "count": 330,
+      "min": 6,
+      "max": 9,
+      "mean": 6.696969696969697,
+      "belowSix": [],
+      "aboveNine": []
+    },
+    "seasonEnd": {
+      "count": 330,
+      "min": 5,
+      "max": 9,
+      "mean": 6.696969696969697,
+      "belowSix": [
+        {
+          "seed": 20261016,
+          "year": 2032,
+          "teamId": 5,
+          "catchers": 5
+        }
+      ],
+      "aboveNine": []
+    },
+    "renewal": {
+      "count": 330,
+      "min": 4,
+      "max": 9,
+      "mean": 6.254545454545455,
+      "belowSix": [
+        {
+          "seed": 20261015,
+          "year": 2026,
+          "teamId": 1,
+          "catchers": 5
+        },
+        {
+          "seed": 20261015,
+          "year": 2026,
+          "teamId": 4,
+          "catchers": 5
+        },
+        {
+          "seed": 20261015,
+          "year": 2026,
+          "teamId": 11,
+          "catchers": 5
+        },
+        {
+          "seed": 20261015,
+          "year": 2027,
+          "teamId": 1,
+          "catchers": 5
+        },
+        {
+          "seed": 20261015,
+          "year": 2029,
+          "teamId": 11,
+          "catchers": 5
+        },
+        {
+          "seed": 20261015,
+          "year": 2030,
+          "teamId": 1,
+          "catchers": 5
+        },
+        {
+          "seed": 20261015,
+          "year": 2030,
+          "teamId": 4,
+          "catchers": 5
+        },
+        {
+          "seed": 20261015,
+          "year": 2030,
+          "teamId": 11,
+          "catchers": 5
+        },
+        {
+          "seed": 20261015,
+          "year": 2031,
+          "teamId": 2,
+          "catchers": 5
+        },
+        {
+          "seed": 20261015,
+          "year": 2031,
+          "teamId": 4,
+          "catchers": 5
+        },
+        {
+          "seed": 20261015,
+          "year": 2032,
+          "teamId": 1,
+          "catchers": 4
+        },
+        {
+          "seed": 20261015,
+          "year": 2035,
+          "teamId": 5,
+          "catchers": 5
+        },
+        {
+          "seed": 20261016,
+          "year": 2026,
+          "teamId": 3,
+          "catchers": 5
+        },
+        {
+          "seed": 20261016,
+          "year": 2026,
+          "teamId": 7,
+          "catchers": 5
+        },
+        {
+          "seed": 20261016,
+          "year": 2027,
+          "teamId": 1,
+          "catchers": 5
+        },
+        {
+          "seed": 20261016,
+          "year": 2027,
+          "teamId": 7,
+          "catchers": 4
+        },
+        {
+          "seed": 20261016,
+          "year": 2028,
+          "teamId": 3,
+          "catchers": 4
+        },
+        {
+          "seed": 20261016,
+          "year": 2028,
+          "teamId": 5,
+          "catchers": 5
+        },
+        {
+          "seed": 20261016,
+          "year": 2029,
+          "teamId": 3,
+          "catchers": 5
+        },
+        {
+          "seed": 20261016,
+          "year": 2030,
+          "teamId": 3,
+          "catchers": 5
+        },
+        {
+          "seed": 20261016,
+          "year": 2031,
+          "teamId": 4,
+          "catchers": 5
+        },
+        {
+          "seed": 20261016,
+          "year": 2032,
+          "teamId": 5,
+          "catchers": 5
+        },
+        {
+          "seed": 20261016,
+          "year": 2034,
+          "teamId": 10,
+          "catchers": 5
+        },
+        {
+          "seed": 20261016,
+          "year": 2035,
+          "teamId": 2,
+          "catchers": 4
+        },
+        {
+          "seed": 20261017,
+          "year": 2026,
+          "teamId": 1,
+          "catchers": 5
+        },
+        {
+          "seed": 20261017,
+          "year": 2026,
+          "teamId": 7,
+          "catchers": 5
+        },
+        {
+          "seed": 20261017,
+          "year": 2026,
+          "teamId": 9,
+          "catchers": 5
+        },
+        {
+          "seed": 20261017,
+          "year": 2026,
+          "teamId": 11,
+          "catchers": 4
+        },
+        {
+          "seed": 20261017,
+          "year": 2028,
+          "teamId": 5,
+          "catchers": 4
+        },
+        {
+          "seed": 20261017,
+          "year": 2028,
+          "teamId": 7,
+          "catchers": 5
+        },
+        {
+          "seed": 20261017,
+          "year": 2029,
+          "teamId": 1,
+          "catchers": 5
+        },
+        {
+          "seed": 20261017,
+          "year": 2029,
+          "teamId": 2,
+          "catchers": 5
+        },
+        {
+          "seed": 20261017,
+          "year": 2029,
+          "teamId": 4,
+          "catchers": 5
+        },
+        {
+          "seed": 20261017,
+          "year": 2029,
+          "teamId": 11,
+          "catchers": 5
+        },
+        {
+          "seed": 20261017,
+          "year": 2030,
+          "teamId": 1,
+          "catchers": 5
+        },
+        {
+          "seed": 20261017,
+          "year": 2033,
+          "teamId": 11,
+          "catchers": 5
+        },
+        {
+          "seed": 20261017,
+          "year": 2035,
+          "teamId": 4,
+          "catchers": 5
+        }
+      ],
+      "aboveNine": []
+    },
+    "market": {
+      "count": 330,
+      "min": 5,
+      "max": 9,
+      "mean": 6.4,
+      "belowSix": [
+        {
+          "seed": 20261015,
+          "year": 2026,
+          "teamId": 11,
+          "catchers": 5
+        }
+      ],
+      "aboveNine": []
+    },
+    "draft": {
+      "count": 330,
+      "min": 6,
+      "max": 9,
+      "mean": 6.793939393939394,
+      "belowSix": [],
+      "aboveNine": []
+    },
+    "afterOffseason": {
+      "count": 330,
+      "min": 6,
+      "max": 9,
+      "mean": 6.793939393939394,
+      "belowSix": [],
+      "aboveNine": []
+    }
+  },
+  "finance": {
+    "revenue": {
+      "count": 360,
+      "min": 961342,
+      "max": 3114755,
+      "mean": 1871893.1361111111
+    },
+    "operatingSurplusBeforePlayerPayroll": {
+      "count": 360,
+      "min": 85526,
+      "max": 986263,
+      "mean": 491606.1777777778
+    },
+    "cpuNextYearBudget": {
+      "count": 330,
+      "min": 205764,
+      "max": 1034170,
+      "mean": 547732.8333333334
+    },
+    "cpuNextYearContractPayroll": {
+      "count": 330,
+      "min": 146658,
+      "max": 460500,
+      "mean": 215552.22727272726
+    },
+    "cpuBudgetAtFloor": 0
+  },
+  "byYear": [
+    {
+      "year": 2026,
+      "cpuClubSeasons": 33,
+      "atBudgetFloor": 0,
+      "seventy": 2,
+      "revenue": {
+        "count": 33,
+        "min": 1187294,
+        "max": 2960289,
+        "mean": 1992771.7878787878
+      },
+      "operatingSurplusBeforePlayerPayroll": {
+        "count": 33,
+        "min": 284348,
+        "max": 842748,
+        "mean": 562531.0303030303
+      },
+      "seasonEndContractPayroll": {
+        "count": 33,
+        "min": 181520,
+        "max": 503210,
+        "mean": 276886.36363636365
+      },
+      "nextYearContractPayroll": {
+        "count": 33,
+        "min": 167880,
+        "max": 460500,
+        "mean": 257779.69696969696
+      },
+      "nextYearBudget": {
+        "count": 33,
+        "min": 299378,
+        "max": 867549,
+        "mean": 545193.4848484849
+      },
+      "catchers": {
+        "count": 33,
+        "min": 6,
+        "max": 8,
+        "mean": 6.454545454545454
+      },
+      "pitchers": {
+        "count": 33,
+        "min": 30,
+        "max": 35,
+        "mean": 32.878787878787875
+      },
+      "nominations": {
+        "count": 33,
+        "min": 4,
+        "max": 8,
+        "mean": 6.212121212121212
+      }
+    },
+    {
+      "year": 2027,
+      "cpuClubSeasons": 33,
+      "atBudgetFloor": 0,
+      "seventy": 0,
+      "revenue": {
+        "count": 33,
+        "min": 1038331,
+        "max": 2852883,
+        "mean": 1950454.7272727273
+      },
+      "operatingSurplusBeforePlayerPayroll": {
+        "count": 33,
+        "min": 161552,
+        "max": 900853,
+        "mean": 533191.6060606061
+      },
+      "seasonEndContractPayroll": {
+        "count": 33,
+        "min": 167880,
+        "max": 472360,
+        "mean": 262342.8787878788
+      },
+      "nextYearContractPayroll": {
+        "count": 33,
+        "min": 159411,
+        "max": 446426,
+        "mean": 237250.45454545456
+      },
+      "nextYearBudget": {
+        "count": 33,
+        "min": 278959,
+        "max": 882007,
+        "mean": 548119.0606060605
+      },
+      "catchers": {
+        "count": 33,
+        "min": 6,
+        "max": 8,
+        "mean": 6.575757575757576
+      },
+      "pitchers": {
+        "count": 33,
+        "min": 29,
+        "max": 36,
+        "mean": 32.333333333333336
+      },
+      "nominations": {
+        "count": 33,
+        "min": 1,
+        "max": 7,
+        "mean": 4.636363636363637
+      }
+    },
+    {
+      "year": 2028,
+      "cpuClubSeasons": 33,
+      "atBudgetFloor": 0,
+      "seventy": 4,
+      "revenue": {
+        "count": 33,
+        "min": 1135782,
+        "max": 3055847,
+        "mean": 1929350.8181818181
+      },
+      "operatingSurplusBeforePlayerPayroll": {
+        "count": 33,
+        "min": 170632,
+        "max": 927718,
+        "mean": 517045.36363636365
+      },
+      "seasonEndContractPayroll": {
+        "count": 33,
+        "min": 159411,
+        "max": 468768,
+        "mean": 244272
+      },
+      "nextYearContractPayroll": {
+        "count": 33,
+        "min": 165964,
+        "max": 390994,
+        "mean": 227247.18181818182
+      },
+      "nextYearBudget": {
+        "count": 33,
+        "min": 269388,
+        "max": 994149,
+        "mean": 548434.5454545454
+      },
+      "catchers": {
+        "count": 33,
+        "min": 6,
+        "max": 9,
+        "mean": 6.7272727272727275
+      },
+      "pitchers": {
+        "count": 33,
+        "min": 29,
+        "max": 35,
+        "mean": 31.818181818181817
+      },
+      "nominations": {
+        "count": 33,
+        "min": 1,
+        "max": 7,
+        "mean": 4.393939393939394
+      }
+    },
+    {
+      "year": 2029,
+      "cpuClubSeasons": 33,
+      "atBudgetFloor": 0,
+      "seventy": 2,
+      "revenue": {
+        "count": 33,
+        "min": 961342,
+        "max": 3085888,
+        "mean": 1922767.0909090908
+      },
+      "operatingSurplusBeforePlayerPayroll": {
+        "count": 33,
+        "min": 85526,
+        "max": 957469,
+        "mean": 511375.8181818182
+      },
+      "seasonEndContractPayroll": {
+        "count": 33,
+        "min": 165964,
+        "max": 413004,
+        "mean": 235353.36363636365
+      },
+      "nextYearContractPayroll": {
+        "count": 33,
+        "min": 156204,
+        "max": 358318,
+        "mean": 218418.9393939394
+      },
+      "nextYearBudget": {
+        "count": 33,
+        "min": 254777,
+        "max": 1025895,
+        "mean": 553861.1515151515
+      },
+      "catchers": {
+        "count": 33,
+        "min": 6,
+        "max": 9,
+        "mean": 6.757575757575758
+      },
+      "pitchers": {
+        "count": 33,
+        "min": 28,
+        "max": 37,
+        "mean": 31.545454545454547
+      },
+      "nominations": {
+        "count": 33,
+        "min": 0,
+        "max": 7,
+        "mean": 3.9393939393939394
+      }
+    },
+    {
+      "year": 2030,
+      "cpuClubSeasons": 33,
+      "atBudgetFloor": 0,
+      "seventy": 0,
+      "revenue": {
+        "count": 33,
+        "min": 979156,
+        "max": 3060198,
+        "mean": 1906866.5151515151
+      },
+      "operatingSurplusBeforePlayerPayroll": {
+        "count": 33,
+        "min": 120883,
+        "max": 931706,
+        "mean": 500133.9090909091
+      },
+      "seasonEndContractPayroll": {
+        "count": 33,
+        "min": 176451,
+        "max": 358787,
+        "mean": 225128.12121212122
+      },
+      "nextYearContractPayroll": {
+        "count": 33,
+        "min": 160115,
+        "max": 286523,
+        "mean": 207866.21212121213
+      },
+      "nextYearBudget": {
+        "count": 33,
+        "min": 261056,
+        "max": 1034170,
+        "mean": 557668.6666666666
+      },
+      "catchers": {
+        "count": 33,
+        "min": 6,
+        "max": 8,
+        "mean": 6.848484848484849
+      },
+      "pitchers": {
+        "count": 33,
+        "min": 26,
+        "max": 37,
+        "mean": 31
+      },
+      "nominations": {
+        "count": 33,
+        "min": 1,
+        "max": 6,
+        "mean": 3.757575757575758
+      }
+    },
+    {
+      "year": 2031,
+      "cpuClubSeasons": 33,
+      "atBudgetFloor": 0,
+      "seventy": 1,
+      "revenue": {
+        "count": 33,
+        "min": 989808,
+        "max": 3046764,
+        "mean": 1887667.0909090908
+      },
+      "operatingSurplusBeforePlayerPayroll": {
+        "count": 33,
+        "min": 132734,
+        "max": 918590,
+        "mean": 485226.54545454547
+      },
+      "seasonEndContractPayroll": {
+        "count": 33,
+        "min": 172231,
+        "max": 306346,
+        "mean": 216649.69696969696
+      },
+      "nextYearContractPayroll": {
+        "count": 33,
+        "min": 156199,
+        "max": 268515,
+        "mean": 203898.42424242425
+      },
+      "nextYearBudget": {
+        "count": 33,
+        "min": 257206,
+        "max": 979631,
+        "mean": 552691.9696969697
+      },
+      "catchers": {
+        "count": 33,
+        "min": 6,
+        "max": 9,
+        "mean": 6.9393939393939394
+      },
+      "pitchers": {
+        "count": 33,
+        "min": 26,
+        "max": 36,
+        "mean": 30.939393939393938
+      },
+      "nominations": {
+        "count": 33,
+        "min": 1,
+        "max": 6,
+        "mean": 3.8181818181818183
+      }
+    },
+    {
+      "year": 2032,
+      "cpuClubSeasons": 33,
+      "atBudgetFloor": 0,
+      "seventy": 3,
+      "revenue": {
+        "count": 33,
+        "min": 1055485,
+        "max": 3114755,
+        "mean": 1871448.1515151516
+      },
+      "operatingSurplusBeforePlayerPayroll": {
+        "count": 33,
+        "min": 119142,
+        "max": 986263,
+        "mean": 473258.51515151514
+      },
+      "seasonEndContractPayroll": {
+        "count": 33,
+        "min": 160509,
+        "max": 291569,
+        "mean": 211578.78787878787
+      },
+      "nextYearContractPayroll": {
+        "count": 33,
+        "min": 146658,
+        "max": 270646,
+        "mean": 200783.60606060605
+      },
+      "nextYearBudget": {
+        "count": 33,
+        "min": 205764,
+        "max": 1031941,
+        "mean": 548626
+      },
+      "catchers": {
+        "count": 33,
+        "min": 6,
+        "max": 8,
+        "mean": 6.848484848484849
+      },
+      "pitchers": {
+        "count": 33,
+        "min": 25,
+        "max": 36,
+        "mean": 30.606060606060606
+      },
+      "nominations": {
+        "count": 33,
+        "min": 0,
+        "max": 8,
+        "mean": 3.696969696969697
+      }
+    },
+    {
+      "year": 2033,
+      "cpuClubSeasons": 33,
+      "atBudgetFloor": 0,
+      "seventy": 1,
+      "revenue": {
+        "count": 33,
+        "min": 1082815,
+        "max": 3071984,
+        "mean": 1856464.3333333333
+      },
+      "operatingSurplusBeforePlayerPayroll": {
+        "count": 33,
+        "min": 143369,
+        "max": 943492,
+        "mean": 461509
+      },
+      "seasonEndContractPayroll": {
+        "count": 33,
+        "min": 158862,
+        "max": 276000,
+        "mean": 209185.54545454544
+      },
+      "nextYearContractPayroll": {
+        "count": 33,
+        "min": 163091,
+        "max": 250645,
+        "mean": 199297
+      },
+      "nextYearBudget": {
+        "count": 33,
+        "min": 209400,
+        "max": 1008800,
+        "mean": 543062.9090909091
+      },
+      "catchers": {
+        "count": 33,
+        "min": 6,
+        "max": 8,
+        "mean": 6.878787878787879
+      },
+      "pitchers": {
+        "count": 33,
+        "min": 25,
+        "max": 35,
+        "mean": 30.21212121212121
+      },
+      "nominations": {
+        "count": 33,
+        "min": 1,
+        "max": 6,
+        "mean": 3.5757575757575757
+      }
+    },
+    {
+      "year": 2034,
+      "cpuClubSeasons": 33,
+      "atBudgetFloor": 0,
+      "seventy": 1,
+      "revenue": {
+        "count": 33,
+        "min": 1107807,
+        "max": 3063553,
+        "mean": 1844918.5454545454
+      },
+      "operatingSurplusBeforePlayerPayroll": {
+        "count": 33,
+        "min": 131714,
+        "max": 935264,
+        "mean": 453316.9393939394
+      },
+      "seasonEndContractPayroll": {
+        "count": 33,
+        "min": 163091,
+        "max": 270206,
+        "mean": 208716.66666666666
+      },
+      "nextYearContractPayroll": {
+        "count": 33,
+        "min": 148731,
+        "max": 264679,
+        "mean": 200102.42424242425
+      },
+      "nextYearBudget": {
+        "count": 33,
+        "min": 232051,
+        "max": 1014841,
+        "mean": 537342.2727272727
+      },
+      "catchers": {
+        "count": 33,
+        "min": 6,
+        "max": 8,
+        "mean": 6.9393939393939394
+      },
+      "pitchers": {
+        "count": 33,
+        "min": 24,
+        "max": 36,
+        "mean": 29.90909090909091
+      },
+      "nominations": {
+        "count": 33,
+        "min": 0,
+        "max": 6,
+        "mean": 3.3636363636363638
+      }
+    },
+    {
+      "year": 2035,
+      "cpuClubSeasons": 33,
+      "atBudgetFloor": 0,
+      "seventy": 0,
+      "revenue": {
+        "count": 33,
+        "min": 1070725,
+        "max": 3106771,
+        "mean": 1861409.4545454546
+      },
+      "operatingSurplusBeforePlayerPayroll": {
+        "count": 33,
+        "min": 110152,
+        "max": 978279,
+        "mean": 466253.36363636365
+      },
+      "seasonEndContractPayroll": {
+        "count": 33,
+        "min": 155745,
+        "max": 264679,
+        "mean": 206104.51515151514
+      },
+      "nextYearContractPayroll": {
+        "count": 33,
+        "min": 151414,
+        "max": 255594,
+        "mean": 202878.33333333334
+      },
+      "nextYearBudget": {
+        "count": 33,
+        "min": 252903,
+        "max": 1016726,
+        "mean": 542328.2727272727
+      },
+      "catchers": {
+        "count": 33,
+        "min": 6,
+        "max": 8,
+        "mean": 6.96969696969697
+      },
+      "pitchers": {
+        "count": 33,
+        "min": 25,
+        "max": 36,
+        "mean": 30.242424242424242
+      },
+      "nominations": {
+        "count": 33,
+        "min": 0,
+        "max": 7,
+        "mean": 3.1515151515151514
+      }
+    }
+  ],
+  "artifacts": [
+    {
+      "name": "seed-20261015.json.gz",
+      "bytes": 1885469,
+      "sha256": "036ef88305e54ffd025998f727620b0394fe9c6b87fc5615bcc27669633701a7"
+    },
+    {
+      "name": "decisions-20261015.jsonl.gz",
+      "bytes": 283662,
+      "sha256": "171ee56240f64f824bec42e8dcad09628cd4ce43e4d88dee3f74cbf6f0ff428a"
+    },
+    {
+      "name": "seed-20261015.log.gz",
+      "bytes": 11590,
+      "sha256": "af4fe07e2e913fe2db85361a97fcb5e5e116cab20d6bd8bbf0289e265a0ce980"
+    },
+    {
+      "name": "source-snapshot-20261015.json",
+      "bytes": 48381,
+      "sha256": "9648731aff924f3dd40344d29bb2f907981cf44bbed2b423e2cd63c692e8a870"
+    },
+    {
+      "name": "completion-20261015.json",
+      "bytes": 310,
+      "sha256": "90e5376a840bbc38d0f039006a940cd24db7ac3b7832a4046c49feffdaf2d5af"
+    },
+    {
+      "name": "vitest-20261015.json",
+      "bytes": 977,
+      "sha256": "8561b0a78a2477f80420a60b435695f41121f65eecb7c12ddb0bf7c190821631"
+    },
+    {
+      "name": "seed-20261016.json.gz",
+      "bytes": 1892509,
+      "sha256": "70a72fe2c7c3cb3ee7d70fbb9c10401b79edf61be456be82de37e738f9e5cbc0"
+    },
+    {
+      "name": "decisions-20261016.jsonl.gz",
+      "bytes": 312361,
+      "sha256": "3cd42a521bca4dde88270d1f1b8c49f1591e2aa49d33ffe64c2e7cf2ab1a65bf"
+    },
+    {
+      "name": "seed-20261016.log.gz",
+      "bytes": 5696,
+      "sha256": "f02f13c6f0f2012e5c546f04879c1d35d7b34e2ab362c1c75c57a8d527aabd07"
+    },
+    {
+      "name": "source-snapshot-20261016.json",
+      "bytes": 48381,
+      "sha256": "6a73ca1aa3eba44b5fe08a240389385c8c5bc13fdb7eeeaf3268100f371d3b4f"
+    },
+    {
+      "name": "completion-20261016.json",
+      "bytes": 310,
+      "sha256": "2e85002b5a174d790203a0b5f51440c5a1b9d3cebdc6623c2f7144dc305bca06"
+    },
+    {
+      "name": "vitest-20261016.json",
+      "bytes": 977,
+      "sha256": "4cfc912e3679a228dd86fb80dea103898b30b5b13a9e69ae7fc06db0be02ee7f"
+    },
+    {
+      "name": "seed-20261017.json.gz",
+      "bytes": 1889630,
+      "sha256": "85787f440ec08f9a7ec2f16d678fdf311ebb4fe7a39e51b33941a1f054dbccf5"
+    },
+    {
+      "name": "decisions-20261017.jsonl.gz",
+      "bytes": 308998,
+      "sha256": "c689cf0f2f0f5f8daf1d81ac6a9c976d632486282249884b111aabdf45b78b6a"
+    },
+    {
+      "name": "seed-20261017.log.gz",
+      "bytes": 5619,
+      "sha256": "97fe63c2b8a3a1232f4e3b261e4c5dd709c6e5fb715f2d4125c8bab6145d4e2e"
+    },
+    {
+      "name": "source-snapshot-20261017.json",
+      "bytes": 48381,
+      "sha256": "6b2d829a35aeca02511007d887adbbc13d07c8da4011c16dd5e508a82b9a4801"
+    },
+    {
+      "name": "completion-20261017.json",
+      "bytes": 310,
+      "sha256": "ecb8a6853cc009aaa71faa5546a934d376751d9029c0699d22c89266c3a30868"
+    },
+    {
+      "name": "vitest-20261017.json",
+      "bytes": 977,
+      "sha256": "42f04cf336ab4f41db5de281987526ad68d6f6c87da62bcf4f561bacfe498b6d"
+    }
+  ],
+  "limitations": [
+    "React hooks and real engine with fake-indexeddb / Map localStorage; no App UI, native-browser capacity or real iPhone acceptance.",
+    "Existing harness bypasses postseason tournament and prize income; fixed user renewal/release/FA/delegated-draft policy.",
+    "Existing harness does not adopt App/Worker immutable batted-ball receipts; no claim of complete archive-chain coverage.",
+    "Final-year rookies have no following season; career DB final checks cover continuously owned user players, not every CPU career.",
+    "Historical AI-03 used older finance and code; these are current-state observations, not a controlled improvement comparison.",
+    "Budget is a spending envelope, not cash. Operating surplus excludes player payroll; salary-subtracted reference is not a cash settlement."
+  ]
+}

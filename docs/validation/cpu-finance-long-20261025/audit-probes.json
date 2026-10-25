@@ -1,0 +1,38 @@
+{
+  "status": "passed",
+  "scope": "Independent evidence aggregator probes; originals unchanged.",
+  "auditSourceSha256": "779420c980c18a8cd2f91f70326af85ca6eb77013a99abcd317a1b826095f2d4",
+  "probes": [
+    {
+      "name": "incomplete-run",
+      "status": "rejected-as-expected",
+      "exitCode": 1,
+      "expectedDiagnostic": "20261015: process exit"
+    },
+    {
+      "name": "income-mismatch",
+      "status": "rejected-as-expected",
+      "exitCode": 1,
+      "expectedDiagnostic": "20261015/2026/team0: income totals"
+    },
+    {
+      "name": "next-budget-mismatch",
+      "status": "rejected-as-expected",
+      "exitCode": 1,
+      "expectedDiagnostic": "20261015/2026/team1: next-year budget"
+    },
+    {
+      "name": "removed-decision",
+      "status": "incompleteness-detected",
+      "exitCode": 0,
+      "omittedCount": 783,
+      "complete": false
+    },
+    {
+      "name": "altered-decision",
+      "status": "rejected-as-expected",
+      "exitCode": 1,
+      "expectedDiagnostic": "20261015: streamed decision is not canonical or is out of order"
+    }
+  ]
+}
