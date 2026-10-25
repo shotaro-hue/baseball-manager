@@ -1,0 +1,124 @@
+{
+  "status": "projection-only",
+  "date": "2026-10-26",
+  "mainCommit": "677c14fb5f96723846d01d0f72c25ac6a0d651b7",
+  "units": "万円",
+  "sourceSha256": {
+    "docs/validation/cpu-finance-long-20261025/seed-20261015.json.gz": "036ef88305e54ffd025998f727620b0394fe9c6b87fc5615bcc27669633701a7",
+    "docs/validation/cpu-finance-long-20261025/seed-20261016.json.gz": "70a72fe2c7c3cb3ee7d70fbb9c10401b79edf61be456be82de37e738f9e5cbc0",
+    "docs/validation/cpu-finance-long-20261025/seed-20261017.json.gz": "85787f440ec08f9a7ec2f16d678fdf311ebb4fe7a39e51b33941a1f054dbccf5",
+    "src/constants.js": "1d62817b81a1ced4638c1c627967db349e1f6c58d041d1a06bb32699f4bc404d"
+  },
+  "analysisSha256": "d4b645e48bb0f811ea4f67a46600603c6735e96287937b636fce2978f229af68",
+  "baselineReconciledRows": 330,
+  "candidates": [
+    {
+      "candidate": "current",
+      "annualAllocationRate": 0.6,
+      "seasonAllocationRate": 1,
+      "cpuClubSeasons": 330,
+      "marketBudget": {
+        "min": 179012,
+        "median": 763074.0,
+        "mean": 864454.6848484848,
+        "max": 1826152
+      },
+      "budgetToPayrollMedian": 3.714905583080955,
+      "marketBelowZero": 0,
+      "marketBelow10Oku": 0,
+      "marketBelow25Oku": 4,
+      "marketAtLeast50Oku": 268
+    },
+    {
+      "candidate": "annual-only",
+      "annualAllocationRate": 0.3,
+      "seasonAllocationRate": 1,
+      "cpuClubSeasons": 330,
+      "marketBudget": {
+        "min": 148248,
+        "median": 634886.5,
+        "mean": 729573.7424242424,
+        "max": 1547836
+      },
+      "budgetToPayrollMedian": 3.1778523715888345,
+      "marketBelowZero": 0,
+      "marketBelow10Oku": 0,
+      "marketBelow25Oku": 13,
+      "marketAtLeast50Oku": 238
+    },
+    {
+      "candidate": "season-half",
+      "annualAllocationRate": 0.6,
+      "seasonAllocationRate": 0.5,
+      "cpuClubSeasons": 330,
+      "marketBudget": {
+        "min": 107328,
+        "median": 543886.5,
+        "mean": 616262.8363636363,
+        "max": 1350174
+      },
+      "budgetToPayrollMedian": 2.7071740772711577,
+      "marketBelowZero": 0,
+      "marketBelow10Oku": 0,
+      "marketBelow25Oku": 23,
+      "marketAtLeast50Oku": 192
+    },
+    {
+      "candidate": "season-quarter",
+      "annualAllocationRate": 0.6,
+      "seasonAllocationRate": 0.25,
+      "cpuClubSeasons": 330,
+      "marketBudget": {
+        "min": 71485,
+        "median": 436463.0,
+        "mean": 492166.63333333336,
+        "max": 1117248
+      },
+      "budgetToPayrollMedian": 2.1457544108190887,
+      "marketBelowZero": 0,
+      "marketBelow10Oku": 3,
+      "marketBelow25Oku": 41,
+      "marketAtLeast50Oku": 129
+    },
+    {
+      "candidate": "combined-half",
+      "annualAllocationRate": 0.3,
+      "seasonAllocationRate": 0.5,
+      "cpuClubSeasons": 330,
+      "marketBudget": {
+        "min": 76564,
+        "median": 431503.5,
+        "mean": 481381.8939393939,
+        "max": 1069102
+      },
+      "budgetToPayrollMedian": 2.1774726717455772,
+      "marketBelowZero": 0,
+      "marketBelow10Oku": 3,
+      "marketBelow25Oku": 46,
+      "marketAtLeast50Oku": 129
+    },
+    {
+      "candidate": "combined-quarter",
+      "annualAllocationRate": 0.3,
+      "seasonAllocationRate": 0.25,
+      "cpuClubSeasons": 330,
+      "marketBudget": {
+        "min": 36513,
+        "median": 321124.0,
+        "mean": 357285.6909090909,
+        "max": 830008
+      },
+      "budgetToPayrollMedian": 1.638009759324742,
+      "marketBelowZero": 0,
+      "marketBelow10Oku": 8,
+      "marketBelow25Oku": 105,
+      "marketAtLeast50Oku": 67
+    }
+  ],
+  "limitations": [
+    "Frozen 2026-2035 CPU contracts, prices, roster, player growth and transfers; no new game simulation.",
+    "No dynamic CPU re-selection, budget-below-zero timing, playoffs, owner-trust variation, user investment or bank-capacity acceptance.",
+    "Only sampled market endpoints are projected; liquidity between them is unmeasured.",
+    "A payroll comparison describes spending capacity, not an amount of unpaid salary."
+  ]
+}
