@@ -41,8 +41,10 @@ for (const legacy of [false, true]) {
     await page.evaluate(() => { window.postingOriginalRandom = Math.random; Math.random = () => 2 / 7; });
     await page.getByRole('button', { name: '✅ 承認する', exact: true }).click();
     await page.getByRole('button', { name: '承認を確定する', exact: true }).click();
-    await expect(page.getByText(`${name} MLB移籍承認 — 移籍金+2000万円`, { exact: true })).toBeVisible();
+    // Assert the durable command result rather than the expiring toast.
+    await expect(page.locator('.reading-detail')).toContainText('対応済み');
     await page.evaluate(() => { Math.random = window.postingOriginalRandom; delete window.postingOriginalRandom; });
+    await page.getByRole('button', { name: '一覧に戻る', exact: true }).click();
     await page.getByText(`【ポスティング成立】${name} 入札額1.0億円`, { exact: true }).click();
     await expect(page.getByText(/球団受取移籍金: 2000万円/)).toBeVisible();
     await page.getByRole('complementary', { name: '監督メニュー' }).getByRole('button', { name: /^経営/ }).click();

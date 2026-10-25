@@ -290,7 +290,7 @@ test('management lists notification for a departed ID replaces the previous cont
   await loadManagementFixture(page, f.fixture); const route = await open(page, 'contract');
   await route.getByRole('button', { name: `${f.contract.name}の契約を確認`, exact: true }).click();
   await page.getByRole('button', { name: /^通知（未読/ }).click();
-  await active(page, 'mailbox').getByRole('button', { name: '退団済み選手の契約回答', exact: true }).click();
+  await active(page, 'mailbox').getByRole('button', { name: /^退団済み選手の契約回答/ }).click();
   await active(page, 'mailbox').getByRole('button', { name: 'この選手の契約状況を見る', exact: true }).click();
   await expect(route.getByRole('heading', { name: 'この選手は現在所属していません', exact: true })).toBeFocused();
   await expect(route.getByRole('heading', { name: f.contract.name, exact: true })).toHaveCount(0);

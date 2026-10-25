@@ -229,7 +229,7 @@ test('hub navigation notifications preserve FA filter, focus, scroll and existin
   expect(settled.mailbox.find(m => m.id === 'visible-offer').resolved).toBe(true);
   await notifications(page).click();
   await active(page).getByText('UI04既読の提案', { exact: true }).click();
-  await expect(active(page).getByText('対応済み', { exact: true })).toBeVisible();
+  await expect(active(page).locator('.reading-detail').getByText('対応済み', { exact: true })).toBeVisible();
   await expect(active(page).getByRole('button', { name: '✅ 承諾する', exact: true })).toHaveCount(0);
   await reloadAndLoad(page);
   expect((await saveHub(page)).teams).toEqual(settled.teams);
