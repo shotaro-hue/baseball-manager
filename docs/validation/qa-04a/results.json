@@ -1,0 +1,1352 @@
+{
+  "baseMain": "e1cb7ab0511bd36a8ee81a9a7789a606a62efb7c",
+  "validatedBlobs": {
+    "src/workers/seasonBatchCore.js": "dc0e02706cf30565fa10cdfeebcbf483c7fa43bb",
+    "e2e/annual-journey.spec.js": "f3d253c509645b927556d4f58bc2846e59e9b08c",
+    "e2e/helpers/annual-journey.js": "36456a6db30d6845b38197c387201898bef7b428"
+  },
+  "annualStats": {
+    "startTime": "2026-10-25T00:40:12.179Z",
+    "duration": 265469.831,
+    "expected": 2,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "extendedStats": {
+    "startTime": "2026-10-25T00:33:52.225Z",
+    "duration": 171729.348,
+    "expected": 20,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "annual": [
+    {
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 128739,
+      "errors": [],
+      "checkpoints": [
+        {
+          "label": "single",
+          "year": 2026,
+          "gameDay": 2,
+          "teamsHash": "e7eade9db4516d9d131fe5e37c4ad72ebd457c5ec2f0c28100881f23a3978b04",
+          "historyHash": "472d033d4607ed3d89ace1d06cc2ff2a8b68ad8c71ab6155093e1c1192c41211",
+          "resultsHash": "5bb6058401a732988b20a9c0e6f1e75f87d58b5c52e06baceeced4496b008231",
+          "farmHash": "2ddf9f43e26318c271655f807488b5e88ef0067ab3fc26cc310492d6b1cded13",
+          "receipt": {
+            "status": "complete",
+            "recordCount": 110,
+            "eventCount": 347
+          },
+          "receiptRef": {
+            "version": 1,
+            "saveId": "fc64e41f-fd47-4860-8dda-57538f368236",
+            "coverage": "complete",
+            "head": {
+              "key": "batted-ball-version:[\"fc64e41f-fd47-4860-8dda-57538f368236\",\"0cbda304-a795-47b2-8e28-6e215b0cf249\",\"run\"]",
+              "digest": "c21d245b80028e4634be08a5b90163e4cd45c9092119430803e2c4bdac422df0"
+            }
+          },
+          "teams": [
+            {
+              "id": 0,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 510214,
+              "results": 1
+            },
+            {
+              "id": 1,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 493821,
+              "results": 1
+            },
+            {
+              "id": 2,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 357540,
+              "results": 1
+            },
+            {
+              "id": 3,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 595213,
+              "results": 1
+            },
+            {
+              "id": 4,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 644948,
+              "results": 1
+            },
+            {
+              "id": 5,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 415987,
+              "results": 1
+            },
+            {
+              "id": 6,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 593526,
+              "results": 1
+            },
+            {
+              "id": 7,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 368005,
+              "results": 1
+            },
+            {
+              "id": 8,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 407751,
+              "results": 1
+            },
+            {
+              "id": 9,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 367654,
+              "results": 1
+            },
+            {
+              "id": 10,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 445219,
+              "results": 1
+            },
+            {
+              "id": 11,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 457476,
+              "results": 1
+            }
+          ],
+          "myResultCount": 1,
+          "duplicateIds": [],
+          "farm": {
+            "year": 2026,
+            "nextRound": 2,
+            "cards": 6,
+            "played": 6,
+            "unplayed": 0,
+            "reasonCounts": {}
+          }
+        },
+        {
+          "label": "101 games",
+          "year": 2026,
+          "gameDay": 102,
+          "teamsHash": "e99fdd9e79883e0f72f672f06348130c771b06d49f5a1e2d4ebdeaf8b0704d68",
+          "historyHash": "da3dacc1bdb40dd6b2e13fba6893d5955438891adf9f073b96a573c62f8e665d",
+          "resultsHash": "f0a613ed68afb5327cd5c4ebad1cb63890314fad1eef03d95914ac7aa85e3969",
+          "farmHash": "717f45479c6c82db5e450b50a7f854f6ad78cc62a5fffd35f4dbe2f89774bc61",
+          "receipt": {
+            "status": "complete",
+            "recordCount": 11087,
+            "eventCount": 34531
+          },
+          "receiptRef": {
+            "version": 1,
+            "saveId": "fc64e41f-fd47-4860-8dda-57538f368236",
+            "coverage": "complete",
+            "head": {
+              "key": "batted-ball-version:[\"fc64e41f-fd47-4860-8dda-57538f368236\",\"d0a0bdcc-7c8f-4965-9fda-31ac978fc04f\",\"run\"]",
+              "digest": "090089c31b3cedbcc35fd4522a6051c91b87c5a26b2650a4748cf08588652ade"
+            }
+          },
+          "teams": [
+            {
+              "id": 0,
+              "wins": 34,
+              "losses": 60,
+              "draws": 7,
+              "budget": 817890,
+              "results": 101
+            },
+            {
+              "id": 1,
+              "wins": 46,
+              "losses": 50,
+              "draws": 5,
+              "budget": 989666,
+              "results": 101
+            },
+            {
+              "id": 2,
+              "wins": 46,
+              "losses": 45,
+              "draws": 10,
+              "budget": 612933,
+              "results": 101
+            },
+            {
+              "id": 3,
+              "wins": 53,
+              "losses": 44,
+              "draws": 4,
+              "budget": 1250601,
+              "results": 101
+            },
+            {
+              "id": 4,
+              "wins": 58,
+              "losses": 40,
+              "draws": 3,
+              "budget": 1269800,
+              "results": 101
+            },
+            {
+              "id": 5,
+              "wins": 37,
+              "losses": 59,
+              "draws": 5,
+              "budget": 591619,
+              "results": 101
+            },
+            {
+              "id": 6,
+              "wins": 48,
+              "losses": 47,
+              "draws": 6,
+              "budget": 1009117,
+              "results": 101
+            },
+            {
+              "id": 7,
+              "wins": 53,
+              "losses": 42,
+              "draws": 6,
+              "budget": 637424,
+              "results": 101
+            },
+            {
+              "id": 8,
+              "wins": 55,
+              "losses": 45,
+              "draws": 1,
+              "budget": 625437,
+              "results": 101
+            },
+            {
+              "id": 9,
+              "wins": 54,
+              "losses": 45,
+              "draws": 2,
+              "budget": 605440,
+              "results": 101
+            },
+            {
+              "id": 10,
+              "wins": 46,
+              "losses": 53,
+              "draws": 2,
+              "budget": 797504,
+              "results": 101
+            },
+            {
+              "id": 11,
+              "wins": 49,
+              "losses": 49,
+              "draws": 3,
+              "budget": 1082228,
+              "results": 101
+            }
+          ],
+          "myResultCount": 101,
+          "duplicateIds": [],
+          "farm": {
+            "year": 2026,
+            "nextRound": 102,
+            "cards": 606,
+            "played": 606,
+            "unplayed": 0,
+            "reasonCounts": {}
+          }
+        },
+        {
+          "label": "143 games",
+          "year": 2026,
+          "gameDay": 144,
+          "teamsHash": "72891698d611ab1422e80c8fe150e6f62e79b6a31b7b4ce95c314bb37a57875a",
+          "historyHash": "34b11f742ff195862a3beb1e746f2d29a674fbd62f4c06ccfefa261afd8a3e2c",
+          "resultsHash": "f517bdcb8f8443232697cdf0957c496afb771db449ffe228e5ec972aeb89227b",
+          "farmHash": "a79a47d7a27895a70bb6082193a076b8faba6e8c73dcad8930e7689d8695c645",
+          "receipt": {
+            "status": "complete",
+            "recordCount": 15710,
+            "eventCount": 49014
+          },
+          "receiptRef": {
+            "version": 1,
+            "saveId": "fc64e41f-fd47-4860-8dda-57538f368236",
+            "coverage": "complete",
+            "head": {
+              "key": "batted-ball-version:[\"fc64e41f-fd47-4860-8dda-57538f368236\",\"896f9326-31b7-4eb4-b37d-ec70346e92a6\",\"run\"]",
+              "digest": "24fe47d4e1738f988c98800dc2a1c6e3a6ef5a2892987c9036ab01107af2351e"
+            }
+          },
+          "teams": [
+            {
+              "id": 0,
+              "wins": 59,
+              "losses": 75,
+              "draws": 9,
+              "budget": 987005,
+              "results": 143
+            },
+            {
+              "id": 1,
+              "wins": 70,
+              "losses": 66,
+              "draws": 7,
+              "budget": 1264960,
+              "results": 143
+            },
+            {
+              "id": 2,
+              "wins": 67,
+              "losses": 64,
+              "draws": 12,
+              "budget": 698388,
+              "results": 143
+            },
+            {
+              "id": 3,
+              "wins": 72,
+              "losses": 65,
+              "draws": 6,
+              "budget": 1356768,
+              "results": 143
+            },
+            {
+              "id": 4,
+              "wins": 76,
+              "losses": 61,
+              "draws": 6,
+              "budget": 1507006,
+              "results": 143
+            },
+            {
+              "id": 5,
+              "wins": 49,
+              "losses": 86,
+              "draws": 8,
+              "budget": 643266,
+              "results": 143
+            },
+            {
+              "id": 6,
+              "wins": 68,
+              "losses": 68,
+              "draws": 7,
+              "budget": 1208097,
+              "results": 143
+            },
+            {
+              "id": 7,
+              "wins": 75,
+              "losses": 60,
+              "draws": 8,
+              "budget": 841424,
+              "results": 143
+            },
+            {
+              "id": 8,
+              "wins": 71,
+              "losses": 68,
+              "draws": 4,
+              "budget": 829848,
+              "results": 143
+            },
+            {
+              "id": 9,
+              "wins": 73,
+              "losses": 65,
+              "draws": 5,
+              "budget": 799672,
+              "results": 143
+            },
+            {
+              "id": 10,
+              "wins": 65,
+              "losses": 73,
+              "draws": 5,
+              "budget": 970786,
+              "results": 143
+            },
+            {
+              "id": 11,
+              "wins": 71,
+              "losses": 65,
+              "draws": 7,
+              "budget": 976209,
+              "results": 143
+            }
+          ],
+          "myResultCount": 143,
+          "duplicateIds": [],
+          "farm": {
+            "year": 2026,
+            "nextRound": 144,
+            "cards": 858,
+            "played": 858,
+            "unplayed": 0,
+            "reasonCounts": {}
+          }
+        },
+        {
+          "label": "next year",
+          "year": 2027,
+          "gameDay": 1,
+          "teamsHash": "da31e5d0f9b94b0bd5688c902b6cc375994c4165aca78580c4d602651f7f369c",
+          "historyHash": "729ce3dc6b4c7263eee1fefa9bb00bef31e1c6221fa1ff1d8340a462bb7e7084",
+          "resultsHash": "6960650a69cf75fb2c5a8a29d8ec4f45ca0f61cc68b76d425c3a792a531a243b",
+          "farmHash": "64d6810426e1578a96b9b31f9ad7fcf8ebeba45e28edd646008024d1ae474038",
+          "receipt": {
+            "status": "complete",
+            "recordCount": 15710,
+            "eventCount": 49014
+          },
+          "receiptRef": {
+            "version": 1,
+            "saveId": "fc64e41f-fd47-4860-8dda-57538f368236",
+            "coverage": "complete",
+            "head": {
+              "key": "batted-ball-version:[\"fc64e41f-fd47-4860-8dda-57538f368236\",\"896f9326-31b7-4eb4-b37d-ec70346e92a6\",\"run\"]",
+              "digest": "24fe47d4e1738f988c98800dc2a1c6e3a6ef5a2892987c9036ab01107af2351e"
+            }
+          },
+          "teams": [
+            {
+              "id": 0,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 511753,
+              "results": 0
+            },
+            {
+              "id": 1,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 716276,
+              "results": 0
+            },
+            {
+              "id": 2,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 342453,
+              "results": 0
+            },
+            {
+              "id": 3,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 764346,
+              "results": 0
+            },
+            {
+              "id": 4,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 909224,
+              "results": 0
+            },
+            {
+              "id": 5,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 345340,
+              "results": 0
+            },
+            {
+              "id": 6,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 508705,
+              "results": 0
+            },
+            {
+              "id": 7,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 430839,
+              "results": 0
+            },
+            {
+              "id": 8,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 479982,
+              "results": 0
+            },
+            {
+              "id": 9,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 397803,
+              "results": 0
+            },
+            {
+              "id": 10,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 571671,
+              "results": 0
+            },
+            {
+              "id": 11,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 512444,
+              "results": 0
+            }
+          ],
+          "myResultCount": 0,
+          "duplicateIds": [],
+          "farm": {
+            "year": 2027,
+            "nextRound": 1,
+            "cards": 0,
+            "played": 0,
+            "unplayed": 0,
+            "reasonCounts": {}
+          }
+        },
+        {
+          "label": "next year first game",
+          "year": 2027,
+          "gameDay": 2,
+          "teamsHash": "7e6d9a2ae5a4b9b4c8fb5023c19ea961663d40817b681caf1ca7209cd23d0972",
+          "historyHash": "729ce3dc6b4c7263eee1fefa9bb00bef31e1c6221fa1ff1d8340a462bb7e7084",
+          "resultsHash": "294888f3c25b92c2edfadb56e9c4df89a394603e909e969c53b1ebfd218a2f85",
+          "farmHash": "f00c6b83475dd8102122e45baf5bd0d69cb708b8948f0adde0114a1082181377",
+          "receipt": {
+            "status": "complete",
+            "recordCount": 15820,
+            "eventCount": 49367
+          },
+          "receiptRef": {
+            "version": 1,
+            "saveId": "fc64e41f-fd47-4860-8dda-57538f368236",
+            "coverage": "complete",
+            "head": {
+              "key": "batted-ball-version:[\"fc64e41f-fd47-4860-8dda-57538f368236\",\"31699010-4a92-4bbb-81f4-e6511653a5b6\",\"run\"]",
+              "digest": "ca560f8836547535d26a5aa2645e327495216da4221151140804619acec9420d"
+            }
+          },
+          "teams": [
+            {
+              "id": 0,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 520217,
+              "results": 1
+            },
+            {
+              "id": 1,
+              "wins": 0,
+              "losses": 0,
+              "draws": 1,
+              "budget": 730216,
+              "results": 1
+            },
+            {
+              "id": 2,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 350270,
+              "results": 1
+            },
+            {
+              "id": 3,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 759737,
+              "results": 1
+            },
+            {
+              "id": 4,
+              "wins": 0,
+              "losses": 0,
+              "draws": 1,
+              "budget": 904741,
+              "results": 1
+            },
+            {
+              "id": 5,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 340906,
+              "results": 1
+            },
+            {
+              "id": 6,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 520732,
+              "results": 1
+            },
+            {
+              "id": 7,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 440154,
+              "results": 1
+            },
+            {
+              "id": 8,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 487735,
+              "results": 1
+            },
+            {
+              "id": 9,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 395612,
+              "results": 1
+            },
+            {
+              "id": 10,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 566619,
+              "results": 1
+            },
+            {
+              "id": 11,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 509953,
+              "results": 1
+            }
+          ],
+          "myResultCount": 1,
+          "duplicateIds": [],
+          "farm": {
+            "year": 2027,
+            "nextRound": 2,
+            "cards": 6,
+            "played": 6,
+            "unplayed": 0,
+            "reasonCounts": {}
+          }
+        }
+      ]
+    },
+    {
+      "project": "mobile-webkit",
+      "status": "passed",
+      "durationMs": 133314,
+      "errors": [],
+      "checkpoints": [
+        {
+          "label": "single",
+          "year": 2026,
+          "gameDay": 2,
+          "teamsHash": "eb2803d45703b8fc56641c540ed2ae2796f80cc847151b83b17a905b06f974c8",
+          "historyHash": "472d033d4607ed3d89ace1d06cc2ff2a8b68ad8c71ab6155093e1c1192c41211",
+          "resultsHash": "19995ef8e43ad9472461258f4c097599a0e42a132a76abe28db2e93f77625bd9",
+          "farmHash": "540883140c56d34977c4345e1c463b8c8f63d9e493c3e6ce759f0c2383bd92f2",
+          "receipt": {
+            "status": "complete",
+            "recordCount": 111,
+            "eventCount": 294
+          },
+          "receiptRef": {
+            "version": 1,
+            "saveId": "7211bb2b-acc5-458b-9e06-7c6178f51675",
+            "coverage": "complete",
+            "head": {
+              "key": "batted-ball-version:[\"7211bb2b-acc5-458b-9e06-7c6178f51675\",\"bb58b662-51b3-4cba-b1ca-8801afd39bf7\",\"run\"]",
+              "digest": "5a8753ef9675ac7a43879352747696bf5860b0f10984aa870130c4ce7482338e"
+            }
+          },
+          "teams": [
+            {
+              "id": 0,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 510214,
+              "results": 1
+            },
+            {
+              "id": 1,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 493821,
+              "results": 1
+            },
+            {
+              "id": 2,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 357540,
+              "results": 1
+            },
+            {
+              "id": 3,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 595213,
+              "results": 1
+            },
+            {
+              "id": 4,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 644948,
+              "results": 1
+            },
+            {
+              "id": 5,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 415987,
+              "results": 1
+            },
+            {
+              "id": 6,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 593526,
+              "results": 1
+            },
+            {
+              "id": 7,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 368005,
+              "results": 1
+            },
+            {
+              "id": 8,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 407751,
+              "results": 1
+            },
+            {
+              "id": 9,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 367654,
+              "results": 1
+            },
+            {
+              "id": 10,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 445219,
+              "results": 1
+            },
+            {
+              "id": 11,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 457476,
+              "results": 1
+            }
+          ],
+          "myResultCount": 1,
+          "duplicateIds": [],
+          "farm": {
+            "year": 2026,
+            "nextRound": 2,
+            "cards": 6,
+            "played": 6,
+            "unplayed": 0,
+            "reasonCounts": {}
+          }
+        },
+        {
+          "label": "101 games",
+          "year": 2026,
+          "gameDay": 102,
+          "teamsHash": "4b288c206a821f36fc66f8c8939d87cb63dc0a10334faf52538f59e705382524",
+          "historyHash": "ae86179e3116aa4d2641d1fb2417ff8f01e22f4348a0e9a01ccf077e10506017",
+          "resultsHash": "39be151fa3c1c04c6244ca0992f99f169b82a35cf915aa64935f179d1a3654ba",
+          "farmHash": "83c155b4029754867678008301396005b47c95c1699e7bf60779b6195fce1b9b",
+          "receipt": {
+            "status": "complete",
+            "recordCount": 11087,
+            "eventCount": 34668
+          },
+          "receiptRef": {
+            "version": 1,
+            "saveId": "7211bb2b-acc5-458b-9e06-7c6178f51675",
+            "coverage": "complete",
+            "head": {
+              "key": "batted-ball-version:[\"7211bb2b-acc5-458b-9e06-7c6178f51675\",\"255ca9d9-c692-4d32-bb44-5fdf7c3829ea\",\"run\"]",
+              "digest": "45b238f2b97b143a2fdf193091f85c4c473a6e5686654df8c15a3fdb33d3f15b"
+            }
+          },
+          "teams": [
+            {
+              "id": 0,
+              "wins": 43,
+              "losses": 50,
+              "draws": 8,
+              "budget": 847305,
+              "results": 101
+            },
+            {
+              "id": 1,
+              "wins": 45,
+              "losses": 53,
+              "draws": 3,
+              "budget": 980413,
+              "results": 101
+            },
+            {
+              "id": 2,
+              "wins": 40,
+              "losses": 58,
+              "draws": 3,
+              "budget": 578264,
+              "results": 101
+            },
+            {
+              "id": 3,
+              "wins": 53,
+              "losses": 41,
+              "draws": 7,
+              "budget": 1206960,
+              "results": 101
+            },
+            {
+              "id": 4,
+              "wins": 57,
+              "losses": 41,
+              "draws": 3,
+              "budget": 1281767,
+              "results": 101
+            },
+            {
+              "id": 5,
+              "wins": 47,
+              "losses": 52,
+              "draws": 2,
+              "budget": 648339,
+              "results": 101
+            },
+            {
+              "id": 6,
+              "wins": 50,
+              "losses": 45,
+              "draws": 6,
+              "budget": 1034443,
+              "results": 101
+            },
+            {
+              "id": 7,
+              "wins": 51,
+              "losses": 45,
+              "draws": 5,
+              "budget": 658037,
+              "results": 101
+            },
+            {
+              "id": 8,
+              "wins": 47,
+              "losses": 51,
+              "draws": 3,
+              "budget": 577757,
+              "results": 101
+            },
+            {
+              "id": 9,
+              "wins": 42,
+              "losses": 54,
+              "draws": 5,
+              "budget": 549751,
+              "results": 101
+            },
+            {
+              "id": 10,
+              "wins": 60,
+              "losses": 34,
+              "draws": 7,
+              "budget": 861887,
+              "results": 101
+            },
+            {
+              "id": 11,
+              "wins": 42,
+              "losses": 53,
+              "draws": 6,
+              "budget": 1008382,
+              "results": 101
+            }
+          ],
+          "myResultCount": 101,
+          "duplicateIds": [],
+          "farm": {
+            "year": 2026,
+            "nextRound": 102,
+            "cards": 606,
+            "played": 606,
+            "unplayed": 0,
+            "reasonCounts": {}
+          }
+        },
+        {
+          "label": "143 games",
+          "year": 2026,
+          "gameDay": 144,
+          "teamsHash": "f391378383fff45d2a003072a090aa432a6e9a3410004d097f20016818b562fd",
+          "historyHash": "ebd925f179a554ed93a7d360ff63c5fb372456dea17c6e5e8f73b714da61db56",
+          "resultsHash": "9d5f94bbc6171c14186bfb85c4d8c3e9ed8a59c36da6c47f126548c137c6ef7e",
+          "farmHash": "1376f73a0f4ef8cc892adcb3d9032a5011fd1b88c0c297d5329726b14cdce703",
+          "receipt": {
+            "status": "complete",
+            "recordCount": 15720,
+            "eventCount": 49169
+          },
+          "receiptRef": {
+            "version": 1,
+            "saveId": "7211bb2b-acc5-458b-9e06-7c6178f51675",
+            "coverage": "complete",
+            "head": {
+              "key": "batted-ball-version:[\"7211bb2b-acc5-458b-9e06-7c6178f51675\",\"b4f38299-46f9-4326-81a9-2bbdf22e698b\",\"run\"]",
+              "digest": "618c1a3b8992605cf06d2328809e677624690edc77277062e68b32322ccb81ca"
+            }
+          },
+          "teams": [
+            {
+              "id": 0,
+              "wins": 63,
+              "losses": 66,
+              "draws": 14,
+              "budget": 1071049,
+              "results": 143
+            },
+            {
+              "id": 1,
+              "wins": 65,
+              "losses": 74,
+              "draws": 4,
+              "budget": 1232008,
+              "results": 143
+            },
+            {
+              "id": 2,
+              "wins": 59,
+              "losses": 77,
+              "draws": 7,
+              "budget": 627212,
+              "results": 143
+            },
+            {
+              "id": 3,
+              "wins": 75,
+              "losses": 60,
+              "draws": 8,
+              "budget": 1334333,
+              "results": 143
+            },
+            {
+              "id": 4,
+              "wins": 84,
+              "losses": 56,
+              "draws": 3,
+              "budget": 1518973,
+              "results": 143
+            },
+            {
+              "id": 5,
+              "wins": 57,
+              "losses": 80,
+              "draws": 6,
+              "budget": 751002,
+              "results": 143
+            },
+            {
+              "id": 6,
+              "wins": 69,
+              "losses": 66,
+              "draws": 8,
+              "budget": 1273022,
+              "results": 143
+            },
+            {
+              "id": 7,
+              "wins": 72,
+              "losses": 64,
+              "draws": 7,
+              "budget": 849560,
+              "results": 143
+            },
+            {
+              "id": 8,
+              "wins": 64,
+              "losses": 72,
+              "draws": 7,
+              "budget": 735601,
+              "results": 143
+            },
+            {
+              "id": 9,
+              "wins": 66,
+              "losses": 72,
+              "draws": 5,
+              "budget": 691310,
+              "results": 143
+            },
+            {
+              "id": 10,
+              "wins": 82,
+              "losses": 53,
+              "draws": 8,
+              "budget": 1125227,
+              "results": 143
+            },
+            {
+              "id": 11,
+              "wins": 59,
+              "losses": 75,
+              "draws": 9,
+              "budget": 902363,
+              "results": 143
+            }
+          ],
+          "myResultCount": 143,
+          "duplicateIds": [],
+          "farm": {
+            "year": 2026,
+            "nextRound": 144,
+            "cards": 858,
+            "played": 858,
+            "unplayed": 0,
+            "reasonCounts": {}
+          }
+        },
+        {
+          "label": "next year",
+          "year": 2027,
+          "gameDay": 1,
+          "teamsHash": "e030dbdfef08e4d9275c3755379d2b46ecc33192cbc53328c52f08b121df0d02",
+          "historyHash": "0dce658fb713de117b4f51ea5775ab3bec974d297b36b42cbd1d26373345dff9",
+          "resultsHash": "0ef70532a48b4a03991a757af3ce25c4eafa6ff3043001d629448e51ac2dcd89",
+          "farmHash": "914c55d7ac618f76610eb18e27bd2cb1e7eae42516309e2c22d2eba295c003ee",
+          "receipt": {
+            "status": "complete",
+            "recordCount": 15720,
+            "eventCount": 49169
+          },
+          "receiptRef": {
+            "version": 1,
+            "saveId": "7211bb2b-acc5-458b-9e06-7c6178f51675",
+            "coverage": "complete",
+            "head": {
+              "key": "batted-ball-version:[\"7211bb2b-acc5-458b-9e06-7c6178f51675\",\"b4f38299-46f9-4326-81a9-2bbdf22e698b\",\"run\"]",
+              "digest": "618c1a3b8992605cf06d2328809e677624690edc77277062e68b32322ccb81ca"
+            }
+          },
+          "teams": [
+            {
+              "id": 0,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 564760,
+              "results": 0
+            },
+            {
+              "id": 1,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 682454,
+              "results": 0
+            },
+            {
+              "id": 2,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 327567,
+              "results": 0
+            },
+            {
+              "id": 3,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 775813,
+              "results": 0
+            },
+            {
+              "id": 4,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 912264,
+              "results": 0
+            },
+            {
+              "id": 5,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 395421,
+              "results": 0
+            },
+            {
+              "id": 6,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 533900,
+              "results": 0
+            },
+            {
+              "id": 7,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 434761,
+              "results": 0
+            },
+            {
+              "id": 8,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 411950,
+              "results": 0
+            },
+            {
+              "id": 9,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 327786,
+              "results": 0
+            },
+            {
+              "id": 10,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 663306,
+              "results": 0
+            },
+            {
+              "id": 11,
+              "wins": 0,
+              "losses": 0,
+              "draws": 0,
+              "budget": 473408,
+              "results": 0
+            }
+          ],
+          "myResultCount": 0,
+          "duplicateIds": [],
+          "farm": {
+            "year": 2027,
+            "nextRound": 1,
+            "cards": 0,
+            "played": 0,
+            "unplayed": 0,
+            "reasonCounts": {}
+          }
+        },
+        {
+          "label": "next year first game",
+          "year": 2027,
+          "gameDay": 2,
+          "teamsHash": "e22e0b0f4d667c12259132bf807a55e75a845266476b3c0e4102f110c3050c7c",
+          "historyHash": "0dce658fb713de117b4f51ea5775ab3bec974d297b36b42cbd1d26373345dff9",
+          "resultsHash": "d780c03eb0db6317073951d07d1e621f09f2cd29bb2ffff212cd142efdae0a26",
+          "farmHash": "b4a3cdd055392abfe90e381e62f02f736daab3746eef0e535844c79f1569a742",
+          "receipt": {
+            "status": "complete",
+            "recordCount": 15831,
+            "eventCount": 49536
+          },
+          "receiptRef": {
+            "version": 1,
+            "saveId": "7211bb2b-acc5-458b-9e06-7c6178f51675",
+            "coverage": "complete",
+            "head": {
+              "key": "batted-ball-version:[\"7211bb2b-acc5-458b-9e06-7c6178f51675\",\"001e26a9-0e95-4014-980c-e044205bb237\",\"run\"]",
+              "digest": "a06abdb1120399d30c998659530470007d03ee600449b54b3eac04eef5a4d2f9"
+            }
+          },
+          "teams": [
+            {
+              "id": 0,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 574922,
+              "results": 1
+            },
+            {
+              "id": 1,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 695520,
+              "results": 1
+            },
+            {
+              "id": 2,
+              "wins": 0,
+              "losses": 0,
+              "draws": 1,
+              "budget": 333517,
+              "results": 1
+            },
+            {
+              "id": 3,
+              "wins": 0,
+              "losses": 0,
+              "draws": 1,
+              "budget": 771306,
+              "results": 1
+            },
+            {
+              "id": 4,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 908019,
+              "results": 1
+            },
+            {
+              "id": 5,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 391130,
+              "results": 1
+            },
+            {
+              "id": 6,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 548432,
+              "results": 1
+            },
+            {
+              "id": 7,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 443462,
+              "results": 1
+            },
+            {
+              "id": 8,
+              "wins": 0,
+              "losses": 1,
+              "draws": 0,
+              "budget": 418655,
+              "results": 1
+            },
+            {
+              "id": 9,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 325371,
+              "results": 1
+            },
+            {
+              "id": 10,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 658920,
+              "results": 1
+            },
+            {
+              "id": 11,
+              "wins": 1,
+              "losses": 0,
+              "draws": 0,
+              "budget": 470650,
+              "results": 1
+            }
+          ],
+          "myResultCount": 1,
+          "duplicateIds": [],
+          "farm": {
+            "year": 2027,
+            "nextRound": 2,
+            "cards": 6,
+            "played": 6,
+            "unplayed": 0,
+            "reasonCounts": {}
+          }
+        }
+      ]
+    }
+  ]
+}

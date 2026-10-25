@@ -55,11 +55,11 @@
 | SAVE-01B-0C-FIX | — | [#499](https://github.com/shotaro-hue/baseball-manager/pull/499)マージ済み | [計画](./docs/implementation/archive-retry-order-plan.md)・[検証](./docs/validation/archive-retry-order/README.md)。再試行/集計原子性/保存別警告/捕手診断を修正。PR CI全13ジョブ成功 |
 | SAVE-CAPACITY-2 | — | [#500](https://github.com/shotaro-hue/baseball-manager/pull/500)マージ済み | [計画](./docs/implementation/archive-retention-plan.md)・[検証](./docs/validation/archive-retention/README.md)。3保存root・生存タブを保護して孤立versionを回収。保持年数の変更なし |
 | SAVE-01B-1 / B-2 | 保留 | 今回は実施しない | 完全バックアップ/復元は利用者の指示で後回し。再開時は#494の設計・v1凍結と残ゲートを再確認 |
-| QA-04A | P1 | 今回着手。[要件](./docs/implementation/qa-04a.md)・[検証](./docs/validation/qa-04a/README.md) | 新規→通常/手動/まとめシム→一軍/二軍成績→契約/FA/取引/スカウト→ドラフト/年度→保存再開。失敗/復旧/競合、CPU編成。通常CI外E2Eを評価し必要なゲートを選ぶ |
+| QA-04A | P1 | [#502](https://github.com/shotaro-hue/baseball-manager/pull/502)で修正と検証、提出CIを確認。[要件](./docs/implementation/qa-04a.md)・[検証](./docs/validation/qa-04a/README.md) | 新規→通常/手動/まとめシム→一軍/二軍成績→契約/FA/取引/スカウト→ドラフト/年度→保存再開。失敗/復旧/競合、CPU編成。通常CI外E2Eを評価し必要なゲートを選ぶ |
 | UI-04D | — | [#501](https://github.com/shotaro-hue/baseball-manager/pull/501)マージ済み | [要件](./docs/implementation/ui-04d.md)・[検証](./docs/validation/ui-04d/README.md)。通知/ニュース/記録/OB/設定の本文をDES-01へ移行。既読と要対応、選択詳細と一覧復帰、保存された旧年度を維持 |
 | QA-04B | P1 | UI-04D後、未着手。**実iPhone確認未完了** | 360/390/760/761/799/800/1023/1024/1440px、Chromium/WebKit、キーボード、保存/復帰。実iPhoneのタッチ・連続スワイプ・速度は別途実施 |
 
-今回の対象は **QA-04A（UI刷新後の進行・年度更新・保存再開）**。通常CIで保護済みの機能は同一sourceの結果を再利用し、通常CI外8specと新規から143試合を実進行する旅程を追加する。実機iPhone・複数年耐久・全seedのバランスは別途。完全バックアップ/復元と#494の設計凍結は保留を維持する。各工程は専用PR、人間がマージ判断。
+今回の対象は **QA-04A（UI刷新後の進行・年度更新・保存再開）**。通常CIで保護済みの機能は同一sourceの結果を再利用し、通常CI外8spec/20件と新規から143試合を実進行するChromium/WebKit旅程2件がローカル成功。長いまとめ処理の全球団スコア欠落も修正。最終headのCI結果は#502を参照。実機iPhone・複数年耐久・全seedのバランスは別途。完全バックアップ/復元と#494の設計凍結は保留を維持する。各工程は専用PR、人間がマージ判断。
 
 **二軍の実測基盤は実装・マージ済み。CPUの編成判断は段階的に改善中。新デザインの全画面移行と長期バランスの完了には至っていない。**
 

@@ -5,6 +5,11 @@ import { annualSnapshot, progressAnnualBatch, finishAnnualOffseason } from './he
 test('annual journey actual 143 games, all clubs, offseason, next year and persisted reload', async ({ page }, testInfo) => {
   test.setTimeout(600_000);
   const mobile = testInfo.project.name === 'mobile-webkit';
+  // This acceptance test checks progression/storage, not external font delivery.
+  // Keep all application console errors fatal without relying on Google Fonts.
+  await page.route('https://fonts.googleapis.com/**', route => route.fulfill({
+    status: 200, contentType: 'text/css', body: '/* offline progression test */',
+  }));
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', msg => {
@@ -45,6 +50,9 @@ test('annual journey actual 143 games, all clubs, offseason, next year and persi
     expect(mid.measuredBatting).toBeGreaterThan(0);
     expect(mid.farm.played).toBeGreaterThan(0);
     await reloadAndLoad(page);
+    // Observe the state actually applied by App.handleLoad, including its
+    // normalization, rather than comparing the same untouched disk root twice.
+    await saveHub(page, { progressOnly: true });
     expect(await annualSnapshot(page)).toEqual(mid);
     await progressAnnualBatch(page, mobile, 42, { final: true });
     await page.getByRole('button', { name: '進行を保存', exact: true }).click();
@@ -56,17 +64,27 @@ test('annual journey actual 143 games, all clubs, offseason, next year and persi
     expect(next.year).toBe(end.year + 1);
     expect(next.gameDay).toBe(1);
     expect(next.saveId).toBe(end.saveId);
+    expect(next.receiptRef).toEqual(end.receiptRef);
+    expect(next.receipt).toEqual(end.receipt);
     expect(next.past).toContainEqual({ year: end.year, games: 143 });
     const standings = next.standings.find(s => s.year === end.year);
     expect([...standings.central, ...standings.pacific].map(t => t.wins + t.losses + t.draws)).toEqual(Array(12).fill(143));
     expect(next.farmArchives.find(a => a.year === end.year)?.nextRound).toBe(144);
     await reloadAndLoad(page);
+    await saveHub(page, { progressOnly: true });
     expect(await annualSnapshot(page)).toEqual(next);
     await runSingle(page, mobile);
     await saveHub(page, { progressOnly: true });
     const reopened = await inspect('next year first game', 1);
     expect(reopened.year).toBe(next.year);
     expect(reopened.past).toEqual(next.past);
+    expect(reopened.receipt.recordCount).toBeGreaterThan(end.receipt.recordCount);
+    expect(reopened.receiptHead).not.toEqual(end.receiptHead);
+    const retained = await page.evaluate(async ({ current, previous }) => {
+      const refs = await (await import('/baseball-manager/src/engine/battedBallReceipts.js')).collectBattedBallReceiptKeys(current);
+      return refs.get(previous.head.key) === previous.head.digest;
+    }, { current: reopened.receiptRef, previous: end.receiptRef });
+    expect(retained, 'next-year history includes the completed-season immutable root').toBe(true);
     expect(errors).toEqual([]);
   } finally {
     await testInfo.attach('annual-checkpoints', { body: JSON.stringify({ checkpoints, errors }), contentType: 'application/json' });

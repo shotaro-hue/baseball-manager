@@ -21,6 +21,7 @@ export async function annualSnapshot(page) {
       teamsHash: await hash(state.teams), historyHash: await hash(state.seasonHistory),
       resultsHash: await hash([state.gameResultsMap, state.allTeamResultsMap, state.scheduleArchive]),
       farmHash: await hash(state.farmCompetition), receipt,
+      receiptRef: state.battedBallReceipt,
       receiptHead: state.battedBallReceipt?.head,
       duplicateIds: ids.filter((id, i) => ids.indexOf(id) !== i),
       teams: state.teams.map(t => ({ id: t.id, wins: t.wins, losses: t.losses, draws: t.draws ?? 0,
@@ -71,7 +72,22 @@ export async function finishAnnualOffseason(page, year) {
   await next.click();
   await page.getByRole('dialog').getByRole('button', { name: '確定して国内FA補強へ', exact: true }).click();
   await page.getByRole('button', { name: '交渉・補強を始める', exact: true }).click();
+  // A real first season has expiring contracts, unlike the old late-season
+  // fixture. Offer the requested salary through the ordinary batch UI.
+  await page.getByRole('button', { name: '自球団', exact: true }).click();
+  await page.getByRole('button', { name: 'まとめて提示を開く', exact: true }).click();
+  await page.getByRole('button', { name: '提示可能な全員を選択', exact: true }).click();
+  const apply = page.getByRole('button', { name: '選択した選手の下書きに適用', exact: true });
+  if (await apply.isEnabled()) {
+    await page.getByLabel('金額の基準').selectOption('demand');
+    await page.getByLabel('基準額に対する割合（%）', { exact: true }).fill('100');
+    await apply.click();
+    await page.getByRole('button', { name: '選択した選手の提示内容を確認', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: '各選手へ1回ずつ提示する', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: '結果を閉じる', exact: true }).click();
+  }
   await page.getByRole('button', { name: '結果確認', exact: true }).click();
+  await expect(page.getByRole('button', { name: '編成終了の最終確認', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: '編成終了の最終確認', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: '確認して確定する', exact: true }).click();
   await page.getByRole('button', { name: 'ドラフトへ進む', exact: true }).click();
