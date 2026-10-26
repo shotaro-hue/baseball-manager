@@ -1,0 +1,793 @@
+{
+  "baseMain": "b8c5e053076fc46a34acecccf913008dd111fdec",
+  "seed": 20261026,
+  "moneyUnit": "万円",
+  "stage": "GM-00 + unused GM-01A foundation; not activated",
+  "sourceHashes": {
+    "src/engine/seasonContract.js": "bba52c6d441e901262dfcca50d7c22432b15292b038f81017cce0ebb8ff9404b",
+    "src/engine/monthlyPayroll.js": "e9aee44105354414737f41f0c875dfbef240c41c488ee3934765f651479dde4f",
+    "src/engine/renewalRules.js": "32a44a7199294f56592f04aa00626f317433902b135446bc195b1c0b79a51bfa",
+    "src/components/hub/faMarket.js": "d897d3b6a615dccc65d8cd7a4f07637c98157c1038e5a375b3427cafd832ed90",
+    "src/engine/contract.js": "d68b752954ac6290d012f87846a02534859703bd2e9552586767746ef4a058da",
+    "src/engine/contractReplies.js": "21ad8784a99eac847a997429e75f47d5276df25dffc511ee0cdf913742cb18fa",
+    "src/engine/draftRules.js": "c12b4c4ec3ebb97ae17b16387d1347055bd79c3d6bff7394677fd9cd1fe46274",
+    "src/engine/tradeTransaction.js": "72adbb487d3a21383f4e141488631c972fbe966bf1f3ebbe959f99592a17001d",
+    "src/hooks/useGameState.js": "2c7c1c796784dc90da0053dcd503a5466a2b50e418a25c2241ec04f8ab42f508",
+    "src/hooks/useOffseason.js": "38cc0858bc7b762b293f9c871974b410e8f980ce84032b5eb368b9aed7bb7a33",
+    "src/engine/clubFinance.js": "330f75ffb6c5f82a9c46f263dae9c6aad811460a475ddaab6d40f3ba078e2d3f",
+    "src/engine/player.js": "aadf466ff76a42cbda465b72c4d7d1d7fe00e6665c0af0c1ed8a9aa18abb2450",
+    "src/engine/bootstrapTeams.js": "98e2a280fd12c9be44b19ed6b5d76fd6178cdfaebbc2ea7628d9ae838c49384d",
+    "src/engine/realplayer.js": "ff32062f5ffb766b56d1cf49ac136ee8191e8708bed07acbe8ac4efb1fb8d4c9",
+    "src/data/npb2025.js": "6c8c000384133e624cf0c294c7f4815eb9e1e0719e8219db82e8fbc047ac82d4",
+    "src/constants.js": "1d62817b81a1ced4638c1c627967db349e1f6c58d041d1a06bb32699f4bc404d",
+    "src/data/clubFinanceProfiles.js": "e4c62c8b9cab835c6d4d07ecbef3fb965123d2507f00230fa85c83f3702b4e63",
+    "package-lock.json": "ffd9b9e0da5b078e526e1e84833779fb63ed14f4003a8133853ab7f2479a4317",
+    "scripts/gm00-contract-audit.test.js": "dd00a6845112a4761f1272da14a502d5713c9db0974a8128b96a5a3cd83a08a8"
+  },
+  "observations": {
+    "manualFa": {
+      "oldBudgetDeltaManYen": 30000,
+      "salary": 10000,
+      "oldYearsAfter2026": 3,
+      "oldRenewalEligible2026": false,
+      "newQuote": {
+        "contractId": "gm00",
+        "annualSalaryManYen": 10000,
+        "nominalTotalManYen": 30000,
+        "totalLiabilityManYen": 25000,
+        "seasons": [
+          {
+            "season": 2026,
+            "annualSalaryManYen": 10000,
+            "amountManYen": 5000,
+            "teams": [
+              {
+                "teamId": 0,
+                "amountManYen": 5000
+              }
+            ]
+          },
+          {
+            "season": 2027,
+            "annualSalaryManYen": 10000,
+            "amountManYen": 10000,
+            "teams": [
+              {
+                "teamId": 0,
+                "amountManYen": 10000
+              }
+            ]
+          },
+          {
+            "season": 2028,
+            "annualSalaryManYen": 10000,
+            "amountManYen": 10000,
+            "teams": [
+              {
+                "teamId": 0,
+                "amountManYen": 10000
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "cpuFa": {
+      "signed": true,
+      "budgetDeltaManYen": 10000,
+      "salaryManYen": 10000,
+      "years": 1
+    },
+    "manualRenewal": {
+      "budgetDeltaManYen": 0,
+      "oldAppliedSalaryManYen": 12000,
+      "clauseScore": 72,
+      "fixedScore": 64,
+      "savedClauses": {
+        "performanceBonusRate": 20,
+        "titleBonus": 1000,
+        "optOut": true
+      }
+    },
+    "cpuRenewal": [
+      {
+        "teamId": 1,
+        "budgetDeltaManYen": 209740
+      },
+      {
+        "teamId": 2,
+        "budgetDeltaManYen": 151040
+      },
+      {
+        "teamId": 3,
+        "budgetDeltaManYen": 248880
+      },
+      {
+        "teamId": 4,
+        "budgetDeltaManYen": 176560
+      },
+      {
+        "teamId": 5,
+        "budgetDeltaManYen": 128680
+      },
+      {
+        "teamId": 6,
+        "budgetDeltaManYen": 139995
+      },
+      {
+        "teamId": 7,
+        "budgetDeltaManYen": 159120
+      },
+      {
+        "teamId": 8,
+        "budgetDeltaManYen": 153110
+      },
+      {
+        "teamId": 9,
+        "budgetDeltaManYen": 181675
+      },
+      {
+        "teamId": 10,
+        "budgetDeltaManYen": 136320
+      },
+      {
+        "teamId": 11,
+        "budgetDeltaManYen": 190525
+      }
+    ],
+    "rookie": {
+      "budgetDeltaManYen": 0,
+      "salaryManYen": 500,
+      "replayDuplicates": 0
+    },
+    "trade": {
+      "budgetDeltasManYen": [
+        -500,
+        500
+      ],
+      "newAllocation": {
+        "contractId": "gm00",
+        "annualSalaryManYen": 10000,
+        "nominalTotalManYen": 30000,
+        "totalLiabilityManYen": 30000,
+        "seasons": [
+          {
+            "season": 2026,
+            "annualSalaryManYen": 10000,
+            "amountManYen": 10000,
+            "teams": [
+              {
+                "teamId": 1,
+                "amountManYen": 5484
+              },
+              {
+                "teamId": 0,
+                "amountManYen": 4516
+              }
+            ]
+          },
+          {
+            "season": 2027,
+            "annualSalaryManYen": 10000,
+            "amountManYen": 10000,
+            "teams": [
+              {
+                "teamId": 0,
+                "amountManYen": 10000
+              }
+            ]
+          },
+          {
+            "season": 2028,
+            "annualSalaryManYen": 10000,
+            "amountManYen": 10000,
+            "teams": [
+              {
+                "teamId": 0,
+                "amountManYen": 10000
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "registration": {
+      "augustRound": 106,
+      "augustDate": {
+        "month": 8,
+        "day": 1
+      },
+      "domesticError": null,
+      "foreignError": "外国人補強の期限を過ぎているか、日程が未記録です",
+      "legacyForeignRoundLimit": 100,
+      "requiresCalendarValidator": "GM-01: effective date <= July 31; CS/August 31 qualification is a separate check"
+    },
+    "coach": [
+      {
+        "grade": 1,
+        "chargedManYen": 36000,
+        "hired": 1,
+        "storedSalaryManYen": 36000
+      },
+      {
+        "grade": 2,
+        "chargedManYen": 84000,
+        "hired": 1,
+        "storedSalaryManYen": 84000
+      },
+      {
+        "grade": 3,
+        "chargedManYen": 180000,
+        "hired": 1,
+        "storedSalaryManYen": 180000
+      },
+      {
+        "grade": 4,
+        "chargedManYen": 360000,
+        "hired": 1,
+        "storedSalaryManYen": 360000
+      }
+    ],
+    "coachSameRoleCount": 2,
+    "coachGrowth": {
+      "none": {
+        "contact": 68,
+        "power": 36,
+        "eye": 30,
+        "speed": 35,
+        "stealSkill": 35,
+        "arm": 61,
+        "defense": 68,
+        "baseRunning": 36,
+        "clutch": 68,
+        "vsLeft": 57,
+        "breakingBall": 86,
+        "catching": 54,
+        "stamina": 72,
+        "recovery": 61
+      },
+      "single": {
+        "contact": 68,
+        "power": 36,
+        "eye": 30,
+        "speed": 35,
+        "stealSkill": 35,
+        "arm": 61,
+        "defense": 68,
+        "baseRunning": 36,
+        "clutch": 68,
+        "vsLeft": 57,
+        "breakingBall": 86,
+        "catching": 54,
+        "stamina": 72,
+        "recovery": 61
+      },
+      "stacked": {
+        "contact": 68,
+        "power": 36,
+        "eye": 30,
+        "speed": 35,
+        "stealSkill": 35,
+        "arm": 61,
+        "defense": 68,
+        "baseRunning": 37,
+        "clutch": 68,
+        "vsLeft": 57,
+        "breakingBall": 86,
+        "catching": 54,
+        "stamina": 72,
+        "recovery": 61
+      }
+    },
+    "scoutContract": {
+      "budgetDeltaManYen": 10000,
+      "salaryManYen": 10000,
+      "years": 2,
+      "signedSeason": null
+    },
+    "promotion": {
+      "budgetDeltaManYen": 180,
+      "salaryManYen": 420,
+      "newSplitCostManYen": 322
+    },
+    "retirementGame": {
+      "budgetDeltaManYen": 50000
+    },
+    "annualTransition": {
+      "year": 2027,
+      "coachCount": 2,
+      "budgetManYen": 543785,
+      "legacyBudgetFormulaManYen": 543785,
+      "prePayrollSurplusManYen": 532092,
+      "budgetFloorActive": false,
+      "carriedContract": {
+        "years": 3,
+        "incentives": {
+          "performanceBonusRate": 20,
+          "titleBonus": 1000,
+          "optOut": true
+        }
+      },
+      "scope": "143 fixed-condition finance receipts and one real hook year transition; no baseball/playoff/prize/bonus-trigger simulation"
+    }
+  },
+  "costs": [
+    {
+      "effectiveDate": "2026-02-01",
+      "annualSalaryManYen": 10000,
+      "currentSeasonManYen": 10000
+    },
+    {
+      "effectiveDate": "2026-04-01",
+      "annualSalaryManYen": 10000,
+      "currentSeasonManYen": 8000
+    },
+    {
+      "effectiveDate": "2026-06-01",
+      "annualSalaryManYen": 10000,
+      "currentSeasonManYen": 6000
+    },
+    {
+      "effectiveDate": "2026-07-01",
+      "annualSalaryManYen": 10000,
+      "currentSeasonManYen": 5000
+    },
+    {
+      "effectiveDate": "2026-07-16",
+      "annualSalaryManYen": 10000,
+      "currentSeasonManYen": 4516
+    },
+    {
+      "effectiveDate": "2026-07-31",
+      "annualSalaryManYen": 10000,
+      "currentSeasonManYen": 4032
+    },
+    {
+      "effectiveDate": "2026-11-30",
+      "annualSalaryManYen": 10000,
+      "currentSeasonManYen": 33
+    }
+  ],
+  "seasons": [
+    {
+      "agreementPhase": "season",
+      "termYears": 1,
+      "startSeason": 2026,
+      "endSeason": 2026,
+      "currentYears": 1,
+      "nextYears": 0
+    },
+    {
+      "agreementPhase": "season",
+      "termYears": 3,
+      "startSeason": 2026,
+      "endSeason": 2028,
+      "currentYears": 3,
+      "nextYears": 2
+    },
+    {
+      "agreementPhase": "offseason",
+      "termYears": 1,
+      "startSeason": 2027,
+      "endSeason": 2027,
+      "currentYears": 0,
+      "nextYears": 1
+    },
+    {
+      "agreementPhase": "offseason",
+      "termYears": 7,
+      "startSeason": 2027,
+      "endSeason": 2033,
+      "currentYears": 0,
+      "nextYears": 7
+    }
+  ],
+  "candidates": [
+    {
+      "teamId": 0,
+      "name": "東京ヤクルトスワローズ",
+      "payrollManYen": 275470,
+      "rosterCount": 65,
+      "prePayrollSurplusManYen": {
+        "min": 532092,
+        "max": 532092
+      },
+      "fixedOperatingCostManYen": 750000,
+      "staticMinimumManYen": 293830,
+      "assumptions": {
+        "optionalStaffManYen": 15000,
+        "rookieAllowanceManYen": 3360
+      },
+      "rates": [
+        {
+          "rate": 0.5,
+          "revenueAllocationManYen": 266046,
+          "minimumSupportManYen": 27784
+        },
+        {
+          "rate": 0.65,
+          "revenueAllocationManYen": 345860,
+          "minimumSupportManYen": 0
+        },
+        {
+          "rate": 0.8,
+          "revenueAllocationManYen": 425674,
+          "minimumSupportManYen": 0
+        }
+      ]
+    },
+    {
+      "teamId": 1,
+      "name": "横浜DeNAベイスターズ",
+      "payrollManYen": 308370,
+      "rosterCount": 65,
+      "prePayrollSurplusManYen": {
+        "min": 761232,
+        "max": 761232
+      },
+      "fixedOperatingCostManYen": 950000,
+      "staticMinimumManYen": 326730,
+      "assumptions": {
+        "optionalStaffManYen": 15000,
+        "rookieAllowanceManYen": 3360
+      },
+      "rates": [
+        {
+          "rate": 0.5,
+          "revenueAllocationManYen": 380616,
+          "minimumSupportManYen": 0
+        },
+        {
+          "rate": 0.65,
+          "revenueAllocationManYen": 494801,
+          "minimumSupportManYen": 0
+        },
+        {
+          "rate": 0.8,
+          "revenueAllocationManYen": 608986,
+          "minimumSupportManYen": 0
+        }
+      ]
+    },
+    {
+      "teamId": 2,
+      "name": "広島東洋カープ",
+      "payrollManYen": 222530,
+      "rosterCount": 65,
+      "prePayrollSurplusManYen": {
+        "min": 397344,
+        "max": 397344
+      },
+      "fixedOperatingCostManYen": 700000,
+      "staticMinimumManYen": 240890,
+      "assumptions": {
+        "optionalStaffManYen": 15000,
+        "rookieAllowanceManYen": 3360
+      },
+      "rates": [
+        {
+          "rate": 0.5,
+          "revenueAllocationManYen": 198672,
+          "minimumSupportManYen": 42218
+        },
+        {
+          "rate": 0.65,
+          "revenueAllocationManYen": 258274,
+          "minimumSupportManYen": 0
+        },
+        {
+          "rate": 0.8,
+          "revenueAllocationManYen": 317875,
+          "minimumSupportManYen": 0
+        }
+      ]
+    },
+    {
+      "teamId": 3,
+      "name": "阪神タイガース",
+      "payrollManYen": 372360,
+      "rosterCount": 65,
+      "prePayrollSurplusManYen": {
+        "min": 715542,
+        "max": 715542
+      },
+      "fixedOperatingCostManYen": 1300000,
+      "staticMinimumManYen": 390720,
+      "assumptions": {
+        "optionalStaffManYen": 15000,
+        "rookieAllowanceManYen": 3360
+      },
+      "rates": [
+        {
+          "rate": 0.5,
+          "revenueAllocationManYen": 357771,
+          "minimumSupportManYen": 32949
+        },
+        {
+          "rate": 0.65,
+          "revenueAllocationManYen": 465102,
+          "minimumSupportManYen": 0
+        },
+        {
+          "rate": 0.8,
+          "revenueAllocationManYen": 572434,
+          "minimumSupportManYen": 0
+        }
+      ]
+    },
+    {
+      "teamId": 4,
+      "name": "読売ジャイアンツ",
+      "payrollManYen": 273320,
+      "rosterCount": 65,
+      "prePayrollSurplusManYen": {
+        "min": 815709,
+        "max": 815709
+      },
+      "fixedOperatingCostManYen": 1500000,
+      "staticMinimumManYen": 291680,
+      "assumptions": {
+        "optionalStaffManYen": 15000,
+        "rookieAllowanceManYen": 3360
+      },
+      "rates": [
+        {
+          "rate": 0.5,
+          "revenueAllocationManYen": 407855,
+          "minimumSupportManYen": 0
+        },
+        {
+          "rate": 0.65,
+          "revenueAllocationManYen": 530211,
+          "minimumSupportManYen": 0
+        },
+        {
+          "rate": 0.8,
+          "revenueAllocationManYen": 652567,
+          "minimumSupportManYen": 0
+        }
+      ]
+    },
+    {
+      "teamId": 5,
+      "name": "中日ドラゴンズ",
+      "payrollManYen": 206070,
+      "rosterCount": 65,
+      "prePayrollSurplusManYen": {
+        "min": 472917,
+        "max": 472917
+      },
+      "fixedOperatingCostManYen": 1000000,
+      "staticMinimumManYen": 224430,
+      "assumptions": {
+        "optionalStaffManYen": 15000,
+        "rookieAllowanceManYen": 3360
+      },
+      "rates": [
+        {
+          "rate": 0.5,
+          "revenueAllocationManYen": 236459,
+          "minimumSupportManYen": 0
+        },
+        {
+          "rate": 0.65,
+          "revenueAllocationManYen": 307396,
+          "minimumSupportManYen": 0
+        },
+        {
+          "rate": 0.8,
+          "revenueAllocationManYen": 378334,
+          "minimumSupportManYen": 0
+        }
+      ]
+    },
+    {
+      "teamId": 6,
+      "name": "福岡ソフトバンクホークス",
+      "payrollManYen": 496390,
+      "rosterCount": 65,
+      "prePayrollSurplusManYen": {
+        "min": 652150,
+        "max": 652150
+      },
+      "fixedOperatingCostManYen": 1350000,
+      "staticMinimumManYen": 514750,
+      "assumptions": {
+        "optionalStaffManYen": 15000,
+        "rookieAllowanceManYen": 3360
+      },
+      "rates": [
+        {
+          "rate": 0.5,
+          "revenueAllocationManYen": 326075,
+          "minimumSupportManYen": 188675
+        },
+        {
+          "rate": 0.65,
+          "revenueAllocationManYen": 423898,
+          "minimumSupportManYen": 90852
+        },
+        {
+          "rate": 0.8,
+          "revenueAllocationManYen": 521720,
+          "minimumSupportManYen": 0
+        }
+      ]
+    },
+    {
+      "teamId": 7,
+      "name": "東北楽天ゴールデンイーグルス",
+      "payrollManYen": 220170,
+      "rosterCount": 65,
+      "prePayrollSurplusManYen": {
+        "min": 485494,
+        "max": 485494
+      },
+      "fixedOperatingCostManYen": 650000,
+      "staticMinimumManYen": 238530,
+      "assumptions": {
+        "optionalStaffManYen": 15000,
+        "rookieAllowanceManYen": 3360
+      },
+      "rates": [
+        {
+          "rate": 0.5,
+          "revenueAllocationManYen": 242747,
+          "minimumSupportManYen": 0
+        },
+        {
+          "rate": 0.65,
+          "revenueAllocationManYen": 315571,
+          "minimumSupportManYen": 0
+        },
+        {
+          "rate": 0.8,
+          "revenueAllocationManYen": 388395,
+          "minimumSupportManYen": 0
+        }
+      ]
+    },
+    {
+      "teamId": 8,
+      "name": "埼玉西武ライオンズ",
+      "payrollManYen": 224760,
+      "rosterCount": 65,
+      "prePayrollSurplusManYen": {
+        "min": 362684,
+        "max": 362684
+      },
+      "fixedOperatingCostManYen": 650000,
+      "staticMinimumManYen": 243120,
+      "assumptions": {
+        "optionalStaffManYen": 15000,
+        "rookieAllowanceManYen": 3360
+      },
+      "rates": [
+        {
+          "rate": 0.5,
+          "revenueAllocationManYen": 181342,
+          "minimumSupportManYen": 61778
+        },
+        {
+          "rate": 0.65,
+          "revenueAllocationManYen": 235745,
+          "minimumSupportManYen": 7375
+        },
+        {
+          "rate": 0.8,
+          "revenueAllocationManYen": 290147,
+          "minimumSupportManYen": 0
+        }
+      ]
+    },
+    {
+      "teamId": 9,
+      "name": "千葉ロッテマリーンズ",
+      "payrollManYen": 267340,
+      "rosterCount": 65,
+      "prePayrollSurplusManYen": {
+        "min": 399750,
+        "max": 399750
+      },
+      "fixedOperatingCostManYen": 700000,
+      "staticMinimumManYen": 285700,
+      "assumptions": {
+        "optionalStaffManYen": 15000,
+        "rookieAllowanceManYen": 3360
+      },
+      "rates": [
+        {
+          "rate": 0.5,
+          "revenueAllocationManYen": 199875,
+          "minimumSupportManYen": 85825
+        },
+        {
+          "rate": 0.65,
+          "revenueAllocationManYen": 259838,
+          "minimumSupportManYen": 25862
+        },
+        {
+          "rate": 0.8,
+          "revenueAllocationManYen": 319800,
+          "minimumSupportManYen": 0
+        }
+      ]
+    },
+    {
+      "teamId": 10,
+      "name": "北海道日本ハムファイターズ",
+      "payrollManYen": 181520,
+      "rosterCount": 65,
+      "prePayrollSurplusManYen": {
+        "min": 658001,
+        "max": 658001
+      },
+      "fixedOperatingCostManYen": 1200000,
+      "staticMinimumManYen": 199880,
+      "assumptions": {
+        "optionalStaffManYen": 15000,
+        "rookieAllowanceManYen": 3360
+      },
+      "rates": [
+        {
+          "rate": 0.5,
+          "revenueAllocationManYen": 329001,
+          "minimumSupportManYen": 0
+        },
+        {
+          "rate": 0.65,
+          "revenueAllocationManYen": 427701,
+          "minimumSupportManYen": 0
+        },
+        {
+          "rate": 0.8,
+          "revenueAllocationManYen": 526401,
+          "minimumSupportManYen": 0
+        }
+      ]
+    },
+    {
+      "teamId": 11,
+      "name": "オリックス・バファローズ",
+      "payrollManYen": 275560,
+      "rosterCount": 65,
+      "prePayrollSurplusManYen": {
+        "min": 593399,
+        "max": 593399
+      },
+      "fixedOperatingCostManYen": 800000,
+      "staticMinimumManYen": 293920,
+      "assumptions": {
+        "optionalStaffManYen": 15000,
+        "rookieAllowanceManYen": 3360
+      },
+      "rates": [
+        {
+          "rate": 0.5,
+          "revenueAllocationManYen": 296700,
+          "minimumSupportManYen": 0
+        },
+        {
+          "rate": 0.65,
+          "revenueAllocationManYen": 385709,
+          "minimumSupportManYen": 0
+        },
+        {
+          "rate": 0.8,
+          "revenueAllocationManYen": 474719,
+          "minimumSupportManYen": 0
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "No production hooks use the new contract/payroll helpers yet.",
+    "Existing-path observations are descriptive, not assertions that preserve known bugs.",
+    "No new spending-envelope coefficient selected. Static support requirements are not a calibrated budget.",
+    "Coach annual rates 800/1200/1800/3000 are still design candidates; growth and affordability not calibrated.",
+    "No eligibility snapshots, guarantee-release ledger, reserve replacement, save migration or atomic payroll transfer yet.",
+    "143 fixed-condition finance receipts and one annual hook boundary cannot prove incentives never trigger in every path.",
+    "Smoothing 1/3 years and 10/15% caps require the connected GM-01 behavior and are not selected here.",
+    "No browser UI, iPhone, new-system save/reload or long-term balance acceptance in this run."
+  ]
+}
