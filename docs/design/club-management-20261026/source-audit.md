@@ -34,7 +34,7 @@
 | 新人 | `draftRules.js`のapplyDraftAcquisitionsは年俸を設定、immediateSpending:0 | 受諾時留保→加入時確定。入団時と年度更新で重複消費しない |
 | 発掘契約 | `useGameState.js`のsignPlayerはsalaryを控除し、contractYearsLeft:2を付与 | 契約の全対象年度へ共通ルールを適用 |
 | 育成の支配下化 | 同ファイルで最低支配下年俸との差額を控除。現在は一軍満員も実行制約 | 年俸差と支配下枠を扱い、一軍昇格とは別判断に整理 |
-| コーチ | hireCoachで12か月分を採用時控除しcoachesへ保持。年次の予算式は選手給与が対象 | 継続費を年次へ明示。現行の参考給与表示と現金支払いを混同しない |
+| コーチ | hireCoachでCOACH_GRADES.salary(3,000/7,000/15,000/30,000万円)の12倍を採用時に控除（実額3.6/8.4/18/36億円）。翌年の継続費は年次予算式に明示されない | 継続費を年次へ明示。現行の参考給与表示と現金支払いを混同しない |
 | トレード | tradeTransactionは金銭の両球団budgetを原子的に更新。移籍に伴う給与差のbudget再計算はない | 金銭と各年年俸の引受を両側で審査 |
 | 臨時収入 | useOffseasonのpostingはfeeManYenを、引退試合は50000万円をbudgetへ加算 | 旧年度維持。新制度では使途/帰属年度と配分方針を明示 |
 
@@ -42,11 +42,19 @@
 
 ## 3. 財務変更だけでは残るゲーム上の疑義
 
+### 契約年数の効力年度
+
+`src/engine/renewalRules.js`の`remainingContractAfterSeason`は`contractSignedYear === year`ならそのシーズンの残数を減らさない。`applyMarketSigning`系と`cpuRenewContracts`等は同じカレンダー年に署名しても、公式戦中とオフシーズンで契約が効く年度が違う。現行の公式戦中新規契約1年を同年度のオフで更新すると1年余計に残る可能性があり、`renewalEligible`の同年署名禁止は当該選手の適法な翌年更改まで止めうる。`src/hooks/useGameState.js`のスカウト選手契約はさらに`contractYearsLeft:2`のみで署名年度を持たず、経路差がある。GM-00で現行の年度進行を再現し、GM-01は合意フェーズ・効力開始年度・満了年度を正本化する。
+
+NPBは[2026年7月31日の新規支配下契約・契約譲渡の終了](https://npb.jp/news/detail/20260731_02.html)を公示。`faMarket.js`には外国人用`FOREIGN_DEADLINE_DAY`の判定があるが、国内FA/スカウト/CPU等の契約経路を含む共通の暦日判定はGM-00で照合する。出場資格も[2026年CSの8月31日支配下登録要件](https://npb.jp/games/2026/info_cscl.html)と別に扱い、加入時期と契約年数で戦力を無償延長させない。
+
 ### 契約条項
 
 `evalOffer`は出来高/タイトル/optOutを交渉評価に加点。`ContractTab`で選べ、`resolveContractReplies`は`contractIncentives`を保存する。非testの`src`をキーで検索した範囲では、年度末の精算やoptOutの行使処理を確認できなかった。これは静的確認の限界を伴うため、GM-00の実再現で処理の有無を確定する。新しい予算を作る前に「約束には履行がある」条件を整理する。
 
 ### コーチの費用と加算
+
+コーチの4段階価格はゲーム定数と`hireCoach`を照合済み。実球団の公開資料では個々の給与台帳は揃わないが、[2024年の年俸相場解説](https://athlete-live.com/category_taiikukai/baseballcoach-income/)および[元二軍コーチの取材証言](https://www.nikkan-gendai.com/articles/view/sports/363081/2)と比べて、現行の一括費用は著しく高い。GM-01では追加専門5枠の年額を800/1,200/1,800/3,000万円（校正候補）とし、一般スタッフの費用が固定運営費に含まれる設計仮定を明示する。安くしたまま現行ボーナス加算を残すのも過剰投資の誘因なので、同職種1担当を同時に導入する。実際の球団会計と同値だと主張しない。
 
 `HubContentRouter`は同じ職種・同グレードの重複をUIで禁止する一方、異なるグレードは選べる。`developPlayers`は同職種のbonusを合計し、育成対象全体へ使う。採用handlerはcoaches配列へ追加する。継続費・主任枠・効果上限の設計が必要で、単に予算を減らすだけでは買い揃える方針の相対的な強さは変わらない。
 
