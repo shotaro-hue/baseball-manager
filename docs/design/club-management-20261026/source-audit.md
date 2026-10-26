@@ -44,7 +44,7 @@
 
 ### 契約年数の効力年度
 
-`src/engine/renewalRules.js`の`remainingContractAfterSeason`は`contractSignedYear === year`ならそのシーズンの残数を減らさない。`applyMarketSigning`系と`cpuRenewContracts`等は同じカレンダー年に署名しても、公式戦中とオフシーズンで契約が効く年度が違う。現行の公式戦中新規契約1年を同年度のオフで更新すると1年余計に残る可能性があり、`renewalEligible`の同年署名禁止は当該選手の適法な翌年更改まで止めうる。`src/hooks/useGameState.js`のスカウト選手契約はさらに`contractYearsLeft:2`のみで署名年度を持たず、経路差がある。GM-00で現行の年度進行を再現し、GM-01は合意フェーズ・効力開始年度・満了年度を正本化する。
+`src/engine/renewalRules.js`の`remainingContractAfterSeason`は`contractSignedYear === year`ならそのシーズンの残数を減らさない。`addMarketSigning`と`cpuRenewContracts`等は同じカレンダー年に署名しても、公式戦中とオフシーズンで契約が効く年度が違う。現行の公式戦中新規契約1年を同年度のオフで更新すると1年余計に残る可能性があり、`renewalEligible`の同年署名禁止は当該選手の適法な翌年更改まで止めうる。`src/hooks/useGameState.js`のスカウト選手契約はさらに`contractYearsLeft:2`のみで署名年度を持たず、経路差がある。GM-00で現行の年度進行を再現し、GM-01は合意フェーズ・効力開始年度・満了年度を正本化する。
 
 NPBは[2026年7月31日の新規支配下契約・契約譲渡の終了](https://npb.jp/news/detail/20260731_02.html)を公示。`faMarket.js`には外国人用`FOREIGN_DEADLINE_DAY`の判定があるが、国内FA/スカウト/CPU等の契約経路を含む共通の暦日判定はGM-00で照合する。出場資格も[2026年CSの8月31日支配下登録要件](https://npb.jp/games/2026/info_cscl.html)と別に扱い、加入時期と契約年数で戦力を無償延長させない。
 
