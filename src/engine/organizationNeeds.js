@@ -21,7 +21,10 @@ const shortage = (minimum, count) => Math.max(0, minimum - count);
 export function evaluateOrganizationNeeds(team, options = {}) {
   const capacity = evaluateRosterCapacity(team, options);
   if (!capacity.ok) return capacity;
-  const accepted = capacity.acceptedPicks;
+  // This report projects the legacy draft's controlled signings, which clear
+  // prospect development flags on acquisition. Keep that role-depth projection
+  // separate from actual controlled-slot/annual-liability reservations.
+  const accepted = [...capacity.acceptedPicks, ...capacity.acceptedDevelopmentPicks];
   const active = team.players || [], farm = team.farm || [];
   const registeredCount = capacity.controlledCount;
   const report = roles.map(([role, label, isPitcher, activeMinimum, organizationMinimum]) => {
