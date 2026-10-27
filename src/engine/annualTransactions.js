@@ -62,7 +62,10 @@ function inspect(state) {
     }
     const capacity = evaluateRosterCapacity(team, { ...state.draftContext, teams: state.teams });
     if (!capacity.ok || capacity.overBy) fail('支配下登録枠を確認してください。');
-    for (const p of [...capacity.acceptedPicks, ...capacity.acceptedDevelopmentPicks]) acceptedRookies.set(p.id, p);
+    for (const p of [...capacity.acceptedPicks, ...capacity.acceptedDevelopmentPicks]) {
+      if (acceptedRookies.has(p.id)) fail('同じ新人が複数球団で受諾済みになっています。');
+      acceptedRookies.set(p.id, { player: p, teamId: team.id });
+    }
   }
   for (const p of state.faPool) {
     if (!validId(p?.id) || playerKeys.has(String(p.id))) fail('市場選手の所属が重複または無効です。');
@@ -74,7 +77,7 @@ function inspect(state) {
       if (playerKeys.has(String(p.id))) fail('新人選手IDの型が衝突しています。');
       // Use the assignment-validated duplicate, not a stale first pool record.
       // Current owned/market metadata above remains authoritative.
-      playerKeys.add(String(p.id)); players.set(p.id, acceptedRookies.get(p.id) ?? p);
+      playerKeys.add(String(p.id)); players.set(p.id, acceptedRookies.get(p.id)?.player ?? p);
     }
   }
   const employed = contractEmploymentAt(state.spending.ledger, state.date);
@@ -82,13 +85,15 @@ function inspect(state) {
   if (employed.some(e => e.registrationType !== undefined
     && (e.registrationType === 'development') !== isIkuseiPlayer(players.get(e.contract.playerId)))) fail('名簿と有効な契約の支配下・育成区分が一致しません。');
   // Capacity reserves the assignment-validated draft class. A recorded rookie
-  // hold must use that same class, otherwise funding could claim a controlled
+  // hold must use that same club/class, otherwise funding could claim a controlled
   // place that capacity still treats as development. Future renewal class
   // changes are independent of these accepted-but-unowned rookie assignments.
   for (const hold of state.spending.reservations) {
-    const contract = hold?.proposal?.contract, rookie = acceptedRookies.get(contract?.playerId);
-    if (hold?.kind === 'rookie' && rookie && contract.registrationType !== undefined
-      && (contract.registrationType === 'development') !== isIkuseiPlayer(rookie)) fail('受諾済み新人と契約留保の支配下・育成区分が一致しません。');
+    const proposal = hold?.proposal, contract = proposal?.contract, rookie = acceptedRookies.get(contract?.playerId);
+    if (hold?.kind !== 'rookie' || !rookie) continue;
+    if (proposal.teamId !== rookie.teamId) fail('受諾済み新人と契約留保の球団が一致しません。');
+    if (contract.registrationType !== undefined
+      && (contract.registrationType === 'development') !== isIkuseiPlayer(rookie.player)) fail('受諾済み新人と契約留保の支配下・育成区分が一致しません。');
   }
   for (const record of state.spending.ledger.records) if (record.changes.some(c => c.effectiveDate > state.date)) fail('未来の取引を現在の名簿へ反映できません。');
   for (const receipt of state.transactions) {

@@ -16,6 +16,25 @@ const move = (id, contractId, teamId, toTeamId, date = '2026-07-16') => ({ id, t
 const cash = (id, teamId, amountManYen, season = 2026, kind = 'trade') => ({ id, teamId, season, kind, amountManYen });
 
 describe('annual spending permission and offer reservations', () => {
+  it.each([
+    ['controlled', 419], ['development', 239],
+  ])('rejects forged explicit %s salary %i on reservation, quote and acceptance without changing input', (registrationType, salary) => {
+    const valid = proposal({ salary: registrationType === 'controlled' ? 420 : 240 });
+    valid.contract.registrationType = registrationType;
+    const forged = JSON.parse(JSON.stringify(valid));
+    forged.contract.annualSalaryManYen = salary;
+    const original = plan(), snapshot = JSON.stringify(original);
+    expect(() => reserve(original, { kind: 'rookie', proposal: forged })).toThrow();
+    expect(JSON.stringify(original)).toBe(snapshot);
+    const held = { ...original, reservations: [{ kind: 'rookie', proposal: forged }] };
+    const heldSnapshot = JSON.stringify(held);
+    expect(() => quote(held)).toThrow();
+    expect(() => commit(held, forged)).toThrow();
+    expect(JSON.stringify(held)).toBe(heldSnapshot);
+    const validHeld = reserve(original, { kind: 'rookie', proposal: valid });
+    expect(row(validHeld).reservedManYen).toBe(registrationType === 'controlled' ? 210 : 120);
+  });
+
   it('does not hide conversion raises by combining them with a liability-reducing retirement in deficit', () => {
     const p = proposal({ salary: 240, date: '2026-02-01' });
     p.contract = createSeasonContract({ ...p.contract, registrationType: 'development' });

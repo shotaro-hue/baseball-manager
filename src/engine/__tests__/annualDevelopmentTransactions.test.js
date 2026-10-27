@@ -48,6 +48,97 @@ function withRookieHold(state, metadataDevelopment, registrationType) {
   return state;
 }
 
+function rejectOnQuoteAndReload(state) {
+  for (const input of [state, JSON.parse(JSON.stringify(state))]) {
+    const snapshot = JSON.stringify(input);
+    const preview = quote(freeze(input), conversion());
+    expect(preview.ok, preview.error).toBe(false);
+    expect(preview.rows).toBeUndefined();
+    reject(input);
+    expect(JSON.stringify(input)).toBe(snapshot);
+  }
+}
+
+describe('accepted rookie club and explicit salary admission', () => {
+  it.each(['controlled', 'development', undefined])('rejects another club holding an accepted rookie (%s)', registrationType => {
+    const state = withRookieHold(fixture(), registrationType === 'development', registrationType);
+    if (registrationType === undefined) {
+      delete state.spending.reservations[0].proposal.contract.registrationType;
+      expect(state.spending.reservations[0].proposal.contract).not.toHaveProperty('registrationType');
+      expect(quote(state, conversion()).ok).toBe(true);
+    }
+    state.spending.reservations[0].proposal.teamId = 1;
+    rejectOnQuoteAndReload(state);
+  });
+
+  it.each(['controlled', 'development'])('keeps the accepted club and %s class with stale pool duplicates in either order', registrationType => {
+    const development = registrationType === 'development';
+    for (const reverse of [false, true]) {
+      const state = withRookieHold(fixture(), development, registrationType);
+      const valid = state.draftContext.draftPool[0];
+      const stale = player('rookie', { _drafted: true, _r1winner: 1, isIkusei: !development });
+      state.draftContext.draftPool = reverse ? [valid, stale] : [stale, valid];
+      // The completed assignment wins over a stale lottery snapshot too.
+      state.draftContext.confirmedPicks = { 1: 'rookie' };
+      const snapshot = JSON.stringify(state), preview = quote(freeze(state), conversion());
+      expect(preview.ok, preview.error).toBe(true);
+      expect(quote(JSON.parse(snapshot), conversion())).toEqual(preview);
+      const next = success(apply(state, conversion()));
+      expect(row(next)).toMatchObject({ reservedManYen: development ? 108 : 190, minimumRosterReserveManYen: 0 });
+      expect(row(next, 2026, 1)).toMatchObject({ reservedManYen: 0, minimumRosterReserveManYen: 420 });
+      expect(quoteAnnualSpendingPlan(next.spending)).toEqual(preview.rows);
+      expect(JSON.stringify(state)).toBe(snapshot);
+      const invalid = JSON.parse(snapshot);
+      invalid.spending.reservations[0].proposal.teamId = 1;
+      rejectOnQuoteAndReload(invalid);
+    }
+  });
+
+  it.each(['controlled', 'development'])('rejects conflicting accepted clubs for the same %s rookie without any hold', registrationType => {
+    for (const reverse of [false, true]) {
+      const state = fixture(), isIkusei = registrationType === 'development';
+      const pool = [0, 1].map(_r1winner => player('rookie', { _drafted: true, _r1winner, isIkusei }));
+      state.draftContext = { draftPool: reverse ? pool.reverse() : pool, drafted: {}, confirmedPicks: {} };
+      rejectOnQuoteAndReload(state);
+    }
+  });
+
+  it('rejects a wrong-club hold even when a conversion would otherwise fit the 70-place boundary', () => {
+    const valid = withRookieHold(addControlled(fixture(), 67), false, 'controlled');
+    const next = success(apply(valid, conversion()));
+    expect(next.teams[0].players.length + next.teams[0].farm.length).toBe(69);
+    expect(next.draftContext.drafted.rookie).toBe(0); // The accepted rookie reserves place 70.
+    valid.spending.reservations[0].proposal.teamId = 1;
+    rejectOnQuoteAndReload(valid);
+  });
+
+  it.each([
+    ['controlled', 419], ['development', 239],
+  ])('rejects a JSON-forged %s rookie hold at %i before deriving maintenance floors', (registrationType, salary) => {
+    const state = withRookieHold(fixture(), registrationType === 'development', registrationType);
+    // Build a valid proposal first, then simulate corrupted persisted input.
+    state.spending.reservations[0].proposal.contract.annualSalaryManYen = salary;
+    state.rosterRequirements.forEach(r => { if (r.teamId === 0) r.requiredControlledCount = 3; });
+    rejectOnQuoteAndReload(state);
+  });
+
+  it.each([
+    ['controlled', 'a', 419], ['development', 'dev', 239],
+  ])('rejects a JSON-forged active %s player %s salary %i without committing a conversion', (registrationType, playerId, salary) => {
+    const state = fixture();
+    state.spending.ledger.records.find(r => r.contract.playerId === playerId).contract.annualSalaryManYen = salary;
+    rejectOnQuoteAndReload(state);
+  });
+
+  it('does not admit a subminimum rookie contract at the 70-place boundary or an overfull 71st conversion', () => {
+    for (const extraControlled of [67, 68]) {
+      const state = withRookieHold(addControlled(fixture(), extraControlled), false, 'controlled');
+      state.spending.reservations[0].proposal.contract.annualSalaryManYen = 419;
+      rejectOnQuoteAndReload(state);
+    }
+  });
+});
+
 describe('atomic annual development-to-controlled conversion (not live activation)', () => {
   it('quotes 322/420/420 without mutation, then changes class, rate and floors together', () => {
     const before = freeze(fixture()), snapshot = JSON.stringify(before), preview = quote(before, conversion());

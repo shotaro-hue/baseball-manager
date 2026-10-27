@@ -1,3 +1,5 @@
+import { MIN_SALARY_SHIHAKA, MIN_SALARY_IKUSEI } from '../constants';
+
 // GM-01 foundation only: not connected to live contracts or save migration yet.
 // Salary is a fixed annual rate in whole 万円, never the prorated club cost.
 const validId = id => (typeof id === 'string' && id.trim().length > 0)
@@ -19,6 +21,10 @@ export function validateSeasonContract(contract) {
     || !Number.isSafeInteger(contract.annualSalaryManYen) || contract.annualSalaryManYen < 0
     || !Number.isSafeInteger(contract.annualSalaryManYen * contract.termYears)
     || (contract.registrationType !== undefined && !['controlled', 'development'].includes(contract.registrationType))
+    // Explicit classes describe player terms. Untyped C-1 ledger records retain
+    // their generic zero-money compatibility; never infer a class for them.
+    || (contract.registrationType === 'controlled' && contract.annualSalaryManYen < MIN_SALARY_SHIHAKA)
+    || (contract.registrationType === 'development' && contract.annualSalaryManYen < MIN_SALARY_IKUSEI)
     || typeof contract.guaranteed !== 'boolean') fail();
   if (contract.startSeason !== startSeasonFor(contract)
     || contract.endSeason !== contract.startSeason + contract.termYears - 1) fail();

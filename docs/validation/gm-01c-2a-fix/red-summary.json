@@ -1,0 +1,113 @@
+{
+  "source": "c6a081245d9433b43d40dd0329cd3026ce61857a + final regression test files",
+  "testFiles": 3,
+  "numTotalTests": 147,
+  "numPassedTests": 128,
+  "numFailedTests": 19,
+  "numPendingTests": 0,
+  "files": [
+    {
+      "path": "src/engine/__tests__/annualDevelopmentTransactions.test.js",
+      "status": "failed",
+      "passed": 33,
+      "failed": 13,
+      "skipped": 0,
+      "failures": [
+        {
+          "name": "accepted rookie club and explicit salary admission rejects another club holding an accepted rookie (controlled)",
+          "failure": "AssertionError: expected true to be false // Object.is equality"
+        },
+        {
+          "name": "accepted rookie club and explicit salary admission rejects another club holding an accepted rookie (development)",
+          "failure": "AssertionError: expected true to be false // Object.is equality"
+        },
+        {
+          "name": "accepted rookie club and explicit salary admission rejects another club holding an accepted rookie (undefined)",
+          "failure": "AssertionError: expected true to be false // Object.is equality"
+        },
+        {
+          "name": "accepted rookie club and explicit salary admission keeps the accepted club and controlled class with stale pool duplicates in either order",
+          "failure": "AssertionError: expected true to be false // Object.is equality"
+        },
+        {
+          "name": "accepted rookie club and explicit salary admission keeps the accepted club and development class with stale pool duplicates in either order",
+          "failure": "AssertionError: expected true to be false // Object.is equality"
+        },
+        {
+          "name": "accepted rookie club and explicit salary admission rejects conflicting accepted clubs for the same controlled rookie without any hold",
+          "failure": "AssertionError: expected true to be false // Object.is equality"
+        },
+        {
+          "name": "accepted rookie club and explicit salary admission rejects conflicting accepted clubs for the same development rookie without any hold",
+          "failure": "AssertionError: expected true to be false // Object.is equality"
+        },
+        {
+          "name": "accepted rookie club and explicit salary admission rejects a wrong-club hold even when a conversion would otherwise fit the 70-place boundary",
+          "failure": "AssertionError: expected true to be false // Object.is equality"
+        },
+        {
+          "name": "accepted rookie club and explicit salary admission rejects a JSON-forged controlled rookie hold at 419 before deriving maintenance floors",
+          "failure": "AssertionError: expected true to be false // Object.is equality"
+        },
+        {
+          "name": "accepted rookie club and explicit salary admission rejects a JSON-forged development rookie hold at 239 before deriving maintenance floors",
+          "failure": "AssertionError: expected true to be false // Object.is equality"
+        },
+        {
+          "name": "accepted rookie club and explicit salary admission rejects a JSON-forged active controlled player a salary 419 without committing a conversion",
+          "failure": "AssertionError: expected true to be false // Object.is equality"
+        },
+        {
+          "name": "accepted rookie club and explicit salary admission rejects a JSON-forged active development player dev salary 239 without committing a conversion",
+          "failure": "AssertionError: expected true to be false // Object.is equality"
+        },
+        {
+          "name": "accepted rookie club and explicit salary admission does not admit a subminimum rookie contract at the 70-place boundary or an overfull 71st conversion",
+          "failure": "AssertionError: expected true to be false // Object.is equality"
+        }
+      ]
+    },
+    {
+      "path": "src/engine/__tests__/annualSpending.test.js",
+      "status": "failed",
+      "passed": 53,
+      "failed": 2,
+      "skipped": 0,
+      "failures": [
+        {
+          "name": "annual spending permission and offer reservations rejects forged explicit controlled salary 419 on reservation, quote and acceptance without changing input",
+          "failure": "AssertionError: expected [Function] to throw an error"
+        },
+        {
+          "name": "annual spending permission and offer reservations rejects forged explicit development salary 239 on reservation, quote and acceptance without changing input",
+          "failure": "AssertionError: expected [Function] to throw an error"
+        }
+      ]
+    },
+    {
+      "path": "src/engine/__tests__/seasonContract.test.js",
+      "status": "failed",
+      "passed": 42,
+      "failed": 4,
+      "skipped": 0,
+      "failures": [
+        {
+          "name": "season-based fixed salary contracts (not yet connected to game state) rejects explicit controlled annual salary 419 at creation and after JSON reload",
+          "failure": "AssertionError: expected [Function] to throw an error"
+        },
+        {
+          "name": "season-based fixed salary contracts (not yet connected to game state) rejects explicit development annual salary 239 at creation and after JSON reload",
+          "failure": "AssertionError: expected [Function] to throw an error"
+        },
+        {
+          "name": "season-based fixed salary contracts (not yet connected to game state) rejects explicit controlled annual salary 0 at creation and after JSON reload",
+          "failure": "AssertionError: expected [Function] to throw an error"
+        },
+        {
+          "name": "season-based fixed salary contracts (not yet connected to game state) rejects explicit development annual salary 0 at creation and after JSON reload",
+          "failure": "AssertionError: expected [Function] to throw an error"
+        }
+      ]
+    }
+  ]
+}

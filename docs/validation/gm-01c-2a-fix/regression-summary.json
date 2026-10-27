@@ -1,0 +1,143 @@
+{
+  "source": "review-fix working tree",
+  "testFiles": 19,
+  "numTotalTests": 417,
+  "numPassedTests": 417,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "files": [
+    {
+      "path": "src/hooks/useGameState.contractReplies.test.js",
+      "status": "passed",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "src/hooks/useGameState.offseasonSave.test.js",
+      "status": "passed",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "src/hooks/useGameState.rosterCapacity.test.js",
+      "status": "passed",
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "src/engine/__tests__/annualDevelopmentTransactions.test.js",
+      "status": "passed",
+      "passed": 46,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "src/engine/__tests__/annualSpending.test.js",
+      "status": "passed",
+      "passed": 55,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "src/engine/__tests__/annualTransactions.test.js",
+      "status": "passed",
+      "passed": 39,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "src/engine/__tests__/contract.test.js",
+      "status": "passed",
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "src/engine/__tests__/contractCalendar.test.js",
+      "status": "passed",
+      "passed": 19,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "src/engine/__tests__/contractLedger.test.js",
+      "status": "passed",
+      "passed": 30,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "src/engine/__tests__/faDeclaration.test.js",
+      "status": "passed",
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "src/engine/__tests__/monthlyPayroll.test.js",
+      "status": "passed",
+      "passed": 30,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "src/engine/__tests__/renewalRules.test.js",
+      "status": "passed",
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "src/engine/__tests__/rosterCapacity.test.js",
+      "status": "passed",
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "src/engine/__tests__/rosterPlanning.integration.test.js",
+      "status": "passed",
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "src/engine/__tests__/rosterPlanning.test.js",
+      "status": "passed",
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "src/engine/__tests__/salaryDemand.test.js",
+      "status": "passed",
+      "passed": 21,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "src/engine/__tests__/seasonContract.test.js",
+      "status": "passed",
+      "passed": 46,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "src/engine/__tests__/tradeTransaction.test.js",
+      "status": "passed",
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "scripts/gm00-contract-audit.test.js",
+      "status": "passed",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0
+    }
+  ]
+}
