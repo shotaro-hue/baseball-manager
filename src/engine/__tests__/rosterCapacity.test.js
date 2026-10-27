@@ -106,3 +106,50 @@ it('uses current ownership when a market state updater receives an older league 
  expect(addMarketSigning(t,p,500,1,2026,'season',{teams:[stale]})).toBe(t);
  expect(t.budget).toBe(10000);expect(t.players).toEqual([p]);expect(t.history).toEqual([]);
 });
+
+it.each([{育成:true},{isIkusei:true}])('does not reserve a controlled place for an accepted development rookie: %j',flags=>{
+ const t=club(70),dev={id:'dev-pick',...flags};
+ const context={draftPool:[dev,dev],drafted:{'dev-pick':0}};
+ const before=JSON.stringify(context);
+ expect(capacity.evaluateRosterCapacity(t,context)).toMatchObject({ok:true,controlledCount:70,acceptedPickCount:0,acceptedPickIds:[],remainingSlots:0,overBy:0});
+ expect(capacity.projectRosterCapacity(t,{},context)).toMatchObject({projectedControlledCount:70,projectedOverBy:0});
+ expect(JSON.stringify(context)).toBe(before);
+});
+it('counts mixed unique accepted controlled rookies at the 69/70 boundary before and after JSON reload',()=>{
+ const t=club(69),regular={id:'regular',_drafted:true,_r1winner:0},dev={id:'dev',育成:true},dev2={id:'dev2',isIkusei:true};
+ const context={draftPool:[regular,{...regular},dev,{...dev},dev2,t.farm[0]],drafted:{dev:0,dev2:0,p0:0}};
+ const result=capacity.evaluateRosterCapacity(t,context);
+ expect(result).toMatchObject({ok:true,acceptedPickIds:['regular'],acceptedPickCount:1,remainingSlots:0,overBy:0});
+ const saved=JSON.parse(JSON.stringify({t,context}));
+ expect(capacity.evaluateRosterCapacity(saved.t,saved.context)).toEqual(result);
+ expect(capacity.evaluateRosterCapacity(t,{...context,draftPool:[...context.draftPool,{id:'extra'}],drafted:{...context.drafted,extra:0}})).toMatchObject({acceptedPickCount:2,overBy:1});
+});
+it('keeps market and conversion capacity available when only a development rookie is reserved',()=>{
+ const dev={id:'dev-pick',isIkusei:true},context={draftPool:[dev],drafted:{'dev-pick':0}};
+ const t={...club(69),budget:10000},free={id:'free',salary:500};
+ expect(marketRosterError(t,free,[t],context)).toBeNull();
+ const signed=addMarketSigning(t,free,500,1,2026,'season',context);
+ expect(capacity.controlledRosterCounts(signed).controlledCount).toBe(70);
+ const ownedDev={id:'owned-dev',育成:true},withDev={...t,farm:[...t.farm,ownedDev]};
+ expect(registrationPreview(withDev,ownedDev,context).reasons).not.toContain('支配下上限に到達');
+});
+it('validates the controlled contracts actually created by legacy draft acquisition',()=>{
+ const dev={id:'dev-pick',isIkusei:true},drafted={'dev-pick':0};
+ expect(applyDraftAcquisitions([club(70)],[dev],drafted,2026).ok).toBe(false);
+ const result=applyDraftAcquisitions([club(69)],[dev],drafted,2026);
+ expect(result.ok).toBe(true);
+ expect(result.teams[0].farm.at(-1)).toMatchObject({id:'dev-pick',育成:false,isIkusei:false,salary:420});
+ expect(capacity.controlledRosterCounts(result.teams[0]).controlledCount).toBe(70);
+});
+it.each([false,true])('preserves the canonical accepted development metadata for spending (development=%s)',development=>{
+ const t=club(69),valid={id:'rookie',isIkusei:development},stale={id:'rookie',_drafted:true,_r1winner:1,isIkusei:!development};
+ for(const draftPool of [[stale,valid],[valid,stale]]){
+  const result=capacity.evaluateRosterCapacity(t,{draftPool,drafted:{rookie:0}});
+  expect(result).toMatchObject({ok:true,acceptedPicks:development?[]:[valid],acceptedDevelopmentPicks:development?[valid]:[],remainingSlots:development?1:0});
+ }
+});
+it.each([false,true])('rejects conflicting accepted contract types for an unowned duplicate (reverse=%s)',reverse=>{
+ const draftPool=[{id:'rookie'},{id:'rookie',育成:true}];
+ if(reverse)draftPool.reverse();
+ expect(capacity.evaluateRosterCapacity(club(),{draftPool,drafted:{rookie:0}})).toMatchObject({ok:false,reason:'conflicting-draft-contract'});
+});

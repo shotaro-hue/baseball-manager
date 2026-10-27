@@ -40,3 +40,9 @@ it('binds a repeated scouting action to its intended player rather than the next
  expect(gs.myTeam.farm.filter(p=>['A','B'].includes(p.id)).map(p=>p.id)).toEqual(['A']);expect(gs.myTeam.budget).toBe(9500);expect(gs.myTeam.scoutResults.map(p=>p.id)).toEqual(['B']);
  act(()=>gs.signPlayer(0));expect(gs.myTeam.farm.filter(p=>['A','B'].includes(p.id)).map(p=>p.id)).toEqual(['A','B']);expect(gs.myTeam.budget).toBe(8900);
 });
+it.each([{育成:true},{isIkusei:true}])('allows the last real conversion slot despite an accepted development rookie: %j',flags=>{
+ setup(69,{year:2026,draftPool:[{id:'dev-pick',_drafted:true,_r1winner:0,...flags}]});
+ const convert=gs.convertIkusei;act(()=>{convert('dev');convert('dev');});
+ expect(gs.myTeam.farm.find(p=>p.id==='dev')).toMatchObject({育成:false,isIkusei:false,salary:420});
+ expect(gs.myTeam.budget).toBe(9820);
+});

@@ -48,7 +48,7 @@ function inspect(state) {
   const date = parseContractDate(state.date);
   if (date.year !== state.season || state.spending?.budgetSeason !== state.season
     || !['preseason', 'season'].includes(state.phase)) fail('取引年度・フェーズを確認してください。');
-  const teams = new Map(), players = new Map(), owners = new Map(), receipts = new Set();
+  const teams = new Map(), players = new Map(), owners = new Map(), receipts = new Set(), acceptedRookies = new Map();
   const teamKeys = new Set(), playerKeys = new Set();
   for (const team of state.teams) {
     if (!validId(team.id) || teamKeys.has(String(team.id)) || !Array.isArray(team.players) || !Array.isArray(team.farm)) fail('球団名簿を確認してください。');
@@ -59,6 +59,7 @@ function inspect(state) {
     }
     const capacity = evaluateRosterCapacity(team, { ...state.draftContext, teams: state.teams });
     if (!capacity.ok || capacity.overBy) fail('支配下登録枠を確認してください。');
+    for (const p of [...capacity.acceptedPicks, ...capacity.acceptedDevelopmentPicks]) acceptedRookies.set(p.id, p);
   }
   for (const p of state.faPool) {
     if (!validId(p?.id) || playerKeys.has(String(p.id))) fail('市場選手の所属が重複または無効です。');
@@ -68,7 +69,9 @@ function inspect(state) {
     if (!validId(p?.id)) fail('新人選手IDを確認してください。');
     if (!players.has(p.id)) {
       if (playerKeys.has(String(p.id))) fail('新人選手IDの型が衝突しています。');
-      playerKeys.add(String(p.id)); players.set(p.id, p);
+      // Use the assignment-validated duplicate, not a stale first pool record.
+      // Current owned/market metadata above remains authoritative.
+      playerKeys.add(String(p.id)); players.set(p.id, acceptedRookies.get(p.id) ?? p);
     }
   }
   const employed = contractEmploymentAt(state.spending.ledger, state.date);

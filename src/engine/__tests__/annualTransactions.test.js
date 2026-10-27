@@ -210,3 +210,108 @@ describe('annual FA and trade transactions (not live activation)', () => {
   });
 
 });
+
+describe('controlled and development rookie liabilities', () => {
+  const exchange = trade({ cashManYen: 0 });
+  const addRookies = (state, pool) => {
+    state.draftContext = { draftPool: pool, drafted: Object.fromEntries(pool.map(p => [p.id, 0])), confirmedPicks: {} };
+    return state;
+  };
+  const requireCount = (state, n) => { state.rosterRequirements.forEach(r => { r.requiredControlledCount = n; }); return state; };
+
+  it.each([{ 育成: true }, { isIkusei: true }])('adds no controlled floor when development rookie %j joins an already funded roster', flags => {
+    const state = addRookies(requireCount(fixture(), 1), [player('dev', { salary: 240, ...flags })]);
+    const snapshot = JSON.stringify(state), preview = quote(freeze(state), exchange);
+    expect(preview.ok, preview.error).toBe(true);
+    expect(preview.rows.find(r => r.teamId === 0 && r.season === 2026)).toMatchObject({ salaryManYen: 10000, reservedManYen: 0, minimumRosterReserveManYen: 0, remainingManYen: 40000 });
+    expect(preview.state).toBeUndefined(); expect(JSON.stringify(state)).toBe(snapshot);
+    const next = success(apply(state, exchange));
+    expect(row(next).minimumRosterReserveManYen).toBe(0);
+    expect(next.draftContext).toEqual(state.draftContext);
+  });
+
+  it('charges a valid development rookie hold for each year without a controlled floor', () => {
+    const state = addRookies(requireCount(fixture(), 1), [player('dev', { isIkusei: true, salary: 240 })]);
+    const p = proposal('dev', 0, { annualSalaryManYen: 240, termYears: 2 });
+    state.spending.reservations.push({ kind: 'rookie', proposal: p });
+    const next = success(apply(freeze(state), exchange));
+    expect([2026, 2027].map(y => row(next, 0, y).reservedManYen)).toEqual([120, 240]);
+    expect([2026, 2027].map(y => row(next, 0, y).minimumRosterReserveManYen)).toEqual([0, 0]);
+    expect([2026, 2027].map(y => row(next, 0, y).remainingManYen)).toEqual([39880, 39760]);
+    expect(next.spending.reservations).toEqual([{ kind: 'rookie', proposal: p }]);
+  });
+
+  it('does not use a held development rookie to fill a missing controlled place', () => {
+    const state = addRookies(fixture(), [player('dev', { 育成: true, salary: 240 })]);
+    state.spending.reservations.push({ kind: 'rookie', proposal: proposal('dev', 0, { annualSalaryManYen: 240, termYears: 1 }) });
+    const next = success(apply(state, exchange));
+    expect(row(next)).toMatchObject({ reservedManYen: 120, minimumRosterReserveManYen: 420, remainingManYen: 39460 });
+  });
+
+  it('reserves one controlled rookie once, replacing its floor with the actual hold', () => {
+    const state = addRookies(requireCount(fixture(), 1), [player('rookie'), player('rookie')]);
+    const unfunded = success(apply(state, exchange));
+    expect(row(unfunded)).toMatchObject({ reservedManYen: 0, minimumRosterReserveManYen: 420 });
+    state.spending.reservations.push({ kind: 'rookie', proposal: proposal('rookie', 0, { annualSalaryManYen: 600, termYears: 1 }) });
+    const held = success(apply(state, exchange));
+    expect(row(held)).toMatchObject({ reservedManYen: 300, minimumRosterReserveManYen: 0, remainingManYen: 39700 });
+  });
+
+  it('does not add an already owned rookie again, including stale development flags in the pool', () => {
+    const state = addRookies(requireCount(fixture(), 1), [player('a'), player('a', { isIkusei: true })]);
+    const next = success(apply(state, exchange));
+    expect(row(next)).toMatchObject({ salaryManYen: 10000, reservedManYen: 0, minimumRosterReserveManYen: 0 });
+  });
+
+  it('keeps mixed duplicate rookie costs and counts stable across quote, apply and JSON reload', () => {
+    const dev = player('dev', { isIkusei: true, salary: 240 }), regular = player('rookie', { salary: 600 });
+    const state = addRookies(requireCount(fixture(), 2), [dev, { ...dev }, regular, { ...regular }, player('a')]);
+    state.spending.reservations.push({ kind: 'rookie', proposal: proposal('dev', 0, { annualSalaryManYen: 240, termYears: 1 }) });
+    const snapshot = JSON.stringify(state), before = quote(freeze(state), exchange);
+    expect(before.ok, before.error).toBe(true);
+    const restored = JSON.parse(snapshot);
+    expect(quote(restored, exchange)).toEqual(before);
+    const next = success(apply(restored, exchange));
+    expect(row(next)).toMatchObject({ salaryManYen: 10000, reservedManYen: 120, minimumRosterReserveManYen: 420, remainingManYen: 39460 });
+    expect(next.transactions).toHaveLength(1);
+    expect(success(apply(JSON.parse(JSON.stringify(next)), exchange)).spending).toEqual(next.spending);
+    expect(JSON.stringify(state)).toBe(snapshot);
+  });
+
+  it('allows an exchange at 70 controlled players plus an accepted development rookie', () => {
+    const state = addRookies(fixture(), [player('dev', { 育成: true, salary: 240 })]);
+    for (let i = 0; i < 69; i++) {
+      const id = `extra-${i}`; state.teams[0].farm.push(player(id, { salary: 420 }));
+      state.spending.ledger = ledgerApply(state.spending.ledger, ownedSign(id, 0, { annualSalaryManYen: 420 }));
+    }
+    state.spending.authorizations.forEach(a => { a.approvedManYen = 1000000; });
+    success(apply(freeze(state), exchange));
+  });
+});
+
+describe('validated duplicate rookie metadata', () => {
+  it.each([false, true])('uses the accepted contract class after a stale conflicting duplicate (development=%s)', development => {
+    const valid = player('rookie', development ? { isIkusei: true, salary: 240 } : { salary: 600 });
+    const stale = player('rookie', { _drafted: true, _r1winner: 1, isIkusei: !development });
+    const outputs = [];
+    for (const pool of [[stale, valid], [valid, stale]]) {
+      const state = fixture();
+      state.rosterRequirements.forEach(r => { r.requiredControlledCount = development ? 2 : 1; });
+      state.draftContext = { draftPool: pool, drafted: { rookie: 0 }, confirmedPicks: {} };
+      state.spending.reservations.push({ kind: 'rookie', proposal: proposal('rookie', 0, { annualSalaryManYen: development ? 240 : 600, termYears: 1 }) });
+      const snapshot = JSON.stringify(state), command = trade({ cashManYen: 0 });
+      const preview = quote(freeze(state), command);
+      expect(preview.ok, preview.error).toBe(true);
+      expect(preview.rows.find(r => r.teamId === 0 && r.season === 2026)).toMatchObject({
+        reservedManYen: development ? 120 : 300, minimumRosterReserveManYen: development ? 420 : 0,
+        remainingManYen: development ? 39460 : 39700,
+      });
+      expect(quote(JSON.parse(snapshot), command)).toEqual(preview);
+      const next = success(apply(JSON.parse(snapshot), command));
+      expect(rows(next)).toEqual(preview.rows);
+      expect(JSON.stringify(state)).toBe(snapshot);
+      outputs.push(preview.rows);
+    }
+    expect(outputs[0]).toEqual(outputs[1]);
+  });
+});
