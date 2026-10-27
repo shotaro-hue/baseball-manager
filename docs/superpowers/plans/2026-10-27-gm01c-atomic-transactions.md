@@ -49,3 +49,5 @@
 - Ruling: reviewer scope deferrals accepted as C-2/D work described in validation note; risk is premature activation, so no live call path is introduced.
 - Ruling: seven-year coverage means every actual liability year, not an unconditional seven-year forecast without liabilities.
 - Final: fixed cheap prorated losing/cancelled hold — 2 RED→GREEN cases; no Critical/Minor outstanding.
+
+- Ruling: local stress observation found 12 repeated employment projections per year; reuse per date within one floor calculation only. 780 players/all-seven-year contracts: 3433ms→688ms; related 133 tests remain green. No cross-transaction cache.

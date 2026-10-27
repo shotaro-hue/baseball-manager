@@ -92,6 +92,7 @@ function withFloors(state) {
       || r.requiredControlledCount < 0 || r.requiredControlledCount > MAX_SHIHAKA_TOTAL || requirements.has(k)) fail('年度別の必要人数を確認してください。');
     requirements.set(k, r.requiredControlledCount);
   }
+  const employmentByDate = new Map();
   const authorizations = state.spending.authorizations.map(a => {
     if (a.season < state.season) return a;
     const required = requirements.get(key(a.teamId, a.season));
@@ -102,7 +103,8 @@ function withFloors(state) {
       const p = players.get(playerId); if (!p) fail('契約対象選手の名簿情報がありません。');
       if (!isIkuseiPlayer(p)) funded.add(playerId);
     };
-    for (const e of contractEmploymentAt(state.spending.ledger, date)) if (e.teamId === a.teamId) count(e.contract.playerId);
+    if (!employmentByDate.has(date)) employmentByDate.set(date, contractEmploymentAt(state.spending.ledger, date));
+    for (const e of employmentByDate.get(date)) if (e.teamId === a.teamId) count(e.contract.playerId);
     for (const h of state.spending.reservations) {
       const p = h.proposal;
       if (p.teamId === a.teamId && p.contract.startSeason <= a.season && p.contract.endSeason >= a.season) count(p.contract.playerId);
