@@ -8,6 +8,14 @@ const mail = (accepted = true, extra = {}) => ({ id: 'mail', type: 'contract_dec
   decision: { playerId: 0, playerName: '選手0', salary: 1200, years: 2, accepted, ...extra } });
 
 describe('normal contract replies', () => {
+  it.each([{育成:true,isIkusei:false},{育成:false,isIkusei:true}])('applies a development agreement in the farm and rejects a term past expiry: %j', flags => {
+    const before=team(true,{...flags,salary:240,ikuseiYears:2});
+    const result=resolveContractReplies(before,[mail(true,{salary:240,years:1})],2,2026);
+    expect(result.replies[0].resolution).toBe('signed');
+    expect(result.team.players).toHaveLength(0);expect(result.team.farm[0]).toMatchObject({...flags,salary:240,contractYearsLeft:1,contractSignedYear:2026});
+    const invalid=resolveContractReplies(before,[mail(true,{salary:1000,years:2})],2,2026);
+    expect(invalid.replies[0].resolution).toBe('cancelled');expect(invalid.team).toBe(before);
+  });
   it.each([false, true])('拒否後も一軍・二軍の所属と契約を維持する（farm=%s）', farm => {
     const before = team(farm), result = resolveContractReplies(before, [mail(false)], 2, 2026);
     expect(result.team).toBe(before);

@@ -1,6 +1,7 @@
 import { fmtAvg, fmtIP, fmtSal } from '../utils';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
 import { contractSalaryStatus } from '../engine/contractPayroll';
+import { isIkuseiPlayer } from '../engine/renewalRules';
 
 export const detailMissing = reason => `— ${reason}`;
 export function detailNumber(value, { allowNegative = false } = {}) {
@@ -56,7 +57,7 @@ export function playerMembership(player, teams) {
     if (team.players?.some(p => p.id === player.id)) return '一軍所属';
     if (team.farm?.some(p => p.id === player.id)) return '二軍所属';
   }
-  return player.isFA ? 'FA中' : '所属区分未確認';
+  return player.isFA ? (isIkuseiPlayer(player) ? '自由契約（育成）' : 'FA中') : '所属区分未確認';
 }
 
 // Selection stays transient; resolve current records without updating the saved game.

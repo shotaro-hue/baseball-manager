@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ACCEPT_THRESHOLD } from '../../constants';
-import { renewalEligible, ikuseiContractYears, validContractOffer } from '../../engine/renewalRules';
+import { renewalEligible, ikuseiContractYears, validContractOffer, isIkuseiPlayer } from '../../engine/renewalRules';
 import { evalOffer, calcPlayerDemand } from '../../engine/contract';
 import { isPendingContractReply } from '../../engine/contractReplies';
 import { contractPayroll, contractSalaryStatus } from '../../engine/contractPayroll';
@@ -97,7 +97,7 @@ export function ContractTab({ team, allTeams = [team], onOffer, onRelease, year,
           {eligible && (!waiting || editingReply) ? <>
             <h3>契約交渉</h3><p>現年俸 {salaryText(live.salary)} · 要求年俸の参考 {money(demand?.demandSalary)}</p>
             <div className="decision-fields"><label>提示年俸（万円）<input type="number" min="1" step="100" value={salary} onChange={e => { setSalary(e.target.value); setConfirmation(null); }} /></label>
-              <label>契約年数<select aria-label="契約年数" value={years} onChange={e => { setYears(Number(e.target.value)); setConfirmation(null); }}>{[1, 2, 3, 4, 5].filter(y => !live.育成 || y <= ikuseiContractYears(live)).map(y => <option key={y} value={y}>{y}年</option>)}</select></label></div>
+              <label>契約年数<select aria-label="契約年数" value={years} onChange={e => { setYears(Number(e.target.value)); setConfirmation(null); }}>{[1, 2, 3, 4, 5].filter(y => !isIkuseiPlayer(live) || y <= ikuseiContractYears(live)).map(y => <option key={y} value={y}>{y}年</option>)}</select></label></div>
             <p className="decision-note">通常更改の年俸は、この画面の提示時に予算から差し引きません。参考要求額は成績に基づく目安で、シーズン中の交渉の確定条件ではありません。</p>
             <details><summary>出来高・条項</summary><div className="decision-fields">
               <label>出来高<select value={performanceBonusRate} onChange={e => { setPerformanceBonusRate(Number(e.target.value)); setConfirmation(null); }}>{[0, 5, 10, 15, 20].map(v => <option key={v} value={v}>{v}%</option>)}</select></label>

@@ -75,14 +75,15 @@ for(const width of [360,390,1440])test(`UI-02E actual goals registration promoti
  await farm(page).getByLabel(`${setup.player.name}の育成目標`,{exact:true}).selectOption('promotion');
  await expect(farm(page).getByLabel(`${setup.player.name}の育成目標`,{exact:true})).toHaveValue('promotion');
  const goal=await saveHub(page),goalPlayer=getTeam(goal).farm.find(p=>p.id===setup.player.id);expect(goalPlayer.devGoal).toBe('promotion');expect(goalPlayer.trainingFocus).toBeTruthy();
- await expect(farm(page).getByRole('button',{name:`${setup.player.name}を支配下登録する`,exact:true})).toBeDisabled();
- await open(page,'野手');await page.getByRole('button',{name:`${setup.bench.name}を二軍へ`,exact:true}).click();await open(page,'二軍');
+ await expect(farm(page).getByRole('button',{name:`${setup.player.name}を支配下登録する`,exact:true})).toBeEnabled();
  const before=await saveHub(page),registration=farm(page).getByRole('button',{name:`${setup.player.name}を支配下登録する`,exact:true});await registration.click();
  const dialog=page.getByRole('dialog',{name:'支配下登録の確認',exact:true});await dialog.getByRole('button',{name:'戻る',exact:true}).click();await expect(registration).toBeFocused();expect((await saveHub(page)).teams).toEqual(before.teams);
  await registration.click();await dialog.getByRole('button',{name:'登録を確定',exact:true}).click();
- const promote=farm(page).getByRole('button',{name:`${setup.player.name}を一軍へ`,exact:true});await expect(promote).toBeEnabled();
+ const promote=farm(page).getByRole('button',{name:`${setup.player.name}を一軍へ`,exact:true});await expect(promote).toBeDisabled();
  const converted=await saveHub(page),convertedPlayer=getTeam(converted).farm.find(p=>p.id===setup.player.id);
  expect(convertedPlayer.育成).toBe(false);expect(convertedPlayer.salary).toBe(420);expect(convertedPlayer.contractYearsLeft).toBe(1);expect(getTeam(converted).budget).toBe(getTeam(before).budget-180);
+ expect(getTeam(converted).players.map(p=>p.id)).toEqual(getTeam(before).players.map(p=>p.id));
+ await open(page,'野手');await page.getByRole('button',{name:`${setup.bench.name}を二軍へ`,exact:true}).click();await open(page,'二軍');await expect(promote).toBeEnabled();
  await expect(farm(page).getByRole('button',{name:`${setup.bench.name}を一軍へ`,exact:true})).toBeDisabled();await expect(farm(page)).toContainText('再登録まで10日');
  await promote.click();const promoted=await saveHub(page);expect(getTeam(promoted).players.some(p=>p.id===setup.player.id)).toBe(true);expect(getTeam(promoted).farm.some(p=>p.id===setup.player.id)).toBe(false);
  expect(promoted.farmCompetition).toEqual(before.farmCompetition);expect(promoted.seasonHistory).toEqual(before.seasonHistory);

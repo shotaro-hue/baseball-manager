@@ -8,6 +8,12 @@ const p = (id, extra = {}) => ({ id, name: `候補${id}`, pos: '捕手', age: 25
 const team = { id: 0, name: '自球団', budget: 10000, players: [p(0), p(1)], farm: [] };
 const text = n => typeof n === 'string' ? n : (n?.children || []).map(text).join('');
 
+it.each([{育成:true,isIkusei:false},{育成:false,isIkusei:true}])('offers only the remaining development term in the normal contract tab: %j',flags=>{
+  const development=p(0,{...flags,salary:240,ikuseiYears:2});
+  act(()=>{view=create(React.createElement(ContractTab,{team:{...team,players:[],farm:[development]},year:2026,focusRequest:{id:0,token:1}}));});
+  expect(view.root.findByProps({'aria-label':'契約年数'}).findAllByType('option').map(o=>o.props.value)).toEqual([1]);
+});
+
 it('initially shows actionable players, not players waiting for an answer, and lazily renders payroll detail', () => {
   act(() => { view = create(React.createElement(ContractTab, { team, year: 2026, mailbox: [{ type: 'contract_decision_pending', decision: { playerId: 1, teamId: 0, offeredYear: 2026 } }] })); });
   const list = view.root.findByProps({ 'aria-label': '所属選手の契約一覧' });

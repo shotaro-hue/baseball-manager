@@ -1,5 +1,6 @@
 import { MIN_SALARY_SHIHAKA, MIN_SALARY_IKUSEI } from '../constants';
 import { salaryCutRule } from './renewalRules';
+import { isIkuseiPlayer } from './rosterCapacity';
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const measured = (s, keys) => keys.every(k => Number.isFinite(s?.[k]) && s[k] >= 0);
@@ -17,7 +18,7 @@ export const SALARY_MODEL = {
 };
 
 export function renewalSalaryFloor(player) {
-  const minimum = player.育成 ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA;
+  const minimum = isIkuseiPlayer(player) ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA;
   const previous = Number.isFinite(player.salary) ? Math.max(minimum, player.salary) : minimum;
   const cut = salaryCutRule({ salary: previous }).rate;
   // Round upward so the cut limit cannot be exceeded by rounding.
@@ -80,7 +81,7 @@ export function salaryAwardBonuses(player, context = {}) {
 }
 
 export function calculateSalaryDemand(player, context = {}) {
-  const minimum = player.育成 ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA;
+  const minimum = isIkuseiPlayer(player) ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA;
   const previous = Number.isFinite(player.salary) ? Math.max(minimum, player.salary) : minimum;
   const floor = renewalSalaryFloor(player);
   const current = assessSalaryPerformance(player);

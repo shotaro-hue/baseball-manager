@@ -21,6 +21,16 @@ function setup(players, demandOverride = {}, farm = []) {
 }
 
 describe('contract renewal workflow', () => {
+  it.each([{育成:true,isIkusei:false},{育成:false,isIkusei:true}])('labels a saved development player and limits its renewal term without offering FA: %j', flags => {
+    const ui=setup([],{},[player(0,{...flags,salary:240,ikuseiYears:2,daysOnActiveRoster:840})]);
+    try {
+      ui.select(0);
+      expect(text(ui.view.root)).toContain('育成契約中・FA対象外');
+      expect(text(ui.view.root)).not.toContain('国内FA資格あり');
+      expect(ui.view.root.findByType('select').findAllByType('option').map(o=>o.props.value)).toEqual([1]);
+      expect(ui.button('FA宣言する')).toBeUndefined();
+    } finally { act(()=>ui.view.unmount()); }
+  });
   it('batch confirmation sends one offer per selected player with the shared rules and no automatic release', () => {
     const ui = setup([player(0), player(1), player(2)], { 0: { demandSalary: 1000, minAcceptSalary: 750 }, 1: { demandSalary: 5000, minAcceptSalary: 4000 } });
     ui.select(1); ui.salary('1000'); ui.click('← 選手一覧に戻る');

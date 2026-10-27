@@ -1009,7 +1009,6 @@ export function useGameState() {
     const capacity=evaluateRosterCapacity(team,draftCapacityContext(current.offseasonPlan,current.year,current.teams));
     if(!capacity.ok){notify(`支配下人数が未確認です（${capacity.reason}）`,"warn");return;}
     if(capacity.remainingSlots<=0){notify(`支配下上限（${MAX_SHIHAKA_TOTAL}人）到達。支配下登録不可`,"warn");return;}
-    if(team.players.length>=MAX_ROSTER){notify("一軍枠満杯（最大"+MAX_ROSTER+"名）のため現在の登録処理では実行不可","warn");return;}
     const newSal=Math.max(p.salary,MIN_SALARY_SHIHAKA),diff=newSal-p.salary;
     if(!Number.isFinite(diff)||!Number.isFinite(team.budget)){notify("年俸・予算が未記録です","warn");return;}
     if(diff>0&&team.budget<diff){notify("予算不足（差額"+Math.round(diff/10000)+"万円必要）","warn");return;}

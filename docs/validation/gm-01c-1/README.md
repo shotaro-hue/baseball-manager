@@ -2,6 +2,8 @@
 
 2026-10-27。base main `e591de1428020da0d42f9c3a88ab94146a03e8bc`（#506）。
 
+最新の追加修正は末尾の「契約区分と一軍/二軍配置」を参照。CIの最終headと完了結果は[PR #507](https://github.com/shotaro-hue/baseball-manager/pull/507)本文を正本とする。
+
 ## 今回の成果と境界
 
 `annualTransactions.js`の見積・確定が、実名簿/FA市場、#506の契約台帳と年度支出審査を一つの不変状態として扱う。既存トレードの名簿移管・外国人/負傷者配置・打順参照整理を`projectTradeRosters`として共有し、既存の現行予算処理は同じ公開関数で継続する。
@@ -126,3 +128,35 @@ C-2で役割評価を新制度へ接続する際は、旧ドラフト候補の�
 GM-01C-2では、本番接続前後の実iPhone Safariで、現実の台帳規模・連続見積頻度・主スレッド停止時間・候補更新/確定の体感遅延を必ず測定する。デスクトップの約0.6〜0.7秒でも連続操作には影響し得るため、接続箇所の呼出頻度を先に計測する。性能の許容判定と必要な追加対策は、その結果で行う。
 
 全ユニット/統合/負荷・ビルド・既存E2Eの品質ゲートは、引き続き**最終headのGitHub CI**を正本とし、完了結果・URL・対象SHAはPR本文に記録する。
+
+
+## 追加修正 — 契約区分と一軍/二軍配置（2026-10-27）
+
+前回の最終head `1d528dd520df64a403d32292d79fc2bf7a525cf2` はCI全14ジョブ成功だったが、それは育成制度全体の完成を意味しない。ユーザーとの追加確認で、既存経路の明確な不整合を同じPRで修正する。支配下/育成は契約区分、一軍/二軍は配置であり、二軍の支配下選手も70人枠に含む。
+
+### 修正内容と既存制約
+
+- `convertIkusei()`と登録プレビューから一軍満員の拒否だけを除去。選手は二軍に残り、受諾済み支配下新人を含む70人枠、最新state、年俸/予算の有限値、差額費用、二重操作防止は維持。一軍昇格は引き続き別操作で、育成・満員・待機・外国人等の既存制約を受ける。
+- `isIkuseiPlayer()`の既存OR判定を更改・給与要求・CPU交渉/市場再契約・FA対象・年度更新・育成満了・契約画面へ共用。定義を`renewalRules.js`へ移し、`rosterCapacity.js`の公開exportは維持して循環依存の新設を避けた。フラグを書き換える保存移行はしない。
+- 通常契約タブとオフ更改画面の年数選択を同じ育成残年数へ揃えた。選手詳細も育成をFA権の対象と表示せず、満了後の市場では「自由契約（育成）」と表示する。
+- 独立レビューで、既存mainのCPU引退補充が高評価の育成を一軍へ移し、二軍だけの満了処理を抜ける問題を再現した。補充から育成を除外し、オフの成長後に既存の一軍育成を二軍へ戻してから満了/FA/posting判定を実行する。同じ選手オブジェクトの年俸・契約・過去実績を保持し、既存の起用参照整理を使う。満了市場の`faOriginRoster`は元の配置を記録する。
+
+既存の育成3年満了、最低年俸、転換時の差額予算処理・1年契約への更新は変更しない。新しい人数/給与政策、育成ドラフト、新APIの本番接続、台帳やセーブの形式変更は導入しない。
+
+### RED → GREEN と回帰
+
+初回18追加ケースで13件RED、CPU海外FA/育成再契約の追加4ケースで3件RED。独立レビュー後の通常契約タブ2ケースで1件RED、CPU補充/旧配置/詳細表示10ケースは全件RED。市場の育成を「契約中」と誤表示しない追加2件もREDを確認した。合計36追加ケース中29件で不具合を再現し、残り7件は既に正しい既存境界を保護した。
+
+修正後は**24ファイル372件成功**。両フラグ、片方が明示falseの入力、支配下化の連続実行、一軍満員と別操作の昇格、遅延回答、CPU更改/市場再契約、過去のFA日数を持つ育成、年度更新、満了、JSONで再読込した旧誤配置を含む。関連する契約台帳・年度支出・共通取引・編成計画も成功。既存の期待値削除・skip・リトライ追加は行っていない。
+
+```sh
+node node_modules/vitest/vitest.mjs run   src/hooks/useGameState.rosterCapacity.test.js src/components/farmDevelopmentDesign.test.js   src/engine/__tests__/renewalRules.test.js src/engine/__tests__/contractReplies.test.js   src/components/farmRenewalFlow.test.js src/components/contractRenewalUI.test.js   src/engine/__tests__/contract.test.js src/engine/__tests__/salaryDemand.test.js   src/engine/__tests__/faDeclaration.test.js src/engine/__tests__/cpuRosterCycle.test.js   src/engine/__tests__/rosterCapacity.test.js src/engine/__tests__/annualTransactions.test.js   src/engine/__tests__/annualSpending.test.js src/engine/__tests__/contractLedger.test.js   src/engine/__tests__/rosterPlanning.test.js src/engine/__tests__/rosterPlanning.integration.test.js   src/components/offseasonFaFlow.test.js src/components/salaryRenewalFlow.test.js   src/components/contractRenewalDesign.test.js src/hooks/useGameState.contractReplies.test.js   src/hooks/useGameState.offseasonSave.test.js src/components/management/contractListFlow.test.js   src/components/PlayerModal.salary.test.js src/components/playerDetailDesign.test.js   --maxWorkers=1 --minWorkers=1 --no-file-parallelism
+```
+
+実画面の既存E2Eは、先に降格してから支配下化する旧制約の期待を訂正した。一軍満員で支配下化し、二軍に残ったことと一軍昇格がまだ不可であることを確認してから、別選手を降格し、昇格・保存・再開を検証する。ローカルChromiumの390pxで1件成功（39.7秒）。初回はブラウザ本体が未導入で起動不能だったため導入後に実施した。360/1440px、他の更改/詳細経路、全単体・統合・負荷とビルドは更新後の正確なheadのCIで確認し、結果をPRへ記録する。前回headのCIを今回の合格扱いにはしない。
+
+### 独立レビューと残す境界
+
+新しい独立コンテキストで差分と関連経路をレビュー。Important 1件（CPU引退補充/旧配置の満了回避）、Minor 2件（通常契約タブ、選手詳細）を上記REDで再現して解消。修正後のsource差分に未解決のCritical/Important/Minorはない。レビュー担当は実装者のテストを独立再実行したとは扱わず、マージ可否は最終headの全CIを条件とした。
+
+GM-01C-2へ引き継ぐのは育成新人の本物の加入経路、契約台帳と契約区分/支配下転換時点の連動、本番の見積頻度と実iPhone Safariでの性能確認。旧誤配置を読込直後に修復する移行は追加せず、今回の修復はオフの境界で実施する。練習・キャンプの育成判定や成長政策も本修正では変更しない。年度負担/原子取引のアルゴリズムと日付別の一時再利用は維持し、同じ780人/84年度枠の最終head測定をPRへ追記する。

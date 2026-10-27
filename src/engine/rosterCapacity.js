@@ -1,8 +1,8 @@
 import { MAX_SHIHAKA_TOTAL } from '../constants';
-import { ownedPlayers } from './renewalRules';
+import { ownedPlayers, isIkuseiPlayer } from './renewalRules';
 import { draftPicksForTeam } from './offseasonResume';
 
-export const isIkuseiPlayer = player => Boolean(player?.育成 || player?.isIkusei);
+export { isIkuseiPlayer } from './renewalRules';
 export function controlledRosterCounts(team) {
   const owned = ownedPlayers(team), developmentCount = owned.filter(isIkuseiPlayer).length;
   return { controlledCount: owned.length - developmentCount, developmentCount };
