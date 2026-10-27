@@ -56,6 +56,22 @@ describe('immutable contract liability boundaries', () => {
     expect(() => apply(ledger, end('bad', '2026-07-16', 'release', 'waive'))).toThrow();
     expect(() => apply(ledger, { ...end('bad', '2026-07-16', 'retirement'), settlement: undefined })).toThrow();
   });
+  it('retains seven-year debt and transfer/end identities after JSON reload', () => {
+    const before = opened({ years: 7 });
+    const moved = apply(before, transfer('t1', '2026-07-01'));
+    const action = end('release', '2026-07-16', 'release', 'retain', 1);
+    const after = apply(moved, action), loaded = JSON.parse(JSON.stringify(after));
+    expect(rows(loaded)).toEqual(rows(after));
+    expect(loaded.records[0].contract).toEqual(before.records[0].contract);
+    expect(loaded.records[0].changes).toEqual([transfer('t1', '2026-07-01'), action]);
+    expect(apply(loaded, action)).toBe(loaded);
+    expect([amount(loaded, 0, 2026, 'salary'), amount(loaded, 1, 2026, 'salary'), amount(loaded, 1, 2026, 'guarantee')])
+      .toEqual([5000, 484, 4516]);
+    expect([2027, 2028, 2029, 2030, 2031, 2032].map(y => amount(loaded, 1, y, 'guarantee')))
+      .toEqual([10000, 10000, 10000, 10000, 10000, 10000]);
+    expect(isContractLedgerExtension(moved, loaded)).toBe(true);
+    expect(before.records[0].changes).toEqual([]);
+  });
   it.each(['retirement', 'posting'])('honors an explicit %s waiver without refunding elapsed salary', reason => {
     const ledger = apply(opened(), end('e1', '2026-07-16', reason, 'waive'));
     expect(amount(ledger, 0, 2026)).toBe(5484);

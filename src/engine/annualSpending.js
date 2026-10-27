@@ -100,11 +100,20 @@ function prepare(plan) {
     const row = target(expense.teamId, expense.season); if (!row) continue;
     row.oneOff += BigInt(expense.amountManYen); row.tokens.push(['expense', ...token]);
   }
-  const fingerprints = new Map(), tokenSets = new Map(), rows = [];
+  const fingerprints = new Map(), tokenSets = new Map(), contractTotals = new Map(), rows = [];
   for (const [key, row] of byYear) {
     if (row.season < plan.budgetSeason) continue;
     const tokens = [...row.tokens, ['minimum-roster', row.minimumRosterReserveManYen]];
-    fingerprints.set(key, sorted(tokens)); tokenSets.set(key, new Set(tokens.map(token => JSON.stringify(token))));
+    fingerprints.set(key, sorted(tokens));
+    tokenSets.set(key, new Set(tokens.filter(token => token[0] !== 'contract').map(token => JSON.stringify(token))));
+    // Approval follows each existing obligation, independent of salary/guarantee
+    // classification. Keep the detailed tokens above for quoting and change detection.
+    const totals = new Map();
+    for (const token of row.tokens) if (token[0] === 'contract') {
+      const contractId = token[1];
+      totals.set(contractId, (totals.get(contractId) ?? 0n) + BigInt(token[4]));
+    }
+    contractTotals.set(key, totals);
     rows.push({ teamId: row.teamId, season: row.season, approvedManYen: row.approvedManYen,
       salaryManYen: numeric(row.salary), guaranteeManYen: numeric(row.guarantee), oneOffManYen: numeric(row.oneOff),
       reservedManYen: numeric(row.reserved), minimumRosterReserveManYen: row.minimumRosterReserveManYen,
@@ -112,7 +121,7 @@ function prepare(plan) {
   }
   const historicalFloors = sorted(plan.authorizations.filter(a => a.season < plan.budgetSeason)
     .map(a => [a.teamId, a.season, a.minimumRosterReserveManYen]));
-  return { rows, fingerprints, tokenSets, authorizations: sorted(authorizations), historicalFloors,
+  return { rows, fingerprints, tokenSets, contractTotals, authorizations: sorted(authorizations), historicalFloors,
     reservations: sorted(reservations), resolutions, expenses };
 }
 
@@ -153,18 +162,38 @@ export function assessAnnualSpendingChange(before, after, { mode = 'spend' } = {
   if (mode === 'cashless-trade' && (actions.some(action => action.type !== 'transfer')
     || a.reservations !== b.reservations || sorted(a.resolutions) !== sorted(b.resolutions) || sorted(a.expenses) !== sorted(b.expenses)
     || before.ledger.closedThroughSeason !== after.ledger.closedThroughSeason)) fail('赤字時の例外は無金銭の契約移管だけに使えます。');
+  if (mode === 'cashless-trade') {
+    const senders = new Set(actions.map(action => action.teamId));
+    const receivers = new Set(actions.map(action => action.toTeamId));
+    if (senders.size !== receivers.size || [...senders].some(teamId => !receivers.has(teamId))) {
+      fail('赤字時の例外は各球団が既存契約を出し合う無金銭交換だけに使えます。');
+    }
+  }
+  // Attribute new raises to the actual payer/year, even when a simultaneous
+  // termination hides the increase in the net annual amount. Removing only
+  // new raise boundaries leaves ownership, earned periods and settlements intact.
+  const increaseIds = new Set(actions.filter(action => action.type === 'increase').map(action => action.id));
+  const withoutRaises = increaseIds.size ? prepare({ ...after, ledger: { ...after.ledger,
+    records: after.ledger.records.map(record => ({ ...record,
+      changes: record.changes.filter(action => !increaseIds.has(action.id)) })) } }) : b;
   const oldRows = new Map(a.rows.map(row => [keyFor(row.teamId, row.season), row]));
   const rows = b.rows.map(row => {
     const key = keyFor(row.teamId, row.season), old = oldRows.get(key);
-    const affected = a.fingerprints.get(key) !== b.fingerprints.get(key);
-    const onlyRemovals = [...b.tokenSets.get(key)].every(token => a.tokenSets.get(key).has(token));
+    const newRaiseSpending = [...b.contractTotals.get(key)].some(([contractId, amount]) =>
+      amount > (withoutRaises.contractTotals.get(key).get(contractId) ?? 0n));
+    const affected = newRaiseSpending || a.fingerprints.get(key) !== b.fingerprints.get(key);
+    const oldContracts = a.contractTotals.get(key);
+    // Never net a new contract/raise against an existing obligation's reduction.
+    const onlyRemovals = !newRaiseSpending && [...b.tokenSets.get(key)].every(token => a.tokenSets.get(key).has(token))
+      && [...b.contractTotals.get(key)].every(([contractId, amount]) => oldContracts.has(contractId)
+        && amount <= oldContracts.get(contractId));
     return { ...row, beforeRemainingManYen: old.remainingManYen, affected,
       onlyRemovals,
       changeManYen: numeric(BigInt(row.remainingManYen) - BigInt(old.remainingManYen)) };
   });
-  const violations = rows.filter(row => row.affected && row.remainingManYen < 0
-    && (mode === 'cashless-trade' ? row.remainingManYen < row.beforeRemainingManYen
-      : !row.onlyRemovals || row.remainingManYen < row.beforeRemainingManYen));
+  const violations = rows.filter(row => row.affected
+    && (mode === 'cashless-trade' ? row.changeManYen < 0
+      : row.remainingManYen < 0 && (!row.onlyRemovals || row.changeManYen < 0)));
   return { ok: violations.length === 0, violations, rows };
 }
 
