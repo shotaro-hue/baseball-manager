@@ -1,0 +1,32 @@
+{
+  "revision": "ed85dac96a34616f15cc5af358b639e683452ce5",
+  "runtime": "v24.22.1",
+  "platform": "linux x64",
+  "cpu": "AMD EPYC 9V74 80-Core Processor",
+  "input": {
+    "clubs": 12,
+    "players": 780,
+    "contractYears": 7,
+    "annualAuthorizations": 84,
+    "warmups": 1,
+    "measuredQuotes": 5,
+    "date": "2026-07-01",
+    "command": "two-way cashless trade",
+    "minimumControlledCount": 67,
+    "salaryManYen": 1000
+  },
+  "node": {
+    "samplesMs": [
+      609.079624,
+      643.7653420000006,
+      558.1375130000015,
+      596.5001749999992,
+      580.2532950000004
+    ],
+    "medianMs": 596.5001749999992,
+    "minMs": 558.1375130000015,
+    "maxMs": 643.7653420000006,
+    "inputUnchanged": true,
+    "committedReceipts": 0
+  }
+}

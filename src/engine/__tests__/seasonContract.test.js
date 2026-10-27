@@ -7,6 +7,42 @@ const terms = extra => ({ contractId: 'c1', playerId: 0, signedSeason: 2026,
 
 describe('season-based fixed salary contracts (not yet connected to game state)', () => {
   it.each([
+    ['controlled', 419], ['development', 239], ['controlled', 0], ['development', 0],
+  ])('rejects explicit %s annual salary %i at creation and after JSON reload', (registrationType, annualSalaryManYen) => {
+    const input = terms({ registrationType, annualSalaryManYen });
+    const raw = { ...createSeasonContract(terms()), registrationType, annualSalaryManYen };
+    const snapshot = JSON.stringify(raw);
+    expect(() => createSeasonContract(input)).toThrow();
+    expect(() => validateSeasonContract(JSON.parse(snapshot))).toThrow();
+    expect(JSON.stringify(raw)).toBe(snapshot);
+  });
+
+  it.each([
+    ['controlled', 420], ['development', 240],
+  ])('accepts explicit %s minimum annual salary %i', (registrationType, annualSalaryManYen) => {
+    const contract = createSeasonContract(terms({ registrationType, annualSalaryManYen }));
+    expect(contract).toMatchObject({ registrationType, annualSalaryManYen });
+    expect(validateSeasonContract(JSON.parse(JSON.stringify(contract)))).toBe(true);
+  });
+
+  it.each([0, 239, 419])('keeps untyped C-1 annual salary %i readable without inventing a class', annualSalaryManYen => {
+    const contract = createSeasonContract(terms({ annualSalaryManYen }));
+    expect(createSeasonContract(JSON.parse(JSON.stringify(contract)))).toEqual(contract);
+    expect(contract).not.toHaveProperty('registrationType');
+  });
+
+  it.each(['controlled', 'development'])('preserves recorded %s class through construction and JSON reload', registrationType => {
+    const contract = createSeasonContract(terms({ registrationType }));
+    expect(contract.registrationType).toBe(registrationType);
+    expect(createSeasonContract(JSON.parse(JSON.stringify(contract))).registrationType).toBe(registrationType);
+  });
+
+  it.each([null, '', 'ikusei', false, 1])('rejects invalid recorded registration class %j', registrationType => {
+    expect(() => createSeasonContract(terms({ registrationType }))).toThrow();
+    expect(() => validateSeasonContract({ ...createSeasonContract(terms()), registrationType })).toThrow();
+  });
+
+  it.each([
     ['season', 'acquisition', 1, 2026, 2026],
     ['season', 'acquisition', 3, 2026, 2028],
     ['offseason', 'acquisition', 1, 2027, 2027],

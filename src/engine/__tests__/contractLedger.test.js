@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createSeasonContract } from '../seasonContract';
 import { createContractLedger, applyContractLedgerAction as apply, contractLiabilityRows as rows,
-  validateContractLedger, closeContractLedgerThrough as close, isContractLedgerExtension } from '../contractLedger';
+  validateContractLedger, closeContractLedgerThrough as close, isContractLedgerExtension, contractEmploymentAt } from '../contractLedger';
 
 const proposal = ({ id = 'sign-1', contractId = 'c1', playerId = 0, teamId = 0,
   salary = 10000, years = 3, date = '2026-02-01', guaranteed = true } = {}) => ({ id, type: 'sign', teamId, effectiveDate: date,
@@ -11,6 +11,71 @@ const transfer = (id, date, teamId = 0, toTeamId = 1) => ({ id, type: 'transfer'
 const end = (id, date, reason = 'release', settlement = 'retain', teamId = 0) => ({ id, type: 'end', contractId: 'c1', teamId, effectiveDate: date, reason, settlement });
 const amount = (ledger, teamId, season, kind) => rows(ledger).filter(r => r.teamId === teamId && r.season === season && (!kind || r.kind === kind)).reduce((n, r) => n + r.amountManYen, 0);
 const opened = extra => apply(createContractLedger(), proposal(extra));
+
+describe('dated development contract conversion', () => {
+  const development = (salary = 240, registrationType = 'development') => {
+    const sign = proposal({ salary });
+    sign.contract = createSeasonContract({ ...sign.contract, registrationType });
+    return apply(createContractLedger(), sign);
+  };
+  const convert = (extra = {}) => ({ id: 'conversion', type: 'convert-to-controlled', contractId: 'c1',
+    teamId: 0, effectiveDate: '2026-07-16', annualSalaryManYen: 420, ...extra });
+
+  it('records class at the effective boundary and charges only future periods at the new rate', () => {
+    const before = development(), snapshot = JSON.stringify(before), ledger = apply(before, convert());
+    expect([2026, 2027, 2028].map(y => amount(ledger, 0, y))).toEqual([322, 420, 420]);
+    expect(contractEmploymentAt(ledger, '2026-07-15')[0]).toMatchObject({ registrationType: 'development', annualSalaryManYen: 240 });
+    expect(contractEmploymentAt(ledger, '2026-07-16')[0]).toMatchObject({ registrationType: 'controlled', annualSalaryManYen: 420 });
+    expect(ledger.records[0].contract).toMatchObject({ registrationType: 'development', annualSalaryManYen: 240, endSeason: 2028, guaranteed: true });
+    expect(JSON.stringify(before)).toBe(snapshot);
+  });
+
+  it('permits same-rate conversion without extending or shortening the contract', () => {
+    const ledger = apply(development(600), convert({ annualSalaryManYen: 600 }));
+    expect([2026, 2027, 2028].map(y => amount(ledger, 0, y))).toEqual([600, 600, 600]);
+    expect(contractEmploymentAt(ledger, '2028-11-30')[0]).toMatchObject({ registrationType: 'controlled', annualSalaryManYen: 600 });
+    expect(contractEmploymentAt(ledger, '2028-12-01')).toEqual([]);
+  });
+
+  it('retains class, original expiry and raised guarantees after transfer and release', () => {
+    let ledger = apply(development(), convert());
+    ledger = apply(ledger, transfer('transfer', '2026-07-20'));
+    expect(contractEmploymentAt(ledger, '2026-07-20')[0]).toMatchObject({ teamId: 1, registrationType: 'controlled', annualSalaryManYen: 420 });
+    ledger = apply(ledger, end('release', '2026-08-01', 'release', 'retain', 1));
+    expect(contractEmploymentAt(ledger, '2026-08-01')).toEqual([]);
+    expect(amount(ledger, 1, 2026, 'guarantee')).toBe(168);
+    expect(amount(ledger, 1, 2027, 'guarantee')).toBe(420);
+    expect(amount(ledger, 1, 2028, 'guarantee')).toBe(420);
+  });
+
+  it('replays an identical conversion after JSON reload and rejects changed terms or another conversion', () => {
+    const before = development(), next = apply(before, convert()), restored = JSON.parse(JSON.stringify(next));
+    expect(apply(restored, convert())).toBe(restored);
+    expect(isContractLedgerExtension(before, restored)).toBe(true);
+    expect(() => apply(restored, convert({ annualSalaryManYen: 421 }))).toThrow();
+    expect(() => apply(restored, convert({ id: 'again' }))).toThrow();
+  });
+
+  it.each([
+    { teamId: 1 }, { contractId: 'missing' }, { effectiveDate: '2026-08-01' },
+    { annualSalaryManYen: 419 }, { annualSalaryManYen: 1.5 }, { annualSalaryManYen: undefined },
+  ])('rejects invalid conversion %j without changing the original ledger', extra => {
+    const ledger = development(), snapshot = JSON.stringify(ledger);
+    expect(() => apply(ledger, convert(extra))).toThrow();
+    expect(JSON.stringify(ledger)).toBe(snapshot);
+  });
+
+  it('rejects conversion of controlled or unclassified contracts and decreases above the minimum', () => {
+    expect(() => apply(development(600, 'controlled'), convert({ annualSalaryManYen: 600 }))).toThrow();
+    expect(() => apply(opened({ salary: 240 }), convert())).toThrow();
+    expect(() => apply(development(600), convert())).toThrow();
+  });
+
+  it('keeps a plain raise from changing the development class', () => {
+    const ledger = apply(development(), { ...convert(), type: 'increase' });
+    expect(contractEmploymentAt(ledger, '2026-07-16')[0]).toMatchObject({ registrationType: 'development', annualSalaryManYen: 420 });
+  });
+});
 
 describe('immutable contract liability boundaries', () => {
   it('quotes a July three-year acquisition by year without changing its annual salary', () => {

@@ -1,6 +1,7 @@
 import { createSeasonContract, validateSeasonContract } from './seasonContract';
 import { parseContractDate, registrationDateAllowed } from './contractCalendar';
 import { salaryForPeriodManYen } from './monthlyPayroll';
+import { MIN_SALARY_SHIHAKA } from '../constants';
 
 // Unconnected GM-01 foundation. Persist only original terms and transaction
 // boundaries; payer intervals, salary schedules and annual totals are derived.
@@ -29,7 +30,7 @@ function normalize(action) {
     if (!id(action.toTeamId) || action.toTeamId === action.teamId) fail();
     return { ...next, toTeamId: action.toTeamId };
   }
-  if (action.type === 'increase') {
+  if (action.type === 'increase' || action.type === 'convert-to-controlled') {
     if (!money(action.annualSalaryManYen)) fail();
     return { ...next, annualSalaryManYen: action.annualSalaryManYen };
   }
@@ -50,20 +51,25 @@ function projectRecord(record) {
   const view = { contract: c, effectiveDate: first.effectiveDate, employmentEndDate: endDate,
     liabilityEndDate: endDate, lastDate: first.effectiveDate, ended: false,
     payers: [{ teamId: first.teamId, startDate: first.effectiveDate, endDate }],
-    rates: [{ startDate: first.effectiveDate, annualSalaryManYen: c.annualSalaryManYen }] };
+    rates: [{ startDate: first.effectiveDate, annualSalaryManYen: c.annualSalaryManYen }],
+    registrations: [{ startDate: first.effectiveDate, registrationType: c.registrationType }] };
   for (const raw of record.changes) {
     const action = normalize(raw), date = action.effectiveDate, current = view.payers.at(-1);
     if (action.type === 'sign' || action.contractId !== c.contractId || view.ended
       || date < view.lastDate || date >= endDate || current.teamId !== action.teamId) fail('取引日または給与負担者が変わっています。');
-    if (action.type === 'transfer' || action.type === 'increase') {
+    if (['transfer', 'increase', 'convert-to-controlled'].includes(action.type)) {
       if (!registrationDateAllowed(parseContractDate(date).year, date)) fail('登録・移籍期限を過ぎています。');
     }
     if (action.type === 'transfer') {
       if (date === current.startDate) view.payers[view.payers.length - 1] = { ...current, teamId: action.toTeamId };
       else view.payers.splice(view.payers.length - 1, 1, { ...current, endDate: date }, { teamId: action.toTeamId, startDate: date, endDate });
-    } else if (action.type === 'increase') {
+    } else if (action.type === 'increase' || action.type === 'convert-to-controlled') {
       const rate = view.rates.at(-1);
-      if (action.annualSalaryManYen <= rate.annualSalaryManYen) fail('期中の変更で既存年俸を引き下げることはできません。');
+      if (action.type === 'convert-to-controlled') {
+        if (view.registrations.at(-1).registrationType !== 'development') fail('育成区分を記録した契約だけを支配下へ転換できます。');
+        if (action.annualSalaryManYen < MIN_SALARY_SHIHAKA || action.annualSalaryManYen < rate.annualSalaryManYen) fail('支配下最低年俸と既存年俸を下回る転換はできません。');
+        view.registrations.push({ startDate: date, registrationType: 'controlled' });
+      } else if (action.annualSalaryManYen <= rate.annualSalaryManYen) fail('期中の変更で既存年俸を引き下げることはできません。');
       const next = { startDate: date, annualSalaryManYen: action.annualSalaryManYen };
       if (date === rate.startDate) view.rates[view.rates.length - 1] = next;
       else view.rates.push(next);
@@ -180,6 +186,8 @@ export function contractEmploymentAt(ledger, date) {
   return viewsFor(ledger).filter(view => view.effectiveDate <= date && date < view.employmentEndDate).map(view => {
     const payer = view.payers.find(p => p.startDate <= date && date < p.endDate);
     const rate = view.rates.filter(r => r.startDate <= date).at(-1);
-    return { contract: view.contract, teamId: payer.teamId, annualSalaryManYen: rate.annualSalaryManYen };
+    const registration = view.registrations.filter(r => r.startDate <= date).at(-1);
+    return { contract: view.contract, teamId: payer.teamId, annualSalaryManYen: rate.annualSalaryManYen,
+      ...(registration.registrationType !== undefined ? { registrationType: registration.registrationType } : {}) };
   });
 }
