@@ -20,6 +20,7 @@ import { salaryCutRule, renewalEligible, ownedPlayers, ikuseiContractYears } fro
 import { pruneRosterReferences } from './offseasonReview';
 import { marketPlacement, marketRosterError } from './marketRoster';
 import { prepareOffseasonFreeAgent } from './offseasonMarket';
+import { isIkuseiPlayer } from './rosterCapacity';
 
 /* ═══════════════════════════════════════════════
    FA 資格閾値 (NPB公式準拠・累積日数方式)
@@ -70,8 +71,8 @@ export function evaluateRenewalOffer(player, offer, team, teams, demand, round =
   const years = Number(offer.years);
   const valid = offer.salary !== '' && Number.isFinite(salary) && salary > 0 && Number.isInteger(years) && years >= 1 && years <= 7;
   if (!valid) return { accepted: false, valid: false, score: null, reason: '年俸は正の金額、契約年数は1〜7年で入力してください' };
-  if (player.育成 && years > ikuseiContractYears(player)) return { accepted: false, valid: false, score: null, reason: '育成3年満了までに収まる契約年数を選んでください' };
-  const minimum = player.育成 ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA;
+  if (isIkuseiPlayer(player) && years > ikuseiContractYears(player)) return { accepted: false, valid: false, score: null, reason: '育成3年満了までに収まる契約年数を選んでください' };
+  const minimum = isIkuseiPlayer(player) ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA;
   const cut = salaryCutRule(player, salary);
   const defaults = { money:50, winning:50, playing:50, hometown:30, loyalty:50, stability:50, future:50 };
   const normalized = { ...player, trust: player.trust ?? 50, personality: { ...defaults, ...player.personality } };
@@ -94,7 +95,7 @@ export function simulateNegotiationRounds(player, team, allTeams, demandSalary, 
   const demand = { ...demandDetails, demandSalary, resistanceFactor, minOfferSalary: minAllowed };
   const threshold = getFaThreshold(player);
   const days      = player.daysOnActiveRoster ?? (player.serviceYears ?? 0) * ACTIVE_ROSTER_FA_DAYS_PER_YEAR;
-  const isFA      = !player.育成 && days >= threshold.domestic;
+  const isFA      = !isIkuseiPlayer(player) && days >= threshold.domestic;
 
   let budget      = team.budget;
   let moraleDelta = 0;
@@ -122,7 +123,7 @@ export function simulateNegotiationRounds(player, team, allTeams, demandSalary, 
       if (offered < player.salary * 0.90) moraleDelta += NEGOTIATION_MORALE_CUT_PENALTY;
       if (round > 1)                      moraleDelta += NEGOTIATION_MORALE_ROUND_HIT * (round - 1);
       trustDelta = round === 1 ? NEGOTIATION_TRUST_HAPPY : NEGOTIATION_TRUST_HOLDOUT;
-      const years = Math.min(player.age <= 28 ? rng(1, 2) : 1, player.育成 ? ikuseiContractYears(player) : 7);
+      const years = Math.min(player.age <= 28 ? rng(1, 2) : 1, isIkuseiPlayer(player) ? ikuseiContractYears(player) : 7);
       return { result: 'signed', finalSalary: offered, years, rounds: round, moraleDelta, trustDelta };
     }
   }
@@ -245,7 +246,7 @@ export function cpuRenewContracts(teams, myId, allTeams, salaryContext = {}) {
       const overseas = p.personality?.overseas || 0;
 
       // 海外志向かつ海外FA資格あり: NPB離脱（変更なし）
-      if (!p.育成 && overseas >= 70 && days >= threshold.overseas) {
+      if (!isIkuseiPlayer(p) && overseas >= 70 && days >= threshold.overseas) {
         outcomes.set(p.id,'overseas-fa');
         players = players.filter(x => x.id !== p.id);
         news.push({
@@ -259,8 +260,8 @@ export function cpuRenewContracts(teams, myId, allTeams, salaryContext = {}) {
       }
 
       // 海外志向かつ国内FA資格はあるが海外FA資格なし: 国内FAをスキップして待機（変更なし）
-      if (!p.育成 && overseas >= 70 && days < threshold.overseas) {
-        const salary = Math.max(p.育成 ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA, Math.round(p.salary * 1.03));
+      if (!isIkuseiPlayer(p) && overseas >= 70 && days < threshold.overseas) {
+        const salary = Math.max(isIkuseiPlayer(p) ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA, Math.round(p.salary * 1.03));
         if (budget-plan.rookieReserve >= salary) {
           outcomes.set(p.id,'await-overseas-rights');
           players = players.map(x => x.id === p.id
@@ -403,7 +404,7 @@ export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = nu
         .filter((p) => !signedPlayers.has(p.id) && !marketRosterError(team, p, [...teamMap.values()], draftContext))
         .map((p) => {
           if (!Number.isFinite(p.salary) || p.salary < 0) return null;
-          const salary = Math.max(p.育成 ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA, p.salary);
+          const salary = Math.max(isIkuseiPlayer(p) ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA, p.salary);
           if (team.budget - reserve < salary) return null;
           const rosterDecision=assessCpuAddition(team,p,{...draftContext,phase,teams:[...teamMap.values()],cpuPlan:currentRosterPlan,salary});
           if(!rosterDecision.eligible)return null;
@@ -431,7 +432,7 @@ export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = nu
 
       const prepared = marketMode === 'offseason' ? prepareOffseasonFreeAgent(player, currentYear, team.id) : player;
       const newPlayerEntry = { ...prepared, isFA: false, contractYears: 1, contractYearsLeft: 1, contractSignedYear: currentYear, salary: best.salary,
-        ...(player.育成 && player.departureReason === 'ikusei_expiry' ? { ikuseiYears: 0 } : {}) };
+        ...(isIkuseiPlayer(player) && player.departureReason === 'ikusei_expiry' ? { ikuseiYears: 0 } : {}) };
       const acquireReason = player.isForeign ? '外国人獲得' : (player.isWaiverReleased ? '戦力外獲得' : 'FA獲得');
       const historyRecord = { ...newPlayerEntry, exitYear: currentYear ?? 0, exitReason: acquireReason, tenure: 0,rosterDecision:best.rosterDecision.reason };
       emitCpuDecision({type:'market-sign',teamId:team.id,year:currentYear,id:player.id,kind:acquireReason,

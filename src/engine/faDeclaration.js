@@ -1,6 +1,7 @@
 import { calcPlayerDemand, getFaProgress } from './contract';
 import { renewalEligible, ownedPlayers } from './renewalRules';
 import { pruneRosterReferences } from './offseasonReview';
+import { isIkuseiPlayer } from './rosterCapacity';
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const preference = (p, key) => Number.isFinite(p.personality?.[key]) ? clamp(p.personality[key], 0, 100) / 100 : .5;
@@ -17,7 +18,7 @@ export function faSeasonDraw(player, team, year) {
 }
 
 export function assessFaDeclaration(player, team, year, demand = calcPlayerDemand(player)) {
-  if (!Number.isFinite(year) || player.id == null || team.id == null || player.isForeign || player.育成
+  if (!Number.isFinite(year) || player.id == null || team.id == null || player.isForeign || isIkuseiPlayer(player)
     || !renewalEligible(player, year) || !getFaProgress(player).domestic?.eligible) return null;
   if (player.faDeclarationDecision?.year === year) return player.faDeclarationDecision;
   // Overseas hopefuls retain the existing policy of waiting for overseas FA.

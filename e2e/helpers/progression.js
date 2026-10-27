@@ -95,6 +95,10 @@ export async function saveHub(page, options = {}) {
 export async function reloadAndLoad(page) {
   await page.reload();
   const resume = page.getByRole('button', { name: '続きから', exact: true });
+  await expect(resume).toBeVisible();
+  // A late web-font swap can move the title/button between pointer-down/up.
+  // Wait for the rendered title's fonts before choosing the click coordinates.
+  await page.evaluate(async () => { await document.fonts.ready; });
   await resume.click();
   // A click only starts App's asynchronous read. Diagnostic readSave() calls
   // must not supersede that pending read before the resumed screen is applied.

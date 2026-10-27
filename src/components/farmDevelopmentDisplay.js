@@ -25,8 +25,6 @@ export function registrationPreview(team,player,draftContext={}) {
  if(!isIkuseiPlayer(player))reasons.push('既に支配下登録済み');
  if(!capacity.ok)reasons.push('支配下人数は未確認');
  if(capacity.ok&&capacity.remainingSlots<=0)reasons.push('支配下上限に到達');
- // Preserve this existing handler constraint even though shihaka and active slots differ.
- if(team.players.length>=MAX_ROSTER)reasons.push('一軍枠満杯のため現在の登録処理では実行不可');
  if(salary===null||remaining===null)reasons.push('年俸・予算が未記録');
  else if(difference>0&&team.budget<difference)reasons.push('予算不足');
  return {count,salary,difference,remaining,reasons,capacity};

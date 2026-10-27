@@ -48,6 +48,15 @@ it('disables registration for budget and shihaka limits without calling the acti
  t.farm=[p,...Array.from({length:MAX_SHIHAKA_TOTAL},(_,i)=>({...p,id:6000+i,name:`支配下${i}`,育成:false}))];t.budget=10000;
  v=render(t,{onConvertIkusei:vi.fn()});root=farm(v);expect(text(root)).toContain('支配下上限');
 });
+it.each([{育成:true,isIkusei:false},{育成:false,isIkusei:true}])('offers farm-only registration when active slots are full: %j',flags=>{
+ const t=structuredClone(source),p={...t.farm[0],...flags,salary:240};t.farm=[p];t.budget=1000;
+ t.players=Array.from({length:MAX_ROSTER},(_,i)=>({...t.players[0],id:`active-${i}`,育成:false,isIkusei:false}));
+ const v=render(t,{onConvertIkusei:()=>{}}),root=farm(v);
+ expect(root.findByProps({'aria-label':`${p.name}を支配下登録する`}).props.disabled).toBe(false);
+ click(v,'支配下登録');const dialog=v.root.findByProps({role:'dialog'});
+ expect(text(dialog)).toContain('二軍の支配下選手になります');expect(text(dialog)).toContain('820万円');
+ expect(dialog.findAllByType('button').find(b=>text(b)==='登録を確定').props.disabled).toBe(false);
+});
 it('keeps talk first-team-only, preserves morale zero and marks missing separately',()=>{
  const t=structuredClone(source);t.players=t.players.slice(0,3);t.players[0].morale=0;delete t.players[1].morale;t.farm[0].name='二軍会話対象外';
  const v=render(t,{onPlayerTalk:vi.fn()}),root=talk(v);expect(text(root)).toContain('一軍選手');expect(text(root)).not.toContain('二軍会話対象外');

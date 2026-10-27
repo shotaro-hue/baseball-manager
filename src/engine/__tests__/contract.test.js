@@ -188,6 +188,18 @@ describe('processCpuFaBids multi-signing', () => {
     expect(result.updatedTeams[1].farm.some(p => p.id === 'ikusei')).toBe(true);
     expect(result.remainingFaPool.map(p => p.id)).toEqual(['shihaka']);
   });
+  it.each([{育成:true,isIkusei:false},{育成:false,isIkusei:true}])('renews an expired development market contract at its own minimum in the farm: %j',flags=>{
+    const my={id:0,players:[],farm:[],budget:0};
+    const cpu={id:1,name:'CPU',league:'セ',wins:70,losses:70,city:'東京',budget:10000,
+      players:Array.from({length:27},(_,i)=>mkBatter(`a${i}`,420)),farm:Array.from({length:43},(_,i)=>mkBatter(`f${i}`,420))};
+    const target={...mkBatter('development',240,20),...flags,ikuseiYears:3,departureReason:'ikusei_expiry',isFA:true,
+      trust:100,personality:{money:0,winning:100,playing:0,hometown:100,loyalty:100,stability:0,future:100}};
+    const result=processCpuFaBids([my,cpu],0,[target],[my,cpu],2026,'offseason');
+    const after=result.updatedTeams[1];
+    expect(after.players).toHaveLength(27);expect(after.farm).toHaveLength(44);
+    expect(after.farm.find(p=>p.id==='development')).toMatchObject({...flags,salary:240,ikuseiYears:0,contractYearsLeft:1});
+    expect(after.budget).toBe(9760);expect(result.remainingFaPool).toHaveLength(0);
+  });
 
   it.each([undefined, NaN, 0, 100])('未記録・不足予算では獲得しない（%s）', budget => {
     const my = { id: 0, players: [], farm: [] };

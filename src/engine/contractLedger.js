@@ -173,3 +173,13 @@ export function isContractLedgerExtension(before, after) {
       && old.changes.every((action, i) => signature(action) === signature(next.changes[i]));
   });
 }
+
+/** Current employment, independent of retained guarantee liability. */
+export function contractEmploymentAt(ledger, date) {
+  parseContractDate(date);
+  return viewsFor(ledger).filter(view => view.effectiveDate <= date && date < view.employmentEndDate).map(view => {
+    const payer = view.payers.find(p => p.startDate <= date && date < p.endDate);
+    const rate = view.rates.filter(r => r.startDate <= date).at(-1);
+    return { contract: view.contract, teamId: payer.teamId, annualSalaryManYen: rate.annualSalaryManYen };
+  });
+}

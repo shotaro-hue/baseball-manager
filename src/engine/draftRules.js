@@ -204,11 +204,14 @@ export function applyDraftAcquisitions(teams, pool, drafted, year, context={}) {
     if (!assignments.has(String(owner))) return fail('指名球団が見つかりません');
     if (!owned.has(p.id)) assignments.get(String(owner)).push(p);
   }
+  // This legacy path signs every acquired pick to a controlled contract below.
+  // Validate that resulting type even if an input prospect has development flags.
+  const controlledPool = pool.map(p => ({ ...p, 育成: false, isIkusei: false }));
   for (const team of teams) {
     const rules=draftRulesFor(context.rules);
     if(rules.version===2&&draftNominationCount(team.id,pool,drafted,context.log)>rules.maxPicks)
       return fail(`年間指名上限（${rules.maxPicks}人）を超えます`);
-    const capacity = evaluateRosterCapacity(team, { teams, draftPool: pool, drafted });
+    const capacity = evaluateRosterCapacity(team, { teams, draftPool: controlledPool, drafted });
     if (!capacity.ok) return fail(`支配下人数が未確認です（${capacity.reason}）`);
     if (capacity.overBy > 0)
       return fail(`支配下登録枠（${MAX_SHIHAKA_TOTAL}人）を超えます`);

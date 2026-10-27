@@ -4,6 +4,7 @@ import { CareerTable } from './tabs/CareerTable';
 import { BattedBallAnalysisPanel } from './BattedBallAnalysisPanel';
 import '../mobile-flow.css';
 import { getFaProgress } from '../engine/contract';
+import { isIkuseiPlayer } from '../engine/renewalRules';
 import { Button, Section } from './design-system/primitives';
 import { useResultDialog } from './useResultDialog';
 import { detailNumber, detailRate, detailInnings, detailSalary, firstTeamScope, playerMembership } from './playerDetailMetrics';
@@ -170,7 +171,7 @@ export function PlayerModal({
     event.currentTarget.parentElement?.querySelectorAll('[role="tab"]')[next]?.focus();
   };
   const faProgress = getFaProgress(p);
-  const faLabel = p.isFA ? 'FA中' : !faProgress.recorded ? 'FA登録日数未記録'
+  const faLabel = isIkuseiPlayer(p) ? (p.isFA ? '自由契約（育成）' : '育成契約中・FA対象外') : p.isFA ? 'FA中' : !faProgress.recorded ? 'FA登録日数未記録'
     : `${faProgress.domestic.eligible ? '国内FA資格あり' : `国内FA 最短あと${faProgress.domestic.years}年（${faProgress.domestic.remainingDays}日）`}${faProgress.estimated ? '・推定' : ''}`;
   const phase = { growth: '成長期', peak: '全盛期', earlyDecline: '衰退初期', decline: '衰退期' }[p.growthPhase] || '成長段階未記録';
   const abilities = p.isPitcher ? [['球速', 'velocity'], ['制球', 'control'], ['スタミナ', 'stamina'], ['変化球', 'breaking'], ['球種', 'variety'], ['ピンチ', 'clutchP']]
@@ -191,7 +192,7 @@ export function PlayerModal({
       <div className="player-state-summary">
         {(p.injuryDaysLeft ?? 0) > 0 && <strong className="player-injury">負傷中 · {String(p.injury || '').slice(0,40)}{p.injuryPart ? ` [${String(p.injuryPart).slice(0,20)}]` : ''} · 残{p.injuryDaysLeft}試合</strong>}
         <span>コンディション {detailNumber(p.condition)}</span><span>モラル {detailNumber(p.morale)}</span>
-        {p.isForeign && <span>外国人</span>}{p.育成 && <span>育成</span>}<span>{phase}</span>
+        {p.isForeign && <span>外国人</span>}{isIkuseiPlayer(p) && <span>育成</span>}<span>{phase}</span>
       </div>
       <div className="player-detail-tabs" role="tablist" aria-label="選手詳細">
         {sections.map(([key, label], index) => <button key={key} type="button" id={tabId(key)} role="tab" aria-selected={activeSection === key} aria-controls={`${tabId(key)}-panel`} tabIndex={activeSection === key ? 0 : -1} className={activeSection === key ? 'on' : ''} onClick={() => setActiveSection(key)} onKeyDown={e => activateTab(e, index)}>{label}</button>)}

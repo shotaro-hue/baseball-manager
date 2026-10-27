@@ -1,10 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import { salaryCutRule } from '../renewalRules';
+import { salaryCutRule, validContractOffer, validContractTerms } from '../renewalRules';
+import { renewalSalaryFloor } from '../salaryDemand';
 import { getFaProgress, getFaThreshold, evaluateRenewalOffer, calcPlayerDemand } from '../contract';
 import { emptyStats } from '../playerCore';
 const team = { players: [], lineup: [0], rotation: [], wins: 80, losses: 40, city: '東京' };
 const p = { id: 0, salary: 10000, trust: 100, hometown: '東京', personality: { money: 0, winning: 0, playing: 100, hometown: 0, loyalty: 0, stability: 100, future: 0 }, stats: { ...emptyStats(), PA: 0 } };
 describe('NPB cut consent and FA progress', () => {
+  it.each([{育成:true},{isIkusei:true},{育成:false,isIkusei:true},{育成:true,isIkusei:false}])('uses development minimum salary and remaining term for either saved flag: %j', flags => {
+    const development = {...p,...flags,salary:240,ikuseiYears:2,stats:{}};
+    expect(validContractOffer(development,240,1)).toBe(true);
+    expect(validContractOffer(development,1000,2)).toBe(false);
+    expect(validContractTerms(development,240,1)).toBe(true);
+    expect(validContractTerms(development,239,1)).toBe(false);
+    expect(renewalSalaryFloor(development)).toBe(240);
+    expect(calcPlayerDemand(development).demandSalary).toBe(240);
+    expect(evaluateRenewalOffer(development,{salary:240,years:1},team,[team],{demandSalary:240,minAcceptSalary:240}).accepted).toBe(true);
+    expect(evaluateRenewalOffer(development,{salary:1000,years:2},team,[team],{demandSalary:240}).valid).toBe(false);
+  });
   it.each([[10000, 7500, .25], [10001, 6000.6, .4], [10100, 6060, .4], [1000, 750, .25]])('uses an exact boundary for previous salary %s', (salary, boundary, rate) => {
     expect(salaryCutRule({ salary }, boundary)).toMatchObject({ rate, boundary, exceeds: false });
     expect(salaryCutRule({ salary }, boundary - .01).exceeds).toBe(true);

@@ -11,7 +11,8 @@ import { remainingContractAfterSeason } from '../engine/renewalRules';
 import { addMarketSigning } from './hub/faMarket';
 import { emptyStats } from '../engine/playerCore';
 import { prepareOffseasonFreeAgent } from '../engine/offseasonMarket';
-vi.mock('../engine/player', () => ({ generateForeignFaPool: () => [], rollRetire: () => false, developPlayers: players => ({ players, summary: {} }) }));
+import { rollRetire } from '../engine/player';
+vi.mock('../engine/player', () => ({ generateForeignFaPool: () => [], rollRetire: vi.fn(() => false), developPlayers: players => ({ players, summary: {} }) }));
 vi.mock('../engine/saveload', () => ({ appendCareerEntriesToIndexedDb: async () => ({ ok: true }) }));
 vi.mock('../engine/scheduleGen', () => ({ generateSeasonSchedule: () => ({}), calcAllStarTriggerDay: () => 50 }));
 vi.mock('./PlayerModal', () => ({ PlayerModal: () => null }));
@@ -24,7 +25,7 @@ const views = []; let current;
 afterEach(() => { views.splice(0).forEach(v => act(() => v.unmount())); vi.restoreAllMocks(); });
 function setup(farm, options = {}) {
   function Harness() {
-    const [teams, setTeams] = useState([team(farm, 0, options.players || [])]);
+    const [teams, setTeams] = useState([team(farm, 0, options.players || []),...(options.otherTeams||[])]);
     const [screen, setScreen] = useState(options.screen || 'offseason_planning');
     const [offseasonPlan, setOffseasonPlan] = useState({ version: 1, year: 2026, myId: 0, stage: 'open', tab: 'roster', demands: Object.fromEntries(farm.map(p => [p.id, calcPlayerDemand(p)])), releasedIds: [], ...options.plan });
     const [year, setYear] = useState(options.year || 2026), [faPool, setFaPool] = useState([]);
@@ -72,9 +73,9 @@ it('adds omitted farm entries to an old saved session while keeping signed terms
   expect(state.entries).toHaveLength(2); expect(state.entries[0]).toMatchObject({ terms: { salary: 1300, years: 2 }, logs: ['既存合意'] });
   expect(state.entries[1]).toMatchObject({ player: { id: 0 }, status: 'pending' }); expect(state.others).toEqual([]);
 });
-it('applies CPU farm renewals in the same location and releases unaffordable contracts from both lists', () => {
+it.each(['育成','isIkusei'])('applies CPU farm renewals and releases unaffordable contracts with %s', flag => {
   vi.spyOn(Math, 'random').mockReturnValue(.5);
-  const own = team([], 0), cpu = team([p(2), p(3, { 育成: true, salary: 300, ikuseiYears: 2 })], 1);
+  const own = team([], 0), cpu = team([p(2), p(3, { [flag]: true, salary: 300, ikuseiYears: 2 })], 1);
   const success = cpuRenewContracts([own, cpu], 0, [own, cpu], { year: 2026 });
   expect(success.updatedTeams[1].players).toHaveLength(0); expect(success.updatedTeams[1].farm).toHaveLength(2);
   expect(success.updatedTeams[1].farm.every(p => p.contractSignedYear === 2026)).toBe(true);
@@ -82,9 +83,17 @@ it('applies CPU farm renewals in the same location and releases unaffordable con
   const failed = cpuRenewContracts([own, { ...cpu, budget: 0 }], 0, [own, cpu], { year: 2026 });
   expect(failed.updatedTeams[1].farm).toHaveLength(0); expect(failed.newFaPlayers.map(p => p.id)).toEqual([2, 3]);
 });
-it('permits an eligible demoted player to declare FA but never an ikusei player', () => {
+it.each([900,1080])('does not treat an isIkusei-only renewal as an overseas FA contract with historical %s active days',days=>{
+  vi.spyOn(Math,'random').mockReturnValue(.5);
+  const own=team([],0),cpu=team([p(3,{isIkusei:true,salary:300,ikuseiYears:2,daysOnActiveRoster:days,personality:{overseas:100}})],1);
+  const result=cpuRenewContracts([own,cpu],0,[own,cpu],{year:2026});
+  expect(result.updatedTeams[1].farm).toHaveLength(1);
+  expect(result.updatedTeams[1].farm[0]).toMatchObject({id:3,isIkusei:true,salary:300,contractYearsLeft:1,contractSignedYear:2026});
+  expect(result.newFaPlayers).toHaveLength(0);
+});
+it.each(['育成','isIkusei'])('permits a demoted player to declare FA but excludes development flag %s', flag => {
   const decision = { year: 2026, declared: true, reasons: ['検証用の確定判断'] };
-  const farm = [p(0, { daysOnActiveRoster: 840, faDeclarationDecision: decision }), p(1, { 育成: true, daysOnActiveRoster: 840, faDeclarationDecision: decision })];
+  const farm = [p(0, { daysOnActiveRoster: 840, faDeclarationDecision: decision }), p(1, { [flag]: true, daysOnActiveRoster: 840, faDeclarationDecision: decision })];
   const result = resolveOffseasonFaDeclarations([team(farm)], 2026);
   expect(result.newFaPlayers.map(p => p.id)).toEqual([0]); expect(result.updatedTeams[0].farm.map(p => p.id)).toEqual([1]);
 });
@@ -97,19 +106,54 @@ it('updates active and farm contracts identically once, preserving newly signed 
   expect(h.current.gs.myTeam.farm[1].daysOnActiveRoster).toBe(700);
   expect(remainingContractAfterSeason(p(4, { contractYearsLeft: undefined }), 2026)).toBeUndefined();
 });
-it('keeps expired ikusei players in history and market and restarts the cycle on a farm-only re-signing', async () => {
-  const h = setup([p(0, { 育成: true, salary: 300, ikuseiYears: 3 })], { screen: 'retire_phase', render: false });
+it.each(['育成','isIkusei'])('keeps expired development players in history and market for a farm-only re-signing: %s', async flag => {
+  const h = setup([p(0, { [flag]: true, salary: 300, ikuseiYears: 3 })], { screen: 'retire_phase', render: false });
   await act(async () => expect(await h.current.os.handleRetirePhaseNext({})).toBe(true));
   expect(h.current.gs.myTeam.farm).toHaveLength(0); expect(h.current.gs.myTeam.history[0].exitReason).toBe('育成契約満了');
-  const market = h.current.gs.faPool[0]; expect(market).toMatchObject({ id: 0, 育成: true, departureReason: 'ikusei_expiry' });
+  const market = h.current.gs.faPool[0]; expect(market).toMatchObject({ id: 0, [flag]: true, departureReason: 'ikusei_expiry' });
   const signed = addMarketSigning(h.current.gs.myTeam, market, 300, 1, 2026, 'offseason');
-  expect(signed.players).toHaveLength(0); expect(signed.farm[0]).toMatchObject({ ikuseiYears: 0, 育成: true });
+  expect(signed.players).toHaveLength(0); expect(signed.farm[0]).toMatchObject({ ikuseiYears: 0, [flag]: true });
 });
-it('rejects contracts beyond the existing ikusei expiry without changing ownership', () => {
-  const player = p(0, { 育成: true, ikuseiYears: 2, salary: 300 }); const t = team([player]);
+it.each(['育成','isIkusei'])('rejects contracts beyond development expiry without changing ownership: %s', flag => {
+  const player = p(0, { [flag]: true, ikuseiYears: 2, salary: 300 }); const t = team([player]);
   expect(evaluateRenewalOffer(player, { salary: 1000, years: 2 }, t, [t], calcPlayerDemand(player)).valid).toBe(false);
   const h = setup([player], { render: false }); act(() => expect(h.current.os.handleContractRenewalSign(0, 1000, 2, 0, 0)).toBe(false));
   expect(h.current.gs.myTeam.farm[0].contractSignedYear).toBeUndefined();
+});
+it.each(['育成','isIkusei'])('updates development years without awarding controlled service and survives JSON reload: %s', async flag => {
+  const h=setup([p(0,{[flag]:true,salary:240,ikuseiYears:1,serviceYears:0,contractYearsLeft:2})],{screen:'spring_training',render:false});
+  await act(async()=>expect(await h.current.os.handleNextYear()).toBe(true));
+  const saved=JSON.parse(JSON.stringify(h.current.gs.myTeam.farm));
+  expect(saved[0]).toMatchObject({[flag]:true,ikuseiYears:2,serviceYears:0,contractYearsLeft:1,daysOnActiveRoster:0});
+  const reloaded=setup(saved,{year:2027,render:false});
+  act(()=>expect(reloaded.current.os.handleContractRenewalPhaseNext([0])).toBe(false));
+  act(()=>expect(reloaded.current.os.handlePlanningRelease(0,'fa')).toBe(false));
+  expect(reloaded.current.gs.myTeam.farm).toHaveLength(1);expect(reloaded.current.gs.faPool).toHaveLength(0);
+});
+it.each(['育成','isIkusei'].flatMap(flag=>[1,3].map(ikuseiYears=>({flag,ikuseiYears}))))('excludes development players from CPU retirement replacements and still expires them: %j',async({flag,ikuseiYears})=>{
+  const development=p(3,{[flag]:true,salary:300,ikuseiYears,batting:{contact:99,power:99}}),controlled=p(4,{batting:{contact:20,power:20}});
+  const cpu=team([development,controlled],1,[p(2,{age:40})]);
+  vi.mocked(rollRetire).mockReturnValueOnce(true);
+  const h=setup([],{screen:'retire_phase',render:false,otherTeams:[cpu]});
+  await act(async()=>expect(await h.current.os.handleRetirePhaseNext({})).toBe(true));
+  const after=h.current.gs.teams.find(t=>t.id===1);
+  expect(after.players.map(p=>p.id)).toEqual([4]);
+  expect(after.farm.some(p=>p.id===3)).toBe(ikuseiYears<3);
+  expect(h.current.gs.faPool.some(p=>p.id===3&&p.departureReason==='ikusei_expiry'&&p.faOriginRoster==='farm')).toBe(ikuseiYears===3);
+});
+it.each(['育成','isIkusei'].flatMap(flag=>[1,3].map(ikuseiYears=>({flag,ikuseiYears}))))('repairs a saved active development placement at the offseason boundary before FA/expiry: %j',async({flag,ikuseiYears})=>{
+  const development=p(0,{[flag]:true,salary:240,ikuseiYears,daysOnActiveRoster:1080,personality:{overseas:100}});
+  const h=setup([],{screen:'retire_phase',render:false,players:JSON.parse(JSON.stringify([development]))});
+  await act(async()=>expect(await h.current.os.handleRetirePhaseNext({})).toBe(true));
+  const after=h.current.gs.myTeam;
+  expect(after.players).toHaveLength(0);expect(after.lineup).toEqual([]);expect(after.budget).toBe(100000);
+  if(ikuseiYears<3){
+    expect(after.farm[0]).toMatchObject({id:0,[flag]:true,salary:240,ikuseiYears,daysOnActiveRoster:1080});
+    expect(h.current.gs.faPool).toHaveLength(0);
+  }else{
+    expect(after.farm).toHaveLength(0);expect(after.history).toEqual([expect.objectContaining({exitReason:'育成契約満了'})]);
+    expect(h.current.gs.faPool[0]).toMatchObject({id:0,departureReason:'ikusei_expiry',faOriginRoster:'active'});
+  }
 });
 it('does not invent a first-team season when a never-played farm player is released and transferred', () => {
   const released = { ...p(0), faEnteredYear: 2026, faOriginTeamId: 0, faOriginTeamName: '旧球団', faOriginRoster: 'farm' };

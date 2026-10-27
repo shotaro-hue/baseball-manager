@@ -1,0 +1,74 @@
+{
+  "baseline": {
+    "revision": "7597eb998b6c0c33beb5f7d68393adfdf15cb5dc",
+    "runtime": "v24.22.1",
+    "platform": "linux x64",
+    "cpu": "AMD EPYC 9V74 80-Core Processor",
+    "input": {
+      "clubs": 12,
+      "players": 780,
+      "contractYears": 7,
+      "annualAuthorizations": 84,
+      "warmups": 1,
+      "measuredQuotes": 5,
+      "date": "2026-07-01",
+      "command": "two-way cashless trade",
+      "minimumControlledCount": 67,
+      "salaryManYen": 1000
+    },
+    "node": {
+      "samplesMs": [
+        649.1030100000007,
+        586.7600789999997,
+        571.9177649999983,
+        574.4298529999996,
+        607.8721889999997
+      ],
+      "medianMs": 586.7600789999997,
+      "minMs": 571.9177649999983,
+      "maxMs": 649.1030100000007,
+      "inputUnchanged": true,
+      "committedReceipts": 0
+    }
+  },
+  "fixedCode": {
+    "revision": "cc254ea601b19cef7011d04e1ec957b271856716",
+    "runtime": "v24.22.1",
+    "platform": "linux x64",
+    "cpu": "AMD EPYC 9V74 80-Core Processor",
+    "input": {
+      "clubs": 12,
+      "players": 780,
+      "contractYears": 7,
+      "annualAuthorizations": 84,
+      "warmups": 1,
+      "measuredQuotes": 5,
+      "date": "2026-07-01",
+      "command": "two-way cashless trade",
+      "minimumControlledCount": 67,
+      "salaryManYen": 1000
+    },
+    "node": {
+      "samplesMs": [
+        541.0794180000012,
+        534.4083559999999,
+        541.8567200000016,
+        640.6287439999996,
+        557.6492760000001
+      ],
+      "medianMs": 541.8567200000016,
+      "minMs": 534.4083559999999,
+      "maxMs": 640.6287439999996,
+      "inputUnchanged": true,
+      "committedReceipts": 0
+    }
+  },
+  "webkit": {
+    "status": "unavailable",
+    "reason": "Missing Linux shared libraries; install-deps blocked by setgroups/seteuid OS restrictions."
+  },
+  "physicalIphone": {
+    "status": "not-verified",
+    "requiredStage": "GM-01C-2"
+  }
+}

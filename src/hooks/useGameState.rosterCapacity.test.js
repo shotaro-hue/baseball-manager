@@ -21,6 +21,22 @@ it('blocks direct promotion of isIkusei-only players and clears both flags on co
  expect(gs.myTeam.farm.find(p=>p.id==='dev')).toMatchObject({育成:false,isIkusei:false,salary:420});
  expect(gs.myTeam.budget).toBe(9820);expect(gs.myTeam.farm).toHaveLength(70);
 });
+it.each([{育成:true},{isIkusei:true}])('converts in the farm with a full active roster and promotes only after a separate vacancy: %j',flags=>{
+ setup();
+ const t=roster(69),controlled=t.farm.slice(0,69);
+ act(()=>gs.setTeams([{...t,players:controlled.slice(0,28),farm:[...controlled.slice(28),{id:'dev',salary:240,...flags}]}]));
+ const activeIds=gs.myTeam.players.map(p=>p.id),convert=gs.convertIkusei;
+ act(()=>{convert('dev');convert('dev');});
+ expect(gs.myTeam.players.map(p=>p.id)).toEqual(activeIds);
+ expect(gs.myTeam.farm.find(p=>p.id==='dev')).toMatchObject({育成:false,isIkusei:false,salary:420});
+ expect(gs.myTeam.budget).toBe(9820);
+ act(()=>gs.promote('dev'));expect(gs.myTeam.players.map(p=>p.id)).toEqual(activeIds);
+ const saved=JSON.parse(JSON.stringify(gs.myTeam));
+ act(()=>gs.setTeams([{...saved,players:saved.players.slice(1),farm:[...saved.farm,saved.players[0]]}]));
+ act(()=>gs.promote('dev'));
+ expect(gs.myTeam.players).toHaveLength(28);expect(gs.myTeam.players.some(p=>p.id==='dev')).toBe(true);
+ expect(gs.myTeam.farm.some(p=>p.id==='dev')).toBe(false);expect(gs.myTeam.budget).toBe(9820);
+});
 it('rechecks the latest roster and accepted draft reservations even through a stale conversion callback',()=>{
  setup(68);const old=gs.convertIkusei;
  act(()=>gs.setTeams([roster(70)]));act(()=>old('dev'));
@@ -39,4 +55,10 @@ it('binds a repeated scouting action to its intended player rather than the next
  const sign=gs.signPlayer;act(()=>{sign(0);sign(0);});
  expect(gs.myTeam.farm.filter(p=>['A','B'].includes(p.id)).map(p=>p.id)).toEqual(['A']);expect(gs.myTeam.budget).toBe(9500);expect(gs.myTeam.scoutResults.map(p=>p.id)).toEqual(['B']);
  act(()=>gs.signPlayer(0));expect(gs.myTeam.farm.filter(p=>['A','B'].includes(p.id)).map(p=>p.id)).toEqual(['A','B']);expect(gs.myTeam.budget).toBe(8900);
+});
+it.each([{育成:true},{isIkusei:true}])('allows the last real conversion slot despite an accepted development rookie: %j',flags=>{
+ setup(69,{year:2026,draftPool:[{id:'dev-pick',_drafted:true,_r1winner:0,...flags}]});
+ const convert=gs.convertIkusei;act(()=>{convert('dev');convert('dev');});
+ expect(gs.myTeam.farm.find(p=>p.id==='dev')).toMatchObject({育成:false,isIkusei:false,salary:420});
+ expect(gs.myTeam.budget).toBe(9820);
 });

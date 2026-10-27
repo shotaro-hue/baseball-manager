@@ -1,6 +1,6 @@
 import {newReinforcementPlan} from '../engine/rosterPlanning';
 import {ensureDraftEvaluation} from '../engine/draftReports';
-import { draftCapacityContext } from '../engine/rosterCapacity';
+import { draftCapacityContext, isIkuseiPlayer } from '../engine/rosterCapacity';
 import {advanceFarmYear} from '../engine/farmMigration';
 import { applyTradeTransaction } from '../engine/tradeTransaction';
 import { nextSeasonMatchHistory } from '../engine/matchHistory';
@@ -164,7 +164,7 @@ export function useOffseason(gs) {
     const nextTeams = (Array.isArray(sourceTeams) ? sourceTeams : teams).map(t=>{
       const nextPlayers=t.players.filter(p=>!p._retireNow).map(p=>{
         const compactPlayer = archiveSeason(p, t);
-        return {...compactPlayer,age:p.age+1,stats:createEmptyStats(),playoffStats:createEmptyStats(),recentPitchingDays:[],lastPitched:false,injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:remainingContractAfterSeason(p, year),postingRequested:false,growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlyDecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),serviceYears:p.育成?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:p.育成?(p.ikuseiYears||0)+1:0};
+        return {...compactPlayer,age:p.age+1,stats:createEmptyStats(),playoffStats:createEmptyStats(),recentPitchingDays:[],lastPitched:false,injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:remainingContractAfterSeason(p, year),postingRequested:false,growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlyDecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),serviceYears:isIkuseiPlayer(p)?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:isIkuseiPlayer(p)?(p.ikuseiYears||0)+1:0};
       });
       const nextIds=new Set(nextPlayers.map(p=>p.id));
       const nextFarm = (t.farm || []).map(p => {
@@ -172,8 +172,8 @@ export function useOffseason(gs) {
         const archived = played ? archiveSeason(p, t) : p;
         return { ...archived, age: p.age + 1, stats: createEmptyStats(), playoffStats: createEmptyStats(),
           injury: null, injuryDaysLeft: 0, recentPitchingDays: [], lastPitched: false, contractYearsLeft: remainingContractAfterSeason(p, year),
-          serviceYears: p.育成 ? (p.serviceYears || 0) : (p.serviceYears || 0) + 1,
-          ikuseiYears: p.育成 ? (p.ikuseiYears || 0) + 1 : 0 };
+          serviceYears: isIkuseiPlayer(p) ? (p.serviceYears || 0) : (p.serviceYears || 0) + 1,
+          ikuseiYears: isIkuseiPlayer(p) ? (p.ikuseiYears || 0) + 1 : 0 };
       });
       // These counters are season-relative. Keeping day 141 from the previous
       // year suppresses the next year's ordinary 14-day roster reviews.
@@ -589,16 +589,18 @@ export function useOffseason(gs) {
       const res=playerMod.developPlayers(activePlayers, t.coaches||[]);
       const farmRes=playerMod.developPlayers(t.farm, t.coaches||[]);
       if(t.id===myId)mySummary=res.summary;
-      let finalPlayers=res.players;
-      let finalFarm=farmRes.players;
+      // Older CPU retirement replacements could put a development contract in
+      // the active list. Restore placement before expiry, FA and posting checks.
+      let finalPlayers=res.players.filter(p=>!isIkuseiPlayer(p));
+      let finalFarm=[...farmRes.players,...res.players.filter(isIkuseiPlayer)];
       if(t.id!==myId&&retiredIds.size>0){
-        const promoted=finalFarm.filter(p=>p.age<=26).sort((a,b)=>{
+        const promoted=finalFarm.filter(p=>!isIkuseiPlayer(p)&&p.age<=26).sort((a,b)=>{
           const oa=a.isPitcher?(a.pitching?.velocity||0)+(a.pitching?.control||0)*1.2:(a.batting?.contact||0)+(a.batting?.power||0);
           const ob=b.isPitcher?(b.pitching?.velocity||0)+(b.pitching?.control||0)*1.2:(b.batting?.contact||0)+(b.batting?.power||0);
           return ob-oa;
         }).slice(0,retiredIds.size);
         const pIds=new Set(promoted.map(p=>p.id));
-        finalPlayers=[...res.players,...promoted];
+        finalPlayers=[...finalPlayers,...promoted];
         finalFarm=finalFarm.filter(p=>!pIds.has(p.id));
       }
       const winPct=(t.wins||0)/Math.max(1,(t.wins||0)+(t.losses||0));
@@ -619,11 +621,11 @@ export function useOffseason(gs) {
       });
       const ikuseiDismissed=new Set();
       const farmAfterIkusei=finalFarm.filter(fp=>{
-        if(fp.育成&&(fp.ikuseiYears||0)>=3){
+        if(isIkuseiPlayer(fp)&&(fp.ikuseiYears||0)>=3){
           ikuseiDismissed.add(fp.id);
           ikuseiExpired.push({ ...fp, isFA: true, contractYearsLeft: 0, departureReason: 'ikusei_expiry',
             marketEntryReason: '育成契約満了', marketLastStats: fp.stats, faEnteredYear: year,
-            faOriginTeamId: t.id, faOriginTeamName: t.name, faOriginRoster: 'farm' });
+            faOriginTeamId: t.id, faOriginTeamName: t.name, faOriginRoster: t.players.some(p=>p.id===fp.id)?'active':'farm' });
           addNews({type:"season",headline:"【育成契約満了】"+fp.name+"（"+t.name+"）が契約満了",source:"野球速報",dateLabel:year+"年",body:fp.name+"選手（"+fp.age+"歳）は育成3年を満了し、自由契約となった。"});
           return false;
         }
@@ -756,8 +758,8 @@ export function useOffseason(gs) {
       : [];
 
     const declaredIdSet = new Set(safeDeclaredIds);
-    if (ownedPlayers(myTeam).some(p => declaredIdSet.has(p.id) && p.育成)) return false;
-    const declaredPlayers = ownedPlayers(myTeam).filter(p => declaredIdSet.has(p.id) && !p.育成);
+    if (ownedPlayers(myTeam).some(p => declaredIdSet.has(p.id) && isIkuseiPlayer(p))) return false;
+    const declaredPlayers = ownedPlayers(myTeam).filter(p => declaredIdSet.has(p.id) && !isIkuseiPlayer(p));
 
     if (declaredPlayers.length > 0) {
       upd(myId, t => ({
@@ -872,7 +874,7 @@ export function useOffseason(gs) {
     const key = JSON.stringify([year, typeof pid, pid]);
     const p = ownedPlayers(myTeam).find(x => x.id === pid);
     if (planningActionIds.current.has(key) || !p || !renewalEligible(p, year)) return false;
-    if (reason === 'fa' && (p.育成 || !getFaProgress(p).domestic?.eligible)) return false;
+    if (reason === 'fa' && (isIkuseiPlayer(p) || !getFaProgress(p).domestic?.eligible)) return false;
     planningActionIds.current.add(key);
     const declared = reason === 'fa';
     upd(myId, t => {

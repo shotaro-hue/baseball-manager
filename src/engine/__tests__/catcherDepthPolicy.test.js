@@ -5,7 +5,8 @@ import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { createInitialTeams } from '../bootstrapTeams';
 import { analyzeTeamNeeds } from '../trade';
 import { evaluateOrganizationNeeds } from '../organizationNeeds';
-import { rankDraftProspects } from '../draftRules';
+import { applyDraftAcquisitions, rankDraftProspects } from '../draftRules';
+import { evaluateRosterCapacity } from '../rosterCapacity';
 import { loadGame, saveGame } from '../saveload';
 import { applyManagementPolicy, buildFullRosterPlan, proficiencyAt, validateTeamRoster } from '../rosterAutomation';
 
@@ -133,16 +134,23 @@ it.each(['育成', 'isIkusei'])('does not count %s catchers as controlled organi
   expect(evaluateOrganizationNeeds(team).roles.catcher.organizationShortage).toBe(2);
 });
 
-it.each(['育成', 'isIkusei'])('counts accepted %s picks toward six controlled catchers without changing prospects', flag => {
+it.each(['育成', 'isIkusei'])('projects legacy controlled draft signings with %s prospect flags without changing prospects', flag => {
   const team = teamWithCatchers(5);
   const pick = { ...structuredClone(team.players.find(p => p.pos === '捕手')), id: 0, [flag]: true };
   const before = structuredClone({ team, pick });
   const report = evaluateOrganizationNeeds(team, { draftPool: [pick], drafted: { 0: team.id } });
+  // Actual development reservations do not consume a controlled slot. This
+  // legacy role projection describes the controlled contract created below.
+  expect(evaluateRosterCapacity(team, { draftPool: [pick], drafted: { 0: team.id } }).acceptedPickCount).toBe(0);
   expect(report.roles.catcher).toMatchObject({ acceptedPickCount: 1, organizationShortage: 0 });
   const pool = [{ ...pick, id: 'best-DH', pos: 'DH', 育成: false, isIkusei: false },
     { ...pick, id: 'another-C', 育成: false, isIkusei: false }];
   expect(rankDraftProspects(team, pool, 2, [pick]))
     .toEqual(rankDraftProspects(team, pool, 2, [{ ...pick, 育成: false, isIkusei: false }]));
+  const acquired = applyDraftAcquisitions([team], [pick], { 0: team.id }, 2026);
+  expect(acquired.ok).toBe(true);
+  expect(acquired.teams[0].farm.find(p => p.id === 0)).toMatchObject({ 育成: false, isIkusei: false });
+  expect(evaluateOrganizationNeeds(acquired.teams[0]).roles.catcher).toMatchObject({ acceptedPickCount: 0, organizationShortage: 0 });
   expect({ team, pick }).toEqual(before);
 });
 

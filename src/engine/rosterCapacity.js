@@ -1,8 +1,8 @@
 import { MAX_SHIHAKA_TOTAL } from '../constants';
-import { ownedPlayers } from './renewalRules';
+import { ownedPlayers, isIkuseiPlayer } from './renewalRules';
 import { draftPicksForTeam } from './offseasonResume';
 
-export const isIkuseiPlayer = player => Boolean(player?.育成 || player?.isIkusei);
+export { isIkuseiPlayer } from './renewalRules';
 export function controlledRosterCounts(team) {
   const owned = ownedPlayers(team), developmentCount = owned.filter(isIkuseiPlayer).length;
   return { controlledCount: owned.length - developmentCount, developmentCount };
@@ -18,7 +18,8 @@ const keyCollision = ids => {
   return false;
 };
 
-/** Derived ownership and accepted-but-unowned reservations. Never edits a save. */
+/** Derived ownership and accepted-but-unowned controlled reservations. Never edits a save.
+ * Accepted development metadata is separate from controlled slots, for contract liabilities. */
 export function evaluateRosterCapacity(team, { teams = [team], draftPool = [], drafted = {}, confirmedPicks = {} } = {}) {
   if (!team || !Array.isArray(teams) || !Array.isArray(draftPool) || !drafted || !confirmedPicks)
     return { ok: false, reason: 'invalid-capacity-input' };
@@ -29,6 +30,7 @@ export function evaluateRosterCapacity(team, { teams = [team], draftPool = [], d
   if (keyCollision([...ownedIds, ...draftPool.filter(p => p?.id != null).map(p => p.id)]))
     return { ok: false, reason: 'invalid-draft-ids' };
   const owned = new Set(ownedIds), acceptedPickIds = [], acceptedPicks = [], ignoredPickIds = [];
+  const acceptedKinds = new Map(), acceptedDevelopmentPicks = [];
   const firstCandidates = new Set(draftPicksForTeam(draftPool.filter(Boolean), drafted, team.id));
   for (const p of draftPool) {
     const id = p?.id;
@@ -46,12 +48,18 @@ export function evaluateRosterCapacity(team, { teams = [team], draftPool = [], d
     if (!sameClub(owner, team.id)) { ignore('other-team'); continue; }
     if (owned.has(id)) { ignore('already-owned'); continue; }
     // Validate each record before deduplication: a rejected duplicate cannot win.
-    if (acceptedPickIds.includes(id)) { ignore('duplicate'); continue; }
+    const development = isIkuseiPlayer(p);
+    if (acceptedKinds.has(id)) {
+      if (acceptedKinds.get(id) !== development) return { ok: false, reason: 'conflicting-draft-contract' };
+      ignore('duplicate'); continue;
+    }
+    acceptedKinds.set(id, development);
+    if (development) { acceptedDevelopmentPicks.push(p); ignore('development-contract'); continue; }
     acceptedPickIds.push(id);
     acceptedPicks.push(p);
   }
   const counts = controlledRosterCounts(team), occupied = counts.controlledCount + acceptedPickIds.length;
-  return { ok: true, ...counts, acceptedPickCount: acceptedPickIds.length, acceptedPickIds, acceptedPicks, ignoredPickIds,
+  return { ok: true, ...counts, acceptedPickCount: acceptedPickIds.length, acceptedPickIds, acceptedPicks, acceptedDevelopmentPicks, ignoredPickIds,
     remainingSlots: Math.max(0, MAX_SHIHAKA_TOTAL - occupied), overBy: Math.max(0, occupied - MAX_SHIHAKA_TOTAL) };
 }
 
