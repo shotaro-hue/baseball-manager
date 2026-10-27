@@ -18,6 +18,7 @@ export function validateSeasonContract(contract) {
     || !Number.isInteger(contract.termYears) || contract.termYears < 1 || contract.termYears > 7
     || !Number.isSafeInteger(contract.annualSalaryManYen) || contract.annualSalaryManYen < 0
     || !Number.isSafeInteger(contract.annualSalaryManYen * contract.termYears)
+    || (contract.registrationType !== undefined && !['controlled', 'development'].includes(contract.registrationType))
     || typeof contract.guaranteed !== 'boolean') fail();
   if (contract.startSeason !== startSeasonFor(contract)
     || contract.endSeason !== contract.startSeason + contract.termYears - 1) fail();
@@ -25,10 +26,11 @@ export function validateSeasonContract(contract) {
 }
 
 export function createSeasonContract({ contractId, playerId, signedSeason, agreementPhase, purpose,
-  termYears, annualSalaryManYen, guaranteed }) {
+  termYears, annualSalaryManYen, guaranteed, registrationType }) {
   const startSeason = startSeasonFor({ signedSeason, agreementPhase, purpose });
   const contract = { version: 1, contractId, playerId, signedSeason, agreementPhase, purpose,
-    startSeason, endSeason: startSeason + termYears - 1, termYears, annualSalaryManYen, guaranteed };
+    startSeason, endSeason: startSeason + termYears - 1, termYears, annualSalaryManYen, guaranteed,
+    ...(registrationType !== undefined ? { registrationType } : {}) };
   validateSeasonContract(contract);
   return contract;
 }

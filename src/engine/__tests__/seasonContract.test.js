@@ -6,6 +6,17 @@ const terms = extra => ({ contractId: 'c1', playerId: 0, signedSeason: 2026,
   annualSalaryManYen: 10000, guaranteed: true, ...extra });
 
 describe('season-based fixed salary contracts (not yet connected to game state)', () => {
+  it.each(['controlled', 'development'])('preserves recorded %s class through construction and JSON reload', registrationType => {
+    const contract = createSeasonContract(terms({ registrationType }));
+    expect(contract.registrationType).toBe(registrationType);
+    expect(createSeasonContract(JSON.parse(JSON.stringify(contract))).registrationType).toBe(registrationType);
+  });
+
+  it.each([null, '', 'ikusei', false, 1])('rejects invalid recorded registration class %j', registrationType => {
+    expect(() => createSeasonContract(terms({ registrationType }))).toThrow();
+    expect(() => validateSeasonContract({ ...createSeasonContract(terms()), registrationType })).toThrow();
+  });
+
   it.each([
     ['season', 'acquisition', 1, 2026, 2026],
     ['season', 'acquisition', 3, 2026, 2028],

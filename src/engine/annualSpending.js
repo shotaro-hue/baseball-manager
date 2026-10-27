@@ -172,7 +172,7 @@ export function assessAnnualSpendingChange(before, after, { mode = 'spend' } = {
   // Attribute new raises to the actual payer/year, even when a simultaneous
   // termination hides the increase in the net annual amount. Removing only
   // new raise boundaries leaves ownership, earned periods and settlements intact.
-  const increaseIds = new Set(actions.filter(action => action.type === 'increase').map(action => action.id));
+  const increaseIds = new Set(actions.filter(action => ['increase', 'convert-to-controlled'].includes(action.type)).map(action => action.id));
   const withoutRaises = increaseIds.size ? prepare({ ...after, ledger: { ...after.ledger,
     records: after.ledger.records.map(record => ({ ...record,
       changes: record.changes.filter(action => !increaseIds.has(action.id)) })) } }) : b;
