@@ -1,20 +1,11 @@
 import { validateSeasonContract } from './seasonContract';
+import { parseContractDate as civilDate } from './contractCalendar';
 
 // GM-01 foundation only. No roster, budget, save, or RNG side effects.
 // Civil dates are strict YYYY-MM-DD strings; interval ends are exclusive.
 const fail = () => { throw new Error('給与の年俸・年度・在籍期間を確認してください。'); };
 const validSeason = year => Number.isInteger(year) && year >= 1 && year <= 9999;
 const seasonDate = (year, suffix) => `${String(year).padStart(4, '0')}-${suffix}`;
-
-function civilDate(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) fail();
-  const [year, month, day] = value.split('-').map(Number);
-  if (!validSeason(year) || month < 1 || month > 12) fail();
-  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
-  if (day < 1 || day > days) fail();
-  return { year, month, day, days };
-}
 
 export function accruedSalaryManYen(annualSalaryManYen, season, date) {
   if (!Number.isSafeInteger(annualSalaryManYen) || annualSalaryManYen < 0 || !validSeason(season)) fail();
