@@ -27,19 +27,25 @@
 ## Task 1: Real roster projection and contract employment selector
 **Files:** `tradeTransaction.js`, `contractLedger.js`, new `annualTransactions.js`, new `__tests__/annualTransactions.test.js`.
 **Interfaces:** `projectTradeRosters(teams, request, draftContext)` returns immutable rosters without cash changes. `contractEmploymentAt(ledger,date)` returns active contract, owner and annual rate.
-- [ ] Add failing tests for salary-period split, atomic cash+ownership, full-roster rejection, stale owner and frozen inputs.
-- [ ] Extract existing roster projection; add employment selector; implement common validation and floors.
-- [ ] Run new tests plus existing ledger/spending/trade tests.
+- [x] Add failing tests for salary-period split, atomic cash+ownership, full-roster rejection, stale owner and frozen inputs.
+- [x] Extract existing roster projection; add employment selector; implement common validation and floors.
+- [x] Run new tests plus existing ledger/spending/trade tests.
 
 ## Task 2: FA offers, quote/apply and durable replay
 **Interfaces:** `quoteAnnualTransaction(state,command)` -> `{ok,rows,error?}`; `applyAnnualTransaction(state,command)` -> `{ok,state,rows?,error?,replayed?}`. State version 1, season/date/phase, teams, faPool, spending, rosterRequirements, draftContext, transactions. Commands: offer-fa (proposal), accept-fa/cancel-fa (proposalId), trade (fromId/toId/outgoingIds/incomingIds/cashManYen/mode); each has a unique caller-generated id.
-- [ ] RED: 7/1 3-year FA yields 5000/10000/10000; hold replaces commitment once; conflicting receipt fails after JSON reload.
-- [ ] RED: missing year, 7th-year deficit, duplicate IDs, stale quote, expired date, losing bids, accepted rookies, floor tampering.
-- [ ] Implement shared candidate construction and atomic receipt with current-state revalidation.
-- [ ] GREEN focused tests, build, one independent branch review; fix important findings with RED/GREEN.
-- [ ] Document scope and remaining C-2/D work, update roadmap, commit/push a PR and inspect CI for final head. Reuse CI for full suite per AGENTS.md.
+- [x] RED: 7/1 3-year FA yields 5000/10000/10000; hold replaces commitment once; conflicting receipt fails after JSON reload.
+- [x] RED: missing year, 7th-year deficit, duplicate IDs, stale quote, expired date, losing bids, accepted rookies, floor tampering.
+- [x] Implement shared candidate construction and atomic receipt with current-state revalidation.
+- [x] GREEN focused tests, build, one independent branch review; fix important findings with RED/GREEN.
+- [x] Document scope and remaining C-2/D work, update roadmap, commit/push a PR and inspect CI for final head. Reuse CI for full suite per AGENTS.md.
 
 ## Decisions / execution ledger
 - Native execution in a fresh dedicated clone/branch; user already authorized implementation. No additional approval pause.
 - Roster requirement policy stays upstream; this adapter requires explicit per-team/year counts and derives cost from actual funded players. Policy integration is C-2/D.
 - JSON roundtrip is adapter persistence validation, not a claim of integration with real saves.
+
+- Task 1/2: complete. New API RED 10 failures; raised salary RED 1; independent review RED 2, all GREEN. Related 6 files 133 passed. CI pending, tracked in PR #507.
+- Ruling: full regression uses exact-source CI per AGENTS.md; no duplicated local all-suite run.
+- Ruling: reviewer scope deferrals accepted as C-2/D work described in validation note; risk is premature activation, so no live call path is introduced.
+- Ruling: seven-year coverage means every actual liability year, not an unconditional seven-year forecast without liabilities.
+- Final: fixed cheap prorated losing/cancelled hold — 2 RED→GREEN cases; no Critical/Minor outstanding.

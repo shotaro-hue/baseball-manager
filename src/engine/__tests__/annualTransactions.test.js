@@ -194,4 +194,19 @@ describe('annual FA and trade transactions (not live activation)', () => {
     expect(next.teams[0].farm.map(p => p.id)).toContain('free');
   });
 
+  it.each(['cancel', 'lose'])('can %s a cheap prorated hold in deficit without treating the restored floor as new spending', operation => {
+    const cheap = proposal('free', 1, { annualSalaryManYen: 420 });
+    let state = success(apply(fixture(), offer(cheap, 'cheap-bid')));
+    if (operation === 'lose') state = success(apply(state, offer()));
+    state.spending.authorizations.find(a => a.teamId === 1 && a.season === 2026).approvedManYen = 10000;
+    const command = operation === 'lose' ? accept() : { id: 'cancel-cheap', type: 'cancel-fa', proposalId: cheap.id };
+    const next = success(apply(state, command));
+    expect(row(next, 1).reservedManYen).toBe(0);
+    expect(row(next, 1).remainingManYen).toBe(-420);
+    if (operation === 'lose') expect(next.teams[0].players.some(p => p.id === 'free')).toBe(true);
+    expect(success(apply(JSON.parse(JSON.stringify(next)), command)).spending).toEqual(next.spending);
+    const another = { ...next, faPool: [...next.faPool, player('other')] };
+    rejected(another, offer(proposal('other', 1, { annualSalaryManYen: 420 }), 'new-spending'));
+  });
+
 });

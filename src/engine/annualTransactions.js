@@ -187,7 +187,10 @@ function candidate(input, command) {
   if (!assessment.ok) fail('対象年度の追加余力が不足または悪化しています。');
   const oldRows = new Map(quoteAnnualSpendingPlan(before.spending).map(r => [key(r.teamId, r.season), r]));
   const rows = quoteAnnualSpendingPlan(after.spending);
-  if (rows.some(r => r.remainingManYen < 0 && r.remainingManYen < oldRows.get(key(r.teamId, r.season)).remainingManYen)) fail('赤字年度の追加余力を悪化させる取引です。');
+  // Releasing a prorated bid may restore a larger conservative annual floor.
+  // Cancellation/losing bids create no obligation; winner admission is above.
+  // Trades must still account for real vacancies created by outgoing players.
+  if (c.type === 'trade' && rows.some(r => r.remainingManYen < 0 && r.remainingManYen < oldRows.get(key(r.teamId, r.season)).remainingManYen)) fail('赤字年度の追加余力を悪化させる取引です。');
   return { state: { ...after, transactions: [...after.transactions, { id: c.id, signature }] }, rows, replayed: false };
 }
 
