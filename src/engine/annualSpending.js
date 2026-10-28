@@ -1,6 +1,7 @@
 import { createContractLedger, applyContractLedgerAction, contractLiabilityRows,
   isContractLedgerExtension } from './contractLedger';
 import { parseContractDate } from './contractCalendar';
+import { acquisitionOfferMetadata, acquisitionAnswerMetadata } from './acquisitionMarket';
 
 // GM-01 foundation only: permission is distinct from revenue/cash and team.budget.
 const fail = message => { throw new Error(message || '年度別の支出許可・留保を確認してください。'); };
@@ -18,14 +19,15 @@ function normalizedProposal(input) {
   if (input?.type !== 'sign') fail('留保する契約の種類を確認してください。');
   const record = applyContractLedgerAction(createContractLedger(), input).records[0];
   return { id: record.actionId, type: 'sign', teamId: record.initialTeamId,
-    effectiveDate: record.effectiveDate, contract: record.contract };
+    effectiveDate: record.effectiveDate, contract: record.contract, ...acquisitionOfferMetadata(input) };
 }
 const proposalSignature = proposal => JSON.stringify(normalizedProposal(proposal));
 const matchingPurpose = (kind, proposal) => kind === 'renewal'
   ? proposal.contract.purpose === 'renewal' : ['offer', 'rookie'].includes(kind) && proposal.contract.purpose === 'acquisition';
-const resolutionFor = (hold, resolution, acceptedProposal) => ({ kind: hold.kind,
+const resolutionFor = (hold, resolution, acceptedProposal, answeredDate) => ({ kind: hold.kind,
   proposal: normalizedProposal(hold.proposal), resolution,
-  ...(acceptedProposal ? { acceptedProposal } : {}) });
+  ...(acceptedProposal ? { acceptedProposal } : {}),
+  ...acquisitionAnswerMetadata(hold.proposal, resolution, answeredDate, acceptedProposal ?? hold.proposal) });
 // Keep the submitted offer immutable. Only an FA acquisition's actual start
 // date may advance; ledger normalization enforces its start year and deadline.
 function delayedOfferProposal(hold, input) {
@@ -70,9 +72,10 @@ function prepare(plan) {
   const resolvedIds = new Set(), resolutions = [];
   const appliedIds = new Set(plan.ledger.records.flatMap(r => [r.actionId, ...r.changes.map(a => a.id)]));
   for (const resolved of plan.resolvedReservations) {
-    if (!resolved || !['cancelled', 'replaced', 'accepted', 'lost'].includes(resolved.resolution)) fail('オファーの解決履歴を確認してください。');
+    if (!resolved || !['cancelled', 'replaced', 'accepted', 'lost', 'rejected'].includes(resolved.resolution)) fail('オファーの解決履歴を確認してください。');
     const proposal = normalizedProposal(resolved.proposal);
-    if (!matchingPurpose(resolved.kind, proposal) || resolvedIds.has(proposal.id)) fail('オファーの解決履歴が重複または無効です。');
+    if (!matchingPurpose(resolved.kind, proposal) || resolvedIds.has(proposal.id)
+      || (proposal.marketEntry && resolved.kind !== 'offer') || (resolved.resolution === 'rejected' && resolved.kind !== 'offer')) fail('オファーの解決履歴が重複または無効です。');
     resolvedIds.add(proposal.id);
     const hasAccepted = Object.hasOwn(resolved, 'acceptedProposal');
     if (hasAccepted && resolved.resolution !== 'accepted') fail('未受諾の履歴に受諾条件を記録できません。');
@@ -80,15 +83,15 @@ function prepare(plan) {
     if (resolved.resolution === 'accepted') {
       const record = plan.ledger.records.find(r => r.actionId === proposal.id);
       if (!record || proposalSignature({ id: record.actionId, type: 'sign', teamId: record.initialTeamId,
-        effectiveDate: record.effectiveDate, contract: record.contract }) !== proposalSignature(accepted)) fail('受諾履歴と確定契約が一致しません。');
+        effectiveDate: record.effectiveDate, contract: record.contract, ...acquisitionOfferMetadata(accepted) }) !== proposalSignature(accepted)) fail('受諾履歴と確定契約が一致しません。');
     } else if (appliedIds.has(proposal.id)) fail('解決済みオファーの取引IDを再利用できません。');
-    resolutions.push(resolutionFor({ kind: resolved.kind, proposal }, resolved.resolution, hasAccepted ? accepted : undefined));
+    resolutions.push(resolutionFor({ kind: resolved.kind, proposal }, resolved.resolution, hasAccepted ? accepted : undefined, resolved.answeredDate));
   }
   const holdIds = new Set(), heldContracts = new Set(), reservations = [];
   for (const hold of plan.reservations) {
     if (!hold || !['renewal', 'offer', 'rookie'].includes(hold.kind)) fail();
     const proposal = normalizedProposal(hold.proposal);
-    if (!matchingPurpose(hold.kind, proposal)) fail('留保と契約の目的が一致しません。');
+    if (!matchingPurpose(hold.kind, proposal) || (proposal.marketEntry && hold.kind !== 'offer')) fail('留保と契約の目的が一致しません。');
     if (holdIds.has(proposal.id) || resolvedIds.has(proposal.id) || heldContracts.has(proposal.contract.contractId)) fail('契約の留保が重複または解決済みです。');
     holdIds.add(proposal.id); heldContracts.add(proposal.contract.contractId);
     if (parseContractDate(proposal.effectiveDate).year < plan.budgetSeason) fail('過去年度のオファーを留保できません。');
@@ -233,24 +236,31 @@ export function reserveContractProposal(plan, { kind, proposal: input, replaceId
   return next;
 }
 
-export function cancelContractReservation(plan, reservationId) {
+export function cancelContractReservation(plan, reservationId, { resolution = 'cancelled', answeredDate } = {}) {
   prepare(plan);
-  if (!id(reservationId)) fail();
+  if (!id(reservationId) || !['cancelled', 'rejected'].includes(resolution)) fail();
   const held = plan.reservations.find(r => r.proposal.id === reservationId);
   const reservations = plan.reservations.filter(r => r.proposal.id !== reservationId);
-  if (!held) return plan;
-  const next = { ...plan, reservations, resolvedReservations: [...plan.resolvedReservations, resolutionFor(held, 'cancelled')] };
+  if (!held) {
+    const resolved = plan.resolvedReservations.find(r => r.proposal.id === reservationId);
+    if (resolved?.proposal.marketEntry && (resolved.resolution !== resolution || resolved.answeredDate !== answeredDate))
+      fail('確定済みの回答を変更できません。');
+    return plan;
+  }
+  const next = { ...plan, reservations, resolvedReservations: [...plan.resolvedReservations,
+    resolutionFor(held, resolution, undefined, answeredDate)] };
   prepare(next);
   return next;
 }
 
-export function commitContractReservation(plan, input, { effectiveDate } = {}) {
+export function commitContractReservation(plan, input, { effectiveDate, answeredDate } = {}) {
   prepare(plan);
   const proposal = normalizedProposal(input), held = plan.reservations.find(r => r.proposal.id === proposal.id);
   if (!held) {
     const resolved = plan.resolvedReservations.find(r => r.proposal.id === proposal.id);
     if (resolved && (resolved.resolution !== 'accepted' || proposalSignature(resolved.proposal) !== proposalSignature(proposal))) fail('解決済みオファーを受諾できません。');
     const accepted = resolved?.acceptedProposal ?? proposal;
+    if (proposal.marketEntry && (!resolved || resolved.answeredDate !== answeredDate)) fail('確定済みの回答日を変更できません。');
     if (effectiveDate !== undefined && effectiveDate !== accepted.effectiveDate) fail('確定済みの受諾日を変更できません。');
     if (applyContractLedgerAction(plan.ledger, accepted) === plan.ledger) return plan;
     fail('受諾対象の留保が見つかりません。');
@@ -263,7 +273,8 @@ export function commitContractReservation(plan, input, { effectiveDate } = {}) {
   const next = { ...plan, ledger: applyContractLedgerAction(plan.ledger, accepted),
     reservations: plan.reservations.filter(r => !resolvedIds.has(r.proposal.id)),
     resolvedReservations: [...plan.resolvedReservations,
-      resolutionFor(held, 'accepted', accepted === proposal ? undefined : accepted), ...losing.map(r => resolutionFor(r, 'lost'))] };
+      resolutionFor(held, 'accepted', accepted === proposal ? undefined : accepted, answeredDate),
+      ...losing.map(r => resolutionFor(r, 'lost', undefined, r.proposal.marketEntry ? answeredDate : undefined))] };
   if (!assessAnnualSpendingChange(plan, next).ok) fail('受諾時点の年度別追加余力が不足しています。');
   return next;
 }
