@@ -4,7 +4,7 @@ import { contractEmploymentAt, applyContractLedgerAction } from './contractLedge
 import { quoteAnnualSpendingPlan, assessAnnualSpendingChange, reserveContractProposal,
   commitContractReservation, cancelContractReservation } from './annualSpending';
 import { parseContractDate, registrationDateAllowed } from './contractCalendar';
-import { ownedPlayers } from './renewalRules';
+import { ownedPlayers, validContractTerms } from './renewalRules';
 import { evaluateRosterCapacity, isIkuseiPlayer } from './rosterCapacity';
 import { marketRosterError, marketPlacement } from './marketRoster';
 import { projectTradeRosters } from './tradeTransaction';
@@ -16,8 +16,26 @@ const key = (team, season) => JSON.stringify([team, season]);
 const stable = value => JSON.stringify(value, (_, v) => v && !Array.isArray(v) && typeof v === 'object'
   ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v);
 const yearStart = year => `${String(year).padStart(4, '0')}-02-01`;
+// Expiring players remain on the offseason roster; no current salary is paid
+// after November. Inspect their existing employment without rolling the year.
+const rosterDate = state => state.phase === 'offseason'
+  ? [state.date, `${String(state.season).padStart(4, '0')}-11-30`].sort()[0] : state.date;
+
+function futureEmployments(state) {
+  const dates = new Map(), result = [];
+  for (const record of state.spending.ledger.records) {
+    if (record.effectiveDate <= state.date) continue;
+    if (!dates.has(record.effectiveDate)) dates.set(record.effectiveDate, new Map(
+      contractEmploymentAt(state.spending.ledger, record.effectiveDate).map(e => [e.contract.contractId, e])));
+    const employment = dates.get(record.effectiveDate).get(record.contract.contractId);
+    if (employment) result.push({ ...employment, effectiveDate: record.effectiveDate });
+  }
+  return result;
+}
 const kinds = {
   'offer-fa': ['proposal'], 'accept-fa': ['proposalId'], 'cancel-fa': ['proposalId'],
+  'offer-renewal': ['proposal', 'contractId'], 'replace-renewal': ['proposalId', 'proposal', 'contractId'],
+  'accept-renewal': ['proposalId', 'contractId'], 'cancel-renewal': ['proposalId'],
   trade: ['fromId', 'toId', 'outgoingIds', 'incomingIds', 'cashManYen', 'mode'],
   'convert-to-controlled': ['teamId', 'playerId', 'contractId', 'annualSalaryManYen'],
 };
@@ -29,10 +47,14 @@ function commandFor(input) {
     if (!Object.hasOwn(input, field)) fail('取引の条件が未記録です。');
     c[field] = input[field];
   }
-  if (c.type === 'offer-fa') {
+  if (['offer-fa', 'offer-renewal', 'replace-renewal'].includes(c.type)) {
     const p = c.proposal;
-    if (!p || p.type !== 'sign' || !validId(p.id) || !validId(p.teamId)) fail('FAオファーを確認してください。');
+    if (!p || p.type !== 'sign' || !validId(p.id) || !validId(p.teamId)) fail('契約オファーを確認してください。');
     c.proposal = { id: p.id, type: 'sign', teamId: p.teamId, effectiveDate: p.effectiveDate, contract: createSeasonContract(p.contract) };
+    if (c.type !== 'offer-fa' && !validId(c.contractId)) fail('更改対象の契約IDを確認してください。');
+    if (c.type === 'replace-renewal' && !validId(c.proposalId)) fail('差し替える更改オファーを確認してください。');
+  } else if (c.type === 'accept-renewal') {
+    if (![c.proposalId, c.contractId].every(validId)) fail('受諾する更改と現在契約を確認してください。');
   } else if (c.type === 'convert-to-controlled') {
     if (![c.teamId, c.playerId, c.contractId].every(validId) || !Number.isSafeInteger(c.annualSalaryManYen)) fail('支配下転換の選手・契約・年俸を確認してください。');
   } else if (c.type === 'trade') {
@@ -49,8 +71,8 @@ function inspect(state) {
     || !Array.isArray(state.transactions) || !Array.isArray(state.rosterRequirements)
     || !state.draftContext || !Array.isArray(state.draftContext.draftPool)) fail('新制度の取引状態が未確認です。');
   const date = parseContractDate(state.date);
-  if (date.year !== state.season || state.spending?.budgetSeason !== state.season
-    || !['preseason', 'season'].includes(state.phase)) fail('取引年度・フェーズを確認してください。');
+  if (date.year !== state.season || state.spending?.budgetSeason !== state.season + Number(state.phase === 'offseason')
+    || !['preseason', 'season', 'offseason'].includes(state.phase)) fail('取引年度・フェーズを確認してください。');
   const teams = new Map(), players = new Map(), owners = new Map(), receipts = new Set(), acceptedRookies = new Map();
   const teamKeys = new Set(), playerKeys = new Set();
   for (const team of state.teams) {
@@ -80,10 +102,12 @@ function inspect(state) {
       playerKeys.add(String(p.id)); players.set(p.id, acceptedRookies.get(p.id)?.player ?? p);
     }
   }
-  const employed = contractEmploymentAt(state.spending.ledger, state.date);
+  const employed = contractEmploymentAt(state.spending.ledger, rosterDate(state));
   if (employed.length !== owners.size || employed.some(e => owners.get(e.contract.playerId) !== e.teamId)) fail('名簿と有効な契約の所属が一致しません。');
   if (employed.some(e => e.registrationType !== undefined
     && (e.registrationType === 'development') !== isIkuseiPlayer(players.get(e.contract.playerId)))) fail('名簿と有効な契約の支配下・育成区分が一致しません。');
+  const conflictsWithControlled = (playerId, registrationType) => registrationType === 'development'
+    && owners.has(playerId) && !isIkuseiPlayer(players.get(playerId));
   // Capacity reserves the assignment-validated draft class. A recorded rookie
   // hold must use that same club/class, otherwise funding could claim a controlled
   // place that capacity still treats as development. Future renewal class
@@ -95,7 +119,20 @@ function inspect(state) {
     if (contract.registrationType !== undefined
       && (contract.registrationType === 'development') !== isIkuseiPlayer(rookie.player)) fail('受諾済み新人と契約留保の支配下・育成区分が一致しません。');
   }
-  for (const record of state.spending.ledger.records) if (record.changes.some(c => c.effectiveDate > state.date)) fail('未来の取引を現在の名簿へ反映できません。');
+  for (const hold of state.spending.reservations) if (hold?.kind === 'renewal') {
+    const terms = hold.proposal?.contract;
+    if (owners.get(terms?.playerId) !== hold.proposal?.teamId) fail('更改留保と現在の所属球団が一致しません。');
+    if (conflictsWithControlled(terms?.playerId, terms?.registrationType))
+      fail('未回答の育成更改オファーを取り消してから支配下転換してください。');
+  }
+  for (const record of state.spending.ledger.records) if (record.effectiveDate <= state.date
+    && record.changes.some(c => c.effectiveDate > state.date)) fail('未来の取引を現在の名簿へ反映できません。');
+  for (const future of futureEmployments(state)) {
+    if (future.contract.purpose === 'renewal'
+      && owners.get(future.contract.playerId) !== future.teamId) fail('更改済み将来契約と現在の所属球団が一致しません。');
+    if (conflictsWithControlled(future.contract.playerId, future.registrationType))
+      fail('受諾済みの将来育成契約があるため、支配下転換できません。');
+  }
   for (const receipt of state.transactions) {
     if (!validId(receipt?.id) || typeof receipt.signature !== 'string' || receipts.has(receipt.id)) fail('取引の確定履歴を確認してください。');
     receipts.add(receipt.id);
@@ -116,7 +153,7 @@ function withFloors(state) {
   }
   const employmentByDate = new Map();
   const authorizations = state.spending.authorizations.map(a => {
-    if (a.season < state.season) return a;
+    if (a.season < state.spending.budgetSeason) return a;
     const required = requirements.get(key(a.teamId, a.season));
     if (required === undefined || !teams.has(a.teamId)) fail('全対象年度に球団の必要人数が必要です。');
     const date = a.season === state.season ? state.date : yearStart(a.season);
@@ -134,10 +171,19 @@ function withFloors(state) {
       if (p.teamId === a.teamId && p.contract.startSeason <= a.season && p.contract.endSeason >= a.season) count(p.contract.playerId, p.contract.registrationType);
     }
     const capacity = evaluateRosterCapacity(teams.get(a.teamId), { ...state.draftContext, teams: state.teams });
-    const unfundedPicks = a.season === state.season ? capacity.acceptedPicks.filter(p => !funded.has(p.id)).length : 0;
+    const unfundedPicks = a.season === state.spending.budgetSeason ? capacity.acceptedPicks.filter(p => !funded.has(p.id)).length : 0;
     return { ...a, minimumRosterReserveManYen: Math.max(unfundedPicks, required - funded.size, 0) * MIN_SALARY_SHIHAKA };
   });
   return { ...state, spending: { ...state.spending, authorizations } };
+}
+
+// A proposal replaces vacancies with its actual liability before admission.
+// Share this projection for FA and renewals; the spending module owns histories.
+function reserveAnnualProposal(state, kind, proposal, replaceId) {
+  const projected = withFloors({ ...state, spending: { ...state.spending,
+    reservations: [...state.spending.reservations.filter(h => h.proposal.id !== replaceId), { kind, proposal }] } });
+  return reserveContractProposal({ ...state.spending, authorizations: projected.spending.authorizations },
+    { kind, proposal, ...(replaceId !== undefined ? { replaceId } : {}) });
 }
 
 function faCandidate(state, c) {
@@ -154,9 +200,7 @@ function faCandidate(state, c) {
     || !registrationDateAllowed(state.season, state.date)) fail('FAの効力日・年俸・契約期間・登録期限を確認してください。');
   const error = marketRosterError(team, player, state.teams, state.draftContext); if (error) fail(error);
   if (c.type === 'offer-fa') {
-    // Derive the final vacancy floor before the ledger's admission check.
-    const projected = withFloors({ ...state, spending: { ...state.spending, reservations: [...state.spending.reservations, { kind: 'offer', proposal: p }] } });
-    return { ...state, spending: reserveContractProposal({ ...state.spending, authorizations: projected.spending.authorizations }, { kind: 'offer', proposal: p }) };
+    return { ...state, spending: reserveAnnualProposal(state, 'offer', p) };
   }
   const spending = commitContractReservation(state.spending, p);
   const acquired = { ...player, isFA: false, salary: p.contract.annualSalaryManYen, contractId: p.contract.contractId,
@@ -166,23 +210,66 @@ function faCandidate(state, c) {
   return { ...state, spending, faPool: state.faPool.filter(x => x.id !== player.id), teams: state.teams.map(t => t.id === team.id ? nextTeam : t) };
 }
 
+function renewalCandidate(state, c) {
+  const proposing = ['offer-renewal', 'replace-renewal'].includes(c.type);
+  const previous = c.type !== 'offer-renewal'
+    ? state.spending.reservations.find(h => h.kind === 'renewal' && h.proposal.id === c.proposalId) : null;
+  const p = proposing ? c.proposal : previous?.proposal;
+  if (!p || (c.type === 'replace-renewal' && (!previous || previous.proposal.id === p.id
+    || previous.proposal.teamId !== p.teamId || previous.proposal.contract.playerId !== p.contract.playerId))) fail('有効な更改オファーが見つかりません。');
+  if (c.type === 'cancel-renewal') return { ...state, spending: cancelContractReservation(state.spending, p.id) };
+  if (!['season', 'offseason'].includes(state.phase)) fail('翌年度更改のフェーズを確認してください。');
+  const team = state.teams.find(t => t.id === p.teamId), terms = p.contract;
+  const player = team && ownedPlayers(team).find(p => p.id === terms.playerId);
+  const current = contractEmploymentAt(state.spending.ledger, rosterDate(state))
+    .find(e => e.teamId === p.teamId && e.contract.playerId === terms.playerId && e.contract.contractId === c.contractId);
+  if (!player || player.isRetired || player._retireNow || !current || current.contract.endSeason !== state.season)
+    fail('更改対象の現在契約・所属・満了年度を確認してください。');
+  const registrationType = isIkuseiPlayer(player) ? 'development' : 'controlled';
+  if (terms.purpose !== 'renewal' || terms.signedSeason !== state.season || terms.startSeason !== state.season + 1
+    || p.effectiveDate !== yearStart(state.season + 1) || !['season', 'offseason'].includes(terms.agreementPhase)
+    || terms.registrationType !== registrationType || !validContractTerms(player, terms.annualSalaryManYen, terms.termYears))
+    fail('翌年度更改の区分・年俸・期間・効力日を確認してください。');
+  if (proposing ? terms.agreementPhase !== state.phase
+    : terms.agreementPhase === 'offseason' && state.phase !== 'offseason') fail('更改の合意フェーズが現在状態と一致しません。');
+  if (proposing) {
+    if (state.spending.resolvedReservations.some(h => h.proposal.id === p.id)
+      || state.spending.reservations.some(h => h.proposal.id === p.id)
+      || state.spending.reservations.some(h => h.kind === 'renewal' && h.proposal.contract.playerId === terms.playerId
+        && h.proposal.id !== previous?.proposal.id)) fail('更改オファーは既存の留保を明示して差し替えてください。');
+    return { ...state, spending: reserveAnnualProposal(state, 'renewal', p, previous?.proposal.id) };
+  }
+  // Future employment goes into the ledger. Current roster salary/term/placement
+  // stay unchanged until the separately implemented annual rollover.
+  return { ...state, spending: commitContractReservation(state.spending, p) };
+}
+
 function tradeCandidate(state, c) {
   if (!registrationDateAllowed(state.season, state.date) || (c.mode === 'cashless-trade' && c.cashManYen !== 0)) fail('移籍期限または無金銭例外の条件を確認してください。');
   const projected = projectTradeRosters(state.teams, { fromId: c.fromId, toId: c.toId,
     outgoing: c.outgoingIds.map(id => ({ id })), incoming: c.incomingIds.map(id => ({ id })) }, state.draftContext);
   if (!projected.ok) fail(projected.error);
-  const employment = contractEmploymentAt(state.spending.ledger, state.date);
-  let ledger = state.spending.ledger;
+  const employment = contractEmploymentAt(state.spending.ledger, state.date), future = futureEmployments(state);
+  const transferred = new Set([...c.outgoingIds, ...c.incomingIds]);
+  const pending = state.spending.reservations.filter(h => h.kind === 'renewal' && transferred.has(h.proposal.contract.playerId));
+  if (c.mode === 'cashless-trade' && pending.length) fail('無金銭例外の前に未回答の更改オファーを取り消してください。');
+  let spending = state.spending;
+  for (const hold of pending) spending = cancelContractReservation(spending, hold.proposal.id);
+  let ledger = spending.ledger;
   for (const [ids, from, to] of [[c.outgoingIds, c.fromId, c.toId], [c.incomingIds, c.toId, c.fromId]]) for (const playerId of ids) {
     const e = employment.find(e => e.contract.playerId === playerId && e.teamId === from);
     if (!e) fail('移籍する選手の有効な契約が見つかりません。');
     ledger = applyContractLedgerAction(ledger, { id: key(c.id, ['transfer', playerId]), type: 'transfer', contractId: e.contract.contractId,
       teamId: from, toTeamId: to, effectiveDate: state.date });
+    for (const upcoming of future.filter(e => e.contract.playerId === playerId)) {
+      if (upcoming.teamId !== from) fail('移籍する選手の将来契約の所属が一致しません。');
+      ledger = applyContractLedgerAction(ledger, { id: key(c.id, ['future-transfer', playerId, upcoming.contract.contractId]),
+        type: 'transfer', contractId: upcoming.contract.contractId, teamId: from, toTeamId: to, effectiveDate: upcoming.effectiveDate });
+    }
   }
   const costs = c.cashManYen === 0 ? [] : [[c.fromId, c.cashManYen], [c.toId, -c.cashManYen]].map(([teamId, amountManYen]) => ({
     id: key(c.id, ['cash', teamId]), transactionId: c.id, teamId, season: state.season, kind: 'trade', amountManYen,
   }));
-  const transferred = new Set([...c.outgoingIds, ...c.incomingIds]);
   const current = new Map(contractEmploymentAt(ledger, state.date).map(e => [e.contract.playerId, e]));
   const project = player => {
     if (!transferred.has(player.id)) return player;
@@ -193,7 +280,7 @@ function tradeCandidate(state, c) {
   };
   const teams = projected.teams.map(t => t.id === c.fromId || t.id === c.toId
     ? { ...t, players: t.players.map(project), farm: t.farm.map(project) } : t);
-  return { ...state, teams, spending: { ...state.spending, ledger, oneOffCosts: [...state.spending.oneOffCosts, ...costs] } };
+  return { ...state, teams, spending: { ...spending, ledger, oneOffCosts: [...spending.oneOffCosts, ...costs] } };
 }
 
 function conversionCandidate(state, c) {
@@ -211,8 +298,9 @@ function conversionCandidate(state, c) {
     contractYears: employment.contract.termYears,
     contractYearsLeft: contractSeasonsRemaining(employment.contract, state.season),
     contractSignedYear: employment.contract.signedSeason };
-  // Classification changes; placement stays farm. Shared inspection below
-  // checks the 70 places including accepted-but-unowned controlled rookies.
+  // Classification changes; placement stays farm. Shared inspection checks
+  // accepted rookies against the 70-place cap and rejects conflicting future
+  // terms before commit, without rewriting their contracts or reservations.
   const teams = state.teams.map(t => t.id === c.teamId ? { ...t, farm: t.farm.map(p => p.id === c.playerId ? converted : p) } : t);
   return { ...state, teams, spending: { ...state.spending, ledger } };
 }
@@ -224,8 +312,10 @@ function candidate(input, command) {
     if (receipt.signature !== signature) fail('同じ取引IDの条件が変わっています。');
     return { state: input, rows: quoteAnnualSpendingPlan(before.spending), replayed: true };
   }
+  if (input.phase === 'offseason' && !c.type.endsWith('renewal')) fail('オフの新制度取引は翌年度更改だけが接続済みです。');
   const after = withFloors(c.type === 'trade' ? tradeCandidate(before, c)
-    : c.type === 'convert-to-controlled' ? conversionCandidate(before, c) : faCandidate(before, c));
+    : c.type === 'convert-to-controlled' ? conversionCandidate(before, c)
+    : c.type.endsWith('renewal') ? renewalCandidate(before, c) : faCandidate(before, c));
   const mode = c.type === 'trade' ? c.mode : 'spend';
   // A derived floor restored by a losing/cancelled bid is not new spending.
   // Use final floors for admission; independently check actual headroom changes.
