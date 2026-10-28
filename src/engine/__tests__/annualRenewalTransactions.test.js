@@ -42,12 +42,13 @@ const success = r => { expect(r.ok, r.error).toBe(true); return r.state; };
 const reload = state => JSON.parse(JSON.stringify(state));
 const row = (state, season = 2027, teamId = 0) => quoteAnnualSpendingPlan(state.spending).find(r => r.teamId === teamId && r.season === season);
 const owned = state => [...state.teams[0].players, ...state.teams[0].farm][0];
-function reject(state, command) {
+function reject(state, command, error) {
   for (const input of [state, reload(state)]) {
     const snapshot = JSON.stringify(input), preview = quote(freeze(input), freeze(command));
     expect(preview.ok).toBe(false); expect(preview.rows).toBeUndefined();
     const r = apply(input, command);
     expect(r.ok).toBe(false); expect(r.state).toBe(input); expect(JSON.stringify(input)).toBe(snapshot);
+    if (error) { expect(preview.error).toMatch(error); expect(r.error).toMatch(error); }
   }
 }
 const held = (state = fixture(), p = renewal()) => success(apply(state, offer(p)));
@@ -230,6 +231,111 @@ describe('annual renewal transactions, next-season terms without live activation
     state.draftContext = { draftPool: [player('rookie')], drafted: { rookie: 0 }, confirmedPicks: {} };
     const next = held(state, renewal({ phase: 'offseason' }));
     expect(row(next)).toMatchObject({ reservedManYen: 1600, minimumRosterReserveManYen: 420 });
+  });
+});
+
+describe('future renewal class and current controlled conversion', () => {
+  const conversion = () => ({ id: 'convert-a', type: 'convert-to-controlled', teamId: 0,
+    playerId: 'a', contractId: 'old-a', annualSalaryManYen: 420 });
+  const developmentRenewal = (salary = 240) => renewal({ registrationType: 'development', salary, years: 2 });
+
+  it.each([240, 600])('rejects conversion after accepting a future development contract at %i, without rewriting any terms', salary => {
+    const state = signed(fixture({ development: true }), developmentRenewal(salary));
+    reject(state, conversion(), /受諾済み.*育成契約/);
+  });
+
+  it.each([240, 600])('requires explicit cancellation of an unanswered development renewal at %i', salary => {
+    const state = held(fixture({ development: true }), developmentRenewal(salary));
+    reject(state, conversion(), /未回答.*育成.*取り消/);
+  });
+
+  it('allows cancellation, conversion and a new controlled offer while retaining the cancelled history', () => {
+    const cancelled = success(apply(held(fixture({ development: true }), developmentRenewal()), cancel()));
+    for (const input of [cancelled, reload(cancelled)]) {
+      const snapshot = JSON.stringify(input), history = reload(input.spending.resolvedReservations);
+      const preview = quote(freeze(input), conversion());
+      expect(preview.ok, preview.error).toBe(true);
+      const next = success(apply(input, conversion()));
+      expect(owned(next)).toMatchObject({ isIkusei: false, 育成: false, ikuseiYears: 0, salary: 420, contractId: 'old-a' });
+      expect(row(next, 2026)).toMatchObject({ salaryManYen: 322, minimumRosterReserveManYen: 0 });
+      expect(row(next, 2027)).toMatchObject({ salaryManYen: 0, minimumRosterReserveManYen: 420 });
+      expect(next.spending.reservations).toEqual([]);
+      expect(next.spending.resolvedReservations).toEqual(history);
+      expect(next.spending.ledger.records).toHaveLength(2);
+      expect(next.teams[0].budget).toBe(999); expect(next.transactions).toHaveLength(3);
+      expect(quoteAnnualSpendingPlan(next.spending)).toEqual(preview.rows);
+      expect(JSON.stringify(input)).toBe(snapshot);
+      reject(next, accept());
+      const p = renewal({ id: 'controlled-reoffer', salary: 420, years: 2 });
+      const offered = success(apply(next, offer(p, 'reoffer-controlled')));
+      expect(row(offered, 2027)).toMatchObject({ reservedManYen: 420, minimumRosterReserveManYen: 0 });
+      expect(offered.spending.resolvedReservations).toEqual(history);
+    }
+  });
+
+  it.each([false, true])('preserves an already controlled future contract (conversion boundary: %s)', convertedFuture => {
+    const state = fixture({ development: true });
+    const p = renewal({ salary: convertedFuture ? 240 : 600, years: 2,
+      registrationType: convertedFuture ? 'development' : 'controlled' });
+    state.spending.ledger = ledgerApply(state.spending.ledger, p);
+    if (convertedFuture) state.spending.ledger = ledgerApply(state.spending.ledger, {
+      id: 'future-controlled', type: 'convert-to-controlled', teamId: 0, contractId: p.contract.contractId,
+      effectiveDate: '2027-02-01', annualSalaryManYen: 600 });
+    for (const input of [state, reload(state)]) {
+      const snapshot = JSON.stringify(input), future = reload(input.spending.ledger.records.at(-1));
+      const preview = quote(freeze(input), conversion()); expect(preview.ok, preview.error).toBe(true);
+      const next = success(apply(input, conversion()));
+      expect(next.spending.ledger.records.at(-1)).toEqual(future);
+      expect(next.spending.ledger.records[0].contract).toEqual(input.spending.ledger.records[0].contract);
+      expect(next.spending.resolvedReservations).toEqual(input.spending.resolvedReservations);
+      expect(owned(next)).toMatchObject({ isIkusei: false, 育成: false, salary: 420 });
+      expect(next.teams[0].players).toEqual([]); expect(next.teams[0].farm).toHaveLength(1);
+      expect(row(next, 2026)).toMatchObject({ salaryManYen: 322, minimumRosterReserveManYen: 0 });
+      expect(row(next, 2027)).toMatchObject({ salaryManYen: 600, minimumRosterReserveManYen: 0 });
+      const futureControlled = contractEmploymentAt(next.spending.ledger, '2027-02-01')
+        .filter(e => e.teamId === 0 && e.registrationType === 'controlled');
+      expect(futureControlled).toHaveLength(1);
+      expect(futureControlled[0]).toMatchObject({ annualSalaryManYen: 600,
+        contract: { contractId: p.contract.contractId, endSeason: 2028, guaranteed: true } });
+      expect(quoteAnnualSpendingPlan(next.spending)).toEqual(preview.rows);
+      expect(JSON.stringify(input)).toBe(snapshot);
+    }
+  });
+
+  it('keeps an ordinary conversion without future contracts valid after JSON reload', () => {
+    const state = fixture({ development: true });
+    for (const input of [state, reload(state)]) {
+      const next = success(apply(freeze(input), conversion()));
+      expect(row(next, 2026).salaryManYen).toBe(322);
+      expect(owned(next)).toMatchObject({ isIkusei: false, 育成: false, salary: 420, contractId: 'old-a' });
+      expect(next.spending.ledger.records).toHaveLength(2);
+      expect(next.spending.reservations).toEqual([]); expect(next.spending.resolvedReservations).toEqual([]);
+    }
+  });
+
+  it.each(['pending', 'accepted'])('rejects a persisted controlled player with a conflicting %s development renewal before replay', kind => {
+    const p = developmentRenewal();
+    const state = kind === 'pending' ? held(fixture({ development: true }), p) : signed(fixture({ development: true }), p);
+    // Reproduce an old saved state using valid ledger boundaries, without
+    // relying on the annual command under test to manufacture the corruption.
+    state.spending.ledger = ledgerApply(state.spending.ledger, { id: 'legacy-conversion',
+      type: 'convert-to-controlled', teamId: 0, contractId: 'old-a', effectiveDate: state.date, annualSalaryManYen: 420 });
+    state.teams[0].farm[0] = { ...owned(state), isIkusei: false, 育成: false, ikuseiYears: 0, salary: 420 };
+    reject(state, offer(p), kind === 'pending' ? /未回答.*育成.*取り消/ : /受諾済み.*育成契約/);
+  });
+
+  it.each(['pending', 'accepted'])('does not block conversion for another player\'s %s development renewal', kind => {
+    const state = fixture({ development: true }), team = state.teams[1];
+    team.farm = [{ ...team.players[0], isIkusei: true, ikuseiYears: 1, salary: 240 }]; team.players = [];
+    state.spending.ledger.records[1].contract = sign('b', 1, {
+      registrationType: 'development', annualSalaryManYen: 240 }).contract;
+    const p = renewal({ id: 'renew-b', teamId: 1, playerId: 'b', registrationType: 'development', salary: 240, years: 2 });
+    let before = success(apply(state, offer(p, 'offer-b', 'old-b')));
+    if (kind === 'accepted') before = success(apply(before, accept({ id: 'accept-b', proposalId: p.id, contractId: 'old-b' })));
+    const next = success(apply(freeze(before), conversion()));
+    expect(next.spending.reservations).toEqual(before.spending.reservations);
+    expect(next.spending.resolvedReservations).toEqual(before.spending.resolvedReservations);
+    expect(next.teams[1]).toEqual(before.teams[1]); expect(owned(next).isIkusei).toBe(false);
   });
 });
 

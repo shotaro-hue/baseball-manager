@@ -106,6 +106,8 @@ function inspect(state) {
   if (employed.length !== owners.size || employed.some(e => owners.get(e.contract.playerId) !== e.teamId)) fail('名簿と有効な契約の所属が一致しません。');
   if (employed.some(e => e.registrationType !== undefined
     && (e.registrationType === 'development') !== isIkuseiPlayer(players.get(e.contract.playerId)))) fail('名簿と有効な契約の支配下・育成区分が一致しません。');
+  const conflictsWithControlled = (playerId, registrationType) => registrationType === 'development'
+    && owners.has(playerId) && !isIkuseiPlayer(players.get(playerId));
   // Capacity reserves the assignment-validated draft class. A recorded rookie
   // hold must use that same club/class, otherwise funding could claim a controlled
   // place that capacity still treats as development. Future renewal class
@@ -117,12 +119,20 @@ function inspect(state) {
     if (contract.registrationType !== undefined
       && (contract.registrationType === 'development') !== isIkuseiPlayer(rookie.player)) fail('受諾済み新人と契約留保の支配下・育成区分が一致しません。');
   }
-  for (const hold of state.spending.reservations) if (hold?.kind === 'renewal'
-    && owners.get(hold.proposal?.contract?.playerId) !== hold.proposal?.teamId) fail('更改留保と現在の所属球団が一致しません。');
+  for (const hold of state.spending.reservations) if (hold?.kind === 'renewal') {
+    const terms = hold.proposal?.contract;
+    if (owners.get(terms?.playerId) !== hold.proposal?.teamId) fail('更改留保と現在の所属球団が一致しません。');
+    if (conflictsWithControlled(terms?.playerId, terms?.registrationType))
+      fail('未回答の育成更改オファーを取り消してから支配下転換してください。');
+  }
   for (const record of state.spending.ledger.records) if (record.effectiveDate <= state.date
     && record.changes.some(c => c.effectiveDate > state.date)) fail('未来の取引を現在の名簿へ反映できません。');
-  for (const future of futureEmployments(state)) if (future.contract.purpose === 'renewal'
-    && owners.get(future.contract.playerId) !== future.teamId) fail('更改済み将来契約と現在の所属球団が一致しません。');
+  for (const future of futureEmployments(state)) {
+    if (future.contract.purpose === 'renewal'
+      && owners.get(future.contract.playerId) !== future.teamId) fail('更改済み将来契約と現在の所属球団が一致しません。');
+    if (conflictsWithControlled(future.contract.playerId, future.registrationType))
+      fail('受諾済みの将来育成契約があるため、支配下転換できません。');
+  }
   for (const receipt of state.transactions) {
     if (!validId(receipt?.id) || typeof receipt.signature !== 'string' || receipts.has(receipt.id)) fail('取引の確定履歴を確認してください。');
     receipts.add(receipt.id);
@@ -288,8 +298,9 @@ function conversionCandidate(state, c) {
     contractYears: employment.contract.termYears,
     contractYearsLeft: contractSeasonsRemaining(employment.contract, state.season),
     contractSignedYear: employment.contract.signedSeason };
-  // Classification changes; placement stays farm. Shared inspection below
-  // checks the 70 places including accepted-but-unowned controlled rookies.
+  // Classification changes; placement stays farm. Shared inspection checks
+  // accepted rookies against the 70-place cap and rejects conflicting future
+  // terms before commit, without rewriting their contracts or reservations.
   const teams = state.teams.map(t => t.id === c.teamId ? { ...t, farm: t.farm.map(p => p.id === c.playerId ? converted : p) } : t);
   return { ...state, teams, spending: { ...state.spending, ledger } };
 }
