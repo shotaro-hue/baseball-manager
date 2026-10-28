@@ -190,22 +190,26 @@ function reserveAnnualProposal(state, kind, proposal, replaceId) {
 }
 
 function faCandidate(state, c) {
+  const proposing = c.type === 'offer-fa';
   let p = c.proposal;
-  if (c.type !== 'offer-fa') p = state.spending.reservations.find(h => h.proposal.id === c.proposalId && h.kind === 'offer')?.proposal;
+  if (!proposing) p = state.spending.reservations.find(h => h.proposal.id === c.proposalId && h.kind === 'offer')?.proposal;
   if (!p) fail('有効なFAオファーが見つかりません。');
   if (c.type === 'cancel-fa') return { ...state, spending: cancelContractReservation(state.spending, p.id) };
   if (state.spending.resolvedReservations.some(h => h.proposal.id === p.id)) fail('解決済みのFAオファーです。');
   if (c.type === 'offer-fa' && state.spending.reservations.some(h => h.proposal.id === p.id)) fail('提示済みのオファーIDです。');
   const team = state.teams.find(t => t.id === p.teamId), player = state.faPool.find(x => x.id === p.contract.playerId);
   if (!team || !player || isIkuseiPlayer(player) || p.contract.registrationType === 'development' || player.isRetired || player._retireNow) fail('FA市場の対象選手を確認してください。');
-  if (p.effectiveDate !== state.date || p.contract.signedSeason !== state.season || p.contract.agreementPhase !== state.phase
+  const phaseAllowed = p.contract.agreementPhase === state.phase
+    || (!proposing && p.contract.agreementPhase === 'preseason' && state.phase === 'season');
+  if ((proposing ? p.effectiveDate !== state.date : p.effectiveDate > state.date)
+    || p.contract.signedSeason !== state.season || !phaseAllowed
     || p.contract.purpose !== 'acquisition' || p.contract.termYears > 3 || p.contract.annualSalaryManYen < MIN_SALARY_SHIHAKA
     || !registrationDateAllowed(state.season, state.date)) fail('FAの効力日・年俸・契約期間・登録期限を確認してください。');
   const error = marketRosterError(team, player, state.teams, state.draftContext); if (error) fail(error);
   if (c.type === 'offer-fa') {
     return { ...state, spending: reserveAnnualProposal(state, 'offer', p) };
   }
-  const spending = commitContractReservation(state.spending, p);
+  const spending = commitContractReservation(state.spending, p, { effectiveDate: state.date });
   const acquired = { ...player, isFA: false, salary: p.contract.annualSalaryManYen, contractId: p.contract.contractId,
     contractYears: p.contract.termYears, contractYearsLeft: contractSeasonsRemaining(p.contract, state.season), contractSignedYear: p.contract.signedSeason };
   const farm = acquired.injuryDaysLeft > 0 || acquired.registrationCooldownDays > 0 || marketPlacement(team, acquired).farm;
