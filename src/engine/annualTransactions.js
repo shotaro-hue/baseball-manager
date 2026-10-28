@@ -247,12 +247,28 @@ function renewalCandidate(state, c) {
   return { ...state, spending: commitContractReservation(state.spending, p) };
 }
 
+// Compare everything a rookie carries into the roster, including nested/future
+// player fields. Only assignment history and values replaced at join are exempt.
+const rookieJoinReplacedFields = new Set(['_drafted', '_r1winner', 'salary', 'contractId',
+  'contractYears', 'contractYearsLeft', 'contractSignedYear', '育成', 'isIkusei', 'ikuseiYears', 'isFA']);
+const rookieAttributes = player => stable(Object.fromEntries(Object.entries(player)
+  .filter(([field]) => !rookieJoinReplacedFields.has(field))));
+
 function acceptedRookie(state, teamId, playerId) {
   const team = state.teams.find(t => t.id === teamId);
   const capacity = team && evaluateRosterCapacity(team, { ...state.draftContext, teams: state.teams });
   const player = capacity?.ok && [...capacity.acceptedPicks, ...capacity.acceptedDevelopmentPicks].find(p => p.id === playerId);
   if (!player || player.isRetired || player._retireNow || state.faPool.some(p => p.id === playerId))
     fail('受諾済み未加入の新人と獲得球団を確認してください。');
+  const attributes = rookieAttributes(player);
+  for (const duplicate of state.draftContext.draftPool.filter(p => p.id === playerId && p !== player)) {
+    // Reuse capacity's exact per-record assignment rules: a conflicting-owner
+    // record or stale lottery snapshot must not veto the legitimate final pick.
+    const single = evaluateRosterCapacity(team, { ...state.draftContext, teams: state.teams, draftPool: [duplicate] });
+    const accepted = single.ok && [...single.acceptedPicks, ...single.acceptedDevelopmentPicks].length > 0;
+    if (accepted && rookieAttributes(duplicate) !== attributes)
+      fail('受諾済み新人の重複候補で選手属性が一致しません。');
+  }
   return { team, player };
 }
 

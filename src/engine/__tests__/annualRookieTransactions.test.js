@@ -171,6 +171,82 @@ function spring(state) {
 function funded(development = false, required = 2) {
   return success(apply(fixture({ development, required }), reserve(proposal(development ? 'development' : 'controlled'))));
 }
+
+describe.each(['controlled', 'development'])('duplicate %s rookie integrity', type => {
+  const development = type === 'development';
+  const conflictingAttributes = [
+    ['batting', { batting: { contact: 50, power: 50 } }, { batting: { contact: 80, power: 50 } }],
+    ['pitching', { pitching: { control: 50 } }, { pitching: { control: 80 } }],
+    ['name', { name: 'original' }, { name: 'different' }],
+    ['age', { age: 18 }, { age: 22 }],
+    ['position', { pos: '捕手' }, { pos: '一塁手' }],
+    ['pitcher role', { isPitcher: false }, { isPitcher: true }],
+    ['potential', { potential: 50 }, { potential: 80 }],
+    ['foreign status', { isForeign: false }, { isForeign: true }],
+    ['injury', { injuryDaysLeft: 0 }, { injuryDaysLeft: 30 }],
+    ['personality', { personality: { ambition: 50 } }, { personality: { ambition: 80 } }],
+    ['skills', { skills: ['選球眼'] }, { skills: ['強打者'] }],
+    ['positions', { positions: { 捕手: 50 } }, { positions: { 捕手: 80 } }],
+    ['career', { stats: { PA: 0 } }, { stats: { PA: 10 } }],
+    ['service', { serviceYears: 0 }, { serviceYears: 1 }],
+    ['retirement', {}, { _retireNow: true }],
+    ['additional inherited field', { extraPlayerData: { value: 50 } }, { extraPlayerData: { value: 80 } }],
+  ];
+  describe.each(['reserve', 'join'])('%s revalidation', stage => {
+    it.each(conflictingAttributes)('rejects conflicting %s in both pool orders without changing any state', (_field, a, b) => {
+      for (const reverse of [false, true]) {
+        const state = stage === 'join' ? spring(funded(development, 1)) : fixture({ development, required: 1 });
+        const command = stage === 'join' ? join() : reserve(proposal(type));
+        expect(quote(state, command).ok).toBe(true);
+        const base = state.draftContext.draftPool[0];
+        const records = [{ ...base, ...a }, { ...base, ...b }];
+        state.draftContext.draftPool = reverse ? records.reverse() : records;
+        reject(state, command);
+      }
+    });
+  });
+  it('rejects decline of ambiguous accepted records without cancelling a hold', () => {
+    const state = funded(development, 1), p = state.draftContext.draftPool[0];
+    state.draftContext.draftPool = [{ ...p, batting: { contact: 50 } }, { ...p, batting: { contact: 80 } }];
+    reject(state, decline());
+  });
+  it('accepts equal cloned records and contract-normalized duplicates exactly once after JSON restore', () => {
+    for (const normalized of [false, true]) for (const reverse of [false, true]) {
+      const state = fixture({ development, required: 1 });
+      const a = { ...state.draftContext.draftPool[0], age: 18, batting: { contact: 80, power: 50 } };
+      const b = { ...JSON.parse(JSON.stringify(a)), batting: { power: 50, contact: 80 } };
+      if (normalized) {
+        Object.assign(b, { _drafted: true, _r1winner: 0, salary: 9999, contractId: 'old',
+          contractYears: 7, contractYearsLeft: 6, contractSignedYear: 2020, ikuseiYears: 2, isFA: true,
+          育成: development });
+        delete b.isIkusei;
+      }
+      state.draftContext.draftPool = reverse ? [b, a] : [a, b];
+      // A stale partial lottery result must not override final drafted=0.
+      state.draftContext.confirmedPicks = { 1: 'rookie' };
+      const reserved = success(apply(freeze(state), reserve(proposal(type))));
+      const restoredHold = JSON.parse(JSON.stringify(reserved));
+      expect(success(apply(restoredHold, reserve(proposal(type))))).toBe(restoredHold);
+      const beforeJoin = spring(restoredHold), next = success(apply(freeze(beforeJoin), join()));
+      expect(next.teams[0].farm).toHaveLength(1);
+      expect(next.teams[0].farm[0]).toMatchObject({ age: 18, batting: { contact: 80, power: 50 },
+        salary: development ? 240 : 600, contractId: 'c-rookie', contractYears: 1, contractYearsLeft: 1,
+        contractSignedYear: 2026, ikuseiYears: 0, isFA: false, isIkusei: development, 育成: development });
+      expect(next.spending.ledger.records.filter(r => r.contract.playerId === 'rookie')).toHaveLength(1);
+      expect(next.spending.ledger.records.find(r => r.contract.playerId === 'rookie').contract).toEqual(proposal(type).contract);
+      expect(row(next).remainingManYen).toBe(row(beforeJoin).remainingManYen);
+      expect(next.teams[1]).toEqual(state.teams[1]);
+      expect(row(next, 1)).toEqual(row(beforeJoin, 1));
+      const restored = JSON.parse(JSON.stringify(next));
+      expect(success(apply(restored, join()))).toBe(restored);
+      reject(restored, join({ id: 'different-join' }));
+      const declined = success(apply(JSON.parse(JSON.stringify(reserved)), decline()));
+      expect(declined.spending.reservations).toEqual([]);
+      expect(capacity(declined).acceptedPickCount).toBe(0);
+    }
+  });
+});
+
 function fillControlled(state, count) {
   for (let i = 0; i < count; i++) {
     const id = `extra-${i}`;
