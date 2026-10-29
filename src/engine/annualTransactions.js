@@ -37,6 +37,7 @@ function futureEmployments(state) {
 const kinds = {
   'offer-fa': ['proposal'], 'accept-fa': ['proposalId'], 'cancel-fa': ['proposalId'],
   'reject-fa': ['proposalId'], 'join-fa': ['proposalId'],
+  'settle-fa-compensation': ['proposalId', 'teamId', 'method'],
   'offer-renewal': ['proposal', 'contractId'], 'replace-renewal': ['proposalId', 'proposal', 'contractId'],
   'accept-renewal': ['proposalId', 'contractId'], 'cancel-renewal': ['proposalId'],
   'reserve-rookie': ['proposal'], 'decline-rookie': ['teamId', 'playerId'], 'join-rookie': ['proposalId'],
@@ -59,6 +60,8 @@ function commandFor(input) {
     if (c.type === 'replace-renewal' && !validId(c.proposalId)) fail('差し替える更改オファーを確認してください。');
   } else if (c.type === 'accept-renewal') {
     if (![c.proposalId, c.contractId].every(validId)) fail('受諾する更改と現在契約を確認してください。');
+  } else if (c.type === 'settle-fa-compensation') {
+    if (![c.proposalId, c.teamId].every(validId) || c.method !== 'cash-only') fail('FA補償の対象・旧球団・金銭方式を確認してください。');
   } else if (c.type === 'decline-rookie') {
     if (![c.teamId, c.playerId].every(validId)) fail('辞退する新人と受諾球団を確認してください。');
   } else if (c.type === 'convert-to-controlled') {
@@ -154,6 +157,21 @@ function inspect(state) {
   for (const receipt of state.transactions) {
     if (!validId(receipt?.id) || typeof receipt.signature !== 'string' || receipts.has(receipt.id)) fail('取引の確定履歴を確認してください。');
     receipts.add(receipt.id);
+    let recorded;
+    try { recorded = JSON.parse(receipt.signature); } catch { /* Preserve legacy opaque receipts. */ }
+    if (recorded?.type === 'offer-fa' && recorded.proposal?.marketEntry) {
+      const command = commandFor(recorded), original = [...state.spending.reservations, ...state.spending.resolvedReservations]
+        .find(h => h.kind === 'offer' && h.proposal.id === command.proposal.id)?.proposal;
+      if (command.id !== receipt.id || stable(command) !== receipt.signature || !original
+        || stable(commandFor({ ...recorded, proposal: original }).proposal) !== stable(command.proposal))
+        fail('FAの原提示履歴と保存された条件が一致しません。');
+    }
+    if (recorded?.type === 'settle-fa-compensation') {
+      const command = commandFor(recorded), compensation = state.spending.faCompensations?.find(h => h.proposalId === command.proposalId);
+      if (command.id !== receipt.id || stable(command) !== receipt.signature
+        || compensation?.resolution !== 'cash-only' || compensation.teamId !== command.teamId)
+        fail('FA補償の精算履歴と旧球団の選択が一致しません。');
+    }
   }
   quoteAnnualSpendingPlan(state.spending);
   return { teams, players, employed };
@@ -208,7 +226,7 @@ function reserveAnnualProposal(state, kind, proposal, replaceId) {
 function faCandidate(state, c) {
   const proposal = c.proposal ?? state.spending.reservations.find(h => h.kind === 'offer' && h.proposal.id === c.proposalId)?.proposal;
   const marketPlayer = state.faPool.find(p => p.id === proposal?.contract.playerId);
-  if (c.type === 'join-fa' || proposal?.marketEntry || marketPlayer?.marketEntry || state.phase === 'offseason')
+  if (['join-fa', 'settle-fa-compensation'].includes(c.type) || proposal?.marketEntry || marketPlayer?.marketEntry || state.phase === 'offseason')
     return explicitAcquisitionCandidate(state, c, reserveAnnualProposal);
   const proposing = c.type === 'offer-fa';
   let p = c.proposal;
@@ -411,7 +429,7 @@ function candidate(input, command) {
     if (receipt.signature !== signature) fail('同じ取引IDの条件が変わっています。');
     return { state: input, rows: quoteAnnualSpendingPlan(before.spending), replayed: true };
   }
-  if (input.phase === 'offseason' && !c.type.endsWith('renewal') && !c.type.endsWith('rookie') && !c.type.endsWith('fa')) fail('オフの新制度取引は翌年度契約だけが接続済みです。');
+  if (input.phase === 'offseason' && !c.type.endsWith('renewal') && !c.type.endsWith('rookie') && !c.type.endsWith('fa') && c.type !== 'settle-fa-compensation') fail('オフの新制度取引は翌年度契約だけが接続済みです。');
   const after = withFloors(c.type === 'trade' ? tradeCandidate(before, c)
     : c.type === 'convert-to-controlled' ? conversionCandidate(before, c)
     : c.type.endsWith('renewal') ? renewalCandidate(before, c)

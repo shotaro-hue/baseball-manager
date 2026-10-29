@@ -1,4 +1,5 @@
 import { parseContractDate, registrationDateAllowed } from './contractCalendar';
+import { normalizeFaCompensationBasis } from './faCompensation';
 
 // Explicit metadata is opt-in. Never infer a declaration from isFA/isForeign.
 const fail = () => { throw new Error('市場区分・提示日・回答日を確認してください。'); };
@@ -6,14 +7,17 @@ const validId = id => (typeof id === 'string' && id.trim().length > 0) || (Numbe
 const yearStart = season => `${String(season).padStart(4, '0')}-02-01`;
 export function normalizeMarketEntry(input) {
   if (!input || !validId(input.id) || !['domestic-fa', 'overseas-fa', 'released'].includes(input.kind)
-    || Object.keys(input).some(k => !['id', 'kind', 'enteredDate', 'originTeamId', 'compensationRank'].includes(k))) fail();
+    || Object.keys(input).some(k => !['id', 'kind', 'enteredDate', 'originTeamId', 'compensationRank', 'compensationBasis'].includes(k))) fail();
   parseContractDate(input.enteredDate);
   if (input.originTeamId !== undefined && !validId(input.originTeamId)) fail();
   if (input.kind === 'released' ? input.compensationRank !== undefined
     : !validId(input.originTeamId) || !['A', 'B', 'C', 'exempt'].includes(input.compensationRank)) fail();
+  const hasBasis = Object.hasOwn(input, 'compensationBasis');
+  if (hasBasis && !['A', 'B'].includes(input.compensationRank)) fail();
   return { id: input.id, kind: input.kind, enteredDate: input.enteredDate,
     ...(input.originTeamId !== undefined ? { originTeamId: input.originTeamId } : {}),
-    ...(input.compensationRank !== undefined ? { compensationRank: input.compensationRank } : {}) };
+    ...(input.compensationRank !== undefined ? { compensationRank: input.compensationRank } : {}),
+    ...(hasBasis ? { compensationBasis: normalizeFaCompensationBasis(input.compensationBasis) } : {}) };
 }
 
 export function acquisitionOfferMetadata(proposal) {

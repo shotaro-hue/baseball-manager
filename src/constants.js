@@ -16,6 +16,8 @@ export const ACCEPT_THRESHOLD = 55;
 export const MIN_SALARY_SHIHAKA = 420;  // 支配下選手最低年俸 420万円 (NPB協約 第89条)
 export const MIN_SALARY_IKUSEI  = 240;  // 育成選手最低年俸  240万円 (NPB協約)
 export const ACTIVE_ROSTER_FA_DAYS_PER_YEAR = 120; // FA権1年分の一軍登録日数（NPB145日→ゲーム換算120日）
+// FA規約の金銭のみ補償率（新基盤、本番未接続）。
+export const FA_CASH_COMPENSATION_PERCENT = { first: { A: 80, B: 60 }, repeat: { A: 40, B: 30 } };
 export const CPU_FA_BUDGET_RESERVE_RATIO = 0.15; // CPU球団がFA補強後に残す予算割合（15%）
 export const CPU_FA_MIN_SCORE = 45; // CPU球団がFAに入札する最低スコア
 export const INJURY_AUTO_DEMOTE_DAYS = 10;        // この日数を超える怪我は自動二軍降格（NPB登録抹消相当）

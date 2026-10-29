@@ -2,6 +2,7 @@ import { createContractLedger, applyContractLedgerAction, contractLiabilityRows,
   isContractLedgerExtension } from './contractLedger';
 import { parseContractDate } from './contractCalendar';
 import { acquisitionOfferMetadata, acquisitionAnswerMetadata } from './acquisitionMarket';
+import { requiresFaCompensation, faCashCompensationManYen, faCashCompensationCosts, prepareFaCompensations } from './faCompensation';
 
 // GM-01 foundation only: permission is distinct from revenue/cash and team.budget.
 const fail = message => { throw new Error(message || '年度別の支出許可・留保を確認してください。'); };
@@ -14,6 +15,10 @@ const numeric = value => {
   return Number(value);
 };
 const sorted = list => list.map(value => JSON.stringify(value)).sort().join('\n');
+const isFaCompensationCostId = value => {
+  try { const parts = JSON.parse(value); return Array.isArray(parts) && parts[0] === 'fa-compensation'; }
+  catch { return false; }
+};
 
 function normalizedProposal(input) {
   if (input?.type !== 'sign') fail('留保する契約の種類を確認してください。');
@@ -87,6 +92,16 @@ function prepare(plan) {
     } else if (appliedIds.has(proposal.id)) fail('解決済みオファーの取引IDを再利用できません。');
     resolutions.push(resolutionFor({ kind: resolved.kind, proposal }, resolved.resolution, hasAccepted ? accepted : undefined, resolved.answeredDate));
   }
+  const compensation = prepareFaCompensations(plan, resolutions);
+  for (const obligation of compensation.obligations) {
+    const p = obligation.proposal, row = target(p.teamId, p.contract.startSeason);
+    target(p.marketEntry.originTeamId, p.contract.startSeason);
+    if (row) {
+      if (obligation.record.resolution === 'pending') row.reserved += BigInt(obligation.amountManYen);
+      // Pending→paid is the same accepted obligation, not fresh spending.
+      row.tokens.push(['fa-obligation', p.id, obligation.amountManYen]);
+    }
+  }
   const holdIds = new Set(), heldContracts = new Set(), reservations = [];
   for (const hold of plan.reservations) {
     if (!hold || !['renewal', 'offer', 'rookie'].includes(hold.kind)) fail();
@@ -104,26 +119,44 @@ function prepare(plan) {
       row.reserved += BigInt(cost.amountManYen);
       row.tokens.push(['hold', hold.kind, proposal.id, cost.contractId, cost.amountManYen]);
     }
+    if (requiresFaCompensation(proposal) && proposal.marketEntry.compensationBasis) {
+      const amount = faCashCompensationManYen(proposal), row = target(proposal.teamId, proposal.contract.startSeason);
+      target(proposal.marketEntry.originTeamId, proposal.contract.startSeason);
+      if (row) { row.reserved += BigInt(amount); row.tokens.push(['fa-bid-compensation', proposal.id, amount]); }
+    }
     reservations.push([hold.kind, proposal]);
   }
-  const expenseIds = new Set(), expenses = [];
+  const expenseIds = new Set(), faExpenseIds = new Set(), expenses = [];
   for (const expense of plan.oneOffCosts) {
     if (!expense || !id(expense.id) || !id(expense.teamId) || !year(expense.season)
-      || !['coach', 'scouting', 'stadium', 'trade'].includes(expense.kind)
-      || !Number.isSafeInteger(expense.amountManYen) || (expense.kind !== 'trade' && expense.amountManYen < 0)
+      || !['coach', 'scouting', 'stadium', 'trade', 'fa-compensation'].includes(expense.kind)
+      || !Number.isSafeInteger(expense.amountManYen) || (!['trade', 'fa-compensation'].includes(expense.kind) && expense.amountManYen < 0)
       || expenseIds.has(expense.id)) fail('一時費用が未記録・不正・重複しています。');
     expenseIds.add(expense.id);
-    const token = [expense.id, expense.teamId, expense.season, expense.kind, expense.amountManYen];
+    const faCost = expense.kind === 'fa-compensation';
+    if (!faCost && (Object.hasOwn(expense, 'proposalId') || isFaCompensationCostId(expense.id)))
+      fail('FA補償の識別情報を別の費目に使うことはできません。');
+    if (faCost) {
+      const expected = compensation.costs.find(c => c.id === expense.id);
+      if (!expected || Object.keys(expense).length !== Object.keys(expected).length
+        || Object.entries(expected).some(([k, v]) => expense[k] !== v)) fail('FA補償の受諾履歴と両側精算が一致しません。');
+      faExpenseIds.add(expense.id);
+    }
+    const token = [expense.id, expense.teamId, expense.season, expense.kind, expense.amountManYen,
+      ...(faCost ? [expense.proposalId] : [])];
     expenses.push(token);
     const row = target(expense.teamId, expense.season); if (!row) continue;
-    row.oneOff += BigInt(expense.amountManYen); row.tokens.push(['expense', ...token]);
+    row.oneOff += BigInt(expense.amountManYen);
+    if (!faCost || expense.amountManYen < 0) row.tokens.push(['expense', ...token]);
   }
+  if (compensation.costs.some(cost => !faExpenseIds.has(cost.id))) fail('FA補償の支払・受取の両行が必要です。');
   const fingerprints = new Map(), tokenSets = new Map(), contractTotals = new Map(), rows = [];
   for (const [key, row] of byYear) {
     if (row.season < plan.budgetSeason) continue;
     const tokens = [...row.tokens, ['minimum-roster', row.minimumRosterReserveManYen]];
     fingerprints.set(key, sorted(tokens));
-    tokenSets.set(key, new Set(tokens.filter(token => token[0] !== 'contract').map(token => JSON.stringify(token))));
+    tokenSets.set(key, new Set(tokens.filter(token => token[0] !== 'contract'
+      && !(token[0] === 'expense' && token[4] === 'fa-compensation' && token[5] < 0)).map(token => JSON.stringify(token))));
     // Approval follows each existing obligation, independent of salary/guarantee
     // classification. Keep the detailed tokens above for quoting and change detection.
     const totals = new Map();
@@ -140,7 +173,7 @@ function prepare(plan) {
   const historicalFloors = sorted(plan.authorizations.filter(a => a.season < plan.budgetSeason)
     .map(a => [a.teamId, a.season, a.minimumRosterReserveManYen]));
   return { rows, fingerprints, tokenSets, contractTotals, authorizations: sorted(authorizations), historicalFloors,
-    reservations: sorted(reservations), resolutions, expenses };
+    reservations: sorted(reservations), resolutions, expenses, faCompensations: compensation.records };
 }
 
 export function quoteAnnualSpendingPlan(plan) { return prepare(plan).rows; }
@@ -168,6 +201,12 @@ export function assessAnnualSpendingChange(before, after, { mode = 'spend' } = {
     const next = after.reservations.find(r => r.proposal.id === old.proposal.id) ?? nextResolved.get(old.proposal.id);
     if (!next || next.kind !== old.kind || proposalSignature(next.proposal) !== proposalSignature(old.proposal)) fail('既存オファーの識別情報を消去・変更できません。');
   }
+  const nextCompensations = new Map(b.faCompensations.map(r => [r.proposalId, r]));
+  for (const old of a.faCompensations) {
+    const next = nextCompensations.get(old.proposalId);
+    if (!next || (old.resolution !== 'pending' && JSON.stringify(old) !== JSON.stringify(next)))
+      fail('受諾済みFA補償の履歴を消去・変更できません。');
+  }
   const oldExpenses = new Map(a.expenses.map(expense => [expense[0], expense]));
   const nextExpenses = new Map(b.expenses.map(expense => [expense[0], expense]));
   for (const [id, old] of oldExpenses) if (JSON.stringify(nextExpenses.get(id)) !== JSON.stringify(old)) fail('確定した費用を取り消すことはできません。');
@@ -178,6 +217,7 @@ export function assessAnnualSpendingChange(before, after, { mode = 'spend' } = {
   }
   if ([...cashBySeason.values()].some(amount => amount !== 0n)) fail('金銭トレードは同じ年度に両球団の支払・受取を記録してください。');
   if (mode === 'cashless-trade' && (actions.some(action => action.type !== 'transfer')
+    || sorted(a.faCompensations) !== sorted(b.faCompensations)
     || a.reservations !== b.reservations || sorted(a.resolutions) !== sorted(b.resolutions) || sorted(a.expenses) !== sorted(b.expenses)
     || before.ledger.closedThroughSeason !== after.ledger.closedThroughSeason)) fail('赤字時の例外は無金銭の契約移管だけに使えます。');
   if (mode === 'cashless-trade') {
@@ -268,13 +308,34 @@ export function commitContractReservation(plan, input, { effectiveDate, answered
   if (proposalSignature(held.proposal) !== proposalSignature(proposal)) fail('留保時の契約条件が変わっています。');
   const accepted = effectiveDate !== undefined && effectiveDate !== proposal.effectiveDate
     ? delayedOfferProposal(held, { ...proposal, effectiveDate }) : proposal;
+  const compensationAmount = faCashCompensationManYen(proposal);
   const losing = plan.reservations.filter(r => r.proposal.id !== proposal.id && overlaps(accepted, r.proposal));
   const resolvedIds = new Set([proposal.id, ...losing.map(r => r.proposal.id)]);
   const next = { ...plan, ledger: applyContractLedgerAction(plan.ledger, accepted),
+    ...(compensationAmount > 0 ? { faCompensations: [...(plan.faCompensations ?? []), { proposalId: proposal.id, resolution: 'pending' }] } : {}),
     reservations: plan.reservations.filter(r => !resolvedIds.has(r.proposal.id)),
     resolvedReservations: [...plan.resolvedReservations,
       resolutionFor(held, 'accepted', accepted === proposal ? undefined : accepted, answeredDate),
       ...losing.map(r => resolutionFor(r, 'lost', undefined, r.proposal.marketEntry ? answeredDate : undefined))] };
   if (!assessAnnualSpendingChange(plan, next).ok) fail('受諾時点の年度別追加余力が不足しています。');
+  return next;
+}
+
+
+export function settleFaCashCompensation(plan, { proposalId, teamId, chosenDate } = {}) {
+  const prepared = prepare(plan);
+  const record = prepared.faCompensations.find(r => r.proposalId === proposalId);
+  if (!record) fail('精算する受諾済みFA補償が見つかりません。');
+  const resolved = prepared.resolutions.find(r => r.proposal.id === proposalId);
+  const p = resolved.proposal;
+  if (teamId !== p.marketEntry.originTeamId) fail('FA補償の方式は旧球団が選択します。');
+  if (record.resolution === 'cash-only') {
+    if (record.teamId !== teamId || record.chosenDate !== chosenDate) fail('精算済みのFA補償を変更できません。');
+    return plan;
+  }
+  const next = { ...plan, faCompensations: prepared.faCompensations.map(r => r.proposalId === proposalId
+    ? { proposalId, resolution: 'cash-only', teamId, chosenDate } : r),
+    oneOffCosts: [...plan.oneOffCosts, ...faCashCompensationCosts(p)] };
+  if (!assessAnnualSpendingChange(plan, next).ok) fail('FA補償の精算で新たな支出を生じさせることはできません。');
   return next;
 }
