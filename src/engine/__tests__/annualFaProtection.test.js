@@ -154,7 +154,7 @@ describe('FA protection list foundation (no personnel selection or live adoption
     expect(view(state).eligiblePlayerIds).toEqual(['a']);
     reject(state, submit({ protectedPlayerIds: ['rookie'] }));
   });
-  it('does not extend the rookie exemption to the next offseason cohort', () => {
+  it.each([true, false])('does not extend the rookie exemption to the next offseason cohort (draft pool cleared: %s)', clearPool => {
     let state = claim(); state.draftContext = { draftPool: [player('rookie')], drafted: { rookie: 0 }, confirmedPicks: {} };
     state = success(apply(state, { id: 'reserve-rookie', type: 'reserve-rookie', proposal: { id: 'rookie-offer', type: 'sign', teamId: 0,
       effectiveDate: '2027-02-01', contract: contract('rookie', { agreementPhase: 'offseason', termYears: 1 }) } }));
@@ -162,7 +162,7 @@ describe('FA protection list foundation (no personnel selection or live adoption
     state = success(apply(state, cash()));
     state = success(apply(state, { id: 'join-bid', type: 'join-fa', proposalId: 'bid' }));
     state = { ...state, phase: 'offseason', date: '2027-11-20', spending: { ...state.spending, budgetSeason: 2028 },
-      draftContext: { draftPool: [], drafted: {}, confirmedPicks: {} } };
+      ...(clearPool ? { draftContext: { draftPool: [], drafted: {}, confirmedPicks: {} } } : {}) };
     state = claim(json(state), 'next-year');
     expect(view(state, 'next-year').eligiblePlayerIds).toEqual(['a', 'fa-bid', 'reserve', 'rookie']);
     expect(view(save(state, submit({ proposalId: 'next-year', protectedPlayerIds: ['rookie'] })), 'next-year').protectedPlayerIds).toEqual(['rookie']);

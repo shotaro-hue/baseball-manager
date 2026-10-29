@@ -37,9 +37,12 @@ function currentEligibleIds(state, p) {
   // Acquisition terms alone cannot distinguish recent rookies from FA/trade
   // arrivals. Accepted rookie reservations survive joining and draft-pool cleanup;
   // spending validation also checks them against the original ledger contract.
-  const drafted = new Set(draftPicksForTeam(state.draftContext.draftPool, state.draftContext.drafted, team.id).map(x => x.id));
-  for (const r of state.spending.resolvedReservations) if (r.kind === 'rookie' && r.resolution === 'accepted'
-    && r.proposal.contract.startSeason === p.contract.startSeason) drafted.add(r.proposal.contract.playerId);
+  const rookies = state.spending.resolvedReservations.filter(r => r.kind === 'rookie' && r.resolution === 'accepted');
+  const recordedRookies = new Set(rookies.map(r => r.proposal.contract.playerId));
+  // Known entry years take precedence over a retained older draft pool.
+  const drafted = new Set(draftPicksForTeam(state.draftContext.draftPool, state.draftContext.drafted, team.id)
+    .filter(x => !recordedRookies.has(x.id)).map(x => x.id));
+  for (const r of rookies) if (r.proposal.contract.startSeason === p.contract.startSeason) drafted.add(r.proposal.contract.playerId);
   return orderedIds(ownedPlayers(team).filter(player => {
     const e = employment.get(player.id);
     return e && !isIkuseiPlayer(player) && e.registrationType !== 'development'
