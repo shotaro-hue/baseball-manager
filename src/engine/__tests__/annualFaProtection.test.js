@@ -17,20 +17,20 @@ function fixture() {
   const state = { version: 1, season: 2026, phase: 'offseason', date: '2026-11-20', transactions: [],
     teams: [0, 1, 2].map(id => ({ id, players: [], farm: [], budget: 999 })), faPool: [],
     draftContext: { draftPool: [], drafted: {}, confirmedPicks: {} },
-    rosterRequirements: [0, 1, 2].flatMap(teamId => [2026, 2027, 2028, 2029].map(season => ({ teamId, season, requiredControlledCount: 0 }))),
+    rosterRequirements: [0, 1, 2].flatMap(teamId => [2026, 2027, 2028, 2029, 2030].map(season => ({ teamId, season, requiredControlledCount: 0 }))),
     spending: { version: 1, budgetSeason: 2027, ledger: createContractLedger(), reservations: [], resolvedReservations: [], oneOffCosts: [],
-      authorizations: [0, 1, 2].flatMap(teamId => [2026, 2027, 2028, 2029].map(season => ({ teamId, season, approvedManYen: 200000, minimumRosterReserveManYen: 0 }))) } };
+      authorizations: [0, 1, 2].flatMap(teamId => [2026, 2027, 2028, 2029, 2030].map(season => ({ teamId, season, approvedManYen: 200000, minimumRosterReserveManYen: 0 }))) } };
   owned(state, 'a'); owned(state, 'reserve'); owned(state, 'b', 1); owned(state, 'c', 2);
   state.teams[0].players.push(state.teams[0].farm.shift()); return state;
 }
 const success = r => { expect(r.ok, r.error).toBe(true); return r.state; };
 function claim(state = fixture(), id = 'bid', originTeamId = 1) {
   const p = player(`fa-${id}`, { isFA: true, entryType: '高卒', daysOnActiveRoster: 1080,
-    marketEntry: { id: `market-${id}`, kind: 'domestic-fa', enteredDate: '2026-11-01', originTeamId, compensationRank: 'A',
+    marketEntry: { id: `market-${id}`, kind: 'domestic-fa', enteredDate: `${state.season}-11-01`, originTeamId, compensationRank: 'A',
       compensationBasis: { previousAnnualSalaryManYen: 10000, exercise: 'first' } } });
   state = { ...state, faPool: [...state.faPool, p] };
-  const proposal = { id, type: 'sign', teamId: 0, offeredDate: state.date, effectiveDate: '2027-02-01', marketEntry: json(p.marketEntry),
-    contract: contract(p.id, { contractId: `new-${id}`, agreementPhase: 'offseason', termYears: 3 }) };
+  const proposal = { id, type: 'sign', teamId: 0, offeredDate: state.date, effectiveDate: `${state.season + 1}-02-01`, marketEntry: json(p.marketEntry),
+    contract: contract(p.id, { contractId: `new-${id}`, signedSeason: state.season, agreementPhase: 'offseason', termYears: 3 }) };
   state = success(tx.applyAnnualTransaction(state, { id: `offer-${id}`, type: 'offer-fa', proposal }));
   return success(tx.applyAnnualTransaction(state, { id: `accept-${id}`, type: 'accept-fa', proposalId: id }));
 }
@@ -110,23 +110,62 @@ describe('FA protection list foundation (no personnel selection or live adoption
     const next = save(state); expect(view(next).eligiblePlayerIds).toEqual(['a', 'reserve']);
     reject(json(next), submit({ id: 'replacement', protectedPlayerIds: ['rookie'] }));
   });
-  it('excludes a same-offseason acquired player even after spring joining', () => {
+  it('includes a same-offseason FA acquisition after actual spring joining', () => {
     let state = claim(); state = claim(state, 'second', 2); state = success(apply(state, cash('second', 2)));
     state = success(apply(spring(state), { id: 'join-second', type: 'join-fa', proposalId: 'second' }));
+    expect(view(state).eligiblePlayerIds).toEqual(['a', 'fa-second', 'reserve']);
+    expect(view(save(state, submit({ protectedPlayerIds: ['fa-second'] })))).toMatchObject({ protectedPlayerIds: ['fa-second'], candidatePlayerIds: ['a', 'reserve'] });
+  });
+  it('does not include an accepted FA before joining, even after its contract becomes effective', () => {
+    const state = spring(claim(claim(), 'second', 2));
     expect(view(state).eligiblePlayerIds).toEqual(['a', 'reserve']);
+    expect(state.acquisitions.every(a => !Object.hasOwn(a, 'joinedDate'))).toBe(true);
+    reject(state, submit({ protectedPlayerIds: ['fa-second'] }));
+  });
+  it.each(['preseason', 'offseason'])('includes an actual trade arrival with a %s acquisition contract', agreementPhase => {
+    const state = spring(claim()); owned(state, 'traded', 1, {}, { agreementPhase, signedSeason: agreementPhase === 'offseason' ? 2026 : 2027 });
+    const next = success(apply(state, { id: 'trade-in', type: 'trade', fromId: 0, toId: 1,
+      outgoingIds: ['reserve'], incomingIds: ['traded'], cashManYen: 0, mode: 'spend' }));
+    expect(view(next)).toMatchObject({ eligiblePlayerIds: ['a', 'traded'], candidatePlayerIds: ['a', 'traded'] });
+    expect(view(save(next, submit({ protectedPlayerIds: ['traded'] })))).toMatchObject({ protectedPlayerIds: ['traded'], candidatePlayerIds: ['a'] });
   });
   it('excludes a joined rookie using its contract even after the draft pool is cleared', () => {
     let state = claim(); state.draftContext = { draftPool: [player('rookie')], drafted: { rookie: 0 }, confirmedPicks: {} };
     state = success(apply(state, { id: 'reserve-rookie', type: 'reserve-rookie', proposal: { id: 'rookie-offer', type: 'sign', teamId: 0,
       effectiveDate: '2027-02-01', contract: contract('rookie', { agreementPhase: 'offseason', termYears: 1 }) } }));
     state = success(apply(spring(state), { id: 'join-rookie', type: 'join-rookie', proposalId: 'rookie-offer' }));
-    state = { ...state, draftContext: { draftPool: [], drafted: {}, confirmedPicks: {} } };
     expect(view(state).eligiblePlayerIds).toEqual(['a', 'reserve']);
+    state = { ...state, draftContext: { draftPool: [], drafted: {}, confirmedPicks: {} } };
+    expect(view(json(state)).eligiblePlayerIds).toEqual(['a', 'reserve']);
     reject(state, submit({ protectedPlayerIds: ['rookie'] }));
   });
   it('does not exclude a same-year midseason recruit as a new winter acquisition', () => {
     const state = fixture(); owned(state, 'midseason', 0, {}, { agreementPhase: 'season' });
     expect(view(claim(state)).eligiblePlayerIds).toEqual(['a', 'midseason', 'reserve']);
+  });
+  it('keeps a recent rookie excluded after a trade and JSON when its original draft pool is gone', () => {
+    let state = claim(); state.draftContext = { draftPool: [player('rookie')], drafted: { rookie: 1 }, confirmedPicks: {} };
+    state = success(apply(state, { id: 'reserve-rookie', type: 'reserve-rookie', proposal: { id: 'rookie-offer', type: 'sign', teamId: 1,
+      effectiveDate: '2027-02-01', contract: contract('rookie', { agreementPhase: 'offseason', termYears: 1 }) } }));
+    state = success(apply(spring(state), { id: 'join-rookie', type: 'join-rookie', proposalId: 'rookie-offer' }));
+    state = success(apply(state, { id: 'trade-rookie', type: 'trade', fromId: 0, toId: 1,
+      outgoingIds: ['reserve'], incomingIds: ['rookie'], cashManYen: 0, mode: 'spend' }));
+    state = json({ ...state, draftContext: { draftPool: [], drafted: {}, confirmedPicks: {} } });
+    expect(view(state).eligiblePlayerIds).toEqual(['a']);
+    reject(state, submit({ protectedPlayerIds: ['rookie'] }));
+  });
+  it('does not extend the rookie exemption to the next offseason cohort', () => {
+    let state = claim(); state.draftContext = { draftPool: [player('rookie')], drafted: { rookie: 0 }, confirmedPicks: {} };
+    state = success(apply(state, { id: 'reserve-rookie', type: 'reserve-rookie', proposal: { id: 'rookie-offer', type: 'sign', teamId: 0,
+      effectiveDate: '2027-02-01', contract: contract('rookie', { agreementPhase: 'offseason', termYears: 1 }) } }));
+    state = success(apply(spring(state), { id: 'join-rookie', type: 'join-rookie', proposalId: 'rookie-offer' }));
+    state = success(apply(state, cash()));
+    state = success(apply(state, { id: 'join-bid', type: 'join-fa', proposalId: 'bid' }));
+    state = { ...state, phase: 'offseason', date: '2027-11-20', spending: { ...state.spending, budgetSeason: 2028 },
+      draftContext: { draftPool: [], drafted: {}, confirmedPicks: {} } };
+    state = claim(json(state), 'next-year');
+    expect(view(state, 'next-year').eligiblePlayerIds).toEqual(['a', 'fa-bid', 'reserve', 'rookie']);
+    expect(view(save(state, submit({ proposalId: 'next-year', protectedPlayerIds: ['rookie'] })), 'next-year').protectedPlayerIds).toEqual(['rookie']);
   });
   it('keeps query validation pure for malformed selectors and invalid whole-state budgets', () => {
     const state = freeze(claim()), snapshot = JSON.stringify(state);
@@ -135,10 +174,62 @@ describe('FA protection list foundation (no personnel selection or live adoption
     expect(JSON.stringify(state)).toBe(snapshot);
     const bad = json(state); bad.spending.authorizations = []; expect(query(bad).ok).toBe(false);
   });
-  it('shares one club/year list across claims even after the original claim settles in cash', () => {
-    let state = save(claim(claim(), 'second', 2)); state = success(apply(state, cash()));
-    expect(view(state, 'second')).toMatchObject({ proposalId: 'second', candidatePlayerIds: ['reserve'], submitted: true });
-    reject(state, submit({ id: 'other-list', proposalId: 'second', protectedPlayerIds: [] }));
+  it('keeps separate lists, candidates and receipts for each FA proposal through JSON, replay and cash settlement', () => {
+    let state = save(claim(claim(), 'second', 2));
+    expect(view(state, 'second')).toMatchObject({ submitted: false, protectedPlayerIds: [], candidatePlayerIds: ['a', 'reserve'] });
+    const first = json(state.faProtectionLists[0]);
+    state = { ...state, date: '2026-11-21' };
+    const other = submit({ id: 'other-list', proposalId: 'second', protectedPlayerIds: ['reserve'] });
+    state = json(save(state, other));
+    expect(state.faProtectionLists).toEqual([first, { ...first, transactionId: 'other-list', proposalId: 'second',
+      submittedDate: '2026-11-21', protectedPlayerIds: ['reserve'] }]);
+    expect(view(state)).toMatchObject({ submitted: true, protectedPlayerIds: ['a'], candidatePlayerIds: ['reserve'] });
+    expect(view(state, 'second')).toMatchObject({ submitted: true, protectedPlayerIds: ['reserve'], candidatePlayerIds: ['a'] });
+    for (const record of state.faProtectionLists) {
+      const receipt = state.transactions.find(r => r.id === record.transactionId);
+      expect(receipt.faProtection).toEqual(record);
+      expect(JSON.parse(receipt.signature)).toMatchObject({ proposalId: record.proposalId, protectedPlayerIds: record.protectedPlayerIds });
+    }
+    expect(success(apply(state))).toBe(state); expect(success(apply(state, other))).toBe(state);
+    reject(json(state), submit({ id: 'replacement', protectedPlayerIds: ['reserve'] }));
+    reject(json(state), { ...other, id: 'other-replacement', protectedPlayerIds: ['a'] });
+    reject(json(state), { ...other, protectedPlayerIds: ['a'] });
+    const lists = json(state.faProtectionLists);
+    state = json(success(apply(state, cash())));
+    expect(state.faProtectionLists).toEqual(lists);
+    expect(view(state, 'second')).toMatchObject({ protectedPlayerIds: ['reserve'], candidatePlayerIds: ['a'] });
+    expect(success(apply(state, other))).toBe(state);
+    expect(success(apply(state))).toBe(state);
+  });
+  it('allows up to 28 different protected players on each proposal in the same club/year', () => {
+    const initial = fixture(); for (let i = 0; i < 28; i++) owned(initial, `p${i}`);
+    const ids = Array.from({ length: 28 }, (_, i) => `p${i}`);
+    let state = save(claim(claim(initial), 'second', 2), submit({ protectedPlayerIds: ids }));
+    state = save(state, submit({ id: 'other-list', proposalId: 'second', protectedPlayerIds: ['a', 'reserve', ...ids.slice(2)] }));
+    expect(state.faProtectionLists.map(r => r.protectedPlayerIds.length)).toEqual([28, 28]);
+    expect(view(state).candidatePlayerIds).toEqual(['a', 'reserve']);
+    expect(view(state, 'second').candidatePlayerIds).toEqual(['p0', 'p1']);
+  });
+  it('rejects a duplicate proposal record even with a matching new receipt and transaction signature', () => {
+    const state = json(save()), duplicate = { ...json(state.faProtectionLists[0]), transactionId: 'forged' };
+    state.faProtectionLists.push(duplicate);
+    const receipt = json(state.transactions.at(-1)), command = JSON.parse(receipt.signature); command.id = 'forged';
+    receipt.id = 'forged'; receipt.signature = JSON.stringify(command); receipt.faProtection = json(duplicate);
+    state.transactions.push(receipt);
+    expect(query(state).ok).toBe(false);
+    reject(state, { id: 'accept-bid', type: 'accept-fa', proposalId: 'bid' });
+  });
+  it('freezes each proposal cohort at its own submission, including a later actual FA arrival only in the later list', () => {
+    let state = claim(claim(claim(), 'second', 2), 'arrival', 1);
+    state = save(state); const first = json(state.faProtectionLists[0]);
+    state = success(apply(state, cash('arrival', 1)));
+    state = success(apply(spring(state), { id: 'join-arrival', type: 'join-fa', proposalId: 'arrival' }));
+    expect(view(state).eligiblePlayerIds).toEqual(['a', 'reserve']);
+    expect(view(state, 'second')).toMatchObject({ submitted: false, eligiblePlayerIds: ['a', 'fa-arrival', 'reserve'] });
+    state = json(save(state, submit({ id: 'second-list', proposalId: 'second', protectedPlayerIds: ['fa-arrival'] })));
+    expect(state.faProtectionLists[0]).toEqual(first);
+    expect(view(state).candidatePlayerIds).toEqual(['reserve']);
+    expect(view(state, 'second')).toMatchObject({ protectedPlayerIds: ['fa-arrival'], candidatePlayerIds: ['a', 'reserve'] });
   });
   it('keeps pending money and spring join blocker, even when submitted in deficit', () => {
     const state = claim(); state.spending.authorizations.forEach(a => { a.approvedManYen = 0; });

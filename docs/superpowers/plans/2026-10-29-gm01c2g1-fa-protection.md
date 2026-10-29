@@ -2,6 +2,8 @@
 
 > **For agentic workers:** Use superpowers:executing-plans inline with test-driven-development and one independent whole-branch source review. User authorized staged implementation through PR; do not repeat approval. This file is the committed progress ledger.
 
+> G-1-FIX注記：これは初回実装の進捗記録。共有名簿・同オフ新加入除外という当初判断は撤回済み。現行仕様は設計書、修正作業は`2026-10-29-gm01c2g1-fix.md`を参照。過去の実行記録は修正後の根拠に使わない。
+
 **Goal:** Persist a validated FA protection list and quote safe candidate IDs without resolving or transferring the compensation.
 **Architecture:** A dedicated pure protection module owns eligible pools, snapshot validation and history. Annual quote/apply validates the whole state and binds submission receipts to immutable list snapshots.
 **Tech Stack:** Existing JavaScript/Vitest/Vite, no new dependencies.
@@ -12,7 +14,7 @@
 - Base main521d64b98447d68509b58f0fa3f9e6eaf81f379f, #513 merged. No main push/merge/auto-merge.
 - Optional new state only; no live hooks/CPU/Worker/UI/save migration, no personnel selection/transfer/settlement or deadline automation.
 - Keep the #513 pending cash obligation unchanged and spring joining blocked until existing cash settlement. No effect on salary/ledger/budgets or roster placement.
-- A club/start-year has one immutable shared list. Protect 0–28 eligible IDs, preserve ID types, reject type collisions. Frozen original eligible pool, current candidate intersection.
+- Superseded by G-1-FIX: a proposal has one immutable list; different proposals may protect different players. Protect 0–28 eligible IDs, preserve ID types, reject type collisions. Frozen original eligible pool, current candidate intersection.
 
 ## Review focus
 
@@ -39,7 +41,7 @@
 - [x] Record sources/game simplifications, G1 limits/G2 dependencies and actual RED/GREEN results.
 - [x] Run relevant contract/transaction/roster/save regressions, build and compare44 deployed file paths/SHA256 to same-tree baseline. Run git diff --check.
 - [x] Independent whole-source review; fix material issues using RED→GREEN and applicable regressions.
-- [ ] Publish feature PR, confirm same remote/local tree and all exact-head CI jobs. Final publication/CI results are recorded in PR body without a bookkeeping-only source revision.
+- [x] Publish feature PR, confirm same remote/local tree and all exact-head CI jobs. Final publication/CI results are recorded in PR body without a bookkeeping-only source revision.
 
 ## Execution record
 

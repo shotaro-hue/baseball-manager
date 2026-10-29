@@ -27,31 +27,30 @@ const claimFor = (state, proposalId, pending = false) => {
       || (state.phase === 'preseason' && state.season === p.contract.startSeason)))) fail();
   return r;
 };
-const sharedList = (state, p) => state.faProtectionLists?.find(r => r.teamId === p.teamId && r.season === p.contract.startSeason);
+const proposalList = (state, p) => state.faProtectionLists?.find(r => r.proposalId === p.id);
 
 function currentEligibleIds(state, p) {
   const team = state.teams.find(t => t.id === p.teamId); if (!team) fail();
   const date = state.phase === 'offseason' ? [state.date, `${state.season}-11-30`].sort()[0] : state.date;
   const employment = new Map(contractEmploymentAt(state.spending.ledger, date)
     .filter(e => e.teamId === team.id).map(e => [e.contract.playerId, e]));
-  // New winter acquisitions are not part of the original club's eligible cohort.
-  // Renewals, midseason recruits and veterans on acquisition contracts remain in it.
-  const newcomers = new Set(state.spending.ledger.records.filter(r => r.contract.purpose === 'acquisition'
-    && r.contract.startSeason === p.contract.startSeason
-    && (r.contract.agreementPhase === 'offseason' || r.contract.signedSeason === p.contract.startSeason))
-    .map(r => r.contract.playerId));
+  // Acquisition terms alone cannot distinguish recent rookies from FA/trade
+  // arrivals. Accepted rookie reservations survive joining and draft-pool cleanup;
+  // spending validation also checks them against the original ledger contract.
   const drafted = new Set(draftPicksForTeam(state.draftContext.draftPool, state.draftContext.drafted, team.id).map(x => x.id));
+  for (const r of state.spending.resolvedReservations) if (r.kind === 'rookie' && r.resolution === 'accepted'
+    && r.proposal.contract.startSeason === p.contract.startSeason) drafted.add(r.proposal.contract.playerId);
   return orderedIds(ownedPlayers(team).filter(player => {
     const e = employment.get(player.id);
     return e && !isIkuseiPlayer(player) && e.registrationType !== 'development'
       && !player.isForeign && !player.isRetired && !player._retireNow && !player.isFA && !player.isWaiverReleased
-      && !newcomers.has(player.id) && !drafted.has(player.id);
+      && !drafted.has(player.id);
   }).map(p => p.id));
 }
 
 export function createFaProtectionList(state, command) {
   const { proposal: p } = claimFor(state, command.proposalId, true);
-  if (command.teamId !== p.teamId || sharedList(state, p)) fail();
+  if (command.teamId !== p.teamId || proposalList(state, p)) fail();
   const eligiblePlayerIds = currentEligibleIds(state, p), protectedPlayerIds = normalizeFaProtectedIds(command.protectedPlayerIds);
   if (protectedPlayerIds.some(id => !eligiblePlayerIds.includes(id))) fail();
   return { transactionId: command.id, proposalId: p.id, teamId: p.teamId, season: p.contract.startSeason,
@@ -62,14 +61,14 @@ export function createFaProtectionList(state, command) {
 // changed; its current eligibility is used only for availability in the query.
 export function inspectFaProtectionLists(state) {
   if (state.faProtectionLists !== undefined && !Array.isArray(state.faProtectionLists)) fail();
-  const records = new Map(), clubYears = new Set();
+  const records = new Map(), proposals = new Set();
   for (const record of state.faProtectionLists ?? []) {
     if (!record || Object.keys(record).length !== 7 || Object.keys(record).some(k =>
       !['transactionId', 'proposalId', 'teamId', 'season', 'submittedDate', 'eligiblePlayerIds', 'protectedPlayerIds'].includes(k))
       || !validId(record.transactionId) || records.has(record.transactionId)) fail();
     const { proposal: p, answeredDate } = claimFor(state, record.proposalId);
-    const date = parseContractDate(record.submittedDate), clubYear = JSON.stringify([record.teamId, record.season]);
-    if (record.teamId !== p.teamId || record.season !== p.contract.startSeason || clubYears.has(clubYear)
+    const date = parseContractDate(record.submittedDate);
+    if (record.teamId !== p.teamId || record.season !== p.contract.startSeason || proposals.has(record.proposalId)
       || record.submittedDate < answeredDate || record.submittedDate > state.date
       || date.year < p.contract.signedSeason || date.year > p.contract.startSeason
       || stable(orderedIds(record.eligiblePlayerIds)) !== stable(record.eligiblePlayerIds)
@@ -77,7 +76,7 @@ export function inspectFaProtectionLists(state) {
       || record.protectedPlayerIds.some(id => !record.eligiblePlayerIds.includes(id))) fail();
     const receipt = state.transactions.find(r => r.id === record.transactionId);
     if (!receipt || stable(receipt.faProtection) !== stable(record)) fail();
-    records.set(record.transactionId, record); clubYears.add(clubYear);
+    records.set(record.transactionId, record); proposals.add(record.proposalId);
   }
   for (const receipt of state.transactions) {
     let command; try { command = JSON.parse(receipt.signature); } catch { /* Legacy opaque receipts have no protection payload. */ }
@@ -94,7 +93,7 @@ export function inspectFaProtectionLists(state) {
 
 export function faProtectionView(state, selector) {
   if (!selector || Object.keys(selector).length !== 1 || !validId(selector.proposalId)) fail();
-  const { proposal: p } = claimFor(state, selector.proposalId, true), list = sharedList(state, p);
+  const { proposal: p } = claimFor(state, selector.proposalId, true), list = proposalList(state, p);
   const current = currentEligibleIds(state, p), eligible = list?.eligiblePlayerIds ?? current, protectedIds = list?.protectedPlayerIds ?? [];
   const unprotected = eligible.filter(id => !protectedIds.includes(id));
   return { proposalId: p.id, teamId: p.teamId, season: p.contract.startSeason, submitted: Boolean(list),
