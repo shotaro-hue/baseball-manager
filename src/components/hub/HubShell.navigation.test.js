@@ -87,7 +87,7 @@ it.each([{ year: 2027 }, { saveId: 'another-save' }])('clears mounted drafts whe
   changed.setScope(scope);
   expect(view.root.findByProps({ 'data-test-tab': 'trade' }).findByType('input').props.value).toBe('');
 });
-it.each(['contract', 'trade', 'scout', 'fa'])('keeps successful autosave feedback in the header without inserting a row above %s', initialTab => {
+it.each(['contract', 'trade', 'scout', 'fa', 'mailbox', 'news', 'alumni'])('keeps successful autosave feedback in the header without inserting a row above %s', initialTab => {
   mount({ initialTab, notif: { type: 'ok', msg: '💾 オートセーブ' }, saveResult: { ok: true } });
   expect(view.root.findAll(n => typeof n.type === 'string' && n.props.className === 'notif nok')).toHaveLength(0);
   expect(text(view.root.findByProps({ 'data-ds': 'home-header' }))).toContain('保存済み');

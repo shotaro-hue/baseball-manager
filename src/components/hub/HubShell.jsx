@@ -50,8 +50,8 @@ export default function HubShell({ state, flows, app }) {
   const navigation = useHubNavigation(tab, setTab, navigationScope);
   const { currentPrimarySection } = navigation;
   // The header already announces this save. A second, late inline row shifts
-  // the restored player in browsers without automatic scroll anchoring.
-  const redundantAutoSave = ['contract', 'trade', 'scout', 'fa'].includes(tab)
+  // the restored row or a pressed control without automatic scroll anchoring.
+  const redundantAutoSave = ['contract', 'trade', 'scout', 'fa', 'mailbox', 'news', 'alumni'].includes(tab)
     && notif?.type === 'ok' && notif.msg === '💾 オートセーブ' && gs.saveResult?.ok === true;
   const mailbox = gs.getMailboxBySelector?.() ?? gs.mailbox;
   const notifications = notificationSummary({ mailbox,
