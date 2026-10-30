@@ -17,7 +17,7 @@ export function annualBudgetHorizon(spending) {
   if (!year(end)) fail();
   return end;
 }
-function approval(input, policy) {
+function approval(input, policy, precedingApproved) {
   const { allocationPercent, smoothingYears, maxChangePercent } = policy;
   if (!id(policy.policyVersion) || ![allocationPercent, maxChangePercent].every(n => Number.isInteger(n) && n >= 0 && n <= 100)
     || !Number.isInteger(smoothingYears) || smoothingYears < 1 || smoothingYears > 3
