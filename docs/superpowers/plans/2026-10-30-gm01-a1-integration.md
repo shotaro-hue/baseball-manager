@@ -72,6 +72,8 @@
 
 ## Task 2: A1-1b legacy開始残高
 
+2026-10-30追記: #518マージ後の実装範囲・検証は[開始残高の記録](../../validation/gm-01-a1-1b/README.md)を参照。候補は契約部分のみで、通常セーブの切替は未接続、一般公開ゲートはOFF。
+
 **Files:** Create `src/engine/economyMigration.js`, `src/engine/__tests__/economyMigration.test.js`; modify `src/engine/contractLedger.js`, `src/engine/seasonContract.js`, `src/engine/annualTransactions.js`, `src/engine/faPersonnel.js`。必要ならselectorを`contractEconomy.js`へ置く。native v1の既存テストを維持。
 
 **Interfaces:** `prepareEconomyMigration(world,boundary) -> {ok,candidate?,issues}`の契約部分、`projectLegacyCarryForward(player,Y)`、`remainingEmploymentSeasons(employment,targetSeason)`。openingのobserved fields/保証unknown/旧投影の将来残を保持する。nativeの署名型は拡張用の嘘の値を要求しない。

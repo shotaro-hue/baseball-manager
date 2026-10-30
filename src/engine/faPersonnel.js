@@ -1,5 +1,5 @@
+import { employmentContractId, employmentPlayerFields } from './seasonContract';
 import { contractEmploymentAt, applyContractLedgerAction } from './contractLedger';
-import { contractSeasonsRemaining } from './seasonContract';
 import { settleFaPersonnelCompensation } from './annualSpending';
 import { faProtectionView } from './faProtection';
 import { requiresFaCompensation } from './faCompensation';
@@ -110,9 +110,9 @@ export function createFaPersonnelSettlement(state, command, signature) {
     for (const date of dates) {
       const e = contractEmploymentAt(spending.ledger, date).find(e => e.contract.playerId === c.playerId);
       if (!e || e.teamId !== p.teamId || e.registrationType === 'development' || isIkuseiPlayer(player)) fail();
-      if (transfers.some(a => a.contractId === e.contract.contractId)) continue;
-      transfers.push({ id: JSON.stringify(['fa-personnel', command.id, c.proposalId, e.contract.contractId]), type: 'transfer',
-        contractId: e.contract.contractId, teamId: p.teamId, toTeamId: c.teamId, effectiveDate: date });
+      if (transfers.some(a => a.contractId === employmentContractId(e.contract))) continue;
+      transfers.push({ id: JSON.stringify(['fa-personnel', command.id, c.proposalId, employmentContractId(e.contract)]), type: 'transfer',
+        contractId: employmentContractId(e.contract), teamId: p.teamId, toTeamId: c.teamId, effectiveDate: date });
     }
     spending = settleFaPersonnelCompensation(spending, { proposalId: c.proposalId, teamId: c.teamId,
       chosenDate: state.date, playerId: c.playerId, transactionId: command.id });
@@ -149,7 +149,7 @@ export function inspectFaPersonnelMoves(state) {
     const receipt = state.transactions.find(r => r.id === m.transactionId);
     if (!receipt?.faPersonnel?.moves?.some(x => stable(x) === stable(originalMove(m)))) fail();
     for (const a of m.transfers) {
-      const r = state.spending.ledger.records.find(r => r.contract.contractId === a.contractId);
+      const r = state.spending.ledger.records.find(r => employmentContractId(r.contract) === a.contractId);
       if (!keys(a, ['id', 'type', 'contractId', 'teamId', 'toTeamId', 'effectiveDate']) || a.type !== 'transfer'
         || a.id !== JSON.stringify(['fa-personnel', m.transactionId, m.proposalId, a.contractId])
         || a.teamId !== m.fromTeamId || a.toTeamId !== m.teamId || a.effectiveDate < m.effectiveDate
@@ -222,9 +222,7 @@ export function joinFaPersonnel(state, command, signature) {
   if (!m || Object.hasOwn(m, 'joinedDate') || state.phase !== 'preseason' || state.season !== p.contract.startSeason || state.date < m.effectiveDate) fail();
   const e = contractEmploymentAt(state.spending.ledger, state.date).find(e => e.contract.playerId === m.player.id && e.teamId === m.teamId);
   if (!e || e.registrationType === 'development') fail();
-  const player = { ...m.player, isFA: false, 育成: false, isIkusei: false, ikuseiYears: 0, salary: e.annualSalaryManYen,
-    contractId: e.contract.contractId, contractYears: e.contract.termYears,
-    contractYearsLeft: contractSeasonsRemaining(e.contract, state.season), contractSignedYear: e.contract.signedSeason };
+  const player = { ...m.player, isFA: false, 育成: false, isIkusei: false, ikuseiYears: 0, ...employmentPlayerFields(e, state.season) };
   return { ...state, teams: state.teams.map(t => t.id === m.teamId ? { ...t, farm: [...t.farm, player] } : t),
     faPersonnelMoves: state.faPersonnelMoves.map(x => x === m ? { ...x, joinedDate: state.date } : x),
     transactions: [...state.transactions, { id: command.id, signature, faPersonnelJoin: { proposalId: m.proposalId, joinedDate: state.date } }] };

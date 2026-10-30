@@ -1,3 +1,4 @@
+import { employmentContractId } from './seasonContract';
 import { MAX_SHIHAKA_TOTAL } from '../constants';
 import { getFaProgress } from './contract';
 import { contractSeasonsRemaining } from './seasonContract';
@@ -73,7 +74,7 @@ export function inspectAnnualAcquisitions(state) {
     validateMarketPlayer(player);
     const record = state.spending.ledger.records.find(r => r.actionId === p.id);
     const employment = contractEmploymentAt(state.spending.ledger, p.effectiveDate)
-      .find(e => e.contract.contractId === p.contract.contractId && e.teamId === p.teamId);
+      .find(e => employmentContractId(e.contract) === p.contract.contractId && e.teamId === p.teamId);
     if (!employment || record.changes.length || state.season > p.contract.startSeason
       || (state.season === p.contract.startSeason && state.phase !== 'preseason'))
       fail('加入待ち契約を変更・未加入のまま年度進行できません。');
