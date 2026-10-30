@@ -9,6 +9,7 @@ const rateStats=new Set(['IP','AVG','OBP','SLG','OPS','ERA','WHIP']);
 
 function validateHistory(h, player) {
   const fail=message=>`${player.playerId}: ${message}`;
+  if(h.teamName!=null)requireValue(typeof h.teamName==='string'&&h.teamName.trim().length>0,fail('invalid history team name'));
   requireValue(Number.isInteger(h.year)&&h.year>=1936&&h.year<=2025,fail('future/invalid performance year'));
   requireValue(!h.league||h.league==='NPB',fail('overseas statistics need a separate translation model'));
   if(player.kind==='pitcher')requireValue(Number.isSafeInteger(h.outs)&&h.outs>=0,fail('exact outs required, not truncated IP'));
@@ -28,14 +29,14 @@ function validateHistory(h, player) {
   } else if(number(h.IP))requireValue(Math.abs(h.IP*3-h.outs)<1e-7,fail('IP must equal exact outs / 3'));
 }
 
-export function compilePlayerMaster(master) {
+export function compilePlayerMaster(master, {localImport=false} = {}) {
   requireValue(master?.schemaVersion===1&&master.asOf===AS_OF&&master.status==='verified','verified schema v1 / opening date required');
   requireValue(Array.isArray(master.players)&&master.players.length>=800,'complete population required');
   requireValue(Array.isArray(master.sources)&&master.sources.length>0,'sources required');
   const sources=new Set();
   for(const source of master.sources) {
     requireValue(source.id&&!sources.has(source.id)&&/^https?:\/\//.test(source.url),'unique source id and URL required');
-    requireValue(source.redistribution==='cleared'&&typeof source.rightsEvidence==='string'&&source.rightsEvidence.trim(),'redistribution rights not cleared');
+    if(!localImport)requireValue(source.redistribution==='cleared'&&typeof source.rightsEvidence==='string'&&source.rightsEvidence.trim(),'redistribution rights not cleared');
     sources.add(source.id);
   }
   requireValue(Array.isArray(master.teams)&&master.teams.length===12&&new Set(master.teams.map(t=>t.teamId)).size===12,'12 independent team evidence rows required');

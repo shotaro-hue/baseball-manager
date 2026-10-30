@@ -5,7 +5,7 @@ import { useGameState } from './useGameState';
 import { TEAM_DEFS } from '../constants';
 
 const mocks=vi.hoisted(()=>({persist:vi.fn(),generate:vi.fn(),foreign:vi.fn(),schedule:vi.fn(),trigger:vi.fn(),queue:vi.fn()}));
-vi.mock('../engine/bootstrapTeams',()=>({createInitialTeams:()=>mocks.generate(),createInitialTeamsAsync:async()=>mocks.generate()}));
+vi.mock('../engine/bootstrapTeams',()=>({createInitialTeams:(...args)=>mocks.generate(...args),createInitialTeamsAsync:async(...args)=>mocks.generate(...args)}));
 vi.mock('../engine/saveload',()=>({hasSave:()=>false,getSaveQueueSnapshot:()=>mocks.queue(),getAutoSaveIntervalMs:()=>Infinity,enqueueSaveGame:async(state,options)=>options?.initialCareerLogs ? mocks.persist(options.initialCareerLogs) : {ok:true}}));
 vi.mock('../engine/player',()=>({generateForeignFaPool:()=>mocks.foreign()}));
 vi.mock('../engine/scheduleGen',async original=>({...await original(),generateSeasonSchedule:(...args)=>mocks.schedule(...args),calcAllStarTriggerDay:()=>mocks.trigger()}));
@@ -29,6 +29,13 @@ for(const phase of ['generate','trigger'])it('releases pending state and permits
   expect(gs.newGameInitializationStatus).toBe('ready');expect(gs.screen).toBe('hub');
 });
 afterEach(()=>{act(()=>view.unmount());vi.restoreAllMocks();});
+it('uses the explicitly imported master even when old teams are still in memory',async()=>{
+ await act(async()=>{gs.setTeams(initial());});
+ const master={schemaVersion:1,players:[{playerId:'external'}]};
+ await act(async()=>{await gs.handleSelect(0,master);});
+ expect(mocks.generate).toHaveBeenCalledWith(master,{localImport:true});
+ expect(gs.newGameInitializationStatus).toBe('ready');
+});
 it('publishes pending before generation, blocks a second selection, and stays on title until persistence succeeds',async()=>{
   let resolve,started;const writingStarted=new Promise(r=>{started=r;});
   mocks.persist.mockImplementation(()=>{started();return new Promise(r=>{resolve=r;});});

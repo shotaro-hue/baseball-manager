@@ -146,7 +146,7 @@ export default function AppScreenRouter({ app }) {
         isInitializationInProgress={gs.isNewGameInitializing}
         getInitializationAttempt={gs.getNewGameInitializationAttempt}
         onLoad={handleLoad}
-        onSelectTeam={id => { clearLoadError?.(); return gs.handleSelect(id); }}
+        onSelectTeam={(id,master) => { clearLoadError?.(); return gs.handleSelect(id,master); }}
         onSaveDeletionStart={handleSaveDeletionStart}
         onSaveDeletionEnd={handleSaveDeletionEnd}
         onSaveDeleted={() => { setSaveExists(false); clearLoadError?.(); }}

@@ -72,7 +72,7 @@ export function prepareRealPlayer(input, kind) {
   const recent=history.filter(h=>h.year>=2023);
   const dataQuality={...input.dataQuality,abilities:recent.length?'game-estimate-pre-opening':'game-estimate-no-history'};
   let pos=input.pos;
-  if (kind==='pitcher') pos=input.roleStatus==='verified'?input.pos:projectPitching(recent).role;
+  if (kind==='pitcher') pos=['verified','game-estimate-pre-opening'].includes(input.roleStatus)?input.pos:projectPitching(recent).role;
   else if (!FIELDING_POSITIONS.includes(pos)) {pos=['捕手','C'].includes(pos)?'捕手':['内野手','IF'].includes(pos)?'一塁手':'左翼手';dataQuality.position='game-assumption';}
   else dataQuality.position ??= input.positions?'provided':'legacy-unverified';
   const development=Boolean(input.育成||input.isIkusei||input.registration==='development');

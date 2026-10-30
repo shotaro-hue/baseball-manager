@@ -679,13 +679,13 @@ export function useGameState() {
     return () => clearTimeout(timer);
   }, [offseasonPlan, screen, saveDirty, isAutoSaveSuspended, handleSave, notify]);
 
-  const ensureInitialTeams = useCallback(async () => {
-    if (teams.length === TEAM_DEFS.length) return teams;
+  const ensureInitialTeams = useCallback(async (localMaster) => {
+    if (!localMaster && teams.length === TEAM_DEFS.length) return teams;
     const { createInitialTeamsAsync } = await import('../engine/bootstrapTeams');
-    return createInitialTeamsAsync();
+    return localMaster ? createInitialTeamsAsync(localMaster,{localImport:true}) : createInitialTeamsAsync();
   }, [teams]);
 
-  const handleSelect = useCallback(async (id)=>{
+  const handleSelect = useCallback(async (id, localMaster)=>{
     if (newGameInitializationRef.current) return;
     newGameInitializationRef.current = true;
     newGameInitializationAttemptRef.current += 1;
@@ -696,7 +696,7 @@ export function useGameState() {
       // Its App continuation is invalidated by the attempt counter above.
       await titleLoadPromiseRef.current?.catch(() => {});
       await yieldToBrowser();
-      const nextTeams = await ensureInitialTeams();
+      const nextTeams = await ensureInitialTeams(localMaster);
       const [playerMod, scheduleMod] = await Promise.all([
         loadPlayerModule(),
         loadScheduleModule(),

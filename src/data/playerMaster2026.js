@@ -5,8 +5,10 @@ import { compilePlayerMaster } from './playerMasterSchema';
 
 // Facts, confidence and game estimates are separate. This adapter is new-game only.
 // Until a fully verified, redistributable master is supplied, completeness stays false.
-export function getOpeningRosters(master = release) {
-  if(master!==null) return compilePlayerMaster(master);
+export function getOpeningRosters(master = release, options) {
+  // Bundled release data always passes publication checks, even when a caller
+  // accidentally supplies local-import options without an external master.
+  if(master!==null) return compilePlayerMaster(master, master===release?undefined:options);
   return Object.fromEntries(Object.entries(NPB2025_ROSTERS).map(([teamId,roster])=> {
     const normalize=(player,kind)=>{
       const correction=PLAYER_CORRECTIONS_2026[`${teamId}::${player.name}`]||{};

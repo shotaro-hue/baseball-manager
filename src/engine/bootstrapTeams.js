@@ -8,13 +8,13 @@ import { TEAM_DEFS } from '../constants';
 import { yieldToBrowser } from './yieldToBrowser';
 import { startClubFinance } from './clubFinance';
 
-export function createInitialTeams(master) {
-  const rosters=getOpeningRosters(master);
+export function createInitialTeams(master, options) {
+  const rosters=getOpeningRosters(master, options);
   return TEAM_DEFS.map(def=>createInitialTeam(def,rosters));
 }
 
-export async function createInitialTeamsAsync(master) {
-  const rosters=getOpeningRosters(master);
+export async function createInitialTeamsAsync(master, options) {
+  const rosters=getOpeningRosters(master, options);
   const teams = [];
   for (const def of TEAM_DEFS) {
     if (teams.length > 0) await yieldToBrowser();

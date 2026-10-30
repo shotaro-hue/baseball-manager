@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { TEAM_DEFS } from '../constants';
+import LocalPlayerMasterPicker from './LocalPlayerMasterPicker';
 
 let titleSaveModulePromise = null;
 
@@ -25,8 +26,11 @@ export default function TitleScreen({
   const [deleting, setDeleting] = useState(false);
   const [deletionError, setDeletionError] = useState(null);
   const deletionInProgress = useRef(false);
+  const [localMaster,setLocalMaster]=useState(null),[readingMaster,setReadingMaster]=useState(false);
+  const readingMasterRef=useRef(false);
+  const setMasterBusy=busy=>{readingMasterRef.current=busy;setReadingMaster(busy);};
   const initializing = initializationStatus === 'initializing';
-  const actionsLocked = () => initializing || deletionInProgress.current || isInitializationInProgress?.();
+  const actionsLocked = () => initializing || readingMasterRef.current || deletionInProgress.current || isInitializationInProgress?.();
 
   useEffect(() => {
     let alive = true;
@@ -56,8 +60,8 @@ export default function TitleScreen({
       type="button"
       className="tcard"
       style={{ '--c': team.color }}
-      disabled={initializing || deleting}
-      onClick={() => { if (!actionsLocked()) onSelectTeam(team.id); }}
+      disabled={initializing || deleting || readingMaster}
+      onClick={() => { if (!actionsLocked()) localMaster?onSelectTeam(team.id,localMaster):onSelectTeam(team.id); }}
       aria-label={team.name}
     >
       <span
@@ -100,6 +104,7 @@ export default function TitleScreen({
           MANAGER 2025
         </div>
         <div className="tsub">NPB SIMULATION v2.1 - TACTICAL MODE</div>
+        <LocalPlayerMasterPicker disabled={initializing||deleting||readingMaster} onChange={setLocalMaster} onBusy={setMasterBusy}/>
 
         {saveExists && (
           <div

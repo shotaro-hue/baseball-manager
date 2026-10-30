@@ -1,5 +1,22 @@
 import { test, expect } from '@playwright/test';
 import { TEAM, waitForNewGameReady, saveHub, reloadAndLoad } from './helpers/progression';
+import {localMasterFixture} from './fixtures/local-master';
+
+test('local master reaches bootstrap through title routing and survives save/reload',async({page})=>{
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('/');
+ await page.getByText('選手名簿ファイルを使う（新規ゲーム）',{exact:true}).click();
+ await page.getByLabel('選手名簿JSON').setInputFiles({name:'local-master.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(localMasterFixture()))});
+ await expect(page.getByText('実在900名',{exact:false})).toBeVisible();
+ await page.getByRole('button',{name:TEAM,exact:true}).click();await waitForNewGameReady(page,TEAM);
+ const saved=await saveHub(page),all=saved.teams.flatMap(t=>[...t.players,...t.farm]);
+ expect(all).toHaveLength(900);expect(new Set(all.map(p=>p.realPlayerId)).size).toBe(900);
+ expect(all.filter(p=>p.isIkusei)).toHaveLength(180);expect(saved.teams.flatMap(t=>t.players).some(p=>p.isIkusei)).toBe(false);
+ await reloadAndLoad(page);
+ const loaded=await saveHub(page);
+ expect(loaded.teams.flatMap(t=>[...t.players,...t.farm]).map(p=>p.realPlayerId)).toEqual(all.map(p=>p.realPlayerId));
+ expect(errors).toEqual([]);
+});
 
 async function initialContents(page) {
   return page.evaluate(async () => {

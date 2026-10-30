@@ -92,6 +92,7 @@ function resolveHistoryTeamNames(history, career, fallback) {
   }, new Map());
   const yearSeen = new Map();
   return rows.map((row) => {
+    if(row.teamName)return row.teamName;
     const year = row.year;
     const seen = yearSeen.get(year) || 0;
     yearSeen.set(year, seen + 1);
