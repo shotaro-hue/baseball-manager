@@ -78,7 +78,13 @@ test('career generations detail failure explains incomplete history at mobile an
  await page.goto('/');
  const props=await page.evaluate(async fixture=>{
   const m=await import('/baseball-manager/src/engine/saveload.js');fixture.teams=(await import('/baseball-manager/src/engine/bootstrapTeams.js')).createInitialTeams();fixture.saveId='detail-widths';await m.saveGame(fixture);
-  const saved=await m.loadGame(),team=saved.teams.find(t=>t.id===saved.myId),player=team.players.find(p=>p.careerLogSummary?.trimmedEntries>3&&!p.isPitcher);
+  const saved=await m.loadGame(),team=saved.teams.find(t=>t.id===saved.myId);
+  // Career persistence applies to every owned player. Initial ability/roster
+  // updates may place veterans in the farm, so active selection is not evidence
+  // that a long career exists or was lost during saving.
+  const player=[...team.players,...team.farm]
+    .filter(p=>p.careerLogSummary?.trimmedEntries>3&&!p.isPitcher)
+    .sort((a,b)=>b.careerLogSummary.trimmedEntries-a.careerLogSummary.trimmedEntries)[0];
   if(!player)throw new Error('fixture requires long career');
   return{player,year:saved.year,teamId:team.id,teamName:team.name,saveId:saved.saveId};
  },fixture);
