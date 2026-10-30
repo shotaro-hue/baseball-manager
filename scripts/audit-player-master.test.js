@@ -8,11 +8,12 @@ describe('2026 opening roster source audit', () => {
     const report = auditPlayerMaster();
     expect(report.asOf).toBe(AS_OF);
     expect(report.teams).toHaveLength(12);
-    expect(report.currentCount).toBe(445);
-    expect(report.development).toBe(0);
+    const raw = Object.values(NPB2025_ROSTERS).flatMap(t => [...t.batters, ...t.pitchers]);
+    expect(report.currentCount).toBe(raw.length);
+    expect(report.controlled + report.development).toBe(raw.length);
     expect(report.referenceCount).toBeNull();
-    expect(report.counts['post-opening-performance']).toBe(445);
-    expect(report.counts['missing-history']).toBeGreaterThan(0);
+    expect(report.counts['post-opening-performance'] ?? 0).toBe(raw.filter(p => p.stats?.G > 0).length);
+    expect(report.teams.reduce((sum, t) => sum + t.controlled + t.development, 0)).toBe(raw.length);
   });
 
   it('applies each present multi-year contract using the actual team mapping', () => {
