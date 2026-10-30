@@ -77,6 +77,10 @@ for(const width of [360,390,1440])test(`F04 farm historical rankings, retired de
 test('E1 new game, five games, persisted reload, one more game', async ({ page }, testInfo) => {
   const mobile = testInfo.project.name === 'mobile-webkit';
   await startNewGame(page);
+  expect(await page.evaluate(async () => {
+    const { loadGame } = await import('/baseball-manager/src/engine/saveload.js');
+    return (await loadGame()).contractEconomy;
+  })).toBeUndefined();
   const initial = progressSignature(await saveHub(page, { progressOnly: true }));
   await expect(page.locator('.topbar')).toContainText('残り143試合');
   if (mobile) await mainNavigation(page, true).getByRole('button', { name: '日程', exact: true }).click();
@@ -94,6 +98,10 @@ test('E1 new game, five games, persisted reload, one more game', async ({ page }
   expect(after.played).toBe(before.played + 1);
   expect(after.gameDay).toBe(before.gameDay + 1);
   await expect(page.locator('.topbar')).toContainText('残り137試合');
+  expect(await page.evaluate(async () => {
+    const { loadGame } = await import('/baseball-manager/src/engine/saveload.js');
+    return (await loadGame()).contractEconomy;
+  })).toBeUndefined();
 });
 
 test('E2 final regular game, postseason save/reload, offseason and next year', async ({ page }) => {

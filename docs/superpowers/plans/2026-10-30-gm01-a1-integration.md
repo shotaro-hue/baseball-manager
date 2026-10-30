@@ -56,6 +56,8 @@
 
 ## Task 1: A1-1a 共通worldとclock
 
+2026-10-30追記: #517マージ後の実装・検証範囲は[記録](../../validation/gm-01-a1-1a/README.md)を参照。実bootstrapの支配下最低年俸不整合を発見し、合法seed fixtureでの初期factory検証と分離した。一般プレイのゲートはOFF。
+
 **Files:** Create `src/engine/contractEconomy.js`, `src/engine/economyCalendar.js`, `src/engine/__tests__/contractEconomy.test.js`, `src/hooks/useGameState.economy.test.js`; modify `src/hooks/gameStateReducer.js`, `src/hooks/useGameState.js`。名前は本計画の新規API。
 
 **Interfaces:** `toAnnualState(world) / fromAnnualState(world, annualState) / quoteEconomyCommand(world, command) / reduceEconomyCommand(world, command)`、`createAnnualNewGameWorld({teams,faPool,myId,saveId,season,policy,randomRoot})`。current fieldがないmodeはlegacy。clockのseasonとroot yearの一致、dateの暦、epoch/revision、single-world更新を検証する。通常のbuildでは`ANNUAL_ECONOMY_RELEASE_ENABLED=false`。
@@ -208,6 +210,8 @@
 **受入:** unresolved0で春へ進め、赤字や不可避の戦力不足で永久停止しない。予算再配布/契約残年数二重減算/二重加入/前年成長の二重実行0。まとめ中の回答予定も落ちない。
 
 ## Task 11: A1-4a UI・校正・統合証拠
+
+A1-1aで発見した初期条件の課題: `createInitialTeams()`の支配下240/300万円seedをそのままnative契約へできない。新規annual専用の区分/最低年俸に整合する初期生成を確定し、実12球団のfactory成功・元データ非変更・予算校正を検証する。旧保存への自動切上げや勝手な育成化で解決しない。この項目はA1-4bの有効化前に必須。
 
 **Files:** Modify `src/components/tabs/ContractTab.jsx`, `src/components/tabs/FinanceTab.jsx`, `src/components/tabs/ContractPayroll.jsx`, `src/components/OffseasonPlanningScreen.jsx`, `src/components/hub/HubFaTab.jsx`; create `scripts/a1-economy-validation.js`, `e2e/economy-annual-journey.spec.js`, `e2e/economy-save-resume.spec.js`, `docs/validation/gm-01-a1-4/README.md`。既存長期harnessは呼出経路を監査してから拡張する。
 
