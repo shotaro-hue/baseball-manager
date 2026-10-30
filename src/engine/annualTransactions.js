@@ -10,6 +10,7 @@ import { marketPlacement } from './marketRoster';
 import { projectTradeRosters } from './tradeTransaction';
 import { acquisitionOfferMetadata, normalizeMarketEntry } from './acquisitionMarket';
 import { inspectAnnualAcquisitions, acquisitionRosterError, explicitAcquisitionCandidate } from './annualAcquisitions';
+import { normalizeFaProtectedIds, inspectFaProtectionLists, createFaProtectionList, faProtectionView } from './faProtection';
 
 // GM-01C: explicit, opt-in engine state. Live hooks/save adoption remain gated.
 const fail = message => { throw new Error(message); };
@@ -38,6 +39,7 @@ const kinds = {
   'offer-fa': ['proposal'], 'accept-fa': ['proposalId'], 'cancel-fa': ['proposalId'],
   'reject-fa': ['proposalId'], 'join-fa': ['proposalId'],
   'settle-fa-compensation': ['proposalId', 'teamId', 'method'],
+  'submit-fa-protection': ['proposalId', 'teamId', 'protectedPlayerIds'],
   'offer-renewal': ['proposal', 'contractId'], 'replace-renewal': ['proposalId', 'proposal', 'contractId'],
   'accept-renewal': ['proposalId', 'contractId'], 'cancel-renewal': ['proposalId'],
   'reserve-rookie': ['proposal'], 'decline-rookie': ['teamId', 'playerId'], 'join-rookie': ['proposalId'],
@@ -62,6 +64,9 @@ function commandFor(input) {
     if (![c.proposalId, c.contractId].every(validId)) fail('受諾する更改と現在契約を確認してください。');
   } else if (c.type === 'settle-fa-compensation') {
     if (![c.proposalId, c.teamId].every(validId) || c.method !== 'cash-only') fail('FA補償の対象・旧球団・金銭方式を確認してください。');
+  } else if (c.type === 'submit-fa-protection') {
+    if (![c.proposalId, c.teamId].every(validId)) fail('FA保護名簿の対象・球団を確認してください。');
+    c.protectedPlayerIds = normalizeFaProtectedIds(c.protectedPlayerIds);
   } else if (c.type === 'decline-rookie') {
     if (![c.teamId, c.playerId].every(validId)) fail('辞退する新人と受諾球団を確認してください。');
   } else if (c.type === 'convert-to-controlled') {
@@ -173,6 +178,7 @@ function inspect(state) {
         fail('FA補償の精算履歴と旧球団の選択が一致しません。');
     }
   }
+  inspectFaProtectionLists(state);
   quoteAnnualSpendingPlan(state.spending);
   return { teams, players, employed };
 }
@@ -429,11 +435,18 @@ function candidate(input, command) {
     if (receipt.signature !== signature) fail('同じ取引IDの条件が変わっています。');
     return { state: input, rows: quoteAnnualSpendingPlan(before.spending), replayed: true };
   }
-  if (input.phase === 'offseason' && !c.type.endsWith('renewal') && !c.type.endsWith('rookie') && !c.type.endsWith('fa') && c.type !== 'settle-fa-compensation') fail('オフの新制度取引は翌年度契約だけが接続済みです。');
-  const after = withFloors(c.type === 'trade' ? tradeCandidate(before, c)
+  if (input.phase === 'offseason' && !c.type.endsWith('renewal') && !c.type.endsWith('rookie') && !c.type.endsWith('fa') && !['settle-fa-compensation', 'submit-fa-protection'].includes(c.type)) fail('オフの新制度取引は翌年度契約だけが接続済みです。');
+  // Snapshot and receipt enter validation together; no unaudited intermediate state.
+  let protectedState;
+  if (c.type === 'submit-fa-protection') {
+    const record = createFaProtectionList(before, c);
+    protectedState = { ...before, faProtectionLists: [...(before.faProtectionLists ?? []), record],
+      transactions: [...before.transactions, { id: c.id, signature, faProtection: JSON.parse(JSON.stringify(record)) }] };
+  }
+  const after = withFloors(protectedState ?? (c.type === 'trade' ? tradeCandidate(before, c)
     : c.type === 'convert-to-controlled' ? conversionCandidate(before, c)
     : c.type.endsWith('renewal') ? renewalCandidate(before, c)
-    : c.type.endsWith('rookie') ? rookieCandidate(before, c) : faCandidate(before, c));
+    : c.type.endsWith('rookie') ? rookieCandidate(before, c) : faCandidate(before, c)));
   const mode = c.type === 'trade' ? c.mode : 'spend';
   // A derived floor restored by a losing/cancelled bid is not new spending.
   // Use final floors for admission; independently check actual headroom changes.
@@ -447,7 +460,12 @@ function candidate(input, command) {
   // Cancellation/losing bids create no obligation; winner admission is above.
   // Trades must still account for real vacancies created by outgoing players.
   if (c.type === 'trade' && rows.some(r => r.remainingManYen < 0 && r.remainingManYen < oldRows.get(key(r.teamId, r.season)).remainingManYen)) fail('赤字年度の追加余力を悪化させる取引です。');
-  return { state: { ...after, transactions: [...after.transactions, { id: c.id, signature }] }, rows, replayed: false };
+  return { state: { ...after, transactions: protectedState ? after.transactions : [...after.transactions, { id: c.id, signature }] }, rows, replayed: false };
+}
+
+export function quoteFaProtectionList(state, selector) {
+  try { return { ok: true, protection: faProtectionView(withFloors(state), selector) }; }
+  catch (error) { return { ok: false, error: error.message }; }
 }
 
 export function quoteAnnualTransaction(state, command) {

@@ -74,6 +74,42 @@ describe('initial catcher coverage', () => {
       expect(result.farm.find(p => p.id === id).registrationCooldownDays).toBe(10);
     }
   });
+  it.each([42, 1099])('recalls same-plan fielding demotions before restoring three active catchers (seed %i)', seed => {
+    // Lotte's second-base-capable real players are all trimmed at these seeds.
+    // Coverage repair must recall one before the third-catcher swap can succeed.
+    seedRandom(seed);
+    const teams = createInitialTeams();
+    checkTeams(teams, true);
+    for (const team of teams) {
+      for (const fielding of [team.fieldingNoDh, team.fieldingDh]) {
+        for (const [id, pos] of Object.entries(fielding)) {
+          if (pos === 'DH') continue;
+          const player = team.players.find(p => p.id === id);
+          expect(player.pos === pos || Number(player.positions?.[pos]) > 0,
+            `team ${team.id}: ${player.name} at ${pos}`).toBe(true);
+        }
+      }
+    }
+  });
+  it('does not recall fielders whose cooldown predates initial optimization', () => {
+    seedRandom(3);
+    const raw = buildTeam(TEAM_DEFS[0]);
+    const canPlaySecond = p => !p.isPitcher
+      && (p.pos === '二塁手' || Number(p.positions?.['二塁手']) > 0);
+    const moved = raw.players.filter(canPlaySecond);
+    const team = { ...raw,
+      players: raw.players.filter(p => !canPlaySecond(p)),
+      farm: [...raw.farm, ...moved].map(p => canPlaySecond(p)
+        ? { ...p, registrationCooldownDays: 10 } : p),
+    };
+    const blockedIds = team.farm.filter(canPlaySecond).map(p => p.id);
+    expect(blockedIds.length).toBeGreaterThan(0);
+    const result = optimizeTeamForGameStart(team);
+    expect(result.players.filter(p => blockedIds.includes(p.id))).toEqual([]);
+    for (const id of blockedIds) {
+      expect(result.farm.find(p => p.id === id).registrationCooldownDays).toBe(10);
+    }
+  });
   it('keeps three active catchers and a playable farm in 65-player real-team organizations', () => {
     for (let seed = 1; seed <= 100; seed++) {
       seedRandom(seed);

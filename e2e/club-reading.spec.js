@@ -98,3 +98,51 @@ test('club reading selected filters and answer effects remain visually distinct'
  const position=await route.getByRole('button',{name:/一戦ずつ大切に戦う/}).evaluate(n=>{const range=document.createRange();range.selectNode(n.firstChild);return {bottom:range.getBoundingClientRect().bottom,top:n.querySelector('small').getBoundingClientRect().top};});
  expect(position.top).toBeGreaterThanOrEqual(position.bottom);
 });
+
+// Hold a real autosave while the pointer is down. A late inline success notice
+// must not move the return button out from under that pointer.
+for (const [width, height] of [[360, 800], [390, 844], [761, 900], [1440, 900]]) {
+ test(`club reading return survives autosave completion during a click ${width}px`, async ({page}, testInfo) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({width, height});
+  await prepareClubReading(page); await waitSaveIdle(page);
+  await notification(page).click();
+  const route = readingRoute(page);
+  await route.getByRole('button', {name: '次の40件', exact: true}).click();
+  await page.evaluate(() => {
+   const original = navigator.locks.request.bind(navigator.locks);
+   const gate = new Promise(resolve => { window.releaseReadingSave = resolve; });
+   navigator.locks.request = (...args) => gate.then(() => original(...args));
+   window.restoreReadingLock = () => { navigator.locks.request = original; };
+  });
+  const row = route.getByRole('button', {name: /球団からのお知らせ41号/});
+  await row.scrollIntoViewIfNeeded();
+  await row.evaluate(node => node.addEventListener('click', () => {
+   window.readingOriginY = scrollY;
+  }, {capture: true, once: true}));
+  await row.click();
+  await expect(route.getByRole('heading', {name: '球団からのお知らせ41号', exact: true})).toBeFocused();
+  await expect(page.locator('.home-save')).toContainText('保存中');
+  const back = route.getByRole('button', {name: '一覧に戻る', exact: true});
+  await back.scrollIntoViewIfNeeded();
+  const before = await back.boundingBox();
+  await page.screenshot({path: testInfo.outputPath('before-save-completion.png')});
+  await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+  await page.mouse.down();
+  try {
+   await page.evaluate(() => { window.releaseReadingSave(); window.restoreReadingLock(); });
+   await expect(page.locator('.home-save')).toContainText('保存済み');
+   const after = await back.boundingBox();
+   await testInfo.attach('return-button-position', {body: JSON.stringify({before, after}), contentType: 'application/json'});
+   await page.screenshot({path: testInfo.outputPath('after-save-completion.png')});
+   expect.soft(Math.abs(after.y - before.y)).toBeLessThan(1);
+  } finally {
+   await page.mouse.up();
+  }
+  await expect(route.locator('.reading-detail')).toHaveCount(0);
+  await expect(row).toBeFocused();
+  await expect.poll(() => page.evaluate(() => Math.abs(scrollY - window.readingOriginY))).toBeLessThan(4);
+  const saved = await readSave(page);
+  expect(saved.mailbox.find(mail => mail.id === 'reading-mail-40').read).toBe(true);
+ });
+}
