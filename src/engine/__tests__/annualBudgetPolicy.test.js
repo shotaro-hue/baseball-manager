@@ -42,6 +42,20 @@ describe('renewal planning replaces rather than stacks obligations', () => {
     if(kind==='source')p.sourceContractId='absent'; if(kind==='owner')p.teamId=1; if(kind==='year')p.season=2028;
     const before=json(w); expect(()=>toAnnualState(freeze(w))).toThrow(); expect(w).toEqual(before);
   });
+  it('releases the old-club estimate when a new contract starts after February 1',()=>{
+    const w=planned(),before=json(w),s=toAnnualState(w).spending;
+    const next={...s,ledger:applyContractLedgerAction(s.ledger,{
+      id:'late-reacquisition',type:'sign',teamId:1,effectiveDate:'2027-04-01',
+      contract:{version:1,contractId:'new-2027-contract',playerId:0,signedSeason:2027,
+        agreementPhase:'season',purpose:'acquisition',startSeason:2027,endSeason:2027,
+        termYears:1,annualSalaryManYen:1200,guaranteed:true,registrationType:'controlled'},
+    })};
+    const oldRows=quoteAnnualSpendingPlan(s),rows=quoteAnnualSpendingPlan(freeze(next));
+    expect(oldRows.find(r=>r.teamId===0&&r.season===2027).renewalPlanReserveManYen).toBe(6000);
+    expect(rows.find(r=>r.teamId===0&&r.season===2027).renewalPlanReserveManYen).toBe(0);
+    expect(rows.find(r=>r.teamId===1&&r.season===2027).salaryManYen).toBeGreaterThan(0);
+    expect(next.renewalPlans).toEqual(s.renewalPlans);expect(w).toEqual(before);
+  });
   it('does not let ordinary spending assessment delete a plan to finance another obligation',()=>{
     const s=toAnnualState(planned()).spending;
     expect(()=>assessAnnualSpendingChange(s,{...s,renewalPlans:[]})).toThrow();
@@ -56,6 +70,26 @@ describe('explicit budget policy, no live calibration',()=>{
     expect(q.rosterRequirements.every(r=>r.requiredControlledCount===65)).toBe(true);
     expect(q.budgetPolicies[0]).toMatchObject({policyVersion:'experiment',inputsRecorded:true,approvedManYen:51000});
     expect(w).toEqual(before); expect(quote(json(w),json(p))).toEqual(q);
+  });
+  it('chains year-on-year budget limits when future prior approvals are null',async()=>{
+    const {quoteAnnualBudgetPolicy:quote}=await policyModule(),w=economyFixture(),p=policy(w);
+    p.forecasts.find(f=>f.teamId===0&&f.season===2027).operatingSurplusesManYen=[500000];
+    const q=quote(freeze(w),freeze(p));
+    expect(q.authorizations.find(a=>a.teamId===0&&a.season===2026).approvedManYen).toBe(51000);
+    expect(q.authorizations.find(a=>a.teamId===0&&a.season===2027).approvedManYen).toBe(56100);
+    expect(q.budgetPolicies.find(a=>a.teamId===0&&a.season===2027).previousApprovedManYen).toBeNull();
+    const next=install(w,q);expect(()=>toAnnualState(next)).not.toThrow();
+    // Recalculation of an individual row is insufficient: the prior year is authoritative.
+    const tampered=json(next),policyRow=tampered.contractEconomy.budgetPolicies.find(a=>a.teamId===0&&a.season===2027);
+    policyRow.previousApprovedManYen=500000;
+    policyRow.approvedManYen=450000;
+    tampered.contractEconomy.engine.spending.authorizations.find(a=>a.teamId===0&&a.season===2027).approvedManYen=450000;
+    expect(()=>toAnnualState(freeze(tampered))).toThrow();
+  });
+  it('rejects an explicit future-year prior that differs from preceding approval',async()=>{
+    const {quoteAnnualBudgetPolicy:quote}=await policyModule(),w=economyFixture(),p=policy(w);
+    p.forecasts.find(f=>f.teamId===0&&f.season===2027).previousApprovedManYen=1000000;
+    expect(()=>quote(freeze(w),freeze(p))).toThrow();
   });
   it('smooths observations and bounds changes using explicit prior approvals',async()=>{
     const {quoteAnnualBudgetPolicy:quote}=await policyModule(),w=economyFixture(),p=policy(w);p.smoothingYears=3;
