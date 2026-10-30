@@ -4,8 +4,8 @@ import { contractEmploymentAt, isContractLedgerExtension } from './contractLedge
 import { employmentPlayerFields } from './seasonContract';
 import { quoteAnnualSpendingPlan } from './annualSpending';
 
-// Storage validation only. Activation, publish/adopt acknowledgements and the
-// non-coalescing economic command barrier belong to the next A1-1d stage.
+// Storage validation only. Commit acknowledgements/barrier live in saveload;
+// activation and application hydration remain separate A1-1d stages.
 export function validateEconomySave(world) {
   const mode = contractEconomyMode(world);
   if (mode === 'annual') {

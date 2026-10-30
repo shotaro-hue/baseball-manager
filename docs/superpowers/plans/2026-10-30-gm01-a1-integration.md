@@ -109,6 +109,8 @@ PR #521レビュー修正: revision増加でもrandomRoot・確定済み台帳�
 
 2026-10-31次工程: [A1-1d-2a 保存要求の置換防止](./2026-10-31-gm01-a1-1d2a-save-queue.md)へ分割。手動/自動要求のFIFOと契約envelopeの非置換化のみを扱う。公開root ack・publish→adopt barrier・hook一括採用は未実装で、queueの`ok:true`を候補採用の保証に使わない。
 
+2026-10-31次工程: [A1-1d-2b 公開確認と状態採用](./2026-10-31-gm01-a1-1d2b-commit.md)。保存サービスのack・barrier・採用binding・公開後失敗の復旧を追加。通常Appのhook一括hydration/成功処理と移行anchor/fenceは後続。
+
 **Files:** Create `src/engine/economyPersistence.js`, `src/engine/economyActivation.js`, `tests/economy-save-migration.test.js`, `e2e/economy-migration.spec.js`; modify `src/engine/economyMigration.js`, `src/engine/saveload.js`, `src/hooks/useGameState.js`, `src/hooks/gameStateReducer.js`, `src/App.jsx`。storage fence/activation anchorは既存`baseballManagerDb.js`を拡張したテストharnessで確認するが通常DB versionはまだ5。保存/hydrationと移行anchorが大きければ本Taskを2PRに分け、両方ゲートOFFで保つ。
 
 **Interfaces:** `commitEconomyCandidate(candidate,expected)`、mode/schema/epoch付き保存・原子的hydration、移行`applied/deferred`。成功時の`committed`は公開root由来のsaveId/epoch/revision/rootSignature/receiptIdsを返し、候補との一致が採用条件。通常保存と共通のbarrier内でannual確定保存を置換不可とし、既存の待機payloadをまとめる経路へそのまま渡さない。dirtyScopesと既存archive/career/farmのreceiptを保存候補に残す。
