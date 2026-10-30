@@ -7,7 +7,7 @@ export function normalizeFaCompensationBasis(input) {
   if (!input || Object.keys(input).length !== 2
     || Object.keys(input).some(k => !['previousAnnualSalaryManYen', 'exercise'].includes(k))
     || !Number.isSafeInteger(input.previousAnnualSalaryManYen) || input.previousAnnualSalaryManYen < MIN_SALARY_SHIHAKA
-    || !['first', 'repeat'].includes(input.exercise)) fail();
+    || !['first', 'repeat', 'legacy-conservative-max'].includes(input.exercise)) fail();
   return { previousAnnualSalaryManYen: input.previousAnnualSalaryManYen, exercise: input.exercise };
 }
 
@@ -17,7 +17,7 @@ export function faCashCompensationManYen(p, method = 'cash-only') {
   if (!['cash-only', 'player-and-cash'].includes(method)) fail();
   if (!requiresFaCompensation(p)) return 0;
   const basis = normalizeFaCompensationBasis(p.marketEntry.compensationBasis);
-  const percent = (method === 'cash-only' ? FA_CASH_COMPENSATION_PERCENT : FA_PERSONNEL_COMPENSATION_PERCENT)[basis.exercise][p.marketEntry.compensationRank];
+  const percent = (method === 'cash-only' ? FA_CASH_COMPENSATION_PERCENT : FA_PERSONNEL_COMPENSATION_PERCENT)[basis.exercise === 'legacy-conservative-max' ? 'first' : basis.exercise][p.marketEntry.compensationRank];
   // Integer 万円 policy: reserve/pay the same upward-rounded amount, once.
   return Number((BigInt(basis.previousAnnualSalaryManYen) * BigInt(percent) + 99n) / 100n);
 }

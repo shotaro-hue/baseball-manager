@@ -194,3 +194,12 @@ describe('FA cash compensation obligations in annual spending (not live)', () =>
     expect(after.oneOffCosts).toEqual(expectedCosts());
   });
 });
+
+
+it.each([['A',8000],['B',6000]])('preserves unknown legacy %s history through reserve, acceptance, settlement and reload',(rank,amount)=>{
+  const p=prop({rank,exercise:'legacy-conservative-max'}),held=reserve(fixture(),p),accepted=accept(held,p),paid=settle(json(accepted));
+  expect(row(held).reservedManYen).toBe(20000+amount);expect(row(accepted).reservedManYen).toBe(amount);
+  expect(row(paid)).toMatchObject({reservedManYen:0,oneOffManYen:amount,salaryManYen:20000});
+  expect(paid.resolvedReservations[0].proposal.marketEntry.compensationBasis.exercise).toBe('legacy-conservative-max');
+  expect(settle(json(paid))).toEqual(paid);
+});
