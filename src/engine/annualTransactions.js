@@ -85,9 +85,24 @@ function commandFor(input) {
 }
 
 function inspect(state) {
-  if (!state || state.version !== 1 || !Array.isArray(state.teams) || !Array.isArray(state.faPool)
+  if (!state || ![1, 2].includes(state.version) || !Array.isArray(state.teams) || !Array.isArray(state.faPool)
     || !Array.isArray(state.transactions) || !Array.isArray(state.rosterRequirements)
     || !state.draftContext || !Array.isArray(state.draftContext.draftPool)) fail('新制度の取引状態が未確認です。');
+  if (state.version === 2) {
+    const identity = state.economyIdentity;
+    if (!identity || !validId(identity.saveId) || !validId(identity.epoch)
+      || !Number.isSafeInteger(identity.baseRevision) || identity.baseRevision < 0
+      || ['acquisitions', 'faProtectionLists', 'faPersonnelMoves', 'faCompensationStandings', 'offseasonDepartures']
+        .some(k => !Array.isArray(state[k]))) fail('v2取引のworld識別情報・必須データを確認してください。');
+    const spending = state.spending;
+    if (!Array.isArray(spending?.ledger?.records) || !Array.isArray(spending.reservations)
+      || !Array.isArray(spending.resolvedReservations)) fail('v2契約台帳・留保が未記録です。');
+    const contracts = [...spending.ledger.records.map(r => r.contract),
+      ...[...spending.reservations, ...spending.resolvedReservations].flatMap(r =>
+        [r.proposal?.contract, ...(r.acceptedProposal ? [r.acceptedProposal.contract] : [])])];
+    if (contracts.some(c => c?.guaranteed !== true || !['controlled', 'development'].includes(c.registrationType)))
+      fail('新しい契約には保証と登録区分が必要です。');
+  }
   const date = parseContractDate(state.date);
   if (date.year !== state.season || state.spending?.budgetSeason !== state.season + Number(state.phase === 'offseason')
     || !['preseason', 'season', 'offseason'].includes(state.phase)) fail('取引年度・フェーズを確認してください。');
@@ -481,6 +496,9 @@ function candidate(input, command) {
   return { state: { ...after, transactions: protectedState ? after.transactions : [...after.transactions, { id: c.id, signature }] }, rows, replayed: false,
     ...(personnel ? { personnel } : {}) };
 }
+
+// The world adapter shares this exact validation/floor projection with v1.
+export function projectAnnualState(state) { return withFloors(state); }
 
 export function quoteFaProtectionList(state, selector) {
   try { return { ok: true, protection: faProtectionView(withFloors(state), selector) }; }

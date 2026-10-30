@@ -8,7 +8,7 @@ import { emptyBattedBallReceipt, validateBattedBallReceipt } from '../engine/bat
 import { useState, useReducer, useMemo, useCallback, useEffect, useRef } from "react";
 import { contractReplyIsDue, resolveContractReplies } from '../engine/contractReplies';
 import { yieldToBrowser } from '../engine/yieldToBrowser';
-import { gameStateReducer, G, interviewChoice } from './gameStateReducer';
+import { gameStateReducer, G, interviewChoice, canApplyLegacyProgress } from './gameStateReducer';
 import { MATCH_HISTORY_FIELDS, matchHistorySnapshot, mergeMatchResultPatch } from '../engine/matchHistory';
 import { createSaveDirtyTracker } from '../state/saveDirtyTracker';
 import { OFFSEASON_SAVE_SCREENS } from '../engine/offseasonResume';
@@ -142,9 +142,16 @@ export function useGameState() {
   const [gameState, dispatch] = useReducer(
     gameStateReducer,
     undefined,
-    () => ({ teams: [], news: [], gameDay: 1, year: 2026, myId: null, saveId: createSaveId() }),
+    () => ({ teams: [], news: [], gameDay: 1, year: 2026, myId: null, saveId: createSaveId(),
+      faPool: [], faYears: {}, offseasonPlan: null, mailbox: [], schedule: null }),
   );
-  const { teams, news, gameDay, year, myId, saveId, farmCompetition, battedBallReceipt } = gameState;
+  const { teams, news, gameDay, year, myId, saveId, farmCompetition, battedBallReceipt,
+    faPool, faYears, offseasonPlan, mailbox, schedule, contractEconomy } = gameState;
+  const setFaPool = useCallback(value => dispatch({ type: G.SET_FA_POOL, value }), []);
+  const setFaYearsState = useCallback(value => dispatch({ type: G.SET_FA_YEARS, value }), []);
+  const setOffseasonPlanState = useCallback(value => dispatch({ type: G.SET_OFFSEASON_PLAN, value }), []);
+  const setMailboxState = useCallback(value => dispatch({ type: G.SET_MAILBOX, value }), []);
+  const setSchedule = useCallback(value => dispatch({ type: G.SET_SCHEDULE, value }), []);
   const rosterCommandRef = useRef(gameState);
   const setNewsState = useCallback(value => {
     const current = rosterCommandRef.current;
@@ -180,9 +187,10 @@ export function useGameState() {
   const setFarmCompetition = useCallback(competition => {progressDispatch({type:G.SET_FARM_COMPETITION,competition});markSaveDirty();},[progressDispatch,markSaveDirty]);
   const applyProgressCandidate = useCallback((candidate,{baseToken}={}) => {
     if(baseToken!=null&&baseToken!==progressTokenRef.current)return false;
+    if(!canApplyLegacyProgress(rosterCommandRef.current,candidate))return false;
     validateFarmSaveState(candidate);
     if ('battedBallReceipt' in candidate) validateBattedBallReceipt(candidate.battedBallReceipt, candidate.saveId ?? rosterCommandRef.current.saveId);
-    progressDispatch({type:G.APPLY_PROGRESS,candidate:{...candidate,teams:slimTeamsForState(candidate.teams)}});
+    progressDispatch({type:G.APPLY_PROGRESS,candidate:{...candidate,...('teams' in candidate?{teams:slimTeamsForState(candidate.teams)}:{})}});
     markSaveDirty();return true;
   },[progressDispatch,markSaveDirty]);
   const setTeams   = useCallback((n) => { progressDispatch({ type: G.SET_TEAMS, teams: (prev) => slimTeamsForState(typeof n === 'function' ? n(prev) : n) }); markSaveDirty(); },    [markSaveDirty]);
@@ -191,16 +199,11 @@ export function useGameState() {
   const setMyId    = useCallback((id) => { progressDispatch({ type: G.SET_MY_ID, myId: id }); markSaveDirty(); }, [markSaveDirty]);
   const setSaveId  = useCallback((id) => { pendingCareerEntriesRef.current=[];progressSessionRef.current++;progressDispatch({ type: G.SET_SAVE_ID, saveId: ensureSaveId(id) }); }, []);
   const [tab, setTab] = useState("dashboard");
-  const [faPool, setFaPool] = useState([]);
-  const [faYears, setFaYearsState] = useState({});
   const setFaYears = useCallback(value => { setFaYearsState(value); markSaveDirty(); }, [markSaveDirty]);
-  const [offseasonPlan, setOffseasonPlanState] = useState(null);
   const setOffseasonPlan = useCallback(value => { setOffseasonPlanState(value); markSaveDirty(); }, [markSaveDirty]);
   const [notif, setNotif] = useState(null);
   const [seasonHistory, setSeasonHistoryState] = useState({awards:[],records:{singleSeasonHR:null,singleSeasonAVG:null,singleSeasonK:null,careerHR:{},careerW:{}},hallOfFame:[],championships:[],standingsHistory:[],transfers:[]});
   const [saveExists, setSaveExists] = useState(false);
-  const [schedule, setSchedule] = useState(null);
-  const [mailbox, setMailboxState] = useState([]);
   const [recentResults, setRecentResultsState] = useState([]);
   const [gameResultsMap, setGameResultsMapState] = useState({});
   const [scheduleArchive, setScheduleArchiveState] = useState([]); // 過去シーズン: [{year, schedule, gameResultsMap, myTeamResultsMap}]
@@ -503,7 +506,7 @@ export function useGameState() {
 
   const myTeam = useMemo(()=>teams.find(t=>t.id===myId),[teams,myId]);
   // Command snapshot also advances synchronously to reject repeated clicks.
-  rosterCommandRef.current = { teams, myId, year, offseasonPlan, news, saveId, progressToken: getProgressToken() };
+  rosterCommandRef.current = { ...gameState, progressToken: getProgressToken() };
   const commitRosterCommand = (current, nextTeam) => {
     const nextTeams = current.teams.map(t => t.id === current.myId ? nextTeam : t);
     rosterCommandRef.current = { ...current, teams: nextTeams };
@@ -1122,7 +1125,7 @@ export function useGameState() {
     retireRole, setRetireRole,
     teams, setTeams,
     myId, setMyId,
-    saveId, setSaveId, battedBallReceipt, farmCompetition, farmCompetitionVersion: farmCompetition ? 1 : undefined, setFarmCompetition, applyProgressCandidate, getProgressToken, getProgressSessionToken,
+    saveId, setSaveId, contractEconomy, battedBallReceipt, farmCompetition, farmCompetitionVersion: farmCompetition ? 1 : undefined, setFarmCompetition, applyProgressCandidate, getProgressToken, getProgressSessionToken,
     tab, setTab,
     gameDay, setGameDay,
     year, setYear,
