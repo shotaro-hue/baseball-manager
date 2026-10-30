@@ -22,4 +22,6 @@ it('does not classify domestic draft players by katakana or miss international p
  expect(find(6,'イヒネ　イツア')).toMatchObject({isForeign:false,foreignQuotaStatus:'domestic',birthDate:'2004-09-02',batHand:'left'});
  expect(find(7,'ワォーターズ')).toMatchObject({isForeign:false,foreignQuotaStatus:'domestic',birthDate:'2005-10-14'});
  expect(find(10,'古林　睿煬')).toMatchObject({isForeign:true,foreignQuotaStatus:'counts',birthDate:'2000-06-12'});
+ expect(find(1,'ビシエド')).toMatchObject({isForeign:false,foreignQuotaStatus:'exempt'});
+ expect(find(9,'ソト')).toMatchObject({isForeign:false,foreignQuotaStatus:'exempt'});
 });

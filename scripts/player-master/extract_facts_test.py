@@ -16,6 +16,11 @@ class ExtractFactsTest(unittest.TestCase):
         self.assertEqual([h['year'] for h in records], [2022,2025])
         self.assertEqual([h['outs'] for h in records], [38,38])
         self.assertEqual(records[0]['teamName'], '球団')
+    def test_zero_out_appearance_retains_runs_and_missing_era(self):
+        stats=['1','0','0','0','0','0','0','0','0','.000','2','+','1','0','0','1','0','0','0','2','2','----']
+        tree=html.fromstring('<table id="tablefix_p"><tbody><tr>'+''.join('<td>'+v+'</td>' for v in ['2020','東北楽天',*stats])+'</tr></tbody></table>')
+        row=extract.profile_history(tree,'pitcher')[0]
+        self.assertEqual(row['outs'],0);self.assertEqual(row['ER'],2);self.assertNotIn('ERA',row)
     def test_sibling_tables_use_their_own_position_heading(self):
         tree = html.fromstring('<div><h5>一塁手</h5><table><tbody><tr><td>A</td><td>4</td></tr></tbody></table><h5>捕手</h5><table><tbody><tr><td>B</td><td>30</td></tr></tbody></table></div>')
         self.assertEqual([r['position'] for r in extract.fielding_rows(tree,'s')], ['一塁手','捕手'])

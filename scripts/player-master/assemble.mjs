@@ -5,6 +5,7 @@ import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {NPB2025_ROSTERS} from '../../src/data/npb2025.js';
 import {PLAYER_CORRECTIONS_2026} from '../../src/data/playerMaster2026Corrections.js';
+import {REVIEWED_PLAYER_FACTS_2026} from '../../src/data/playerMaster2026Facts.js';
 const codes=['s','db','c','t','g','d','h','e','l','m','f','b'];
 const teamNames=['東京ヤクルトスワローズ','横浜DeNAベイスターズ','広島東洋カープ','阪神タイガース','読売ジャイアンツ','中日ドラゴンズ','福岡ソフトバンクホークス','東北楽天ゴールデンイーグルス','埼玉西武ライオンズ','千葉ロッテマリーンズ','北海道日本ハムファイターズ','オリックス・バファローズ'];
 const key=s=>s.normalize('NFKC').replace(/[\s・.]/g,'').replaceAll('廣','広').replaceAll('髙','高').replaceAll('﨑','崎').replaceAll('瀨','瀬');
@@ -75,15 +76,19 @@ export function assemble(reference,facts, legacyRosters=NPB2025_ROSTERS) {
     }
     // A sparse register is not evidence of citizenship or service time.
     const draft=f.draft?.match(/^(\d{4})年/),quota=old?.foreignQuotaStatus||(draft?'domestic':'unknown');
-    const foreign=quota==='unknown'?Boolean(old?.isForeign):quota==='counts';
+    const foreign=quota==='unknown'?(old?.isForeign??!draft):quota==='counts';
+    const {sourceUrls=[],...reviewed}=REVIEWED_PLAYER_FACTS_2026[p.playerId]||{};
+    for(const url of sourceUrls)sourceIds.add(source(url));
     return {playerId:p.playerId,legacyPlayerId:old?.playerId,name:p.name,teamId:p.teamId,registration:p.registration,kind:p.kind,
       birthDate:f.birthDate,throws:f.throws,bats:f.bats,pos,positions:proficiencies,positionStatus,roleStatus:'game-estimate-pre-opening',
       foreignQuotaStatus:quota,gameIsForeign:foreign,
+      foreignQuotaBasis:quota==='unknown'?'game-assumption-not-eligibility-certification':draft?'documented-domestic-draft':'reviewed-legacy-correction',
       salaryStatus:'game-assumption',gameSalaryManYen:Math.max(old?.salary||0,p.registration==='development'?240:420),
       salaryBasis:old?'preserved-unverified-legacy':'minimum-game-assumption',
       contractStatus:'game-assumption',gameContractEndYear:old?.contractEndYear||2026,contractBasis:old?'preserved-unverified-legacy':'single-year-game-assumption',
-      entryType:old?.entryType||'不明',...(draft?{draftYear:Number(draft[1])}:{}),
+      entryType:old?.entryType||'不明',...(draft?{draftYear:Number(draft[1]),entryRoute:'domestic-draft',draftDescription:f.draft}:{entryRoute:'unknown'}),
       history:history.sort((a,b)=>a.year-b.year||a.teamName.localeCompare(b.teamName)),
+      ...reviewed,
       sourceIds:[...sourceIds]};
   });
   return {schemaVersion:1,asOf:'2026-03-27',status:'candidate',sources:[...sources.values()],

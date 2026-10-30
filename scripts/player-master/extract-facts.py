@@ -62,11 +62,13 @@ def profile_history(tree, kind):
         row = {'year': int(c[0]), 'teamName': c[1]}
         for key, raw in zip(keys, c[2:]):
             if key == 'innings':
-                innings = re.fullmatch(r'(\d+)(?:\.([012]))?', re.sub(r'\s', '', raw))
+                notation = re.sub(r'\s', '', raw)
+                if notation == '+': notation = '0'
+                innings = re.fullmatch(r'(\d+)(?:\.([012]))?', notation)
                 if not innings:
                     raise ValueError(f'Invalid profile innings: {raw}')
                 row['outs'] = int(innings[1])*3 + int(innings[2] or 0)
-            elif raw not in ['-', '--', '']:
+            elif raw and not re.fullmatch(r'-+', raw):
                 row[key] = float(raw) if '.' in raw else int(raw)
         result.append(row)
     return result
