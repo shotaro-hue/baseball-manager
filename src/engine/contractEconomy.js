@@ -172,10 +172,28 @@ export function createAnnualNewGameWorld({ teams, faPool, myId, saveId, season, 
     || !policy || ['authorizations', 'rosterRequirements', 'budgetPolicies'].some(k => !Array.isArray(policy[k])))
     fail('新規ゲームの名簿・明示した年度policyが必要です。');
   for (const t of teams) for (let y = season; y <= season + 7; y++) {
-    const match = list => list.filter(r => r.teamId === t.id && r.season === y);
+    const match = list => list.filter(r => r?.teamId === t.id && r.season === y);
     if (match(policy.authorizations).length !== 1 || match(policy.rosterRequirements).length !== 1 || match(policy.budgetPolicies).length !== 1)
       fail('新規ゲームの全審査年度にpolicy・許可・人数計画が必要です。');
   }
+  // Validate supplied evidence only; generating/rolling annual budgets is A1-1c.
+  // Include extra supplied years, not only the minimum season..season+7 range.
+  const approvals = list => {
+    const rows = new Map();
+    for (const row of list) {
+      if (row?.approvedManYen === undefined || row.approvedManYen === null) fail('年度予算の承認額が未記録です。');
+      if (!counter(row.approvedManYen)) fail('年度予算の承認額が不正です。');
+      const key = JSON.stringify([row.teamId, row.season]);
+      if (rows.has(key)) fail('同一球団・年度の予算policy・許可が重複しています。');
+      rows.set(key, row.approvedManYen);
+    }
+    return rows;
+  };
+  const authorized = approvals(policy.authorizations), recorded = approvals(policy.budgetPolicies);
+  if (authorized.size !== recorded.size || [...authorized.keys()].some(key => !recorded.has(key)))
+    fail('同一球団・年度の予算policy・許可が未記録です。');
+  for (const [key, amount] of authorized) if (amount !== recorded.get(key))
+    fail('同一球団・年度の予算policyと許可の承認額が一致しません。');
   const ledger = createContractLedger();
   for (const team of teams) {
     if (!Array.isArray(team.players) || !Array.isArray(team.farm)) fail('初期名簿の一軍・二軍が未記録です。');

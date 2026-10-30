@@ -145,6 +145,63 @@ describe('A1-1a single contract economy world (release disabled)', () => {
 });
 
 describe('native initial conditions and civil economy clock', () => {
+  const initialParams = () => {
+    const teams = [{ id: 0, players: [{ id: 0, salary: 1000, contractYearsLeft: 1 }], farm: [] },
+      { id: 1, players: [{ id: 'b', salary: 1000, contractYearsLeft: 1 }], farm: [] }];
+    return { teams, faPool: [], myId: 0, saveId: 'policy-check', season: 2026,
+      policy: economyPolicy(teams), randomRoot: { algorithmVersion: 1, seed: 'policy-check' } };
+  };
+
+  it('matches budget policy amounts by team and season, independently of row order, without changing inputs', () => {
+    const params = initialParams();
+    for (const [i, row] of params.policy.authorizations.entries()) row.approvedManYen = 50000 + i;
+    params.policy.budgetPolicies = params.policy.authorizations.map(({ teamId, season, approvedManYen }) =>
+      ({ teamId, season, approvedManYen, policyVersion: 'explicit-test-policy' })).reverse();
+    const snapshot = structuredClone(params), world = createAnnualNewGameWorld(freezeEconomy(params));
+    for (const row of params.policy.authorizations) expect(world.contractEconomy.engine.spending.authorizations)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ teamId: row.teamId, season: row.season, approvedManYen: row.approvedManYen })]));
+    expect(world.contractEconomy.budgetPolicies).toEqual(params.policy.budgetPolicies);
+    expect(params).toEqual(snapshot);
+  });
+
+  it.each([[0, 2026], [1, 2033]])('rejects a mismatched approval for team %s / season %s without modifying input', (teamId, season) => {
+    const params = initialParams();
+    params.policy.budgetPolicies.find(r => r.teamId === teamId && r.season === season).approvedManYen = 30000;
+    const snapshot = structuredClone(params);
+    expect(() => createAnnualNewGameWorld(freezeEconomy(params))).toThrow(/承認額.*一致/);
+    expect(params).toEqual(snapshot);
+  });
+
+  it.each(['authorizations', 'budgetPolicies'])('rejects missing or invalid mandatory amounts in %s without coercion', field => {
+    for (const amount of [undefined, null, '', '50000', -1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+      const params = initialParams(), row = params.policy[field][0];
+      if (amount === undefined) delete row.approvedManYen; else row.approvedManYen = amount;
+      const snapshot = structuredClone(params);
+      expect(() => createAnnualNewGameWorld(freezeEconomy(params))).toThrow(/承認額.*(未記録|不正)/);
+      expect(params).toEqual(snapshot);
+    }
+  });
+
+  it('accepts explicit zero approvals and distinguishes them from missing amounts', () => {
+    const params = initialParams();
+    for (const field of ['authorizations', 'budgetPolicies']) params.policy[field].forEach(row => { row.approvedManYen = 0; });
+    const world = createAnnualNewGameWorld(params);
+    expect(world.teams[0].budget).toBe(-1000); // Existing salaries remain liabilities; zero is not inferred from legacy budget.
+    expect(world.contractEconomy.budgetPolicies[0].approvedManYen).toBe(0);
+    for (const field of ['authorizations', 'budgetPolicies']) {
+      const invalid = structuredClone(params); delete invalid.policy[field][0].approvedManYen;
+      expect(() => createAnnualNewGameWorld(invalid)).toThrow(/承認額.*未記録/);
+    }
+  });
+
+  it('also rejects inconsistent extra policy rows beyond the required initial horizon', () => {
+    const params = initialParams();
+    params.policy.authorizations.push({ teamId: 0, season: 2034, approvedManYen: 50000, minimumRosterReserveManYen: 0 });
+    params.policy.budgetPolicies.push({ teamId: 0, season: 2034, approvedManYen: 30000, policyVersion: 'explicit-test-policy' });
+    params.policy.rosterRequirements.push({ teamId: 0, season: 2034, requiredControlledCount: 1 });
+    expect(() => createAnnualNewGameWorld(params)).toThrow(/承認額.*一致/);
+  });
+
   it('constructs one native contract for each of 780 valid fresh players without changing seed terms', () => {
     // Deliberate valid native seeds, not a repair of legacy initial salaries.
     const teams = Array.from({ length: 12 }, (_, id) => ({ id, players: Array.from({ length: 30 }, (_, i) =>

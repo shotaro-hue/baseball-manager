@@ -26,6 +26,41 @@ const legacyWrites = new Set([G.APPLY_PROGRESS, G.SET_TEAMS, G.UPD_TEAM, G.SET_G
   G.SET_MY_ID, G.SET_SAVE_ID, G.SET_FA_POOL, G.SET_FA_YEARS, G.SET_OFFSEASON_PLAN, G.SET_SCHEDULE, G.ANSWER_INTERVIEW]);
 const fieldActions = { [G.SET_FA_POOL]: 'faPool', [G.SET_FA_YEARS]: 'faYears',
   [G.SET_OFFSEASON_PLAN]: 'offseasonPlan', [G.SET_MAILBOX]: 'mailbox', [G.SET_SCHEDULE]: 'schedule' };
+// `season` is deliberately absent: legacy uses it for injuries AND contracts,
+// posting, FA and releases. Ambiguous/new event types belong to the world action.
+// Interviews also carry a decision with team effects, not just display content.
+const independentNotifications = {
+  news: new Set(['game', 'allstar', 'record']),
+  mailbox: new Set(['championship', 'hof', 'morale_warning']),
+};
+
+function updateAnnualNotifications(state, field, value) {
+  try {
+    // A legacy functional updater must not mutate the live world before the
+    // guard can reject it. Notifications are persisted plain data.
+    const previous = state[field];
+    const next = typeof value === 'function' ? value(structuredClone(previous)) : structuredClone(value);
+    if (!Array.isArray(next) || next.some(item => !item || typeof item !== 'object'
+      || !((typeof item.id === 'string' && item.id.trim()) || (Number.isSafeInteger(item.id) && item.id >= 0)))
+      || new Set(next.map(item => String(item.id))).size !== next.length) return state;
+    const protectedContent = items => items.filter(item => !independentNotifications[field].has(item.type)).map(item => {
+      if (field !== 'mailbox') return item;
+      // Reading is presentation-only; resolving/answering/changing a contract
+      // must still arrive with its ledger and roster in APPLY_ECONOMY_WORLD.
+      const { read, ...content } = item;
+      return content;
+    });
+    if (field === 'mailbox' && next.some(item => Object.hasOwn(item, 'read') && typeof item.read !== 'boolean')) return state;
+    if (JSON.stringify(protectedContent(previous)) !== JSON.stringify(protectedContent(next))) return state;
+    if (JSON.stringify(previous) === JSON.stringify(next)) return state;
+    const revision = state.contractEconomy.revision + 1;
+    if (!Number.isSafeInteger(revision)) return state;
+    // Fence an already prepared economic candidate so it cannot overwrite a
+    // newer ordinary notice/read flag with its stale notification snapshot.
+    return { ...state, [field]: next, contractEconomy: { ...state.contractEconomy, revision } };
+  } catch { return state; }
+}
+
 export function canApplyLegacyProgress(state, candidate) {
   try { return contractEconomyMode(state) === 'legacy' && contractEconomyMode(candidate) === 'legacy'; }
   catch { return false; }
@@ -45,6 +80,12 @@ export function interviewChoice(article, option) {
  */
 export function gameStateReducer(state, action) {
   if (legacyWrites.has(action.type) && !canApplyLegacyProgress(state, action.candidate ?? {})) return state;
+  if (action.type === G.SET_MAILBOX || action.type === G.SET_NEWS) {
+    try {
+      if (contractEconomyMode(state) === 'annual') return action.type === G.SET_MAILBOX
+        ? updateAnnualNotifications(state, 'mailbox', action.value) : updateAnnualNotifications(state, 'news', action.news);
+    } catch { return state; }
+  }
   if (fieldActions[action.type]) {
     const key = fieldActions[action.type];
     return { ...state, [key]: typeof action.value === 'function' ? action.value(state[key]) : action.value };
