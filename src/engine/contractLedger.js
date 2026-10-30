@@ -45,7 +45,7 @@ function normalize(action) {
     if (agreement !== undefined && (!agreement || !id(agreement.id) || agreement.agreedDate !== action.effectiveDate
       || Object.keys(agreement).some(k => !['id', 'agreedDate'].includes(k)))) fail('新しい解除合意の日付・IDを確認してください。');
     return { ...next, reason: action.reason, settlement: action.settlement,
-      ...(agreement !== undefined ? { terminationAgreement: { ...agreement } } : {}) };
+      ...(agreement !== undefined ? { terminationAgreement: { id: agreement.id, agreedDate: agreement.agreedDate } } : {}) };
   }
   fail('取引の種類が無効です。');
 }
@@ -122,7 +122,7 @@ function viewsFor(ledger) {
   if (!ledger || ![1, 2].includes(ledger.version) || !Array.isArray(ledger.records)
     || !Number.isInteger(ledger.closedThroughSeason) || ledger.closedThroughSeason < 0 || ledger.closedThroughSeason > 9999) fail();
   const contractIds = new Set(), actionIds = new Set(), byPlayer = new Map(), views = [];
-  const playerIds = new Map(), teamIds = new Map();
+  const playerIds = new Map(), teamIds = new Map(), agreementIds = new Set();
   const typedId = (value, seen) => {
     if (seen.has(String(value)) && seen.get(String(value)) !== value) fail('識別IDの型が衝突しています。');
     seen.set(String(value), value);
@@ -138,6 +138,11 @@ function viewsFor(ledger) {
       if (action.type === 'transfer') typedId(action.toTeamId, teamIds);
       if (actionIds.has(String(action.id))) fail('取引IDが重複しています。');
       actionIds.add(String(action.id));
+      if (action.terminationAgreement) {
+        const agreementId = String(action.terminationAgreement.id);
+        if (agreementIds.has(agreementId)) fail('解除合意IDが複数の終了取引で重複しています。');
+        agreementIds.add(agreementId);
+      }
     }
     const list = byPlayer.get(view.contract.playerId) ?? [];
     if (view.effectiveDate < view.employmentEndDate) list.push(view);

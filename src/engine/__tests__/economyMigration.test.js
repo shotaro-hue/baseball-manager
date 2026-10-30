@@ -200,3 +200,64 @@ describe('review: legacy evidence must support the migration boundary and class'
     expect(c.registrationType).toBe(flags.isIkusei || flags.育成 ? 'development' : 'controlled');
   });
 });
+
+describe('A1-1b FIX: explicit reply resolution', () => {
+  it.each(['contract_decision_pending', 'contract_decision'].flatMap(type =>
+    ['false', 'true', 0, 1, null, undefined, false, true, {}, []].map(resolved => [type, resolved])))
+  ('checks %s resolved=%j before and after JSON reload without changing mail', async (type, resolved) => {
+    const w = world(); w.mailbox = [{ id: 'reply', type, ...(resolved !== undefined ? { resolved } : {}) },
+      { id: 'news', type: 'news', resolved: 'false' }, { id: 'normal', type: 'message', read: false }];
+    for (const input of [w, json(w)]) {
+      const before = json(input), r = await migrate(freeze(input));
+      expect(r.ok).toBe(resolved === true);
+      if (resolved !== true) { expect(r.candidate).toBeUndefined(); expect(r.issues).toContainEqual(expect.objectContaining({ field: 'mailbox', code: 'deferred' })); }
+      expect(input).toEqual(before);
+    }
+  });
+});
+
+describe('A1-1b FIX: termination agreement identity', () => {
+  const pair = () => ({ ...ledgerFor(opening()), records: [ledgerFor(opening()).records[0],
+    ledgerFor(opening({ openingId: 'second', playerId: 'second' })).records[0]] });
+  const waive = (contractId = 'opening-old', agreementId = 'agreement', id = 'end-first') => end({
+    id, contractId, settlement: 'waive', terminationAgreement: { id: agreementId, agreedDate: '2027-07-01' } });
+  it.each(['agreement', 0])('rejects agreement %s reuse on another contract without losing its liability', agreementId => {
+    const first = applyContractLedgerAction(pair(), waive('opening-old', agreementId));
+    for (const input of [first, json(first)]) {
+      const before = json(input), rows = contractLiabilityRows(input);
+      expect(() => applyContractLedgerAction(freeze(input), waive('second', agreementId, 'end-second'))).toThrow(/合意/);
+      expect(input).toEqual(before); expect(contractLiabilityRows(input)).toEqual(rows);
+      expect(rows.filter(r => r.playerId === 'second').map(r => r.amountManYen)).toEqual([1000, 1000]);
+      const retained = applyContractLedgerAction(input, end({ id: 'retain-second', contractId: 'second' }));
+      expect(contractLiabilityRows(retained).filter(r => r.playerId === 'second' && r.kind === 'guarantee').map(r => r.amountManYen)).toEqual([500, 1000]);
+    }
+  });
+  it('rejects duplicate and numeric/string alias agreement IDs in already persisted records', () => {
+    const first = applyContractLedgerAction(pair(), waive('opening-old', 0));
+    for (const id of [0, '0']) {
+      const forged = json(first); forged.records[1].changes.push(waive('second', id, 'end-second'));
+      expect(() => validateContractLedger(forged)).toThrow(/合意/);
+      expect(() => contractLiabilityRows(forged)).toThrow(/合意/);
+    }
+  });
+  it('allows distinct agreements and exact replay; rejects changed transaction conditions', () => {
+    const command = waive(), first = applyContractLedgerAction(pair(), command);
+    const next = applyContractLedgerAction(first, waive('second', 'other', 'end-second'));
+    expect(contractLiabilityRows(next).map(r => r.amountManYen)).toEqual([500, 500]);
+    for (const input of [next, json(next)]) {
+      expect(applyContractLedgerAction(freeze(input), command)).toBe(input);
+      expect(applyContractLedgerAction(input, { ...command, terminationAgreement: { agreedDate: command.effectiveDate, id: 'agreement' } })).toBe(input);
+      expect(() => applyContractLedgerAction(input, waive('opening-old', 'changed'))).toThrow(/取引ID/);
+    }
+  });
+  it('shares agreement uniqueness with native contracts without weakening native guaranteed release', () => {
+    const p = { id: 'native-sign', type: 'sign', teamId: 0, effectiveDate: '2027-02-01',
+      contract: seasonContract.createSeasonContract({ contractId: 'native', playerId: 'native', signedSeason: 2027,
+        agreementPhase: 'preseason', purpose: 'acquisition', termYears: 2, annualSalaryManYen: 1000, guaranteed: true }) };
+    const l = applyContractLedgerAction(ledgerFor(opening()), p), first = applyContractLedgerAction(l, waive());
+    expect(() => applyContractLedgerAction(first, waive('native', 'unique', 'end-native'))).toThrow(/保証/);
+    const retirement = { ...waive('native', 'agreement', 'end-native'), reason: 'retirement' };
+    expect(() => applyContractLedgerAction(first, retirement)).toThrow(/合意/);
+    expect(applyContractLedgerAction(first, { ...retirement, terminationAgreement: { id: 'native-agreement', agreedDate: retirement.effectiveDate } }).records).toHaveLength(2);
+  });
+});

@@ -1,4 +1,4 @@
-import { employmentContractId, employmentPlayerFields, validateAnnualEmploymentContract } from './seasonContract';
+import { employmentContractId, projectEmploymentPlayer, validateAnnualEmploymentContract } from './seasonContract';
 import { MIN_SALARY_SHIHAKA, MAX_SHIHAKA_TOTAL } from '../constants';
 import { createSeasonContract, contractSeasonsRemaining } from './seasonContract';
 import { contractEmploymentAt, applyContractLedgerAction } from './contractLedger';
@@ -423,7 +423,7 @@ function tradeCandidate(state, c) {
   const project = player => {
     if (!transferred.has(player.id)) return player;
     const e = current.get(player.id);
-    return { ...player, ...employmentPlayerFields(e, state.season) };
+    return projectEmploymentPlayer(player, e, state.season);
   };
   const teams = projected.teams.map(t => t.id === c.fromId || t.id === c.toId
     ? { ...t, players: t.players.map(project), farm: t.farm.map(project) } : t);
@@ -440,8 +440,8 @@ function conversionCandidate(state, c) {
   const ledger = applyContractLedgerAction(state.spending.ledger, { id: key(c.id, ['conversion', c.playerId]),
     type: 'convert-to-controlled', teamId: c.teamId, contractId: c.contractId,
     effectiveDate: state.date, annualSalaryManYen: c.annualSalaryManYen });
-  const converted = { ...player, 育成: false, isIkusei: false, ikuseiYears: 0,
-    ...employmentPlayerFields({ ...employment, annualSalaryManYen: c.annualSalaryManYen }, state.season) };
+  const converted = { ...projectEmploymentPlayer(player, { ...employment, annualSalaryManYen: c.annualSalaryManYen }, state.season),
+    育成: false, isIkusei: false, ikuseiYears: 0 };
   // Classification changes; placement stays farm. Shared inspection checks
   // accepted rookies against the 70-place cap and rejects conflicting future
   // terms before commit, without rewriting their contracts or reservations.

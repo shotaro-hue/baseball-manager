@@ -106,7 +106,16 @@ export function employmentPlayerFields(employment, season) {
   const c = employment.contract;
   return { salary: employment.annualSalaryManYen, contractId: employmentContractId(c),
     contractYearsLeft: remainingEmploymentSeasons(c, season),
-    ...(!isLegacyOpening(c) ? { contractYears: c.termYears, contractSignedYear: c.signedSeason } : {}) };
+    ...(isLegacyOpening(c)
+      ? Object.fromEntries(['contractYears', 'contractSignedYear'].filter(k => Object.hasOwn(c.sourceFields, k)).map(k => [k, c.sourceFields[k]]))
+      : { contractYears: c.termYears, contractSignedYear: c.signedSeason }) };
+}
+// Native fields come from signed terms; legacy fields retain observed evidence.
+// Neither a stale roster value nor an inferred signature/term is authoritative.
+// Opening endSeason/remainingEmploymentSeasons still determine future liability.
+export function projectEmploymentPlayer(player, employment, season) {
+  const { contractYears, contractSignedYear, ...rest } = player;
+  return { ...rest, ...employmentPlayerFields(employment, season) };
 }
 export function validateAnnualEmploymentContract(c) {
   if (isLegacyOpening(c)) return validateLegacyOpening(c);

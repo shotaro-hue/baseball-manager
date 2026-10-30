@@ -1,4 +1,4 @@
-import { employmentContractId, employmentPlayerFields, validateAnnualEmploymentContract, normalizeEmploymentContract } from './seasonContract';
+import { employmentContractId, projectEmploymentPlayer, validateAnnualEmploymentContract, normalizeEmploymentContract } from './seasonContract';
 import { createSeasonContract } from './seasonContract';
 import { createContractLedger, applyContractLedgerAction, contractEmploymentAt, validateContractLedger } from './contractLedger';
 import { applyAnnualTransaction, projectAnnualState } from './annualTransactions';
@@ -138,8 +138,8 @@ export function fromAnnualState(world, input) {
   const projectPlayer = p => {
     const employment = employed.get(p.id);
     if (!employment) fail('現在の名簿に対応する雇用がありません。');
-    const c = employment.contract, development = employment.registrationType === 'development';
-    return { ...p, ...employmentPlayerFields(employment, state.season),
+    const development = employment.registrationType === 'development';
+    return { ...projectEmploymentPlayer(p, employment, state.season),
       育成: development, isIkusei: development };
   };
   const teams = state.teams.map(t => {

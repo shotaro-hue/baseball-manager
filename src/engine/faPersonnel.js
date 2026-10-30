@@ -1,4 +1,4 @@
-import { employmentContractId, employmentPlayerFields } from './seasonContract';
+import { employmentContractId, projectEmploymentPlayer } from './seasonContract';
 import { contractEmploymentAt, applyContractLedgerAction } from './contractLedger';
 import { settleFaPersonnelCompensation } from './annualSpending';
 import { faProtectionView } from './faProtection';
@@ -222,7 +222,7 @@ export function joinFaPersonnel(state, command, signature) {
   if (!m || Object.hasOwn(m, 'joinedDate') || state.phase !== 'preseason' || state.season !== p.contract.startSeason || state.date < m.effectiveDate) fail();
   const e = contractEmploymentAt(state.spending.ledger, state.date).find(e => e.contract.playerId === m.player.id && e.teamId === m.teamId);
   if (!e || e.registrationType === 'development') fail();
-  const player = { ...m.player, isFA: false, 育成: false, isIkusei: false, ikuseiYears: 0, ...employmentPlayerFields(e, state.season) };
+  const player = { ...projectEmploymentPlayer(m.player, e, state.season), isFA: false, 育成: false, isIkusei: false, ikuseiYears: 0 };
   return { ...state, teams: state.teams.map(t => t.id === m.teamId ? { ...t, farm: [...t.farm, player] } : t),
     faPersonnelMoves: state.faPersonnelMoves.map(x => x === m ? { ...x, joinedDate: state.date } : x),
     transactions: [...state.transactions, { id: command.id, signature, faPersonnelJoin: { proposalId: m.proposalId, joinedDate: state.date } }] };

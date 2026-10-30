@@ -1,7 +1,7 @@
 import { fmtSal } from '../utils';
 import { ownedPlayers, mapOwnedPlayers, renewalEligible, validContractTerms, applyAgreedContract } from './renewalRules';
 
-export const isPendingContractReply = mail => ['contract_decision_pending', 'contract_decision'].includes(mail.type) && !mail.resolved;
+export const isPendingContractReply = mail => ['contract_decision_pending', 'contract_decision'].includes(mail.type) && mail.resolved !== true;
 export const contractSnapshot = player => ({ salary: player.salary, contractYearsLeft: player.contractYearsLeft, contractSignedYear: player.contractSignedYear ?? null });
 const offerYear = mail => mail.decision?.offeredYear ?? (mail.dateLabel?.match(/^(\d+)年/) ? Number(mail.dateLabel.match(/^(\d+)年/)[1]) : null);
 export const contractReplyIsDue = (mail, gameDay, year) => isPendingContractReply(mail)
