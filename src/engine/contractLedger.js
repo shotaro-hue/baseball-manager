@@ -1,4 +1,4 @@
-import { createSeasonContract, validateSeasonContract } from './seasonContract';
+import { createSeasonContract, validateSeasonContract, isLegacyOpening, employmentContractId, normalizeEmploymentContract } from './seasonContract';
 import { parseContractDate, registrationDateAllowed } from './contractCalendar';
 import { salaryForPeriodManYen } from './monthlyPayroll';
 import { MIN_SALARY_SHIHAKA } from '../constants';
@@ -15,6 +15,11 @@ function normalize(action) {
   if (!action || !id(action.id) || !id(action.teamId)) fail();
   const d = parseContractDate(action.effectiveDate);
   const base = { id: action.id, type: action.type, teamId: action.teamId, effectiveDate: action.effectiveDate };
+  if (action.type === 'legacy-opening') {
+    const contract = normalizeEmploymentContract(action.contract);
+    if (!isLegacyOpening(contract) || action.id !== contract.openingId || action.teamId !== contract.teamId || action.effectiveDate !== contract.observedDate) fail();
+    return { ...base, contract };
+  }
   if (action.type === 'sign') {
     validateSeasonContract(action.contract);
     const contract = createSeasonContract(action.contract);
@@ -36,12 +41,16 @@ function normalize(action) {
   }
   if (action.type === 'end') {
     if (!['release', 'retirement', 'posting'].includes(action.reason) || !['retain', 'waive'].includes(action.settlement)) fail('終了理由と残債の合意が未確認です。');
-    return { ...next, reason: action.reason, settlement: action.settlement };
+    const agreement = action.terminationAgreement;
+    if (agreement !== undefined && (!agreement || !id(agreement.id) || agreement.agreedDate !== action.effectiveDate
+      || Object.keys(agreement).some(k => !['id', 'agreedDate'].includes(k)))) fail('新しい解除合意の日付・IDを確認してください。');
+    return { ...next, reason: action.reason, settlement: action.settlement,
+      ...(agreement !== undefined ? { terminationAgreement: { id: agreement.id, agreedDate: agreement.agreedDate } } : {}) };
   }
   fail('取引の種類が無効です。');
 }
 
-const opening = record => normalize({ id: record.actionId, type: 'sign', teamId: record.initialTeamId,
+const opening = record => normalize({ id: record.actionId, type: isLegacyOpening(record.contract) ? 'legacy-opening' : 'sign', teamId: record.initialTeamId,
   effectiveDate: record.effectiveDate, contract: record.contract });
 const signature = action => JSON.stringify(normalize(action));
 
@@ -51,11 +60,11 @@ function projectRecord(record) {
   const view = { contract: c, effectiveDate: first.effectiveDate, employmentEndDate: endDate,
     liabilityEndDate: endDate, lastDate: first.effectiveDate, ended: false,
     payers: [{ teamId: first.teamId, startDate: first.effectiveDate, endDate }],
-    rates: [{ startDate: first.effectiveDate, annualSalaryManYen: c.annualSalaryManYen }],
+    rates: [{ startDate: first.effectiveDate, annualSalaryManYen: isLegacyOpening(c) ? c.observedAnnualSalaryManYen : c.annualSalaryManYen }],
     registrations: [{ startDate: first.effectiveDate, registrationType: c.registrationType }] };
   for (const raw of record.changes) {
     const action = normalize(raw), date = action.effectiveDate, current = view.payers.at(-1);
-    if (action.type === 'sign' || action.contractId !== c.contractId || view.ended
+    if (['sign', 'legacy-opening'].includes(action.type) || action.contractId !== employmentContractId(c) || view.ended
       || date < view.lastDate || date >= endDate || current.teamId !== action.teamId) fail('取引日または給与負担者が変わっています。');
     if (['transfer', 'increase', 'convert-to-controlled'].includes(action.type)) {
       if (!registrationDateAllowed(parseContractDate(date).year, date)) fail('登録・移籍期限を過ぎています。');
@@ -74,6 +83,7 @@ function projectRecord(record) {
       if (date === rate.startDate) view.rates[view.rates.length - 1] = next;
       else view.rates.push(next);
     } else {
+      if (isLegacyOpening(c) && action.settlement === 'waive' && !action.terminationAgreement) fail('旧契約の残額放棄には新しく記録した解除合意が必要です。');
       if (action.reason === 'release' && c.guaranteed && action.settlement !== 'retain') fail('保証契約の残債を球団都合で取り消すことはできません。');
       view.employmentEndDate = date;
       view.liabilityEndDate = action.settlement === 'waive' ? date : endDate;
@@ -86,7 +96,7 @@ function projectRecord(record) {
 
 function rowsFor(view) {
   const c = view.contract, totals = new Map();
-  for (let season = c.startSeason; season <= c.endSeason; season++) {
+  for (let season = isLegacyOpening(c) ? c.observedSeason + 1 : c.startSeason; season <= c.endSeason; season++) {
     for (const payer of view.payers) for (let i = 0; i < view.rates.length; i++) {
       const rate = view.rates[i], rateEnd = view.rates[i + 1]?.startDate ?? yearDate(c.endSeason, '12-01');
       for (const [kind, kindStart, kindEnd] of [
@@ -98,7 +108,7 @@ function rowsFor(view) {
         if (start >= end) continue;
         const amount = salaryForPeriodManYen(rate.annualSalaryManYen, season, start, end);
         const key = JSON.stringify([payer.teamId, season, kind]);
-        const row = totals.get(key) ?? { contractId: c.contractId, playerId: c.playerId, teamId: payer.teamId, season, kind, amountManYen: 0 };
+        const row = totals.get(key) ?? { contractId: employmentContractId(c), playerId: c.playerId, teamId: payer.teamId, season, kind, amountManYen: 0 };
         totals.set(key, { ...row, amountManYen: add(row.amountManYen, amount) });
       }
     }
@@ -109,16 +119,30 @@ function rowsFor(view) {
 }
 
 function viewsFor(ledger) {
-  if (!ledger || ledger.version !== 1 || !Array.isArray(ledger.records)
+  if (!ledger || ![1, 2].includes(ledger.version) || !Array.isArray(ledger.records)
     || !Number.isInteger(ledger.closedThroughSeason) || ledger.closedThroughSeason < 0 || ledger.closedThroughSeason > 9999) fail();
   const contractIds = new Set(), actionIds = new Set(), byPlayer = new Map(), views = [];
+  const playerIds = new Map(), teamIds = new Map(), agreementIds = new Set();
+  const typedId = (value, seen) => {
+    if (seen.has(String(value)) && seen.get(String(value)) !== value) fail('識別IDの型が衝突しています。');
+    seen.set(String(value), value);
+  };
   for (const record of ledger.records) {
+    if (isLegacyOpening(record?.contract) && ledger.version !== 2) fail('開始残高には台帳v2が必要です。');
     const view = projectRecord(record);
-    if (contractIds.has(view.contract.contractId)) fail('契約IDが重複しています。');
-    contractIds.add(view.contract.contractId);
+    typedId(view.contract.playerId, playerIds);
+    if (contractIds.has(String(employmentContractId(view.contract)))) fail('契約IDが重複しています。');
+    contractIds.add(String(employmentContractId(view.contract)));
     for (const action of [opening(record), ...record.changes.map(normalize)]) {
-      if (actionIds.has(action.id)) fail('取引IDが重複しています。');
-      actionIds.add(action.id);
+      typedId(action.teamId, teamIds);
+      if (action.type === 'transfer') typedId(action.toTeamId, teamIds);
+      if (actionIds.has(String(action.id))) fail('取引IDが重複しています。');
+      actionIds.add(String(action.id));
+      if (action.terminationAgreement) {
+        const agreementId = String(action.terminationAgreement.id);
+        if (agreementIds.has(agreementId)) fail('解除合意IDが複数の終了取引で重複しています。');
+        agreementIds.add(agreementId);
+      }
     }
     const list = byPlayer.get(view.contract.playerId) ?? [];
     if (view.effectiveDate < view.employmentEndDate) list.push(view);
@@ -139,6 +163,7 @@ export function contractLiabilityRows(ledger) { return viewsFor(ledger).flatMap(
 export function applyContractLedgerAction(ledger, input) {
   validateContractLedger(ledger);
   const action = normalize(input);
+  if (action.type === 'legacy-opening') fail('開始残高は移行候補でのみ生成できます。');
   for (const record of ledger.records) {
     const previous = [opening(record), ...record.changes].find(a => a.id === action.id);
     if (previous) {
@@ -151,8 +176,8 @@ export function applyContractLedgerAction(ledger, input) {
   if (action.type === 'sign') records = [...ledger.records, { contract: action.contract, actionId: action.id,
     initialTeamId: action.teamId, effectiveDate: action.effectiveDate, changes: [] }];
   else {
-    if (!ledger.records.some(r => r.contract.contractId === action.contractId)) fail('対象契約が見つかりません。');
-    records = ledger.records.map(r => r.contract.contractId === action.contractId ? { ...r, changes: [...r.changes, action] } : r);
+    if (!ledger.records.some(r => employmentContractId(r.contract) === action.contractId)) fail('対象契約が見つかりません。');
+    records = ledger.records.map(r => employmentContractId(r.contract) === action.contractId ? { ...r, changes: [...r.changes, action] } : r);
   }
   const next = { ...ledger, records };
   validateContractLedger(next);
@@ -167,14 +192,14 @@ export function closeContractLedgerThrough(ledger, season) {
 
 export function isContractLedgerExtension(before, after) {
   validateContractLedger(before); validateContractLedger(after);
-  if (after.closedThroughSeason < before.closedThroughSeason) return false;
+  if (after.version !== before.version || after.closedThroughSeason < before.closedThroughSeason) return false;
   for (const record of after.records) {
-    const old = before.records.find(r => r.contract.contractId === record.contract.contractId);
-    if (!old && parseContractDate(record.effectiveDate).year <= before.closedThroughSeason) return false;
+    const old = before.records.find(r => employmentContractId(r.contract) === employmentContractId(record.contract));
+    if (!old && (isLegacyOpening(record.contract) || parseContractDate(record.effectiveDate).year <= before.closedThroughSeason)) return false;
     if (record.changes.slice(old?.changes.length ?? 0).some(action => parseContractDate(action.effectiveDate).year <= before.closedThroughSeason)) return false;
   }
   return before.records.every(old => {
-    const next = after.records.find(r => r.contract.contractId === old.contract.contractId);
+    const next = after.records.find(r => employmentContractId(r.contract) === employmentContractId(old.contract));
     return next && signature(opening(old)) === signature(opening(next)) && next.changes.length >= old.changes.length
       && old.changes.every((action, i) => signature(action) === signature(next.changes[i]));
   });

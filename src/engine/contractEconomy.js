@@ -1,4 +1,5 @@
-import { createSeasonContract, contractSeasonsRemaining } from './seasonContract';
+import { employmentContractId, projectEmploymentPlayer, validateAnnualEmploymentContract, normalizeEmploymentContract } from './seasonContract';
+import { createSeasonContract } from './seasonContract';
 import { createContractLedger, applyContractLedgerAction, contractEmploymentAt, validateContractLedger } from './contractLedger';
 import { applyAnnualTransaction, projectAnnualState } from './annualTransactions';
 import { quoteAnnualSpendingPlan } from './annualSpending';
@@ -32,10 +33,10 @@ function inspectContractClaims(spending, proposal) {
     [r.proposal, ...(r.acceptedProposal ? [r.acceptedProposal] : [])]);
   if (proposal) proposals.push(proposal);
   const claims = [...spending.ledger.records.map(r => ({ id: r.actionId, teamId: r.initialTeamId, contract: r.contract })), ...proposals];
-  typedIds(claims.map(p => p.contract.contractId));
+  typedIds(claims.map(p => employmentContractId(p.contract)));
   const seen = new Map();
   for (const p of claims) {
-    const key = p.contract.contractId, value = JSON.stringify([p.id, p.teamId, createSeasonContract(p.contract)]);
+    const key = employmentContractId(p.contract), value = JSON.stringify([p.id, p.teamId, normalizeEmploymentContract(p.contract)]);
     // Accepted proposals appear both in history and ledger. Cancellation must
     // not free their contract identity for a different player or promise.
     if (seen.has(key) && seen.get(key) !== value) fail('契約IDを別の提示・条件へ再利用できません。');
@@ -88,8 +89,7 @@ function inspectEnvelope(world) {
   inspectBudgetApprovals(spending.authorizations, e.budgetPolicies);
   // All NEW native terms are guaranteed; v1 fixtures remain independent.
   const contracts = recordedContracts(spending);
-  if (contracts.some(c => c?.guaranteed !== true || !['controlled', 'development'].includes(c.registrationType)))
-    fail('新しい契約には保証と登録区分が必要です。');
+  contracts.forEach(validateAnnualEmploymentContract);
   typedIds(e.engine.transactions.map(r => r?.id));
   inspectContractClaims(spending);
   typedIds([...spending.reservations, ...spending.resolvedReservations].map(r => r.proposal?.id));
@@ -138,9 +138,8 @@ export function fromAnnualState(world, input) {
   const projectPlayer = p => {
     const employment = employed.get(p.id);
     if (!employment) fail('現在の名簿に対応する雇用がありません。');
-    const c = employment.contract, development = employment.registrationType === 'development';
-    return { ...p, salary: employment.annualSalaryManYen, contractId: c.contractId,
-      contractYears: c.termYears, contractYearsLeft: contractSeasonsRemaining(c, state.season), contractSignedYear: c.signedSeason,
+    const development = employment.registrationType === 'development';
+    return { ...projectEmploymentPlayer(p, employment, state.season),
       育成: development, isIkusei: development };
   };
   const teams = state.teams.map(t => {

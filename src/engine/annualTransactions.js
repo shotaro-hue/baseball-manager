@@ -1,3 +1,4 @@
+import { employmentContractId, projectEmploymentPlayer, validateAnnualEmploymentContract } from './seasonContract';
 import { MIN_SALARY_SHIHAKA, MAX_SHIHAKA_TOTAL } from '../constants';
 import { createSeasonContract, contractSeasonsRemaining } from './seasonContract';
 import { contractEmploymentAt, applyContractLedgerAction } from './contractLedger';
@@ -30,8 +31,8 @@ function futureEmployments(state) {
   for (const record of state.spending.ledger.records) {
     if (record.effectiveDate <= state.date) continue;
     if (!dates.has(record.effectiveDate)) dates.set(record.effectiveDate, new Map(
-      contractEmploymentAt(state.spending.ledger, record.effectiveDate).map(e => [e.contract.contractId, e])));
-    const employment = dates.get(record.effectiveDate).get(record.contract.contractId);
+      contractEmploymentAt(state.spending.ledger, record.effectiveDate).map(e => [employmentContractId(e.contract), e])));
+    const employment = dates.get(record.effectiveDate).get(employmentContractId(record.contract));
     if (employment) result.push({ ...employment, effectiveDate: record.effectiveDate });
   }
   return result;
@@ -100,8 +101,7 @@ function inspect(state) {
     const contracts = [...spending.ledger.records.map(r => r.contract),
       ...[...spending.reservations, ...spending.resolvedReservations].flatMap(r =>
         [r.proposal?.contract, ...(r.acceptedProposal ? [r.acceptedProposal.contract] : [])])];
-    if (contracts.some(c => c?.guaranteed !== true || !['controlled', 'development'].includes(c.registrationType)))
-      fail('新しい契約には保証と登録区分が必要です。');
+    contracts.forEach(validateAnnualEmploymentContract);
   }
   const date = parseContractDate(state.date);
   if (date.year !== state.season || state.spending?.budgetSeason !== state.season + Number(state.phase === 'offseason')
@@ -146,7 +146,7 @@ function inspect(state) {
     }
   }
   const employed = contractEmploymentAt(state.spending.ledger, rosterDate(state)).filter(e =>
-    !pendingAcquisitions.some(h => h.proposal.contract.contractId === e.contract.contractId)
+    !pendingAcquisitions.some(h => h.proposal.contract.contractId === employmentContractId(e.contract))
     && !pendingPersonnel.some(m => m.player.id === e.contract.playerId));
   if (employed.length !== owners.size || employed.some(e => owners.get(e.contract.playerId) !== e.teamId)) fail('名簿と有効な契約の所属が一致しません。');
   if (employed.some(e => e.registrationType !== undefined
@@ -176,7 +176,7 @@ function inspect(state) {
     fail('未来の取引を現在の名簿へ反映できません。');
   for (const future of futureEmployments(state)) {
     if (future.contract.purpose === 'acquisition' && !owners.has(future.contract.playerId)
-      && !pendingAcquisitions.some(h => h.proposal.contract.contractId === future.contract.contractId)
+      && !pendingAcquisitions.some(h => h.proposal.contract.contractId === employmentContractId(future.contract))
       && !pendingPersonnel.some(m => m.player.id === future.contract.playerId && m.teamId === future.teamId))
       fail('将来の獲得契約に加入待ち選手の情報がありません。');
     if (future.contract.purpose === 'renewal'
@@ -300,7 +300,7 @@ function renewalCandidate(state, c) {
   const team = state.teams.find(t => t.id === p.teamId), terms = p.contract;
   const player = team && ownedPlayers(team).find(p => p.id === terms.playerId);
   const current = contractEmploymentAt(state.spending.ledger, rosterDate(state))
-    .find(e => e.teamId === p.teamId && e.contract.playerId === terms.playerId && e.contract.contractId === c.contractId);
+    .find(e => e.teamId === p.teamId && e.contract.playerId === terms.playerId && employmentContractId(e.contract) === c.contractId);
   if (!player || player.isRetired || player._retireNow || !current || current.contract.endSeason !== state.season)
     fail('更改対象の現在契約・所属・満了年度を確認してください。');
   const registrationType = isIkuseiPlayer(player) ? 'development' : 'controlled';
@@ -408,12 +408,12 @@ function tradeCandidate(state, c) {
   for (const [ids, from, to] of [[c.outgoingIds, c.fromId, c.toId], [c.incomingIds, c.toId, c.fromId]]) for (const playerId of ids) {
     const e = employment.find(e => e.contract.playerId === playerId && e.teamId === from);
     if (!e) fail('移籍する選手の有効な契約が見つかりません。');
-    ledger = applyContractLedgerAction(ledger, { id: key(c.id, ['transfer', playerId]), type: 'transfer', contractId: e.contract.contractId,
+    ledger = applyContractLedgerAction(ledger, { id: key(c.id, ['transfer', playerId]), type: 'transfer', contractId: employmentContractId(e.contract),
       teamId: from, toTeamId: to, effectiveDate: state.date });
     for (const upcoming of future.filter(e => e.contract.playerId === playerId)) {
       if (upcoming.teamId !== from) fail('移籍する選手の将来契約の所属が一致しません。');
-      ledger = applyContractLedgerAction(ledger, { id: key(c.id, ['future-transfer', playerId, upcoming.contract.contractId]),
-        type: 'transfer', contractId: upcoming.contract.contractId, teamId: from, toTeamId: to, effectiveDate: upcoming.effectiveDate });
+      ledger = applyContractLedgerAction(ledger, { id: key(c.id, ['future-transfer', playerId, employmentContractId(upcoming.contract)]),
+        type: 'transfer', contractId: employmentContractId(upcoming.contract), teamId: from, toTeamId: to, effectiveDate: upcoming.effectiveDate });
     }
   }
   const costs = c.cashManYen === 0 ? [] : [[c.fromId, c.cashManYen], [c.toId, -c.cashManYen]].map(([teamId, amountManYen]) => ({
@@ -423,9 +423,7 @@ function tradeCandidate(state, c) {
   const project = player => {
     if (!transferred.has(player.id)) return player;
     const e = current.get(player.id);
-    return { ...player, salary: e.annualSalaryManYen, contractId: e.contract.contractId,
-      contractYears: e.contract.termYears, contractYearsLeft: contractSeasonsRemaining(e.contract, state.season),
-      contractSignedYear: e.contract.signedSeason };
+    return projectEmploymentPlayer(player, e, state.season);
   };
   const teams = projected.teams.map(t => t.id === c.fromId || t.id === c.toId
     ? { ...t, players: t.players.map(project), farm: t.farm.map(project) } : t);
@@ -436,17 +434,14 @@ function conversionCandidate(state, c) {
   const team = state.teams.find(t => t.id === c.teamId);
   const player = team?.farm.find(p => p.id === c.playerId);
   const employment = contractEmploymentAt(state.spending.ledger, state.date)
-    .find(e => e.contract.playerId === c.playerId && e.teamId === c.teamId && e.contract.contractId === c.contractId);
+    .find(e => e.contract.playerId === c.playerId && e.teamId === c.teamId && employmentContractId(e.contract) === c.contractId);
   if (!player || !isIkuseiPlayer(player) || player.isRetired || player._retireNow
     || employment?.registrationType !== 'development') fail('現在の所属と育成契約を確認してください。');
   const ledger = applyContractLedgerAction(state.spending.ledger, { id: key(c.id, ['conversion', c.playerId]),
     type: 'convert-to-controlled', teamId: c.teamId, contractId: c.contractId,
     effectiveDate: state.date, annualSalaryManYen: c.annualSalaryManYen });
-  const converted = { ...player, 育成: false, isIkusei: false, ikuseiYears: 0,
-    salary: c.annualSalaryManYen, contractId: c.contractId,
-    contractYears: employment.contract.termYears,
-    contractYearsLeft: contractSeasonsRemaining(employment.contract, state.season),
-    contractSignedYear: employment.contract.signedSeason };
+  const converted = { ...projectEmploymentPlayer(player, { ...employment, annualSalaryManYen: c.annualSalaryManYen }, state.season),
+    育成: false, isIkusei: false, ikuseiYears: 0 };
   // Classification changes; placement stays farm. Shared inspection checks
   // accepted rookies against the 70-place cap and rejects conflicting future
   // terms before commit, without rewriting their contracts or reservations.

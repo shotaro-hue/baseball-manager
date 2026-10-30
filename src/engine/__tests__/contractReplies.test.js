@@ -72,3 +72,21 @@ describe('normal contract replies', () => {
     expect(result.replies[0]).toMatchObject({ id: 'mail', resolved: true, resolution: 'cancelled' });
   });
 });
+
+describe('explicit legacy reply resolution', () => {
+  it.each(['contract_decision_pending', 'contract_decision'].flatMap(type =>
+    ['false', 'true', 0, 1, null, undefined, false, true, {}, []].map(resolved => [type, resolved])))
+  ('processes %s resolved=%j once and preserves the original mailbox', (type, resolved) => {
+    const pending = { ...mail(), type }; if (resolved === undefined) delete pending.resolved; else pending.resolved = resolved;
+    for (const input of [[pending, { type: 'news' }], JSON.parse(JSON.stringify([pending, { type: 'news' }]))]) {
+      const snapshot = JSON.stringify(input), before = team(), result = resolveContractReplies(before, input, 2, 2026);
+      expect(result.replies).toHaveLength(resolved === true ? 0 : 1);
+      if (resolved === true) expect(result.team).toBe(before);
+      else {
+        expect(result.team.players[0].salary).toBe(1200);
+        expect(resolveContractReplies(result.team, JSON.parse(JSON.stringify(result.replies)), 3, 2026).replies).toEqual([]);
+      }
+      expect(JSON.stringify(input)).toBe(snapshot); expect(before.players[0].salary).toBe(1000);
+    }
+  });
+});

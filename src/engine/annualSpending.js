@@ -1,3 +1,4 @@
+import { employmentContractId } from './seasonContract';
 import { createContractLedger, applyContractLedgerAction, contractLiabilityRows,
   isContractLedgerExtension } from './contractLedger';
 import { parseContractDate } from './contractCalendar';
@@ -110,7 +111,7 @@ function prepare(plan) {
     if (holdIds.has(proposal.id) || resolvedIds.has(proposal.id) || heldContracts.has(proposal.contract.contractId)) fail('契約の留保が重複または解決済みです。');
     holdIds.add(proposal.id); heldContracts.add(proposal.contract.contractId);
     if (parseContractDate(proposal.effectiveDate).year < plan.budgetSeason) fail('過去年度のオファーを留保できません。');
-    if (plan.ledger.records.some(r => r.contract.contractId === proposal.contract.contractId)) fail('確定済み契約を再び留保できません。');
+    if (plan.ledger.records.some(r => employmentContractId(r.contract) === proposal.contract.contractId)) fail('確定済み契約を再び留保できません。');
     // Validate current ownership/overlap and closed years without committing it.
     applyContractLedgerAction(plan.ledger, proposal);
     const projected = applyContractLedgerAction(createContractLedger(), proposal);
@@ -181,7 +182,7 @@ export function quoteAnnualSpendingPlan(plan) { return prepare(plan).rows; }
 function newLedgerActions(before, after) {
   const result = [];
   for (const record of after.records) {
-    const old = before.records.find(r => r.contract.contractId === record.contract.contractId);
+    const old = before.records.find(r => employmentContractId(r.contract) === employmentContractId(record.contract));
     if (!old) result.push({ type: 'sign', effectiveDate: record.effectiveDate });
     result.push(...record.changes.slice(old?.changes.length ?? 0));
   }
