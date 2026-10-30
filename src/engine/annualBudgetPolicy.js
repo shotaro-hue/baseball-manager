@@ -53,15 +53,19 @@ export function quoteAnnualBudgetPolicy(world, policy) {
     forecasts.set(key(f.teamId,f.season),f);
   }
   const authorizations=[],budgetPolicies=[],rosterRequirements=[];
-  for(const teamId of teams.keys())for(let season=spending.budgetSeason;season<=end;season++){
-    const f=forecasts.get(key(teamId,season));if(!f)fail();
-    const approvedManYen=approval(f,policy), pair={teamId,season};
+  for(const teamId of teams.keys()){
+    let precedingApproved;
+    for(let season=spending.budgetSeason;season<=end;season++){
+      const f=forecasts.get(key(teamId,season));if(!f)fail();
+      const approvedManYen=approval(f,policy,precedingApproved), pair={teamId,season};
+      precedingApproved=approvedManYen;
     authorizations.push({...pair,approvedManYen,minimumRosterReserveManYen:0});
     rosterRequirements.push({...pair,requiredControlledCount:65});
     budgetPolicies.push({...pair,kind,policyVersion:policy.policyVersion,inputsRecorded:true,
       source:f.source,operatingSurplusesManYen:[...f.operatingSurplusesManYen],supportManYen:f.supportManYen,
       previousApprovedManYen:f.previousApprovedManYen,allocationPercent:policy.allocationPercent,smoothingYears:policy.smoothingYears,
       maxChangePercent:policy.maxChangePercent,approvedManYen,reason:'payroll-before-estimate; future approval is a planning forecast'});
+    }
   }
   return {authorizations,budgetPolicies,rosterRequirements};
 }
