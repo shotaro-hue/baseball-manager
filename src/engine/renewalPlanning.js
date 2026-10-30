@@ -23,7 +23,15 @@ export function activeRenewalPlans(spending) {
     const recordedMinimum=source.contract.registrationType==='development'?MIN_SALARY_IKUSEI:MIN_SALARY_SHIHAKA;
     if(p.amountManYen<recordedMinimum)fail();
     if(p.season<spending.budgetSeason||!e||e.teamId!==p.teamId)continue;
-    if(at(date(p.season,'02-01')).some(e=>e.contract.playerId===p.playerId))continue;
+    // In-season new contracts supersede the expiring contract's old estimate.
+    const seasonStart=date(p.season,'02-01'),seasonEnd=date(p.season,'11-30');
+    const superseded=spending.ledger.records.some(r=>{
+      if(r.contract.playerId!==p.playerId||employmentContractId(r.contract)===p.sourceContractId
+        ||r.contract.endSeason<p.season||r.effectiveDate>seasonEnd)return false;
+      const checkDate=r.effectiveDate>seasonStart?r.effectiveDate:seasonStart;
+      return at(checkDate).some(e=>employmentContractId(e.contract)===employmentContractId(r.contract));
+    });
+    if(superseded)continue;
     if(spending.reservations.some(h=>h.kind==='renewal'&&h.proposal.teamId===p.teamId&&h.proposal.contract.playerId===p.playerId
       &&h.proposal.contract.startSeason<=p.season&&h.proposal.contract.endSeason>=p.season))continue;
     active.push({...p,amountManYen:Math.max(p.amountManYen,e.registrationType==='development'?MIN_SALARY_IKUSEI:MIN_SALARY_SHIHAKA),registrationType:e.registrationType});
