@@ -1,3 +1,4 @@
+import { activeRenewalPlans } from './renewalPlanning';
 import { employmentContractId, projectEmploymentPlayer, validateAnnualEmploymentContract } from './seasonContract';
 import { MIN_SALARY_SHIHAKA, MAX_SHIHAKA_TOTAL } from '../constants';
 import { createSeasonContract, contractSeasonsRemaining } from './seasonContract';
@@ -219,7 +220,7 @@ function withFloors(state) {
       || r.requiredControlledCount < 0 || r.requiredControlledCount > MAX_SHIHAKA_TOTAL || requirements.has(k)) fail('年度別の必要人数を確認してください。');
     requirements.set(k, r.requiredControlledCount);
   }
-  const employmentByDate = new Map();
+  const employmentByDate = new Map(), plans = activeRenewalPlans(state.spending);
   const authorizations = state.spending.authorizations.map(a => {
     if (a.season < state.spending.budgetSeason) return a;
     const required = requirements.get(key(a.teamId, a.season));
@@ -239,6 +240,7 @@ function withFloors(state) {
       const p = h.proposal;
       if (p.teamId === a.teamId && p.contract.startSeason <= a.season && p.contract.endSeason >= a.season) count(p.contract.playerId, p.contract.registrationType, true);
     }
+    for (const p of plans) if (p.teamId === a.teamId && p.season === a.season) count(p.playerId, p.registrationType);
     const capacity = evaluateRosterCapacity(teams.get(a.teamId), { ...faPersonnelCapacityContext(state), teams: state.teams });
     const unfundedPicks = a.season === state.spending.budgetSeason ? capacity.acceptedPicks.filter(p => !funded.has(p.id)).length : 0;
     return { ...a, minimumRosterReserveManYen: Math.max(unfundedPicks, required - funded.size, 0) * MIN_SALARY_SHIHAKA };

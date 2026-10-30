@@ -1,3 +1,4 @@
+import { activeRenewalPlans } from './renewalPlanning';
 import { employmentContractId } from './seasonContract';
 import { createContractLedger, applyContractLedgerAction, contractLiabilityRows,
   isContractLedgerExtension } from './contractLedger';
@@ -61,7 +62,7 @@ function prepare(plan) {
     if (byYear.has(key)) fail('同じ球団・年度の許可額が重複しています。');
     byYear.set(key, { teamId: authorization.teamId, season: authorization.season,
       approvedManYen: authorization.approvedManYen, minimumRosterReserveManYen: authorization.minimumRosterReserveManYen,
-      salary: 0n, guarantee: 0n, oneOff: 0n, reserved: 0n, tokens: [] });
+      salary: 0n, guarantee: 0n, oneOff: 0n, reserved: 0n, staff: 0n, planned: 0n, tokens: [] });
     authorizations.push([authorization.teamId, authorization.season, authorization.approvedManYen]);
   }
   const target = (teamId, season) => {
@@ -127,12 +128,29 @@ function prepare(plan) {
     }
     reservations.push([hold.kind, proposal]);
   }
+  for (const p of activeRenewalPlans(plan)) {
+    const row = target(p.teamId, p.season); if (!row) continue;
+    row.planned += BigInt(p.amountManYen);
+    row.tokens.push(['renewal-plan', p.playerId, p.sourceContractId, p.amountManYen]);
+  }
+  const staffIds = new Set(), staffRoles = new Set(), staffCosts = [];
+  if (plan.staffContracts !== undefined && !Array.isArray(plan.staffContracts)) fail('スタッフ年度契約を確認してください。');
+  for (const c of plan.staffContracts ?? []) {
+    if (!c || !id(c.id) || !id(c.teamId) || !id(c.role) || !year(c.season) || !money(c.annualSalaryManYen)) fail('スタッフ年度費用が不正です。');
+    const identity = JSON.stringify([String(c.id), c.season]), role = JSON.stringify([c.teamId, c.season, c.role]);
+    if (staffIds.has(identity) || staffRoles.has(role)) fail('スタッフの年度担当・費用が重複しています。');
+    staffIds.add(identity); staffRoles.add(role);
+    const token = ['staff', c.id, c.teamId, c.season, c.role, c.annualSalaryManYen]; staffCosts.push(token);
+    const row = target(c.teamId, c.season); if (!row) continue;
+    row.staff += BigInt(c.annualSalaryManYen); row.tokens.push(token);
+  }
   const expenseIds = new Set(), faExpenseIds = new Set(), expenses = [];
   for (const expense of plan.oneOffCosts) {
     if (!expense || !id(expense.id) || !id(expense.teamId) || !year(expense.season)
       || !['coach', 'scouting', 'stadium', 'trade', 'fa-compensation'].includes(expense.kind)
       || !Number.isSafeInteger(expense.amountManYen) || (!['trade', 'fa-compensation'].includes(expense.kind) && expense.amountManYen < 0)
       || expenseIds.has(expense.id)) fail('一時費用が未記録・不正・重複しています。');
+    if (expense.kind === 'coach' && (plan.staffContracts ?? []).some(c => c.teamId === expense.teamId && c.season === expense.season)) fail('年度スタッフ費と旧一時コーチ費を二重計上できません。');
     expenseIds.add(expense.id);
     const faCost = expense.kind === 'fa-compensation';
     if (!faCost && (Object.hasOwn(expense, 'proposalId') || isFaCompensationCostId(expense.id)))
@@ -156,7 +174,7 @@ function prepare(plan) {
     if (row.season < plan.budgetSeason) continue;
     const tokens = [...row.tokens, ['minimum-roster', row.minimumRosterReserveManYen]];
     fingerprints.set(key, sorted(tokens));
-    tokenSets.set(key, new Set(tokens.filter(token => token[0] !== 'contract'
+    tokenSets.set(key, new Set(tokens.filter(token => token[0] !== 'contract' && token[0] !== 'renewal-plan'
       && !(token[0] === 'expense' && token[4] === 'fa-compensation' && token[5] < 0)).map(token => JSON.stringify(token))));
     // Approval follows each existing obligation, independent of salary/guarantee
     // classification. Keep the detailed tokens above for quoting and change detection.
@@ -168,12 +186,12 @@ function prepare(plan) {
     contractTotals.set(key, totals);
     rows.push({ teamId: row.teamId, season: row.season, approvedManYen: row.approvedManYen,
       salaryManYen: numeric(row.salary), guaranteeManYen: numeric(row.guarantee), oneOffManYen: numeric(row.oneOff),
-      reservedManYen: numeric(row.reserved), minimumRosterReserveManYen: row.minimumRosterReserveManYen,
-      remainingManYen: numeric(BigInt(row.approvedManYen) - row.salary - row.guarantee - row.oneOff - row.reserved - BigInt(row.minimumRosterReserveManYen)) });
+      reservedManYen: numeric(row.reserved), staffManYen: numeric(row.staff), renewalPlanReserveManYen: numeric(row.planned), minimumRosterReserveManYen: row.minimumRosterReserveManYen,
+      remainingManYen: numeric(BigInt(row.approvedManYen) - row.salary - row.guarantee - row.oneOff - row.reserved - row.staff - row.planned - BigInt(row.minimumRosterReserveManYen)) });
   }
   const historicalFloors = sorted(plan.authorizations.filter(a => a.season < plan.budgetSeason)
     .map(a => [a.teamId, a.season, a.minimumRosterReserveManYen]));
-  return { rows, fingerprints, tokenSets, contractTotals, authorizations: sorted(authorizations), historicalFloors,
+  return { rows, fingerprints, tokenSets, contractTotals, staffCosts, authorizations: sorted(authorizations), historicalFloors,
     reservations: sorted(reservations), resolutions, expenses, faCompensations: compensation.records };
 }
 
@@ -194,6 +212,8 @@ export function assessAnnualSpendingChange(before, after, { mode = 'spend' } = {
   if (!['spend', 'cashless-trade'].includes(mode) || before.budgetSeason !== after.budgetSeason
     || a.authorizations !== b.authorizations || a.historicalFloors !== b.historicalFloors
     || !isContractLedgerExtension(before.ledger, after.ledger)) fail('支出審査で既存の許可額や契約履歴を書き換えることはできません。');
+  if (sorted(before.renewalPlans ?? []) !== sorted(after.renewalPlans ?? [])) fail('通常取引で未更改計画の根拠を変更できません。');
+  if (sorted(a.staffCosts) !== sorted(b.staffCosts)) fail('スタッフ年度契約の変更は専用処理が必要です。');
   const actions = newLedgerActions(before.ledger, after.ledger);
   if (actions.some(action => parseContractDate(action.effectiveDate).year < before.budgetSeason)) fail('過去年度の取引を追加できません。');
   const nextResolved = new Map(b.resolutions.map(r => [r.proposal.id, r]));
@@ -235,6 +255,17 @@ export function assessAnnualSpendingChange(before, after, { mode = 'spend' } = {
   const withoutRaises = increaseIds.size ? prepare({ ...after, ledger: { ...after.ledger,
     records: after.ledger.records.map(record => ({ ...record,
       changes: record.changes.filter(action => !increaseIds.has(action.id)) })) } }) : b;
+  // Restore only the estimate that a cancelled hold previously displaced.
+  // Use the OLD ledger: conversion/other changes cannot borrow this exception
+  // to introduce a higher future planning floor while already over budget.
+  const cancelled = new Set(before.reservations.filter(h => h.kind === 'renewal'
+    && nextResolved.get(h.proposal.id)?.resolution === 'cancelled').map(h => h.proposal.id));
+  const restoredPlans = new Map();
+  if (cancelled.size) for (const p of activeRenewalPlans({ ...before,
+    reservations: before.reservations.filter(h => !cancelled.has(h.proposal.id)) })) {
+    const key = keyFor(p.teamId, p.season);
+    restoredPlans.set(key, (restoredPlans.get(key) ?? 0n) + BigInt(p.amountManYen));
+  }
   const oldRows = new Map(a.rows.map(row => [keyFor(row.teamId, row.season), row]));
   const rows = b.rows.map(row => {
     const key = keyFor(row.teamId, row.season), old = oldRows.get(key);
@@ -248,11 +279,12 @@ export function assessAnnualSpendingChange(before, after, { mode = 'spend' } = {
         && amount <= oldContracts.get(contractId));
     return { ...row, beforeRemainingManYen: old.remainingManYen, affected,
       onlyRemovals,
+      planRestoredManYen: Math.max(0, numeric(restoredPlans.get(key) ?? 0n) - old.renewalPlanReserveManYen),
       changeManYen: numeric(BigInt(row.remainingManYen) - BigInt(old.remainingManYen)) };
   });
   const violations = rows.filter(row => row.affected
     && (mode === 'cashless-trade' ? row.changeManYen < 0
-      : row.remainingManYen < 0 && (!row.onlyRemovals || row.changeManYen < 0)));
+      : row.remainingManYen < 0 && (!row.onlyRemovals || row.changeManYen + row.planRestoredManYen < 0)));
   return { ok: violations.length === 0, violations, rows };
 }
 

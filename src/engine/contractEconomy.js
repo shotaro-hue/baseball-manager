@@ -1,3 +1,4 @@
+import { inspectAnnualBudgetCoverage } from './annualBudgetPolicy';
 import { employmentContractId, projectEmploymentPlayer, validateAnnualEmploymentContract, normalizeEmploymentContract } from './seasonContract';
 import { createSeasonContract } from './seasonContract';
 import { createContractLedger, applyContractLedgerAction, contractEmploymentAt, validateContractLedger } from './contractLedger';
@@ -87,6 +88,8 @@ function inspectEnvelope(world) {
   if (!spending || !Array.isArray(spending.ledger?.records) || !Array.isArray(spending.reservations)
     || !Array.isArray(spending.resolvedReservations)) fail('契約台帳・正式留保が未記録です。');
   inspectBudgetApprovals(spending.authorizations, e.budgetPolicies);
+  inspectAnnualBudgetCoverage(world);
+  if (Object.hasOwn(spending, 'staffContracts')) fail('スタッフ契約の正本はworldです。');
   // All NEW native terms are guaranteed; v1 fixtures remain independent.
   const contracts = recordedContracts(spending);
   contracts.forEach(validateAnnualEmploymentContract);
@@ -108,7 +111,7 @@ export function contractEconomyMode(world) {
 export function toAnnualState(world) {
   if (contractEconomyMode(world) !== 'annual') fail('新契約制度のworldが必要です。');
   const e = world.contractEconomy;
-  return projectAnnualState({ ...e.engine, ...e.clock, teams: world.teams, faPool: world.faPool,
+  return projectAnnualState({ ...e.engine, spending: { ...e.engine.spending, staffContracts: e.staffContracts }, ...e.clock, teams: world.teams, faPool: world.faPool,
     economyIdentity: identity(world), draftContext: draftCapacityContext(world.offseasonPlan, world.year, world.teams) });
 }
 
@@ -132,6 +135,7 @@ export function fromAnnualState(world, input) {
   if (contractEconomyMode(world) !== 'annual' || !sameIdentity(input.economyIdentity, identity(world))
     || input.season !== world.year || input.phase !== world.contractEconomy.clock.phase || input.date !== world.contractEconomy.clock.date)
     fail('取引結果のworld・年度・revisionが一致しません。');
+  if (JSON.stringify(input.spending?.staffContracts) !== JSON.stringify(world.contractEconomy.staffContracts)) fail('スタッフ年度契約の投影が正本と一致しません。');
   const state = projectAnnualState(input), rows = quoteAnnualSpendingPlan(state.spending);
   const rosterDate = state.phase === 'offseason' ? `${String(state.season).padStart(4, '0')}-11-30` : state.date;
   const employed = new Map(contractEmploymentAt(state.spending.ledger, rosterDate).map(e => [e.contract.playerId, e]));
@@ -148,6 +152,8 @@ export function fromAnnualState(world, input) {
     return { ...t, players: t.players.map(projectPlayer), farm: t.farm.map(projectPlayer), budget: row.remainingManYen };
   });
   const engine = Object.fromEntries(['version', 'spending', ...engineArrays].map(k => [k, state[k]]));
+  const { staffContracts, ...persistedSpending } = engine.spending;
+  engine.spending = persistedSpending;
   const next = { ...world, teams, faPool: state.faPool, offseasonPlan: projectDraftPlan(world, state),
     contractEconomy: { ...world.contractEconomy, engine } };
   toAnnualState(next);
