@@ -103,6 +103,10 @@
 
 ## Task 4: A1-1d 保存と移行candidate
 
+2026-10-31追記: 第1PRを保存I/O境界へ分割。[A1-1d-1の検証・残工程](../../validation/gm-01-a1-1d1/README.md)を参照。保存/復元のvalidation、既知epochの降格拒否、Appの公開ゲートを追加。非置換commit/ack/barrier、hook hydration、移行candidate/anchor/fenceは後続であり、Task 4全体の完了ではない。
+
+PR #521レビュー修正: revision増加でもrandomRoot・確定済み台帳・取引receiptを保持する保存境界を追加。clock更新を同revisionのまま保存すると拒否されるため、後続の進行/年度移行producerがrevisionを更新する。[採番責務・履歴保持の申し送り](../../validation/gm-01-a1-1d1/README.md#後続a1工程のrevision更新責務)をTask 4と通常/Worker/年度移行の受入条件に含める。
+
 **Files:** Create `src/engine/economyPersistence.js`, `src/engine/economyActivation.js`, `tests/economy-save-migration.test.js`, `e2e/economy-migration.spec.js`; modify `src/engine/economyMigration.js`, `src/engine/saveload.js`, `src/hooks/useGameState.js`, `src/hooks/gameStateReducer.js`, `src/App.jsx`。storage fence/activation anchorは既存`baseballManagerDb.js`を拡張したテストharnessで確認するが通常DB versionはまだ5。保存/hydrationと移行anchorが大きければ本Taskを2PRに分け、両方ゲートOFFで保つ。
 
 **Interfaces:** `commitEconomyCandidate(candidate,expected)`、mode/schema/epoch付き保存・原子的hydration、移行`applied/deferred`。成功時の`committed`は公開root由来のsaveId/epoch/revision/rootSignature/receiptIdsを返し、候補との一致が採用条件。通常保存と共通のbarrier内でannual確定保存を置換不可とし、既存の待機payloadをまとめる経路へそのまま渡さない。dirtyScopesと既存archive/career/farmのreceiptを保存候補に残す。
