@@ -23,15 +23,29 @@ for (const large of [false, true]) test(`save generations: annual world survives
     const loaded = await mod.loadGame(), before = localStorage.getItem('baseball_manager_v1');
     const { contractEconomy, ...legacy } = loaded;
     const rejected = await mod.saveGame(legacy), unchanged = localStorage.getItem('baseball_manager_v1') === before;
+    const roots = () => ['baseball_manager_v1', 'baseball_manager_v1_bk1', 'baseball_manager_v1_bk2'].map(k => localStorage.getItem(k));
+    const historyChecks = [];
+    for (const kind of ['seed', 'receipt', 'ledger order']) {
+      const candidate = structuredClone(loaded), previousRoots = JSON.stringify(roots());
+      candidate.contractEconomy.revision++;
+      if (kind === 'seed') candidate.contractEconomy.randomRoot.seed = 'changed';
+      if (kind === 'receipt') candidate.contractEconomy.engine.transactions.pop();
+      if (kind === 'ledger order') candidate.contractEconomy.engine.spending.ledger.records.reverse();
+      const input = JSON.stringify(candidate), result = await mod.saveGame(candidate);
+      historyChecks.push({ result, rootsUnchanged: JSON.stringify(roots()) === previousRoots, inputUnchanged: JSON.stringify(candidate) === input });
+    }
     const accepted = reduceEconomyCommand(loaded, { saveId: loaded.saveId, epoch: contractEconomy.epoch, baseRevision: 1,
       transaction: { id: 'answer', type: 'accept-renewal', proposalId: 'renewal', contractId: loaded.teams[0].players[0].contractId } });
     accepted.world.mailbox = [{ id: 'signed', type: 'contract_reply', read: false }];
     const saved = await mod.enqueueSaveGame(accepted.world, { dirtyScopes: [] });
     const restored = await mod.loadGame();
-    return { rejected, unchanged, saved, revision: restored.contractEconomy.revision,
+    return { rejected, unchanged, historyChecks, saved, revision: restored.contractEconomy.revision,
       sameEconomy: JSON.stringify(restored.contractEconomy) === JSON.stringify(accepted.world.contractEconomy), mailbox: restored.mailbox };
   });
   expect(result.rejected).toMatchObject({ ok: false, reason: 'economy_payload_missing' });
+  expect(result.historyChecks).toEqual(Array.from({ length: 3 }, () => ({
+    result: expect.objectContaining({ ok: false, reason: 'economy_history_conflict' }), rootsUnchanged: true, inputUnchanged: true,
+  })));
   expect(result.unchanged).toBe(true); expect(result.saved.ok).toBe(true);
   expect(result.revision).toBe(2); expect(result.sameEconomy).toBe(true);
   expect(result.mailbox).toEqual([{ id: 'signed', type: 'contract_reply', read: false }]);

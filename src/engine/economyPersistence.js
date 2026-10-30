@@ -1,6 +1,6 @@
 import { contractEconomyMode, toAnnualState } from './contractEconomy';
 import { hasSelectedTeam } from './teamId';
-import { contractEmploymentAt } from './contractLedger';
+import { contractEmploymentAt, isContractLedgerExtension } from './contractLedger';
 import { employmentPlayerFields } from './seasonContract';
 import { quoteAnnualSpendingPlan } from './annualSpending';
 
@@ -44,6 +44,19 @@ export function economySaveMetadata(world) {
     revision: e?.revision, terms: canonical(e) };
 }
 
+function preservesEconomyHistory(before, after) {
+  if (canonical(before.randomRoot) !== canonical(after.randomRoot)) return false;
+  const oldLedger = before.engine.spending.ledger, newLedger = after.engine.spending.ledger;
+  // Reuse ledger semantics (including closed years); additionally retain the
+  // exact persisted evidence and record order, which the semantic check ignores.
+  if (!isContractLedgerExtension(oldLedger, newLedger)
+    || !oldLedger.records.every((record, i) => canonical(record) === canonical({ ...newLedger.records[i],
+      changes: newLedger.records[i].changes.slice(0, record.changes.length) }))) return false;
+  const receipts = before.engine.transactions, nextReceipts = after.engine.transactions;
+  return nextReceipts.length >= receipts.length
+    && receipts.every((receipt, i) => canonical(receipt) === canonical(nextReceipts[i]));
+}
+
 export function economyOverwriteIssue(previous, next, metadata = economySaveMetadata(previous)) {
   if (!previous || previous.saveId !== next.saveId) return null;
   const before = metadata, after = economySaveMetadata(next);
@@ -55,6 +68,11 @@ export function economyOverwriteIssue(previous, next, metadata = economySaveMeta
   if (before.epoch !== after.epoch) return 'economy_epoch_conflict';
   if (after.revision < before.revision || (after.revision === before.revision && after.terms !== before.terms))
     return 'economy_revision_conflict';
+  // terms is an independent serialized observation, including after load or
+  // backup recovery. Canonicalize both sides: legacy opening signatures retain
+  // their source object's key order. Never use the caller-owned previous world.
+  if (after.revision > before.revision
+    && !preservesEconomyHistory(JSON.parse(before.terms), JSON.parse(after.terms))) return 'economy_history_conflict';
   return null;
 }
 

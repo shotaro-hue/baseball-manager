@@ -33,3 +33,32 @@
 4. 一般の契約交渉/CPU/Worker/春越え、校正と本番有効化は後続のまま。
 
 独立レビューのCritical/Minorは0。レビューで対象外とされたqueue/barrier/ack/hydration/anchor/fenceとopaque破損は上記の未接続範囲として明記し、保護済みとは扱わない。表示投影については対象内と判断して修正した。
+
+## PR #521 レビュー修正（A1-1d-1-FIX）
+
+対象head `b9f74ff0b0b7ddcbbcdc5f1db1c1c604866ed662`、基準mainは上記と同じ。開始時CI #585は14ジョブ成功だったが、revision増加時に過去のworldとの比較がなく、現在の名簿・予算と矛盾しない過去契約の改変やreceipt削除、乱数seed変更を保存できた。履歴を失うと取引の再実行検出や再現可能性を損なう。
+
+`economyOverwriteIssue()`は、独立したcanonical文字列として既にcacheに保持している`terms`から確定済み状態を読み、revision増加時にも以下を検証する。呼び出し元worldへの参照や別の保存エンジンは追加しない。
+
+- `randomRoot`は同一saveId・epoch内で不変。
+- 台帳は`isContractLedgerExtension()`による合法的拡張（締め年度の単調増加を含む）。加えて既存recordの順番・原記録・changesの先頭部分をそのまま保持し、削除・改変・並べ替えを拒否する。
+- `engine.transactions`の既存receiptを同じ順番・内容で保持し、末尾への追加を許可する。
+- 予約一覧や予算・clock全体を不変にはしない。更改提示/差替え/受諾/キャンセル、台帳への新規契約/変更追加、予算更新、締め年度・年度移行を許可する。
+- 旧開始残高のsignatureは元objectの項目順を残すため、比較の両側をcanonical化してから既存台帳チェックへ渡す。保証unknownや未記録の署名情報を補完しない。
+
+### 修正の検証
+
+- 10種類（seed、receipt削除/改変/並べ替え、契約条件改変、台帳record削除/並べ替え、台帳change削除/改変、締め年度逆行）×5経路（同一プロセス、冷起動から直接保存、冷起動load後、backup復旧後、versionless rootのload後）×inline/IndexedDB大root＝100件で、修正前に不正保存成功のREDを確認。
+- 各異常候補は単体worldとして妥当であることを確認したうえで保存を拒否し、primary・backup 2世代・入力worldを保持する。元world/loaded worldの直接変更も同じ試験で扱う。
+- 正常な提示→差替え→受諾→年俸変更→同revision再保存、予算policy更新、複数年契約の翌年度持越し、旧開始残高の再保存を検証。新しい履歴保護で旧開始残高を誤拒否する問題を検出し、両側canonical化で修正。
+- Chromiumの既存inline/大root E2Eでも、冷起動後のseed/receipt/台帳順序改変拒否と正常受諾を追加。修正前は2ケースともRED。
+- 最終headの単体・回帰・E2E・CIの件数と結果はPR本文へ記録する。
+
+### 後続A1工程のrevision更新責務
+
+1. 現状は`reduceEconomyCommand()`が新しい正常取引で+1し、replayでは増やさない。`economyClockFor()`は時計を作るだけ、`fromAnnualState()`は投影するだけで採番しない。保存層も採番しない。
+2. 実日程とclockを翌日へそろえても同revisionなら`economy_revision_conflict`になる。producer側でrevisionを増やした候補は保存可能、という挙動を回帰テストで固定した。
+3. 後続の通常/戦術/まとめ/Worker進行とオフturn・年度移行は、clock・cycle・年度予算などの経済状態を変更する単一world候補を作る責務を持ち、その候補へ最新revisionからの増分を付与する。単一の進行操作では+1を基本とし、内包する契約commandで既に採番した場合の扱いも共通Reducerで一元化する。保存回数をrevisionにせず、quote・同一worldの再保存・replayは増やさない。
+4. 日付/年度だけ先に採用しない。baseRevisionを照合し、契約履歴とclock・予算・通知を一つの候補として検証し、後続のbarrier/公開root ack/原子的採用を通す。失敗時は未公開候補のrevisionや通知を採用せず、同一commandで再試行する。Workerに独立した採番器を置かない。
+5. 未来の年度移行でも確定履歴は保持して末尾追加する。台帳/receiptの並べ替え・削除による圧縮、randomRoot再生成、台帳schema変更をこの通常上書き経路へ流さない。将来アーカイブ等で必要になった場合は、検証可能な履歴継承と専用移行仕様を先に設計する。
+6. 通常の試合進行・年度移行の本番接続は今回未実施。非置換queue、publish→adopt barrier、公開root ack、原子的hydration、activation anchor、storage fenceは従来どおり後続。冷起動でprimaryが完全に判読不能な場合の保証は追加していない。DB version 5、一般公開ゲートOFF、旧セーブ自動移行なしを維持する。

@@ -2,11 +2,15 @@ import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
 import { saveGame, loadGame, getLastLoadResult, enqueueSaveGame } from '../src/engine/saveload';
 import { economyFixture, renewalEnvelope } from '../src/engine/__tests__/fixtures/economyWorld';
-import { reduceEconomyCommand, toAnnualState } from '../src/engine/contractEconomy';
+import { reduceEconomyCommand, toAnnualState, createAnnualNewGameWorld } from '../src/engine/contractEconomy';
 import { prepareRootBody } from '../src/engine/saveRootBodies';
 import { prepareEconomyMigration } from '../src/engine/economyMigration';
 import { economyPolicy } from '../src/engine/__tests__/fixtures/economyWorld';
 import { fromAnnualState } from '../src/engine/contractEconomy';
+import { applyContractLedgerAction, closeContractLedgerThrough } from '../src/engine/contractLedger';
+import { createSeasonContract } from '../src/engine/seasonContract';
+import { validateEconomySave } from '../src/engine/economyPersistence';
+import { quoteAnnualBudgetPolicy } from '../src/engine/annualBudgetPolicy';
 
 const primary = 'baseball_manager_v1', bk1 = primary + '_bk1', bk2 = primary + '_bk2';
 let rows;
@@ -197,4 +201,151 @@ it('retains an observed opening and unknown guarantee without inventing signatur
   expect(loaded.contractEconomy.engine.spending.ledger.records[0].contract.guaranteeStatus).toBe('unknown');
   expect(loaded.teams[0].players[0]).not.toHaveProperty('contractSignedYear');
   expect(loaded.teams[0].players[0]).not.toHaveProperty('contractYears');
+  const evidence = structuredClone(loaded.contractEconomy.engine.spending.ledger);
+  expect((await save(loaded)).ok).toBe(true);
+  loaded.contractEconomy.revision++;
+  expect((await save(loaded)).ok).toBe(true);
+  const resaved = await loadGame();
+  expect(resaved.contractEconomy.engine.spending.ledger).toEqual(evidence);
+  expect(resaved.teams[0].players[0]).not.toHaveProperty('contractSignedYear');
+  expect(resaved.teams[0].players[0]).not.toHaveProperty('contractYears');
+});
+
+// Past employment is deliberately absent from today's roster. Deleting or
+// rewriting it still produces a valid current world, but must not erase history.
+function historyFixture() {
+  const world = economyFixture();
+  let ledger = applyContractLedgerAction(world.contractEconomy.engine.spending.ledger, {
+    id: 'past-sign', type: 'sign', teamId: 0, effectiveDate: '2025-02-01',
+    contract: createSeasonContract({ contractId: 'past', playerId: 'past-player', signedSeason: 2025,
+      agreementPhase: 'preseason', purpose: 'acquisition', termYears: 1,
+      annualSalaryManYen: 1000, guaranteed: true, registrationType: 'controlled' }),
+  });
+  for (const [id, effectiveDate, annualSalaryManYen] of [['raise-1', '2025-03-01', 1200], ['raise-2', '2025-04-01', 1400]]) {
+    ledger = applyContractLedgerAction(ledger, { id, type: 'increase', teamId: 0, contractId: 'past', effectiveDate, annualSalaryManYen });
+  }
+  world.contractEconomy.engine.spending.ledger = closeContractLedgerThrough(ledger, 2025);
+  const offered = reduceEconomyCommand(world, renewalEnvelope(world));
+  expect(offered.ok, offered.error).toBe(true);
+  return commandWorld(offered.world, { id: 'cancel', type: 'cancel-renewal', proposalId: 'renewal' });
+}
+
+function commandWorld(world, transaction) {
+  const result = reduceEconomyCommand(world, { saveId: world.saveId, epoch: world.contractEconomy.epoch,
+    baseRevision: world.contractEconomy.revision, transaction });
+  expect(result.ok, result.error).toBe(true);
+  return result.world;
+}
+
+const historyEdits = [
+  ['random seed', e => { e.randomRoot.seed = 'rewritten-seed'; }],
+  ['receipt deletion', e => { e.engine.transactions.pop(); }],
+  ['receipt rewrite', e => { e.engine.transactions[0].signature = 'rewritten-receipt'; }],
+  ['receipt reorder', e => { e.engine.transactions.reverse(); }],
+  ['signed terms', e => { e.engine.spending.ledger.records.at(-1).contract.annualSalaryManYen = 900; }],
+  ['ledger record deletion', e => { e.engine.spending.ledger.records.pop(); }],
+  ['ledger record reorder', e => { e.engine.spending.ledger.records.reverse(); }],
+  ['ledger action deletion', e => { e.engine.spending.ledger.records.at(-1).changes.shift(); }],
+  ['ledger action rewrite', e => { e.engine.spending.ledger.records.at(-1).changes[0].annualSalaryManYen = 1250; }],
+  ['closed year regression', e => { e.engine.spending.ledger.closedThroughSeason = 2024; }],
+];
+
+for (const large of [false, true]) for (const route of ['warm', 'cold', 'loaded', 'recovered', 'unversioned']) {
+  it.each(historyEdits)(`rejects higher-revision %s without changing roots or input (${route}, large=${large})`, async (_, edit) => {
+    let candidate = historyFixture();
+    if (large) candidate.padding = 'large'.repeat(20000);
+    if (route === 'unversioned') {
+      rows.set(primary, await prepareRootBody(JSON.stringify(candidate)));
+      rows.set(bk1, rows.get(primary)); rows.set(bk2, rows.get(primary));
+    } else {
+      for (let i = 0; i < 3; i++) expect((await save(candidate)).ok).toBe(true);
+    }
+    expect(JSON.parse(rows.get(primary)).rootBodyVersion === 1).toBe(large);
+    if (route !== 'warm') freshStorageSurface();
+    if (route === 'recovered') rows.set(primary, 'corrupt-primary');
+    if (['loaded', 'recovered', 'unversioned'].includes(route)) {
+      candidate = await loadGame();
+      expect(getLastLoadResult().status).toBe(route === 'recovered' ? 'recovered' : 'primary');
+    }
+    const before = roots();
+    candidate.contractEconomy.revision++;
+    edit(candidate.contractEconomy); // Mutate the caller's original/loaded object in place.
+    expect(() => validateEconomySave(candidate)).not.toThrow();
+    const input = structuredClone(candidate);
+    expect(await save(candidate)).toMatchObject({ ok: false, reason: 'economy_history_conflict' });
+    expect(roots()).toEqual(before); expect(candidate).toEqual(input);
+  });
+}
+
+it.each([false, true])('saves legitimate offers, replacement, acceptance and ledger changes (large=%s)', async large => {
+  let world = economyFixture();
+  if (large) world.padding = 'large'.repeat(20000);
+  expect((await save(world)).ok).toBe(true);
+  world = commandWorld(world, renewalEnvelope(world).transaction);
+  expect((await save(world)).ok).toBe(true);
+  const replacement = renewalEnvelope(world, { id: 'replace', salary: 1800 }).transaction;
+  replacement.type = 'replace-renewal'; replacement.proposalId = 'renewal';
+  replacement.proposal.id = 'replacement'; replacement.proposal.contract.contractId = 'replacement-contract';
+  world = commandWorld(world, replacement);
+  expect((await save(world)).ok).toBe(true);
+  freshStorageSurface(); world = await loadGame();
+  world = commandWorld(world, { id: 'accept', type: 'accept-renewal', proposalId: 'replacement',
+    contractId: world.teams[0].players[0].contractId });
+  expect((await save(world)).ok).toBe(true);
+  expect(world.contractEconomy.engine.transactions.map(r => r.id)).toEqual([0, 'replace', 'accept']);
+  expect(world.contractEconomy.engine.spending.reservations).toEqual([]);
+  expect(world.contractEconomy.engine.spending.resolvedReservations.map(r => r.resolution)).toEqual(['replaced', 'accepted']);
+  const state = toAnnualState(world);
+  state.spending.ledger = applyContractLedgerAction(state.spending.ledger, { id: 'raise', type: 'increase',
+    contractId: world.teams[0].players[0].contractId, teamId: 0, effectiveDate: '2026-07-16', annualSalaryManYen: 1100 });
+  world = fromAnnualState(world, state); world.contractEconomy.revision++;
+  expect((await save(world)).ok).toBe(true);
+  expect((await save(world)).ok).toBe(true);
+  expect((await loadGame()).contractEconomy).toEqual(world.contractEconomy);
+});
+
+it('permits a legitimate budget policy update at a new revision', async () => {
+  const world = historyFixture(); expect((await save(world)).ok).toBe(true);
+  const policy = quoteAnnualBudgetPolicy(world, { policyVersion: 'next-budget', allocationPercent: 60,
+    smoothingYears: 1, maxChangePercent: 20, forecasts: world.contractEconomy.budgetPolicies.map(({ teamId, season }) => ({
+      teamId, season, source: 'observed', operatingSurplusesManYen: [100000], supportManYen: 0, previousApprovedManYen: null,
+    })) });
+  const next = structuredClone(world), e = next.contractEconomy;
+  e.budgetPolicies = policy.budgetPolicies; e.engine.rosterRequirements = policy.rosterRequirements;
+  e.engine.spending.authorizations = policy.authorizations; e.revision++;
+  const projected = fromAnnualState(next, toAnnualState(next));
+  expect((await save(projected)).ok).toBe(true);
+  expect((await loadGame()).contractEconomy.budgetPolicies[0].approvedManYen).toBe(60000);
+});
+
+it('permits closing a year and carrying intact history into a future season', async () => {
+  const fixture = economyFixture(), teams = fixture.teams.map(t => ({ ...t,
+    players: t.players.map(p => ({ ...p, contractYearsLeft: 3 })) }));
+  const world = createAnnualNewGameWorld({ teams, faPool: [], myId: 0, saveId: 'rollover', season: 2026,
+    policy: economyPolicy(teams), randomRoot: { algorithmVersion: 1, seed: 'rollover' } });
+  expect((await save(world)).ok).toBe(true);
+  const next = structuredClone(world), e = next.contractEconomy, policy = economyPolicy(teams, 2027);
+  next.year = 2027; e.clock = { season: 2027, phase: 'preseason', date: '2027-02-01', offseasonTurn: 0 };
+  e.cycle = { ...e.cycle, season: 2027 }; e.revision++;
+  e.engine.spending.budgetSeason = 2027;
+  e.engine.spending.ledger = closeContractLedgerThrough(e.engine.spending.ledger, 2026);
+  e.budgetPolicies = policy.budgetPolicies; e.engine.rosterRequirements = policy.rosterRequirements;
+  e.engine.spending.authorizations = policy.authorizations;
+  const projected = fromAnnualState(next, toAnnualState(next));
+  expect((await save(projected)).ok).toBe(true);
+  const loaded = await loadGame();
+  expect(loaded.year).toBe(2027); expect(loaded.teams[0].players[0].contractYearsLeft).toBe(2);
+  expect(loaded.contractEconomy.engine.spending.ledger.records).toEqual(world.contractEconomy.engine.spending.ledger.records);
+});
+
+it('requires the progression producer to increment revision when the economy clock changes', async () => {
+  const world = economyFixture(); expect((await save(world)).ok).toBe(true);
+  const next = structuredClone(world), before = roots();
+  next.gameDay = 2; next.schedule.push({ date: { month: 7, day: 17 } });
+  next.contractEconomy.clock.date = '2026-07-17';
+  expect(await save(next)).toMatchObject({ ok: false, reason: 'economy_revision_conflict' });
+  expect(roots()).toEqual(before);
+  next.contractEconomy.revision++;
+  expect((await save(next)).ok).toBe(true);
+  expect((await loadGame()).contractEconomy.clock.date).toBe('2026-07-17');
 });
