@@ -567,18 +567,19 @@ export const MULTI_YEAR_CONTRACT_END_YEAR_BY_PLAYER = new Map([
 
 const KATAKANA_NAME_RE = /^[ァ-ヺー・]+$/;
 const TEAM_ID_TO_NAME = {
+  // The IDs must stay aligned with TEAM_DEFS in src/constants.js.
   0: '東京ヤクルトスワローズ',
-  1: '阪神タイガース',
-  2: '横浜DeNAベイスターズ',
-  3: '広島東洋カープ',
+  1: '横浜DeNAベイスターズ',
+  2: '広島東洋カープ',
+  3: '阪神タイガース',
   4: '読売ジャイアンツ',
   5: '中日ドラゴンズ',
   6: '福岡ソフトバンクホークス',
-  7: '北海道日本ハムファイターズ',
-  8: '千葉ロッテマリーンズ',
-  9: '東北楽天ゴールデンイーグルス',
-  10: 'オリックス・バファローズ',
-  11: '埼玉西武ライオンズ',
+  7: '東北楽天ゴールデンイーグルス',
+  8: '埼玉西武ライオンズ',
+  9: '千葉ロッテマリーンズ',
+  10: '北海道日本ハムファイターズ',
+  11: 'オリックス・バファローズ',
 };
 
 function isKatakanaName(name = '') {
