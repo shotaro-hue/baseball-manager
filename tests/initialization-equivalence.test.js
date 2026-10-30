@@ -21,16 +21,21 @@ for (const seed of [7,42,20261009]) it('preserves complete generated data and ra
     expect(owned).toHaveLength(65);expect(owned.filter(p=>p.isPitcher)).toHaveLength(32);
     expect(owned.filter(p=>!p.isPitcher)).toHaveLength(33);
     expect(owned.filter(p=>!p.isPitcher&&p.pos==='捕手').length).toBeGreaterThanOrEqual(6);
+    expect(team.players.some(p=>p.育成||p.isIkusei)).toBe(false);
   }
+  const all=teams.flatMap(t=>[...t.players,...t.farm]),real=all.filter(p=>p.realPlayerId);
+  expect(all).toHaveLength(782);expect(new Set(all.map(p=>p.id)).size).toBe(782);
+  expect(real).toHaveLength(445);expect(new Set(real.map(p=>p.realPlayerId)).size).toBe(445);
+  expect(real.filter(p=>p.isIkusei).map(p=>p.name.replace(/\s+/g,' ')).sort()).toEqual(['平山 功太','福島 圭音']);
+  for(const p of real){expect(p.ratingsThrough).toBe(2025);expect(p.daysOnActiveRoster).toBe(0);expect(p.dataQuality.serviceTime).toBe('game-baseline-unknown');}
   const baselineCalls=calls();
   // Pin every pre-existing generated field and RNG call. The additive annual
   // receipts ledger is separately covered by clubFinance lifecycle/roundtrip tests.
   const digest=createHash('sha256').update(JSON.stringify(teams.map(({clubFinance,...existing})=>existing))).digest('hex');
-  // Approved65-player supplementation intentionally changes generated roles,
-  // real primary-position preservation, RNG consumption and full payloads.
-  // Pin the full payload and RNG consumption; sync/async must still match exactly.
-  // The seed 42 digest includes the repaired same-plan fielding recall. Only
-  // roster membership, cooldowns and lineups changed; player data/RNG did not.
+  // DATA-PLAYER-2026 intentionally changes abilities to pre-opening projections,
+  // removes randomized service time, adds source identity/confidence, and keeps
+  // two development players outside the 65 controlled slots. Pin this new-game
+  // baseline; saved games keep their existing payload and sync/async must match.
   expect({digest,calls:baselineCalls}).toMatchSnapshot();
   vi.restoreAllMocks();const asyncCalls=seedRandom(seed);
   expect(typeof bootstrap.createInitialTeamsAsync).toBe('function');

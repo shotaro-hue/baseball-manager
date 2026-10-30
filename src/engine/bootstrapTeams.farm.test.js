@@ -5,7 +5,7 @@ import { isIkuseiPlayer, optimizeTeamForGameStart, validateTeamRoster } from './
 import { buildTeam, makePlayer, makeInitialFarmBatters } from './playerCore';
 import { rng } from '../utils';
 import { FIELDING_POSITIONS, TEAM_DEFS } from '../constants';
-import { NPB2025_ROSTERS } from '../data/npb2025';
+import { getOpeningRosters } from '../data/playerMaster2026';
 
 function seedRandom(seed) {
   let n = seed;
@@ -17,12 +17,20 @@ function seedRandom(seed) {
 afterEach(() => { vi.restoreAllMocks(); vi.doUnmock('../data/npb2025'); vi.resetModules(); });
 
 function checkTeams(teams, real) {
+  const rosters=real?getOpeningRosters():null;
   for (const team of teams) {
     const all = [...team.players, ...team.farm];
-    const expected = 65;
+    const source=real?[...rosters[team.id].batters,...rosters[team.id].pitchers]:[];
+    const development=source.filter(isIkuseiPlayer);
+    const controlled=all.filter(p=>!isIkuseiPlayer(p));
+    const expected = 65+development.length;
     expect(all.length, `team ${team.id}: total`).toBe(expected);
-    expect(all.filter(p=>p.isPitcher)).toHaveLength(32);
-    expect(all.filter(p=>!p.isPitcher)).toHaveLength(33);
+    expect(controlled).toHaveLength(65);
+    expect(controlled.filter(p=>p.isPitcher)).toHaveLength(32);
+    expect(controlled.filter(p=>!p.isPitcher)).toHaveLength(33);
+    expect(all.filter(isIkuseiPlayer).map(p=>p.realPlayerId).sort()).toEqual(development.map(p=>p.playerId).sort());
+    expect(all.filter(p=>p.realPlayerId).map(p=>p.realPlayerId).sort()).toEqual(source.map(p=>p.playerId).sort());
+    expect(team.players.some(isIkuseiPlayer)).toBe(false);
     expect(team.players.length, `team ${team.id}: active roster`).toBe(28);
     expect(new Set(all.map(p => p.id)).size).toBe(expected);
     const catchers = team.players.filter(p => !p.isPitcher && p.pos === '捕手'
@@ -110,7 +118,7 @@ describe('initial catcher coverage', () => {
       expect(result.farm.find(p => p.id === id).registrationCooldownDays).toBe(10);
     }
   });
-  it('keeps three active catchers and a playable farm in 65-player real-team organizations', () => {
+  it('keeps three active catchers and a playable farm with 65 controlled players plus development players', () => {
     for (let seed = 1; seed <= 100; seed++) {
       seedRandom(seed);
       checkTeams(createInitialTeams(), true);
