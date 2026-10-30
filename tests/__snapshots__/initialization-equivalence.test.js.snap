@@ -10,7 +10,7 @@ exports[`preserves complete generated data and random/ID consumption (seed 7) 1`
 exports[`preserves complete generated data and random/ID consumption (seed 42) 1`] = `
 {
   "calls": 20521,
-  "digest": "e36a8216f9e69398be65db47e60534f36ef581a9f8fb1ba5163bea76af91b44f",
+  "digest": "f3f7b98ed2173c585f3452299129daea4b06829821ebcfb1daf3d41da35a13a4",
 }
 `;
 

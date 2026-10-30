@@ -29,6 +29,8 @@ for (const seed of [7,42,20261009]) it('preserves complete generated data and ra
   // Approved65-player supplementation intentionally changes generated roles,
   // real primary-position preservation, RNG consumption and full payloads.
   // Pin the full payload and RNG consumption; sync/async must still match exactly.
+  // The seed 42 digest includes the repaired same-plan fielding recall. Only
+  // roster membership, cooldowns and lineups changed; player data/RNG did not.
   expect({digest,calls:baselineCalls}).toMatchSnapshot();
   vi.restoreAllMocks();const asyncCalls=seedRandom(seed);
   expect(typeof bootstrap.createInitialTeamsAsync).toBe('function');

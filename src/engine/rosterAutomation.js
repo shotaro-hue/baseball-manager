@@ -731,20 +731,21 @@ function ensureRequiredFieldingCoverage(team, options = {}) {
     && [false, true].every(rosterDhMode => buildAutoLineupEntries(nextTeam, {
       ...options, rosterDhMode,
     }).length === (rosterDhMode ? 9 : 8));
-  const eligibleFarm = (nextTeam.farm || []).filter(
-    (player) =>
-      !player.isPitcher
-      && !(reserveFarmCatcher && isHealthyFarmCatcher(player))
-      && isEligibleActivePlayer(player)
-      && (
-        (Number(player.registrationCooldownDays) || 0) === 0
-        || (
-          options.allowSamePlanRecall === true
-          && !options.originalCooldownIds?.has(player.id)
-        )
-      )
-      && canAddToActiveRoster(player, nextTeam.players),
-  );
+  // Eligibility must see the recallable copy: canAddToActiveRoster rejects any
+  // cooldown, including one created earlier in this same roster plan.
+  const eligibleFarm = (nextTeam.farm || [])
+    .map(player => options.allowSamePlanRecall === true
+      && (Number(player.registrationCooldownDays) || 0) > 0
+      && !options.originalCooldownIds?.has(player.id)
+      ? { ...player, registrationCooldownDays: 0 } : player)
+    .filter(
+      (player) =>
+        !player.isPitcher
+        && !(reserveFarmCatcher && isHealthyFarmCatcher(player))
+        && isEligibleActivePlayer(player)
+        && (Number(player.registrationCooldownDays) || 0) === 0
+        && canAddToActiveRoster(player, nextTeam.players),
+    );
   const candidateTeam = {
     ...nextTeam,
     players: [...(nextTeam.players || []), ...eligibleFarm],
