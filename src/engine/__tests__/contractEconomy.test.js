@@ -75,6 +75,9 @@ describe('A1-1a single contract economy world (release disabled)', () => {
     const world = economyFixture(), command = renewalEnvelope(world);
     expect(quoteEconomyCommand(world, command).ok).toBe(true);
     const latest = structuredClone(world); latest.contractEconomy.engine.spending.authorizations.find(a => a.teamId === 0 && a.season === 2029).approvedManYen = 1500;
+    // A legitimate changed approval updates both records; still reject the
+    // stale quote because the remaining budget cannot cover the offer.
+    latest.contractEconomy.budgetPolicies.find(a => a.teamId === 0 && a.season === 2029).approvedManYen = 1500;
     const result = reduceEconomyCommand(freezeEconomy(latest), command);
     expect(result.ok).toBe(false); expect(result.world).toBe(latest); expect(result.error).toMatch(/余力/);
   });
@@ -268,5 +271,54 @@ describe('native initial conditions and civil economy clock', () => {
     expect(() => economyClockFor({ season: 2026, phase: 'season', gameDay: 100, schedule: [] })).toThrow();
     expect(() => economyClockFor({ season: 2026, phase: 'season', gameDay: 1, schedule: [null, { date: { month: 2, day: 29 } }] })).toThrow();
     expect(() => economyClockFor({ season: 2026, phase: 'offseason' })).toThrow();
+  });
+});
+
+describe('loaded annual budget approvals', () => {
+  const rowsFor = (world, field) => field === 'budgetPolicies'
+    ? world.contractEconomy.budgetPolicies : world.contractEconomy.engine.spending.authorizations;
+  const invalidRows = [
+    ['different amount', rows => { rows[0].approvedManYen = 100000; }],
+    ['missing row', rows => { rows.pop(); }],
+    ['extra row', rows => { rows.push({ ...rows[0], season: 2034 }); }],
+    ['duplicate row', rows => { rows.push({ ...rows[0] }); }],
+    ['missing amount', rows => { delete rows[0].approvedManYen; }],
+    ...[null, '', '50000', -1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1].map(value =>
+      [`invalid amount ${String(value)}`, rows => { rows[0].approvedManYen = value; }]),
+  ];
+  for (const field of ['budgetPolicies', 'authorizations']) it.each(invalidRows)(`${field}: rejects %s without modifying input`, (_, edit) => {
+    const world = JSON.parse(JSON.stringify(economyFixture()));
+    edit(rowsFor(world, field));
+    const before = structuredClone(world), command = renewalEnvelope(world);
+    freezeEconomy(world);
+    expect(() => contractEconomyMode(world)).toThrow();
+    expect(() => toAnnualState(world)).toThrow();
+    expect(quoteEconomyCommand(world, command).ok).toBe(false);
+    const result = reduceEconomyCommand(world, command);
+    expect(result.ok).toBe(false); expect(result.world).toBe(world); expect(world).toEqual(before);
+  });
+
+  it('validates matching changed approvals by typed team/year keys, including zero and reordered rows', () => {
+    const world = economyFixture();
+    for (const field of ['authorizations', 'budgetPolicies']) rowsFor(world, field).forEach((r, i) => { r.approvedManYen = i === 0 ? 0 : 70000 + i; });
+    world.contractEconomy.budgetPolicies.reverse();
+    const loaded = freezeEconomy(JSON.parse(JSON.stringify(world))), before = structuredClone(loaded);
+    expect(contractEconomyMode(loaded)).toBe('annual');
+    const state = toAnnualState(loaded);
+    expect(state.spending.authorizations.find(r => r.teamId === 0 && r.season === 2026).approvedManYen).toBe(0);
+    expect(fromAnnualState(loaded, state).teams[0].budget).toBe(-1000);
+    expect(loaded).toEqual(before);
+  });
+
+  it.each([
+    ['missing team', r => { delete r.teamId; }],
+    ['empty team', r => { r.teamId = ''; }],
+    ['missing season', r => { delete r.season; }],
+    ['string season', r => { r.season = '2026'; }],
+    ['invalid season', r => { r.season = 0; }],
+  ])('rejects matching but invalid approval keys: %s', (_, edit) => {
+    const world = economyFixture();
+    edit(world.contractEconomy.budgetPolicies[0]); edit(world.contractEconomy.engine.spending.authorizations[0]);
+    expect(() => contractEconomyMode(freezeEconomy(world))).toThrow();
   });
 });

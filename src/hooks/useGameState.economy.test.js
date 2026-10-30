@@ -151,3 +151,28 @@ it('keeps legacy setters and one progress snapshot coherent across reducer-owned
   act(() => { expect(gs.applyProgressCandidate(economyFixture())).toBe(false); });
   expect(gs.getProgressToken()).toBe(token); expect(gs.contractEconomy).toBeUndefined();
 });
+
+it('rejects the annual legacy farm setter, including after reload', () => {
+  const before = { ...economyFixture(), farmCompetition: { nextRound: 1 } };
+  for (const world of [before, JSON.parse(JSON.stringify(before))]) {
+    freezeEconomy(world);
+    expect(gameStateReducer(world, { type: G.SET_FARM_COMPETITION, competition: { nextRound: 2 } })).toBe(world);
+    expect(world.farmCompetition.nextRound).toBe(1);
+  }
+});
+
+it('adopts farm progress with the roster in one annual revision and rejects a stale economic candidate', () => {
+  const before = { ...economyFixture(), farmCompetition: { nextRound: 1 } };
+  const stale = reduceEconomyCommand(before, renewalEnvelope(before)).world;
+  const candidate = { ...before, farmCompetition: { nextRound: 2 },
+    teams: before.teams.map(t => ({ ...t, farmProgressMarker: 'completed' })),
+    contractEconomy: { ...before.contractEconomy, revision: 1 } };
+  const expected = { saveId: before.saveId, epoch: before.contractEconomy.epoch, baseRevision: 0 };
+  const next = gameStateReducer(freezeEconomy(before), { type: G.APPLY_ECONOMY_WORLD, world: candidate, expected });
+  expect(next.farmCompetition).toEqual({ nextRound: 2 });
+  expect(next.teams.every(t => t.farmProgressMarker === 'completed')).toBe(true);
+  expect(next.contractEconomy.revision).toBe(1);
+  const loaded = freezeEconomy(JSON.parse(JSON.stringify(next)));
+  expect(gameStateReducer(loaded, { type: G.APPLY_ECONOMY_WORLD, world: stale, expected })).toBe(loaded);
+  expect(loaded.farmCompetition.nextRound).toBe(2);
+});

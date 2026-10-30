@@ -69,3 +69,21 @@ it('actual annual save failure preserves the old year; retry saves distinct sche
  expect(loaded.scheduleArchive.at(-1)).toMatchObject({year:old.year,schedule:old.schedule});
  expect(loaded.teams[0].farm[0].recentPitchingDays).toEqual([]);expect(gs.getSeasonHistory().farmArchives).toEqual(loaded.seasonHistory.farmArchives);
 });
+
+it('legacy farm setter keeps real farm results through save and resume',async()=>{
+ const initial=state();mount(initial);
+ const progress=prepareFarmProgress(initial,initial.teams,1);
+ const progressed=finishFarmProgress(initial.teams,progress,1).map(t=>({...t,draws:1}));
+ act(()=>{gs.setTeams(progressed);gs.setGameDay(2);gs.setFarmCompetition(progress.competition);});
+ expect(gs.farmCompetition.nextRound).toBe(2);
+ await act(async()=>expect((await gs.handleSave({silent:true})).ok).toBe(true));
+ const loaded=await loadGame();
+ expect(loaded.farmCompetition).toEqual(progress.competition);expect(loaded.gameDay).toBe(2);
+ act(()=>view.unmount());view=null;mount(loaded);
+ expect(gs.farmCompetition).toEqual(progress.competition);expect(gs.gameDay).toBe(2);
+ const next=prepareFarmProgress(loaded,loaded.teams,2);
+ act(()=>{gs.setTeams(finishFarmProgress(loaded.teams,next,2).map(t=>({...t,draws:2})));gs.setGameDay(3);gs.setFarmCompetition(next.competition);});
+ expect(gs.farmCompetition.nextRound).toBe(3);
+ await act(async()=>expect((await gs.handleSave({silent:true})).ok).toBe(true));
+ expect((await loadGame()).farmCompetition).toEqual(next.competition);
+});

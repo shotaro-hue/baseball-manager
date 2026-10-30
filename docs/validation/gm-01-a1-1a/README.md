@@ -55,3 +55,32 @@
 A1-1aでは公開hookへのannual採用経路がなく、一般プレイはlegacy。A1-1dで公開worldを接続する際は、旧`setNewsState`がupdaterをlive refへ先行適用する経路を流用せず、採用済みworldから通知refを同期する。旧`addNews(...slice(0,50))`が契約通知を押し出す場合も、このguardを緩めず、通知生成/保持/削除を共通worldのcandidateへ組み込む。混在する`season`通知も生成責務を分ける。これは一般有効化前の接続要件であり、今回annualの一般公開が完了したことを意味しない。
 
 A1-1b（legacy開始残高）へ進める条件は、今回の最終headのCI成功と本PRのマージ。マージ操作は本修正に含めない。
+
+## PR #518 追加レビュー修正（3b85ca0 → 追加コミット）
+
+開始head: `3b85ca0a3211f6ec99c1e2e3983aaa8bd989c1f0`。開始時のCIは成功、指摘3件は未解消だった。最終headとそのCI結果はPR本文に記載する。
+
+### 原因と修正
+
+1. **二軍の部分更新**: `farmCompetition`はworldの採用対象だが、`SET_FARM_COMPETITION`だけがannualの旧更新禁止リストから漏れていた。旧setterをannualでは拒否し、名簿・二軍結果・時計を`APPLY_ECONOMY_WORLD`の一回のrevision更新にまとめる。新しい二軍結果の採用後、古い契約候補は拒否する。legacy setterと既存の試合進行・保存は維持する。
+2. **予算の二重記録の不一致**: 初期factoryにしかなかった照合を共通の`inspectBudgetApprovals`へ抽出し、通常world検証にも適用。型を保つ球団ID・年度ペアで、片側だけの行、重複、額の欠損・不正値・不一致、不正なキーを拒否する。明示0、行順変更、両側が整合した承認変更を受理し、入力を変更しない。既存の「見積後の予算不足」テストは、承認額の両正本を1500へ揃えたうえで元の余力不足の期待値を維持した。
+3. **シーズン終了の時計逆行**: `gameDay`は次の公式戦番号。`simulateSeasonBatch`の最終試合と`useSeasonFlow`の個別試合経路は143試合後に144へ進み、ポストシーズンへ遷移する。一方`generateSeasonSchedule`の144/145は7月のオールスター。契約時計が配列indexだけで読むと夏へ戻ることを実際の最終試合batchで再現した。公式戦範囲外・All-Star・gameNo不一致を拒否し、world採用時には直前worldより過去の日付・同日の過去オフturnも拒否する。7/31・8/1の登録期限は変更しない。
+
+### 意図的な境界
+
+- 一般プレイの新制度はOFFで、annualを公開進行へ接続するhookはまだない。実際のlegacyプレイは144・postseason・offseasonへ従来どおり進む。
+- annualの`phase='season', gameDay=144`を最終公式戦日へ丸めたり、架空のポストシーズン日へ補完したりしない。日付が明示されないこの状態で契約処理を拒否する。将来のannual進行接続ではポストシーズンの暦日の正本が必要。本修正で後続schedulerを先取りしない。
+- オフは既存仕様の同年12/1＋永続turnを維持。実日程に沿った前進と明示オフ移行は受理する。JSON往復後も検証・登録期限・逆行拒否の意味を維持する。annualの製品保存接続が完成したという試験ではない。
+- 初期factoryの8年度必須条件は維持。入力済み行の照合と、将来年度の必要範囲生成・更新（A1-1c）は別責務。両側から未使用の将来年度を除いたときの必要範囲審査、承認履歴の専用receipt、annual保存・移行は後続範囲のまま。
+
+### 検証
+
+- 本番修正前RED: 3ファイル108件中 **38失敗・70成功**。二軍setter1件、通常予算検証31件、時計境界・逆行6件。
+- GREEN: `npx vitest run src/engine/__tests__/contractEconomy.test.js src/engine/__tests__/economyCalendar.test.js src/hooks/useGameState.economy.test.js src/hooks/farmRuntime.integration.test.js` — **4ファイル112件成功**。
+- 関連回帰: farmState、farmProgression、farmMigration、useSeasonFlowのboundaries/receipts/batchSave、useGameState.offseasonSave、annualSpending、annualTransactions、contractCalendar、contractLedger — **11ファイル183件成功**。
+- 実legacy保存: 旧二軍setterで実測結果を採用→保存→loadGame→hook再開→次の二軍進行→再保存を確認。既存の保存失敗/再試行・年次二軍archiveも成功。
+- Build: `npm run build`成功。既存の500kB超bundle警告あり。
+- Chromium: E1（通常新規→5試合→保存/再開→1試合）、E2（最終公式戦→ポストシーズン保存/再開→オフ→翌年）**2件成功**。同じcheckoutの独立ポート5189を使用、E1で新制度OFFも検証。
+- ローカルmobile-webkit E1: `libgstreamer-1.0.so.0`欠損でブラウザ起動不能。成功扱いにせず、最終headのGitHub CIで確認する。
+- 独立レビュー: 追加Critical/Importantなし。任意の軽微な補強案は、片側だけ球団IDを数値0から文字列"0"へ変える専用テスト。実装の型区別は確認済み、追加は見送った。
+- `npm test`: **256ファイル2874件成功**。既存の明示実行用ベンチマーク2ファイル2件skip、失敗0。複数年シミュレーション・物理演算・保存系を含む。最終head CIはPR本文で別途確認する。

@@ -1,5 +1,6 @@
 import { clamp } from '../utils';
 import { contractEconomyMode, toAnnualState } from '../engine/contractEconomy';
+import { validateEconomyClock } from '../engine/economyCalendar';
 
 export const G = {
   APPLY_PROGRESS: 'APPLY_PROGRESS',
@@ -23,7 +24,8 @@ export const G = {
 const domainFields = ['teams', 'gameDay', 'year', 'myId', 'saveId', 'farmCompetition', 'battedBallReceipt',
   'faPool', 'faYears', 'offseasonPlan', 'mailbox', 'news', 'schedule', 'contractEconomy'];
 const legacyWrites = new Set([G.APPLY_PROGRESS, G.SET_TEAMS, G.UPD_TEAM, G.SET_GAME_DAY, G.SET_YEAR,
-  G.SET_MY_ID, G.SET_SAVE_ID, G.SET_FA_POOL, G.SET_FA_YEARS, G.SET_OFFSEASON_PLAN, G.SET_SCHEDULE, G.ANSWER_INTERVIEW]);
+  G.SET_MY_ID, G.SET_SAVE_ID, G.SET_FA_POOL, G.SET_FA_YEARS, G.SET_OFFSEASON_PLAN, G.SET_SCHEDULE,
+  G.SET_FARM_COMPETITION, G.ANSWER_INTERVIEW]);
 const fieldActions = { [G.SET_FA_POOL]: 'faPool', [G.SET_FA_YEARS]: 'faYears',
   [G.SET_OFFSEASON_PLAN]: 'offseasonPlan', [G.SET_MAILBOX]: 'mailbox', [G.SET_SCHEDULE]: 'schedule' };
 // `season` is deliberately absent: legacy uses it for injuries AND contracts,
@@ -100,6 +102,7 @@ export function gameStateReducer(state, action) {
           || expected.epoch !== e.epoch || expected.baseRevision !== e.revision || world.saveId !== state.saveId
           || world.contractEconomy?.epoch !== e.epoch || world.contractEconomy.revision !== e.revision + 1) return state;
         toAnnualState(world);
+        validateEconomyClock(world, state);
         return { ...state, ...Object.fromEntries(domainFields.map(k => [k, world[k]])) };
       } catch { return state; }
     }
@@ -126,6 +129,8 @@ export function gameStateReducer(state, action) {
         ...(action.candidate.saveId && action.candidate.saveId !== state.saveId ? { battedBallReceipt: null } : {}),
         ...Object.fromEntries(domainFields.filter(k=>k in action.candidate).map(k=>[k,action.candidate[k]]))};
     case G.SET_FARM_COMPETITION:
+      // Legacy hydration only. Annual farm results, roster effects and clock
+      // must arrive together in APPLY_ECONOMY_WORLD with one new revision.
       return {...state,farmCompetition:action.competition};
     case G.SET_TEAMS:
       return { ...state, teams: typeof action.teams === 'function' ? action.teams(state.teams) : action.teams };

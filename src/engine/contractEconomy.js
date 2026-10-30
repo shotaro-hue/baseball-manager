@@ -43,6 +43,30 @@ function inspectContractClaims(spending, proposal) {
   }
 }
 
+function inspectBudgetApprovals(authorizations, budgetPolicies) {
+  // Validate supplied evidence only; generating/rolling annual budgets is A1-1c.
+  // Include extra supplied years, not only the minimum season..season+7 range.
+  const approvals = list => {
+    const rows = new Map();
+    if (!Array.isArray(list)) fail('年度予算のpolicy・許可が未記録です。');
+    for (const row of list) {
+      if (!validId(row?.teamId) || !Number.isInteger(row?.season) || row.season < 1 || row.season > 9999)
+        fail('年度予算の球団・年度を確認してください。');
+      if (row?.approvedManYen === undefined || row.approvedManYen === null) fail('年度予算の承認額が未記録です。');
+      if (!counter(row.approvedManYen)) fail('年度予算の承認額が不正です。');
+      const key = JSON.stringify([row.teamId, row.season]);
+      if (rows.has(key)) fail('同一球団・年度の予算policy・許可が重複しています。');
+      rows.set(key, row.approvedManYen);
+    }
+    return rows;
+  };
+  const authorized = approvals(authorizations), recorded = approvals(budgetPolicies);
+  if (authorized.size !== recorded.size || [...authorized.keys()].some(key => !recorded.has(key)))
+    fail('同一球団・年度の予算policy・許可が未記録です。');
+  for (const [key, amount] of authorized) if (amount !== recorded.get(key))
+    fail('同一球団・年度の予算policyと許可の承認額が一致しません。');
+}
+
 function inspectEnvelope(world) {
   const e = world.contractEconomy;
   if (!validId(world.saveId) || !validId(e.epoch) || !counter(e.revision)
@@ -61,6 +85,7 @@ function inspectEnvelope(world) {
   const spending = e.engine.spending;
   if (!spending || !Array.isArray(spending.ledger?.records) || !Array.isArray(spending.reservations)
     || !Array.isArray(spending.resolvedReservations)) fail('契約台帳・正式留保が未記録です。');
+  inspectBudgetApprovals(spending.authorizations, e.budgetPolicies);
   // All NEW native terms are guaranteed; v1 fixtures remain independent.
   const contracts = recordedContracts(spending);
   if (contracts.some(c => c?.guaranteed !== true || !['controlled', 'development'].includes(c.registrationType)))
@@ -176,24 +201,7 @@ export function createAnnualNewGameWorld({ teams, faPool, myId, saveId, season, 
     if (match(policy.authorizations).length !== 1 || match(policy.rosterRequirements).length !== 1 || match(policy.budgetPolicies).length !== 1)
       fail('新規ゲームの全審査年度にpolicy・許可・人数計画が必要です。');
   }
-  // Validate supplied evidence only; generating/rolling annual budgets is A1-1c.
-  // Include extra supplied years, not only the minimum season..season+7 range.
-  const approvals = list => {
-    const rows = new Map();
-    for (const row of list) {
-      if (row?.approvedManYen === undefined || row.approvedManYen === null) fail('年度予算の承認額が未記録です。');
-      if (!counter(row.approvedManYen)) fail('年度予算の承認額が不正です。');
-      const key = JSON.stringify([row.teamId, row.season]);
-      if (rows.has(key)) fail('同一球団・年度の予算policy・許可が重複しています。');
-      rows.set(key, row.approvedManYen);
-    }
-    return rows;
-  };
-  const authorized = approvals(policy.authorizations), recorded = approvals(policy.budgetPolicies);
-  if (authorized.size !== recorded.size || [...authorized.keys()].some(key => !recorded.has(key)))
-    fail('同一球団・年度の予算policy・許可が未記録です。');
-  for (const [key, amount] of authorized) if (amount !== recorded.get(key))
-    fail('同一球団・年度の予算policyと許可の承認額が一致しません。');
+  inspectBudgetApprovals(policy.authorizations, policy.budgetPolicies);
   const ledger = createContractLedger();
   for (const team of teams) {
     if (!Array.isArray(team.players) || !Array.isArray(team.farm)) fail('初期名簿の一軍・二軍が未記録です。');
