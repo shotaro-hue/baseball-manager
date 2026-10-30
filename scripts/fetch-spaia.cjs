@@ -2,10 +2,10 @@
 /**
  * fetch-spaia.cjs
  * spaia.jp の非公式 JSON API から NPB 成績を取得し、
- * src/data/npb2025.js を生成するスクリプト。
+ * 検証用候補を別ファイルへ生成する。ゲームのソースは上書きしない。
  *
  * 使い方:
- *   node scripts/fetch-spaia.cjs                    # 2024年データ取得・書き込み
+ *   node scripts/fetch-spaia.cjs --output=/tmp/spaia-candidate.js # 候補のみ
  *   node scripts/fetch-spaia.cjs --year=2023         # 年度指定
  *   node scripts/fetch-spaia.cjs --dry-run           # ファイル書き込みなしで確認
  *   node scripts/fetch-spaia.cjs --debug             # 1チーム分の生JSONを出力して終了
@@ -22,6 +22,10 @@ const path = require('path');
 
 // ── CLI オプション ──────────────────────────────────────────
 const args    = process.argv.slice(2);
+const {resolveStagingOutput,writeStagedFile}=require('./player-master/staging.cjs');
+let stagingOutput;
+try { stagingOutput=resolveStagingOutput(args,path.join(__dirname,'..')); }
+catch(error) { console.error(error.message); process.exit(1); }
 const DRY_RUN = args.includes('--dry-run');
 const DEBUG   = args.includes('--debug');
 const YEAR    = (() => {
@@ -632,14 +636,8 @@ function buildFileContent(rosters) {
     console.log(content.slice(0, 3000));
     console.log('...(以下省略)...');
   } else {
-    const outPath = path.join(__dirname, '..', 'src', 'data', 'npb2025.js');
-    if (fs.existsSync(outPath)) {
-      const backupPath = outPath.replace('.js', `.backup.${Date.now()}.js`);
-      fs.copyFileSync(outPath, backupPath);
-      console.log(`バックアップ: ${path.basename(backupPath)}`);
-    }
-    fs.writeFileSync(outPath, content, 'utf8');
-    console.log(`出力完了: ${outPath}`);
+    writeStagedFile(stagingOutput,content);
+    console.log(`検証用候補: ${stagingOutput}（契約・名簿照合・権利確認前、本番利用不可）`);
   }
 
   console.log('\n=== 取得結果サマリー ===');

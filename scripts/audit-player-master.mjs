@@ -30,11 +30,15 @@ export function auditPlayerMaster(rosters = NPB2025_ROSTERS, reference = null) {
       ...(roster?.pitchers ?? []).map(p => ({ ...p, teamId: t.teamId, kind: 'pitcher' })),
     ];
   });
-  const issues = [], byKey = new Map();
+  const issues = [], byKey = new Map(), byId = new Map();
   for (const team of teams)
     if (!rosters[team.teamId]) issues.push({ severity: 'critical', code: 'missing-team', teamId: team.teamId });
   for (const p of players) {
     const key = rosterKey(p.teamId, p.name);
+    if (p.playerId) {
+      if (byId.has(p.playerId)) issues.push(recordIssue('critical', 'duplicate-player-id', p));
+      else byId.set(p.playerId,p);
+    }
     if (!normalizedName(p.name)) issues.push(recordIssue('critical', 'missing-name', p));
     if (byKey.has(key)) issues.push(recordIssue('critical', 'duplicate-team-name', p));
     else byKey.set(key, p);
@@ -44,7 +48,7 @@ export function auditPlayerMaster(rosters = NPB2025_ROSTERS, reference = null) {
       issues.push(recordIssue('error', 'invalid-salary', p, String(p.salary)));
     if (p.salary === 5000) issues.push(recordIssue('review', 'ambiguous-salary-5000', p, 'Verify; may be actual salary or fallback (万円)'));
     if (!p.history?.length) issues.push(recordIssue('review', 'missing-history', p));
-    if (p.stats?.G > 0) issues.push(recordIssue('review', 'post-opening-performance', p, '2026 observed performance must not inform a 2026-03-27 game start'));
+    if (p.stats?.G > 0) issues.push(recordIssue('error', 'post-opening-performance', p, '2026 observed performance must not inform a 2026-03-27 game start'));
     if (['内野手', '外野手'].includes(p.pos)) issues.push(recordIssue('review', 'generic-position', p, String(p.pos)));
     if (p.kind === 'pitcher' && finite(p.stats?.IP) && p.stats.IP > 0) {
       const { IP, ERA, ER } = p.stats;
@@ -55,6 +59,7 @@ export function auditPlayerMaster(rosters = NPB2025_ROSTERS, reference = null) {
     if (p.育成 || p.isIkusei) teams[p.teamId].development++;
     else teams[p.teamId].controlled++;
   }
+  for (const team of teams) if (team.controlled>70) issues.push({severity:'critical',code:'controlled-cap-exceeded',teamId:team.teamId});
   const unmatchedContracts = [];
   for (const [nameKey, endYear] of MULTI_YEAR_CONTRACT_END_YEAR_BY_PLAYER) {
     const [teamName, playerName] = nameKey.split('::');
@@ -74,31 +79,44 @@ export function auditPlayerMaster(rosters = NPB2025_ROSTERS, reference = null) {
   if (reference) {
     if (reference.scope !== 'all' || reference.asOf !== AS_OF || !Array.isArray(reference.players))
       throw new Error(`reference requires scope=all, asOf=${AS_OF} and players[]`);
-    const refByKey = new Map();
+    if (reference.status !== 'verified' || !Array.isArray(reference.teams) || reference.teams.length!==12)
+      issues.push({severity:'critical',code:'reference-not-verified',detail:'Requires per-team controlled/development review; counts or reconstruction alone are insufficient'});
+    const refByKey = new Map(), refIds = new Set();
     for (const p of reference.players) {
       if (!Number.isInteger(p.teamId) || p.teamId < 0 || p.teamId > 11 ||
           !normalizedName(p.name) || !['controlled', 'development'].includes(p.registration))
         throw new Error(`invalid reference row: ${JSON.stringify(p)}`);
+      if(p.playerId && refIds.has(p.playerId)) throw new Error(`duplicate reference player ID: ${p.playerId}`);
+      if(p.playerId) refIds.add(p.playerId);
+      if(!p.sourceUrl) issues.push(recordIssue('error','missing-reference-source',p));
       const k = rosterKey(p.teamId, p.name);
       if (refByKey.has(k)) throw new Error(`duplicate reference row: ${k}`);
       refByKey.set(k, p);
     }
     if (refByKey.size < 800) throw new Error('reference not exhaustive: fewer than 800 players');
     referenceCount = refByKey.size;
+    for(const team of teams) {
+      const rows=reference.players.filter(p=>p.teamId===team.teamId);
+      const evidence=reference.teams?.find(t=>t.teamId===team.teamId);
+      const controlled=rows.filter(p=>p.registration==='controlled').length;
+      if(!rows.length||controlled>70||!evidence||evidence.verified!==true||evidence.controlled!==controlled||evidence.development!==rows.length-controlled)
+        issues.push({severity:'error',code:'reference-team-evidence',teamId:team.teamId});
+    }
     for (const [key, p] of refByKey) {
-      const actual = byKey.get(key);
+      const actual = (p.playerId && byId.get(p.playerId)) || byKey.get(key);
       if (!actual) { missing.push(p); continue; }
       const registration = actual.育成 || actual.isIkusei ? 'development' : 'controlled';
-      if (registration !== p.registration || (p.kind && actual.kind !== p.kind))
+      if (actual.teamId!==p.teamId || registration !== p.registration || (p.kind && actual.kind !== p.kind))
         mismatched.push({ teamId: p.teamId, name: p.name, registration, expectedRegistration: p.registration, kind: actual.kind, expectedKind: p.kind });
     }
     for (const [key, p] of byKey) if (!refByKey.has(key)) unexpected.push({teamId:p.teamId,name:p.name});
     for (const p of missing) issues.push(recordIssue('critical', 'missing-reference-player', p));
     for (const p of mismatched) issues.push(recordIssue('error', 'reference-registration-mismatch', p));
-    for (const p of unexpected) issues.push(recordIssue('review', 'not-in-reference', p));
+    for (const p of unexpected) issues.push(recordIssue('error', 'not-in-reference', p));
   }
   const counts = Object.fromEntries([...new Set(issues.map(x => x.code))].map(code => [code, issues.filter(x => x.code === code).length]));
   return {
+    readyForRelease: Boolean(reference) && !issues.some(x=>['critical','error'].includes(x.severity)),
     asOf: AS_OF, source: 'src/data/npb2025.js', currentCount: players.length,
     controlled: teams.reduce((n, t) => n + t.controlled, 0),
     development: teams.reduce((n, t) => n + t.development, 0),
@@ -124,9 +142,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       teams: result.teams,
     }, null, 2));
     // A complete 2026 opening-day verification must never pass without reference evidence.
-    if (args.includes('--strict') &&
-        (!reference || result.missing.length || result.mismatched.length ||
-         result.issues.some(x => ['critical', 'error'].includes(x.severity))))
+    if (args.includes('--strict') && !result.readyForRelease)
       process.exitCode = 1;
   } catch (error) {
     console.error(`Player master audit failed: ${error.message}`);

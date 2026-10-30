@@ -1,53 +1,75 @@
-# DATA-PLAYER-2026 — 2026開幕時点の選手マスタを一括再構築するための監査・移行基準
+# DATA-PLAYER-2026：開幕選手マスタの更新と検証
 
-## 目的・基準日
+基準日は2026-03-27、能力に使う確定成績は2025年以前。**全選手再構築は未完了**。実在445名、うち開幕時育成2名が新規ゲームへ接続される。公式公示候補1,059名の公開利用条件と独立資料照合が未確認のため、未収録614名は投入していない。
 
-2026-03-27に新規ゲームを開始した場合、実在の12球団（支配下＋育成）を、開幕時点の所属・登録区分・基本属性・2025年までの実績で再現する。2026年途中・シーズン終了時点の登録名簿と混ぜない。
+球団別の前後人数、出典、訂正、検証と未達条件は [検証報告](../validation/data-player-2026/README.md) を参照。
 
-この文書は移行仕様と未完了条件を明記するものであり、現行445名の名簿を完全なものと保証しない。
+## データの分離
 
-## 監査済みの現状（main #520時点）
+- `npb2025.js`：従来の取得データを凍結。445名へ固定ソースIDを付与し、従来の外国人フラグを明示値にする。契約球団ID対応修正を維持。2026年成績は原本に存在するが新規能力へ使わない。
+- `playerMaster2026Corrections.js`：根拠URL付きの開幕時属性訂正。
+- `playerMaster2026.js`：新規ゲーム用アダプター。未確認年俸・守備・契約・履歴精度を区分し、原データを変更しない。
+- `playerMaster2026.release.json`：検証済み完全マスタの差し込み口。現在は `null`。未検証候補で埋めない。
+- `playerMasterSchema.js`：ID、12球団別人数、登録区分、出典、利用条件、属性型、年俸単位、契約年、成績年度と整数アウト数の検証。
+- `realPlayerProjection.js`：新規ゲームに限り観測履歴から能力へ変換。2023/24/25を .35/.65/1 で加重し少標本を中立値へ縮約する。推定を観測履歴へ書き戻さない。
 
-- 実在データ: `src/data/npb2025.js`。445名（野手228、投手217）、育成フラグ0。ファームの一部はゲーム内で架空生成される。
-- ソースは2026-04-17のSPAIA API出力。2026年開幕後の成績を含む。実際に3月27日時点の能力へ流用している。
-- 契約終了年の球団ID対応が8球団でずれていたため、同一PR内で12球団の対応表を修正。存在する複数年契約をテストする。
-- 73名が年俸5000万円で、真値と取得失敗の既定値を見分けられない。年俸の保存単位は**万円**（ゲーム内の年間支払額・保証負担へ接続）。
-- 汎用の「内野手」「外野手」を二塁手/中堅手と置き換えている。事実確認できない細分類は推測と分ける。
-- カタカナ名から外国人枠を推定しているが、国籍や枠の適用資格と一致する保証はない。
-- 投球回数は原データから端数が失われた疑いがある。投球回はアウト数（整数）を正とし、3分の1イニングを正しく扱うべき。
-- データ再取得スクリプト `scripts/fetch-spaia.cjs` を再実行しても契約追記情報が保たれるわけではない。**直接再生成して上書きしない**。
+ソースIDとゲーム内所有IDは別物。既存セーブのIDや選手を新マスタで置換する経路は追加していない。
 
-## データを一括反映するためのゲート
+## 取得と照合
 
-1. **母集団の確定**: 2026-03-27時点の各球団について支配下/育成、選手名、可能ならNPB選手ID・背番号・投打・主な守備区分を、球団公式/NPB公示/当時の保存版で照合。出場選手登録（一軍のみ）を全選手と取り違えない。球団別・登録区分別の検算を必須とする。
-2. **履歴属性の分離**: `playerId`（恒久識別子）、`teamId`、`asOf`、`registration`、`position`、`throws`、`bats`、`birthDate`、`foreignQuotaStatus`、`salaryManYen`、`contractEndYear`、`observedStatsThrough=2025` を明示。未確定値を0や5000万円で埋めない。`unknown` + 出典/精度を保持。
-3. **能力への投影**: 新規ゲームの能力は2025年以前の確定成績＋必要時の説明可能な中立事前分布から生成する。2026年4月以降の実績は一切参照しない。登板/打席数が小さい選手は単年度の率成績だけで極端な評価にならないようにする。
-4. **守備・育成・契約の接続**: 支配下最大70名。育成は別枠で所有し、一軍へ直接登録しない。実在選手を定員合わせで架空選手に入れ替えない。既存の試合、FA年数、トレード、契約更改、契約台帳、月割給与、二軍、年度更新に適用。
-5. **IDとセーブ互換**: 既存セーブは自動置換しない。新しいデータは新規ゲーム開始時のみ反映。識別子変更がある場合は新規ゲームと旧セーブを分けて検証する。
-6. **権利・出典**: 公開リポジトリに収録できるデータか確認。サイトのHTML/APIを無条件に大量転載しない。確認済み事実・推定・未確認を区別し、出典URLと照合日を保持。
-7. **保存・性能**: 選手が1000人超になっても同期/非同期初期化の再現性、メモリ、IndexedDB容量、iPhone Safariでの保存再開を確認。
-
-## 監査実行
+1. 利用条件と必要な許諾を確認する。公開に適さない原本HTML・全名簿・成績をコミットしない。
+2. 12球団の支配下・育成登録公示24ページをローカル保存する。ファイル名は `registered_s.html` / `registereddev_s.html` など。コード順は `s,db,c,t,g,d,h,e,l,m,f,b`。
+3. 開幕時点の候補を新しいファイルへ抽出する。
 
 ```bash
-node scripts/audit-player-master.mjs --output /tmp/player-audit.json
-# 2026-03-27の支配下+育成の検証済み完全名簿（JSON）を準備したら
-node scripts/audit-player-master.mjs --reference /path/to/opening-roster.json --output /tmp/full-audit.json --strict
-npx vitest run scripts/audit-player-master.test.js src/engine/__tests__/initialRoster.test.js
+node scripts/player-master/registration.mjs /path/to/private-html /tmp/opening-candidate.json
 ```
 
-Reference JSONは最低限 `{ "scope":"all","asOf":"2026-03-27","players":[{"teamId":0,"name":"...","registration":"controlled","kind":"batter","sourceUrl":"..."}] }`。800人未満は完全名簿と認めないが、800人以上という条件**だけで網羅済みとはしない**。登録区分ごと・12球団ごとの公式照合と差分ゼロが必要。
+登録日と抹消日から在籍期間を復元する。現在の取り消し線を開幕時点の退団と扱わない。出力は `reconstructed-not-independently-verified` であり、そのまま本番へ使えない。
 
-## 完了条件
+4. 別資料と全選手単位で照合し、ID・球団・登録区分・出典を備えた参照を作る。`scope:"all"`, `asOf:"2026-03-27"`, `status:"verified"` は実際の確認後に設定する。監査CLI用には12件の `teams:[{teamId,controlled,development,verified:true}]` と各選手の `sourceUrl` も必要。
+5. 属性・契約・成績を照合して正規化マスタを作る。800人以上という人数だけでは完全扱いしない。
 
-- 12球団・支配下/育成の検証済み開幕名簿が基準データに存在し、漏れ/重複/異球団/育成区分違いの報告がゼロ。
-- 生年月日・投打・年俸・契約・外国人枠などの未確認値は未確認と表示し、決め打ち値と混在させない。
-- 2025年の実績をもとに能力生成。データ変換前後の成績整合と投球回（アウト数）の端数整合を確認。
-- 新規ゲームの一軍・二軍・育成／契約支払／保存再開／年度更新のテスト成功、旧セーブ不変。
-- CIのbuild・関連Vitest・重要E2Eが緑。大量投入後は初期化/保存パフォーマンスも計測。
+| 区分 | フィールド・条件 |
+|---|---|
+| マスタ | `schemaVersion:1`, `asOf`, `status`, `teams`, `sources`, `players` |
+| 出典 | `id`, `url`, `redistribution:"cleared"`, `rightsEvidence`。フラグだけで権利確認済みにしない |
+| 選手 | 恒久 `playerId`, `teamId`, `name`, `registration`（controlled/development）, `kind`（batter/pitcher）, `sourceIds` |
+| 属性 | `birthDate`（不明時は `gameAge`）, `throws`, `bats`, `pos`, 野手の `positions`（主位置100、副位置0–100） |
+| 外国人枠 | `foreignQuotaStatus`（counts/domestic/exempt/unknown）。unknown時は `gameIsForeign` を明示 |
+| 給与 | `salaryStatus`（official/reported/game-assumption）。前2者は `salaryManYen`、仮設定は `gameSalaryManYen`。年額・万円 |
+| 契約 | 同様の `contractStatus` と `contractEndYear` / `gameContractEndYear` |
+| 成績 | `history` は不明なら空配列。`year<=2025`、投手は正確な `outs` 必須。観測カウントは非負整数、欠測はゼロにしない |
+| 入団・FA | 確認できた `entryType`, `entryYear`, `entryAge`, `daysOnActiveRoster`, `serviceYears`。履歴年数から推測しない |
 
-## このPRのスコープ
+投球回の変換は `inningsToOuts(value, encoding)`。野球表記12.1回は37アウト、十進数12.1とは区別する。海外成績は翻訳モデル未実装のため完全マスタでは拒否する。
 
-**含む**: 契約球団IDの確定誤り修正、検査用CLIと回帰テスト、完全移行の判定基準。
+## 安全な更新
 
-**含まない（未完了）**: 全選手の公式照合・追加、年俸／外国人資格の一括修正、2026年成績を初期能力から除外するゲーム本体の切替、育成選手の新規配置、二軍/保存容量回帰。**このPRだけで「選手データ全面修正完了」と扱わない。**
+SPAIA取得も明示的な新規出力へ行う。取得だけで完全性・権利・開幕日・契約を確認したことにはならない。
+
+```bash
+node scripts/fetch-spaia.cjs --output=/tmp/spaia-candidate.js
+node scripts/player-master/stage.mjs --input=/path/to/normalized.json --reference=/path/to/verified-reference.json --previous=/path/to/previous-normalized.json --output=/tmp/new-master.json --report=/tmp/master-diff.json
+```
+
+初回の完全マスタでは `--previous` を省略可能。ただし移行時には既存445名の給与・契約終了年を別途比較する。stageは既知の契約区分がゲーム仮設定へ劣化する変更を拒否し、追加・削除・変更IDと球団別人数を報告する。給与・終了年の値を変更する場合も差分を人が確認する。
+
+本番ソース配下や既存ファイルへの直接出力は拒否する。候補と差分のレビュー後、通常のコード変更として `playerMaster2026.release.json` に反映する。CLIは公開・コミットしない。
+
+```bash
+# 従来原本の監査。原本に残る2026年成績も報告する
+node scripts/audit-player-master.mjs --output /tmp/legacy-audit.json
+node scripts/audit-player-master.mjs --reference /path/to/verified-reference.json --output /tmp/full-audit.json --strict
+npx vitest run scripts/audit-player-master.test.js scripts/player-master src/data/playerMaster2026.test.js src/data/playerMasterSchema.test.js src/engine/__tests__/realPlayerProjection.test.js src/engine/__tests__/initialRoster.test.js src/engine/__tests__/playerMasterBootstrap.test.js
+```
+
+原本監査と新規ゲーム用アダプターは対象が異なる。原本の人数をゲーム内訂正後の人数と取り違えない。
+
+## 接続と公開条件
+
+完全マスタは全選手を保持し、架空補充しない。支配下70名以内、育成は二軍。二軍捕手を残して一軍9野手・8守備位置が成立する候補を選び、成立しない完全データはエラーにする。架空補充や守備位置の書換えで調整しない。現行の不完全445名では守備・人数の架空補充を継続する。
+
+同期/非同期初期化、契約・年度予算、全員保存、試合・年度更新、育成転換・FA・補償を検証する。合成1,080名の試験は収容能力の証拠であり、実在全員の照合完了の証拠ではない。iPhone実機と長期保存は別途必要。
+
+既存セーブを変更せず、最新PR headのビルド・単体・重要E2Eを確認する。同じコミットの全スイートをローカルとCIで重複実行しない。全選手の利用可能性・属性・出典・権利・保存互換が揃うまで全面再構築完了としない。

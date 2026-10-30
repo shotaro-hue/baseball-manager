@@ -13,6 +13,7 @@ describe('2026 opening roster source audit', () => {
     expect(report.controlled + report.development).toBe(raw.length);
     expect(report.referenceCount).toBeNull();
     expect(report.counts['post-opening-performance'] ?? 0).toBe(raw.filter(p => p.stats?.G > 0).length);
+    expect(report.issues.filter(p=>p.code==='post-opening-performance').every(p=>p.severity==='error')).toBe(true);
     expect(report.teams.reduce((sum, t) => sum + t.controlled + t.development, 0)).toBe(raw.length);
   });
 
@@ -55,5 +56,21 @@ describe('2026 opening roster source audit', () => {
     const players = Array.from({length:800},(_,i)=>({teamId: i%12,name:`照合${i}`,registration:'controlled'}));
     players[1]={...players[0]};
     expect(() => auditPlayerMaster(undefined, {scope:'all',asOf:AS_OF,players})).toThrow(/duplicate/);
+  });
+
+  it('does not accept counts alone or extra players as a complete release', () => {
+    const players=Array.from({length:840},(_,i)=>({teamId:i%12,name:`照合${i}`,registration:'controlled',sourceUrl:'https://example.org/roster'}));
+    const report=auditPlayerMaster(undefined,{scope:'all',asOf:AS_OF,players});
+    expect(report.readyForRelease).toBe(false);
+    expect(report.counts['reference-not-verified']).toBe(1);
+    expect(report.issues.find(x=>x.code==='not-in-reference').severity).toBe('error');
+  });
+  it('catches duplicate permanent IDs across teams and a controlled roster above 70', () => {
+    const rosters=Object.fromEntries(TEAM_DEFS.map(t=>[t.id,{batters:[],pitchers:[]}]));
+    rosters[0].batters=Array.from({length:71},(_,i)=>({name:`選手${i}`,playerId:`npb:${i}`,age:24,salary:500,history:[]}));
+    rosters[1].batters=[{name:'別名',playerId:'npb:0',age:24,salary:500}];
+    const r=auditPlayerMaster(rosters);
+    expect(r.counts['duplicate-player-id']).toBe(1);
+    expect(r.counts['controlled-cap-exceeded']).toBe(1);
   });
 });

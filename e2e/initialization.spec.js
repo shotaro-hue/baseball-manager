@@ -20,6 +20,8 @@ async function initialContents(page) {
     const { generateSeasonSchedule } = await import('/baseball-manager/src/engine/scheduleGen.js');
     const schedule = generateSeasonSchedule(saved.year,saved.teams);
     return { myId:saved.myId, teamCount:saved.teams.length, catcherCoverage, controlled:saved.teams.map(t=>[...t.players,...t.farm].filter(p=>!p.育成&&!p.isIkusei).length), playerIds:players.map(p=>p.id),
+      development:players.filter(p=>p.育成||p.isIkusei).map(p=>p.name.replace(/\s+/g,' ')).sort(),
+      activeDevelopment:saved.teams.flatMap(t=>t.players).filter(p=>p.育成||p.isIkusei).length,
       rows:rows.rows.reduce((n,r)=>n+r.length,0), historyKeys:rows.keys, historyIds,
       regularMatchups:schedule.slice(1,144).reduce((n,day)=>n+day.matchups.length,0),
       scheduledTeamGames:saved.teams.map(t=>schedule.slice(1,144).reduce((n,day)=>n+day.matchups.filter(m=>m.homeId===t.id||m.awayId===t.id).length,0)) };
@@ -89,8 +91,9 @@ test('failed initial IndexedDB write stays on title and retry saves all history 
   await waitForNewGameReady(page,TEAM);
   await saveHub(page);const before=await initialContents(page);
   expect(before.catcherCoverage.every(t => t.active >= 3 && t.farmStatus === 'ready')).toBe(true);
-  expect(before.teamCount).toBe(12);expect(before.controlled).toEqual(Array(12).fill(65));expect(before.playerIds).toHaveLength(780);
-  expect(new Set(before.playerIds).size).toBe(780);
+  expect(before.teamCount).toBe(12);expect(before.controlled).toEqual(Array(12).fill(65));expect(before.playerIds).toHaveLength(782);
+  expect(new Set(before.playerIds).size).toBe(782);
+  expect(before.development).toEqual(['平山 功太','福島 圭音']);expect(before.activeDevelopment).toBe(0);
   expect(before.rows).toBe(2009);expect(before.historyKeys).toHaveLength(376);
   expect([...before.historyIds].sort()).toEqual([...before.historyKeys].sort());
   // schedule[0] is a sentinel; verify actual games instead of counting array keys.
