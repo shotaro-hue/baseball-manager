@@ -73,9 +73,19 @@ export function inspectAnnualBudgetCoverage(world) {
   const e=world.contractEconomy;
   if(!e.budgetPolicies.some(p=>p?.kind===kind))return; // Earlier explicit fixture policies remain supported.
   const s=e.engine.spending,end=annualBudgetHorizon(s), teams=new Set(world.teams.map(t=>t.id));
-  for(const p of e.budgetPolicies)if(!teams.has(p.teamId)||p.kind!==kind||p.inputsRecorded!==true||p.approvedManYen!==approval(p,p))fail();
-  for(const teamId of teams)for(let season=s.budgetSeason;season<=end;season++){
-    for(const list of [e.budgetPolicies,s.authorizations,e.engine.rosterRequirements])
-      if(list.filter(r=>r.teamId===teamId&&r.season===season).length!==1)fail();
+  for(const p of e.budgetPolicies)if(!teams.has(p.teamId)||p.kind!==kind||p.inputsRecorded!==true)fail();
+  for(const teamId of teams){
+    // Retained historical rows also prove the earlier budget in future years.
+    const policies=e.budgetPolicies.filter(p=>p.teamId===teamId).sort((a,b)=>a.season-b.season);
+    let precedingApproved,precedingSeason;
+    for(const p of policies){
+      const previous=precedingSeason===p.season-1?precedingApproved:undefined;
+      if(!year(p.season)||p.approvedManYen!==approval(p,p,previous))fail();
+      precedingApproved=p.approvedManYen;precedingSeason=p.season;
+    }
+    for(let season=s.budgetSeason;season<=end;season++){
+      for(const list of [e.budgetPolicies,s.authorizations,e.engine.rosterRequirements])
+        if(list.filter(r=>r.teamId===teamId&&r.season===season).length!==1)fail();
+    }
   }
 }
