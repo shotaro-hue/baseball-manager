@@ -26,6 +26,33 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
+it.each([false, true])('keeps a queued contract save ahead of a stale trailing save (manual=%s)', async manual => {
+  const world = economyFixture(), offered = reduceEconomyCommand(world, renewalEnvelope(world)).world;
+  const expected = structuredClone(offered.contractEconomy);
+  const active = enqueueSaveGame(world, { skipCompression: true });
+  const economic = enqueueSaveGame(offered, { skipCompression: true, dirtyScopes: [] });
+  const stale = (manual ? saveGame : enqueueSaveGame)(world, { skipCompression: true });
+  offered.contractEconomy.randomRoot.seed = 'caller-mutated-after-enqueue';
+  const [a, b, c] = await Promise.all([active, economic, stale]);
+  expect(a.ok).toBe(true); expect(b.ok).toBe(true);
+  expect(b.generation).not.toBe(a.generation);
+  expect(c).toMatchObject({ ok: false, reason: 'economy_revision_conflict' });
+  freshStorageSurface();
+  expect((await loadGame()).contractEconomy).toEqual(expected);
+});
+
+it('reports an invalid queued contract candidate as failed even if a later normal save succeeds', async () => {
+  const world = economyFixture(), invalid = structuredClone(world);
+  delete invalid.contractEconomy.engine;
+  const active = enqueueSaveGame(world, { skipCompression: true });
+  const economic = enqueueSaveGame(invalid, { skipCompression: true });
+  const normal = enqueueSaveGame(world, { skipCompression: true });
+  const [a, b, c] = await Promise.all([active, economic, normal]);
+  expect(a.ok).toBe(true); expect(b).toMatchObject({ ok: false, reason: 'economy_payload_invalid' });
+  expect(c.ok).toBe(true);
+  expect((await loadGame()).contractEconomy).toEqual(world.contractEconomy);
+});
+
 it.each([false, true])('reload/resave/accept preserves the complete economic world, large root=%s', async large => {
   const world = economyFixture(), command = renewalEnvelope(world);
   const offered = reduceEconomyCommand(world, command).world;
