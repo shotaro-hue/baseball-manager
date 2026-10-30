@@ -1,4 +1,6 @@
 import { saveFailure } from './saveDiagnostics';
+import { validateEconomySave, economySaveMetadata, economyOverwriteIssue,
+  economyRecoveryGuard, matchesEconomyRecoveryGuard } from './economyPersistence';
 import { prepareRootBody, readRootBody, rootBodyReference, compressRootJson, decodeRootJson, rootCompressionApi } from './saveRootBodies';
 import { validateFarmSaveState } from './farmMigration';
 import { validateClubFinance } from './clubFinance';
@@ -267,12 +269,16 @@ function validateAndMigrateSave(state) {
   if (!state || !hasSelectedTeam(state.teams, state.myId) || !state.year) {
     return { ok: false };
   }
+  const mode = validateEconomySave(state);
   // Introduced data is validated as-is; a corrupt ledger must reach backup recovery.
   validateFarmSaveState(state);
   for (const team of state.teams) {
     validateClubFinance(team.clubFinance);
     if (team.clubFinance !== undefined && team.clubFinance.year !== state.year) throw new Error('球団収支の年度が一致しません。');
   }
+  // Native terms and legacy-opening evidence are already authoritative. Never
+  // fill missing economic fields or run old initial-contract corrections here.
+  if (mode === 'annual') return { ok: true, state: { ...state, ...matchHistorySnapshot(state) } };
   const teams = state.teams.map(t => ({
     ...t,
     wins:               t.wins               ?? 0,
@@ -622,6 +628,9 @@ async function saveGameImpl(state, options = {}) {
 
   const perfBreakdown = {};
   let safeState;
+  let economyMode;
+  try { economyMode = validateEconomySave(state); }
+  catch (error) { return failedSave('economy_payload_invalid', 'validate_state', 'saveGame', error); }
   try {
     safeState = sanitizeSaveState(state);
     safeState.saveId = ensureSaveId(safeState.saveId);
@@ -643,6 +652,9 @@ async function saveGameImpl(state, options = {}) {
     const known = validatedRoots.get(localStorage);
     if (known?.saveId === safeState.saveId) previous = known;
     else try { if (currentRaw) previous = await readSaveRoot(currentRaw); } catch { /* recovery */ }
+    const economyIssue = economyOverwriteIssue(previous, safeState,
+      previous === known ? known?.economySave : economySaveMetadata(previous));
+    if (economyIssue) return failedSave(economyIssue, 'validate_previous', 'saveGame');
     if(previous?.saveId===safeState.saveId && Number(previous.year)>Number(safeState.year)) {
       return failedSave('stale_save', 'validate_previous', 'saveGame');
     }
@@ -654,6 +666,10 @@ async function saveGameImpl(state, options = {}) {
       return failedSave('archive_receipt_missing', 'validate_previous', 'saveGame');
     }
     let generationDirtyScopes=options?.dirtyScopes;
+    // These chunks are part of the same economic world as the root ledger.
+    // Reusing an older notification chunk would create a mixed revision.
+    if (economyMode === 'annual' && Array.isArray(generationDirtyScopes))
+      generationDirtyScopes = [...new Set([...generationDirtyScopes, 'news', 'mailbox'])];
     if(safeState.farmCompetition && previous?.farmCompetition?.archiveSignature!==safeState.farmCompetition.archiveSignature
       && Array.isArray(generationDirtyScopes)) {
       generationDirtyScopes=[...new Set([...generationDirtyScopes,'seasonHistory','matchHistory'])];
@@ -796,8 +812,15 @@ const chunkRootCache = new WeakMap();
 const legacyCareerSeeds = new WeakMap();
 function validatedRootMetadata(state) {
   // Legacy career migration still needs its inline player records until explicit save.
-  if (!(state.saveDataVersion >= GENERATION_VERSION)) return state;
+  if (!(state.saveDataVersion >= GENERATION_VERSION)) {
+    // The caller owns the loaded world and can mutate it. Keep the identity and
+    // economic observation independent even before the first generation save.
+    const metadata = { ...state, economySave: economySaveMetadata(state) };
+    if (legacyCareerSeeds.has(state)) legacyCareerSeeds.set(metadata, legacyCareerSeeds.get(state));
+    return metadata;
+  }
   return { saveId: state.saveId, year: state.year, saveDataVersion: state.saveDataVersion,
+    economySave: economySaveMetadata(state),
     battedBallReceipt: state.battedBallReceipt ? structuredClone(state.battedBallReceipt) : null,
     farmCompetitionVersion: state.farmCompetitionVersion,
     farmCompetition: state.farmCompetition ? {archiveSignature:state.farmCompetition.archiveSignature} : undefined,
@@ -1036,6 +1059,8 @@ export async function loadGame() {
     { key: BACKUP_KEY_1, label: 'backup-1' },
     { key: BACKUP_KEY_2, label: 'backup-2' },
   ];
+  const knownEconomyRoot = validatedRoots.get(storage);
+  let recoveryGuard = economyRecoveryGuard(knownEconomyRoot, knownEconomyRoot?.economySave);
   for (const { key, label } of candidates) {
     if (deletionChanged()) return null;
     try {
@@ -1045,6 +1070,16 @@ export async function loadGame() {
       if (!raw) continue;
       foundCandidate = true;
       const state = await readSaveRoot(raw);
+      if (key === SAVE_KEY) {
+        const decodedGuard = economyRecoveryGuard(state);
+        // A separately initialized save supersedes this process's observation;
+        // losing the mode on the same save ID does not erase that observation.
+        if (decodedGuard || state.saveId !== recoveryGuard?.saveId) recoveryGuard = decodedGuard;
+      }
+      // When the primary is absent/opaque, the first recognizable backup also
+      // fences older backups; unsupported schema is never a legacy fallback.
+      if (!recoveryGuard) recoveryGuard = economyRecoveryGuard(state);
+      if (!matchesEconomyRecoveryGuard(state, recoveryGuard)) continue;
       await hydrateSaveCandidate(state);
       if (deletionChanged()) return null;
       if(!(state?.saveDataVersion >= GENERATION_VERSION)) legacyCareerSeeds.set(state,captureInlineCareerLogs(state));

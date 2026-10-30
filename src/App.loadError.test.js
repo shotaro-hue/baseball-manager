@@ -2,6 +2,7 @@ import React from 'react';
 import { act, create } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import App from './App';
+import { economyFixture } from './engine/__tests__/fixtures/economyWorld';
 import { TEAM_DEFS } from './constants';
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
@@ -32,6 +33,13 @@ const message = () => view.root.findByProps({ role: 'alert' }).children.join('')
 const resume = () => view.root.findAllByType('button').find(b => b.children.join('') === '続きから');
 async function mount() { await act(async () => { view = create(React.createElement(App)); }); }
 async function load() { await act(async () => { await mock.app.handleLoad(); }); }
+
+it('keeps annual saves out of legacy App hydration while the release gate is off', async () => {
+  mock.status = 'primary'; mock.load.mockResolvedValue(economyFixture());
+  await mount(); await load();
+  expect(mock.app.gs.screen).toBe('title'); expect(mock.app.gs.teams).toEqual([]);
+  expect(mock.app.gs.myId).toBeNull(); expect(message()).toContain('新契約制度');
+});
 
 it.each(['unrecoverable', 'none', 'thrown'])('retains %s failure after toast expiry and unrelated notifications, leaving retry available', async status => {
   mock.status = status;

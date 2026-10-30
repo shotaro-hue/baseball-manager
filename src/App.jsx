@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { ANNUAL_ECONOMY_RELEASE_ENABLED, contractEconomyMode } from './engine/contractEconomy';
 import {migrateFarmCompetition} from './engine/farmMigration';
 import './styles.css';
 import { SEASON_PARAMS, getDefaultParams } from './data/scheduleParams.js';
@@ -68,6 +69,11 @@ export default function App() {
           setLoadError(status === 'conflict'
             ? '読込中にセーブが更新されたため、再開を止めました。別タブの保存完了を確認し、「続きから」で最新の保存を読み込んでください。'
             : status === 'unrecoverable' ? 'セーブとバックアップを復旧できませんでした。必要な履歴が欠損・破損しています。' : 'セーブデータが見つかりません');
+          return;
+        }
+
+        if (contractEconomyMode(saved) === 'annual' && !ANNUAL_ECONOMY_RELEASE_ENABLED) {
+          setLoadError('このバージョンでは新契約制度のセーブを再開できません。保存データは変更していません。');
           return;
         }
 

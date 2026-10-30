@@ -3,6 +3,45 @@ import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 const fixture = JSON.parse(gunzipSync(readFileSync(new URL('./fixtures/new-game.json.gz', import.meta.url))).toString());
 
+for (const large of [false, true]) test(`save generations: annual world survives cold reload and refuses downgrade (${large ? 'large' : 'inline'})`, async ({ page }) => {
+  await page.goto('/');
+  const initial = await page.evaluate(async large => {
+    const { economyFixture, renewalEnvelope } = await import('/baseball-manager/src/engine/__tests__/fixtures/economyWorld.js');
+    const { reduceEconomyCommand } = await import('/baseball-manager/src/engine/contractEconomy.js');
+    const { saveGame } = await import('/baseball-manager/src/engine/saveload.js');
+    const world = economyFixture(), offered = reduceEconomyCommand(world, renewalEnvelope(world)).world;
+    if (large) offered.padding = 'large'.repeat(20000);
+    offered.mailbox = [{ id: 'pending', type: 'contract_decision_pending', read: false }];
+    const saved = await saveGame(offered, { skipCompression: true });
+    return { saved, referenced: JSON.parse(localStorage.getItem('baseball_manager_v1')).rootBodyVersion === 1 };
+  }, large);
+  expect(initial.saved.ok).toBe(true); expect(initial.referenced).toBe(large);
+  await page.reload();
+  const result = await page.evaluate(async () => {
+    const mod = await import('/baseball-manager/src/engine/saveload.js');
+    const { reduceEconomyCommand } = await import('/baseball-manager/src/engine/contractEconomy.js');
+    const loaded = await mod.loadGame(), before = localStorage.getItem('baseball_manager_v1');
+    const { contractEconomy, ...legacy } = loaded;
+    const rejected = await mod.saveGame(legacy), unchanged = localStorage.getItem('baseball_manager_v1') === before;
+    const accepted = reduceEconomyCommand(loaded, { saveId: loaded.saveId, epoch: contractEconomy.epoch, baseRevision: 1,
+      transaction: { id: 'answer', type: 'accept-renewal', proposalId: 'renewal', contractId: loaded.teams[0].players[0].contractId } });
+    accepted.world.mailbox = [{ id: 'signed', type: 'contract_reply', read: false }];
+    const saved = await mod.enqueueSaveGame(accepted.world, { dirtyScopes: [] });
+    const restored = await mod.loadGame();
+    return { rejected, unchanged, saved, revision: restored.contractEconomy.revision,
+      sameEconomy: JSON.stringify(restored.contractEconomy) === JSON.stringify(accepted.world.contractEconomy), mailbox: restored.mailbox };
+  });
+  expect(result.rejected).toMatchObject({ ok: false, reason: 'economy_payload_missing' });
+  expect(result.unchanged).toBe(true); expect(result.saved.ok).toBe(true);
+  expect(result.revision).toBe(2); expect(result.sameEconomy).toBe(true);
+  expect(result.mailbox).toEqual([{ id: 'signed', type: 'contract_reply', read: false }]);
+  await page.reload();
+  const before = await page.evaluate(() => localStorage.getItem('baseball_manager_v1'));
+  await page.getByRole('button', { name: '続きから', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('新契約制度');
+  expect(await page.evaluate(() => localStorage.getItem('baseball_manager_v1'))).toBe(before);
+});
+
 test('save generations recover their histories after primary corruption and disappearance', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(async fixture => {
