@@ -1,4 +1,4 @@
-import { FA_CASH_COMPENSATION_PERCENT, MIN_SALARY_SHIHAKA } from '../constants';
+import { FA_CASH_COMPENSATION_PERCENT, FA_PERSONNEL_COMPENSATION_PERCENT, MIN_SALARY_SHIHAKA } from '../constants';
 import { parseContractDate } from './contractCalendar';
 
 const fail = () => { throw new Error('FA補償の根拠・選択・精算履歴を確認してください。'); };
@@ -13,16 +13,17 @@ export function normalizeFaCompensationBasis(input) {
 
 export const requiresFaCompensation = p => ['domestic-fa', 'overseas-fa'].includes(p?.marketEntry?.kind)
   && ['A', 'B'].includes(p.marketEntry.compensationRank) && p.marketEntry.originTeamId !== p.teamId;
-export function faCashCompensationManYen(p) {
+export function faCashCompensationManYen(p, method = 'cash-only') {
+  if (!['cash-only', 'player-and-cash'].includes(method)) fail();
   if (!requiresFaCompensation(p)) return 0;
   const basis = normalizeFaCompensationBasis(p.marketEntry.compensationBasis);
-  const percent = FA_CASH_COMPENSATION_PERCENT[basis.exercise][p.marketEntry.compensationRank];
+  const percent = (method === 'cash-only' ? FA_CASH_COMPENSATION_PERCENT : FA_PERSONNEL_COMPENSATION_PERCENT)[basis.exercise][p.marketEntry.compensationRank];
   // Integer 万円 policy: reserve/pay the same upward-rounded amount, once.
   return Number((BigInt(basis.previousAnnualSalaryManYen) * BigInt(percent) + 99n) / 100n);
 }
 
-export function faCashCompensationCosts(p) {
-  const amount = faCashCompensationManYen(p);
+export function faCashCompensationCosts(p, method = 'cash-only') {
+  const amount = faCashCompensationManYen(p, method);
   return amount === 0 ? [] : [['payer', p.teamId, amount], ['payee', p.marketEntry.originTeamId, -amount]].map(([side, teamId, amountManYen]) => ({
     id: JSON.stringify(['fa-compensation', p.id, side]), teamId, season: p.contract.startSeason,
     kind: 'fa-compensation', amountManYen, proposalId: p.id,
@@ -39,11 +40,12 @@ export function prepareFaCompensations(plan, resolutions) {
   const ids = new Set(), records = [], obligations = [], costs = [];
   for (const input of plan.faCompensations ?? []) {
     if (!input || !validId(input.proposalId) || ids.has(input.proposalId)
-      || !['pending', 'cash-only'].includes(input.resolution)) fail();
+      || !['pending', 'cash-only', 'player-and-cash'].includes(input.resolution)) fail();
     ids.add(input.proposalId);
     const resolved = accepted.get(input.proposalId), p = resolved?.proposal;
     if (!p || p.contract.agreementPhase !== 'offseason') fail();
-    const pending = input.resolution === 'pending', fields = pending ? ['proposalId', 'resolution'] : ['proposalId', 'resolution', 'teamId', 'chosenDate'];
+    const pending = input.resolution === 'pending', personnel = input.resolution === 'player-and-cash';
+    const fields = pending ? ['proposalId', 'resolution'] : ['proposalId', 'resolution', 'teamId', 'chosenDate', ...(personnel ? ['playerId', 'transactionId'] : [])];
     if (Object.keys(input).length !== fields.length || Object.keys(input).some(k => !fields.includes(k))) fail();
     let record = { proposalId: p.id, resolution: input.resolution };
     if (pending) {
@@ -53,7 +55,11 @@ export function prepareFaCompensations(plan, resolutions) {
       if (input.teamId !== p.marketEntry.originTeamId || input.chosenDate < resolved.answeredDate
         || date.year < p.contract.signedSeason || date.year > p.contract.startSeason) fail();
       record = { ...record, teamId: input.teamId, chosenDate: input.chosenDate };
-      costs.push(...faCashCompensationCosts(p));
+      if (personnel) {
+        if (!validId(input.playerId) || !validId(input.transactionId) || input.playerId === p.contract.playerId) fail();
+        record = { ...record, playerId: input.playerId, transactionId: input.transactionId };
+      }
+      costs.push(...faCashCompensationCosts(p, input.resolution));
     }
     records.push(record); obligations.push({ record, proposal: p, amountManYen: faCashCompensationManYen(p) });
   }

@@ -9,6 +9,7 @@ import { evaluateRosterCapacity, isIkuseiPlayer } from './rosterCapacity';
 import { marketRosterError, marketPlacement } from './marketRoster';
 import { ownedPlayers, validContractTerms } from './renewalRules';
 import { requiresFaCompensation } from './faCompensation';
+import { faPersonnelCapacityContext } from './faPersonnel';
 
 // GM-01 opt-in lifecycle only. The live FA pool and saves remain unchanged.
 const fail = message => { throw new Error(message); };
@@ -86,10 +87,12 @@ export function inspectAnnualAcquisitions(state) {
 }
 
 export function acquisitionRosterError(state, team, player) {
-  const error = marketRosterError(team, player, state.teams, state.draftContext);
+  const context = faPersonnelCapacityContext(state);
+  const error = marketRosterError(team, player, state.teams, context);
   if (error) return error;
-  const capacity = evaluateRosterCapacity(team, { ...state.draftContext, teams: state.teams });
-  const pending = inspectAnnualAcquisitions(state).filter(h => h.proposal.teamId === team.id && !isIkuseiPlayer(h.player)).length;
+  const capacity = evaluateRosterCapacity(team, { ...context, teams: state.teams });
+  const pending = inspectAnnualAcquisitions(state).filter(h => h.proposal.teamId === team.id && !isIkuseiPlayer(h.player)).length
+    + (state.faPersonnelMoves ?? []).filter(m => m.teamId === team.id && !Object.hasOwn(m, 'joinedDate')).length;
   if (!isIkuseiPlayer(player) && capacity.remainingSlots <= pending) return `加入待ちを含む支配下登録枠（${MAX_SHIHAKA_TOTAL}人）が満員です。`;
   return null;
 }

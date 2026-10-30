@@ -333,9 +333,24 @@ export function settleFaCashCompensation(plan, { proposalId, teamId, chosenDate 
     if (record.teamId !== teamId || record.chosenDate !== chosenDate) fail('精算済みのFA補償を変更できません。');
     return plan;
   }
+  if (record.resolution !== 'pending') fail('精算済みのFA補償を変更できません。');
   const next = { ...plan, faCompensations: prepared.faCompensations.map(r => r.proposalId === proposalId
     ? { proposalId, resolution: 'cash-only', teamId, chosenDate } : r),
     oneOffCosts: [...plan.oneOffCosts, ...faCashCompensationCosts(p)] };
   if (!assessAnnualSpendingChange(plan, next).ok) fail('FA補償の精算で新たな支出を生じさせることはできません。');
+  return next;
+}
+
+// Salary/ownership are composed by the common personnel transaction. This
+// function owns only the accepted obligation and both sides of reduced cash.
+export function settleFaPersonnelCompensation(plan, { proposalId, teamId, chosenDate, playerId, transactionId } = {}) {
+  const prepared = prepare(plan), record = prepared.faCompensations.find(r => r.proposalId === proposalId);
+  const p = prepared.resolutions.find(r => r.proposal.id === proposalId)?.proposal;
+  if (!p || record?.resolution !== 'pending' || teamId !== p.marketEntry.originTeamId)
+    fail('旧球団が選ぶ未精算の人的補償を確認してください。');
+  const next = { ...plan, faCompensations: prepared.faCompensations.map(r => r.proposalId === proposalId
+    ? { proposalId, resolution: 'player-and-cash', teamId, chosenDate, playerId, transactionId } : r),
+    oneOffCosts: [...plan.oneOffCosts, ...faCashCompensationCosts(p, 'player-and-cash')] };
+  prepare(next);
   return next;
 }

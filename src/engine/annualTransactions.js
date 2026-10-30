@@ -11,6 +11,7 @@ import { projectTradeRosters } from './tradeTransaction';
 import { acquisitionOfferMetadata, normalizeMarketEntry } from './acquisitionMarket';
 import { inspectAnnualAcquisitions, acquisitionRosterError, explicitAcquisitionCandidate } from './annualAcquisitions';
 import { normalizeFaProtectedIds, inspectFaProtectionLists, createFaProtectionList, faProtectionView } from './faProtection';
+import { normalizeFaPersonnelSelections, createFaPersonnelSettlement, inspectFaPersonnelMoves, joinFaPersonnel, faPersonnelCapacityContext } from './faPersonnel';
 
 // GM-01C: explicit, opt-in engine state. Live hooks/save adoption remain gated.
 const fail = message => { throw new Error(message); };
@@ -40,6 +41,7 @@ const kinds = {
   'reject-fa': ['proposalId'], 'join-fa': ['proposalId'],
   'settle-fa-compensation': ['proposalId', 'teamId', 'method'],
   'submit-fa-protection': ['proposalId', 'teamId', 'protectedPlayerIds'],
+  'settle-fa-personnel': ['selections'], 'join-fa-personnel': ['proposalId'],
   'offer-renewal': ['proposal', 'contractId'], 'replace-renewal': ['proposalId', 'proposal', 'contractId'],
   'accept-renewal': ['proposalId', 'contractId'], 'cancel-renewal': ['proposalId'],
   'reserve-rookie': ['proposal'], 'decline-rookie': ['teamId', 'playerId'], 'join-rookie': ['proposalId'],
@@ -67,6 +69,8 @@ function commandFor(input) {
   } else if (c.type === 'submit-fa-protection') {
     if (![c.proposalId, c.teamId].every(validId)) fail('FA保護名簿の対象・球団を確認してください。');
     c.protectedPlayerIds = normalizeFaProtectedIds(c.protectedPlayerIds);
+  } else if (c.type === 'settle-fa-personnel') {
+    c.selections = normalizeFaPersonnelSelections(c.selections);
   } else if (c.type === 'decline-rookie') {
     if (![c.teamId, c.playerId].every(validId)) fail('辞退する新人と受諾球団を確認してください。');
   } else if (c.type === 'convert-to-controlled') {
@@ -88,6 +92,7 @@ function inspect(state) {
   if (date.year !== state.season || state.spending?.budgetSeason !== state.season + Number(state.phase === 'offseason')
     || !['preseason', 'season', 'offseason'].includes(state.phase)) fail('取引年度・フェーズを確認してください。');
   const pendingAcquisitions = inspectAnnualAcquisitions(state);
+  const pendingPersonnel = inspectFaPersonnelMoves(state);
   const teams = new Map(), players = new Map(), owners = new Map(), receipts = new Set(), acceptedRookies = new Map();
   const teamKeys = new Set(), playerKeys = new Set();
   for (const team of state.teams) {
@@ -97,8 +102,9 @@ function inspect(state) {
       if (!validId(p?.id) || playerKeys.has(String(p.id))) fail('選手の所属が重複または無効です。');
       playerKeys.add(String(p.id)); players.set(p.id, p); owners.set(p.id, team.id);
     }
-    const capacity = evaluateRosterCapacity(team, { ...state.draftContext, teams: state.teams });
-    const pendingCount = pendingAcquisitions.filter(h => h.proposal.teamId === team.id && !isIkuseiPlayer(h.player)).length;
+    const capacity = evaluateRosterCapacity(team, { ...faPersonnelCapacityContext(state), teams: state.teams });
+    const pendingCount = pendingAcquisitions.filter(h => h.proposal.teamId === team.id && !isIkuseiPlayer(h.player)).length
+      + pendingPersonnel.filter(m => m.teamId === team.id).length;
     if (!capacity.ok || capacity.overBy || capacity.controlledCount + capacity.acceptedPickCount + pendingCount > MAX_SHIHAKA_TOTAL)
       fail('加入待ちを含む支配下登録枠を確認してください。');
     for (const p of [...capacity.acceptedPicks, ...capacity.acceptedDevelopmentPicks]) {
@@ -111,7 +117,7 @@ function inspect(state) {
     if (!validId(p?.id) || playerKeys.has(String(p.id))) fail('市場選手の所属が重複または無効です。');
     playerKeys.add(String(p.id)); players.set(p.id, p);
   }
-  for (const { player: p } of pendingAcquisitions) {
+  for (const { player: p } of [...pendingAcquisitions, ...pendingPersonnel]) {
     if (!validId(p.id) || playerKeys.has(String(p.id))) fail('加入待ち選手のID・所属が重複しています。');
     playerKeys.add(String(p.id)); players.set(p.id, p);
   }
@@ -125,7 +131,8 @@ function inspect(state) {
     }
   }
   const employed = contractEmploymentAt(state.spending.ledger, rosterDate(state)).filter(e =>
-    !pendingAcquisitions.some(h => h.proposal.contract.contractId === e.contract.contractId));
+    !pendingAcquisitions.some(h => h.proposal.contract.contractId === e.contract.contractId)
+    && !pendingPersonnel.some(m => m.player.id === e.contract.playerId));
   if (employed.length !== owners.size || employed.some(e => owners.get(e.contract.playerId) !== e.teamId)) fail('名簿と有効な契約の所属が一致しません。');
   if (employed.some(e => e.registrationType !== undefined
     && (e.registrationType === 'development') !== isIkuseiPlayer(players.get(e.contract.playerId)))) fail('名簿と有効な契約の支配下・育成区分が一致しません。');
@@ -148,14 +155,18 @@ function inspect(state) {
     if (conflictsWithControlled(terms?.playerId, terms?.registrationType))
       fail('未回答の育成更改オファーを取り消してから支配下転換してください。');
   }
+  const personnelTransfers = (state.faPersonnelMoves ?? []).flatMap(m => m.transfers);
   for (const record of state.spending.ledger.records) if (record.effectiveDate <= state.date
-    && record.changes.some(c => c.effectiveDate > state.date)) fail('未来の取引を現在の名簿へ反映できません。');
+    && record.changes.some(c => c.effectiveDate > state.date && !personnelTransfers.some(a => stable(a) === stable(c))))
+    fail('未来の取引を現在の名簿へ反映できません。');
   for (const future of futureEmployments(state)) {
     if (future.contract.purpose === 'acquisition' && !owners.has(future.contract.playerId)
-      && !pendingAcquisitions.some(h => h.proposal.contract.contractId === future.contract.contractId))
+      && !pendingAcquisitions.some(h => h.proposal.contract.contractId === future.contract.contractId)
+      && !pendingPersonnel.some(m => m.player.id === future.contract.playerId && m.teamId === future.teamId))
       fail('将来の獲得契約に加入待ち選手の情報がありません。');
     if (future.contract.purpose === 'renewal'
-      && owners.get(future.contract.playerId) !== future.teamId) fail('更改済み将来契約と現在の所属球団が一致しません。');
+      && owners.get(future.contract.playerId) !== future.teamId
+      && !pendingPersonnel.some(m => m.player.id === future.contract.playerId && m.teamId === future.teamId)) fail('更改済み将来契約と現在の所属球団が一致しません。');
     if (conflictsWithControlled(future.contract.playerId, future.registrationType))
       fail('受諾済みの将来育成契約があるため、支配下転換できません。');
   }
@@ -213,7 +224,7 @@ function withFloors(state) {
       const p = h.proposal;
       if (p.teamId === a.teamId && p.contract.startSeason <= a.season && p.contract.endSeason >= a.season) count(p.contract.playerId, p.contract.registrationType, true);
     }
-    const capacity = evaluateRosterCapacity(teams.get(a.teamId), { ...state.draftContext, teams: state.teams });
+    const capacity = evaluateRosterCapacity(teams.get(a.teamId), { ...faPersonnelCapacityContext(state), teams: state.teams });
     const unfundedPicks = a.season === state.spending.budgetSeason ? capacity.acceptedPicks.filter(p => !funded.has(p.id)).length : 0;
     return { ...a, minimumRosterReserveManYen: Math.max(unfundedPicks, required - funded.size, 0) * MIN_SALARY_SHIHAKA };
   });
@@ -370,7 +381,7 @@ function rookieCandidate(state, c) {
 function tradeCandidate(state, c) {
   if (!registrationDateAllowed(state.season, state.date) || (c.mode === 'cashless-trade' && c.cashManYen !== 0)) fail('移籍期限または無金銭例外の条件を確認してください。');
   const projected = projectTradeRosters(state.teams, { fromId: c.fromId, toId: c.toId,
-    outgoing: c.outgoingIds.map(id => ({ id })), incoming: c.incomingIds.map(id => ({ id })) }, state.draftContext);
+    outgoing: c.outgoingIds.map(id => ({ id })), incoming: c.incomingIds.map(id => ({ id })) }, faPersonnelCapacityContext(state));
   if (!projected.ok) fail(projected.error);
   const employment = contractEmploymentAt(state.spending.ledger, state.date), future = futureEmployments(state);
   const transferred = new Set([...c.outgoingIds, ...c.incomingIds]);
@@ -433,9 +444,10 @@ function candidate(input, command) {
   const receipt = input.transactions.find(r => r.id === c.id);
   if (receipt) {
     if (receipt.signature !== signature) fail('同じ取引IDの条件が変わっています。');
-    return { state: input, rows: quoteAnnualSpendingPlan(before.spending), replayed: true };
+    return { state: input, rows: quoteAnnualSpendingPlan(before.spending), replayed: true,
+      ...(receipt.faPersonnel ? { personnel: { winnerProposalIds: [...receipt.faPersonnel.winnerProposalIds], lostProposalIds: [...receipt.faPersonnel.lostProposalIds] } } : {}) };
   }
-  if (input.phase === 'offseason' && !c.type.endsWith('renewal') && !c.type.endsWith('rookie') && !c.type.endsWith('fa') && !['settle-fa-compensation', 'submit-fa-protection'].includes(c.type)) fail('オフの新制度取引は翌年度契約だけが接続済みです。');
+  if (input.phase === 'offseason' && !c.type.endsWith('renewal') && !c.type.endsWith('rookie') && !c.type.endsWith('fa') && !['settle-fa-compensation', 'submit-fa-protection', 'settle-fa-personnel', 'join-fa-personnel'].includes(c.type)) fail('オフの新制度取引は翌年度契約だけが接続済みです。');
   // Snapshot and receipt enter validation together; no unaudited intermediate state.
   let protectedState;
   if (c.type === 'submit-fa-protection') {
@@ -443,6 +455,11 @@ function candidate(input, command) {
     protectedState = { ...before, faProtectionLists: [...(before.faProtectionLists ?? []), record],
       transactions: [...before.transactions, { id: c.id, signature, faProtection: JSON.parse(JSON.stringify(record)) }] };
   }
+  let personnel;
+  if (c.type === 'settle-fa-personnel') {
+    const result = createFaPersonnelSettlement(before, c, signature);
+    protectedState = result.state; personnel = result.personnel;
+  } else if (c.type === 'join-fa-personnel') protectedState = joinFaPersonnel(before, c, signature);
   const after = withFloors(protectedState ?? (c.type === 'trade' ? tradeCandidate(before, c)
     : c.type === 'convert-to-controlled' ? conversionCandidate(before, c)
     : c.type.endsWith('renewal') ? renewalCandidate(before, c)
@@ -458,9 +475,11 @@ function candidate(input, command) {
   const rows = quoteAnnualSpendingPlan(after.spending);
   // Releasing a prorated bid may restore a larger conservative annual floor.
   // Cancellation/losing bids create no obligation; winner admission is above.
-  // Trades must still account for real vacancies created by outgoing players.
-  if (c.type === 'trade' && rows.some(r => r.remainingManYen < 0 && r.remainingManYen < oldRows.get(key(r.teamId, r.season)).remainingManYen)) fail('赤字年度の追加余力を悪化させる取引です。');
-  return { state: { ...after, transactions: protectedState ? after.transactions : [...after.transactions, { id: c.id, signature }] }, rows, replayed: false };
+  // Departures must still account for real vacancies created by outgoing players.
+  if (['trade', 'settle-fa-personnel'].includes(c.type)
+    && rows.some(r => r.remainingManYen < 0 && r.remainingManYen < oldRows.get(key(r.teamId, r.season)).remainingManYen)) fail('赤字年度の追加余力を悪化させる取引です。');
+  return { state: { ...after, transactions: protectedState ? after.transactions : [...after.transactions, { id: c.id, signature }] }, rows, replayed: false,
+    ...(personnel ? { personnel } : {}) };
 }
 
 export function quoteFaProtectionList(state, selector) {
@@ -469,7 +488,7 @@ export function quoteFaProtectionList(state, selector) {
 }
 
 export function quoteAnnualTransaction(state, command) {
-  try { const r = candidate(state, command); return { ok: true, rows: r.rows, replayed: r.replayed }; }
+  try { const r = candidate(state, command); return { ok: true, rows: r.rows, replayed: r.replayed, ...(r.personnel ? { personnel: r.personnel } : {}) }; }
   catch (error) { return { ok: false, error: error.message }; }
 }
 export function applyAnnualTransaction(state, command) {
