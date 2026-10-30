@@ -18,7 +18,7 @@
 - 新旧の保存形式を混在させない。legacyにannual engineを一部だけ入れず、annualはschema/全必須データを一括で保存する。
 - 見積と失敗は非変更、最新状態で再検証、同じ取引は一度だけ、保存成功後だけ候補を採用する。
 - 金額は整数万円。未記録と0を区別する。保証/過去支払/FA行使歴/署名フェーズを捏造しない。
-- nativeのFA最大3年、更改最大7年、新人単年、2〜11月給与と7/31登録期限を維持する。5/7年契約の検証は更改等の許可された経路で実施し、FAの上限を緩めない。
+- nativeのFA最大3年、更改最大7年、新人単年、2〜11月給与を維持する。新規獲得/登録は7/31当日まで、翌年度更改はこの登録期限の対象外。5/7年契約の検証は更改等の許可された経路で実施し、FAの上限を緩めない。
 - 各PRで対象回帰と同一公開headのCIを確認。期待値の緩和/skip追加で合格にしない。一般の有効化前に全主体と年度更新を揃える。
 - コードは小さな責務へ追加するが、既存の大きいhookを理由なく全面書換えしない。下記はファイル候補であり、無関係な再構成の許可ではない。
 
@@ -29,6 +29,7 @@
 3. 冬の退団と満了・更改・人的移管が雇用/名簿照合を壊さない（A1-2c/3b）。
 4. 同一年度の再開/保存失敗で春の予算・加齢・乱数・加入を二重適用しない（A1-1d/3b）。
 5. 小さいinline root/大きいIndexedDB root、冷起動、旧タブの保存/削除/新規初期化でも新契約を失わない（A1-1d/4a/4b）。
+6. 確定保存Bを通常保存Cで置換せず、公開したrevision/receiptを確認してから採用する（A1-1d）。オフで翌シーズンの更改最終年度まで枠を用意し（A1-1c/3b）、登録期限後も更改回答を処理する（A1-2a/3b）。
 
 ## PR順序と依存
 
@@ -85,30 +86,33 @@
 
 **Files:** Create `src/engine/annualBudgetPolicy.js`, `src/engine/__tests__/annualBudgetPolicy.test.js`; modify `src/engine/annualSpending.js`, `src/engine/annualTransactions.js`, `src/engine/faCompensation.js`, `src/engine/contractEconomy.js`; extend relevant engine tests。
 
-**Interfaces:** `quoteAnnualBudgetPolicy(world,policy) -> {authorizations,budgetPolicies,rosterRequirements}`、未更改計画`spending.renewalPlans`、年度`staffContracts`費の一意な見積。policyは必須引数、実験候補に本番既定の適正値を付けない。
+**Interfaces:** `quoteAnnualBudgetPolicy(world,policy) -> {authorizations,budgetPolicies,rosterRequirements}`、未更改計画`spending.renewalPlans`、年度`staffContracts`費の一意な見積。承認上限は`max(既存契約/提示の最終年, budgetSeason+7)`で、calendar seasonを代入しない。policyは必須引数、実験候補に本番既定の適正値を付けない。
 
 - [ ] `test_plan6000_offer5000_accept5000_replaces_reserve`で計画/提示/確定が6000→5000→5000となり、二重消費0を確認。取消で6000へ戻るケースもRED。
 - [ ] `test_next_year_seven_year_renewal_checks_2033`で2026期中更改が2027〜2033を審査し、2033だけ不足なら拒否、元state不変を確認する。
+- [ ] `test_offseason_budget_horizon_covers_next_season_seven_year_renewal`で2026オフの`season=2026 / budgetSeason=2027`から2034年までauthorizations/budgetPolicies/rosterRequirementsを揃える。翌2027年中の2028〜2034年更改を全年度審査し、2034年だけ不足なら拒否する。最終年の承認行/人数計画行の欠損も0補完せず拒否する（C13）。実際の春越えを含む同ケースはTask 10で接続し、春のauthorizations再生成を解決策にしない。
 - [ ] 年度/球団行の重複、missing/0、赤字合法取引、スタッフの年度一意費、未知FA行使歴の`legacy-conservative-max`をREDで作る。
 - [ ] 既存`quoteAnnualSpendingPlan/assessAnnualSpendingChange`へ不足区分を加え、既存最低維持費/正式留保と同じ選手を重複計上しない。nativeの初回/反復率は維持する。
 - [ ] `npx vitest run src/engine/__tests__/annualBudgetPolicy.test.js src/engine/__tests__/annualSpending.test.js src/engine/__tests__/annualRenewalTransactions.test.js src/engine/__tests__/faCompensationSpending.test.js`をGREEN、CI。
 
-**受入:** 許可額・確定負担・計画・正式留保が別表示可能。全年度審査と赤字非悪化条件を保持。旧nextClubBudgetを呼ばない。
+**受入:** 許可額・確定負担・計画・正式留保が別表示可能。budgetSeason基準で翌シーズンの最長更改年度まで準備し、全年度審査と赤字非悪化条件を保持。旧nextClubBudgetを呼ばない。
 
 ## Task 4: A1-1d 保存と移行candidate
 
 **Files:** Create `src/engine/economyPersistence.js`, `src/engine/economyActivation.js`, `tests/economy-save-migration.test.js`, `e2e/economy-migration.spec.js`; modify `src/engine/economyMigration.js`, `src/engine/saveload.js`, `src/hooks/useGameState.js`, `src/hooks/gameStateReducer.js`, `src/App.jsx`。storage fence/activation anchorは既存`baseballManagerDb.js`を拡張したテストharnessで確認するが通常DB versionはまだ5。保存/hydrationと移行anchorが大きければ本Taskを2PRに分け、両方ゲートOFFで保つ。
 
-**Interfaces:** `commitEconomyCandidate(candidate,expected)`、mode/schema/epoch付き保存・原子的hydration、移行`applied/deferred`。dirtyScopesと既存archive/career/farmのreceiptを保存候補に残す。
+**Interfaces:** `commitEconomyCandidate(candidate,expected)`、mode/schema/epoch付き保存・原子的hydration、移行`applied/deferred`。成功時の`committed`は公開root由来のsaveId/epoch/revision/rootSignature/receiptIdsを返し、候補との一致が採用条件。通常保存と共通のbarrier内でannual確定保存を置換不可とし、既存の待機payloadをまとめる経路へそのまま渡さない。dirtyScopesと既存archive/career/farmのreceiptを保存候補に残す。
 
 - [ ] `test_failed_publish_preserves_old_world_primary_and_backups`、`test_reload_resave_then_accept_keeps_engine`、`test_annual_payload_cannot_downgrade_to_legacy`をRED。
 - [ ] 既にオフ開始/境界不明/旧回答未解決/スタッフ未確定は`deferred`、進行中の旧年は旧式で完走する。移行済み同IDの2回目はno-opとするテストを作る。
 - [ ] 保存中のロスター編集/新規初期化/削除の直列化、saveId/epoch/revision競合、inline/大root/バックアップ復旧をREDで固定する。
+- [ ] `test_pending_economy_commit_cannot_be_replaced_by_normal_save`でA実行中→B契約候補→C旧snapshotを自動/手動保存の両方から起こし、B未公開の成功0、採用後の旧C上書き0、保存/メモリのrevision・取引receipt一致を確認する（S15）。既存の実行中/待機中保存を待ってから最新worldを再検証し、Cは採用後に破棄/再構築する。
+- [ ] `test_commit_ack_requires_published_candidate_identity`でCの`ok:true`、別saveId/epoch/revision/receipt/root署名をBの成功へ流用できないことをRED。dirty解除/pendingCareerEntries/archive receiptの成功処理も公開候補との一致を必要とする。公開→採用間で通常保存を差し込み、barrierが採用/復旧まで保持されることと、冷起動で同じ契約を復元することも確認する。要求引数を写しただけの応答を公開証拠にしない。
 - [ ] `test_corrupt_annual_primary_never_auto_loads_legacy_backup`、prepared anchorのpublish前/後、公開後anchor確定I/O失敗、削除/別saveIdのケースをRED。判別できない破損は非破壊で停止する。
 - [ ] 読込時は候補検証だけ、境界保存成功後に一括publish/adoptする。既存の削除/競合/容量対策を利用し、保存エンジンを並立させない。
 - [ ] `npx vitest run tests/economy-save-migration.test.js`と`npm run test:e2e -- economy-migration.spec.js --workers=1 --retries=0`を両browserでGREEN。既存save/career/farm回帰とCI。
 
-**受入:** 新旧混在rootなし、未知schemaは拒否、未記録値の0補完なし、再読込/再保存/回答待ちを保持。製品での切替はまだ不可。
+**受入:** 新旧混在rootなし、未知schemaは拒否、未記録値の0補完なし、再読込/再保存/回答待ちを保持。確定保存の置換0、公開候補以外の成功採用0、採用後の旧snapshot保存0。製品での切替はまだ不可。
 
 ## Task 5: A1-2a 人の更改とFA
 
@@ -119,6 +123,7 @@
 - [ ] `test_2026_renewal_does_not_replace_2026_salary`で今季10000、2027年から12000×3を確認。正式提示2件の予算競合、差替え/取消、回答時最新余力/枠/期限をRED。
 - [ ] `reject-renewal`の本人拒否をcancelledと区別し、現在salary/所属と未更改計画を保持したまま正式提示を解放する試験をRED。
 - [ ] `test_july1_salary10000_three_year_acquisition_is_5000_10000_10000`、期中自由契約/外国人の7/31と8/1、オフの将来sign/加入待ちをRED。
+- [ ] `test_august_scheduler_accepts_renewal_but_expires_acquisition`で同じ8/1のdueに、更改は翌2/1効力で受諾、FA新規獲得は期限切れとして留保解放する。11/30の更改受諾、7/31当日の登録可能も確認し、今季salary/所属は更改で変えない（S16）。既存`annualRenewalTransactions.test.js`の8/1・11/30受諾を維持する。
 - [ ] `test_unsupported_clauses_cannot_improve_new_offer`、旧contractIncentivesがsave/reload後も残るケースをRED。salaryDemandの実績補正とは分離する。
 - [ ] UIから共通quote/reduce/commitを使い、annualの旧salary×years控除/旧返信effect/局所Mapだけの正式提示を廃止する。交渉の見た目を全面変更しない。
 - [ ] 新規対象テスト、既存contract/market/renewal回帰と対象E2EをGREEN、CI。
@@ -190,12 +195,13 @@
 **Interfaces:** `prepareAnnualRollover(world,{targetSeason,transitionId}) -> candidate/blockedReasons`、`advanceEconomyDecisions`、protocolVersion/mode/saveId/epoch/baseRevisionを伴うWorker往復。
 
 - [ ] 同じ2026オフ→2027候補を再実行して、`expect(authorizations).toEqual(originalApproved)`、salary期間/加齢/加入/収入receiptが1回のみとなる試験をRED。
+- [ ] C13の実hook経路で、2026オフに2034年まで承認→2027春も承認行不変→2027期中に2028〜2034年の7年更改を確認する。2034年だけ不足する場合は最新審査で拒否し、春/通常更改の予算追加で通さない。
 - [ ] 期中更改済み、未回答、FA競合/人的/新人加入の順序入替、再読込後join、保存失敗→同じ抽選結果で再試行をRED。
 - [ ] `test_closing_year_growth_precedes_demands_and_excludes_new_rookies`、旧移行初年の旧コーチ/選手集合、翌年スタッフが前年成長へ影響しないケースをRED。成長/退職はopen-offseason、春に再実行しない。
 - [ ] `test_failed_rollover_cold_reload_rebuilds_same_draws_and_ids`をRED。既存utilsを任意source付きで再利用するscoped乱数/UIDを注入し、グローバルMath.randomの一時差替えを使わない。
 - [ ] 期限後の保有戦力不足を再配置で解消できないfixtureは、明示の不戦敗/双方不成立で日次が進み、個人成績/給与/許可を捏造しないことをRED。収支の固定額/round一回配賦、順位/履歴/保存/両browserまで検証する。不戦経路が大きければ別のゲートOFF PRとする。
 - [ ] 日本シリーズ8戦目の双方負傷fixtureは0-0をseries結果へ渡さず、非試合休養tick→同じ試合再検査で回復することをRED。series試合数/実暦契約日/公式戦収支を二重に進めない。全回復後も成立不能なデータは初期化/移行/任意取引で拒否する。
-- [ ] 通常/戦術/単日/まとめ/Workerで同じ取引とdueを処理し、古いrevision/未知protocol/engine欠損を拒否する試験をRED。
+- [ ] 通常/戦術/単日/まとめ/Workerで同じ取引とdueを処理し、古いrevision/未知protocol/engine欠損を拒否する試験をRED。S16の8/1境界を日次/まとめでも通し、新規獲得だけを期限切れにして更改回答を落とさない。
 - [ ] 新年度builderは旧`nextClubBudget/remainingContractAfterSeason`を呼ばず、未来契約投影→clock→join→年次処理→全体検証→保存の順で組む。legacy分岐は維持する。
 - [ ] 新規対象、既存offseason/save/Worker/batch回帰、年度journey E2EをGREEN、CI。通常の新規ゲームはまだlegacy。
 
