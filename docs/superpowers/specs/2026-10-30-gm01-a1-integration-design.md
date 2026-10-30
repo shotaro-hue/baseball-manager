@@ -88,7 +88,7 @@ annual向けに旧`upd`/UIからsalary、契約年数、budgetを直接更新す
 - 新規ゲームは開幕前、以後はポストシーズン終了後・最初の更改/補強の前に翌年度枠を決める。春は枠を再生成しない。
 - 原資は現行プロフィール/実測の**給与前**運営差額と支援方針。親設計5.3に従い、`TEAM_DEFS.budget`や旧`nextClubBudget`の結果を許可総額へ改名しない。「基礎予算＋運営差額60%−給与」を新枠に転用しない。
 - `budgetPolicies`へpolicyVersion、入力の記録有無、対象年度、給与前収益見込み、支援、増減制限、approved、理由を保存する。将来は審査用見込みであって支給保証ではないと表示する。
-- 当年度から`max(既存契約/提示の最終年, season+7)`まで必要な承認行を用意する。シーズン中の翌年開始7年更改の最終年も落とさない。3年だけを審査する実装は禁止。
+- 支出審査対象の`budgetSeason`から`max(既存契約/提示の最終年, budgetSeason+7)`まで、`authorizations / budgetPolicies / rosterRequirements`を同じ範囲で用意する。承認額だけ延長して最低人数の予算行を欠かせない。ここで基準にするのはcalendarの`clock.season`ではない。新規2026年は2033年まで、2026年オフは`clock.season=2026 / budgetSeason=2027`なので2034年までをオフ開始の承認receiptで準備する。これにより春の再配布なしで、2027年中に合意する2028〜2034年の7年更改も審査できる。既存契約/提示がさらに先まであればその最終年まで必要。3年だけを審査する実装は禁止。
 - 通常取引中はauthorizationsを変更しない。年度境界での再審査は専用receipt付き操作で行い、既存負担を消さない。下振れで赤字になっても契約は履行し、新しい任意支出を止める。
 - 配分率50/65/80%、平滑化1/3年、通常増減上限10/15%は**実験候補**。支援額もA1-4の12球団静的表→1seed×3年→3seed×10年で選ぶ。テスト内の固定許可額は本番係数の根拠にしない。
 - 初版は当年の通常収益を追加配分しない。`applyClubGameFinance`は収支だけを進め、annualのbudget投影を増やさない。ポスティング/引退試合等も独立収支receiptへ記録し、翌年度審査の入力にする。旧ルールの当年は維持する。
@@ -126,7 +126,7 @@ toAnnualState(world) -> AnnualStateV2
 quoteEconomyCommand(world, command) -> {ok, rows, effects, error?}
 reduceEconomyCommand(world, command) -> {ok, world, replayed, error?}
 commitEconomyCandidate(candidate, {saveId, epoch, baseRevision, progressToken, sessionToken})
-  -> Promise<{ok, world?, error?, retryable?}>
+  -> Promise<{ok, world?, committed?, error?, retryable?}>
 ```
 
 `quote`は乱数・UID生成・メール送信・state変更・保存を行わない。UIは同じIDのcommandを保持し、確定時は最新worldで再検証する。ID再利用で条件が異なれば拒否、同一command再実行は同じ結果。失敗は入力worldの参照/JSON/所属/費用を維持する。
@@ -137,12 +137,14 @@ commitEconomyCandidate(candidate, {saveId, epoch, baseRevision, progressToken, s
 
 1. UI/CPUが意思決定を作り、結果の乱数・提示ID・回答時点を固定する。quote内では生成しない。
 2. 最新saveId/epoch/revisionでcommandを純粋適用し、契約・配置・市場・留保・枠・回答状態・receiptを一つのcandidateにする。
-3. userの契約確定/年度移行はcandidateを保存し、**保存成功後だけ**単一Reducer actionで採用する。通知/履歴UIの成功表示もその後。失敗時は旧world/旧rootのまま同じcommandで再試行できる。
+3. userの契約確定/年度移行はcandidateを保存し、**そのcandidateの公開成功を確認した後だけ**単一Reducer actionで採用する。成功応答の`committed`は、実際に公開したrootの`saveId / epoch / revision / rootSignature / receiptIds`を示し、要求した候補と一致することを検証する。要求引数を応答へコピーするだけ、別snapshotの`ok:true`だけでは採用しない。dirty状態の解除やpendingCareerEntries/archive receiptの成功処理も、対応する公開候補を確認してから行う。通知/履歴UIの成功表示は採用後。未公開の失敗時は旧world/旧rootのまま同じcommandで再試行できる。
 4. CPU/日次/まとめは内部の複数commandを同じ純粋candidateで処理し、受理する進行単位でまとめて1回保存する。選手1人ごとに保存しない。annualではまとめ結果も保存成功前に採用しない。
-5. 保存中は同じworldへの進行・取引・ロスター編集を直列化する。読み取りは可能。既存のprogress/session tokenも検査し、ロード・削除・別タブ変更を跨ぐ候補は採用しない。
+5. 同じworldへの進行・取引・ロスター編集と、**自動保存・手動保存を含む全保存要求**を共通barrierで直列化する。確定保存の開始前に既存の実行中/待機中保存を完了させ、最新worldのsaveId/epoch/revisionを再検証する。barrierはroot公開の確認から候補採用、または公開済みrootの復旧まで保持する。待機中に旧worldから作られた通常保存snapshotは破棄するか、barrier解放後の採用済みworldから作り直し、そのまま後追い保存しない。読み取りは可能。既存のprogress/session tokenも検査し、ロード・削除・別タブ変更を跨ぐ候補は採用しない。
 6. publish済みrootとメモリの採用に割込みが起きた場合は、そのrootを再読込して整合させる。publish済みを失敗前worldで上書きしない。保存待ち中の新規ゲーム/削除は既存barrierに参加させる。
 
-保存技術は既存`saveGame/enqueueSaveGame`、世代root、root body、career/farm/archive receipt、バックアップ、競合排除を再利用する。金融処理だけの別localStorage財布は作らない。
+世代root、root body、career/farm/archive receipt、バックアップ、競合排除は既存`saveGame`を再利用する。ただし現行`enqueueSaveGame`の待機payload置換を、annualの契約/進行/年度移行の確定保存にそのまま使わない。`createSaveRequestQueue`はBの待機中にCが来るとBを置換し、Bの呼出元にもCの結果を返す。annualの確定保存は共通barrier内の**置換不可の保存要求**として実行し、通常保存もこのbarrierを経由させる。legacyの通常保存をまとめる挙動は維持してよい。別の保存エンジンやlocalStorage財布は作らない。
+
+必須の競合例は「通常保存A実行中→契約候補B待機→旧worldの自動/手動保存C」。Bが未公開ならBの確定成功/採用を返さず、公開した場合はBのrevision/receiptを保存とメモリの双方に残す。CがBを置換することも、採用後に旧worldを上書きすることも許さない。公開成功と候補採用の間で停止/再読込した場合は手順6の復旧を使い、barrierを早期解放しない。
 
 ### 4.3 抽選・IDと保存失敗の再試行
 
@@ -161,7 +163,8 @@ algorithmVersion 1は既存`faSeasonDraw`のFNV-1a/32bit finalizerによる決�
 - 初版のオフはゲーム用の固定暦日`Y-12-01`と、永続化した`offseasonTurn`を使う。現在エンジンの「date.year===season」を維持する。翌1月を年Yのdateとして捏造しない。オフの返答待ちは「日」ではなく「ターン」で表示し、同日受諾が許される既存APIにtick順序を加える。厳密な現実のFA日程再現ではない。
 - `decisions`はproposalId、固定した評価/乱数結果、dueDateまたはdueTurn、deadline、statusを保持。mailboxは表示で、メール1000件切捨てが未回答債務を消さない。
 - 日次/まとめの各境界、オフのターン進行で同じschedulerを呼ぶ。dueより先にまとめが終了しない。受諾直前にも所有/予算/枠/期限を再検査する。
-- 期中は7/31の登録期限以降に新受諾しない。未回答は期限切れ/取消で留保解放し、遡及加入しない。オフは新規提示30ターンまで、各回答は提示後最大7ターン。市場終了操作は残る未受諾提示を理由付き失効にしてから進む。30ターンという値は初版の進行上限で、受諾率の校正値ではない。
+- 期中の新規獲得・支配下転換等、当年の登録期限を要する操作は**7/31当日まで許可し、8/1以降は確定しない**。未回答の新規獲得オファーは期限切れ/取消で留保を解放し、遡及加入しない。この登録期限を翌年度更改へ適用しない。更改は固有のdue/回答期限、現在契約・所属・予算を審査し、8/1・11/30の受諾も可能とする。受諾しても今季salary/所属は変えず、翌2/1から効く。同じ8/1のschedulerで、更改受諾と新規FA獲得の期限切れを別々に処理する。
+- オフは新規提示30ターンまで、各回答は提示後最大7ターン。市場終了操作は残る未受諾提示を理由付き失効にしてから進む。30ターンという値は初版の進行上限で、受諾率の校正値ではない。
 - 回答待ち、契約確定、効力発生、加入待ちは別status。旧`contractReplies`の給与書換えeffectはannualで実行しない。
 
 ## 5. 不足している契約操作の仕様
@@ -330,6 +333,6 @@ preparedの参照は既存root/body/chunk回収の保護対象に加える。act
 
 これらは実装インターフェースの空欄ではなく、測定後に選ぶpolicy/リリース判定である。A1-1は明示policyを注入したfixtureで実装できる。有効化PRに未決のまま持ち込まない。
 
-親設計5/6の年度枠・月割り・正本・経過条項を継承する。初版に追加する仕様は、legacy-opening/保証不明、冬のdepartures、未更改計画、worldの保存先行、オフturn、旧市場の分類不能保全、保守的補償率、storage epoch/activation anchor、操作別乱数、不可避な試合不能の明示結果である。理由はいずれも現行APIの入力/保存/日付/進行制約との不整合を防ぐため。[接続監査](../../design/gm-01-a1-0/audit.md)のF01〜F12と進行経路R21〜R23へ対応する。
+親設計5/6の年度枠・月割り・正本・経過条項を継承する。初版に追加する仕様は、legacy-opening/保証不明、冬のdepartures、未更改計画、worldの保存先行、オフturn、旧市場の分類不能保全、保守的補償率、storage epoch/activation anchor、操作別乱数、不可避な試合不能の明示結果である。理由はいずれも現行APIの入力/保存/日付/進行制約との不整合を防ぐため。[接続監査](../../design/gm-01-a1-0/audit.md)のF01〜F15と進行経路R21〜R23へ対応する。#516レビュー追補で、確定保存の非置換/公開証明、budgetSeason基準の承認範囲、更改と新規登録の期限分離を明文化した。これらも後続実装の受入条件であり、この文書修正で本番実装済みにはならない。
 
 旧SPECのbudget加算/春再配布/旧更改はlegacyの完走仕様として残す。C-2E〜G-2の「hook/CPU/Worker/旧保存は未接続」は基準mainの事実で、本設計を置いても実装済みにはならない。FA件数/厳密な制度日程、スカウト時計、出来高/代理人の詳細は後続であり、A1の完成をそれらの完成と同一視しない。
