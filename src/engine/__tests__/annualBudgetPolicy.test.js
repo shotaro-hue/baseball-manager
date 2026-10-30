@@ -93,7 +93,7 @@ describe('explicit budget policy, no live calibration',()=>{
   });
   it('smooths observations and bounds changes using explicit prior approvals',async()=>{
     const {quoteAnnualBudgetPolicy:quote}=await policyModule(),w=economyFixture(),p=policy(w);p.smoothingYears=3;
-    p.forecasts.forEach(f=>{f.operatingSurplusesManYen=[20000,40000,60000];f.previousApprovedManYen=10000;});
+    p.forecasts.forEach(f=>{f.operatingSurplusesManYen=[20000,40000,60000];f.previousApprovedManYen=f.season===2026?10000:null;});
     expect(quote(w,p).authorizations[0].approvedManYen).toBe(11000);
     p.forecasts.forEach(f=>f.operatingSurplusesManYen=[-10000,-20000,-30000]);
     expect(quote(w,p).authorizations[0].approvedManYen).toBe(9000);
@@ -151,7 +151,7 @@ describe('policy boundary and restore regression',()=>{
   it('uses the offseason approval in a 2027 fixture and rejects only 2034 shortfall',async()=>{
     const {quoteAnnualBudgetPolicy:quote}=await policyModule(),old=economyFixture();
     old.contractEconomy.clock={season:2026,phase:'offseason',date:'2026-12-01',offseasonTurn:0};old.contractEconomy.engine.spending.budgetSeason=2027;
-    const p=policy(old,2027);p.forecasts.find(r=>r.teamId===0&&r.season===2034).operatingSurplusesManYen=[61758];
+    const p=policy(old,2027);p.maxChangePercent=100;p.forecasts.find(r=>r.teamId===0&&r.season===2034).operatingSurplusesManYen=[61758];
     const q=quote(old,p);
     // A spring envelope fixture, not the future production rollover builder.
     let w=createAnnualNewGameWorld({teams:old.teams,faPool:[],myId:0,saveId:'spring',season:2027,policy:q,randomRoot:{algorithmVersion:1,seed:'spring'}});
