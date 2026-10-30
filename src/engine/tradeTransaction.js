@@ -4,6 +4,22 @@ import { marketPlacement } from './marketRoster';
 import { evaluateRosterCapacity, isIkuseiPlayer } from './rosterCapacity';
 import { pruneRosterReferences } from './offseasonReview';
 
+// Shared departure cleanup for ordinary trades and opt-in FA personnel moves.
+export function removeDepartingPlayers(team, removedIds) {
+  const next = { ...team, players: (team.players || []).filter(p => !removedIds.has(p.id)),
+    farm: (team.farm || []).filter(p => !removedIds.has(p.id)), ...pruneRosterReferences(team, removedIds) };
+  const removedKeys = new Set([...removedIds].map(String));
+  for (const key of ['fieldingNoDh', 'fieldingDh']) {
+    if (team[key]) next[key] = Object.fromEntries(Object.entries(team[key]).filter(([id]) => !removedKeys.has(id)));
+  }
+  if (team.pitchingPattern) {
+    const pattern = team.pitchingPattern, retain = id => removedIds.has(id) ? null : id;
+    next.pitchingPattern = { ...pattern, closerId: retain(pattern.closerId), setupId: retain(pattern.setupId),
+      seventhId: retain(pattern.seventhId), middleOrder: (pattern.middleOrder || []).filter(id => !removedIds.has(id)) };
+  }
+  return next;
+}
+
 // cash is signed 万円: positive means fromId pays toId. No state or effects
 // are committed until both clubs pass. Offer copies are only ID selectors.
 export function projectTradeRosters(teams, { fromId, toId, outgoing, incoming }, draftContext = {}) {
@@ -24,18 +40,7 @@ export function projectTradeRosters(teams, { fromId, toId, outgoing, incoming },
   if ([...sent, ...received].some(p => !p)) return fail('選手の所属が変わっています。条件を選び直してください');
   const exchange = (team, removed, added) => {
     const removedIds = new Set(removed.map(p => p.id));
-    const next = { ...team, players: (team.players || []).filter(p => !removedIds.has(p.id)),
-      farm: (team.farm || []).filter(p => !removedIds.has(p.id)), ...pruneRosterReferences(team, removedIds) };
-    const removedKeys = new Set([...removedIds].map(String));
-    for (const key of ['fieldingNoDh', 'fieldingDh']) {
-      if (team[key]) next[key] = Object.fromEntries(Object.entries(team[key]).filter(([id]) => !removedKeys.has(id)));
-    }
-    if (team.pitchingPattern) {
-      const pattern = team.pitchingPattern;
-      const retain = id => removedIds.has(id) ? null : id;
-      next.pitchingPattern = { ...pattern, closerId: retain(pattern.closerId), setupId: retain(pattern.setupId),
-        seventhId: retain(pattern.seventhId), middleOrder: (pattern.middleOrder || []).filter(id => !removedIds.has(id)) };
-    }
+    const next = removeDepartingPlayers(team, removedIds);
     for (const player of added) {
       const farm = isIkuseiPlayer(player) || (player.injuryDaysLeft ?? 0) > 0 || (player.registrationCooldownDays ?? 0) > 0 || marketPlacement(next, player).farm;
       if (farm) next.farm.push(player);
