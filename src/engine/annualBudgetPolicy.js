@@ -23,11 +23,15 @@ function approval(input, policy, precedingApproved) {
     || !Number.isInteger(smoothingYears) || smoothingYears < 1 || smoothingYears > 3
     || !['profile', 'observed'].includes(input.source) || !Array.isArray(input.operatingSurplusesManYen)
     || input.operatingSurplusesManYen.length !== smoothingYears || !input.operatingSurplusesManYen.every(Number.isSafeInteger)
-    || !money(input.supportManYen) || !(input.previousApprovedManYen === null || money(input.previousApprovedManYen))) fail();
+    || !money(input.supportManYen) || !(input.previousApprovedManYen === null || money(input.previousApprovedManYen))
+    || (precedingApproved !== undefined && input.previousApprovedManYen !== null
+      && input.previousApprovedManYen !== precedingApproved)) fail();
+  // Future null baselines inherit the immediately preceding forecast.
+  const effectivePrevious=precedingApproved === undefined ? input.previousApprovedManYen : precedingApproved;
   const total = input.operatingSurplusesManYen.reduce((a,n)=>a+BigInt(n),0n);
   let amount = (total > 0n ? total : 0n) * BigInt(allocationPercent) / BigInt(100 * smoothingYears) + BigInt(input.supportManYen);
-  if (input.previousApprovedManYen !== null) {
-    const prior=BigInt(input.previousApprovedManYen), lower=(prior*BigInt(100-maxChangePercent)+99n)/100n, upper=prior*BigInt(100+maxChangePercent)/100n;
+  if (effectivePrevious !== null) {
+    const prior=BigInt(effectivePrevious), lower=(prior*BigInt(100-maxChangePercent)+99n)/100n, upper=prior*BigInt(100+maxChangePercent)/100n;
     amount = amount < lower ? lower : amount > upper ? upper : amount;
   }
   if (amount > BigInt(Number.MAX_SAFE_INTEGER)) fail();
