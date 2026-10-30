@@ -440,6 +440,10 @@ A/Bの国内FA・海外FAによるNPB内移籍には、任意の`marketEntry.com
 
 制度根拠は選手会公開2009年FA規約第10条3・4を画像で確認。現行最新版の取得とは区別する。一括裁定、0〜28名、契約確定後の実行、期限自動管理を伴わないことはゲーム側の簡略化。新制度のCPU・UI・hook/Worker・保存移行/年度更新、FA獲得上限・海外離脱は後続。[設計](./docs/superpowers/specs/2026-10-30-gm01c2g2-fa-personnel-design.md)／[検証と限界](./docs/validation/gm-01c-2g2/README.md)。
 
+#### GM-01 A1-0 本番接続監査・切替設計（設計のみ）
+
+#515マージ済みmain `b255d2c2482dd50cba49f9620405e669c7f159b5`の[現行接続監査](./docs/design/gm-01-a1-0/audit.md)、[A1接続設計](./docs/superpowers/specs/2026-10-30-gm01-a1-integration-design.md)、[後続PR計画](./docs/superpowers/plans/2026-10-30-gm01-a1-integration.md)、[検証マトリクス](./docs/validation/gm-01-a1-0/README.md)を追加した。これは後続仕様で、現在の新基盤を本番有効化する変更ではない。旧budget/給与更新/春のnextClubBudgetはlegacyの現行処理として残る。将来のannualでは新台帳と年度許可を正本にし、保存単位で排他的に切り替える。読込だけで移行せず、進行中シーズンと開始済みオフは旧方式を完走し、次の未開始オフで全主体を一括移行する。係数・実機・長期検証は有効化前の必須ゲートであり未完了。
+
 #### オファースコア計算（0〜100）
 
 各要素を加算し合計が **55 以上** で契約成立。
