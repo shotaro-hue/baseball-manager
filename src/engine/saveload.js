@@ -59,8 +59,7 @@ const MAX_RECENT_CAREER_LOG_YEARS = 3;
 
 export function createSaveRequestQueue(saveImpl) {
   let isSaving = false;
-  let queuedPayload = null;
-  let queuedListeners = [];
+  const pending = [];
   const inheritOptions = (older, newer) => {
     const a=older.options.dirtyScopes,b=newer.options.dirtyScopes;
     const options={...newer.options,dirtyScopes:Array.isArray(a)&&Array.isArray(b)?[...new Set([...a,...b])]:undefined};
@@ -71,7 +70,7 @@ export function createSaveRequestQueue(saveImpl) {
     return {...newer,options};
   };
 
-  const runSave = async (payload, listeners = []) => {
+  const runSave = async (payload, listeners = [], coalesce = true) => {
     isSaving = true;
     let succeeded = false;
     try {
@@ -84,36 +83,39 @@ export function createSaveRequestQueue(saveImpl) {
       throw error;
     } finally {
       isSaving = false;
-      if (queuedPayload !== null) {
-        let nextPayload = queuedPayload;
-        if (!succeeded && payload?.options && nextPayload?.options) {
+      if (pending.length) {
+        const next = pending.shift();
+        let nextPayload = next.payload;
+        if (!succeeded && coalesce && next.coalesce && payload?.options && nextPayload?.options) {
           nextPayload = inheritOptions(payload,nextPayload);
         }
-        const nextListeners = queuedListeners;
-        queuedPayload = null;
-        queuedListeners = [];
-        void runSave(nextPayload, nextListeners).catch(() => {});
+        void runSave(nextPayload, next.listeners, next.coalesce).catch(() => {});
       }
     }
   };
 
   return {
-    enqueue(payload) {
-      if (!isSaving && queuedPayload === null) {
-        return runSave(payload);
+    enqueue(payload, { coalesce = true } = {}) {
+      if (!isSaving && !pending.length) {
+        return runSave(payload, [], coalesce);
       }
       return new Promise((resolve, reject) => {
-        if (queuedPayload?.options && payload?.options) {
-          payload = inheritOptions(queuedPayload,payload);
+        const tail = pending.at(-1);
+        // Only adjacent normal requests may share a payload/result. Protected
+        // candidates retain their FIFO position, options and own completion.
+        if (coalesce && tail?.coalesce) {
+          if (tail.payload?.options && payload?.options) payload = inheritOptions(tail.payload, payload);
+          tail.payload = payload;
+          tail.listeners.push({ resolve, reject });
+        } else {
+          pending.push({ payload, coalesce, listeners: [{ resolve, reject }] });
         }
-        queuedPayload = payload;
-        queuedListeners.push({ resolve, reject });
       });
     },
     getSnapshot() {
       return {
         isSaving,
-        hasQueuedSave: queuedPayload !== null,
+        hasQueuedSave: pending.length > 0,
       };
     },
   };
@@ -861,7 +863,16 @@ async function cleanupSaveChunks(options) {
   });
 }
 export function saveGame(state, options = {}) {
-  try { return saveOwnedSnapshot(structuredClone(state), structuredClone(options)); }
+  return enqueueSaveSnapshot(state, options, false);
+}
+function enqueueSaveSnapshot(state, options, coalesce) {
+  try {
+    const snapshot = structuredClone(state);
+    return sharedSaveQueue.enqueue({ state: snapshot, options: structuredClone(options),
+      deletionEpoch: deletionEpochs.get(localStorage) ?? 0 },
+    // Do not hide invalid/unknown envelopes by replacing them with a later save.
+    { coalesce: coalesce && snapshot?.contractEconomy === undefined });
+  }
   catch (error) { return Promise.resolve(failedSave('snapshot_failed', 'snapshot', 'structuredClone', error)); }
 }
 function saveOwnedSnapshot(snapshot, safeOptions, deletionEpoch = deletionEpochs.get(localStorage) ?? 0) {
@@ -901,8 +912,7 @@ function saveOwnedSnapshot(snapshot, safeOptions, deletionEpoch = deletionEpochs
 const sharedSaveQueue = createSaveRequestQueue(({ state, options, deletionEpoch }) => saveOwnedSnapshot(state, options, deletionEpoch));
 
 export function enqueueSaveGame(state, options = {}) {
-  try { return sharedSaveQueue.enqueue({ state: structuredClone(state), options: structuredClone(options), deletionEpoch: deletionEpochs.get(localStorage) ?? 0 }); }
-  catch (error) { return Promise.resolve(failedSave('snapshot_failed', 'snapshot', 'structuredClone', error)); }
+  return enqueueSaveSnapshot(state, options, true);
 }
 
 function failedSave(reason, step, api, error) {

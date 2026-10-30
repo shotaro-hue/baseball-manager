@@ -8,14 +8,20 @@ for (const large of [false, true]) test(`save generations: annual world survives
   const initial = await page.evaluate(async large => {
     const { economyFixture, renewalEnvelope } = await import('/baseball-manager/src/engine/__tests__/fixtures/economyWorld.js');
     const { reduceEconomyCommand } = await import('/baseball-manager/src/engine/contractEconomy.js');
-    const { saveGame } = await import('/baseball-manager/src/engine/saveload.js');
+    const { saveGame, enqueueSaveGame } = await import('/baseball-manager/src/engine/saveload.js');
     const world = economyFixture(), offered = reduceEconomyCommand(world, renewalEnvelope(world)).world;
     if (large) offered.padding = 'large'.repeat(20000);
     offered.mailbox = [{ id: 'pending', type: 'contract_decision_pending', read: false }];
-    const saved = await saveGame(offered, { skipCompression: true });
-    return { saved, referenced: JSON.parse(localStorage.getItem('baseball_manager_v1')).rootBodyVersion === 1 };
+    const active = enqueueSaveGame(world, { skipCompression: true });
+    const economic = enqueueSaveGame(offered, { skipCompression: true });
+    const staleAuto = enqueueSaveGame(world, { skipCompression: true });
+    const staleManual = saveGame(world, { skipCompression: true });
+    const [, saved, autoResult, manualResult] = await Promise.all([active, economic, staleAuto, staleManual]);
+    return { saved, autoResult, manualResult, referenced: JSON.parse(localStorage.getItem('baseball_manager_v1')).rootBodyVersion === 1 };
   }, large);
   expect(initial.saved.ok).toBe(true); expect(initial.referenced).toBe(large);
+  expect(initial.autoResult).toMatchObject({ ok: false, reason: 'economy_revision_conflict' });
+  expect(initial.manualResult).toMatchObject({ ok: false, reason: 'economy_revision_conflict' });
   await page.reload();
   const result = await page.evaluate(async () => {
     const mod = await import('/baseball-manager/src/engine/saveload.js');
