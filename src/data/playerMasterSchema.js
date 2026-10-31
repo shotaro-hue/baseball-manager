@@ -29,14 +29,20 @@ function validateHistory(h, player) {
   } else if(number(h.IP))requireValue(Math.abs(h.IP*3-h.outs)<1e-7,fail('IP must equal exact outs / 3'));
 }
 
-export function compilePlayerMaster(master, {localImport=false} = {}) {
+export function compilePlayerMaster(master, {localImport=false,publicationDecision} = {}) {
+  const acknowledgedPublication=publicationDecision?.type==='maintainer-authorized-unconfirmed'
+    &&publicationDecision.scope==='bundled-opening-2026'
+    &&/^\d{4}-\d{2}-\d{2}$/.test(publicationDecision.date)
+    &&typeof publicationDecision.instruction==='string'&&publicationDecision.instruction.trim()
+    &&typeof publicationDecision.notice==='string'&&publicationDecision.notice.trim();
   requireValue(master?.schemaVersion===1&&master.asOf===AS_OF&&master.status==='verified','verified schema v1 / opening date required');
   requireValue(Array.isArray(master.players)&&master.players.length>=800,'complete population required');
   requireValue(Array.isArray(master.sources)&&master.sources.length>0,'sources required');
   const sources=new Set();
   for(const source of master.sources) {
     requireValue(source.id&&!sources.has(source.id)&&/^https?:\/\//.test(source.url),'unique source id and URL required');
-    if(!localImport)requireValue(source.redistribution==='cleared'&&typeof source.rightsEvidence==='string'&&source.rightsEvidence.trim(),'redistribution rights not cleared');
+    if(!localImport)requireValue((source.redistribution==='cleared'&&typeof source.rightsEvidence==='string'&&source.rightsEvidence.trim())
+      ||(acknowledgedPublication&&source.redistribution==='unconfirmed'),'redistribution rights not cleared');
     sources.add(source.id);
   }
   requireValue(Array.isArray(master.teams)&&master.teams.length===12&&new Set(master.teams.map(t=>t.teamId)).size===12,'12 independent team evidence rows required');
