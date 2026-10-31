@@ -540,6 +540,127 @@ export function useGameState() {
     return result;
   }, []);
 
+
+  // The storage service re-reads the published root. This binding is only for
+  // adopting that verified root; title hydration resets the session and must
+  // never be reused as a transaction success path.
+  const economyCommitBindings = useCallback(() => ({
+    readCurrent: () => ({
+      world: rosterCommandRef.current,
+      sessionToken: progressSessionRef.current,
+      progressToken: progressTokenRef.current,
+    }),
+    adopt: async (world, committed, canAdopt) => {
+      if (!canAdopt() || pendingEconomyAdoptionRef.current) return false;
+      const before = rosterCommandRef.current;
+      const expected = { saveId: before.saveId, epoch: before.contractEconomy?.epoch,
+        baseRevision: before.contractEconomy?.revision };
+      const action = { type: G.APPLY_ECONOMY_WORLD, world, expected };
+      const next = gameStateReducer(before, action);
+      if (next === before || next.contractEconomy?.revision !== committed.revision
+        || next.saveId !== committed.saveId || next.contractEconomy?.epoch !== committed.epoch
+        || JSON.stringify(next.contractEconomy.engine.transactions.map(row => row.id))
+          !== JSON.stringify(committed.receiptIds) || !canAdopt()) return false;
+      // Await the actual React state transition, not just a dispatched action
+      // or a ref assignment. The service keeps the native save lock meanwhile.
+      return new Promise(resolve => {
+        pendingEconomyAdoptionRef.current = { world, committed, resolve };
+        progressDispatch(action);
+      });
+    },
+  }), [progressDispatch]);
+
+  useEffect(() => {
+    const pending = pendingEconomyAdoptionRef.current;
+    if (!pending) return;
+    const { world, committed, resolve } = pending;
+    if (gameState.saveId !== committed.saveId
+      || gameState.contractEconomy?.epoch !== committed.epoch
+      || gameState.contractEconomy?.revision !== committed.revision
+      || gameState.teams !== world.teams
+      || JSON.stringify(gameState.contractEconomy?.engine?.transactions?.map(row => row.id))
+        !== JSON.stringify(committed.receiptIds)) return;
+    pendingEconomyAdoptionRef.current = null;
+    resolve(true);
+  }, [gameState]);
+
+  const finalizeEconomyCommit = useCallback(async (context, result) => {
+    const ack = result?.committed, next = context.world.contractEconomy;
+    if (!result?.ok || !ack || !/^[a-f0-9]{64}$/.test(ack.rootSignature)
+      || ack.saveId !== context.expected.saveId || ack.epoch !== context.expected.epoch
+      || ack.revision !== next.revision
+      || JSON.stringify(ack.receiptIds) !== JSON.stringify(next.engine.transactions.map(row => row.id)))
+      return { ok: false, reason: 'economy_ack_invalid' };
+    const persisted = new Set(context.pendingCareerEntries);
+    pendingCareerEntriesRef.current = pendingCareerEntriesRef.current.filter(entry => !persisted.has(entry));
+    const completed = saveDirtyTrackerRef.current.complete(context.dirtySnapshot);
+    if (completed.isCurrent) setSaveDirty(false);
+    setSaveExists(true);
+    const archive = await flushCommittedArchives(context.world);
+    const confirmed = { ...result, archive };
+    setSaveResult(confirmed);
+    return confirmed;
+  }, []);
+
+  // Internal annual-fixture transaction route. UI/CPU/Worker remain gated OFF
+  // until A1-2/A1-3 integrate all producers.
+  const commitEconomyCommand = useCallback(async command => {
+    if (economyCommitRef.current) return { ok: false, reason: 'economy_commit_pending' };
+    if (newGameInitializationRef.current || pendingSaveRequestsRef.current.size || isAutoSaveSuspended)
+      return { ok: false, reason: 'economy_operation_busy' };
+    const base = rosterCommandRef.current;
+    try { if (contractEconomyMode(base) !== 'annual') return { ok: false, reason: 'economy_not_active' }; }
+    catch { return { ok: false, reason: 'economy_candidate_invalid' }; }
+    const reduced = reduceEconomyCommand(base, command);
+    if (!reduced.ok) return { ok: false, reason: 'economy_command_invalid', error: reduced.error };
+    if (reduced.replayed) return { ok: true, replayed: true };
+    const expected = { saveId: base.saveId, epoch: base.contractEconomy.epoch,
+      baseRevision: base.contractEconomy.revision,
+      sessionToken: progressSessionRef.current, progressToken: progressTokenRef.current };
+    const dirtySnapshot = saveDirtyTrackerRef.current.snapshot({ persistAll: !saveExists });
+    const pendingCareerEntries = [...pendingCareerEntriesRef.current];
+    const world = { ...reduced.world, seasonHistory, saveRevision, ...getMatchHistorySnapshot() };
+    const context = { expected, dirtySnapshot, pendingCareerEntries, world, status: 'saving' };
+    economyCommitRef.current = context;
+    setSaveResult(null);
+    let result;
+    try {
+      const mod = await loadSaveModule();
+      const options = { careerEntries: structuredClone(pendingCareerEntries) };
+      if (Array.isArray(dirtySnapshot.dirtyScopes)) options.dirtyScopes = dirtySnapshot.dirtyScopes;
+      result = await mod.commitEconomyCandidate(world, expected, economyCommitBindings(), options);
+      if (result.ok) result = await finalizeEconomyCommit(context, result);
+      else if (result.reason === 'economy_adoption_required') context.status = 'recovery';
+    } catch {
+      result = { ok: false, reason: 'economy_commit_failed' };
+    } finally {
+      if (context.status !== 'recovery' && economyCommitRef.current === context) economyCommitRef.current = null;
+      refreshSaveQueueState();
+    }
+    if (!result.ok) setSaveResult(result);
+    return result;
+  }, [economyCommitBindings, finalizeEconomyCommit, getMatchHistorySnapshot, isAutoSaveSuspended,
+    refreshSaveQueueState, saveExists, saveRevision, seasonHistory]);
+
+  const recoverEconomyCommand = useCallback(async () => {
+    const context = economyCommitRef.current;
+    if (!context || context.status !== 'recovery') return { ok: false, reason: 'economy_recovery_unavailable' };
+    context.status = 'recovering';
+    let result;
+    try {
+      const mod = await loadSaveModule();
+      result = await mod.recoverEconomyCommit(context.expected, economyCommitBindings());
+      if (result.ok) result = await finalizeEconomyCommit(context, result);
+    } catch { result = { ok: false, reason: 'economy_adoption_required' }; }
+    finally {
+      if (result?.ok) economyCommitRef.current = null;
+      else context.status = 'recovery';
+      refreshSaveQueueState();
+    }
+    if (!result.ok) setSaveResult(result);
+    return result;
+  }, [economyCommitBindings, finalizeEconomyCommit, refreshSaveQueueState]);
+
   // gameDay が進んだとき、記者会見インターバルを超えていれば会見イベントをセット
   useEffect(()=>{
     if(!isTeamIdSet(myId) || gameDay <= 1 || gameDay > 143) return;
@@ -686,9 +807,10 @@ export function useGameState() {
 
   // オートセーブ（hubに戻った時）
   useEffect(()=>{
-    if(screen!=='hub' || isAutoSaveSuspended || !saveDirty || saveQueueState.isSaving) return;
+    if(screen!=='hub' || isAutoSaveSuspended || !saveDirty || saveQueueState.isSaving || economyCommitRef.current) return;
     const now = Date.now();
     loadSaveModule().then((mod)=>{
+      if (economyCommitRef.current) return { result: { ok: false, skipped: true }, snapshot: null };
       const intervalMs = mod.getAutoSaveIntervalMs();
       if (lastAutoSaveAt > 0 && now - lastAutoSaveAt < intervalMs) {
         return { result: { ok: false, skipped: true }, snapshot: null };
@@ -718,6 +840,7 @@ export function useGameState() {
   },[screen,isAutoSaveSuspended,saveDirty,lastAutoSaveAt,saveRevision,saveQueueState.isSaving]);
 
   const handleSave = useCallback(async (options = {})=>{
+    if (economyCommitRef.current) return { ok: false, reason: 'economy_commit_pending' };
     if (offseasonPlan && isAutoSaveSuspended && !options.payload) return { ok: false, reason: 'transition_in_progress' };
     const request = beginTrackedSave(options.saveOptions);
     if(options.careerEntries) request.options.careerEntries=options.careerEntries;
@@ -1237,6 +1360,7 @@ export function useGameState() {
     getLatestNewsId,
     markSaveDirty,
     hydrateSavedWorld, hydrateLargeSaveData, getMatchHistorySnapshot, hydrateMatchHistory, applyMatchResultPatch,
+    commitEconomyCommand, recoverEconomyCommand,
     resetSaveTracking,
     // derived
     myTeam,
