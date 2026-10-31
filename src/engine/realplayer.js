@@ -15,6 +15,14 @@ import { buildCareerLogSummary, compactCareerStats, getRecentCareerLog } from '.
 
 const GAME_START_YEAR = 2026;
 
+const openingContractEvidence=source=>source.reviewedEvidence?{
+  asOf:'2026-03-27',annualSalaryManYen:source.salary,salaryStatus:source.dataQuality.salary,
+  salaryBasis:source.salaryBasis,contractEndYear:source.contractEndYear,
+  contractStatus:source.dataQuality.contract,contractBasis:source.contractBasis,
+  ...(source.contractOption?{contractOption:source.contractOption}:{}),
+  evidence:source.reviewedEvidence,
+}:undefined;
+
 function applyRealPositionFields(player, source) {
   if (source.positions && !player.isPitcher) return {...player, positions:{...source.positions}, convertTarget:null};
   const result = applyPositionFields(player);
@@ -213,6 +221,7 @@ export function realBatterToPlayer(input, teamDef) {
     id: uid(), name, pos, age,
     realPlayerId: b.playerId, batHand: b.batHand, hand: b.hand,
     dataQuality: b.dataQuality, ratingsThrough: b.ratingsThrough, foreignQuotaStatus: b.foreignQuotaStatus,
+    openingContractEvidence:openingContractEvidence(b),
     potential: clamp(sc(OPS, 0.60, 1.05, 55, 96) + rng(-5, 8), 55, 99),
     isPitcher: false, isForeign,
     salary,
@@ -282,6 +291,7 @@ export function realPitcherToPlayer(input, teamDef) {
     id: uid(), name, pos, age,
     realPlayerId: p.playerId, batHand: p.batHand,
     dataQuality: p.dataQuality, ratingsThrough: p.ratingsThrough, foreignQuotaStatus: p.foreignQuotaStatus,
+    openingContractEvidence:openingContractEvidence(p),
     potential: clamp(sc(ERA, 5.5, 1.8, 55, 97) + rng(-5, 8), 55, 99),
     isPitcher: true, isForeign,
     hand,

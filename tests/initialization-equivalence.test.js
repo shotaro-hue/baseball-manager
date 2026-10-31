@@ -28,7 +28,7 @@ for (const seed of [7,42,20261009]) it('preserves complete generated data and ra
   expect(real).toHaveLength(445);expect(new Set(real.map(p=>p.realPlayerId)).size).toBe(445);
   expect(real.filter(p=>p.isIkusei).map(p=>p.name.replace(/\s+/g,' ')).sort()).toEqual(['平山 功太','福島 圭音']);
   for(const name of ['ビシエド','ソト'])expect(real.find(p=>p.name===name)).toMatchObject({
-    isForeign:false,foreignQuotaStatus:'exempt',dataQuality:{foreignQuota:'official-profile-reviewed'},
+    isForeign:false,foreignQuotaStatus:'exempt',dataQuality:{foreignQuota:'2025-official-domestic-FA-qualified'},
   });
   for(const p of real){expect(p.ratingsThrough).toBe(2025);expect(p.daysOnActiveRoster).toBe(0);expect(p.dataQuality.serviceTime).toBe('game-baseline-unknown');}
   const baselineCalls=calls();
@@ -39,8 +39,9 @@ for (const seed of [7,42,20261009]) it('preserves complete generated data and ra
   // removes randomized service time, adds source identity/confidence, and keeps
   // two development players outside the 65 controlled slots. Pin this new-game
   // baseline; saved games keep their existing payload and sync/async must match.
-  // The later domestic-FA exemption correction changes only three quota fields
-  // for Viciedo and Soto in each seed; see the retained quota-snapshot-audit.json.
+  // The reviewed facts update changes source IDs, provenance, salaries, contract
+  // terms and quota confidence only; all other fields and RNG counts are compared
+  // with merged main in reviewed-facts-snapshot-audit.json before repinning.
   expect({digest,calls:baselineCalls}).toMatchSnapshot();
   vi.restoreAllMocks();const asyncCalls=seedRandom(seed);
   expect(typeof bootstrap.createInitialTeamsAsync).toBe('function');

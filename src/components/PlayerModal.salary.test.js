@@ -13,6 +13,19 @@ it('distinguishes unverified real-world pay and pre-game service time from game 
  try {const value=text(view.root);expect(value).toContain('ゲーム設定');expect(value).toContain('開始前のFA登録日数は未確認');expect(value).not.toContain('国内FA 最短あと');}
  finally {act(()=>view.unmount());}
 });
+it('does not label a negotiated game salary as an opening-day media estimate',()=>{
+ const player={...fixture.teams[0].farm.find(p=>!p.isPitcher),salary:1200,contractSignedYear:2026,
+   dataQuality:{salary:'reported',contract:'game-assumption'},openingContractEvidence:{annualSalaryManYen:1000}};
+ let view;act(()=>{view=create(React.createElement(PlayerModal,{player,initialSection:'profile',onClose:()=>{}}));});
+ try {expect(text(view.root)).not.toContain('報道推定');expect(text(view.root)).not.toContain('実際の終了年は未確認');}
+ finally {act(()=>view.unmount());}
+});
+it('identifies an assumed end year separately from a reported annual salary',()=>{
+ const player={...fixture.teams[0].farm.find(p=>!p.isPitcher),dataQuality:{salary:'reported',contract:'game-assumption'}};
+ let view;act(()=>{view=create(React.createElement(PlayerModal,{player,initialSection:'profile',onClose:()=>{}}));});
+ try {expect(text(view.root)).toContain('報道推定');expect(text(view.root)).toContain('実際の終了年は未確認');}
+ finally {act(()=>view.unmount());}
+});
 it.each([{育成:true,isIkusei:false},{育成:false,isIkusei:true}])('shows the development contract category instead of FA eligibility in player details: %j',flags=>{
   const player={...fixture.teams[0].farm.find(p=>!p.isPitcher),...flags,daysOnActiveRoster:1080};
   let view;act(()=>{view=create(React.createElement(PlayerModal,{player,initialSection:'profile',onClose:()=>{}}));});
