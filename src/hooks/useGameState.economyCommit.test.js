@@ -35,12 +35,13 @@ async function setupAnnual() {
     return null;
   }
   await act(async () => { view = create(React.createElement(Harness)); });
-  act(() => expect(gs.hydrateSavedWorld(world, {
+  const loaded = await loadGame();
+  act(() => expect(gs.hydrateSavedWorld(loaded, {
     progressToken: gs.getProgressToken(), sessionToken: gs.getProgressSessionToken(),
   })).toBe(true));
   expect(gs.contractEconomy.revision).toBe(0);
   expect(gs.commitEconomyCommand).toBeTypeOf('function');
-  return world;
+  return loaded;
 }
 
 async function commitCommand(command, revision = 1) {
