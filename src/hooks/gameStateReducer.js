@@ -21,7 +21,7 @@ export const G = {
   ANSWER_INTERVIEW: 'ANSWER_INTERVIEW',
 };
 
-const domainFields = ['teams', 'gameDay', 'year', 'myId', 'saveId', 'farmCompetition', 'battedBallReceipt',
+const domainFields = ['teams', 'gameDay', 'year', 'myId', 'saveId', 'farmCompetition', 'farmCompetitionVersion', 'battedBallReceipt',
   'faPool', 'faYears', 'offseasonPlan', 'mailbox', 'news', 'schedule', 'contractEconomy'];
 const legacyWrites = new Set([G.APPLY_PROGRESS, G.SET_TEAMS, G.UPD_TEAM, G.SET_GAME_DAY, G.SET_YEAR,
   G.SET_MY_ID, G.SET_SAVE_ID, G.SET_FA_POOL, G.SET_FA_YEARS, G.SET_OFFSEASON_PLAN, G.SET_SCHEDULE,
@@ -103,7 +103,14 @@ export function gameStateReducer(state, action) {
           || world.contractEconomy?.epoch !== e.epoch || world.contractEconomy.revision !== e.revision + 1) return state;
         toAnnualState(world);
         validateEconomyClock(world, state);
-        return { ...state, ...Object.fromEntries(domainFields.map(k => [k, world[k]])) };
+        const next = { ...state };
+        // Absence is meaningful to save validators (e.g. an unmigrated farm).
+        // Do not manufacture present-but-undefined payloads on adoption.
+        for (const key of domainFields) {
+          if (Object.hasOwn(world, key)) next[key] = world[key];
+          else delete next[key];
+        }
+        return next;
       } catch { return state; }
     }
     case G.SET_NEWS:

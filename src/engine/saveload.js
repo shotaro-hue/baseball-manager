@@ -1,3 +1,4 @@
+import { validateEconomyClock } from './economyCalendar';
 import { saveFailure } from './saveDiagnostics';
 import { validateEconomySave, economySaveMetadata, economyOverwriteIssue,
   economyRecoveryGuard, matchesEconomyRecoveryGuard } from './economyPersistence';
@@ -618,7 +619,7 @@ async function replaceCareerLogEntriesBatch(entriesByPlayer) {
   });
 }
 
-async function saveGameImpl(state, options = {}) {
+async function saveGameImpl(state, options = {}, onPublished) {
   // ⚠️ 入力値検証: 想定外の形式を保存しない（破損セーブ防止）
   if (!state || typeof state !== 'object' || !Array.isArray(state.teams)) {
     console.error('Save failed: invalid state payload');
@@ -770,6 +771,7 @@ async function saveGameImpl(state, options = {}) {
     commitStep = 'commit_root';
     commitApi = 'localStorage.setItem';
     localStorage.setItem(SAVE_KEY, compressed);
+    onPublished?.(compressed);
     perfBreakdown.writeMainSaveMs = safeElapsedMs(setItemStart);
     logPerf('saveGame.localStorage.setItem', setItemStart);
     observations.set(localStorage, compressed);
@@ -867,6 +869,8 @@ export function saveGame(state, options = {}) {
 }
 function enqueueSaveSnapshot(state, options, coalesce) {
   try {
+    const active = economyCommits.get(localStorage);
+    if (active) return Promise.resolve(economyCommitFailure(active.pending ? 'economy_commit_pending' : 'economy_adoption_required'));
     const snapshot = structuredClone(state);
     return sharedSaveQueue.enqueue({ state: snapshot, options: structuredClone(options),
       deletionEpoch: deletionEpochs.get(localStorage) ?? 0 },
@@ -875,7 +879,7 @@ function enqueueSaveSnapshot(state, options, coalesce) {
   }
   catch (error) { return Promise.resolve(failedSave('snapshot_failed', 'snapshot', 'structuredClone', error)); }
 }
-function saveOwnedSnapshot(snapshot, safeOptions, deletionEpoch = deletionEpochs.get(localStorage) ?? 0) {
+function saveOwnedSnapshot(snapshot, safeOptions, deletionEpoch = deletionEpochs.get(localStorage) ?? 0, transaction) {
   try {
     if (!observations.has(localStorage)) observePrimary();
   } catch (error) { return Promise.resolve(failedSave('storage_read_failed', 'observe_root', 'localStorage.getItem', error)); }
@@ -890,8 +894,14 @@ function saveOwnedSnapshot(snapshot, safeOptions, deletionEpoch = deletionEpochs
         if (deletionEpoch !== (deletionEpochs.get(localStorage) ?? 0) || observations.get(localStorage) !== currentPrimary || backupChanged) {
           return failedSave('save_conflict', 'check_conflict', 'localStorage.getItem');
         }
+        if (transaction?.recover) return await transaction.recover();
+        const rejected = await transaction?.before?.();
+        if (rejected) return rejected;
         const archivePin = await retainBattedBallReceipt(snapshot.battedBallReceipt);
-        try { return await saveGameImpl(snapshot, safeOptions); }
+        try {
+          const result = await saveGameImpl(snapshot, safeOptions, transaction?.published);
+          return result.ok && transaction?.after ? await transaction.after(result) : result;
+        }
         finally { archivePin.release(); }
       } catch (error) {
         return failedSave('save_failed', 'save', 'saveGame', error);
@@ -909,7 +919,138 @@ function saveOwnedSnapshot(snapshot, safeOptions, deletionEpoch = deletionEpochs
   localSaveTail = result.catch(() => {});
   return result;
 }
-const sharedSaveQueue = createSaveRequestQueue(({ state, options, deletionEpoch }) => saveOwnedSnapshot(state, options, deletionEpoch));
+const sharedSaveQueue = createSaveRequestQueue(({ state, options, deletionEpoch, execute }) => execute ? execute() : saveOwnedSnapshot(state, options, deletionEpoch));
+
+// Commit operations own this slot from enqueue through adoption. Ordinary
+// snapshots made during that interval must be rebuilt by their producer.
+const economyCommits = new WeakMap();
+function releaseEconomyCommit(storage, entry) {
+  if (economyCommits.get(storage) === entry) economyCommits.delete(storage);
+}
+const canonicalEconomy = value => JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item)
+  ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
+const adoptionFields = ['saveId', 'myId', 'year', 'gameDay', 'teams', 'faPool', 'faYears',
+  'offseasonPlan', 'schedule', 'news', 'mailbox', 'contractEconomy', 'farmCompetition', 'farmCompetitionVersion', 'battedBallReceipt'];
+// Presence and undefined are part of the state contract, not JSON omissions.
+const adoptionContent = world => canonicalEconomy(adoptionFields.map(key =>
+  [key, Object.hasOwn(world ?? {}, key), typeof world?.[key], world?.[key]]));
+function economyCommitFailure(reason) { return { ok: false, reason }; }
+function matchesCommitSession(current, expected) {
+  return current?.world?.saveId === expected.saveId
+    && current.world.contractEconomy?.epoch === expected.epoch
+    && current.sessionToken === expected.sessionToken && current.progressToken === expected.progressToken;
+}
+async function readPublishedEconomy(raw) {
+  if (!raw || localStorage.getItem(SAVE_KEY) !== raw) throw new Error('published_root_changed');
+  const world = await readSaveRoot(raw);
+  await hydrateSaveCandidate(world, { strict: true });
+  if (validateEconomySave(world) !== 'annual') throw new Error('annual_root_required');
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+  const committed = { saveId: world.saveId, epoch: world.contractEconomy.epoch,
+    revision: world.contractEconomy.revision,
+    rootSignature: Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join(''),
+    receiptIds: world.contractEconomy.engine.transactions.map(receipt => receipt.id) };
+  if (localStorage.getItem(SAVE_KEY) !== raw) throw new Error('published_root_changed');
+  return { world, committed };
+}
+async function adoptPublishedEconomy(entry, expected, bindings) {
+  const { world, committed } = await readPublishedEconomy(entry.raw);
+  if (['saveId', 'epoch', 'baseRevision', 'sessionToken'].some(key => expected?.[key] !== entry.identity[key])
+    || world.saveId !== expected.saveId || world.contractEconomy.epoch !== expected.epoch
+    || canonicalEconomy(world.contractEconomy) !== entry.terms) throw new Error('candidate_identity_changed');
+  const content = adoptionContent(world);
+  const alreadyAdopted = entry.recovering && adoptionContent(bindings.readCurrent()?.world) === content;
+  const canAdopt = () => {
+    const current = bindings.readCurrent();
+    return localStorage === entry.storage
+      && localStorage.getItem(SAVE_KEY) === entry.raw
+      && (deletionEpochs.get(localStorage) ?? 0) === entry.deletionEpoch
+      && matchesCommitSession(current, expected)
+      && (alreadyAdopted ? adoptionContent(current.world) === content
+        : current.progressToken === entry.identity.progressToken
+          && adoptionContent(current.world) === entry.baseContent);
+  };
+  if (!canAdopt()) throw new Error('adoption_session_changed');
+  // A dispatch may have completed before its caller threw. Recovery is a
+  // readback acknowledgement in that case, not a second reducer transition.
+  if (alreadyAdopted) return { ok: true, committed };
+  // Bindings must atomically check canAdopt immediately before their reducer
+  // dispatch, and resolve only after that complete world is observable.
+  const accepted = await bindings.adopt(world, structuredClone(committed), canAdopt);
+  const current = bindings.readCurrent();
+  if (accepted !== true || localStorage !== entry.storage || localStorage.getItem(SAVE_KEY) !== entry.raw
+    || (deletionEpochs.get(localStorage) ?? 0) !== entry.deletionEpoch
+    || current?.sessionToken !== expected.sessionToken || adoptionContent(current?.world) !== content)
+    throw new Error('adoption_not_confirmed');
+  return { ok: true, committed };
+}
+
+export function commitEconomyCandidate(candidate, expected, bindings, options = {}) {
+  const storage = localStorage;
+  if (economyCommits.has(storage)) return Promise.resolve(economyCommitFailure('economy_commit_pending'));
+  let snapshot, identity, safeOptions;
+  try {
+    snapshot = structuredClone(candidate); identity = structuredClone(expected); safeOptions = structuredClone(options);
+    if (!identity || !Number.isSafeInteger(identity.progressToken) || !Number.isSafeInteger(identity.sessionToken)
+      || typeof bindings?.readCurrent !== 'function' || typeof bindings?.adopt !== 'function'
+      || validateEconomySave(snapshot) !== 'annual' || snapshot.saveId !== identity.saveId
+      || snapshot.contractEconomy.epoch !== identity.epoch
+      || snapshot.contractEconomy.revision !== identity.baseRevision + 1) throw new Error('invalid_candidate');
+  } catch { return Promise.resolve(economyCommitFailure('economy_candidate_invalid')); }
+  const entry = { storage, identity, pending: true, deletionEpoch: deletionEpochs.get(storage) ?? 0,
+    terms: canonicalEconomy(snapshot.contractEconomy), raw: null };
+  economyCommits.set(storage, entry);
+  return sharedSaveQueue.enqueue({ execute: async () => {
+    try {
+      const result = await saveOwnedSnapshot(snapshot, safeOptions, entry.deletionEpoch, {
+        before: async () => {
+          const current = bindings.readCurrent();
+          if (!matchesCommitSession(current, identity) || current.world.contractEconomy.revision !== identity.baseRevision)
+            return economyCommitFailure('economy_candidate_stale');
+          entry.baseContent = adoptionContent(current.world);
+          // Never overwrite a newer published base even if the caller is stale.
+          const base = await readPublishedEconomy(storage.getItem(SAVE_KEY));
+          if (base.world.saveId !== identity.saveId || base.world.contractEconomy.epoch !== identity.epoch
+            || base.world.contractEconomy.revision !== identity.baseRevision
+            || !matchesCommitSession(bindings.readCurrent(), identity)
+            || adoptionContent(bindings.readCurrent().world) !== entry.baseContent) return economyCommitFailure('economy_candidate_stale');
+          validateEconomyClock(snapshot, base.world);
+          return null;
+        },
+        published: raw => { entry.raw = raw; },
+        after: async result => ({ ...result, ...await adoptPublishedEconomy(entry, identity, bindings) }),
+      });
+      entry.pending = false;
+      if (result.ok || !entry.raw) releaseEconomyCommit(storage, entry);
+      return entry.raw && !result.ok ? economyCommitFailure('economy_adoption_required') : result;
+    } catch {
+      entry.pending = false;
+      if (!entry.raw) releaseEconomyCommit(storage, entry);
+      return economyCommitFailure(entry.raw ? 'economy_adoption_required' : 'economy_candidate_stale');
+    }
+  } }, { coalesce: false });
+}
+
+export function recoverEconomyCommit(expected, bindings) {
+  const storage = localStorage, entry = economyCommits.get(storage);
+  if (!entry?.raw || sharedSaveQueue.getSnapshot().isSaving) return Promise.resolve(economyCommitFailure('economy_recovery_unavailable'));
+  let identity;
+  try { identity = structuredClone(expected); } catch { return Promise.resolve(economyCommitFailure('economy_candidate_invalid')); }
+  // A failed delete invalidates waiting candidates, but does not invalidate
+  // an explicit readback of the identical surviving published root.
+  const deletionEpoch = deletionEpochs.get(storage) ?? 0;
+  return sharedSaveQueue.enqueue({ execute: async () => {
+    const result = await saveOwnedSnapshot(null, {}, deletionEpoch, { recover: async () => {
+      if (economyCommits.get(storage) !== entry) throw new Error('recovery_slot_changed');
+      // Recovery may acknowledge the published world or adopt from the original
+      // base. Never bless a changed world/session by replacing the saved fence.
+      const result = await adoptPublishedEconomy({ ...entry, deletionEpoch, recovering: true }, identity, bindings);
+      releaseEconomyCommit(storage, entry);
+      return result;
+    } });
+    return result.ok ? result : economyCommitFailure('economy_adoption_required');
+  } }, { coalesce: false });
+}
 
 export function enqueueSaveGame(state, options = {}) {
   return enqueueSaveSnapshot(state, options, true);
@@ -1294,6 +1435,7 @@ async function deleteSaveImpl() {
   validatedRoots.delete(localStorage);
   validatedRawRoots.delete(localStorage);
   lastLoadResult = { status: 'none' };
+  economyCommits.delete(localStorage);
   releaseCurrentBattedBallReceipt(saveId);
   try { await cleanupSaveChunks({ force: true }); }
   catch (error) { console.warn('Save deleted; archive cleanup deferred:', error); }

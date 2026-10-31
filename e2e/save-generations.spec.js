@@ -158,3 +158,67 @@ test('save generations: deletion invalidates a stale backup-only recovery in ano
  const result=await other.evaluate(async()=>await(await import('/baseball-manager/src/engine/saveload.js')).saveGame(window.recovered));
  expect(result).toMatchObject({ok:false,reason:'save_conflict'});
 });
+
+for (const large of [false, true]) test(`save generations: acknowledged contract adoption holds the save barrier (${large ? 'large' : 'inline'})`, async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(async large => {
+    const mod = await import('/baseball-manager/src/engine/saveload.js');
+    const { economyFixture, renewalEnvelope } = await import('/baseball-manager/src/engine/__tests__/fixtures/economyWorld.js');
+    const { reduceEconomyCommand } = await import('/baseball-manager/src/engine/contractEconomy.js');
+    const { gameStateReducer, G } = await import('/baseball-manager/src/hooks/gameStateReducer.js');
+    let current = { world: economyFixture(), sessionToken: 1, progressToken: 1 };
+    const expected = { saveId: current.world.saveId, epoch: current.world.contractEconomy.epoch,
+      baseRevision: 0, sessionToken: 1, progressToken: 1 };
+    const old = structuredClone(current.world);
+    const initial = mod.saveGame(old, { skipCompression: true });
+    const next = reduceEconomyCommand(old, renewalEnvelope(old)).world;
+    if (large) next.padding = 'large'.repeat(20000);
+    let release, entered;
+    const gate = new Promise(r => release = r), inside = new Promise(r => entered = r);
+    const commit = mod.commitEconomyCandidate(next, expected, {
+      readCurrent: () => current,
+      adopt: async (world, ack, canAdopt) => {
+        entered(); await gate;
+        if (!canAdopt()) return false;
+        current = { ...current, world: gameStateReducer(current.world, { type: G.APPLY_ECONOMY_WORLD, world, expected }), progressToken: 2 };
+        return true;
+      },
+    }, { skipCompression: true });
+    await initial;
+    await Promise.race([inside, commit.then(result => { throw new Error(JSON.stringify(result)); })]);
+    const before = current.world.contractEconomy.revision;
+    const auto = await mod.enqueueSaveGame(old), manual = await mod.saveGame(old);
+    release(); const saved = await commit;
+    return { before, auto, manual, saved, revision: current.world.contractEconomy.revision,
+      referenced: JSON.parse(localStorage.getItem('baseball_manager_v1')).rootBodyVersion === 1 };
+  }, large);
+  expect(result.before).toBe(0); expect(result.revision).toBe(1); expect(result.referenced).toBe(large);
+  expect(result.auto).toMatchObject({ ok: false, reason: 'economy_commit_pending' });
+  expect(result.manual).toMatchObject({ ok: false, reason: 'economy_commit_pending' });
+  expect(result.saved).toMatchObject({ ok: true, committed: { revision: 1, receiptIds: [0] } });
+  expect(result.saved.committed.rootSignature).toMatch(/^[a-f0-9]{64}$/);
+  await page.reload();
+  expect(await page.evaluate(async () => {
+    const world = await (await import('/baseball-manager/src/engine/saveload.js')).loadGame();
+    return { revision: world.contractEconomy.revision, receipts: world.contractEconomy.engine.transactions.map(r => r.id) };
+  })).toEqual({ revision: 1, receipts: [0] });
+  expect(await page.evaluate(async () => {
+    const mod = await import('/baseball-manager/src/engine/saveload.js');
+    const { reduceEconomyCommand } = await import('/baseball-manager/src/engine/contractEconomy.js');
+    const { gameStateReducer, G } = await import('/baseball-manager/src/hooks/gameStateReducer.js');
+    let current = { world: await mod.loadGame(), progressToken: 1, sessionToken: 2 };
+    const expected = { saveId: current.world.saveId, epoch: current.world.contractEconomy.epoch,
+      baseRevision: 1, progressToken: 1, sessionToken: 2 };
+    const next = reduceEconomyCommand(current.world, { saveId: expected.saveId, epoch: expected.epoch, baseRevision: expected.baseRevision, transaction: { id: 'accept',
+      type: 'accept-renewal', proposalId: 'renewal', contractId: current.world.teams[0].players[0].contractId } });
+    if (!next.ok) throw new Error(next.error);
+    const result = await mod.commitEconomyCandidate(next.world, expected, { readCurrent: () => current,
+      adopt: async (world, ack, canAdopt) => {
+        if (!canAdopt()) return false;
+        current = { ...current, world: gameStateReducer(current.world, { type: G.APPLY_ECONOMY_WORLD, world, expected }) };
+        return true;
+      } });
+    const resaved = await mod.saveGame(current.world);
+    return { committed: result.ok, resaved: resaved.ok, revision: (await mod.loadGame()).contractEconomy.revision };
+  })).toEqual({ committed: true, resaved: true, revision: 2 });
+});
