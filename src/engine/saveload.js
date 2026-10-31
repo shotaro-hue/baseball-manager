@@ -931,7 +931,9 @@ const canonicalEconomy = value => JSON.stringify(value, (_, item) => item && typ
   ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
 const adoptionFields = ['saveId', 'myId', 'year', 'gameDay', 'teams', 'faPool', 'faYears',
   'offseasonPlan', 'schedule', 'news', 'mailbox', 'contractEconomy', 'farmCompetition', 'farmCompetitionVersion', 'battedBallReceipt'];
-const adoptionContent = world => canonicalEconomy(Object.fromEntries(adoptionFields.map(key => [key, world?.[key]])));
+// Presence and undefined are part of the state contract, not JSON omissions.
+const adoptionContent = world => canonicalEconomy(adoptionFields.map(key =>
+  [key, Object.hasOwn(world ?? {}, key), typeof world?.[key], world?.[key]]));
 function economyCommitFailure(reason) { return { ok: false, reason }; }
 function matchesCommitSession(current, expected) {
   return current?.world?.saveId === expected.saveId
@@ -953,18 +955,25 @@ async function readPublishedEconomy(raw) {
 }
 async function adoptPublishedEconomy(entry, expected, bindings) {
   const { world, committed } = await readPublishedEconomy(entry.raw);
-  if (world.saveId !== expected.saveId || world.contractEconomy.epoch !== expected.epoch
+  if (['saveId', 'epoch', 'baseRevision', 'sessionToken'].some(key => expected?.[key] !== entry.identity[key])
+    || world.saveId !== expected.saveId || world.contractEconomy.epoch !== expected.epoch
     || canonicalEconomy(world.contractEconomy) !== entry.terms) throw new Error('candidate_identity_changed');
   const content = adoptionContent(world);
-  const canAdopt = () => localStorage === entry.storage
-    && localStorage.getItem(SAVE_KEY) === entry.raw
-    && (deletionEpochs.get(localStorage) ?? 0) === entry.deletionEpoch
-    && matchesCommitSession(bindings.readCurrent(), expected)
-    && adoptionContent(bindings.readCurrent().world) === entry.baseContent;
+  const alreadyAdopted = entry.recovering && adoptionContent(bindings.readCurrent()?.world) === content;
+  const canAdopt = () => {
+    const current = bindings.readCurrent();
+    return localStorage === entry.storage
+      && localStorage.getItem(SAVE_KEY) === entry.raw
+      && (deletionEpochs.get(localStorage) ?? 0) === entry.deletionEpoch
+      && matchesCommitSession(current, expected)
+      && (alreadyAdopted ? adoptionContent(current.world) === content
+        : current.progressToken === entry.identity.progressToken
+          && adoptionContent(current.world) === entry.baseContent);
+  };
   if (!canAdopt()) throw new Error('adoption_session_changed');
   // A dispatch may have completed before its caller threw. Recovery is a
   // readback acknowledgement in that case, not a second reducer transition.
-  if (entry.recovering && adoptionContent(bindings.readCurrent().world) === content) return { ok: true, committed };
+  if (alreadyAdopted) return { ok: true, committed };
   // Bindings must atomically check canAdopt immediately before their reducer
   // dispatch, and resolve only after that complete world is observable.
   const accepted = await bindings.adopt(world, structuredClone(committed), canAdopt);
@@ -988,7 +997,7 @@ export function commitEconomyCandidate(candidate, expected, bindings, options = 
       || snapshot.contractEconomy.epoch !== identity.epoch
       || snapshot.contractEconomy.revision !== identity.baseRevision + 1) throw new Error('invalid_candidate');
   } catch { return Promise.resolve(economyCommitFailure('economy_candidate_invalid')); }
-  const entry = { storage, pending: true, deletionEpoch: deletionEpochs.get(storage) ?? 0,
+  const entry = { storage, identity, pending: true, deletionEpoch: deletionEpochs.get(storage) ?? 0,
     terms: canonicalEconomy(snapshot.contractEconomy), raw: null };
   economyCommits.set(storage, entry);
   return sharedSaveQueue.enqueue({ execute: async () => {
@@ -1033,8 +1042,9 @@ export function recoverEconomyCommit(expected, bindings) {
   return sharedSaveQueue.enqueue({ execute: async () => {
     const result = await saveOwnedSnapshot(null, {}, deletionEpoch, { recover: async () => {
       if (economyCommits.get(storage) !== entry) throw new Error('recovery_slot_changed');
-      const result = await adoptPublishedEconomy({ ...entry, deletionEpoch, recovering: true,
-        baseContent: adoptionContent(bindings.readCurrent().world) }, identity, bindings);
+      // Recovery may acknowledge the published world or adopt from the original
+      // base. Never bless a changed world/session by replacing the saved fence.
+      const result = await adoptPublishedEconomy({ ...entry, deletionEpoch, recovering: true }, identity, bindings);
       releaseEconomyCommit(storage, entry);
       return result;
     } });
