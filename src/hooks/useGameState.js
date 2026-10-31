@@ -3,7 +3,7 @@ import { stadiumUpgradeCosts } from '../engine/clubFinance';
 import { marketRosterError } from '../engine/marketRoster';
 import {createFarmCompetition} from '../engine/farmRecords';
 import {validateFarmSaveState} from '../engine/farmMigration';
-import { contractEconomyMode } from '../engine/contractEconomy';
+import { contractEconomyMode, reduceEconomyCommand } from '../engine/contractEconomy';
 import { validateEconomySave } from '../engine/economyPersistence';
 import { saveFeedback } from '../engine/saveFeedback';
 import { emptyBattedBallReceipt, validateBattedBallReceipt } from '../engine/battedBallRun';
@@ -131,6 +131,32 @@ function sliceCollection(items, options = {}) {
   return safeItems.slice(offset, offset + limit);
 }
 
+// Shared by ordinary saves and acknowledged annual commits. Archive failures
+// never turn a published economic transaction into a purported rollback.
+async function flushCommittedArchives(state) {
+  try {
+    const archive = await import('../engine/battedBallArchive');
+    const receipts = await import('../engine/battedBallReceipts');
+    const scope = { saveId: state.saveId };
+    let receiptResult = await receipts.flushBattedBallReceipts(state.battedBallReceipt, scope);
+    const status = archive.getBattedBallQueueStatus(scope);
+    let archiveResult = status.failedRecords > 0
+      ? await archive.retryFailedBattedBallWrites(scope)
+      : await archive.flushBattedBallQueue(scope);
+    let settled = archive.getBattedBallQueueStatus(scope);
+    while (settled.isWriting || settled.queuedRecords > 0) {
+      archiveResult = await archive.flushBattedBallQueue(scope);
+      settled = archive.getBattedBallQueueStatus(scope);
+    }
+    if (!receiptResult.ok && archiveResult?.ok !== false && !settled.failedRecords)
+      receiptResult = await receipts.flushBattedBallReceipts(state.battedBallReceipt, scope);
+    return { ...archiveResult, ok: receiptResult.ok && archiveResult?.ok !== false && !(settled.failedRecords > 0) };
+  } catch (error) {
+    console.warn('打球アーカイブのフラッシュに失敗しました。試合セーブは完了しています。', error);
+    return { ok: false };
+  }
+}
+
 export function useGameState() {
   const [screen, setScreenState] = useState("title");
   const screenRef = useRef('title');
@@ -162,7 +188,10 @@ export function useGameState() {
   const setMailboxState = useCallback(value => dispatch({ type: G.SET_MAILBOX, value }), []);
   const setSchedule = useCallback(value => dispatch({ type: G.SET_SCHEDULE, value }), []);
   const rosterCommandRef = useRef(gameState);
+  const economyCommitRef = useRef(null);
+  const pendingEconomyAdoptionRef = useRef(null);
   const setNewsState = useCallback(value => {
+    if (economyCommitRef.current) return false;
     const current = rosterCommandRef.current;
     const nextNews = typeof value === 'function' ? value(current.news) : value;
     rosterCommandRef.current = { ...current, news: nextNews };
@@ -172,7 +201,12 @@ export function useGameState() {
   const progressTokenRef = useRef(0);
   const progressSessionRef = useRef(0);
   const getProgressSessionToken = useCallback(()=>progressSessionRef.current,[]);
-  const progressDispatch = useCallback(action => {progressTokenRef.current++;dispatch(action);},[]);
+  const progressDispatch = useCallback(action => {
+    if (economyCommitRef.current && action.type !== G.APPLY_ECONOMY_WORLD) return false;
+    progressTokenRef.current++;
+    dispatch(action);
+    return true;
+  }, []);
   const getProgressToken = useCallback(()=>progressTokenRef.current,[]);
   const [saveDirty, setSaveDirty] = useState(false);
   const saveDirtyRef = useRef(saveDirty);
@@ -185,11 +219,13 @@ export function useGameState() {
     saveDirtyTrackerRef.current = createSaveDirtyTracker();
   }
   const markSaveDirty = useCallback((scopes = [])=>{
+    if (economyCommitRef.current) return false;
     saveDirtyTrackerRef.current.mark(scopes);
     setSaveRevision(prev=>prev+1);
     setSaveDirty(true);
   },[]);
   const stageCareerEntries = useCallback(entries => {
+    if (economyCommitRef.current) return false;
     pendingCareerEntriesRef.current.push(...structuredClone(entries));
     markSaveDirty();
   },[markSaveDirty]);
@@ -206,7 +242,7 @@ export function useGameState() {
   const setGameDay = useCallback((n) => { progressDispatch({ type: G.SET_GAME_DAY, day: n }); markSaveDirty(); }, [markSaveDirty]);
   const setYear    = useCallback((n) => { progressDispatch({ type: G.SET_YEAR, year: n }); markSaveDirty(); }, [markSaveDirty]);
   const setMyId    = useCallback((id) => { progressDispatch({ type: G.SET_MY_ID, myId: id }); markSaveDirty(); }, [markSaveDirty]);
-  const setSaveId  = useCallback((id) => { pendingCareerEntriesRef.current=[];progressSessionRef.current++;progressDispatch({ type: G.SET_SAVE_ID, saveId: ensureSaveId(id) }); }, []);
+  const setSaveId  = useCallback((id) => { if (economyCommitRef.current) return false; pendingCareerEntriesRef.current=[];progressSessionRef.current++;progressDispatch({ type: G.SET_SAVE_ID, saveId: ensureSaveId(id) }); }, []);
   const [tab, setTab] = useState("dashboard");
   const setFaYears = useCallback(value => { setFaYearsState(value); markSaveDirty(); }, [markSaveDirty]);
   const setOffseasonPlan = useCallback(value => { setOffseasonPlanState(value); markSaveDirty(); }, [markSaveDirty]);
@@ -249,21 +285,22 @@ export function useGameState() {
     finally { if (titleLoadPromiseRef.current === task) titleLoadPromiseRef.current = null; }
   }, []);
 
-  const setAllTeamResultsMap = useCallback(value => { setAllTeamResultsMapState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
-  const setAllTeamBoxScoresMap = useCallback(value => { setAllTeamBoxScoresMapState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
-  const setRecentResults = useCallback(value => { setRecentResultsState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
-  const setGameResultsMap = useCallback(value => { setGameResultsMapState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
-  const setScheduleArchive = useCallback(value => { setScheduleArchiveState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
-  const setPressEvent = useCallback(value => { setPressEventState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
-  const setLastPressDay = useCallback(value => { setLastPressDayState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
-  const setAllStarDone = useCallback(value => { setAllStarDoneState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
-  const setAllStarResult = useCallback(value => { setAllStarResultState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
+  const setAllTeamResultsMap = useCallback(value => { if (economyCommitRef.current) return false; setAllTeamResultsMapState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
+  const setAllTeamBoxScoresMap = useCallback(value => { if (economyCommitRef.current) return false; setAllTeamBoxScoresMapState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
+  const setRecentResults = useCallback(value => { if (economyCommitRef.current) return false; setRecentResultsState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
+  const setGameResultsMap = useCallback(value => { if (economyCommitRef.current) return false; setGameResultsMapState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
+  const setScheduleArchive = useCallback(value => { if (economyCommitRef.current) return false; setScheduleArchiveState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
+  const setPressEvent = useCallback(value => { if (economyCommitRef.current) return false; setPressEventState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
+  const setLastPressDay = useCallback(value => { if (economyCommitRef.current) return false; setLastPressDayState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
+  const setAllStarDone = useCallback(value => { if (economyCommitRef.current) return false; setAllStarDoneState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
+  const setAllStarResult = useCallback(value => { if (economyCommitRef.current) return false; setAllStarResultState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
   const getMatchHistorySnapshot = useCallback(() => matchHistorySnapshot({
     gameResultsMap, allTeamResultsMap, allTeamBoxScoresMap, scheduleArchive, recentResults,
     allStarDone, allStarResult, lastPressDay, pressEvent,
   }), [gameResultsMap, allTeamResultsMap, allTeamBoxScoresMap, scheduleArchive, recentResults,
     allStarDone, allStarResult, lastPressDay, pressEvent]);
   const hydrateMatchHistory = useCallback(saved => {
+    if (economyCommitRef.current) return false;
     const next = matchHistorySnapshot(saved);
     setAllTeamResultsMapState(next.allTeamResultsMap);
     setAllTeamBoxScoresMapState(next.allTeamBoxScoresMap);
@@ -276,6 +313,7 @@ export function useGameState() {
     setAllStarResultState(next.allStarResult);
   }, []);
   const applyMatchResultPatch = useCallback(patch => {
+    if (economyCommitRef.current) return false;
     const next = mergeMatchResultPatch(getMatchHistorySnapshot(), patch);
     hydrateMatchHistory(next);
     markSaveDirty(['matchHistory']);
@@ -285,18 +323,22 @@ export function useGameState() {
   const persistentStoreRef = useRef(null);
   const [persistentSummaries, setPersistentSummaries] = useState(EMPTY_PERSISTENT_SUMMARIES);
   const setSeasonHistory = useCallback((nextValue) => {
+    if (economyCommitRef.current) return false;
     setSeasonHistoryState(nextValue);
     markSaveDirty(['seasonHistory']);
   }, [markSaveDirty]);
   const setNews = useCallback((nextValue) => {
+    if (economyCommitRef.current) return false;
     setNewsState(nextValue);
     markSaveDirty(['news']);
   }, [markSaveDirty]);
   const setMailbox = useCallback((nextValue) => {
+    if (economyCommitRef.current) return false;
     setMailboxState(nextValue);
     markSaveDirty(['mailbox']);
   }, [markSaveDirty]);
   const hydrateLargeSaveData = useCallback((nextValue = {}) => {
+    if (economyCommitRef.current) return false;
     setSeasonHistoryState(nextValue.seasonHistory ?? {});
     setNewsState(Array.isArray(nextValue.news) ? nextValue.news : []);
     setMailboxState(Array.isArray(nextValue.mailbox) ? nextValue.mailbox : []);
@@ -311,6 +353,7 @@ export function useGameState() {
   // Load-only boundary. A transaction must use commitEconomyCandidate and its
   // published-root acknowledgement, never reset the session through this API.
   const hydrateSavedWorld = useCallback((saved, expected) => {
+    if (economyCommitRef.current) return false;
     if (screenRef.current !== 'title' || !expected
       || expected.sessionToken !== progressSessionRef.current
       || expected.progressToken !== progressTokenRef.current
@@ -464,30 +507,7 @@ export function useGameState() {
         if (!result?.ok || sessionToken !== progressSessionRef.current) return result;
         const committed=new Set(pending);
         pendingCareerEntriesRef.current=pendingCareerEntriesRef.current.filter(entry=>!committed.has(entry));
-        try {
-          const archive = await import('../engine/battedBallArchive');
-          const receipts = await import('../engine/battedBallReceipts');
-          const archiveScope = { saveId: state.saveId };
-          let receiptResult = await receipts.flushBattedBallReceipts(state.battedBallReceipt, archiveScope);
-          const status = archive.getBattedBallQueueStatus(archiveScope);
-          let archiveResult = status.failedRecords > 0
-            ? await archive.retryFailedBattedBallWrites(archiveScope)
-            : await archive.flushBattedBallQueue(archiveScope);
-          // One flush only covers its snapshot. More Worker chunks may already
-          // be queued behind it; success requires those writes to settle too.
-          let settled = archive.getBattedBallQueueStatus(archiveScope);
-          while (settled.isWriting || settled.queuedRecords > 0) {
-            archiveResult = await archive.flushBattedBallQueue(archiveScope);
-            settled = archive.getBattedBallQueueStatus(archiveScope);
-          }
-          if (!receiptResult.ok && archiveResult?.ok !== false && !settled.failedRecords) {
-            receiptResult = await receipts.flushBattedBallReceipts(state.battedBallReceipt, archiveScope);
-          }
-          return { ...result, archive: { ...archiveResult, ok: receiptResult.ok && archiveResult?.ok !== false && !(settled.failedRecords > 0) } };
-        } catch (error) {
-          console.warn('打球アーカイブのフラッシュに失敗しました。試合セーブは完了しています。', error);
-          return { ...result, archive: { ok: false } };
-        }
+        return { ...result, archive: await flushCommittedArchives(state) };
       })
       .then((result) => {
         if (result?.ok === false && result.diagnostics) {
