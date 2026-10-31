@@ -237,6 +237,14 @@ export function useGameState() {
   saveDirtyRef.current = saveDirty;
   const [lastAutoSaveAt, setLastAutoSaveAt] = useState(0);
   const [saveRevision, setSaveRevision] = useState(0);
+  const setPublicSaveDirty = useCallback(value => {
+    if (economyCommitRef.current) return false;
+    setSaveDirty(value);
+  }, []);
+  const setPublicSaveRevision = useCallback(value => {
+    if (economyCommitRef.current) return false;
+    setSaveRevision(value);
+  }, []);
   const saveDirtyTrackerRef = useRef(null);
   // Count applied updates, not the latest requested version: concurrent React
   // can commit an urgent update while an earlier transition is still pending.
@@ -1448,9 +1456,9 @@ export function useGameState() {
     allStarResult, setAllStarResult,
     allStarTriggerDay, setAllStarTriggerDay,
     isAutoSaveSuspended, setIsAutoSaveSuspended,
-    saveDirty, setSaveDirty,
+    saveDirty, setSaveDirty: setPublicSaveDirty,
     saveQueueState, saveResult,
-    saveRevision, setSaveRevision,
+    saveRevision, setSaveRevision: setPublicSaveRevision,
     persistentSummaries,
     newGameInitializationError,
     newGameInitializationStatus,

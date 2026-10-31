@@ -217,16 +217,24 @@ it('does not start a transaction through an unmounted hook callback', async () =
   expect(rows.get(primary)).toBe(raw);
 });
 
-it('retains dirty state when reset tracking is attempted during publication', async () => {
+it.each(['reset', 'dirty setter', 'revision setter'])('retains tracking when %s is attempted during publication', async operation => {
   const world = await setupAnnual();
   act(() => gs.stageCareerEntries([{ playerId: 0, careerEntry: { year: 2025, stats: { HR: 13 } } }]));
   const set = localStorage.setItem;
   localStorage.setItem = (name, value) => {
-    if (name === primary) { act(() => gs.resetSaveTracking()); throw new Error('publish failed'); }
+    if (name === primary) {
+      act(() => {
+        if (operation === 'reset') gs.resetSaveTracking();
+        if (operation === 'dirty setter') gs.setSaveDirty(false);
+        if (operation === 'revision setter') gs.setSaveRevision(999);
+      });
+      throw new Error('publish failed');
+    }
     set(name, value);
   };
   expect((await gs.commitEconomyCommand(renewalEnvelope(world))).ok).toBe(false);
   expect(gs.saveDirty).toBe(true);
+  expect(gs.saveRevision).toBe(1);
   localStorage.setItem = set;
 });
 
