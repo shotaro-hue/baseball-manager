@@ -3,20 +3,20 @@
 exports[`preserves complete generated data and random/ID consumption (seed 7) 1`] = `
 {
   "calls": 20003,
-  "digest": "5f52b350d48bf1a0f7d137c2007cdca60e84d28f642fff51bea6aa2bed677dde",
+  "digest": "9e45bcb1efd92d7aae741039f2987ee37a90e21fb382f831d3b635629a8da4f9",
 }
 `;
 
 exports[`preserves complete generated data and random/ID consumption (seed 42) 1`] = `
 {
   "calls": 20010,
-  "digest": "1d5954d2a5d2fd6456d0886d673543c372f6839f250d2504c0562afeaa4bb98e",
+  "digest": "d18152d33f90a7e2301907f2c4599387ae5ad9cbd0d453638151530f5adda909",
 }
 `;
 
 exports[`preserves complete generated data and random/ID consumption (seed 20261009) 1`] = `
 {
   "calls": 20037,
-  "digest": "e49666765e9fa8d7e04abe1de18e5ccc7eee6885c0af3d458657f7aea996c143",
+  "digest": "7a9c798f4cad52273794d5d4aace23f351038c16de9ced5c775e8191e83eaf48",
 }
 `;

@@ -1,6 +1,8 @@
 import { expect, it } from 'vitest';
 import { getOpeningRosters } from './playerMaster2026';
 import { NPB2025_ROSTERS } from './npb2025';
+import { REVIEWED_FACTS_2026 } from './playerMaster2026Facts';
+import { realBatterToPlayer } from '../engine/realplayer';
 
 it('keeps the legacy source immutable and clearly incomplete, with stable source identities',()=>{
  const before=structuredClone(NPB2025_ROSTERS),a=getOpeningRosters(),b=getOpeningRosters();
@@ -22,6 +24,22 @@ it('does not classify domestic draft players by katakana or miss international p
  expect(find(6,'イヒネ　イツア')).toMatchObject({isForeign:false,foreignQuotaStatus:'domestic',birthDate:'2004-09-02',batHand:'left'});
  expect(find(7,'ワォーターズ')).toMatchObject({isForeign:false,foreignQuotaStatus:'domestic',birthDate:'2005-10-14'});
  expect(find(10,'古林　睿煬')).toMatchObject({isForeign:true,foreignQuotaStatus:'counts',birthDate:'2000-06-12'});
+ for(const [id,name] of [[6,'徐　若熙'],[7,'宋　家豪'],[8,'林　安可']])expect(find(id,name)).toMatchObject({isForeign:true,foreignQuotaStatus:'counts'});
  expect(find(1,'ビシエド')).toMatchObject({isForeign:false,foreignQuotaStatus:'exempt'});
  expect(find(9,'ソト')).toMatchObject({isForeign:false,foreignQuotaStatus:'exempt'});
+});
+it('connects reviewed Yamada terms to the bundled new-game roster',()=>{
+ const p=getOpeningRosters()[0].batters.find(p=>p.name==='山田　哲人');
+ expect(p).toMatchObject({playerId:'npb:91895133',contractEndYear:2027,
+   salary:50000,dataQuality:{salary:'reported',contract:'reported'}});
+ const game=realBatterToPlayer(p,{gameId:0,name:'東京ヤクルト',city:'東京'});
+ expect(game).toMatchObject({realPlayerId:'npb:91895133',salary:50000,contractYearsLeft:2,
+   openingContractEvidence:{asOf:'2026-03-27',annualSalaryManYen:50000,salaryStatus:'reported',contractEndYear:2027}});
+ expect(game.openingContractEvidence.evidence.salary.length).toBeGreaterThan(0);
+});
+it('has an unambiguous legacy crosswalk and keeps the three annual equivalents out of reported salaries',()=>{
+ const legacy=new Map(Object.entries(NPB2025_ROSTERS).flatMap(([teamId,r])=>[...r.batters,...r.pitchers].map(p=>[p.playerId,Number(teamId)])));
+ for(const p of REVIEWED_FACTS_2026.byId.values())if(p.legacyPlayerId)expect(legacy.get(p.legacyPlayerId)).toBe(p.teamId);
+ for(const id of ['npb:63965134','npb:13415155','npb:53755138'])expect(REVIEWED_FACTS_2026.byId.get(id)).toMatchObject({salaryStatus:'game-assumption'});
+ expect(REVIEWED_FACTS_2026.byId.get('npb:53355150')).toMatchObject({foreignQuotaStatus:'unknown',gameIsForeign:false});
 });

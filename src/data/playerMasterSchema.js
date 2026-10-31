@@ -70,7 +70,7 @@ export function compilePlayerMaster(master, {localImport=false} = {}) {
       salary,contractEndYear:endYear,isIkusei:p.registration==='development',育成:p.registration==='development',
       isForeign:p.foreignQuotaStatus==='counts'||(p.foreignQuotaStatus==='unknown'&&p.gameIsForeign),
       dataQuality:{salary:p.salaryStatus,contract:p.contractStatus,age:p.birthDate?'official':'game-assumption',
-        position:p.positionStatus||'game-assumption',foreignQuota:p.foreignQuotaStatus==='unknown'?'game-assumption':'provided',
+        position:p.positionStatus||'game-assumption',foreignQuota:p.foreignQuotaStatus==='unknown'?'game-assumption':p.foreignQuotaBasis||'provided',
         history:'sourced',identity:'stable-source-id',membership:'verified-opening'},
     };
     rosters[p.teamId][p.kind==='pitcher'?'pitchers':'batters'].push(source);

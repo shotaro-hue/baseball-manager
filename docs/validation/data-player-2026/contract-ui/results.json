@@ -1,0 +1,50 @@
+[
+  {
+    "label": "before",
+    "width": 360,
+    "overflow": false,
+    "errors": [],
+    "closed": true,
+    "assumedEndNote": false
+  },
+  {
+    "label": "before",
+    "width": 390,
+    "overflow": false,
+    "errors": [],
+    "closed": true,
+    "assumedEndNote": false
+  },
+  {
+    "label": "before",
+    "width": 1440,
+    "overflow": false,
+    "errors": [],
+    "closed": true,
+    "assumedEndNote": false
+  },
+  {
+    "label": "after",
+    "width": 360,
+    "overflow": false,
+    "errors": [],
+    "closed": true,
+    "assumedEndNote": true
+  },
+  {
+    "label": "after",
+    "width": 390,
+    "overflow": false,
+    "errors": [],
+    "closed": true,
+    "assumedEndNote": true
+  },
+  {
+    "label": "after",
+    "width": 1440,
+    "overflow": false,
+    "errors": [],
+    "closed": true,
+    "assumedEndNote": true
+  }
+]

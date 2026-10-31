@@ -19,6 +19,7 @@ it('preserves a legacy contract, applies the controlled minimum, and never deriv
 it('applies individually sourced salary, contract and quota facts with their confidence',()=>{
  const player=p('npb:63965134','Ｌ．モイネロ',6),f=facts([player]);
  const m=assemble({asOf:'2026-03-27',scope:'all',players:[player]},f,{});
- expect(m.players[0]).toMatchObject({foreignQuotaStatus:'exempt',gameIsForeign:false,salaryStatus:'reported',salaryManYen:100000,contractStatus:'reported',contractEndYear:2028});
+ expect(m.players[0]).toMatchObject({foreignQuotaStatus:'exempt',gameIsForeign:false,salaryStatus:'game-assumption',gameSalaryManYen:100000,contractStatus:'reported',contractEndYear:2028});
+ expect(m.players[0].salaryManYen).toBeUndefined();
  expect(m.players[0].sourceIds).toContain('https://pacificleague.com/news/2024/3/10028617');
 });
