@@ -39,15 +39,22 @@ test('local master reset and invalid replacement do not restore a stale roster',
 
 test('local master remains selectable for this session when its database is unavailable',async({page})=>{
  await page.addInitScript(()=>{
-  const open=indexedDB.open.bind(indexedDB);
-  indexedDB.open=(name,...args)=>{
-   if(name==='npb-player-master-v1')throw new DOMException('Unavailable','SecurityError');
-   return open(name,...args);
+  // Inject the fault for every factory instance, including those accessed
+  // after the init script. Verify below that the injection actually ran.
+  const open=IDBFactory.prototype.open;
+  window.__masterStorageDenied=0;
+  IDBFactory.prototype.open=function(name,...args){
+   if(name==='npb-player-master-v1'){
+    window.__masterStorageDenied++;
+    throw new DOMException('Unavailable','SecurityError');
+   }
+   return open.call(this,name,...args);
   };
  });
  await page.goto('/');await page.locator('summary').click();
  await page.getByLabel('選手名簿JSON').setInputFiles({name:'local-master.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(localMasterFixture()))});
  await expect(page.getByRole('alert')).toContainText('今回の新規ゲームには使えます');
+ expect(await page.evaluate(()=>window.__masterStorageDenied)).toBeGreaterThan(0);
  await expect(page.locator('summary')).not.toContainText('記憶済み');
  await page.getByRole('button',{name:TEAM,exact:true}).click();await waitForNewGameReady(page,TEAM);
  const saved=await saveHub(page);
