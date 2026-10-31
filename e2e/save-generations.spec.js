@@ -263,3 +263,97 @@ test('save generations: hook hydrates and resaves annual evidence without activa
   await expect(page.getByRole('alert')).toContainText('新契約制度');
   expect(await page.evaluate(() => localStorage.getItem('baseball_manager_v1'))).toBe(rootBefore);
 });
+
+
+for (const large of [false, true]) test(`save generations: real hook commit preserves history, retries and receipts (${large ? 'large' : 'inline'})`, async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(async large => {
+    const { mountEconomyHook } = await import('/baseball-manager/tests/helpers/economy-hook-harness.jsx');
+    const { economyFixture, renewalEnvelope } = await import('/baseball-manager/src/engine/__tests__/fixtures/economyWorld.js');
+    const saves = await import('/baseball-manager/src/engine/saveload.js');
+    const world = economyFixture();
+    if (large) world.teams[0].notes = 'large-root'.repeat(20000);
+    await saves.saveGame(world, { skipCompression: true });
+    const h = mountEconomyHook(await saves.loadGame());
+    const older = h.current().commitEconomyCommand;
+    const entry = { year: 2025, teamId: 0, stats: { HR: 23 } };
+    h.update(gs => {
+      gs.setSeasonHistory({ transfers: [{ id: 'latest' }] });
+      gs.setGameResultsMap({ 1: { label: 'latest' } });
+      gs.stageCareerEntries([{ playerId: 0, careerEntry: entry }]);
+    });
+    const set = Storage.prototype.setItem, before = localStorage.getItem('baseball_manager_v1');
+    Storage.prototype.setItem = function(k, v) { if (k === 'baseball_manager_v1') throw new DOMException('full', 'QuotaExceededError'); return set.call(this, k, v); };
+    const failed = await older(renewalEnvelope(world));
+    Storage.prototype.setItem = set;
+    const failure = { ok: failed.ok, revision: h.current().contractEconomy.revision,
+      dirty: h.current().saveDirty, unchanged: localStorage.getItem('baseball_manager_v1') === before };
+    const saved = await older(renewalEnvelope(world));
+    const restored = await saves.loadGame();
+    const replayed = await h.current().commitEconomyCommand(renewalEnvelope(world));
+    const outcome = { failure, saved, replayed, restored,
+      career: await saves.loadPlayerCareerLogById('0', world.saveId),
+      rendered: document.querySelector('[data-economy-revision]')?.textContent };
+    h.unmount(); return outcome;
+  }, large);
+  expect(result.failure).toEqual({ ok: false, revision: 0, dirty: true, unchanged: true });
+  expect(result.saved).toMatchObject({ ok: true, committed: { revision: 1, receiptIds: [0] } });
+  expect(result.replayed).toEqual({ ok: true, replayed: true });
+  expect(result.restored.seasonHistory.transfers).toEqual([{ id: 'latest' }]);
+  expect(result.restored.gameResultsMap).toEqual({ 1: { label: 'latest' } });
+  expect(result.restored.contractEconomy.engine.transactions).toHaveLength(1);
+  expect(result.career).toEqual([{ year: 2025, teamId: 0, stats: { HR: 23 } }]);
+  expect(result.rendered).toBe('1');
+});
+
+test('save generations: real hook suspended adoption times out safely and recovers', async ({ page }) => {
+  await page.goto('/');
+  await page.clock.install();
+  await page.evaluate(async () => {
+    const { mountEconomyHook } = await import('/baseball-manager/tests/helpers/economy-hook-harness.jsx');
+    const { economyFixture, renewalEnvelope } = await import('/baseball-manager/src/engine/__tests__/fixtures/economyWorld.js');
+    const saves = await import('/baseball-manager/src/engine/saveload.js');
+    const world = economyFixture(); await saves.saveGame(world, { skipCompression: true });
+    const h = window.economyHarness = mountEconomyHook(await saves.loadGame());
+    h.update(gs => gs.stageCareerEntries([{ playerId: 0, careerEntry: { year: 2025, stats: { HR: 29 } } }]));
+    h.block();
+    window.economyTask = h.current().commitEconomyCommand(renewalEnvelope(world));
+  });
+  await page.waitForFunction(() => window.economyHarness.suspended());
+  expect(await page.evaluate(() => ({ revision: window.economyHarness.current().contractEconomy.revision,
+    dirty: window.economyHarness.current().saveDirty }))).toEqual({ revision: 0, dirty: true });
+  await page.clock.fastForward(10001);
+  expect(await page.evaluate(() => window.economyTask)).toMatchObject({ ok: false, reason: 'economy_adoption_required' });
+  const raw = await page.evaluate(() => localStorage.getItem('baseball_manager_v1'));
+  await page.evaluate(() => window.economyHarness.resume());
+  await expect(page.locator('[data-economy-revision="1"]')).toHaveText('1');
+  expect(await page.evaluate(() => window.economyHarness.current().recoverEconomyCommand()))
+    .toMatchObject({ ok: true, committed: { revision: 1, receiptIds: [0] } });
+  expect(await page.evaluate(() => localStorage.getItem('baseball_manager_v1'))).toBe(raw);
+  await page.waitForFunction(() => !window.economyHarness.current().saveDirty);
+  await page.evaluate(() => window.economyHarness.unmount());
+});
+
+test('save generations: real hook remount acknowledges the published root and resumes saving', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(async () => {
+    const { mountEconomyHook } = await import('/baseball-manager/tests/helpers/economy-hook-harness.jsx');
+    const { economyFixture, renewalEnvelope } = await import('/baseball-manager/src/engine/__tests__/fixtures/economyWorld.js');
+    const saves = await import('/baseball-manager/src/engine/saveload.js');
+    const world = economyFixture(); await saves.saveGame(world, { skipCompression: true });
+    const first = mountEconomyHook(await saves.loadGame());
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function(k, v) { set.call(this, k, v); if (k === 'baseball_manager_v1') first.unmount(); };
+    const interrupted = await first.current().commitEconomyCommand(renewalEnvelope(world));
+    Storage.prototype.setItem = set;
+    const raw = localStorage.getItem('baseball_manager_v1');
+    const second = mountEconomyHook(await saves.loadGame());
+    const recovered = await second.current().recoverEconomyCommand();
+    const unchanged = raw === localStorage.getItem('baseball_manager_v1');
+    const saved = await second.current().handleSave({ silent: true });
+    second.unmount(); return { interrupted, recovered, unchanged, saved };
+  });
+  expect(result.interrupted).toMatchObject({ ok: false, reason: 'economy_adoption_required' });
+  expect(result.recovered).toMatchObject({ ok: true, committed: { revision: 1, receiptIds: [0] } });
+  expect(result.unchanged).toBe(true); expect(result.saved.ok).toBe(true);
+});
