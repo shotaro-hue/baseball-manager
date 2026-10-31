@@ -51,7 +51,8 @@ it('returns a surplus active catcher to the farm without changing abilities', ()
 
 function twoCatcherTeam() {
   seedRandom(4);
-  const team = createInitialTeams()[0];
+  // Controlled generated bench isolates catcher repair from development eligibility.
+  const team = createInitialTeams(null)[0];
   const ids = new Set(activeCatchers(team).slice(0, 2).map(p => p.id));
   team.players = team.players.filter(p => proficiencyAt(p, '捕手') <= 0 || ids.has(p.id));
   team.farm = team.farm.filter(p => proficiencyAt(p, '捕手') <= 0);

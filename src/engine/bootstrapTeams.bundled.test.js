@@ -3,6 +3,7 @@ import master from '../data/playerMaster2026.release.json';
 import {createInitialTeams,createInitialTeamsAsync} from './bootstrapTeams';
 import {validateTeamRoster} from './rosterAutomation';
 import {selectFarmTeam} from './farmSelection';
+import {hasCompleteFieldingCoverage} from './initialRoster';
 import {compilePlayerMaster} from '../data/playerMasterSchema';
 
 it('starts every bundled player once, on the correct team and tier, in both initialization paths',async()=>{
@@ -33,3 +34,20 @@ it('records the bundling decision without inventing source permissions or disabl
  expect(()=>compilePlayerMaster(invalid,options)).toThrow(/duplicate/);
  expect(()=>compilePlayerMaster(master,{publicationDecision:{type:'maintainer-authorized-unconfirmed'}})).toThrow(/rights/);
 });
+
+// Seed 121 previously demoted the third outfielder during oversized-roster
+// trimming, then blocked recall with a newly created registration cooldown.
+it('builds legal opening rosters across 100 seeds and the mass-demotion regression',()=>{
+ for(const input of [...Array.from({length:100},(_,i)=>i+1),121]){
+  let seed=input;vi.spyOn(Math,'random').mockImplementation(()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;});
+  try{
+   for(const team of createInitialTeams()){
+    expect(hasCompleteFieldingCoverage(team.players.filter(p=>!p.isPitcher)),`seed ${input} club ${team.id}`).toBe(true);
+    expect(validateTeamRoster(team).errors).toEqual([]);
+    expect(Object.keys(team.rosterFallbackAssignments||{})).toHaveLength(0);
+    expect(selectFarmTeam(team,{round:1}).status).toBe('ready');
+    expect([...team.players,...team.farm].map(p=>p.realPlayerId).sort()).toEqual(master.players.filter(p=>p.teamId===team.id).map(p=>p.playerId).sort());
+   }
+  }finally{vi.restoreAllMocks();}
+ }
+},60000);

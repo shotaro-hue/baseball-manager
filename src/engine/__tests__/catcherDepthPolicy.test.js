@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { afterEach, expect, it, vi } from 'vitest';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
+// These fixtures require the legacy generated depth; bundled data is tested separately.
 import { createInitialTeams } from '../bootstrapTeams';
 import { analyzeTeamNeeds } from '../trade';
 import { evaluateOrganizationNeeds } from '../organizationNeeds';
@@ -37,7 +38,7 @@ it('starts all clubs with at least six controlled catchers and three active catc
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
     return seed / 4294967296;
   });
-  for (const team of createInitialTeams()) {
+  for (const team of createInitialTeams(null)) {
     expect(owned(team).filter(p => !p.isPitcher && p.pos === '捕手' && !p.育成 && !p.isIkusei).length,
       `club ${team.id}: controlled depth`).toBeGreaterThanOrEqual(6);
     expect(activeCatchers(team).length, `club ${team.id}: active`).toBe(3);

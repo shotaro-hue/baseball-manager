@@ -31,7 +31,7 @@ function createInitialTeam(def,rosters) {
   // Reserve a farm catcher without removing the only fielder for another slot.
   // Complete input must produce a legal team without adding fictional players.
   for(const farmCatcher of rosters[def.id]?.complete ? catchers : [catchers[0]]) {
-    const team=optimizeInitialTeam(rawTeam,farmCatcher);
+    const team=optimizeInitialTeam(rawTeam,farmCatcher,rosters[def.id]?.complete===true);
     const batters=team.players.filter(p=>!p.isPitcher);
     if(rosters[def.id]?.complete&&(batters.length<9||!hasCompleteFieldingCoverage(batters)||validateTeamRoster(team).errors.length))continue;
     return startClubFinance(team, 2026);
@@ -39,11 +39,13 @@ function createInitialTeam(def,rosters) {
   throw new Error('完全名簿では一軍・二軍の守備が成立しません。捕手と守備適性を確認してください');
 }
 
-function optimizeInitialTeam(rawTeam,farmCatcher) {
+function optimizeInitialTeam(rawTeam,farmCatcher,complete=false) {
   const team = optimizeTeamForGameStart({
     ...rawTeam,
-    players: rawTeam.players.filter(p => p !== farmCatcher),
-    farm: rawTeam.farm.filter(p => p !== farmCatcher),
+    // A complete master starts unassigned. Treating every controlled player as
+    // active causes mass demotions and artificial cooldowns before opening day.
+    players: complete ? [] : rawTeam.players.filter(p => p !== farmCatcher),
+    farm: (complete ? [...rawTeam.players,...rawTeam.farm] : rawTeam.farm).filter(p => p !== farmCatcher),
   });
   if (farmCatcher) team.farm = [...team.farm, farmCatcher];
   const nonPitcherIds = (team.players || [])
