@@ -51,6 +51,7 @@ export default function App() {
 
   const handleLoad = async () => {
     if (titleDeletionInProgress.current || gs.isNewGameInitializing()) return;
+    const loadTokens = { sessionToken: gs.getProgressSessionToken(), progressToken: gs.getProgressToken() };
     const attempt = gs.getNewGameInitializationAttempt();
     const epoch = titleLoadEpoch.current;
     const loadIsStale = () => epoch !== titleLoadEpoch.current || gs.isNewGameInitializing() || attempt !== gs.getNewGameInitializationAttempt();
@@ -111,38 +112,20 @@ export default function App() {
         );
         const shouldBackfillForeignFa =
           (saved.faPool?.length ?? 0) === 0 && saved.gameDay === 1;
-        gs.applyProgressCandidate({ ...migrated, battedBallReceipt: saved.battedBallReceipt ?? null });
-        gs.setMyId(saved.myId);
-        gs.setSaveId(saved.saveId);
-        gs.setGameDay(saved.gameDay);
-        gs.setYear(saved.year);
-        gs.setOffseasonPlan(planningResumeScreen(saved.offseasonPlan, saved.year, saved.myId) === 'hub' ? null : saved.offseasonPlan);
-
-        gs.setSchedule(loadedSchedule);
-        gs.setAllStarTriggerDay(loadedAllStarTriggerDay);
-        gs.setFaPool(shouldBackfillForeignFa ? openingForeignPool : saved.faPool || []);
-        gs.setFaYears(saved.faYears || {});
-        gs.hydrateLargeSaveData({
+        const hydrated = gs.hydrateSavedWorld({
+          ...migrated,
+          battedBallReceipt: saved.battedBallReceipt ?? null,
+          offseasonPlan: planningResumeScreen(saved.offseasonPlan, saved.year, saved.myId) === 'hub' ? null : saved.offseasonPlan,
+          faPool: shouldBackfillForeignFa ? openingForeignPool : saved.faPool || [],
+          faYears: saved.faYears || {},
           seasonHistory: saved.seasonHistory || {
-            awards: [],
-            records: {
-              singleSeasonHR: null,
-              singleSeasonAVG: null,
-              singleSeasonK: null,
-              careerHR: {},
-              careerW: {},
-            },
-            hallOfFame: [],
-            championships: [],
-            standingsHistory: [],
-            transfers: [],
+            awards: [], records: { singleSeasonHR: null, singleSeasonAVG: null, singleSeasonK: null, careerHR: {}, careerW: {} },
+            hallOfFame: [], championships: [], standingsHistory: [], transfers: [],
           },
-          news: saved.news || [],
-          mailbox: saved.mailbox || [],
-        });
-        gs.hydrateMatchHistory(saved);
-        gs.setSaveRevision(Number(saved.saveRevision) || 0);
-        gs.resetSaveTracking();
+          news: saved.news || [], mailbox: saved.mailbox || [],
+        }, loadTokens);
+        if (!hydrated) throw new Error('save_hydration_rejected');
+        gs.setAllStarTriggerDay(loadedAllStarTriggerDay);
         gs.setCpuTradeOffers([]);
 
         sf.setPlayoff(null);
