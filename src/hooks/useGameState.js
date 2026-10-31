@@ -564,7 +564,15 @@ export function useGameState() {
       // Await the actual React state transition, not just a dispatched action
       // or a ref assignment. The service keeps the native save lock meanwhile.
       return new Promise(resolve => {
-        pendingEconomyAdoptionRef.current = { world, committed, resolve };
+        const finish = ok => { clearTimeout(expiration); resolve(ok); };
+        // A reducer rejection or an unmounted/suspended UI must not retain the
+        // origin-wide native save lock indefinitely after publication.
+        const expiration = setTimeout(() => {
+          if (pendingEconomyAdoptionRef.current?.resolve === finish)
+            pendingEconomyAdoptionRef.current = null;
+          resolve(false);
+        }, 10000);
+        pendingEconomyAdoptionRef.current = { world, committed, resolve: finish };
         progressDispatch(action);
       });
     },
@@ -583,6 +591,12 @@ export function useGameState() {
     pendingEconomyAdoptionRef.current = null;
     resolve(true);
   }, [gameState]);
+
+  useEffect(() => () => {
+    const pending = pendingEconomyAdoptionRef.current;
+    pendingEconomyAdoptionRef.current = null;
+    pending?.resolve(false);
+  }, []);
 
   const finalizeEconomyCommit = useCallback(async (context, result) => {
     const ack = result?.committed, next = context.world.contractEconomy;
@@ -879,7 +893,7 @@ export function useGameState() {
   }, [teams]);
 
   const handleSelect = useCallback(async (id, localMaster)=>{
-    if (newGameInitializationRef.current) return;
+    if (newGameInitializationRef.current || economyCommitRef.current) return;
     newGameInitializationRef.current = true;
     newGameInitializationAttemptRef.current += 1;
     setNewGameInitializationStatus('initializing');
