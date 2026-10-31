@@ -182,11 +182,31 @@ export function useGameState() {
   );
   const { teams, news, gameDay, year, myId, saveId, farmCompetition, battedBallReceipt,
     faPool, faYears, offseasonPlan, mailbox, schedule, contractEconomy } = gameState;
-  const setFaPool = useCallback(value => dispatch({ type: G.SET_FA_POOL, value }), []);
-  const setFaYearsState = useCallback(value => dispatch({ type: G.SET_FA_YEARS, value }), []);
-  const setOffseasonPlanState = useCallback(value => dispatch({ type: G.SET_OFFSEASON_PLAN, value }), []);
-  const setMailboxState = useCallback(value => dispatch({ type: G.SET_MAILBOX, value }), []);
-  const setSchedule = useCallback(value => dispatch({ type: G.SET_SCHEDULE, value }), []);
+  const setFaPool = useCallback(value => {
+    if (economyCommitRef.current) return false;
+    dispatch({ type: G.SET_FA_POOL, value });
+    return true;
+  }, []);
+  const setFaYearsState = useCallback(value => {
+    if (economyCommitRef.current) return false;
+    dispatch({ type: G.SET_FA_YEARS, value });
+    return true;
+  }, []);
+  const setOffseasonPlanState = useCallback(value => {
+    if (economyCommitRef.current) return false;
+    dispatch({ type: G.SET_OFFSEASON_PLAN, value });
+    return true;
+  }, []);
+  const setMailboxState = useCallback(value => {
+    if (economyCommitRef.current) return false;
+    dispatch({ type: G.SET_MAILBOX, value });
+    return true;
+  }, []);
+  const setSchedule = useCallback(value => {
+    if (economyCommitRef.current) return false;
+    dispatch({ type: G.SET_SCHEDULE, value });
+    return true;
+  }, []);
   const rosterCommandRef = useRef(gameState);
   const economyCommitRef = useRef(null);
   const pendingEconomyAdoptionRef = useRef(null);
@@ -238,7 +258,7 @@ export function useGameState() {
     progressDispatch({type:G.APPLY_PROGRESS,candidate:{...candidate,...('teams' in candidate?{teams:slimTeamsForState(candidate.teams)}:{})}});
     markSaveDirty();return true;
   },[progressDispatch,markSaveDirty]);
-  const setTeams   = useCallback((n) => { progressDispatch({ type: G.SET_TEAMS, teams: (prev) => slimTeamsForState(typeof n === 'function' ? n(prev) : n) }); markSaveDirty(); },    [markSaveDirty]);
+  const setTeams   = useCallback((n) => { if (economyCommitRef.current) return false; progressDispatch({ type: G.SET_TEAMS, teams: (prev) => slimTeamsForState(typeof n === 'function' ? n(prev) : n) }); markSaveDirty(); },    [markSaveDirty]);
   const setGameDay = useCallback((n) => { progressDispatch({ type: G.SET_GAME_DAY, day: n }); markSaveDirty(); }, [markSaveDirty]);
   const setYear    = useCallback((n) => { progressDispatch({ type: G.SET_YEAR, year: n }); markSaveDirty(); }, [markSaveDirty]);
   const setMyId    = useCallback((id) => { progressDispatch({ type: G.SET_MY_ID, myId: id }); markSaveDirty(); }, [markSaveDirty]);
@@ -712,6 +732,7 @@ export function useGameState() {
   // Command snapshot also advances synchronously to reject repeated clicks.
   rosterCommandRef.current = { ...gameState, progressToken: getProgressToken() };
   const commitRosterCommand = (current, nextTeam) => {
+    if (economyCommitRef.current) return false;
     const nextTeams = current.teams.map(t => t.id === current.myId ? nextTeam : t);
     rosterCommandRef.current = { ...current, teams: nextTeams };
     setTeams(nextTeams);
@@ -734,7 +755,7 @@ export function useGameState() {
   },[myTeam,mailbox,faPool,news,gameDay]);
 
   const notify = useCallback((msg,type="ok")=>{setNotif({msg,type});setTimeout(()=>setNotif(null),3500);},[]);
-  const upd = useCallback((id, fn) => { progressDispatch({ type: G.UPD_TEAM, id, fn: (team) => slimTeamForState(fn(team)) }); markSaveDirty(); }, [markSaveDirty]);
+  const upd = useCallback((id, fn) => { if (economyCommitRef.current) return false; progressDispatch({ type: G.UPD_TEAM, id, fn: (team) => slimTeamForState(fn(team)) }); markSaveDirty(); }, [markSaveDirty]);
 
   const pushResult = useCallback((won,drew,oppName,myScore,oppScore,gameNo)=>{
     setRecentResults(prev=>[{won,drew,oppName,myScore,oppScore,gameNo},...prev.filter(r=>r.gameNo!==gameNo)].slice(0,5));
