@@ -146,3 +146,33 @@ it('preserves explicit recovery after a failed deletion of the same published ro
   expect(roots()).toStrictEqual(published);
   expect((await saves.saveGame(current.world, options)).ok).toBe(true);
 });
+
+it.each(['domain', 'history', 'match history', 'save revision', 'session', 'progress', 'root'])(
+  'refuses a remount acknowledgement with changed %s and retains the save barrier', async kind => {
+    await interruptAdoption();
+    const loaded = await saves.loadGame();
+    const mounted = { world: loaded, sessionToken: 20, progressToken: 1 };
+    const original = structuredClone(mounted);
+    const primary = rows.get(key);
+    if (kind === 'domain') mounted.world.news.push({ id: 'unsaved', type: 'game' });
+    if (kind === 'history') mounted.world.seasonHistory = { unsaved: true };
+    if (kind === 'match history') mounted.world.gameResultsMap = { 1: { unsaved: true } };
+    if (kind === 'save revision') mounted.world.saveRevision = 99;
+    let reads = 0;
+    const readCurrent = () => {
+      if (++reads === 2) {
+        if (kind === 'session') mounted.sessionToken++;
+        if (kind === 'progress') mounted.progressToken++;
+        if (kind === 'root') rows.set(key, 'different root');
+      }
+      return mounted;
+    };
+    expect(await saves.recoverLoadedEconomyCommit({ readCurrent })).toMatchObject({ ok: false, reason: 'economy_adoption_required' });
+    expect(await saves.saveGame(loaded, options)).toMatchObject({ ok: false, reason: 'economy_adoption_required' });
+    rows.set(key, primary);
+    expect(await saves.recoverLoadedEconomyCommit({ readCurrent: () => original }))
+      .toMatchObject({ ok: true, committed: { revision: 1, receiptIds: [0] } });
+    expect(rows.get(key)).toBe(primary);
+    expect((await saves.saveGame(loaded, options)).ok).toBe(true);
+  },
+);

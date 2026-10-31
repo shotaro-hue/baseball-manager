@@ -1052,6 +1052,37 @@ export function recoverEconomyCommit(expected, bindings) {
   } }, { coalesce: false });
 }
 
+// Explicit handoff after a component remount. This never adopts or rewrites a
+// world and does not relax recoverEconomyCommit's original-session fence. The
+// new owner must already have committed the entire published save via hydration.
+export function recoverLoadedEconomyCommit(bindings) {
+  const storage = localStorage, entry = economyCommits.get(storage);
+  if (!entry?.raw || entry.pending || sharedSaveQueue.getSnapshot().isSaving)
+    return Promise.resolve(economyCommitFailure('economy_recovery_unavailable'));
+  const current = bindings?.readCurrent?.();
+  if (!current?.world) return Promise.resolve(economyCommitFailure('economy_adoption_required'));
+  const identity = { sessionToken: current.sessionToken, progressToken: current.progressToken };
+  const deletionEpoch = deletionEpochs.get(storage) ?? 0;
+  const content = world => canonicalEconomy({ domain: adoptionContent(world),
+    seasonHistory: world?.seasonHistory ?? {}, saveRevision: world?.saveRevision ?? 0,
+    history: matchHistorySnapshot(world) });
+  return sharedSaveQueue.enqueue({ execute: async () => {
+    const result = await saveOwnedSnapshot(null, {}, deletionEpoch, { recover: async () => {
+      const unchanged = () => localStorage === storage && economyCommits.get(storage) === entry
+        && (deletionEpochs.get(storage) ?? 0) === deletionEpoch && storage.getItem(SAVE_KEY) === entry.raw;
+      if (!unchanged()) throw new Error('recovery_slot_changed');
+      const { world, committed } = await readPublishedEconomy(entry.raw);
+      const live = bindings.readCurrent();
+      if (!unchanged() || live?.sessionToken !== identity.sessionToken
+        || live?.progressToken !== identity.progressToken || content(live?.world) !== content(world))
+        throw new Error('reloaded_world_not_confirmed');
+      releaseEconomyCommit(storage, entry);
+      return { ok: true, committed };
+    } });
+    return result.ok ? result : economyCommitFailure('economy_adoption_required');
+  } }, { coalesce: false });
+}
+
 export function enqueueSaveGame(state, options = {}) {
   return enqueueSaveSnapshot(state, options, true);
 }
