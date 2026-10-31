@@ -3,7 +3,7 @@ import { act, create } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
 import { useGameState } from './useGameState';
-import { saveGame, loadGame } from '../engine/saveload';
+import { saveGame, loadGame, loadPlayerCareerLogById } from '../engine/saveload';
 import { economyFixture, renewalEnvelope } from '../engine/__tests__/fixtures/economyWorld';
 import { prepareEconomyMigration } from '../engine/economyMigration';
 import { economyPolicy } from '../engine/__tests__/fixtures/economyWorld';
@@ -126,4 +126,44 @@ it('keeps observed legacy opening and unknown guarantee through hook hydration a
   expect(loaded.teams[0].players[0]).not.toHaveProperty('contractSignedYear');
   expect(loaded.teams[0].players[0]).not.toHaveProperty('contractYears');
   expect(loaded.schedule).toBeNull();
+});
+
+it.each(['mailbox', 'news'])('rejects malformed %s entries before changing the current world or save tracking', async field => {
+  await setup(); act(() => gs.setMyId(0));
+  const before = { session: gs.getProgressSessionToken(), token: gs.getProgressToken(), saveId: gs.saveId };
+  const world = economyFixture(); world[field] = [null];
+  act(() => expect(gs.hydrateSavedWorld(world, tokens())).toBe(false));
+  expect(gs.getProgressSessionToken()).toBe(before.session);
+  expect(gs.getProgressToken()).toBe(before.token); expect(gs.saveId).toBe(before.saveId);
+  expect(gs.saveDirty).toBe(true);
+});
+
+it('rejects a title callback captured before navigating to a different screen', async () => {
+  await setup(); const staleHydrate = gs.hydrateSavedWorld, expected = tokens();
+  act(() => gs.setScreen('select'));
+  act(() => expect(staleHydrate(economyFixture(), expected)).toBe(false));
+  expect(gs.contractEconomy).toBeUndefined();
+});
+
+it('preserves a saved annual offseason resume location during title-screen resave', async () => {
+  const world = economyFixture();
+  world.offseasonPlan = { version: 1, year: 2026, myId: 0, stage: 'results', resumeScreen: 'draft', draftPool: [] };
+  expect((await saveGame(world)).ok).toBe(true);
+  await setup(); expect(hydrate(await loadGame())).toBe(true);
+  await act(async () => { expect((await gs.handleSave({ silent: true })).ok).toBe(true); });
+  const loaded = await loadGame();
+  expect(loaded.offseasonPlan).toEqual(world.offseasonPlan);
+  expect(loaded.contractEconomy.revision).toBe(0);
+});
+
+it('retains pending career entries after rejecting a malformed load', async () => {
+  await setup(); const legacy = { ...economyFixture() }; delete legacy.contractEconomy;
+  delete legacy.teams[0].farm; // Old saves may omit an empty farm.
+  expect(hydrate(legacy)).toBe(true); expect(gs.teams[0].farm).toEqual([]);
+  const entry = { year: 2025, teamId: 0, teamName: '球団', stats: { HR: 7 } };
+  act(() => gs.stageCareerEntries([{ playerId: 0, careerEntry: entry }]));
+  const broken = economyFixture(); broken.mailbox = [null];
+  expect(hydrate(broken)).toBe(false); expect(gs.saveDirty).toBe(true);
+  await act(async () => { expect((await gs.handleSave({ silent: true })).ok).toBe(true); });
+  expect(await loadPlayerCareerLogById('0', legacy.saveId)).toEqual([entry]);
 });

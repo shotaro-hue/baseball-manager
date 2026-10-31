@@ -132,7 +132,14 @@ function sliceCollection(items, options = {}) {
 }
 
 export function useGameState() {
-  const [screen, setScreen] = useState("title");
+  const [screen, setScreenState] = useState("title");
+  const screenRef = useRef('title');
+  const setScreen = useCallback(value => {
+    // Async title loads may retain an older callback across navigation.
+    const next = typeof value === 'function' ? value(screenRef.current) : value;
+    screenRef.current = next;
+    setScreenState(next);
+  }, []);
   const [retireModal, setRetireModal] = useState(null);
   const [playerModal, setPlayerModal] = useState(null);
   const [viewingTeam, setViewingTeam] = useState(null);  // チーム詳細画面で表示中のチーム
@@ -304,7 +311,7 @@ export function useGameState() {
   // Load-only boundary. A transaction must use commitEconomyCandidate and its
   // published-root acknowledgement, never reset the session through this API.
   const hydrateSavedWorld = useCallback((saved, expected) => {
-    if (screen !== 'title' || !expected
+    if (screenRef.current !== 'title' || !expected
       || expected.sessionToken !== progressSessionRef.current
       || expected.progressToken !== progressTokenRef.current
       || newGameInitializationRef.current || pendingSaveRequestsRef.current.size) return false;
@@ -318,6 +325,13 @@ export function useGameState() {
         || !Array.isArray(world.news) || !Array.isArray(world.mailbox)
         || typeof world.saveId !== 'string' || !world.saveId
         || !Number.isInteger(world.year) || !Number.isInteger(world.gameDay)) return false;
+      const isRecord = item => item !== null && typeof item === 'object' && !Array.isArray(item);
+      // These rows are consumed immediately by badge/notification rendering.
+      // Reject malformed elements before resetting the live session or dirty data.
+      const rosterRows = rows => (mode === 'legacy' && rows == null) || (Array.isArray(rows) && rows.every(isRecord));
+      if (!world.mailbox.every(isRecord) || !world.news.every(isRecord)
+        || !world.faPool.every(isRecord) || !world.teams.every(team => isRecord(team)
+          && rosterRows(team.players) && rosterRows(team.farm))) return false;
       // Preserve annual evidence exactly; legacy player history stays slim.
       if (mode === 'legacy') world.teams = slimTeamsForState(world.teams);
     } catch { return false; }
@@ -332,7 +346,7 @@ export function useGameState() {
     resetSaveTracking();
     setSaveExists(true);
     return true;
-  }, [screen, hydrateMatchHistory, resetSaveTracking]);
+  }, [hydrateMatchHistory, resetSaveTracking]);
 
   useEffect(() => {
     let alive = true;
@@ -692,7 +706,7 @@ export function useGameState() {
     }
     const result=await queueSave(
       {teams,myId,gameDay,year,saveId,battedBallReceipt,schedule,...farmFields,...(contractEconomy ? {contractEconomy} : {}),faPool,faYears,seasonHistory,news,mailbox,saveRevision,...getMatchHistorySnapshot(),
-        offseasonPlan: offseasonPlan && { ...offseasonPlan, resumeScreen:
+        offseasonPlan: contractEconomy?.mode === 'annual' ? offseasonPlan : offseasonPlan && { ...offseasonPlan, resumeScreen:
           offseasonPlan.stage === 'postseason' && screen === 'hub' ? offseasonPlan.resumeScreen : screen }, ...options.payload},
       request.options,
       request.snapshot,

@@ -23,3 +23,12 @@ Ruling: 2cはタイトル読込のhydrationと通常再保存に限定する。�
 - malformed candidateの部分反映、旧effectsによるannualの無断変更。
 - dirty/pending careerの失敗時消失、通常保存のengine欠落。
 - 一括ロード入口をcommitの公開証明として利用しない。
+
+## 検証・独立レビュー
+
+- 新規hook6件が入口未実装でRED→GREEN。実save/loadを用い、inline/大root/backupの一括反映・参照分離・再保存を確認。自動保存と旧開始残高/保証unknownも追加。
+- 独立レビューのImportant2件（null通知要素の受理後クラッシュ、annual再保存でresumeScreenをtitleへ変更）を再現テストでRED→GREEN。
+- Ruling: レビューの古いcallbackによる画面制約迂回をImportantへ再評価。非同期loadが保持するcallbackは正当な利用形態で、現在画面の制約は入口の約束だから。現在screenを同期refで検査する。代償: screen setterの責務が増えるが通常の画面遷移は維持しE2Eで確認する。
+- 不正なロード拒否後にもpending careerが残り、次の正常保存で実際に履歴へ記録されることを確認。legacyの省略farmは従来どおり空配列として読込可能。
+- 検証済みの範囲はdomainの一括置換。履歴/表示用storeは既存hook経路を再利用する。新制度の通常Appロードは公開ゲートで引き続き拒否。
+- 取引公開ack/全操作barrierとactivation/進行/UIの未実装は工程分割どおり後続。任意payloadによるAPI悪用やtoken偽装は現行consumerなしとして対象外。CI/browserは実行結果をPRへ記録。独立レビューに残った未解決指摘なし。
