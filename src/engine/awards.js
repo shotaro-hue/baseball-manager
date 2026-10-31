@@ -128,9 +128,8 @@ function pickSawamura(pitchers) {
 function pickRookie(allPlayers) {
   const rookies = allPlayers.filter(p => {
     const careerSummary = getCareerSummary(p);
-    const belowCareerLimit = p.isPitcher
-      ? careerSummary.totalInningsPitched < 30
-      : careerSummary.totalPlateAppearances < 60;
+    const careerExposure = p.isPitcher ? careerSummary.totalInningsPitched : careerSummary.totalPlateAppearances;
+    const belowCareerLimit = Number.isFinite(careerExposure) && careerExposure < (p.isPitcher ? 30 : 60);
     return p.age <= 27 && belowCareerLimit && (p.isPitcher ? p.stats?.IP > 0 : p.stats?.PA > 0);
   });
   const scored = rookies.map(p => {
@@ -239,12 +238,13 @@ export function updateRecords(records, teams) {
       }
 
       // 通算本塁打
-      const careerHR = getCareerSummary(p).totalHomeRuns + (s.HR || 0);
+      const summary = getCareerSummary(p);
+      const careerHR = Number.isFinite(summary.totalHomeRuns) ? summary.totalHomeRuns + (s.HR || 0) : null;
       if (careerHR > (newRec.careerHR[p.id]?.value || 0))
         newRec.careerHR[p.id] = { value: careerHR, playerName: p.name };
 
       // 通算勝利数
-      const careerW = getCareerSummary(p).totalWins + (s.W || 0);
+      const careerW = Number.isFinite(summary.totalWins) ? summary.totalWins + (s.W || 0) : null;
       if (careerW > (newRec.careerW[p.id]?.value || 0))
         newRec.careerW[p.id] = { value: careerW, playerName: p.name };
     }

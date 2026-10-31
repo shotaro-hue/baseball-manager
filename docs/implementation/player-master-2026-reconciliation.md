@@ -37,7 +37,7 @@ node scripts/player-master/registration.mjs /path/to/private-html /tmp/opening-c
 | マスタ | `schemaVersion:1`, `asOf`, `status`, `teams`, `sources`, `players` |
 | 出典 | `id`, `url`, `redistribution:"cleared"`, `rightsEvidence`。フラグだけで権利確認済みにしない |
 | 選手 | 恒久 `playerId`, `teamId`, `name`, `registration`（controlled/development）, `kind`（batter/pitcher）, `sourceIds` |
-| 属性 | `birthDate`（不明時は `gameAge`）, `throws`, `bats`, `pos`, 野手の `positions`（主位置100、副位置0–100） |
+| 属性 | `birthDate`（不明時は `gameAge`）, `throws`（right/left）, `bats`（right/left/switch。不明は読込拒否）, `pos`, 野手の `positions`（主位置100、副位置0–100） |
 | 外国人枠 | `foreignQuotaStatus`（counts/domestic/exempt/unknown）。unknown時は `gameIsForeign` を明示 |
 | 給与 | `salaryStatus`（official/reported/game-assumption）。前2者は `salaryManYen`、仮設定は `gameSalaryManYen`。年額・万円 |
 | 契約 | 同様の `contractStatus` と `contractEndYear` / `gameContractEndYear` |

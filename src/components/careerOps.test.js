@@ -3,6 +3,8 @@ import { act, create } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
 import { CareerTable } from './tabs/CareerTable';
+import { realBatterToPlayer, realPitcherToPlayer } from '../engine/realplayer';
+import { appendCareerEntryToPlayer, makeCareerEntry } from '../engine/careerStats';
 import { emptyStats } from '../engine/playerCore';
 import { saveGame, loadGame, loadPlayerCareerLogById } from '../engine/saveload';
 
@@ -79,4 +81,52 @@ it('keeps annual OPS but withholds career OPS when saved historical details are 
   await render({...player([row(known)]),careerLogSummary:{trimmedEntries:4}});
   expect(JSON.stringify(view.toJSON())).toContain('過去の詳細成績を読み込めませんでした');
   expect(opsRows().map(r=>r.at(-1))).toEqual(['0.797','— 未記録']);
+});
+
+it('preserves unknown imported history, real zeroes and career totals through save/reload and next season', async () => {
+  const p = realBatterToPlayer({name:'入力検証', pos:'捕手', age:24, salary:420,
+    dataQuality:{history:'sourced'}, history:[{year:2025, PA:10, AB:10, H:null, HR:null, RBI:0, SB:0}]}, {gameId:0,name:'球団'});
+  expect(p.careerLog[0].stats).toMatchObject({PA:10,H:null,HR:null,RBI:0,AVG:null,OPS:null});
+  expect(p.careerLogSummary).toMatchObject({totalHits:null,totalHomeRuns:null,totalRbi:0});
+  const state={saveId:'unknown-history',year:2026,gameDay:1,myId:0,teams:[{id:0,name:'球団',players:[p],farm:[]}],seasonHistory:{},news:[],mailbox:[],gameResultsMap:{}};
+  await saveGame(state,{initialCareerLogs:[{playerId:p.id,careerEntries:p.careerLog}]});
+  const loaded=await loadGame();
+  expect((await loadPlayerCareerLogById(p.id,state.saveId))[0].stats.H).toBeNull();
+  const saved=loaded.teams[0].players[0];
+  expect(saved.careerLogSummary.totalHits).toBeNull();
+  await render(saved,{saveId:state.saveId});
+  expect(opsRows().map(r=>r.slice(2,7))).toEqual([
+    ['10','— 未記録','— 未記録','0','0'], ['10','— 未記録','— 未記録','0','0'],
+  ]);
+  const next=appendCareerEntryToPlayer(saved,makeCareerEntry({...emptyStats(),PA:4,AB:4,H:1,HR:0},undefined,2026,0,'球団'));
+  expect(next.careerLogSummary).toMatchObject({totalHits:null,totalHomeRuns:null,totalPlateAppearances:14});
+});
+it('does not derive pitching rates from missing observations or lose exact outs', async () => {
+  const p=realPitcherToPlayer({name:'投手検証',pos:'先発',age:24,salary:420,
+    dataQuality:{history:'sourced'}, history:[{year:2025,outs:1,W:0,L:null,SO:0,ER:null,H:null,BB:0}]}, {gameId:0,name:'球団'});
+  expect(p.careerLog[0].stats).toMatchObject({IP:1/3,W:0,L:null,ER:null,Hp:null,GS:null});
+  await render({...p,recentCareerLog:p.careerLog});
+  expect(opsRows().map(r=>r.slice(2))).toEqual([
+    ['— 未記録','0','— 未記録','— 未記録','0.1','0','— 未記録'],
+    ['— 未記録','0','— 未記録','— 未記録','0.1','0','— 未記録'],
+  ]);
+});
+
+it('retains explicitly observed zero rates while missing denominators stay unknown in career totals', async () => {
+  const p=realBatterToPlayer({name:'ゼロ実測',pos:'捕手',age:24,salary:420,dataQuality:{history:'sourced'},
+    history:[{year:2025,PA:10,AB:10,AVG:0,OPS:0,H:null}]},{gameId:0,name:'球団'});
+  await render({...p,recentCareerLog:p.careerLog});
+  expect(opsRows()[0][3]).toBe('.000');
+  expect(opsRows()[0].at(-1)).toBe('0.000');
+  expect(opsRows()[1][3]).toBe('— 未記録');
+  expect(opsRows()[1].at(-1)).toBe('— 未記録');
+});
+it('includes zero-out runs and walks in imported career pitching rates', async () => {
+  const p=realPitcherToPlayer({name:'アウト検証',pos:'先発',age:24,salary:420,dataQuality:{history:'sourced'},
+    history:[{year:2024,outs:0,ER:1,BB:1,H:0},{year:2025,outs:3,ER:0,BB:0,H:0}]},{gameId:0,name:'球団'});
+  await render({...p,recentCareerLog:p.careerLog});
+  expect(opsRows()[0][2]).toBe('0.00');
+  expect(opsRows()[1][2]).toBe('---');
+  expect(opsRows()[2][2]).toBe('9.00');
+  expect(opsRows()[2].at(-1)).toBe('1.00');
 });

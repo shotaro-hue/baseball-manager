@@ -47,7 +47,7 @@ export function compilePlayerMaster(master, {localImport=false} = {}) {
     requireValue(typeof p.name==='string'&&p.name.trim()&&Number.isInteger(p.teamId)&&rosters[p.teamId],'name/team required');
     requireValue(['controlled','development'].includes(p.registration)&&['batter','pitcher'].includes(p.kind),`${p.playerId}: invalid registration/kind`);
     requireValue(Array.isArray(p.sourceIds)&&p.sourceIds.length>0&&p.sourceIds.every(id=>sources.has(id)),`${p.playerId}: missing evidence`);
-    requireValue(['right','left','unknown'].includes(p.throws)&&['right','left','switch','unknown'].includes(p.bats),`${p.playerId}: hands required`);
+    requireValue(['right','left'].includes(p.throws)&&['right','left','switch'].includes(p.bats),`${p.playerId}: confirmed throwing/batting hands required`);
     requireValue(['counts','domestic','exempt','unknown'].includes(p.foreignQuotaStatus),`${p.playerId}: quota status required`);
     if(p.foreignQuotaStatus==='unknown')requireValue(typeof p.gameIsForeign==='boolean',`${p.playerId}: explicit quota assumption required`);
     if(p.birthDate!=null) {
@@ -66,7 +66,7 @@ export function compilePlayerMaster(master, {localImport=false} = {}) {
     if(p.kind==='batter')requireValue(p.positions&&p.positions[p.pos]===100&&Object.entries(p.positions).every(([pos,value])=>positions.includes(pos)&&number(value)&&value>=0&&value<=100),`${p.playerId}: invalid position proficiencies`);
     requireValue(Array.isArray(p.history),`${p.playerId}: history required (empty if unknown)`);
     for(const h of p.history)validateHistory(h,p);
-    const source={...p,age:p.gameAge,hand:p.throws==='unknown'?undefined:p.throws,batHand:p.bats==='unknown'?undefined:p.bats,
+    const source={...p,age:p.gameAge,hand:p.throws,batHand:p.bats,
       salary,contractEndYear:endYear,isIkusei:p.registration==='development',育成:p.registration==='development',
       isForeign:p.foreignQuotaStatus==='counts'||(p.foreignQuotaStatus==='unknown'&&p.gameIsForeign),
       dataQuality:{salary:p.salaryStatus,contract:p.contractStatus,age:p.birthDate?'official':'game-assumption',

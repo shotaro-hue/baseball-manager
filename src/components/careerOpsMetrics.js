@@ -18,8 +18,8 @@ export function careerOps(s) {
   }
   // Compact history used 0 for absent rates, so only a positive saved OPS is
   // unambiguously recorded when its source counts are incomplete.
-  const stored = Number(s?.OPS);
-  if (Number.isFinite(stored) && stored > 0) return result(stored, null, 'stored');
+  const stored = s?.OPS;
+  if (Number.isFinite(stored) && (stored > 0 || (stored === 0 && s.recording === 'observed'))) return result(stored, null, 'stored');
   return result(null, '未記録');
 }
 

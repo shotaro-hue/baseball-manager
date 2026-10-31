@@ -16,6 +16,8 @@ it('compiles all 12 verified teams with explicit assumptions and stable identiti
  expect(r[1].batters[0].dataQuality.salary).toBe('game-assumption');expect(m).toEqual(before);
 });
 it.each([
+ ['unknown throwing hand',m=>m.players[0].throws='unknown'],
+ ['unknown batting hand',m=>m.players[1].bats='unknown'],
  ['rights',m=>m.sources[0].redistribution='unconfirmed'],
  ['future performance',m=>m.players[0].history=[{year:2026,outs:3}]],
  ['duplicate id',m=>m.players[1].playerId=m.players[0].playerId],

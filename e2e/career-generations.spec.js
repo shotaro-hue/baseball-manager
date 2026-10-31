@@ -118,3 +118,38 @@ test('career generations detail failure explains incomplete history at mobile an
  }
  await page.evaluate(()=>{IDBObjectStore.prototype.get=window.careerOriginalGet;});
 });
+
+test('career generations preserve imported unknowns and observed zeroes after reload',async({page},testInfo)=>{
+ await page.goto('/');
+ await page.evaluate(async fixture=>{
+  const {realBatterToPlayer}=await import('/baseball-manager/src/engine/realplayer.js');
+  const {saveGame}=await import('/baseball-manager/src/engine/saveload.js');
+  const player=realBatterToPlayer({name:'未記録検証',pos:'捕手',age:24,salary:420,dataQuality:{history:'sourced'},
+   history:[{year:2025,PA:10,AB:10,H:null,HR:null,RBI:0,SB:0,AVG:0,OPS:0}]},{gameId:0,name:'検証球団'});
+  fixture.saveId='imported-unknowns';fixture.myId=0;fixture.teams=[{id:0,name:'検証球団',players:[player],farm:[]}];
+  await saveGame(fixture,{initialCareerLogs:[{playerId:player.id,careerEntries:player.careerLog}]});
+ },fixture);
+ await page.reload();
+ await page.evaluate(async()=>{
+  const {loadGame,loadPlayerCareerLogById}=await import('/baseball-manager/src/engine/saveload.js');
+  const saved=await loadGame(),player=saved.teams[0].players[0];
+  const entries=await loadPlayerCareerLogById(player.id,saved.saveId);
+  if(entries[0].stats.H!==null||entries[0].stats.recording!=='observed'||player.careerLogSummary.totalHits!==null)throw Error('unknown history changed after reload');
+  const React=(await import('/baseball-manager/node_modules/.vite/deps/react.js')).default;
+  const {createRoot}=(await import('/baseball-manager/node_modules/.vite/deps/react-dom_client.js')).default;
+  const {CareerTable}=await import('/baseball-manager/src/components/tabs/CareerTable.jsx');
+  const host=document.createElement('main');host.id='career-qa';host.style.cssText='padding:16px;box-sizing:border-box;width:100%';document.body.replaceChildren(host);
+  createRoot(host).render(React.createElement(CareerTable,{player,saveId:saved.saveId,includeCurrentSeason:false}));
+ });
+ const rows=page.locator('#career-qa tbody tr');
+ await expect(rows).toHaveCount(2);
+ await expect(rows.nth(0).locator('td')).toHaveText(['2025','検証球団','10','.000','— 未記録','0','0','0.000']);
+ await expect(rows.nth(1).locator('td')).toHaveText(['通算','','10','— 未記録','— 未記録','0','0','— 未記録']);
+ for(const width of [360,390,1440]){
+  await page.setViewportSize({width,height:900});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  const region=page.getByRole('region',{name:'成績一覧。横にスクロールできます'});
+  const box=await region.boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);
+  await page.screenshot({path:testInfo.outputPath(`career-imported-unknown-${width}.png`),fullPage:true});
+ }
+});

@@ -81,11 +81,13 @@ export function createEmptyCareerLogSummary() {
   };
 }
 
-export function compactCareerStats(stats = {}) {
+// Explicit null represents an unrecorded imported observation. Legacy/live
+// omitted fields retain the existing zero default.
+export function compactCareerStats(stats = {}, { preserveUnknown = false } = {}) {
   return CAREER_STAT_KEYS.reduce((result, key) => {
-    result[key] = safeNumber(stats?.[key]);
+    result[key] = stats?.[key] === null || (preserveUnknown && stats?.[key] == null) ? null : safeNumber(stats?.[key]);
     return result;
-  }, {});
+  }, preserveUnknown || stats?.recording === 'observed' ? { recording: 'observed' } : {});
 }
 
 export function makeCareerEntry(stats, playoffStats, year, teamId, teamName) {
@@ -104,24 +106,18 @@ export function buildCareerLogSummary(entries) {
     if (!entry || typeof entry !== 'object') continue;
     const stats = compactCareerStats(entry.stats);
     const year = safeYear(entry.year);
-    summary.totalGames += safeNumber(entry.games ?? stats.G);
-    summary.totalPlateAppearances += stats.PA;
-    summary.totalAtBats += stats.AB;
-    summary.totalHits += stats.H;
-    summary.totalDoubles += stats.D;
-    summary.totalTriples += stats.T;
-    summary.totalHomeRuns += stats.HR;
-    summary.totalRbi += stats.RBI;
-    summary.totalWalks += stats.BB;
-    summary.totalBattingStrikeouts += stats.K;
-    summary.totalStolenBases += stats.SB;
-    summary.totalInningsPitched += stats.IP;
-    summary.totalEarnedRuns += stats.ER;
-    summary.totalPitchingStrikeouts += stats.Kp;
-    summary.totalWins += stats.W;
-    summary.totalLosses += stats.L;
-    summary.totalSaves += stats.SV;
-    summary.totalHolds += stats.HLD;
+    const fields = {
+      totalGames: entry.games ?? stats.G, totalPlateAppearances: stats.PA,
+      totalAtBats: stats.AB, totalHits: stats.H, totalDoubles: stats.D,
+      totalTriples: stats.T, totalHomeRuns: stats.HR, totalRbi: stats.RBI,
+      totalWalks: stats.BB, totalBattingStrikeouts: stats.K,
+      totalStolenBases: stats.SB, totalInningsPitched: stats.IP,
+      totalEarnedRuns: stats.ER, totalPitchingStrikeouts: stats.Kp,
+      totalWins: stats.W, totalLosses: stats.L, totalSaves: stats.SV, totalHolds: stats.HLD,
+    };
+    for (const [key, value] of Object.entries(fields)) {
+      summary[key] = summary[key] === null || value === null ? null : summary[key] + safeNumber(value);
+    }
     summary.trimmedEntries += 1;
     if (year > 0) {
       summary.firstYear = summary.firstYear === 0 ? year : Math.min(summary.firstYear, year);
@@ -134,7 +130,7 @@ export function buildCareerLogSummary(entries) {
 export function normalizeCareerLogSummary(summary) {
   const source = summary && typeof summary === 'object' ? summary : {};
   const normalized = createEmptyCareerLogSummary();
-  for (const key of SUMMARY_KEYS) normalized[key] = safeNumber(source[key]);
+  for (const key of SUMMARY_KEYS) normalized[key] = source[key] === null ? null : safeNumber(source[key]);
   normalized.firstYear = safeYear(source.firstYear);
   normalized.lastYear = safeYear(source.lastYear);
   return normalized;
@@ -144,7 +140,7 @@ export function addCareerLogSummaries(base, delta) {
   const left = normalizeCareerLogSummary(base);
   const right = normalizeCareerLogSummary(delta);
   const result = createEmptyCareerLogSummary();
-  for (const key of SUMMARY_KEYS) result[key] = left[key] + right[key];
+  for (const key of SUMMARY_KEYS) result[key] = left[key] === null || right[key] === null ? null : left[key] + right[key];
   const firstYears = [left.firstYear, right.firstYear].filter((year) => year > 0);
   result.firstYear = firstYears.length > 0 ? Math.min(...firstYears) : 0;
   result.lastYear = Math.max(left.lastYear, right.lastYear);

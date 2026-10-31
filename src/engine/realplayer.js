@@ -107,7 +107,7 @@ function resolveHistoryTeamNames(history, career, fallback) {
 
 /* ─── 過去成績 → careerLog エントリ変換 ─── */
 
-function historyBatterEntry(h, teamId, teamName) {
+function historyBatterEntry(h, teamId, teamName, preserveUnknown = false) {
   const { year } = h;
   // 過去実績は元データに存在する実数だけを使う。AVG/PAからの逆算・平均値補完は行わない。
   const stats = compactCareerStats({
@@ -131,15 +131,15 @@ function historyBatterEntry(h, teamId, teamName) {
     SB: h.SB,
     CS: h.CS,
     R: h.R,
-  });
+  }, { preserveUnknown });
   return {
     year, teamId, teamName,
     stats,
-    playoffStats: compactCareerStats(),
+    playoffStats: compactCareerStats({}, { preserveUnknown }),
   };
 }
 
-function historyPitcherEntry(h, teamId, teamName) {
+function historyPitcherEntry(h, teamId, teamName, preserveUnknown = false) {
   const { year } = h;
   const stats = compactCareerStats({
     G: h.G,
@@ -159,11 +159,12 @@ function historyPitcherEntry(h, teamId, teamName) {
     L: h.L,
     SV: h.SV,
     HLD: h.HLD,
-  });
+    BF: h.BF,
+  }, { preserveUnknown });
   return {
     year, teamId, teamName,
     stats,
-    playoffStats: compactCareerStats(),
+    playoffStats: compactCareerStats({}, { preserveUnknown }),
   };
 }
 
@@ -202,7 +203,7 @@ export function realBatterToPlayer(input, teamDef) {
   // careerLog: 実際の過去成績から生成（なければ空配列）
   const historyTeamNames = resolveHistoryTeamNames(history, career, teamDef.name);
   const careerLog = (history ?? []).map((h, index) =>
-    historyBatterEntry(h, teamDef.gameId, historyTeamNames[index])
+    historyBatterEntry(h, teamDef.gameId, historyTeamNames[index], b.dataQuality.history === 'sourced')
   );
   const recentCareerLog = getRecentCareerLog(careerLog);
   const careerLogSummary = buildCareerLogSummary(careerLog);
@@ -271,7 +272,7 @@ export function realPitcherToPlayer(input, teamDef) {
 
   const historyTeamNames = resolveHistoryTeamNames(history, career, teamDef.name);
   const careerLog = (history ?? []).map((h, index) =>
-    historyPitcherEntry(h, teamDef.gameId, historyTeamNames[index])
+    historyPitcherEntry(h, teamDef.gameId, historyTeamNames[index], p.dataQuality.history === 'sourced')
   );
   const recentCareerLog = getRecentCareerLog(careerLog);
   const careerLogSummary = buildCareerLogSummary(careerLog);
