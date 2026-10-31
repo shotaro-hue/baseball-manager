@@ -1,0 +1,112 @@
+{
+  "beforeCommit": "072ff769141af58ddba57ca4fb4d560dce8e7e1a",
+  "afterCommit": "6bf8d26f2182eb954de63a42b564ba39c0dc5722",
+  "method": "Recreate both inputs with identical PR code and seeded Math.random/Date.now; remove only Viciedo/Soto corrections for before; compare every team field, assert equal RNG calls. All unlisted fields identical.",
+  "seeds": [
+    {
+      "seed": 7,
+      "before": "675dc81aa98c30eac3ec78d20fd1a480de1928209d1aeab1086cb7d385e1a4c4",
+      "after": "5f52b350d48bf1a0f7d137c2007cdca60e84d28f642fff51bea6aa2bed677dde",
+      "changes": [
+        {
+          "path": ".1.farm.20.dataQuality.foreignQuota",
+          "before": "legacy-unverified",
+          "after": "official-profile-reviewed"
+        },
+        {
+          "path": ".1.farm.20.foreignQuotaStatus",
+          "after": "exempt"
+        },
+        {
+          "path": ".1.farm.20.isForeign",
+          "before": true,
+          "after": false
+        },
+        {
+          "path": ".9.farm.19.dataQuality.foreignQuota",
+          "before": "legacy-unverified",
+          "after": "official-profile-reviewed"
+        },
+        {
+          "path": ".9.farm.19.foreignQuotaStatus",
+          "after": "exempt"
+        },
+        {
+          "path": ".9.farm.19.isForeign",
+          "before": true,
+          "after": false
+        }
+      ]
+    },
+    {
+      "seed": 42,
+      "before": "00c453b136bde17e389abe5f33fee54b2257fdbb2f0f1bf5a360466185331037",
+      "after": "1d5954d2a5d2fd6456d0886d673543c372f6839f250d2504c0562afeaa4bb98e",
+      "changes": [
+        {
+          "path": ".1.farm.18.dataQuality.foreignQuota",
+          "before": "legacy-unverified",
+          "after": "official-profile-reviewed"
+        },
+        {
+          "path": ".1.farm.18.foreignQuotaStatus",
+          "after": "exempt"
+        },
+        {
+          "path": ".1.farm.18.isForeign",
+          "before": true,
+          "after": false
+        },
+        {
+          "path": ".9.farm.22.dataQuality.foreignQuota",
+          "before": "legacy-unverified",
+          "after": "official-profile-reviewed"
+        },
+        {
+          "path": ".9.farm.22.foreignQuotaStatus",
+          "after": "exempt"
+        },
+        {
+          "path": ".9.farm.22.isForeign",
+          "before": true,
+          "after": false
+        }
+      ]
+    },
+    {
+      "seed": 20261009,
+      "before": "73b44807e008635303f9bb4f03c428d57ad28f49c50b4addd1749ff5306868bb",
+      "after": "e49666765e9fa8d7e04abe1de18e5ccc7eee6885c0af3d458657f7aea996c143",
+      "changes": [
+        {
+          "path": ".1.farm.21.dataQuality.foreignQuota",
+          "before": "legacy-unverified",
+          "after": "official-profile-reviewed"
+        },
+        {
+          "path": ".1.farm.21.foreignQuotaStatus",
+          "after": "exempt"
+        },
+        {
+          "path": ".1.farm.21.isForeign",
+          "before": true,
+          "after": false
+        },
+        {
+          "path": ".9.farm.20.dataQuality.foreignQuota",
+          "before": "legacy-unverified",
+          "after": "official-profile-reviewed"
+        },
+        {
+          "path": ".9.farm.20.foreignQuotaStatus",
+          "after": "exempt"
+        },
+        {
+          "path": ".9.farm.20.isForeign",
+          "before": true,
+          "after": false
+        }
+      ]
+    }
+  ]
+}

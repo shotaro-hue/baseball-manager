@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcSeasonAwards } from '../awards';
+import { calcSeasonAwards, updateRecords } from '../awards';
 import { emptyStats } from '../playerCore';
 
 const player = (id, stats = {}, extra = {}) => ({ id, name: `選手${id}`, age: 25, pos: '外野', stats: { ...emptyStats(), ...stats }, ...extra });
@@ -70,4 +70,16 @@ describe('season award eligibility and winners', () => {
     expect(awards.farmAwards.eastern.batting.value).toBe(.5);
     expect(awards.farmAwards.eastern.batting.winners.map(p => p.playerId)).toEqual([0, 2]);
   });
+});
+
+it('does not assert rookie eligibility or career records from unknown imported totals', () => {
+  const unknown=player('unknown',{PA:500,AB:450,H:180,HR:30,W:15,IP:150},
+    {careerLogSummary:{totalHomeRuns:null,totalWins:null,totalPlateAppearances:null,totalInningsPitched:null}});
+  const teams=[team(0,'セ',[unknown])];
+  expect(calcSeasonAwards(teams,2026).rookie.central).toBeNull();
+  expect(calcSeasonAwards([team(0,'セ',[{...unknown,isPitcher:true}])],2026).rookie.central).toBeNull();
+  const result=updateRecords({},teams,2026);
+  expect(result.records.careerHR.unknown).toBeUndefined();
+  expect(result.records.careerW.unknown).toBeUndefined();
+  expect(result.records.singleSeasonHR.value).toBe(30);
 });

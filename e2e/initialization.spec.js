@@ -1,5 +1,22 @@
 import { test, expect } from '@playwright/test';
 import { TEAM, waitForNewGameReady, saveHub, reloadAndLoad } from './helpers/progression';
+import {localMasterFixture} from './fixtures/local-master';
+
+test('local master reaches bootstrap through title routing and survives save/reload',async({page})=>{
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('/');
+ await page.getByText('選手名簿ファイルを使う（新規ゲーム）',{exact:true}).click();
+ await page.getByLabel('選手名簿JSON').setInputFiles({name:'local-master.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(localMasterFixture()))});
+ await expect(page.getByText('実在900名',{exact:false})).toBeVisible();
+ await page.getByRole('button',{name:TEAM,exact:true}).click();await waitForNewGameReady(page,TEAM);
+ const saved=await saveHub(page),all=saved.teams.flatMap(t=>[...t.players,...t.farm]);
+ expect(all).toHaveLength(900);expect(new Set(all.map(p=>p.realPlayerId)).size).toBe(900);
+ expect(all.filter(p=>p.isIkusei)).toHaveLength(180);expect(saved.teams.flatMap(t=>t.players).some(p=>p.isIkusei)).toBe(false);
+ await reloadAndLoad(page);
+ const loaded=await saveHub(page);
+ expect(loaded.teams.flatMap(t=>[...t.players,...t.farm]).map(p=>p.realPlayerId)).toEqual(all.map(p=>p.realPlayerId));
+ expect(errors).toEqual([]);
+});
 
 async function initialContents(page) {
   return page.evaluate(async () => {
@@ -20,6 +37,8 @@ async function initialContents(page) {
     const { generateSeasonSchedule } = await import('/baseball-manager/src/engine/scheduleGen.js');
     const schedule = generateSeasonSchedule(saved.year,saved.teams);
     return { myId:saved.myId, teamCount:saved.teams.length, catcherCoverage, controlled:saved.teams.map(t=>[...t.players,...t.farm].filter(p=>!p.育成&&!p.isIkusei).length), playerIds:players.map(p=>p.id),
+      development:players.filter(p=>p.育成||p.isIkusei).map(p=>p.name.replace(/\s+/g,' ')).sort(),
+      activeDevelopment:saved.teams.flatMap(t=>t.players).filter(p=>p.育成||p.isIkusei).length,
       rows:rows.rows.reduce((n,r)=>n+r.length,0), historyKeys:rows.keys, historyIds,
       regularMatchups:schedule.slice(1,144).reduce((n,day)=>n+day.matchups.length,0),
       scheduledTeamGames:saved.teams.map(t=>schedule.slice(1,144).reduce((n,day)=>n+day.matchups.filter(m=>m.homeId===t.id||m.awayId===t.id).length,0)) };
@@ -89,8 +108,9 @@ test('failed initial IndexedDB write stays on title and retry saves all history 
   await waitForNewGameReady(page,TEAM);
   await saveHub(page);const before=await initialContents(page);
   expect(before.catcherCoverage.every(t => t.active >= 3 && t.farmStatus === 'ready')).toBe(true);
-  expect(before.teamCount).toBe(12);expect(before.controlled).toEqual(Array(12).fill(65));expect(before.playerIds).toHaveLength(780);
-  expect(new Set(before.playerIds).size).toBe(780);
+  expect(before.teamCount).toBe(12);expect(before.controlled).toEqual(Array(12).fill(65));expect(before.playerIds).toHaveLength(782);
+  expect(new Set(before.playerIds).size).toBe(782);
+  expect(before.development).toEqual(['平山 功太','福島 圭音']);expect(before.activeDevelopment).toBe(0);
   expect(before.rows).toBe(2009);expect(before.historyKeys).toHaveLength(376);
   expect([...before.historyIds].sort()).toEqual([...before.historyKeys].sort());
   // schedule[0] is a sentinel; verify actual games instead of counting array keys.

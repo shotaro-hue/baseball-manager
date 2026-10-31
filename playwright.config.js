@@ -45,8 +45,8 @@ export default defineConfig({
     },
     {
       name: 'mobile-webkit',
-      testMatch: ['**/annual-journey.spec.js', '**/progression.smoke.spec.js', '**/finance.spec.js', '**/save-generations.spec.js', '**/career-generations.spec.js', '**/hub-navigation.spec.js', '**/club-reading.spec.js', '**/management-decisions.spec.js', '**/management-lists.spec.js', '**/core-reliability.spec.js', '**/offseason-save-feedback.spec.js', '**/offseason-save-progression.spec.js', '**/save-capacity.spec.js', '**/save-capacity-ui.spec.js', '**/archive-lock.spec.js', '**/storage-version-fence.spec.js', '**/batted-ball-receipts.spec.js'],
-      grep: /annual journey|E1 new game|finance|save generations|career generations|hub navigation|club reading|management decisions|management lists|core reliability|offseason save|save capacity|archive lock|storage version fence|archive receipts/,
+      testMatch: ['**/initialization.spec.js', '**/annual-journey.spec.js', '**/progression.smoke.spec.js', '**/finance.spec.js', '**/save-generations.spec.js', '**/career-generations.spec.js', '**/hub-navigation.spec.js', '**/club-reading.spec.js', '**/management-decisions.spec.js', '**/management-lists.spec.js', '**/core-reliability.spec.js', '**/offseason-save-feedback.spec.js', '**/offseason-save-progression.spec.js', '**/save-capacity.spec.js', '**/save-capacity-ui.spec.js', '**/archive-lock.spec.js', '**/storage-version-fence.spec.js', '**/batted-ball-receipts.spec.js'],
+      grep: /local master|annual journey|E1 new game|finance|save generations|career generations|hub navigation|club reading|management decisions|management lists|core reliability|offseason save|save capacity|archive lock|storage version fence|archive receipts/,
       use: { ...devices['iPhone 13'], viewport: { width: 390, height: 844 } },
     },
   ],

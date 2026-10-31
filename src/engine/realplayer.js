@@ -1,4 +1,6 @@
 import {initialRosterSlots} from './initialRoster';
+import { prepareRealPlayer } from './realPlayerProjection';
+import { isIkuseiPlayer } from './rosterCapacity';
 import { clamp, rng, uid } from '../utils';
 import { emptyStats, makePlayer, applyPositionFields } from './playerCore';
 import { DEFAULT_CONTRACT_END_YEAR } from '../data/npb2025';
@@ -12,6 +14,13 @@ import { buildCareerLogSummary, compactCareerStats, getRecentCareerLog } from '.
 
 
 const GAME_START_YEAR = 2026;
+
+function applyRealPositionFields(player, source) {
+  if (source.positions && !player.isPitcher) return {...player, positions:{...source.positions}, convertTarget:null};
+  const result = applyPositionFields(player);
+  if (source.dataQuality.position === 'game-assumption') result.positions = {[player.pos]:100};
+  return result;
+}
 
 function validateYearOrNull(yearValue) {
   if (yearValue === null) return null;
@@ -36,12 +45,6 @@ function sc(val, inMin, inMax, outMin, outMax) {
     outMax
   );
 }
-
-// 大雑把な守備位置を具体的ポジションに正規化
-// 外野手→中堅手: SECONDARY_POSITION_RULES で左翼手・右翼手が自動付与される
-// 内野手→二塁手: 同ルールで遊撃手・三塁手が付与され、一塁手は除外される
-const GENERIC_POS_MAP = { '外野手': '中堅手', '内野手': '二塁手', 'OF': '中堅手', 'IF': '二塁手' };
-function normalizeRealPos(pos) { return GENERIC_POS_MAP[pos] ?? pos; }
 
 // ポジション別守備基準値
 function posDefenseBase(pos) {
@@ -89,6 +92,7 @@ function resolveHistoryTeamNames(history, career, fallback) {
   }, new Map());
   const yearSeen = new Map();
   return rows.map((row) => {
+    if(row.teamName)return row.teamName;
     const year = row.year;
     const seen = yearSeen.get(year) || 0;
     yearSeen.set(year, seen + 1);
@@ -103,7 +107,7 @@ function resolveHistoryTeamNames(history, career, fallback) {
 
 /* ─── 過去成績 → careerLog エントリ変換 ─── */
 
-function historyBatterEntry(h, teamId, teamName) {
+function historyBatterEntry(h, teamId, teamName, preserveUnknown = false) {
   const { year } = h;
   // 過去実績は元データに存在する実数だけを使う。AVG/PAからの逆算・平均値補完は行わない。
   const stats = compactCareerStats({
@@ -127,15 +131,15 @@ function historyBatterEntry(h, teamId, teamName) {
     SB: h.SB,
     CS: h.CS,
     R: h.R,
-  });
+  }, { preserveUnknown });
   return {
     year, teamId, teamName,
     stats,
-    playoffStats: compactCareerStats(),
+    playoffStats: compactCareerStats({}, { preserveUnknown }),
   };
 }
 
-function historyPitcherEntry(h, teamId, teamName) {
+function historyPitcherEntry(h, teamId, teamName, preserveUnknown = false) {
   const { year } = h;
   const stats = compactCareerStats({
     G: h.G,
@@ -155,25 +159,27 @@ function historyPitcherEntry(h, teamId, teamName) {
     L: h.L,
     SV: h.SV,
     HLD: h.HLD,
-  });
+    BF: h.BF,
+  }, { preserveUnknown });
   return {
     year, teamId, teamName,
     stats,
-    playoffStats: compactCareerStats(),
+    playoffStats: compactCareerStats({}, { preserveUnknown }),
   };
 }
 
 /* ─── 打者変換 ─── */
-export function realBatterToPlayer(b, teamDef) {
+export function realBatterToPlayer(input, teamDef) {
+  const b = prepareRealPlayer(input, 'batter');
   const { name, age, hometown = teamDef.city, isForeign = false, salary, stats, history, career } = b;
-  const pos = normalizeRealPos(b.pos);
+  const pos = b.pos;
   const { AVG = 0.250, HR = 5, RBI = 30, SB = 5, BB = 30, PA = 300, OPS = 0.680 } = stats;
 
   const bbPct = PA > 0 ? BB / PA : 0.08;
   const hrPct = PA > 0 ? HR / PA : 0.02;
 
-  // キャリア最高盗塁数: 2025年スナップショットは開幕直後で少ないため history の最大値を使用
-  const bestSB = Math.max(SB, ...(history ?? []).map(h => h.SB || 0));
+  // Recent exposure-weighted estimate, with no future or career-peak leakage.
+  const bestSB = SB;
 
   const batting = {
     contact:     sc(AVG,   0.195, 0.345, 38, 90),
@@ -197,21 +203,19 @@ export function realBatterToPlayer(b, teamDef) {
   // careerLog: 実際の過去成績から生成（なければ空配列）
   const historyTeamNames = resolveHistoryTeamNames(history, career, teamDef.name);
   const careerLog = (history ?? []).map((h, index) =>
-    historyBatterEntry(h, teamDef.gameId, historyTeamNames[index])
+    historyBatterEntry(h, teamDef.gameId, historyTeamNames[index], b.dataQuality.history === 'sourced')
   );
   const recentCareerLog = getRecentCareerLog(careerLog);
   const careerLogSummary = buildCareerLogSummary(careerLog);
-  // serviceYears: 実績年数優先、なければ年齢から推定
-  const serviceYears = careerLog.length > 0
-    ? careerLog.length
-    : rng(0, Math.max(0, age - 18));
-  const entryAge = age - serviceYears;
+  const { serviceYears, entryAge } = b;
 
-  return applyPositionFields({
+  return applyRealPositionFields({
     id: uid(), name, pos, age,
+    realPlayerId: b.playerId, batHand: b.batHand, hand: b.hand,
+    dataQuality: b.dataQuality, ratingsThrough: b.ratingsThrough, foreignQuotaStatus: b.foreignQuotaStatus,
     potential: clamp(sc(OPS, 0.60, 1.05, 55, 96) + rng(-5, 8), 55, 99),
     isPitcher: false, isForeign,
-    salary: salary ?? 5000000,
+    salary,
     contractYears: resolveInitialContractYears(b.contractEndYear), contractYearsLeft: resolveInitialContractYears(b.contractEndYear),
     育成: Boolean(b.育成 || b.isIkusei), isIkusei: Boolean(b.育成 || b.isIkusei), isFA: false,
     condition: rng(85, 100),
@@ -231,18 +235,19 @@ export function realBatterToPlayer(b, teamDef) {
     trimmedCareerLogSummary: careerLogSummary,
     serviceYears,
     entryAge,
-    entryType: isForeign ? '外国人' : age <= 19 ? '高卒' : age <= 22 ? '大卒' : '社会人',
-    daysOnActiveRoster: serviceYears * rng(100, 140),
+    entryType: b.entryType,
+    daysOnActiveRoster: b.daysOnActiveRoster,
     ikuseiYears: 0,
     playerType: '',
     playerComment: '',
-  });
+  }, b);
 }
 
 /* ─── 投手変換 ─── */
-export function realPitcherToPlayer(p, teamDef) {
+export function realPitcherToPlayer(input, teamDef) {
+  const p = prepareRealPlayer(input, 'pitcher');
   const { name, age, hand = 'right', hometown = teamDef.city, isForeign = false, salary, stats, history, career } = p;
-  const pos = normalizeRealPos(p.pos);
+  const pos = p.pos;
   const { ERA = 4.00, W = 5, L = 8, IP = 80, SO = 70, BB = 35, WHIP = 1.40 } = stats;
   const K = SO;
 
@@ -267,22 +272,21 @@ export function realPitcherToPlayer(p, teamDef) {
 
   const historyTeamNames = resolveHistoryTeamNames(history, career, teamDef.name);
   const careerLog = (history ?? []).map((h, index) =>
-    historyPitcherEntry(h, teamDef.gameId, historyTeamNames[index])
+    historyPitcherEntry(h, teamDef.gameId, historyTeamNames[index], p.dataQuality.history === 'sourced')
   );
   const recentCareerLog = getRecentCareerLog(careerLog);
   const careerLogSummary = buildCareerLogSummary(careerLog);
-  const serviceYears = careerLog.length > 0
-    ? careerLog.length
-    : rng(0, Math.max(0, age - 18));
-  const entryAge = age - serviceYears;
+  const { serviceYears, entryAge } = p;
 
-  return applyPositionFields({
+  return applyRealPositionFields({
     id: uid(), name, pos, age,
+    realPlayerId: p.playerId, batHand: p.batHand,
+    dataQuality: p.dataQuality, ratingsThrough: p.ratingsThrough, foreignQuotaStatus: p.foreignQuotaStatus,
     potential: clamp(sc(ERA, 5.5, 1.8, 55, 97) + rng(-5, 8), 55, 99),
     isPitcher: true, isForeign,
     hand,
     subtype,
-    salary: salary ?? 5000000,
+    salary,
     contractYears: resolveInitialContractYears(p.contractEndYear), contractYearsLeft: resolveInitialContractYears(p.contractEndYear),
     育成: Boolean(p.育成 || p.isIkusei), isIkusei: Boolean(p.育成 || p.isIkusei), isFA: false,
     condition: rng(85, 100),
@@ -302,25 +306,26 @@ export function realPitcherToPlayer(p, teamDef) {
     trimmedCareerLogSummary: careerLogSummary,
     serviceYears,
     entryAge,
-    entryType: isForeign ? '外国人' : age <= 19 ? '高卒' : age <= 22 ? '大卒' : '社会人',
-    daysOnActiveRoster: serviceYears * rng(100, 140),
+    entryType: p.entryType,
+    daysOnActiveRoster: p.daysOnActiveRoster,
     ikuseiYears: 0,
     playerType: '',
     playerComment: '',
-  });
+  }, p);
 }
 
 /* ─── チーム構築 ─── */
 export function buildRealTeam(def, rosterData) {
   const batters  = rosterData.batters.map(b => realBatterToPlayer(b, def));
   const pitchers = rosterData.pitchers.map(p => realPitcherToPlayer(p, def));
-  const players  = [...batters, ...pitchers];
+  const allRealPlayers = [...batters, ...pitchers];
+  const players = allRealPlayers.filter(p=>!isIkuseiPlayer(p));
 
   // ファームはランダム生成（ドラフト候補など）
   const q = rng(42, 58);
   const nonPitchers = players.filter(p => !p.isPitcher);
-  const slots=initialRosterSlots(players);
-  const farm=slots.batterPositions.map(pos=>makePlayer(pos,q,false,rng(18,25)));
+  const slots=initialRosterSlots(allRealPlayers, {complete:rosterData.complete===true});
+  const farm=[...allRealPlayers.filter(isIkuseiPlayer), ...slots.batterPositions.map(pos=>makePlayer(pos,q,false,rng(18,25)))];
   for(const role of slots.pitcherRoles)farm.push(makePlayer(role,q-5,true,rng(18,24)));
 
   const starters    = players.filter(p => p.isPitcher && p.subtype === '先発');

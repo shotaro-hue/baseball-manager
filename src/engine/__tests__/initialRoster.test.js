@@ -22,6 +22,19 @@ it('keeps development input outside the65 controlled count',()=>{
  const data={batters:[...roster.batters,{...roster.batters[0],name:'育成入力',isIkusei:true}],pitchers:roster.pitchers},t=buildRealTeam(def,data);
  const all=[...t.players,...t.farm];expect(all).toHaveLength(66);expect(all.find(p=>p.name==='育成入力').育成).toBe(true);expect(all.filter(p=>!p.育成&&!p.isIkusei)).toHaveLength(65);
 });
+it('retains a complete 64-player club with four catchers without adding fictional players',()=>{
+ const data={complete:true,batters:repeat(roster.batters[0],32).map((p,i)=>({...p,pos:i<4?'捕手':FIELDING_POSITIONS[1+(i-4)%7],positions:{[i<4?'捕手':FIELDING_POSITIONS[1+(i-4)%7]]:100}})),pitchers:repeat(roster.pitchers[0],32)};
+ const t=buildRealTeam(def,data);
+ expect([...t.players,...t.farm]).toHaveLength(64);
+ expect([...t.players,...t.farm].every(p=>p.name.startsWith('入力'))).toBe(true);
+});
+it('uses secondary defensive coverage without rewriting or supplementing a complete roster',()=>{
+ const players=[...controlled(4,'捕手'),...controlled(6,'一塁手').map((p,i)=>({...p,positions:{一塁手:100,[FIELDING_POSITIONS[i+2]]:80}})),...controlled(1,'一塁手'),...controlled(53,'先発',true)];
+ expect(initialRosterSlots(players,{complete:true})).toEqual({batterPositions:[],pitcherRoles:[]});
+});
+it('rejects an unplayable complete roster instead of disguising it with fictional players',()=>{
+ expect(()=>initialRosterSlots(controlled(65,'先発',true),{complete:true})).toThrow(/完全名簿/);
+});
 it('keeps real names, skills, original histories and salary across generated supplementation',()=>{
  const t=buildRealTeam(def,roster),all=[...t.players,...t.farm];
  for(const b of [...roster.batters,...roster.pitchers]){const p=all.find(p=>p.name===b.name);expect(p).toBeTruthy();expect(p.salary).toBe(b.salary);expect(p.careerLog.map(r=>r.year)).toEqual((b.history||[]).map(r=>r.year));}

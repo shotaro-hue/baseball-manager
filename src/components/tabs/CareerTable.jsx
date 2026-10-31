@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
-import { fmtAvg, fmtIP } from '../../utils';
-import { saberBatter, saberPitcher } from '../../engine/sabermetrics';
+import { careerCount, careerAverage, careerInnings, careerRateText, careerMetric, sumCareerStat, totalCareerPitchingRate } from '../careerDisplayStats';
 import { careerOps, careerTotalOps } from '../careerOpsMetrics';
 import { emptyStats } from '../../engine/playerCore';
 import { mergeCareerLogWithCurrentSeason } from '../../engine/careerStats';
@@ -66,11 +65,8 @@ export function CareerTable({player,year,teamId,teamName,saveId,includeCurrentSe
     return mode==="playoff" ? (live?player?.playoffStats:row.playoffStats)||emptyStats()
       : (live?player?.stats:row.stats)||{};
   };
-  // compact形式では未保存の率指標も0になるため、正の実測値だけを保存値として扱う。
-  // 実測0はカウント値から再計算しても0のままなので表示結果は変わらない。
-  const hasStoredRate=(s,key)=>Number(s?.[key])>0;
-  const batterRate=(s,key)=>key==="OPS"?careerOps(s).value:hasStoredRate(s,key)?Number(s[key]):saberBatter(s)[key];
-  const pitcherRate=(s,key)=>hasStoredRate(s,key)?Number(s[key]):saberPitcher(s)[key];
+  const batterRate=(s,key)=>key==="OPS"?careerOps(s).value:careerMetric(s,key);
+  const pitcherRate=(s,key)=>careerMetric(s,key,true);
 
   // ⑥ キャリア推移グラフ用指標定義
   const BATTER_METRICS=[
@@ -78,33 +74,28 @@ export function CareerTable({player,year,teamId,teamName,saveId,includeCurrentSe
     {key:"RBI", label:"打点",   get:s=>s.RBI,   isCount:true},
     {key:"AVG", label:"打率",   get:s=>batterRate(s,"AVG")},
     {key:"OPS", label:"OPS",   get:s=>batterRate(s,"OPS")},
-    {key:"wOBA",label:"wOBA",  get:s=>saberBatter(s).wOBA},
-    {key:"WAR", label:"WAR",   get:s=>saberBatter(s).WAR},
+    {key:"wOBA",label:"wOBA",  get:s=>careerMetric(s,"wOBA")},
+    {key:"WAR", label:"WAR",   get:s=>careerMetric(s,"WAR")},
   ];
   const PITCHER_METRICS=[
     {key:"ERA", label:"防御率", get:s=>pitcherRate(s,"ERA")},
     {key:"W",   label:"勝利",   get:s=>s.W,     isCount:true},
     {key:"WHIP",label:"WHIP",  get:s=>pitcherRate(s,"WHIP")},
     {key:"K",   label:"奪三振", get:s=>s.Kp,   isCount:true},
-    {key:"FIP", label:"FIP",   get:s=>saberPitcher(s).FIP},
-    {key:"WAR", label:"WAR",   get:s=>saberPitcher(s).WAR},
+    {key:"FIP", label:"FIP",   get:s=>careerMetric(s,"FIP",true)},
+    {key:"WAR", label:"WAR",   get:s=>careerMetric(s,"WAR",true)},
   ];
   const metrics=ip?PITCHER_METRICS:BATTER_METRICS;
   const activeMet=metrics.find(m=>m.key===metricKey)||metrics[0];
   const chartData=[...displayLog].map(row=>{const s=getS(row);return{year:row.year,value:metricKey==="OPS"?careerOps(getOpsS(row)).value:activeMet.get(s)};});
 
   // 通算計算
-  const sumK=(k)=>displayLog.reduce((a,r)=>a+(getS(r)[k]||0),0);
+  const sumK=(k)=>sumCareerStat(displayLog.map(getS),k);
   const totals={PA:sumK("PA"),AB:sumK("AB"),H:sumK("H"),D:sumK("D"),T:sumK("T"),HR:sumK("HR"),RBI:sumK("RBI"),BB:sumK("BB"),K:sumK("K"),HBP:sumK("HBP"),SF:sumK("SF"),SH:sumK("SH"),SB:sumK("SB"),BF:sumK("BF"),W:sumK("W"),L:sumK("L"),SV:sumK("SV"),IP:sumK("IP"),Kp:sumK("Kp"),ER:sumK("ER"),BBp:sumK("BBp"),HBPp:sumK("HBPp"),Hp:sumK("Hp"),HRp:sumK("HRp")};
   const hasTotals=ip?(totals.BF>0||totals.IP>0):(totals.PA>0);
-  const weightedRate=(key,weightKey,getFallback)=>{
-    let weighted=0;let weightTotal=0;
-    displayLog.forEach(row=>{const s=getS(row);const weight=Number(s?.[weightKey])||0;if(weight<=0)return;const rate=hasStoredRate(s,key)?Number(s[key]):getFallback(s);weighted+=rate*weight;weightTotal+=weight;});
-    return weightTotal>0?weighted/weightTotal:0;
-  };
   const totalOPS=detailUnavailable?{value:null,display:"— 未記録"}:careerTotalOps(displayLog.map(getOpsS));
-  const totalERA=weightedRate("ERA","IP",s=>saberPitcher(s).ERA);
-  const totalWHIP=weightedRate("WHIP","IP",s=>saberPitcher(s).WHIP);
+  const totalERA=totalCareerPitchingRate(displayLog.map(getS),"ERA");
+  const totalWHIP=totalCareerPitchingRate(displayLog.map(getS),"WHIP");
 
   return(
     <div className="calm-detail career-detail" style={{marginTop:8,background:"#f6f9fd",borderRadius:6,padding:"8px 10px"}}>
@@ -152,13 +143,13 @@ export function CareerTable({player,year,teamId,teamName,saveId,includeCurrentSe
                   <tr key={row.year+"-p-"+ri}>
                     <td className="mono" style={{color:"#805700"}}>{row.year}</td>
                     <td className="mono" style={{color:"#53657c",maxWidth:60,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.teamName||""}</td>
-                    <td className="mono">{s.IP>0?pitcherRate(s,"ERA").toFixed(2):"---"}</td>
-                    <td className="mono" style={{color:"#14714b"}}>{s.W}</td>
-                    <td className="mono" style={{color:"#b42332"}}>{s.L}</td>
-                    <td className="mono">{s.SV}</td>
-                    <td className="mono">{fmtIP(s.IP)}</td>
-                    <td className="mono">{s.Kp}</td>
-                    <td className="mono">{s.IP>0?pitcherRate(s,"WHIP").toFixed(2):"---"}</td>
+                    <td className="mono">{s.IP!==0?careerRateText(pitcherRate(s,"ERA")):"---"}</td>
+                    <td className="mono" style={{color:"#14714b"}}>{careerCount(s.W)}</td>
+                    <td className="mono" style={{color:"#b42332"}}>{careerCount(s.L)}</td>
+                    <td className="mono">{careerCount(s.SV)}</td>
+                    <td className="mono">{careerInnings(s.IP)}</td>
+                    <td className="mono">{careerCount(s.Kp)}</td>
+                    <td className="mono">{s.IP!==0?careerRateText(pitcherRate(s,"WHIP")):"---"}</td>
                   </tr>
                 );
               })}
@@ -166,13 +157,13 @@ export function CareerTable({player,year,teamId,teamName,saveId,includeCurrentSe
                 <tr style={{background:"rgba(245,200,66,.06)",fontWeight:700}}>
                   <td style={{color:"#805700",fontSize:14}}>通算</td>
                   <td></td>
-                  <td className="mono">{totals.IP>0?totalERA.toFixed(2):"---"}</td>
-                  <td className="mono" style={{color:"#14714b"}}>{totals.W}</td>
-                  <td className="mono" style={{color:"#b42332"}}>{totals.L}</td>
-                  <td className="mono">{totals.SV}</td>
-                  <td className="mono">{fmtIP(totals.IP)}</td>
-                  <td className="mono">{totals.Kp}</td>
-                  <td className="mono">{totals.IP>0?totalWHIP.toFixed(2):"---"}</td>
+                  <td className="mono">{totals.IP!==0?careerRateText(totalERA):"---"}</td>
+                  <td className="mono" style={{color:"#14714b"}}>{careerCount(totals.W)}</td>
+                  <td className="mono" style={{color:"#b42332"}}>{careerCount(totals.L)}</td>
+                  <td className="mono">{careerCount(totals.SV)}</td>
+                  <td className="mono">{careerInnings(totals.IP)}</td>
+                  <td className="mono">{careerCount(totals.Kp)}</td>
+                  <td className="mono">{totals.IP!==0?careerRateText(totalWHIP):"---"}</td>
                 </tr>
               )}
             </tbody>
@@ -182,10 +173,10 @@ export function CareerTable({player,year,teamId,teamName,saveId,includeCurrentSe
           <table className="tbl" style={{fontSize:14,width:"100%",marginTop:8}}>
             <thead><tr><th>年度</th><th>打席</th><th>打数</th><th>打率</th><th>安打</th><th>犠打</th></tr></thead>
             <tbody>
-              {[...displayLog].reverse().map((row,ri)=>{const s=getS(row);if(s.PA===0)return null;return(
-                <tr key={row.year+"-pb-"+ri}><td className="mono" style={{color:"#805700"}}>{row.year}</td><td className="mono">{s.PA}</td><td className="mono">{s.AB}</td><td className="mono">{fmtAvg(s.H,s.AB)}</td><td className="mono">{s.H}</td><td className="mono">{s.SH||0}</td></tr>
+              {[...displayLog].reverse().map((row,ri)=>{const s=getS(row);if(!(s.PA>0))return null;return(
+                <tr key={row.year+"-pb-"+ri}><td className="mono" style={{color:"#805700"}}>{row.year}</td><td className="mono">{careerCount(s.PA)}</td><td className="mono">{careerCount(s.AB)}</td><td className="mono">{careerAverage(s)}</td><td className="mono">{careerCount(s.H)}</td><td className="mono">{careerCount(s.SH)}</td></tr>
               );})}
-              <tr style={{background:"rgba(245,200,66,.06)",fontWeight:700}}><td style={{color:"#805700",fontSize:14}}>通算</td><td className="mono">{totals.PA}</td><td className="mono">{totals.AB}</td><td className="mono">{fmtAvg(totals.H,totals.AB)}</td><td className="mono">{totals.H}</td><td className="mono">{totals.SH}</td></tr>
+              <tr style={{background:"rgba(245,200,66,.06)",fontWeight:700}}><td style={{color:"#805700",fontSize:14}}>通算</td><td className="mono">{careerCount(totals.PA)}</td><td className="mono">{careerCount(totals.AB)}</td><td className="mono">{careerAverage(totals)}</td><td className="mono">{careerCount(totals.H)}</td><td className="mono">{careerCount(totals.SH)}</td></tr>
             </tbody>
           </table>
         )}
@@ -202,11 +193,11 @@ export function CareerTable({player,year,teamId,teamName,saveId,includeCurrentSe
                   <tr key={row.year+"-b-"+ri}>
                     <td className="mono" style={{color:"#805700"}}>{row.year}</td>
                     <td className="mono" style={{color:"#53657c",maxWidth:60,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.teamName||""}</td>
-                    <td className="mono">{s.PA}</td>
-                    <td className="mono">{fmtAvg(s.H,s.AB)}</td>
-                    <td className="mono" style={{color:s.HR>=20?"#805700":undefined}}>{s.HR}</td>
-                    <td className="mono">{s.RBI}</td>
-                    <td className="mono">{s.SB}</td>
+                    <td className="mono">{careerCount(s.PA)}</td>
+                    <td className="mono">{careerAverage(s)}</td>
+                    <td className="mono" style={{color:s.HR>=20?"#805700":undefined}}>{careerCount(s.HR)}</td>
+                    <td className="mono">{careerCount(s.RBI)}</td>
+                    <td className="mono">{careerCount(s.SB)}</td>
                     <td className="mono">{careerOps(getOpsS(row)).display}</td>
                   </tr>
                 );
@@ -215,11 +206,11 @@ export function CareerTable({player,year,teamId,teamName,saveId,includeCurrentSe
                 <tr style={{background:"rgba(245,200,66,.06)",fontWeight:700}}>
                   <td style={{color:"#805700",fontSize:14}}>通算</td>
                   <td></td>
-                  <td className="mono">{totals.PA}</td>
-                  <td className="mono">{fmtAvg(totals.H,totals.AB)}</td>
-                  <td className="mono" style={{color:totals.HR>=200?"#805700":undefined}}>{totals.HR}</td>
-                  <td className="mono">{totals.RBI}</td>
-                  <td className="mono">{totals.SB}</td>
+                  <td className="mono">{careerCount(totals.PA)}</td>
+                  <td className="mono">{careerAverage(totals)}</td>
+                  <td className="mono" style={{color:totals.HR>=200?"#805700":undefined}}>{careerCount(totals.HR)}</td>
+                  <td className="mono">{careerCount(totals.RBI)}</td>
+                  <td className="mono">{careerCount(totals.SB)}</td>
                   <td className="mono">{totalOPS.display}</td>
                 </tr>
               )}

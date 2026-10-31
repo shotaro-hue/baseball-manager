@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { STRATEGY_OPTS, PITCHING_POLICY_OPTS, RLABEL, IS_HIT, IS_OUT, BATCH, FATIGUE_WARNING } from '../constants';
 import { fmtAvg, fmtPct, fmtEra } from '../utils';
 import { saberBatter, saberPitcher } from '../engine/sabermetrics';
-import { initGameState, matchupScore, calcEffectiveFatigue, processAtBat, endHalfInning, checkStopCondition, replacePitcherInBattingOrder, STADIUMS, TEAM_STADIUM } from '../engine/simulation';
+import { initGameState, matchupScore, calcEffectiveFatigue, replacePitcherInBattingOrder, STADIUMS, TEAM_STADIUM } from '../engine/simulation';
 import { OV, CondBadge, HandBadge, PitchBadge } from './ui';
 import Baseball3DModal from './Baseball3DModal';
 import PhysicsInsightPanel from './game/PhysicsInsightPanel';
@@ -38,16 +38,12 @@ export function TacticalGameScreen({myTeam,oppTeam,isHome=true,onGameEnd}){
   useEffect(()=>{
     if(!autoRunning||gs.stopped||gs.gameOver) return;
     const t=setTimeout(()=>{
-      setGs(prev=>{
-        if(prev.stopped||prev.gameOver) return prev;
-        if(prev.outs>=3) return endHalfInning(prev);
-        let next=processAtBat(prev,"normal");
-        if(next.outs>=3) return endHalfInning(next);
-        // Check stop condition
-        const stop=checkStopCondition(next);
-        if(stop){setAutoRunning(false);return{...next,stopped:true,stopReason:stop.reason,stopData:stop};}
-        return next;
-      });
+      // Simulation consumes RNG. React can replay functional updaters in StrictMode;
+      // a discarded result must not stop auto play while the committed result runs.
+      // Compute once, then commit the game and its matching control state together.
+      const next=advanceTacticalAction(gs,"normal");
+      setGs(next);
+      if(next.stopped||next.gameOver)setAutoRunning(false);
     },180);
     return()=>clearTimeout(t);
   },[autoRunning,gs]);

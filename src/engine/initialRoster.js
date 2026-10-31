@@ -1,11 +1,28 @@
 import {FIELDING_POSITIONS,MAX_SHIHAKA_TOTAL,MIN_TOTAL_BY_POS} from '../constants';
 import {isIkuseiPlayer} from './rosterCapacity';
 
+// Match distinct fielders; one utility player cannot fill several slots at once.
+export function hasCompleteFieldingCoverage(batters) {
+  const assigned=new Map();
+  const match=(pos,visited)=>batters.some((p,index)=>{
+    if(visited.has(index)||(p.pos!==pos&&(p.positions?.[pos]??0)<50))return false;
+    visited.add(index);
+    if(!assigned.has(index)||match(assigned.get(index),visited)){assigned.set(index,pos);return true;}
+    return false;
+  });
+  return FIELDING_POSITIONS.every(pos=>match(pos,new Set()));
+}
+
 // Only new-game builders call this. Existing players and loaded saves are never changed.
-export function initialRosterSlots(players) {
+export function initialRosterSlots(players, {complete=false} = {}) {
   const owned=players.filter(p=>!isIkuseiPlayer(p));
   if(owned.length>MAX_SHIHAKA_TOTAL)throw new Error('初期支配下人数が70人を超えています');
   const pitchers=owned.filter(p=>p.isPitcher),batters=owned.filter(p=>!p.isPitcher);
+  if(complete) {
+    if(batters.length<9||pitchers.length<5||batters.filter(p=>p.pos==='捕手').length<3||!hasCompleteFieldingCoverage(batters))
+      throw new Error('完全名簿では一軍・二軍の守備が成立しません。属性を確認してください');
+    return {pitcherRoles:[],batterPositions:[]};
+  }
   // Protect defensive coverage before distributing the optional 32/33 target.
   // Minimums use primary positions and controlled players only; never rewrite
   // a real player's position or use development players to fill these slots.

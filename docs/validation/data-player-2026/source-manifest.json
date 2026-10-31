@@ -1,0 +1,155 @@
+{
+  "asOf": "2026-03-27",
+  "retrievedOn": "2026-10-31",
+  "timezone": "Asia/Tokyo",
+  "status": "reconstructed-not-independently-verified",
+  "redistribution": "unconfirmed",
+  "method": "date-filtered registrations minus removals effective on/before 2026-03-27; relative and absolute profile links; parser outputs cross-checked against local lxml extraction",
+  "candidateCount": 1059,
+  "sources": [
+    {
+      "teamId": 0,
+      "registration": "controlled",
+      "sourceUrl": "https://npb.jp/announcement/2026/registered_s.html",
+      "sha256": "b33da4f49f311cb6839bd6653be08593f4026c894da6b07a2997c4d4c6c335ee"
+    },
+    {
+      "teamId": 0,
+      "registration": "development",
+      "sourceUrl": "https://npb.jp/announcement/2026/registereddev_s.html",
+      "sha256": "5f736f6ea46f4615a6eaf90177afc87db88844fddcd662d33c400b94d870732c"
+    },
+    {
+      "teamId": 1,
+      "registration": "controlled",
+      "sourceUrl": "https://npb.jp/announcement/2026/registered_db.html",
+      "sha256": "ebc78c7caebd1f2a5598b370514548848cf5d12e68397a81cd02841450326046"
+    },
+    {
+      "teamId": 1,
+      "registration": "development",
+      "sourceUrl": "https://npb.jp/announcement/2026/registereddev_db.html",
+      "sha256": "a7bfe3847341b3ad0a531daec29864f9c9490002c989f7529667e9b784b7b3cb"
+    },
+    {
+      "teamId": 2,
+      "registration": "controlled",
+      "sourceUrl": "https://npb.jp/announcement/2026/registered_c.html",
+      "sha256": "63dca3376e75e0f26767ae044c827d211fb0f8d52a9495b94ba4f93f68f46cc8"
+    },
+    {
+      "teamId": 2,
+      "registration": "development",
+      "sourceUrl": "https://npb.jp/announcement/2026/registereddev_c.html",
+      "sha256": "a448160a792a0b8907a46e712e0732d48e4cfe25d7eba829af3512ba46c69735"
+    },
+    {
+      "teamId": 3,
+      "registration": "controlled",
+      "sourceUrl": "https://npb.jp/announcement/2026/registered_t.html",
+      "sha256": "e6d486efcf66b0de86aae7b6a23e2053174a298404d423b6b712621d782c4537"
+    },
+    {
+      "teamId": 3,
+      "registration": "development",
+      "sourceUrl": "https://npb.jp/announcement/2026/registereddev_t.html",
+      "sha256": "ac81f0a0173c7df891d2b70d5670d952ac1460bf53aa372b8dd5f54ce465625c"
+    },
+    {
+      "teamId": 4,
+      "registration": "controlled",
+      "sourceUrl": "https://npb.jp/announcement/2026/registered_g.html",
+      "sha256": "3a0f85c01dfc9dafdb8cd77a7d90d7db67ce977e106a15d9b69898f2568e8b68"
+    },
+    {
+      "teamId": 4,
+      "registration": "development",
+      "sourceUrl": "https://npb.jp/announcement/2026/registereddev_g.html",
+      "sha256": "b8390dbc62dc3974576e27f035b9a371b96068d9934f9782e68d47f189478af7"
+    },
+    {
+      "teamId": 5,
+      "registration": "controlled",
+      "sourceUrl": "https://npb.jp/announcement/2026/registered_d.html",
+      "sha256": "c8d9fec84b5bc7e432678b650d11ebfbccdc121b4cbb69f15919ee7cd8ad4c16"
+    },
+    {
+      "teamId": 5,
+      "registration": "development",
+      "sourceUrl": "https://npb.jp/announcement/2026/registereddev_d.html",
+      "sha256": "dead69bfbd17d5952de3b190b3079964865be81aa75fe64e82a91522702e79b6"
+    },
+    {
+      "teamId": 6,
+      "registration": "controlled",
+      "sourceUrl": "https://npb.jp/announcement/2026/registered_h.html",
+      "sha256": "7e1f0ac250f0e23b82b27930e365455b8a8a827f403e3b6bdc8d4301c3b365ba"
+    },
+    {
+      "teamId": 6,
+      "registration": "development",
+      "sourceUrl": "https://npb.jp/announcement/2026/registereddev_h.html",
+      "sha256": "69a0b26d76f65844aed72a3ea41840a8552b57d62b1ffbdb0f6f8f71289708c4"
+    },
+    {
+      "teamId": 7,
+      "registration": "controlled",
+      "sourceUrl": "https://npb.jp/announcement/2026/registered_e.html",
+      "sha256": "1671de21af24db11bbf060931d397a4060ab68f7e3e0a64dfeeab2afb8f53fcd"
+    },
+    {
+      "teamId": 7,
+      "registration": "development",
+      "sourceUrl": "https://npb.jp/announcement/2026/registereddev_e.html",
+      "sha256": "0de0a2288462e8a33423af2e6d3d750e55c683ef4d8301b9ce391b58c1702176"
+    },
+    {
+      "teamId": 8,
+      "registration": "controlled",
+      "sourceUrl": "https://npb.jp/announcement/2026/registered_l.html",
+      "sha256": "8a5929a1cbc52524548f094bea5d1410efccb632351b351a48af6f4b84b6b68d"
+    },
+    {
+      "teamId": 8,
+      "registration": "development",
+      "sourceUrl": "https://npb.jp/announcement/2026/registereddev_l.html",
+      "sha256": "8a93665a1d30a9cf578cc1898a44d6f42e6cd37aa3062be07fb39ae2234751de"
+    },
+    {
+      "teamId": 9,
+      "registration": "controlled",
+      "sourceUrl": "https://npb.jp/announcement/2026/registered_m.html",
+      "sha256": "649216cab5a66419eeb19d58d15fc4e4ac9a0112a92a7c751c411ac1998aab4b"
+    },
+    {
+      "teamId": 9,
+      "registration": "development",
+      "sourceUrl": "https://npb.jp/announcement/2026/registereddev_m.html",
+      "sha256": "f00719554e2636cb5f8843112d1006e9bc93d0e342b10ded7258547eb05c46de"
+    },
+    {
+      "teamId": 10,
+      "registration": "controlled",
+      "sourceUrl": "https://npb.jp/announcement/2026/registered_f.html",
+      "sha256": "bcb0a55426cf5a27598ead9a1ee0fca0b5f088a30d17d8fa5a2a6aca77ac7124"
+    },
+    {
+      "teamId": 10,
+      "registration": "development",
+      "sourceUrl": "https://npb.jp/announcement/2026/registereddev_f.html",
+      "sha256": "e93f5a3ace009cb2e54e931caa7a0dda51cf34b5f90ac78ff0f76440bb8e7149"
+    },
+    {
+      "teamId": 11,
+      "registration": "controlled",
+      "sourceUrl": "https://npb.jp/announcement/2026/registered_b.html",
+      "sha256": "2ef0ebe7d80b6e16e4ac80636d177e37dbea1fd2c6cf8636998d6ea08edf9252"
+    },
+    {
+      "teamId": 11,
+      "registration": "development",
+      "sourceUrl": "https://npb.jp/announcement/2026/registereddev_b.html",
+      "sha256": "d8c6114307f4c391bd177631263edce7027ecbc1894bc8328f77428c4a371a80"
+    }
+  ]
+}

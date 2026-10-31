@@ -7,6 +7,12 @@ import { ContractTab } from './tabs/ContractTab';
 import { PlayerModal } from './PlayerModal';
 const fixture = JSON.parse(gunzipSync(readFileSync(new URL('../../e2e/fixtures/new-game.json.gz', import.meta.url))));
 const text = node => typeof node === 'string' ? node : (node.children || []).map(text).join('');
+it('distinguishes unverified real-world pay and pre-game service time from game settings',()=>{
+ const player={...fixture.teams[0].farm.find(p=>!p.isPitcher),daysOnActiveRoster:2,serviceYears:0,dataQuality:{salary:'game-assumption-ambiguous-legacy',contract:'legacy-unverified',serviceTime:'game-baseline-unknown'}};
+ let view;act(()=>{view=create(React.createElement(PlayerModal,{player,initialSection:'profile',onClose:()=>{}}));});
+ try {const value=text(view.root);expect(value).toContain('ゲーム設定');expect(value).toContain('開始前のFA登録日数は未確認');expect(value).not.toContain('国内FA 最短あと');}
+ finally {act(()=>view.unmount());}
+});
 it.each([{育成:true,isIkusei:false},{育成:false,isIkusei:true}])('shows the development contract category instead of FA eligibility in player details: %j',flags=>{
   const player={...fixture.teams[0].farm.find(p=>!p.isPitcher),...flags,daysOnActiveRoster:1080};
   let view;act(()=>{view=create(React.createElement(PlayerModal,{player,initialSection:'profile',onClose:()=>{}}));});

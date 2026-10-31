@@ -1,0 +1,54 @@
+[
+  {
+    "kind": "chromium",
+    "width": 390,
+    "initialMs": 1713,
+    "actual": {
+      "total": 782,
+      "real": 445,
+      "development": [
+        "福島　圭音",
+        "平山　功太"
+      ],
+      "activeDevelopment": 0
+    },
+    "reloadIdentityPreserved": true,
+    "large": {
+      "initMs": 188.19999999552965,
+      "saveMs": 428.20000000298023,
+      "loadMs": 61.5,
+      "utf8Bytes": 3328949,
+      "total": 1080,
+      "unique": 1080,
+      "development": 300,
+      "storageUtf16Units": 1005
+    },
+    "errors": []
+  },
+  {
+    "kind": "chromium",
+    "width": 1280,
+    "initialMs": 1894,
+    "actual": {
+      "total": 782,
+      "real": 445,
+      "development": [
+        "福島　圭音",
+        "平山　功太"
+      ],
+      "activeDevelopment": 0
+    },
+    "reloadIdentityPreserved": true,
+    "large": {
+      "initMs": 203.29999999701977,
+      "saveMs": 642.7000000029802,
+      "loadMs": 190,
+      "utf8Bytes": 3328972,
+      "total": 1080,
+      "unique": 1080,
+      "development": 300,
+      "storageUtf16Units": 1024
+    },
+    "errors": []
+  }
+]
