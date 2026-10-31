@@ -15,7 +15,7 @@ function seedRandom(seed) {
 }
 for (const seed of [7,42,20261009]) it('preserves complete generated data and random/ID consumption (seed '+seed+')', async () => {
   const calls=seedRandom(seed);
-  const teams=bootstrap.createInitialTeams();
+  const teams=bootstrap.createInitialTeams(null);
   for(const team of teams){
     const owned=[...team.players,...team.farm].filter(p=>!p.育成&&!p.isIkusei);
     expect(owned).toHaveLength(65);expect(owned.filter(p=>p.isPitcher)).toHaveLength(32);
@@ -45,7 +45,7 @@ for (const seed of [7,42,20261009]) it('preserves complete generated data and ra
   expect({digest,calls:baselineCalls}).toMatchSnapshot();
   vi.restoreAllMocks();const asyncCalls=seedRandom(seed);
   expect(typeof bootstrap.createInitialTeamsAsync).toBe('function');
-  const asyncTeams=await bootstrap.createInitialTeamsAsync();
+  const asyncTeams=await bootstrap.createInitialTeamsAsync(null);
   expect(asyncTeams).toEqual(teams);
   expect(asyncCalls()).toBe(baselineCalls);
 });

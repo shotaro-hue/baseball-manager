@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
+// These fixtures require the legacy generated depth; bundled data is tested separately.
 import { createInitialTeams } from '../bootstrapTeams';
 import { chooseDraftProspect } from '../draftRules';
 import { draftPicksForTeam } from '../offseasonResume';
@@ -12,7 +13,7 @@ function fixture() {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
     return seed / 4294967296;
   });
-  const team = createInitialTeams()[0];
+  const team = createInitialTeams(null)[0];
   const keep = new Set(team.players.filter(p => p.pos === '捕手').slice(0, 2).map(p => p.id));
   team.players = team.players.filter(p => p.pos !== '捕手' || keep.has(p.id));
   // One accepted catcher fills the new six-player organizational target.

@@ -3,6 +3,7 @@ import { ANNUAL_ECONOMY_RELEASE_ENABLED, contractEconomyMode, createAnnualNewGam
   toAnnualState, fromAnnualState, quoteEconomyCommand, reduceEconomyCommand } from '../contractEconomy';
 import { economyClockFor } from '../economyCalendar';
 import { contractEmploymentAt } from '../contractLedger';
+// These fixtures require the legacy generated depth; bundled data is tested separately.
 import { createInitialTeams } from '../bootstrapTeams';
 import { applyAnnualTransaction } from '../annualTransactions';
 import { economyPolicy, economyFixture, renewalEnvelope, freezeEconomy } from './fixtures/economyWorld';
@@ -222,7 +223,7 @@ describe('native initial conditions and civil economy clock', () => {
     expect(teams).toEqual(before);
   });
   it('rejects the current legacy bootstrap below native salary minimums instead of silently raising or reclassifying it', () => {
-    const teams = createInitialTeams(), before = structuredClone(teams);
+    const teams = createInitialTeams(null), before = structuredClone(teams);
     expect(teams.flatMap(t => [...t.players, ...t.farm]).some(p => !p.育成 && !p.isIkusei && p.salary < 420)).toBe(true);
     expect(() => createAnnualNewGameWorld({ teams, faPool: [], myId: 0, saveId: 'bootstrap', season: 2026,
       policy: economyPolicy(teams, 2026, 1000000), randomRoot: { algorithmVersion: 1, seed: 'bootstrap' } })).toThrow();

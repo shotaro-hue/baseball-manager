@@ -1,6 +1,10 @@
+import {readFileSync} from 'node:fs';
 import { test, expect } from '@playwright/test';
 import { TEAM, waitForNewGameReady, saveHub, reloadAndLoad } from './helpers/progression';
 import {localMasterFixture} from './fixtures/local-master';
+const openingMaster=JSON.parse(readFileSync(new URL('../src/data/playerMaster2026.release.json',import.meta.url),'utf8'));
+const historicalPlayers=openingMaster.players.filter(p=>p.history.length>0);
+
 
 test('local master reaches bootstrap through title routing and survives save/reload',async({page})=>{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -152,15 +156,15 @@ test('failed initial IndexedDB write stays on title and retry saves all history 
   await waitForNewGameReady(page,TEAM);
   await saveHub(page);const before=await initialContents(page);
   expect(before.catcherCoverage.every(t => t.active >= 3 && t.farmStatus === 'ready')).toBe(true);
-  expect(before.teamCount).toBe(12);expect(before.controlled).toEqual(Array(12).fill(65));expect(before.playerIds).toHaveLength(782);
-  expect(new Set(before.playerIds).size).toBe(782);
-  expect(before.development).toEqual(['平山 功太','福島 圭音']);expect(before.activeDevelopment).toBe(0);
-  expect(before.rows).toBe(2009);expect(before.historyKeys).toHaveLength(376);
+  expect(before.teamCount).toBe(12);expect(before.controlled).toEqual(openingMaster.teams.map(t=>t.controlled));expect(before.playerIds).toHaveLength(1059);
+  expect(new Set(before.playerIds).size).toBe(1059);
+  expect(before.development).toEqual(openingMaster.players.filter(p=>p.registration==='development').map(p=>p.name.replace(/\s+/g,' ')).sort());expect(before.activeDevelopment).toBe(0);
+  expect(before.rows).toBe(historicalPlayers.reduce((n,p)=>n+p.history.length,0));expect(before.historyKeys).toHaveLength(historicalPlayers.length);
   expect([...before.historyIds].sort()).toEqual([...before.historyKeys].sort());
   // schedule[0] is a sentinel; verify actual games instead of counting array keys.
   expect(before.regularMatchups).toBe(858);
   expect(before.scheduledTeamGames).toEqual(Array(12).fill(143));
-  expect(new Set(before.historyKeys).size).toBe(376);
+  expect(new Set(before.historyKeys).size).toBe(historicalPlayers.length);
   expect(await page.evaluate(()=>window.initialHistoryAttempts)).toBe(2);
   await reloadAndLoad(page);await expect(page.locator('.topbar')).toContainText(TEAM);
   const after=await initialContents(page);expect(after).toEqual(before);

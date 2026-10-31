@@ -6,11 +6,10 @@ import { REVIEWED_FACTS_2026 } from './playerMaster2026Facts';
 import { applyReviewedFacts } from './reviewedPlayerFacts';
 
 // Facts, confidence and game estimates are separate. This adapter is new-game only.
-// Until a fully verified, redistributable master is supplied, completeness stays false.
 export function getOpeningRosters(master = release, options) {
-  // Bundled release data always passes publication checks, even when a caller
-  // accidentally supplies local-import options without an external master.
-  if(master!==null) return compilePlayerMaster(master, master===release?undefined:options);
+  // The maintainer's explicit bundling decision is distinct from source-owner
+  // rights clearance. Arbitrary caller options cannot bypass bundled validation.
+  if(master!==null) return compilePlayerMaster(master, master===release?{publicationDecision:release.publicationDecision}:options);
   return Object.fromEntries(Object.entries(NPB2025_ROSTERS).map(([teamId,roster])=> {
     const normalize=(player,kind)=>{
       const correction=PLAYER_CORRECTIONS_2026[`${teamId}::${player.name}`]||{};

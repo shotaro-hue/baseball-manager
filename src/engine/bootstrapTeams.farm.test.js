@@ -17,7 +17,7 @@ function seedRandom(seed) {
 afterEach(() => { vi.restoreAllMocks(); vi.doUnmock('../data/npb2025'); vi.resetModules(); });
 
 function checkTeams(teams, real) {
-  const rosters=real?getOpeningRosters():null;
+  const rosters=real?getOpeningRosters(null):null;
   for (const team of teams) {
     const all = [...team.players, ...team.farm];
     const source=real?[...rosters[team.id].batters,...rosters[team.id].pitchers]:[];
@@ -86,7 +86,7 @@ describe('initial catcher coverage', () => {
     // Lotte's second-base-capable real players are all trimmed at these seeds.
     // Coverage repair must recall one before the third-catcher swap can succeed.
     seedRandom(seed);
-    const teams = createInitialTeams();
+    const teams = createInitialTeams(null);
     checkTeams(teams, true);
     for (const team of teams) {
       for (const fielding of [team.fieldingNoDh, team.fieldingDh]) {
@@ -121,7 +121,7 @@ describe('initial catcher coverage', () => {
   it('keeps three active catchers and a playable farm with 65 controlled players plus development players', () => {
     for (let seed = 1; seed <= 100; seed++) {
       seedRandom(seed);
-      checkTeams(createInitialTeams(), true);
+      checkTeams(createInitialTeams(null), true);
       vi.restoreAllMocks();
     }
   }, 60000);
@@ -130,7 +130,7 @@ describe('initial catcher coverage', () => {
     const { createInitialTeams: createFallback } = await import('./bootstrapTeams');
     for (let seed = 1; seed <= 100; seed++) {
       seedRandom(seed);
-      checkTeams(createFallback(), false);
+      checkTeams(createFallback(null), false);
       vi.restoreAllMocks();
     }
   }, 60000);

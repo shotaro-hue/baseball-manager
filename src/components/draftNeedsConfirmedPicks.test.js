@@ -2,6 +2,7 @@ import React from 'react';
 import { act, create } from 'react-test-renderer';
 import { afterEach, expect, it, vi } from 'vitest';
 import { DraftScreen } from './Draft';
+// These fixtures require the legacy generated depth; bundled data is tested separately.
 import { createInitialTeams } from '../engine/bootstrapTeams';
 vi.mock('./ui', () => ({ OV: () => null, HandBadge: () => null }));
 const views = [];
@@ -15,7 +16,7 @@ for (const firstRound of [true, false]) it(`CPU uses ${firstRound ? 'first' : 'l
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
     return seed / 4294967296;
   });
-  const team = createInitialTeams()[0];
+  const team = createInitialTeams(null)[0];
   const keep = new Set(team.players.filter(p => p.pos === '捕手').slice(0, 2).map(p => p.id));
   team.players = team.players.filter(p => p.pos !== '捕手' || keep.has(p.id));
   // Five owned plus one accepted catcher meet the six-player depth target.
