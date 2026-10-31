@@ -44,3 +44,13 @@ it('disables automatic reuse even if clearing IndexedDB fails',async()=>{
  await expect(forgetPlayerMaster()).rejects.toThrow('blocked');
  expect(hasRememberedPlayerMaster()).toBe(false);
 });
+it('allows a session-only replacement after automatic reuse is disabled even if IndexedDB is blocked',async()=>{
+ await rememberPlayerMaster(master());
+ vi.stubGlobal('indexedDB',{open:()=>{throw Error('blocked');}});
+ await expect(forgetPlayerMaster({deleteRequired:false})).resolves.toBe(false);
+ expect(hasRememberedPlayerMaster()).toBe(false);
+});
+it('never ignores failure to clear the automatic selection marker',async()=>{
+ localStorage.removeItem=()=>{throw Error('marker unavailable');};
+ await expect(forgetPlayerMaster({deleteRequired:false})).rejects.toThrow('marker unavailable');
+});

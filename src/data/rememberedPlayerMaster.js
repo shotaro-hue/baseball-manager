@@ -52,8 +52,16 @@ export async function rememberPlayerMaster(master) {
  await access('readwrite',store=>store.put(text,KEY));
  globalThis.localStorage.setItem(MARKER,'1');
 }
-export async function forgetPlayerMaster() {
+export async function forgetPlayerMaster({deleteRequired=true}={}) {
  // Stop auto-selection first, even if deletion subsequently fails.
  globalThis.localStorage?.removeItem(MARKER);
- if(canRememberPlayerMaster())await access('readwrite',store=>store.delete(KEY));
+ try {
+  if(canRememberPlayerMaster())await access('readwrite',store=>store.delete(KEY));
+  return true;
+ }catch(error){
+  // Selecting a new file must remain usable without persistent storage. This
+  // fallback is safe only after the old automatic-selection marker was cleared.
+  if(deleteRequired)throw error;
+  return false;
+ }
 }

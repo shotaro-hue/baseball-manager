@@ -37,6 +37,24 @@ test('local master reset and invalid replacement do not restore a stale roster',
  expect(await page.evaluate(()=>localStorage.getItem('npb-local-player-master-selected'))).toBeNull();
 });
 
+test('local master remains selectable for this session when its database is unavailable',async({page})=>{
+ await page.addInitScript(()=>{
+  const open=indexedDB.open.bind(indexedDB);
+  indexedDB.open=(name,...args)=>{
+   if(name==='npb-player-master-v1')throw new DOMException('Unavailable','SecurityError');
+   return open(name,...args);
+  };
+ });
+ await page.goto('/');await page.locator('summary').click();
+ await page.getByLabel('選手名簿JSON').setInputFiles({name:'local-master.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(localMasterFixture()))});
+ await expect(page.getByRole('alert')).toContainText('今回の新規ゲームには使えます');
+ await expect(page.locator('summary')).not.toContainText('記憶済み');
+ await page.getByRole('button',{name:TEAM,exact:true}).click();await waitForNewGameReady(page,TEAM);
+ const saved=await saveHub(page);
+ expect(saved.teams.flatMap(t=>[...t.players,...t.farm])).toHaveLength(900);
+ expect(await page.evaluate(()=>localStorage.getItem('npb-local-player-master-selected'))).toBeNull();
+});
+
 async function initialContents(page) {
   return page.evaluate(async () => {
     const { loadGame } = await import('/baseball-manager/src/engine/saveload.js');

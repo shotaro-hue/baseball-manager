@@ -27,7 +27,7 @@ export default function LocalPlayerMasterPicker({disabled,onChange,onBusy}) {
   setMaster(null);setRemembered(false);callbacks.current.onChange(null);
   try {
    // An invalid replacement must not resurrect an older selection on reload.
-   await forgetPlayerMaster();
+   await forgetPlayerMaster({deleteRequired:false});
    const next=await readLocalPlayerMaster(file);if(attempt!==epoch.current)return;
    setMaster(next);callbacks.current.onChange(next);setStorageIssue(false);
    try {
