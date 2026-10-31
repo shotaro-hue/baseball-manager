@@ -8,6 +8,10 @@ test('local master reaches bootstrap through title routing and survives save/rel
  await page.getByText('選手名簿ファイルを使う（新規ゲーム）',{exact:true}).click();
  await page.getByLabel('選手名簿JSON').setInputFiles({name:'local-master.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(localMasterFixture()))});
  await expect(page.getByText('実在900名',{exact:false})).toBeVisible();
+ await expect(page.locator('summary')).toContainText('記憶済み');
+ await page.reload();
+ await expect(page.getByText('実在900名',{exact:false})).toBeVisible();
+ await expect(page.locator('summary')).toContainText('記憶済み');
  await page.getByRole('button',{name:TEAM,exact:true}).click();await waitForNewGameReady(page,TEAM);
  const saved=await saveHub(page),all=saved.teams.flatMap(t=>[...t.players,...t.farm]);
  expect(all).toHaveLength(900);expect(new Set(all.map(p=>p.realPlayerId)).size).toBe(900);
@@ -16,6 +20,46 @@ test('local master reaches bootstrap through title routing and survives save/rel
  const loaded=await saveHub(page);
  expect(loaded.teams.flatMap(t=>[...t.players,...t.farm]).map(p=>p.realPlayerId)).toEqual(all.map(p=>p.realPlayerId));
  expect(errors).toEqual([]);
+});
+
+test('local master reset and invalid replacement do not restore a stale roster',async({page})=>{
+ const upload=async()=>{
+  await page.getByLabel('選手名簿JSON').setInputFiles({name:'local-master.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(localMasterFixture()))});
+  await expect(page.locator('summary')).toContainText('記憶済み');
+ };
+ await page.goto('/');await page.locator('summary').click();await upload();
+ await page.getByRole('button',{name:'標準名簿に戻す',exact:true}).click();
+ await page.reload();await expect(page.locator('summary')).toHaveText('選手名簿ファイルを使う（新規ゲーム）');
+ await page.locator('summary').click();await upload();
+ await page.getByLabel('選手名簿JSON').setInputFiles({name:'bad.json',mimeType:'application/json',buffer:Buffer.from('{}')});
+ await expect(page.getByRole('alert')).toContainText('人数');
+ await page.reload();await expect(page.locator('summary')).toHaveText('選手名簿ファイルを使う（新規ゲーム）');
+ expect(await page.evaluate(()=>localStorage.getItem('npb-local-player-master-selected'))).toBeNull();
+});
+
+test('local master remains selectable for this session when its database is unavailable',async({page})=>{
+ await page.addInitScript(()=>{
+  // Inject the fault for every factory instance, including those accessed
+  // after the init script. Verify below that the injection actually ran.
+  const open=IDBFactory.prototype.open;
+  window.__masterStorageDenied=0;
+  IDBFactory.prototype.open=function(name,...args){
+   if(name==='npb-player-master-v1'){
+    window.__masterStorageDenied++;
+    throw new DOMException('Unavailable','SecurityError');
+   }
+   return open.call(this,name,...args);
+  };
+ });
+ await page.goto('/');await page.locator('summary').click();
+ await page.getByLabel('選手名簿JSON').setInputFiles({name:'local-master.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(localMasterFixture()))});
+ await expect(page.getByRole('alert')).toContainText('今回の新規ゲームには使えます');
+ expect(await page.evaluate(()=>window.__masterStorageDenied)).toBeGreaterThan(0);
+ await expect(page.locator('summary')).not.toContainText('記憶済み');
+ await page.getByRole('button',{name:TEAM,exact:true}).click();await waitForNewGameReady(page,TEAM);
+ const saved=await saveHub(page);
+ expect(saved.teams.flatMap(t=>[...t.players,...t.farm])).toHaveLength(900);
+ expect(await page.evaluate(()=>localStorage.getItem('npb-local-player-master-selected'))).toBeNull();
 });
 
 async function initialContents(page) {

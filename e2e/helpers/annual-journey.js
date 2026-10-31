@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { openBatch, waitSaveIdle } from './progression';
+import { mainNavigation, openBatch, saveHub, waitSaveIdle } from './progression';
 
 // These helpers only observe real saves and operate the existing UI. They do
 // not manufacture results, advance the date, or replace simulation/storage.
@@ -60,6 +60,36 @@ export async function answerAnnualPress(page) {
   await press.getByRole('button').filter({ hasNotText: '回答する' }).first().click();
   await press.getByRole('button', { name: '回答する', exact: true }).click();
   await expect(press).toHaveCount(0);
+}
+
+// Winter departures and the previous season's roster changes can leave holes
+// in a saved lineup. Single-game mode intentionally requires the manager to
+// confirm a valid order (see E3); the batch auto-manage checkbox does not do it.
+export async function prepareAnnualOpeningRoster(page, mobile) {
+  const nav = mainNavigation(page, mobile);
+  await nav.getByRole('button', { name: /^編成/ }).click();
+  await page.locator('.tabs-nav').getByRole('button', { name: 'ロスター', exact: true }).click();
+  const settings = page.locator('.roster-full-settings');
+  await settings.locator('summary').click();
+  await settings.getByRole('button', { name: '🔄 一括自動編成を確認', exact: true }).click();
+  await expect(settings.locator('.settings-recommendations')).toContainText('未反映');
+  await settings.getByRole('button', { name: /プランを一括反映/ }).click();
+  await saveHub(page, { progressOnly: true });
+  const roster = await page.evaluate(async () => {
+    const state = await (await import('/baseball-manager/src/engine/saveload.js')).loadGame();
+    const team = state.teams.find(t => t.id === state.myId);
+    return {
+      eligible: team.players.filter(p => !p.isPitcher && !p.isIkusei && !p.育成).map(p => p.id),
+      noDh: team.lineupNoDh, dh: team.lineupDh,
+    };
+  });
+  expect(roster.noDh).toHaveLength(8);
+  expect(roster.dh).toHaveLength(9);
+  for (const lineup of [roster.noDh, roster.dh]) {
+    expect(new Set(lineup).size).toBe(lineup.length);
+    expect(lineup.every(id => roster.eligible.includes(id))).toBe(true);
+  }
+  await nav.getByRole('button', { name: 'ホーム', exact: true }).click();
 }
 
 export async function finishAnnualOffseason(page, year) {

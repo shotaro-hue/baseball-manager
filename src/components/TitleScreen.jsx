@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { TEAM_DEFS } from '../constants';
 import LocalPlayerMasterPicker from './LocalPlayerMasterPicker';
+import {hasRememberedPlayerMaster} from '../data/rememberedPlayerMaster';
 
 let titleSaveModulePromise = null;
 
@@ -26,8 +27,8 @@ export default function TitleScreen({
   const [deleting, setDeleting] = useState(false);
   const [deletionError, setDeletionError] = useState(null);
   const deletionInProgress = useRef(false);
-  const [localMaster,setLocalMaster]=useState(null),[readingMaster,setReadingMaster]=useState(false);
-  const readingMasterRef=useRef(false);
+  const [localMaster,setLocalMaster]=useState(null),[readingMaster,setReadingMaster]=useState(hasRememberedPlayerMaster);
+  const readingMasterRef=useRef(hasRememberedPlayerMaster());
   const setMasterBusy=busy=>{readingMasterRef.current=busy;setReadingMaster(busy);};
   const initializing = initializationStatus === 'initializing';
   const actionsLocked = () => initializing || readingMasterRef.current || deletionInProgress.current || isInitializationInProgress?.();

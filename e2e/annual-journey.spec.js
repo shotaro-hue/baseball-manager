@@ -1,6 +1,15 @@
 import { test, expect } from '@playwright/test';
-import { startNewGame, runSingle, saveHub, reloadAndLoad } from './helpers/progression';
-import { annualSnapshot, progressAnnualBatch, finishAnnualOffseason } from './helpers/annual-journey';
+import { loadFixture, startNewGame, runSingle, saveHub, reloadAndLoad } from './helpers/progression';
+import { annualSnapshot, progressAnnualBatch, finishAnnualOffseason, prepareAnnualOpeningRoster } from './helpers/annual-journey';
+
+test('annual journey opening roster is confirmed through UI when saved orders have vacancies', async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
+  const mobile = testInfo.project.name === 'mobile-webkit';
+  await loadFixture(page, 'invalid-lineup');
+  await prepareAnnualOpeningRoster(page, mobile);
+  await runSingle(page, mobile);
+  expect((await saveHub(page, { progressOnly: true })).gameDay).toBe(2);
+});
 
 test('annual journey actual 143 games, all clubs, offseason, next year and persisted reload', async ({ page }, testInfo) => {
   test.setTimeout(600_000);
@@ -73,6 +82,7 @@ test('annual journey actual 143 games, all clubs, offseason, next year and persi
     await reloadAndLoad(page);
     await saveHub(page, { progressOnly: true });
     expect(await annualSnapshot(page)).toEqual(next);
+    await prepareAnnualOpeningRoster(page, mobile);
     await runSingle(page, mobile);
     await saveHub(page, { progressOnly: true });
     const reopened = await inspect('next year first game', 1);
