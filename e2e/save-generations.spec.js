@@ -222,3 +222,44 @@ for (const large of [false, true]) test(`save generations: acknowledged contract
     return { committed: result.ok, resaved: resaved.ok, revision: (await mod.loadGame()).contractEconomy.revision };
   })).toEqual({ committed: true, resaved: true, revision: 2 });
 });
+
+test('save generations: hook hydrates and resaves annual evidence without activating the title gate', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(async () => {
+    const React = (await import('/baseball-manager/node_modules/.vite/deps/react.js')).default;
+    const { createRoot } = (await import('/baseball-manager/node_modules/.vite/deps/react-dom_client.js')).default;
+    const { useGameState } = await import('/baseball-manager/src/hooks/useGameState.js');
+    const { economyFixture, renewalEnvelope } = await import('/baseball-manager/src/engine/__tests__/fixtures/economyWorld.js');
+    const { reduceEconomyCommand } = await import('/baseball-manager/src/engine/contractEconomy.js');
+    const { saveGame, loadGame } = await import('/baseball-manager/src/engine/saveload.js');
+    const world = economyFixture(), offered = reduceEconomyCommand(world, renewalEnvelope(world)).world;
+    const saved = await saveGame(offered);
+    if (!saved.ok) throw new Error(saved.reason);
+    const loaded = await loadGame();
+    window.hydrationQa = { loaded, expected: JSON.stringify(loaded.contractEconomy) };
+    const host = document.createElement('div'); document.body.appendChild(host);
+    function Harness() {
+      const gs = useGameState(); window.hydrationQa.gs = gs;
+      return React.createElement('output', { 'data-testid': 'hydrated-world' }, `${gs.saveId}:${gs.contractEconomy?.revision ?? 'legacy'}`);
+    }
+    window.hydrationQa.root = createRoot(host);
+    window.hydrationQa.root.render(React.createElement(Harness));
+  });
+  await expect(page.getByTestId('hydrated-world')).toContainText('legacy');
+  expect(await page.evaluate(() => {
+    const { gs, loaded } = window.hydrationQa;
+    return gs.hydrateSavedWorld(loaded, { sessionToken: gs.getProgressSessionToken(), progressToken: gs.getProgressToken() });
+  })).toBe(true);
+  await expect(page.getByTestId('hydrated-world')).toHaveText('test-save:1');
+  expect(await page.evaluate(async () => {
+    const qa = window.hydrationQa, result = await qa.gs.handleSave({ silent: true });
+    const { loadGame } = await import('/baseball-manager/src/engine/saveload.js');
+    const restored = await loadGame();
+    return { ok: result.ok, same: JSON.stringify(restored.contractEconomy) === qa.expected };
+  })).toEqual({ ok: true, same: true });
+  await page.reload();
+  const rootBefore = await page.evaluate(() => localStorage.getItem('baseball_manager_v1'));
+  await page.getByRole('button', { name: '続きから', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('新契約制度');
+  expect(await page.evaluate(() => localStorage.getItem('baseball_manager_v1'))).toBe(rootBefore);
+});

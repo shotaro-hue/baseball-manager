@@ -3,6 +3,8 @@ import { stadiumUpgradeCosts } from '../engine/clubFinance';
 import { marketRosterError } from '../engine/marketRoster';
 import {createFarmCompetition} from '../engine/farmRecords';
 import {validateFarmSaveState} from '../engine/farmMigration';
+import { contractEconomyMode } from '../engine/contractEconomy';
+import { validateEconomySave } from '../engine/economyPersistence';
 import { saveFeedback } from '../engine/saveFeedback';
 import { emptyBattedBallReceipt, validateBattedBallReceipt } from '../engine/battedBallRun';
 import { useState, useReducer, useMemo, useCallback, useEffect, useRef } from "react";
@@ -299,6 +301,39 @@ export function useGameState() {
     setSaveResult(null);
   }, []);
 
+  // Load-only boundary. A transaction must use commitEconomyCandidate and its
+  // published-root acknowledgement, never reset the session through this API.
+  const hydrateSavedWorld = useCallback((saved, expected) => {
+    if (screen !== 'title' || !expected
+      || expected.sessionToken !== progressSessionRef.current
+      || expected.progressToken !== progressTokenRef.current
+      || newGameInitializationRef.current || pendingSaveRequestsRef.current.size) return false;
+    let world;
+    try {
+      world = structuredClone(saved);
+      const mode = validateEconomySave(world);
+      validateFarmSaveState(world);
+      if ('battedBallReceipt' in world) validateBattedBallReceipt(world.battedBallReceipt, world.saveId);
+      if (!Array.isArray(world.teams) || !Array.isArray(world.faPool)
+        || !Array.isArray(world.news) || !Array.isArray(world.mailbox)
+        || typeof world.saveId !== 'string' || !world.saveId
+        || !Number.isInteger(world.year) || !Number.isInteger(world.gameDay)) return false;
+      // Preserve annual evidence exactly; legacy player history stays slim.
+      if (mode === 'legacy') world.teams = slimTeamsForState(world.teams);
+    } catch { return false; }
+    progressSessionRef.current++;
+    progressTokenRef.current++;
+    pendingCareerEntriesRef.current = [];
+    rosterCommandRef.current = { ...world, progressToken: progressTokenRef.current };
+    dispatch({ type: G.HYDRATE_SAVED_WORLD, world });
+    setSeasonHistoryState(world.seasonHistory ?? {});
+    hydrateMatchHistory(world);
+    setSaveRevision(Number(world.saveRevision) || 0);
+    resetSaveTracking();
+    setSaveExists(true);
+    return true;
+  }, [screen, hydrateMatchHistory, resetSaveTracking]);
+
   useEffect(() => {
     let alive = true;
     loadSaveModule()
@@ -489,7 +524,7 @@ export function useGameState() {
 
   // シーズン日程をyear変更時に再生成（チームID・リーグ構成は不変なのでteams.lengthで十分）
   useEffect(()=>{
-    if(teams.length===12){
+    if(contractEconomyMode(gameState) === 'legacy' && teams.length===12){
       loadScheduleModule()
         .then((mod) => {
           const newSchedule = mod.generateSeasonSchedule(year,teams);
@@ -572,6 +607,7 @@ export function useGameState() {
   },[]);
 
   useEffect(() => {
+    if (contractEconomyMode(gameState) !== 'legacy') return;
     const dueMails = mailbox.filter(m => contractReplyIsDue(m, gameDay, year));
     if (!dueMails.length || !myTeam) return;
     const result = resolveContractReplies(myTeam, dueMails, gameDay, year);
@@ -625,7 +661,7 @@ export function useGameState() {
       }
       const request = beginTrackedSave();
       return queueSave(
-        {teams,myId,gameDay,year,saveId,battedBallReceipt,schedule,...farmFields,faPool,faYears,seasonHistory,news,mailbox,saveRevision,offseasonPlan,...getMatchHistorySnapshot()},
+        {teams,myId,gameDay,year,saveId,battedBallReceipt,schedule,...farmFields,...(contractEconomy ? {contractEconomy} : {}),faPool,faYears,seasonHistory,news,mailbox,saveRevision,offseasonPlan,...getMatchHistorySnapshot()},
         request.options,
         request.snapshot,
       ).then((result) => ({ result, snapshot: request.snapshot }));
@@ -655,7 +691,7 @@ export function useGameState() {
       request.options.dirtyScopes = [...new Set([...(request.options.dirtyScopes ?? ['seasonHistory', 'news', 'mailbox']), 'matchHistory'])];
     }
     const result=await queueSave(
-      {teams,myId,gameDay,year,saveId,battedBallReceipt,schedule,...farmFields,faPool,faYears,seasonHistory,news,mailbox,saveRevision,...getMatchHistorySnapshot(),
+      {teams,myId,gameDay,year,saveId,battedBallReceipt,schedule,...farmFields,...(contractEconomy ? {contractEconomy} : {}),faPool,faYears,seasonHistory,news,mailbox,saveRevision,...getMatchHistorySnapshot(),
         offseasonPlan: offseasonPlan && { ...offseasonPlan, resumeScreen:
           offseasonPlan.stage === 'postseason' && screen === 'hub' ? offseasonPlan.resumeScreen : screen }, ...options.payload},
       request.options,
@@ -671,7 +707,7 @@ export function useGameState() {
     }
     return result;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[teams,myId,saveId,gameDay,year,battedBallReceipt,farmCompetition,schedule,faPool,faYears,seasonHistory,news,mailbox,saveRevision,offseasonPlan,screen,isAutoSaveSuspended,notify,queueSave,beginTrackedSave,completeTrackedSave,getMatchHistorySnapshot]);
+  },[teams,myId,saveId,gameDay,year,battedBallReceipt,farmCompetition,contractEconomy,schedule,faPool,faYears,seasonHistory,news,mailbox,saveRevision,offseasonPlan,screen,isAutoSaveSuspended,notify,queueSave,beginTrackedSave,completeTrackedSave,getMatchHistorySnapshot]);
 
   useEffect(() => {
     if (!offseasonPlan || !OFFSEASON_SAVE_SCREENS.has(screen) || !saveDirty || isAutoSaveSuspended) return;
@@ -1166,7 +1202,7 @@ export function useGameState() {
     getUnreadMailboxCount,
     getLatestNewsId,
     markSaveDirty,
-    hydrateLargeSaveData, getMatchHistorySnapshot, hydrateMatchHistory, applyMatchResultPatch,
+    hydrateSavedWorld, hydrateLargeSaveData, getMatchHistorySnapshot, hydrateMatchHistory, applyMatchResultPatch,
     resetSaveTracking,
     // derived
     myTeam,

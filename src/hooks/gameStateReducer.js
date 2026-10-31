@@ -3,6 +3,7 @@ import { contractEconomyMode, toAnnualState } from '../engine/contractEconomy';
 import { validateEconomyClock } from '../engine/economyCalendar';
 
 export const G = {
+  HYDRATE_SAVED_WORLD: 'HYDRATE_SAVED_WORLD',
   APPLY_PROGRESS: 'APPLY_PROGRESS',
   APPLY_ECONOMY_WORLD: 'APPLY_ECONOMY_WORLD',
   SET_FA_POOL: 'SET_FA_POOL',
@@ -93,6 +94,12 @@ export function gameStateReducer(state, action) {
     return { ...state, [key]: typeof action.value === 'function' ? action.value(state[key]) : action.value };
   }
   switch (action.type) {
+    case G.HYDRATE_SAVED_WORLD: {
+      // A load replaces the entire domain, including absent optional fields.
+      // The hook validates and owns the independent snapshot before dispatch.
+      return Object.fromEntries(domainFields.filter(key => Object.hasOwn(action.world, key))
+        .map(key => [key, action.world[key]]));
+    }
     case G.APPLY_ECONOMY_WORLD: {
       // Persistence will own dispatching this action after publish (A1-1d).
       // A1-1a exposes no public hook that activates/adopts an annual fixture.
