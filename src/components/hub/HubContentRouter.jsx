@@ -4,6 +4,7 @@ import { Suspense, lazy } from 'react';
 import { DashboardTab } from '../DashboardTab';
 import { MobileHome } from '../MobileHome';
 import { ContractTab } from '../tabs/ContractTab';
+import { AnnualContractTab } from '../tabs/AnnualContractTab';
 import { NewsTab } from '../tabs/NewsTab';
 import { MailboxTab } from '../tabs/MailboxTab';
 import { TradeTab } from '../tabs/TradeTab';
@@ -333,6 +334,9 @@ export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTab
   }
 
   if (tab === 'contract') {
+    if (gs.contractEconomy !== undefined && !(gs.contractEconomy?.schemaVersion === 1
+      && gs.contractEconomy.mode === 'legacy' && gs.contractEconomy.engine === undefined))
+      return <AnnualContractTab gs={gs} os={os} focusRequest={focusRequest} />;
     return (
       <ContractTab
         team={myTeam}

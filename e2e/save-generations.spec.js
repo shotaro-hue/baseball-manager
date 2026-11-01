@@ -357,3 +357,117 @@ test('save generations: real hook remount acknowledges the published root and re
   expect(result.recovered).toMatchObject({ ok: true, committed: { revision: 1, receiptIds: [0] } });
   expect(result.unchanged).toBe(true); expect(result.saved.ok).toBe(true);
 });
+
+async function mountHumanRenewal(page, { reload = false, due = false, legacy = false, offseason = false } = {}) {
+  await page.evaluate(async ({ reload, due, legacy, offseason }) => {
+    const { renewalFixture } = await import('/baseball-manager/src/engine/__tests__/fixtures/renewalWorld.js');
+    const { renewalRequest, reduceRenewalRequest } = await import('/baseball-manager/src/engine/renewalDecisions.js');
+    const { saveGame, loadGame } = await import('/baseball-manager/src/engine/saveload.js');
+    const { mountRenewalView } = await import('/baseball-manager/tests/helpers/renewal-hook-harness.jsx');
+    let world = reload ? await loadGame() : renewalFixture();
+    if (due) {
+      world = reduceRenewalRequest(world, renewalRequest(world, { type: 'offer', playerId: 0, salary: 12000, years: 3 })).world;
+      // Seed the clock, not an implementation of day progression (a later slice).
+      world.contractEconomy.clock.date = '2026-07-18'; world.schedule[1].date.day = 18; world.mailbox = [];
+    }
+    if (!reload && !(await saveGame(world, { skipCompression: true })).ok) throw new Error('fixture save failed');
+    window.renewalHarness?.unmount();
+    window.renewalHarness = mountRenewalView(world, { legacy, offseason });
+  }, { reload, due, legacy, offseason });
+}
+async function humanRenewalTerms(page) {
+  await page.getByRole('button', { name: 'Aの契約を確認', exact: true }).click();
+  await page.getByRole('spinbutton', { name: '提示年俸（万円）', exact: true }).fill('12000');
+  await page.getByRole('combobox', { name: '契約年数', exact: true }).selectOption('3');
+}
+async function captureRenewal(page, testInfo, stage, width) {
+  if (process.env.RENEWAL_CAPTURE) await page.screenshot({
+    path: `${process.env.RENEWAL_CAPTURE}/${testInfo.project.name}-${width}-${stage}.png`, fullPage: true,
+  });
+}
+for (const width of [360, 390, 1440]) test(`save generations: human renewal draft, retry and cold reload at ${width}px`, async ({ page }, testInfo) => {
+  await page.setViewportSize({ width, height: 900 }); await page.goto('/');
+  await mountHumanRenewal(page, { legacy: true });
+  await page.getByRole('combobox', { name: '契約状態', exact: true }).selectOption('all');
+  await page.getByRole('button', { name: 'Aの契約を確認', exact: true }).click();
+  await captureRenewal(page, testInfo, 'before', width);
+  await mountHumanRenewal(page, { reload: true }); await humanRenewalTerms(page);
+  await captureRenewal(page, testInfo, 'after', width);
+  await page.getByRole('button', { name: '提示条件を確認する', exact: true }).click();
+  await page.evaluate(() => {
+    window.renewalWrite = Storage.prototype.setItem;
+    window.renewalRoot = localStorage.getItem('baseball_manager_v1');
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'baseball_manager_v1') throw new DOMException('full', 'QuotaExceededError');
+      return window.renewalWrite.call(this, key, value);
+    };
+  });
+  await page.getByRole('button', { name: 'この条件で提示する', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('保存できません');
+  await expect(page.getByText('提示を保存しました。回答待ちです。', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('spinbutton', { name: '提示年俸（万円）', exact: true })).toHaveValue('12000');
+  expect(await page.evaluate(() => localStorage.getItem('baseball_manager_v1') === window.renewalRoot)).toBe(true);
+  await captureRenewal(page, testInfo, 'write-error', width);
+  await page.evaluate(() => { Storage.prototype.setItem = window.renewalWrite; });
+  await page.getByRole('button', { name: 'この条件で提示する', exact: true }).click();
+  await expect(page.getByText('提示を保存しました。回答待ちです。', { exact: true })).toBeVisible();
+  await expect(page.getByText('回答予定：2026-07-18', { exact: true })).toBeVisible();
+  await page.getByText('年度別の予算と契約負担', { exact: true }).click();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await captureRenewal(page, testInfo, 'pending', width);
+  await page.reload(); await mountHumanRenewal(page, { reload: true });
+  await page.getByRole('button', { name: 'Aの契約を確認', exact: true }).click();
+  await expect(page.getByText('回答予定：2026-07-18', { exact: true })).toBeVisible();
+  const saved = await page.evaluate(async () => {
+    const w = await (await import('/baseball-manager/src/engine/saveload.js')).loadGame();
+    return { salary: w.teams[0].players[0].salary, decisions: w.contractEconomy.decisions.length,
+      receipts: w.contractEconomy.engine.transactions.length, reservations: w.contractEconomy.engine.spending.reservations.length };
+  });
+  expect(saved).toEqual({ salary: 10000, decisions: 1, receipts: 1, reservations: 1 });
+  await page.getByRole('button', { name: '提示を取り消す', exact: true }).click();
+  await page.getByRole('button', { name: '取消を確定する', exact: true }).click();
+  await expect(page.getByText('提示を取り消しました。', { exact: true })).toBeVisible();
+});
+
+test('save generations: human renewal due reply survives missing mail and cold reload', async ({ page }) => {
+  await page.goto('/'); await mountHumanRenewal(page, { due: true, offseason: true });
+  // Standalone offseason routes must own a readable canvas, independent of the hub shell.
+  expect(await page.locator('[data-ds="annual-renewal-screen"]').evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(244, 246, 249)');
+  await page.getByRole('button', { name: '届いた回答を確認する', exact: true }).click();
+  await expect(page.getByText('届いた回答を保存しました。', { exact: true })).toBeVisible();
+  await page.reload(); await mountHumanRenewal(page, { reload: true });
+  await page.getByRole('button', { name: 'Aの契約を確認', exact: true }).click();
+  await expect(page.locator('.decision-detail')).toContainText('来季契約済み');
+  await expect(page.getByRole('spinbutton', { name: '提示年俸（万円）', exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => {
+    const gs = window.renewalHarness.current();
+    return { salary: gs.myTeam.players[0].salary, status: gs.contractEconomy.decisions[0].status,
+      agreements: gs.contractEconomy.engine.spending.ledger.records.filter(r => r.contract.startSeason === 2027).length };
+  })).toEqual({ salary: 10000, status: 'accepted', agreements: 1 });
+});
+
+test('save generations: human renewal recovers acknowledgement without a second transaction', async ({ page }) => {
+  await page.goto('/'); await mountHumanRenewal(page); await humanRenewalTerms(page);
+  await page.getByRole('button', { name: '提示条件を確認する', exact: true }).click();
+  await page.evaluate(() => {
+    window.renewalRead = Storage.prototype.getItem;
+    let interrupted = false;
+    Storage.prototype.getItem = function (key) {
+      if (key === 'baseball_manager_v1' && window.renewalHarness.current().contractEconomy.revision === 1 && !interrupted) {
+        interrupted = true; throw new Error('ack interrupted');
+      }
+      return window.renewalRead.call(this, key);
+    };
+  });
+  await page.getByRole('button', { name: 'この条件で提示する', exact: true }).click();
+  await expect(page.getByRole('button', { name: '保存済みの更改を復旧する', exact: true })).toBeVisible();
+  await expect(page.getByText('提示を保存しました。回答待ちです。', { exact: true })).toHaveCount(0);
+  const root = await page.evaluate(() => {
+    Storage.prototype.getItem = window.renewalRead;
+    return localStorage.getItem('baseball_manager_v1');
+  });
+  await page.getByRole('button', { name: '保存済みの更改を復旧する', exact: true }).click();
+  await expect(page.getByText('保存済みの更改を復旧しました。', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('baseball_manager_v1'))).toBe(root);
+  expect(await page.evaluate(() => window.renewalHarness.current().contractEconomy.engine.transactions.length)).toBe(1);
+});

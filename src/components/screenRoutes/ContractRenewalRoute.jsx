@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { compactRenewalSession } from '../../engine/offseasonPlanning';
+import { AnnualContractTab } from '../tabs/AnnualContractTab';
 
 export default function ContractRenewalRoute({
   gs,
@@ -17,6 +18,11 @@ export default function ContractRenewalRoute({
   const saveView = useCallback(renewalView => gs.setOffseasonPlan?.(prev =>
     prev?.year === year && prev.myId === myId ? { ...prev, renewalView } : prev), [gs.setOffseasonPlan, year, myId]);
   if (gs.screen !== 'contract_renewal_phase') return null;
+  if (gs.contractEconomy !== undefined && !(gs.contractEconomy?.schemaVersion === 1
+    && gs.contractEconomy.mode === 'legacy' && gs.contractEconomy.engine === undefined))
+    return <div data-ds="annual-renewal-screen" style={{ minHeight: '100dvh', background: 'var(--ds-canvas)', color: 'var(--ds-text)', padding: 16 }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto' }}><AnnualContractTab gs={gs} os={os} /></div>
+    </div>;
 
   return (
     <ScreenComponent
