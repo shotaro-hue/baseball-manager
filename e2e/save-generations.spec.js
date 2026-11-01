@@ -59,6 +59,34 @@ for (const width of [360, 390, 1440]) test(`save generations: human development 
   })).toEqual({ salary: 420, years: 3, development: false, receipts: 1, costs: [322, 420, 420] });
   await captureDevelopment(page, testInfo, 'reload', width);
 });
+test('save generations: human development refreshes an open quote and rejects the old callback after another contract', async ({ page }) => {
+  await page.goto('/'); await mountHumanDevelopment(page);
+  await page.getByRole('button', { name: '育成選手を支配下登録する', exact: true }).click();
+  const costs2027 = page.getByRole('dialog').getByRole('row').filter({ hasText: '2027' });
+  await expect(costs2027).toContainText('4.96億円');
+  expect(await page.evaluate(async () => {
+    const { renewalEnvelope } = await import('/baseball-manager/src/engine/__tests__/fixtures/economyWorld.js');
+    const gs = window.developmentHarness.current();
+    window.oldDevelopmentConfirm = gs.convertIkusei;
+    const command = renewalEnvelope(gs); command.transaction.proposal.contract.playerId = 'active-0';
+    return (await gs.commitEconomyCommand(command)).ok;
+  })).toBe(true);
+  await expect(costs2027).toContainText('4.80億円');
+  expect(await page.evaluate(async () => {
+    const root = localStorage.getItem('baseball_manager_v1');
+    const result = await window.oldDevelopmentConfirm(0);
+    return { ok: result.ok, reason: result.reason, sameRoot: root === localStorage.getItem('baseball_manager_v1'),
+      receipts: window.developmentHarness.current().contractEconomy.engine.transactions.length };
+  })).toEqual({ ok: false, reason: 'economy_command_invalid', sameRoot: true, receipts: 1 });
+  await expect(page.getByRole('dialog')).toContainText('322万円');
+  await page.getByRole('button', { name: '登録を確定', exact: true }).click();
+  await expect(page.getByText('支配下登録を保存しました。', { exact: true })).toBeVisible();
+  await page.reload(); await mountHumanDevelopment(page, { reload: true });
+  expect(await page.evaluate(() => {
+    const gs = window.developmentHarness.current();
+    return { salary: gs.myTeam.farm[0].salary, receipts: gs.contractEconomy.engine.transactions.length };
+  })).toEqual({ salary: 420, receipts: 2 });
+});
 test('save generations: human development published acknowledgement recovery survives returning to farm', async ({ page }) => {
   await page.goto('/'); await mountHumanDevelopment(page);
   await page.getByRole('button', { name: '育成選手を支配下登録する', exact: true }).click();
