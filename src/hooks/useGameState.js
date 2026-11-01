@@ -4,6 +4,8 @@ import { marketRosterError } from '../engine/marketRoster';
 import {createFarmCompetition} from '../engine/farmRecords';
 import {validateFarmSaveState} from '../engine/farmMigration';
 import { contractEconomyMode, reduceEconomyCommand } from '../engine/contractEconomy';
+import { reduceAcquisitionRequest } from '../engine/acquisitionDecisions';
+import { advanceEconomyDecisions } from '../engine/economyDecisions';
 import { validateEconomySave } from '../engine/economyPersistence';
 import { reduceRenewalRequest } from '../engine/renewalDecisions';
 import { saveFeedback } from '../engine/saveFeedback';
@@ -722,6 +724,14 @@ export function useGameState() {
   const commitRenewalRequest = useCallback((request, sessionToken) => {
     if (!Number.isSafeInteger(sessionToken)) return Promise.resolve({ ok: false, reason: 'economy_session_conflict' });
     return commitEconomyOperation(request, reduceRenewalRequest, sessionToken);
+  }, [commitEconomyOperation]);
+  const commitAcquisitionRequest = useCallback((request, sessionToken) => {
+    if (!Number.isSafeInteger(sessionToken)) return Promise.resolve({ ok: false, reason: 'economy_session_conflict' });
+    return commitEconomyOperation(request, reduceAcquisitionRequest, sessionToken);
+  }, [commitEconomyOperation]);
+  const commitDueEconomyRequest = useCallback((request, sessionToken) => {
+    if (!Number.isSafeInteger(sessionToken)) return Promise.resolve({ ok: false, reason: 'economy_session_conflict' });
+    return commitEconomyOperation(request, advanceEconomyDecisions, sessionToken);
   }, [commitEconomyOperation]);
 
   const recoverEconomyCommand = useCallback(async () => {
@@ -1485,7 +1495,7 @@ export function useGameState() {
     getLatestNewsId,
     markSaveDirty,
     hydrateSavedWorld, hydrateLargeSaveData, getMatchHistorySnapshot, hydrateMatchHistory, applyMatchResultPatch,
-    commitEconomyCommand, commitRenewalRequest, recoverEconomyCommand,
+    commitEconomyCommand, commitRenewalRequest, commitAcquisitionRequest, commitDueEconomyRequest, recoverEconomyCommand,
     resetSaveTracking,
     // derived
     myTeam,

@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import HubFaTab from './hub/HubFaTab';
+import { AnnualMarketTab } from './tabs/AnnualMarketTab';
 import { PlayerComparisonDialog, PlayerComparisonTray } from './PlayerComparisonTray';
 import { useResultDialog } from './useResultDialog';
 import { fmtSal } from '../utils';
@@ -19,6 +20,15 @@ function FinishDialog({ acquired, onClose, onConfirm }) {
 }
 
 export default function OffseasonFaPhaseScreen({ gs, os, myTeam, myId, year, embedded = false }) {
+  if (gs.contractEconomy !== undefined && !(gs.contractEconomy?.schemaVersion === 1
+    && gs.contractEconomy.mode === 'legacy' && gs.contractEconomy.engine === undefined))
+    return <div data-ds="annual-market-screen" style={{ minHeight: embedded ? undefined : '100dvh', background: 'var(--ds-canvas)', color: 'var(--ds-text)', padding: embedded ? 0 : 16 }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto' }}><AnnualMarketTab gs={gs} os={os} /></div>
+    </div>;
+  return <LegacyOffseasonFaPhaseScreen gs={gs} os={os} myTeam={myTeam} myId={myId} year={year} embedded={embedded} />;
+}
+
+function LegacyOffseasonFaPhaseScreen({ gs, os, myTeam, myId, year, embedded }) {
   const [profile, setProfile] = useState(null);
   const [compared, setCompared] = useState([]);
   const [compareOpen, setCompareOpen] = useState(false);
