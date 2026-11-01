@@ -5,6 +5,7 @@ import { employmentPlayerFields } from './seasonContract';
 import { quoteAnnualSpendingPlan } from './annualSpending';
 import { validateRenewalDecisions, preservesRenewalDecisions } from './renewalDecisions';
 import { validateAcquisitionDecisions, preservesAcquisitionDecisions } from './acquisitionDecisions';
+import { validateRookieContracts } from './rookieContracts';
 
 // Storage validation only. Commit acknowledgements/barrier live in saveload;
 // activation and application hydration remain separate A1-1d stages.
@@ -13,6 +14,7 @@ export function validateEconomySave(world) {
   if (mode === 'annual') {
     validateRenewalDecisions(world);
     validateAcquisitionDecisions(world);
+    validateRookieContracts(world);
     // The legacy writer may normalize/mint save IDs. Annual identities must
     // survive serialization exactly (including their receipt references).
     if (typeof world.saveId !== 'string' || !world.saveId.trim()

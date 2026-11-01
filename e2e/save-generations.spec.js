@@ -3,6 +3,105 @@ import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 const fixture = JSON.parse(gunzipSync(readFileSync(new URL('./fixtures/new-game.json.gz', import.meta.url))).toString());
 
+async function mountHumanRookies(page, { reload = false, legacy = false } = {}) {
+  await page.evaluate(async ({ reload, legacy }) => {
+    const { rookieFixture } = await import('/baseball-manager/src/engine/__tests__/fixtures/rookieWorld.js');
+    const { saveGame, loadGame } = await import('/baseball-manager/src/engine/saveload.js');
+    const { mountRookieView } = await import('/baseball-manager/tests/helpers/rookie-hook-harness.jsx');
+    const world = reload ? await loadGame() : rookieFixture();
+    // Pre-fix saves can contain a 240 controlled pick; review the correction
+    // before committing, then retain exactly that offer through failure/reload.
+    if (!reload) world.offseasonPlan.draftResult.pool[0].salary = 240;
+    window.rookieHarness?.unmount();
+    if (!reload && !(await saveGame(world, { skipCompression: true })).ok) throw Error('fixture save failed');
+    window.rookieHarness = mountRookieView(world, { legacy });
+  }, { reload, legacy });
+}
+async function captureRookie(page, testInfo, stage, width) {
+  if (process.env.ROOKIE_CAPTURE) {
+    await page.evaluate(() => new Promise(resolve => { window.scrollTo(0, 0); requestAnimationFrame(() => requestAnimationFrame(resolve)); }));
+    await page.screenshot({ path: `${process.env.ROOKIE_CAPTURE}/${testInfo.project.name}-${width}-${stage}.png`, fullPage: true });
+  }
+}
+for (const width of [360, 390, 1440]) test(`save generations: human rookie reserve, failed write, decline and reload at ${width}px`, async ({ page }, testInfo) => {
+  await page.setViewportSize({ width, height: 900 }); await page.goto('/');
+  await mountHumanRookies(page, { legacy: true });
+  await expect(page.getByRole('button', { name: '2027年シーズン開幕！', exact: true })).toBeVisible();
+  await captureRookie(page, testInfo, 'before', width);
+  await mountHumanRookies(page, { reload: true });
+  await expect(page.getByRole('heading', { name: '翌年度の新人契約', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '2027年シーズン開幕！', exact: true })).toHaveCount(0);
+  await captureRookie(page, testInfo, 'after', width);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.getByRole('button', { name: '支配下新人の留保条件を確認', exact: true }).click();
+  const confirmation = page.getByRole('region', { name: '新人契約の最終確認', exact: true });
+  await expect(confirmation).toContainText('年俸 420万円');
+  await expect(confirmation).toContainText('240万円 から最低年俸の 420万円');
+  await page.evaluate(() => {
+    window.rookieWrite = Storage.prototype.setItem; window.rookieRoot = localStorage.getItem('baseball_manager_v1');
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'baseball_manager_v1') throw new DOMException('full', 'QuotaExceededError');
+      return window.rookieWrite.call(this, key, value);
+    };
+  });
+  await page.getByRole('button', { name: 'この条件を留保する', exact: true }).click();
+  await expect(page.getByText('新人契約を保存できませんでした。確認内容を保持しています。再試行してください。', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('baseball_manager_v1') === window.rookieRoot)).toBe(true);
+  expect(await page.evaluate(() => window.rookieHarness.current().offseasonPlan.draftResult.pool[0].salary)).toBe(240);
+  await captureRookie(page, testInfo, 'failed', width);
+  await page.evaluate(() => { Storage.prototype.setItem = window.rookieWrite; });
+  await page.getByRole('button', { name: 'この条件を留保する', exact: true }).click();
+  await expect(page.getByText('契約留保を保存しました。翌春の加入待ちです。', { exact: true })).toBeVisible();
+  await page.reload(); await mountHumanRookies(page, { reload: true });
+  await expect(page.getByText('留保済み・翌春加入待ち', { exact: true })).toBeVisible();
+  await expect(page.getByText('支配下 · 2027年度 年俸 420万円 · 単年', { exact: true })).toBeVisible();
+  expect(await page.evaluate(async () => {
+    const { quoteAnnualSpendingPlan } = await import('/baseball-manager/src/engine/annualSpending.js');
+    const { toAnnualState } = await import('/baseball-manager/src/engine/contractEconomy.js');
+    const gs = window.rookieHarness.current(), engine = gs.contractEconomy.engine;
+    return { recorded: gs.offseasonPlan.draftResult.pool[0].salary,
+      proposal: engine.spending.reservations[0].proposal.contract.annualSalaryManYen,
+      receipt: JSON.parse(engine.transactions[0].signature).proposal.contract.annualSalaryManYen,
+      reserved: quoteAnnualSpendingPlan(toAnnualState(gs).spending).find(r => r.teamId === 0 && r.season === 2027).reservedManYen };
+  })).toEqual({ recorded: 420, proposal: 420, receipt: 420, reserved: 420 });
+  await page.getByRole('button', { name: '育成新人の留保条件を確認', exact: true }).click();
+  await page.getByRole('button', { name: 'この条件を留保する', exact: true }).click();
+  await expect(page.getByText('契約留保を保存しました。翌春の加入待ちです。', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '支配下新人の辞退を確認', exact: true }).click();
+  await page.getByRole('button', { name: '辞退を確定する', exact: true }).click();
+  await expect(page.getByText('新人の辞退を保存しました。', { exact: true })).toBeVisible();
+  await page.reload(); await mountHumanRookies(page, { reload: true });
+  await expect(page.getByText('辞退済み', { exact: true })).toBeVisible();
+  await captureRookie(page, testInfo, 'history', width);
+  expect(await page.evaluate(() => {
+    const gs = window.rookieHarness.current();
+    return { farm: gs.myTeam.farm.length, salary: gs.myTeam.players[0].salary,
+      declined: gs.offseasonPlan.draftResult.drafted.rookie,
+      holds: gs.contractEconomy.engine.spending.reservations.map(h => h.proposal.contract.annualSalaryManYen),
+      receipts: gs.contractEconomy.engine.transactions.length };
+  })).toEqual({ farm: 0, salary: 10000, declined: 'refused', holds: [240], receipts: 3 });
+});
+
+test('save generations: human rookie recovers published acknowledgement without a second hold', async ({ page }) => {
+  await page.goto('/'); await mountHumanRookies(page);
+  await page.getByRole('button', { name: '支配下新人の留保条件を確認', exact: true }).click();
+  await page.evaluate(() => {
+    window.rookieRead = Storage.prototype.getItem; let interrupted = false;
+    Storage.prototype.getItem = function (key) {
+      if (key === 'baseball_manager_v1' && window.rookieHarness.current().contractEconomy.revision === 1 && !interrupted) { interrupted = true; throw Error('ack interrupted'); }
+      return window.rookieRead.call(this, key);
+    };
+  });
+  await page.getByRole('button', { name: 'この条件を留保する', exact: true }).click();
+  await expect(page.getByRole('button', { name: '保存済みの新人契約を復旧する', exact: true })).toBeVisible();
+  await expect(page.getByText('契約留保を保存しました。翌春の加入待ちです。', { exact: true })).toHaveCount(0);
+  const root = await page.evaluate(() => { Storage.prototype.getItem = window.rookieRead; return localStorage.getItem('baseball_manager_v1'); });
+  await page.getByRole('button', { name: '保存済みの新人契約を復旧する', exact: true }).click();
+  await expect(page.getByText('保存済みの新人契約を復旧しました。', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('baseball_manager_v1'))).toBe(root);
+  expect(await page.evaluate(() => window.rookieHarness.current().contractEconomy.engine.transactions.length)).toBe(1);
+});
+
 for (const large of [false, true]) test(`save generations: annual world survives cold reload and refuses downgrade (${large ? 'large' : 'inline'})`, async ({ page }) => {
   await page.goto('/');
   const initial = await page.evaluate(async large => {

@@ -1,4 +1,5 @@
 import { draftCapacityContext, evaluateRosterCapacity, isIkuseiPlayer } from '../engine/rosterCapacity';
+import { reduceRookieRequest } from '../engine/rookieContracts';
 import { stadiumUpgradeCosts } from '../engine/clubFinance';
 import { marketRosterError } from '../engine/marketRoster';
 import {createFarmCompetition} from '../engine/farmRecords';
@@ -732,6 +733,10 @@ export function useGameState() {
   const commitDueEconomyRequest = useCallback((request, sessionToken) => {
     if (!Number.isSafeInteger(sessionToken)) return Promise.resolve({ ok: false, reason: 'economy_session_conflict' });
     return commitEconomyOperation(request, advanceEconomyDecisions, sessionToken);
+  }, [commitEconomyOperation]);
+  const commitRookieRequest = useCallback((request, sessionToken) => {
+    if (!Number.isSafeInteger(sessionToken)) return Promise.resolve({ ok: false, reason: 'economy_session_conflict' });
+    return commitEconomyOperation(request, reduceRookieRequest, sessionToken);
   }, [commitEconomyOperation]);
 
   const recoverEconomyCommand = useCallback(async () => {
@@ -1495,7 +1500,7 @@ export function useGameState() {
     getLatestNewsId,
     markSaveDirty,
     hydrateSavedWorld, hydrateLargeSaveData, getMatchHistorySnapshot, hydrateMatchHistory, applyMatchResultPatch,
-    commitEconomyCommand, commitRenewalRequest, commitAcquisitionRequest, commitDueEconomyRequest, recoverEconomyCommand,
+    commitEconomyCommand, commitRenewalRequest, commitAcquisitionRequest, commitDueEconomyRequest, commitRookieRequest, recoverEconomyCommand,
     resetSaveTracking,
     // derived
     myTeam,

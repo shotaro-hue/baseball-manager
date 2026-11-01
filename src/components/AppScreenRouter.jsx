@@ -460,6 +460,7 @@ export default function AppScreenRouter({ app }) {
     return (
       <DeferredScreenFrame screen={screen} gs={gs}>
         <DraftReviewScreen
+          gs={gs} os={os}
           teams={teams}
           myId={myId}
           year={year}

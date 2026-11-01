@@ -34,6 +34,7 @@ import { rankLeague, standingsContext } from '../engine/standings';
 import { draftPicksForTeam } from '../engine/offseasonResume';
 import { hasRecordedFirstTeamSeason } from '../engine/seasonParticipants';
 import { renewalRequest } from '../engine/renewalDecisions';
+import { rookieRequest } from '../engine/rookieContracts';
 import { acquisitionRequest } from '../engine/acquisitionDecisions';
 
 let offseasonPlayerModulePromise = null;
@@ -60,11 +61,17 @@ function createEmptyStats() {
   };
 }
 
+const usesLegacyContracts = gs => gs.contractEconomy === undefined
+  || (gs.contractEconomy?.schemaVersion === 1 && gs.contractEconomy.mode === 'legacy' && gs.contractEconomy.engine === undefined);
+
 export function useOffseason(gs) {
   // Only absent/explicit legacy envelopes may enter the old wallet handlers.
-  const legacyContracts = gs.contractEconomy === undefined
-    || (gs.contractEconomy?.schemaVersion === 1 && gs.contractEconomy.mode === 'legacy' && gs.contractEconomy.engine === undefined);
+  const legacyContracts = usesLegacyContracts(gs);
+  const draftContextRef = useRef(gs);
+  draftContextRef.current = gs;
   const renewalSession = gs.getProgressSessionToken?.();
+  const canProgressLegacy = () => usesLegacyContracts(draftContextRef.current)
+    && renewalSession === draftContextRef.current.getProgressSessionToken?.();
   const commitRenewal = action => gs.commitRenewalRequest
     ? gs.commitRenewalRequest(renewalRequest(gs, action), renewalSession)
     : Promise.resolve({ ok: false, reason: 'economy_not_active' });
@@ -79,6 +86,11 @@ export function useOffseason(gs) {
     ? gs.commitDueEconomyRequest(acquisitionRequest(gs, { type: 'resolve-due' }), renewalSession)
     : Promise.resolve({ ok: false, reason: 'economy_not_active' });
   const handleResolveRenewals = handleResolveEconomyDecisions;
+  const commitRookie = action => gs.commitRookieRequest
+    ? gs.commitRookieRequest(rookieRequest(gs, action), renewalSession)
+    : Promise.resolve({ ok: false, reason: 'economy_not_active' });
+  const handleReserveRookie = playerId => commitRookie({ type: 'reserve', playerId });
+  const handleDeclineRookie = playerId => commitRookie({ type: 'decline', playerId });
   const {
     teams, setTeams, myId, myTeam,
     year, setYear, gameDay, setGameDay,
@@ -112,7 +124,9 @@ export function useOffseason(gs) {
   const setDraftPool = value => { const next = typeof value === 'function' ? value(draftPool) : value;
     setDraftPoolState(next); gs.setOffseasonPlan?.(prev => prev && ({ ...prev, draftPool: next })); };
   const [draftResultState, setDraftResultState] = useState(null);
-  const draftResult = draftResultState ?? gs.offseasonPlan?.draftResult;
+  // Annual commits publish the canonical plan, including declined picks. A local
+  // pre-commit result must never mask the newly adopted result after save/reload.
+  const draftResult = legacyContracts ? draftResultState ?? gs.offseasonPlan?.draftResult : gs.offseasonPlan?.draftResult;
   const setDraftResult = value => { setDraftResultState(value); gs.setOffseasonPlan?.(prev => prev && ({ ...prev, draftResult: value })); };
   const [draftAllocationState, setDraftAllocationState] = useState(null);
   const draftAllocation = draftAllocationState ?? gs.offseasonPlan?.draftAllocation ?? {pitcher:50,batter:50};
@@ -160,6 +174,7 @@ export function useOffseason(gs) {
   const appendCareerEntryWithSummary = (player, entry) => appendCareerEntryToPlayer(player, entry);
 
   const handleNextYear = async (sourceTeams = teams) => {
+    if (!canProgressLegacy()) return false;
     if (nextYearTransitionRef.current) return false;
     if (gs.offseasonPlan && gs.screen !== 'spring_training') return false;
     nextYearTransitionRef.current = true;
@@ -319,9 +334,8 @@ export function useOffseason(gs) {
     return { conditionDeltas, conditionChanges, campEvents, rosterBattles };
   };
 
-  const draftContextRef = useRef(gs);
-  draftContextRef.current = gs;
   const handleDraftComplete = (pl, dr) => {
+    if (!canProgressLegacy()) return false;
     const { teams, year, offseasonPlan, screen } = draftContextRef.current;
     if (draftAppliedRef.current === year || offseasonPlan?.draftApplied || (offseasonPlan && screen !== 'draft_review')) return false;
     const result = applyDraftAcquisitions(teams, pl, dr, year, {rules:offseasonPlan?.draftRules,log:offseasonPlan?.draftViews?.draft?.log});
@@ -342,6 +356,7 @@ export function useOffseason(gs) {
   };
 
   const handleSpringTrainingComplete = async () => {
+    if (!canProgressLegacy()) return false;
     if (gs.offseasonPlan && gs.screen !== 'spring_training') return false;
     let preparedTeams = teams;
     if (springTrainingData?.conditionDeltas) {
@@ -962,7 +977,7 @@ export function useOffseason(gs) {
     handleResolveRenewals,
     handleContractRenewalSign,
     handleFaPhaseNext,
-    handleAcquisitionOffer, handleCancelAcquisition, handleResolveEconomyDecisions,
+    handleAcquisitionOffer, handleCancelAcquisition, handleResolveEconomyDecisions, handleReserveRookie, handleDeclineRookie,
     handleContractRenewalPhaseNext,
     handleTrade,
     acceptCpuOffer,

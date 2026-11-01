@@ -1,6 +1,7 @@
 import {evaluateDraftContinuation} from '../engine/draftContinuation';
 import {draftRulesFor,draftParticipation,draftEndLabel} from '../engine/draftConference';
 import DraftEndSelection from './DraftEndSelection';
+import AnnualRookieContracts from './AnnualRookieContracts';
 import { evaluateRosterCapacity } from '../engine/rosterCapacity';
 import { RosterCapacitySummary } from './RosterCapacitySummary';
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
@@ -467,16 +468,16 @@ export function DraftScreen({teams,myId,year,pool,rules,draftAllocation,autoSkip
    PLAYOFF SYSTEM
 ═══════════════════════════════════════════════ */
 
-export function DraftReviewScreen({teams,myId,year,pool,drafted,onEnd,savedState,onStateChange,evaluation}) {
+export function DraftReviewScreen({teams,myId,year,pool,drafted,onEnd,savedState,onStateChange,evaluation,gs,os}) {
   const [tab,setTab]=useState(savedState?.tab || 'myteam');
   useEffect(()=>{onStateChange?.({tab});},[tab,onStateChange]);
   const picksFor=id=>draftPicksForTeam(pool,drafted || {},id),mine=picksFor(myId);
   const undrafted=pool.filter(p=>!p._drafted&&drafted?.[p.id]===undefined);
-  return <div className="draft-experience" data-ds="draft"><div className="draft-page"><header className="draft-header"><div><small>DRAFT REVIEW</small><h1>{year+1}年 ドラフト結果</h1><p>指名時の見立てを、今後の育成につなげる</p></div><StateLabel>獲得 {mine.length}人</StateLabel></header>
+  return <div className="draft-experience" data-ds="draft"><div className="draft-page"><header className="draft-header"><div><small>DRAFT REVIEW</small><h1>{year+1}年 ドラフト結果</h1><p>指名時の見立てを、今後の育成につなげる</p></div><StateLabel>{gs?.contractEconomy?.mode === 'annual' ? '指名' : '獲得'} {mine.length}人</StateLabel></header>
     <nav className="draft-tabs" aria-label="ドラフト結果">{[['myteam','自チーム'],['allteams','全球団結果'],['undrafted','指名漏れ']].map(([id,label])=><Button key={id} variant={tab===id?'primary':'secondary'} onClick={()=>setTab(id)}>{label}</Button>)}</nav>
     {tab==='myteam'&&<section className="draft-panel"><h2>指名時のスカウト所見</h2><p className="draft-muted">当時の評価記録です。将来の活躍を確定する採点ではありません。</p>{!mine.length&&<p>指名なし</p>}{mine.map(p=>{const snapshot=evaluation?.snapshots?.[p.id];return <div key={p.id} className="draft-result-row"><strong>{p.name}</strong><span className="draft-muted">　{p.pos} · {p.age}歳</span>{snapshot?<><p>{snapshot.report.summary}</p><p>期待役割：{snapshot.report.role} · 将来性 {draftBand(snapshot.report.future)} · 確度 {snapshot.report.confidence}</p><StateLabel>当時の世間：{snapshot.publicTier}</StateLabel></>:<p>当時の評価記録なし</p>}</div>;})}</section>}
     {tab==='allteams'&&<section className="draft-panel"><h2>全球団 指名結果</h2>{teams.map(t=><div key={t.id} className="draft-team-row"><h3>{t.name}</h3><p>{picksFor(t.id).map(p=>`${p.name}（${p.pos}）`).join(' / ') || '指名なし'}</p></div>)}</section>}
     {tab==='undrafted'&&<section className="draft-panel"><h2>指名漏れ ({undrafted.length}人)</h2>{undrafted.map(p=><div key={p.id} className="draft-result-row"><strong>{p.name}</strong> · {p.pos} · {p.age}歳 <StateLabel>{publicDraftTier(evaluation,p.id)}</StateLabel></div>)}</section>}
-    <Button onClick={onEnd}>{year+1}年シーズン開幕！</Button>
+    {gs?.contractEconomy?.mode === 'annual' ? <AnnualRookieContracts gs={gs} os={os} /> : <Button onClick={onEnd}>{year+1}年シーズン開幕！</Button>}
   </div></div>;
 }
