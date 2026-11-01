@@ -3,11 +3,11 @@ import { stadiumUpgradeCosts } from '../engine/clubFinance';
 import { marketRosterError } from '../engine/marketRoster';
 import {createFarmCompetition} from '../engine/farmRecords';
 import {validateFarmSaveState} from '../engine/farmMigration';
-import { contractEconomyMode } from '../engine/contractEconomy';
+import { contractEconomyMode, reduceEconomyCommand } from '../engine/contractEconomy';
 import { validateEconomySave } from '../engine/economyPersistence';
 import { saveFeedback } from '../engine/saveFeedback';
 import { emptyBattedBallReceipt, validateBattedBallReceipt } from '../engine/battedBallRun';
-import { useState, useReducer, useMemo, useCallback, useEffect, useRef } from "react";
+import { useState, useReducer, useMemo, useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { contractReplyIsDue, resolveContractReplies } from '../engine/contractReplies';
 import { yieldToBrowser } from '../engine/yieldToBrowser';
 import { gameStateReducer, G, interviewChoice, canApplyLegacyProgress } from './gameStateReducer';
@@ -131,14 +131,42 @@ function sliceCollection(items, options = {}) {
   return safeItems.slice(offset, offset + limit);
 }
 
+// Shared by ordinary saves and acknowledged annual commits. Archive failures
+// never turn a published economic transaction into a purported rollback.
+async function flushCommittedArchives(state) {
+  try {
+    const archive = await import('../engine/battedBallArchive');
+    const receipts = await import('../engine/battedBallReceipts');
+    const scope = { saveId: state.saveId };
+    let receiptResult = await receipts.flushBattedBallReceipts(state.battedBallReceipt, scope);
+    const status = archive.getBattedBallQueueStatus(scope);
+    let archiveResult = status.failedRecords > 0
+      ? await archive.retryFailedBattedBallWrites(scope)
+      : await archive.flushBattedBallQueue(scope);
+    let settled = archive.getBattedBallQueueStatus(scope);
+    while (settled.isWriting || settled.queuedRecords > 0) {
+      archiveResult = await archive.flushBattedBallQueue(scope);
+      settled = archive.getBattedBallQueueStatus(scope);
+    }
+    if (!receiptResult.ok && archiveResult?.ok !== false && !settled.failedRecords)
+      receiptResult = await receipts.flushBattedBallReceipts(state.battedBallReceipt, scope);
+    return { ...archiveResult, ok: receiptResult.ok && archiveResult?.ok !== false && !(settled.failedRecords > 0) };
+  } catch (error) {
+    console.warn('打球アーカイブのフラッシュに失敗しました。試合セーブは完了しています。', error);
+    return { ok: false };
+  }
+}
+
 export function useGameState() {
   const [screen, setScreenState] = useState("title");
   const screenRef = useRef('title');
   const setScreen = useCallback(value => {
+    if (economyCommitRef.current) return false;
     // Async title loads may retain an older callback across navigation.
     const next = typeof value === 'function' ? value(screenRef.current) : value;
     screenRef.current = next;
     setScreenState(next);
+    return true;
   }, []);
   const [retireModal, setRetireModal] = useState(null);
   const [playerModal, setPlayerModal] = useState(null);
@@ -156,13 +184,38 @@ export function useGameState() {
   );
   const { teams, news, gameDay, year, myId, saveId, farmCompetition, battedBallReceipt,
     faPool, faYears, offseasonPlan, mailbox, schedule, contractEconomy } = gameState;
-  const setFaPool = useCallback(value => dispatch({ type: G.SET_FA_POOL, value }), []);
-  const setFaYearsState = useCallback(value => dispatch({ type: G.SET_FA_YEARS, value }), []);
-  const setOffseasonPlanState = useCallback(value => dispatch({ type: G.SET_OFFSEASON_PLAN, value }), []);
-  const setMailboxState = useCallback(value => dispatch({ type: G.SET_MAILBOX, value }), []);
-  const setSchedule = useCallback(value => dispatch({ type: G.SET_SCHEDULE, value }), []);
+  const setFaPool = useCallback(value => {
+    if (economyCommitRef.current) return false;
+    dispatch({ type: G.SET_FA_POOL, value });
+    return true;
+  }, []);
+  const setFaYearsState = useCallback(value => {
+    if (economyCommitRef.current) return false;
+    dispatch({ type: G.SET_FA_YEARS, value });
+    return true;
+  }, []);
+  const setOffseasonPlanState = useCallback(value => {
+    if (economyCommitRef.current) return false;
+    dispatch({ type: G.SET_OFFSEASON_PLAN, value });
+    return true;
+  }, []);
+  const setMailboxState = useCallback(value => {
+    if (economyCommitRef.current) return false;
+    dispatch({ type: G.SET_MAILBOX, value });
+    return true;
+  }, []);
+  const setSchedule = useCallback(value => {
+    if (economyCommitRef.current) return false;
+    dispatch({ type: G.SET_SCHEDULE, value });
+    return true;
+  }, []);
   const rosterCommandRef = useRef(gameState);
+  const economyCommitRef = useRef(null);
+  const pendingEconomyAdoptionRef = useRef(null);
+  const economySnapshotRef = useRef(null);
+  const economyMountedRef = useRef(false);
   const setNewsState = useCallback(value => {
+    if (economyCommitRef.current) return false;
     const current = rosterCommandRef.current;
     const nextNews = typeof value === 'function' ? value(current.news) : value;
     rosterCommandRef.current = { ...current, news: nextNews };
@@ -172,24 +225,43 @@ export function useGameState() {
   const progressTokenRef = useRef(0);
   const progressSessionRef = useRef(0);
   const getProgressSessionToken = useCallback(()=>progressSessionRef.current,[]);
-  const progressDispatch = useCallback(action => {progressTokenRef.current++;dispatch(action);},[]);
+  const progressDispatch = useCallback(action => {
+    if (economyCommitRef.current && action.type !== G.APPLY_ECONOMY_WORLD) return false;
+    progressTokenRef.current++;
+    dispatch(action);
+    return true;
+  }, []);
   const getProgressToken = useCallback(()=>progressTokenRef.current,[]);
   const [saveDirty, setSaveDirty] = useState(false);
   const saveDirtyRef = useRef(saveDirty);
   saveDirtyRef.current = saveDirty;
   const [lastAutoSaveAt, setLastAutoSaveAt] = useState(0);
   const [saveRevision, setSaveRevision] = useState(0);
+  const setPublicSaveDirty = useCallback(value => {
+    if (economyCommitRef.current) return false;
+    setSaveDirty(value);
+  }, []);
+  const setPublicSaveRevision = useCallback(value => {
+    if (economyCommitRef.current) return false;
+    setSaveRevision(value);
+  }, []);
   const saveDirtyTrackerRef = useRef(null);
+  // Count applied updates, not the latest requested version: concurrent React
+  // can commit an urgent update while an earlier transition is still pending.
+  const [committedMutationCount, setCommittedMutationCount] = useState(0);
   const pendingCareerEntriesRef = useRef([]);
   if (saveDirtyTrackerRef.current === null) {
     saveDirtyTrackerRef.current = createSaveDirtyTracker();
   }
   const markSaveDirty = useCallback((scopes = [])=>{
+    if (economyCommitRef.current) return false;
     saveDirtyTrackerRef.current.mark(scopes);
+    setCommittedMutationCount(count => count + 1);
     setSaveRevision(prev=>prev+1);
     setSaveDirty(true);
   },[]);
   const stageCareerEntries = useCallback(entries => {
+    if (economyCommitRef.current) return false;
     pendingCareerEntriesRef.current.push(...structuredClone(entries));
     markSaveDirty();
   },[markSaveDirty]);
@@ -202,11 +274,11 @@ export function useGameState() {
     progressDispatch({type:G.APPLY_PROGRESS,candidate:{...candidate,...('teams' in candidate?{teams:slimTeamsForState(candidate.teams)}:{})}});
     markSaveDirty();return true;
   },[progressDispatch,markSaveDirty]);
-  const setTeams   = useCallback((n) => { progressDispatch({ type: G.SET_TEAMS, teams: (prev) => slimTeamsForState(typeof n === 'function' ? n(prev) : n) }); markSaveDirty(); },    [markSaveDirty]);
+  const setTeams   = useCallback((n) => { if (economyCommitRef.current) return false; progressDispatch({ type: G.SET_TEAMS, teams: (prev) => slimTeamsForState(typeof n === 'function' ? n(prev) : n) }); markSaveDirty(); },    [markSaveDirty]);
   const setGameDay = useCallback((n) => { progressDispatch({ type: G.SET_GAME_DAY, day: n }); markSaveDirty(); }, [markSaveDirty]);
   const setYear    = useCallback((n) => { progressDispatch({ type: G.SET_YEAR, year: n }); markSaveDirty(); }, [markSaveDirty]);
   const setMyId    = useCallback((id) => { progressDispatch({ type: G.SET_MY_ID, myId: id }); markSaveDirty(); }, [markSaveDirty]);
-  const setSaveId  = useCallback((id) => { pendingCareerEntriesRef.current=[];progressSessionRef.current++;progressDispatch({ type: G.SET_SAVE_ID, saveId: ensureSaveId(id) }); }, []);
+  const setSaveId  = useCallback((id) => { if (economyCommitRef.current) return false; pendingCareerEntriesRef.current=[];progressSessionRef.current++;progressDispatch({ type: G.SET_SAVE_ID, saveId: ensureSaveId(id) }); }, []);
   const [tab, setTab] = useState("dashboard");
   const setFaYears = useCallback(value => { setFaYearsState(value); markSaveDirty(); }, [markSaveDirty]);
   const setOffseasonPlan = useCallback(value => { setOffseasonPlanState(value); markSaveDirty(); }, [markSaveDirty]);
@@ -222,7 +294,13 @@ export function useGameState() {
   const [allStarDone, setAllStarDoneState] = useState(false);
   const [allStarResult, setAllStarResultState] = useState(null);
   const [allStarTriggerDay, setAllStarTriggerDay] = useState(72);
-  const [isAutoSaveSuspended, setIsAutoSaveSuspended] = useState(false);
+  const [isAutoSaveSuspended, setIsAutoSaveSuspendedState] = useState(false);
+  const autoSaveSuspendedRef = useRef(false);
+  const setIsAutoSaveSuspended = useCallback(value => {
+    const next = typeof value === 'function' ? value(autoSaveSuspendedRef.current) : value;
+    autoSaveSuspendedRef.current = next;
+    setIsAutoSaveSuspendedState(next);
+  }, []);
   const [saveQueueState, setSaveQueueState] = useState({ isSaving: false });
   // Display-only outcome from the actual save request; never persisted.
   const [saveResult, setSaveResult] = useState(null);
@@ -249,21 +327,22 @@ export function useGameState() {
     finally { if (titleLoadPromiseRef.current === task) titleLoadPromiseRef.current = null; }
   }, []);
 
-  const setAllTeamResultsMap = useCallback(value => { setAllTeamResultsMapState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
-  const setAllTeamBoxScoresMap = useCallback(value => { setAllTeamBoxScoresMapState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
-  const setRecentResults = useCallback(value => { setRecentResultsState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
-  const setGameResultsMap = useCallback(value => { setGameResultsMapState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
-  const setScheduleArchive = useCallback(value => { setScheduleArchiveState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
-  const setPressEvent = useCallback(value => { setPressEventState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
-  const setLastPressDay = useCallback(value => { setLastPressDayState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
-  const setAllStarDone = useCallback(value => { setAllStarDoneState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
-  const setAllStarResult = useCallback(value => { setAllStarResultState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
+  const setAllTeamResultsMap = useCallback(value => { if (economyCommitRef.current) return false; setAllTeamResultsMapState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
+  const setAllTeamBoxScoresMap = useCallback(value => { if (economyCommitRef.current) return false; setAllTeamBoxScoresMapState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
+  const setRecentResults = useCallback(value => { if (economyCommitRef.current) return false; setRecentResultsState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
+  const setGameResultsMap = useCallback(value => { if (economyCommitRef.current) return false; setGameResultsMapState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
+  const setScheduleArchive = useCallback(value => { if (economyCommitRef.current) return false; setScheduleArchiveState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
+  const setPressEvent = useCallback(value => { if (economyCommitRef.current) return false; setPressEventState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
+  const setLastPressDay = useCallback(value => { if (economyCommitRef.current) return false; setLastPressDayState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
+  const setAllStarDone = useCallback(value => { if (economyCommitRef.current) return false; setAllStarDoneState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
+  const setAllStarResult = useCallback(value => { if (economyCommitRef.current) return false; setAllStarResultState(value); markSaveDirty(["matchHistory"]); }, [markSaveDirty]);
   const getMatchHistorySnapshot = useCallback(() => matchHistorySnapshot({
     gameResultsMap, allTeamResultsMap, allTeamBoxScoresMap, scheduleArchive, recentResults,
     allStarDone, allStarResult, lastPressDay, pressEvent,
   }), [gameResultsMap, allTeamResultsMap, allTeamBoxScoresMap, scheduleArchive, recentResults,
     allStarDone, allStarResult, lastPressDay, pressEvent]);
   const hydrateMatchHistory = useCallback(saved => {
+    if (economyCommitRef.current) return false;
     const next = matchHistorySnapshot(saved);
     setAllTeamResultsMapState(next.allTeamResultsMap);
     setAllTeamBoxScoresMapState(next.allTeamBoxScoresMap);
@@ -276,6 +355,7 @@ export function useGameState() {
     setAllStarResultState(next.allStarResult);
   }, []);
   const applyMatchResultPatch = useCallback(patch => {
+    if (economyCommitRef.current) return false;
     const next = mergeMatchResultPatch(getMatchHistorySnapshot(), patch);
     hydrateMatchHistory(next);
     markSaveDirty(['matchHistory']);
@@ -285,25 +365,31 @@ export function useGameState() {
   const persistentStoreRef = useRef(null);
   const [persistentSummaries, setPersistentSummaries] = useState(EMPTY_PERSISTENT_SUMMARIES);
   const setSeasonHistory = useCallback((nextValue) => {
+    if (economyCommitRef.current) return false;
     setSeasonHistoryState(nextValue);
     markSaveDirty(['seasonHistory']);
   }, [markSaveDirty]);
   const setNews = useCallback((nextValue) => {
+    if (economyCommitRef.current) return false;
     setNewsState(nextValue);
     markSaveDirty(['news']);
   }, [markSaveDirty]);
   const setMailbox = useCallback((nextValue) => {
+    if (economyCommitRef.current) return false;
     setMailboxState(nextValue);
     markSaveDirty(['mailbox']);
   }, [markSaveDirty]);
   const hydrateLargeSaveData = useCallback((nextValue = {}) => {
+    if (economyCommitRef.current) return false;
     setSeasonHistoryState(nextValue.seasonHistory ?? {});
     setNewsState(Array.isArray(nextValue.news) ? nextValue.news : []);
     setMailboxState(Array.isArray(nextValue.mailbox) ? nextValue.mailbox : []);
   }, []);
   const resetSaveTracking = useCallback(() => {
+    if (economyCommitRef.current) return false;
     saveRequestRef.current++;
     saveDirtyTrackerRef.current.reset();
+    setCommittedMutationCount(count => count + 1);
     setSaveDirty(false);
     setSaveResult(null);
   }, []);
@@ -311,6 +397,7 @@ export function useGameState() {
   // Load-only boundary. A transaction must use commitEconomyCandidate and its
   // published-root acknowledgement, never reset the session through this API.
   const hydrateSavedWorld = useCallback((saved, expected) => {
+    if (economyCommitRef.current) return false;
     if (screenRef.current !== 'title' || !expected
       || expected.sessionToken !== progressSessionRef.current
       || expected.progressToken !== progressTokenRef.current
@@ -355,7 +442,7 @@ export function useGameState() {
         if (!alive) return;
         setSaveExists(mod.hasSave());
         const queue = mod.getSaveQueueSnapshot();
-        setSaveQueueState({ ...queue, isSaving: queue.isSaving || pendingSaveRequestsRef.current.has(saveRequestRef.current) });
+        setSaveQueueState({ ...queue, isSaving: queue.isSaving || ['saving', 'recovering'].includes(economyCommitRef.current?.status) || pendingSaveRequestsRef.current.has(saveRequestRef.current) });
       })
       .catch((error) => {
         console.error('Failed to load save module:', error);
@@ -439,7 +526,7 @@ export function useGameState() {
     loadSaveModule()
       .then((mod) => {
         const queue = mod.getSaveQueueSnapshot();
-        setSaveQueueState({ ...queue, isSaving: queue.isSaving || pendingSaveRequestsRef.current.has(saveRequestRef.current) });
+        setSaveQueueState({ ...queue, isSaving: queue.isSaving || ['saving', 'recovering'].includes(economyCommitRef.current?.status) || pendingSaveRequestsRef.current.has(saveRequestRef.current) });
       })
       .catch((error) => {
         console.error('Failed to refresh save queue state:', error);
@@ -464,30 +551,7 @@ export function useGameState() {
         if (!result?.ok || sessionToken !== progressSessionRef.current) return result;
         const committed=new Set(pending);
         pendingCareerEntriesRef.current=pendingCareerEntriesRef.current.filter(entry=>!committed.has(entry));
-        try {
-          const archive = await import('../engine/battedBallArchive');
-          const receipts = await import('../engine/battedBallReceipts');
-          const archiveScope = { saveId: state.saveId };
-          let receiptResult = await receipts.flushBattedBallReceipts(state.battedBallReceipt, archiveScope);
-          const status = archive.getBattedBallQueueStatus(archiveScope);
-          let archiveResult = status.failedRecords > 0
-            ? await archive.retryFailedBattedBallWrites(archiveScope)
-            : await archive.flushBattedBallQueue(archiveScope);
-          // One flush only covers its snapshot. More Worker chunks may already
-          // be queued behind it; success requires those writes to settle too.
-          let settled = archive.getBattedBallQueueStatus(archiveScope);
-          while (settled.isWriting || settled.queuedRecords > 0) {
-            archiveResult = await archive.flushBattedBallQueue(archiveScope);
-            settled = archive.getBattedBallQueueStatus(archiveScope);
-          }
-          if (!receiptResult.ok && archiveResult?.ok !== false && !settled.failedRecords) {
-            receiptResult = await receipts.flushBattedBallReceipts(state.battedBallReceipt, archiveScope);
-          }
-          return { ...result, archive: { ...archiveResult, ok: receiptResult.ok && archiveResult?.ok !== false && !(settled.failedRecords > 0) } };
-        } catch (error) {
-          console.warn('打球アーカイブのフラッシュに失敗しました。試合セーブは完了しています。', error);
-          return { ...result, archive: { ok: false } };
-        }
+        return { ...result, archive: await flushCommittedArchives(state) };
       })
       .then((result) => {
         if (result?.ok === false && result.diagnostics) {
@@ -519,6 +583,176 @@ export function useGameState() {
     if (result.isCurrent) setSaveDirty(false);
     return result;
   }, []);
+
+
+  // Only a committed render is evidence for storage acknowledgement. A render
+  // may suspend or be discarded, and must never leak a speculative world here.
+  const renderedMutationVersion = committedMutationCount;
+  const renderedProgressToken = progressTokenRef.current;
+  useLayoutEffect(() => {
+    const context = economyCommitRef.current;
+    const adoption = context?.adoption;
+    const adopted = adoption && gameState.saveId === adoption.committed.saveId
+      && gameState.contractEconomy?.epoch === adoption.committed.epoch
+      && gameState.contractEconomy?.revision === adoption.committed.revision
+      && context.adoptionWorlds.some(world => gameState.teams === world.teams);
+    if (adopted && !context.adoptionObserved) {
+      context.adoptionObserved = true;
+      progressTokenRef.current++;
+    }
+    economySnapshotRef.current = {
+      world: { ...gameState, seasonHistory, saveRevision, ...getMatchHistorySnapshot() },
+      mutationVersion: renderedMutationVersion, progressToken: adopted ? progressTokenRef.current : renderedProgressToken,
+      sessionToken: progressSessionRef.current, isAutoSaveSuspended, saveExists,
+    };
+    if (adopted) pendingEconomyAdoptionRef.current?.resolve(true);
+  });
+
+  const economyCommitBindings = useCallback(() => ({
+    readCurrent: () => economyMountedRef.current ? {
+      world: economySnapshotRef.current?.world,
+      sessionToken: progressSessionRef.current,
+      progressToken: progressTokenRef.current,
+    } : null,
+    adopt: async (world, committed, canAdopt) => {
+      if (!economyMountedRef.current || !canAdopt() || pendingEconomyAdoptionRef.current) return false;
+      const before = economySnapshotRef.current.world;
+      const expected = { saveId: before.saveId, epoch: before.contractEconomy?.epoch,
+        baseRevision: before.contractEconomy?.revision };
+      const action = { type: G.APPLY_ECONOMY_WORLD, world, expected };
+      const next = gameStateReducer(before, action);
+      if (next === before || next.contractEconomy?.revision !== committed.revision
+        || next.saveId !== committed.saveId || next.contractEconomy?.epoch !== committed.epoch
+        || JSON.stringify(next.contractEconomy.engine.transactions.map(row => row.id))
+          !== JSON.stringify(committed.receiptIds) || !canAdopt()) return false;
+      // Keep the adoption evidence after a deadline: a delayed React commit can
+      // still be acknowledged by explicit recovery, without a second write.
+      const context = economyCommitRef.current;
+      context.adoption = { world, committed };
+      (context.adoptionWorlds ??= []).push(world);
+      return new Promise(resolve => {
+        const finish = ok => {
+          clearTimeout(expiration);
+          if (pendingEconomyAdoptionRef.current?.resolve === finish) pendingEconomyAdoptionRef.current = null;
+          resolve(ok);
+        };
+        const expiration = setTimeout(() => finish(false), 10000);
+        pendingEconomyAdoptionRef.current = { world, committed, resolve: finish };
+        // Increment the progress fence only once React commits the world.
+        dispatch(action);
+      });
+    },
+  }), []);
+
+  useLayoutEffect(() => {
+    economyMountedRef.current = true;
+    return () => {
+      economyMountedRef.current = false;
+      pendingEconomyAdoptionRef.current?.resolve(false);
+    };
+  }, []);
+
+  const finalizeEconomyCommit = useCallback(async (context, result) => {
+    const ack = result?.committed, next = context.world.contractEconomy;
+    if (!result?.ok || !ack || !/^[a-f0-9]{64}$/.test(ack.rootSignature)
+      || ack.saveId !== context.expected.saveId || ack.epoch !== context.expected.epoch
+      || ack.revision !== next.revision
+      || JSON.stringify(ack.receiptIds) !== JSON.stringify(next.engine.transactions.map(row => row.id)))
+      return { ok: false, reason: 'economy_ack_invalid' };
+    const persisted = new Set(context.pendingCareerEntries);
+    pendingCareerEntriesRef.current = pendingCareerEntriesRef.current.filter(entry => !persisted.has(entry));
+    const completed = saveDirtyTrackerRef.current.complete(context.dirtySnapshot);
+    if (completed.isCurrent) setSaveDirty(false);
+    setSaveExists(true);
+    const archive = await flushCommittedArchives(context.world);
+    const confirmed = { ...result, archive };
+    setSaveResult(confirmed);
+    return confirmed;
+  }, []);
+
+  // Internal annual-fixture transaction route. UI/CPU/Worker remain gated OFF
+  // until A1-2/A1-3 integrate all producers.
+  const commitEconomyCommand = useCallback(async command => {
+    if (economyCommitRef.current) return { ok: false, reason: 'economy_commit_pending' };
+    const snapshot = economySnapshotRef.current;
+    if (!economyMountedRef.current || !snapshot || newGameInitializationRef.current
+      || pendingSaveRequestsRef.current.size || autoSaveSuspendedRef.current
+      || snapshot.progressToken !== progressTokenRef.current
+      || snapshot.mutationVersion !== saveDirtyTrackerRef.current.snapshot().mutationVersion)
+      return { ok: false, reason: 'economy_operation_busy' };
+    const base = snapshot.world;
+    try { if (contractEconomyMode(base) !== 'annual') return { ok: false, reason: 'economy_not_active' }; }
+    catch { return { ok: false, reason: 'economy_candidate_invalid' }; }
+    const reduced = reduceEconomyCommand(base, command);
+    if (!reduced.ok) return { ok: false, reason: 'economy_command_invalid', error: reduced.error };
+    if (reduced.replayed) return { ok: true, replayed: true };
+    const expected = { saveId: base.saveId, epoch: base.contractEconomy.epoch,
+      baseRevision: base.contractEconomy.revision,
+      sessionToken: progressSessionRef.current, progressToken: progressTokenRef.current };
+    const dirtySnapshot = saveDirtyTrackerRef.current.snapshot({ persistAll: !snapshot.saveExists });
+    const pendingCareerEntries = [...pendingCareerEntriesRef.current];
+    const world = reduced.world;
+    const context = { expected, dirtySnapshot, pendingCareerEntries, world, status: 'saving' };
+    economyCommitRef.current = context;
+    setSaveQueueState(prev => ({ ...prev, isSaving: true }));
+    setSaveResult(null);
+    let result;
+    try {
+      const mod = await loadSaveModule();
+      const options = { careerEntries: structuredClone(pendingCareerEntries) };
+      if (Array.isArray(dirtySnapshot.dirtyScopes)) options.dirtyScopes = dirtySnapshot.dirtyScopes;
+      result = await mod.commitEconomyCandidate(world, expected, economyCommitBindings(), options);
+      if (result.ok) result = await finalizeEconomyCommit(context, result);
+      else if (result.reason === 'economy_adoption_required') context.status = 'recovery';
+    } catch {
+      result = { ok: false, reason: 'economy_commit_failed' };
+    } finally {
+      if (context.status !== 'recovery' && economyCommitRef.current === context) economyCommitRef.current = null;
+      refreshSaveQueueState();
+    }
+    if (!result.ok) setSaveResult(result);
+    return result;
+  }, [economyCommitBindings, finalizeEconomyCommit, refreshSaveQueueState]);
+
+  const recoverEconomyCommand = useCallback(async () => {
+    if (!economyMountedRef.current) return { ok: false, reason: 'economy_recovery_unavailable' };
+    let context = economyCommitRef.current;
+    // A remounted hook can explicitly acknowledge a fully reloaded root. It
+    // must not replay the previous hook's dirty/career completion bookkeeping.
+    const reloaded = !context;
+    if (reloaded) {
+      const snapshot = economySnapshotRef.current;
+      if (!snapshot || pendingSaveRequestsRef.current.size || newGameInitializationRef.current
+        || snapshot.mutationVersion !== saveDirtyTrackerRef.current.snapshot().mutationVersion
+        || snapshot.progressToken !== progressTokenRef.current)
+        return { ok: false, reason: 'economy_recovery_unavailable' };
+      context = { status: 'recovery', world: snapshot.world };
+      economyCommitRef.current = context;
+    }
+    if (context.status !== 'recovery') return { ok: false, reason: 'economy_recovery_unavailable' };
+    context.status = 'recovering';
+    setSaveQueueState(prev => ({ ...prev, isSaving: true }));
+    let result;
+    try {
+      const mod = await loadSaveModule();
+      result = reloaded
+        ? await mod.recoverLoadedEconomyCommit(economyCommitBindings())
+        : await mod.recoverEconomyCommit({ ...context.expected, progressToken: progressTokenRef.current }, economyCommitBindings());
+      if (result.ok) {
+        if (reloaded) {
+          result = { ...result, archive: await flushCommittedArchives(context.world) };
+          setSaveResult(result);
+        } else result = await finalizeEconomyCommit(context, result);
+      }
+    } catch { result = { ok: false, reason: 'economy_adoption_required' }; }
+    finally {
+      if (result?.ok || reloaded) economyCommitRef.current = null;
+      else context.status = 'recovery';
+      refreshSaveQueueState();
+    }
+    if (!result.ok) setSaveResult(result);
+    return result;
+  }, [economyCommitBindings, finalizeEconomyCommit, refreshSaveQueueState]);
 
   // gameDay が進んだとき、記者会見インターバルを超えていれば会見イベントをセット
   useEffect(()=>{
@@ -557,6 +791,7 @@ export function useGameState() {
   // Command snapshot also advances synchronously to reject repeated clicks.
   rosterCommandRef.current = { ...gameState, progressToken: getProgressToken() };
   const commitRosterCommand = (current, nextTeam) => {
+    if (economyCommitRef.current) return false;
     const nextTeams = current.teams.map(t => t.id === current.myId ? nextTeam : t);
     rosterCommandRef.current = { ...current, teams: nextTeams };
     setTeams(nextTeams);
@@ -579,7 +814,7 @@ export function useGameState() {
   },[myTeam,mailbox,faPool,news,gameDay]);
 
   const notify = useCallback((msg,type="ok")=>{setNotif({msg,type});setTimeout(()=>setNotif(null),3500);},[]);
-  const upd = useCallback((id, fn) => { progressDispatch({ type: G.UPD_TEAM, id, fn: (team) => slimTeamForState(fn(team)) }); markSaveDirty(); }, [markSaveDirty]);
+  const upd = useCallback((id, fn) => { if (economyCommitRef.current) return false; progressDispatch({ type: G.UPD_TEAM, id, fn: (team) => slimTeamForState(fn(team)) }); markSaveDirty(); }, [markSaveDirty]);
 
   const pushResult = useCallback((won,drew,oppName,myScore,oppScore,gameNo)=>{
     setRecentResults(prev=>[{won,drew,oppName,myScore,oppScore,gameNo},...prev.filter(r=>r.gameNo!==gameNo)].slice(0,5));
@@ -666,9 +901,10 @@ export function useGameState() {
 
   // オートセーブ（hubに戻った時）
   useEffect(()=>{
-    if(screen!=='hub' || isAutoSaveSuspended || !saveDirty || saveQueueState.isSaving) return;
+    if(screen!=='hub' || isAutoSaveSuspended || !saveDirty || saveQueueState.isSaving || economyCommitRef.current) return;
     const now = Date.now();
     loadSaveModule().then((mod)=>{
+      if (economyCommitRef.current) return { result: { ok: false, skipped: true }, snapshot: null };
       const intervalMs = mod.getAutoSaveIntervalMs();
       if (lastAutoSaveAt > 0 && now - lastAutoSaveAt < intervalMs) {
         return { result: { ok: false, skipped: true }, snapshot: null };
@@ -698,6 +934,7 @@ export function useGameState() {
   },[screen,isAutoSaveSuspended,saveDirty,lastAutoSaveAt,saveRevision,saveQueueState.isSaving]);
 
   const handleSave = useCallback(async (options = {})=>{
+    if (economyCommitRef.current) return { ok: false, reason: 'economy_commit_pending' };
     if (offseasonPlan && isAutoSaveSuspended && !options.payload) return { ok: false, reason: 'transition_in_progress' };
     const request = beginTrackedSave(options.saveOptions);
     if(options.careerEntries) request.options.careerEntries=options.careerEntries;
@@ -736,7 +973,7 @@ export function useGameState() {
   }, [teams]);
 
   const handleSelect = useCallback(async (id, localMaster)=>{
-    if (newGameInitializationRef.current) return;
+    if (newGameInitializationRef.current || economyCommitRef.current) return false;
     newGameInitializationRef.current = true;
     newGameInitializationAttemptRef.current += 1;
     setNewGameInitializationStatus('initializing');
@@ -834,6 +1071,7 @@ export function useGameState() {
   }, [upd, myId]);
 
   const handlePlayerTalk = useCallback((pid, talkType) => {
+    if (economyCommitRef.current) return false;
     const p = myTeam?.players.find(x => x.id === pid);
     if (!p) return;
     if ((p.lastTalkGameDay ?? 0) > 0 && gameDay - p.lastTalkGameDay < TALK_COOLDOWN_DAYS) {
@@ -858,6 +1096,7 @@ export function useGameState() {
 
   const interviewSession = getProgressSessionToken();
   const handleInterview = useCallback((newsId,opt)=>{
+    if (economyCommitRef.current) return false;
     const current = rosterCommandRef.current;
     if (interviewSession !== getProgressSessionToken() || current.progressToken !== getProgressToken()) return false;
     const choice = interviewChoice(current.news.find(article => article.id === newsId), opt);
@@ -874,6 +1113,7 @@ export function useGameState() {
   },[interviewSession,getProgressSessionToken,getProgressToken,progressDispatch,markSaveDirty,notify]);
 
   const toggleLineup = useCallback((pid)=>{
+    if (economyCommitRef.current) return false;
     if(!myTeam) return;
     const inL=myTeam.lineup.includes(pid);
     const p=myTeam.players.find(x=>x.id===pid);
@@ -890,6 +1130,7 @@ export function useGameState() {
   },[myTeam,upd,myId,notify]);
 
   const replaceLineup = useCallback((entries) => {
+    if (economyCommitRef.current) return false;
     // entries: [{id, pos}, ...] in batting order. 本職は変えず試合時の守備配置だけ保存する。
     upd(myId, t => {
       const dhMode = t.rosterDhMode ?? t.dhEnabled;
@@ -906,6 +1147,7 @@ export function useGameState() {
   }, [upd, myId]);
 
   const setLineupOrder = useCallback((pid, order) => {
+    if (economyCommitRef.current) return false;
     if (!myTeam) return;
     const p = myTeam.players.find(x => x.id === pid);
     if ((p?.injuryDaysLeft ?? 0) > 0) { notify("故障中は出場不可", "warn"); return; }
@@ -948,6 +1190,7 @@ export function useGameState() {
   }, [myTeam, upd, myId, notify]);
 
   const setPlayerPosition = useCallback((pid, pos) => {
+    if (economyCommitRef.current) return false;
     upd(myId, t => {
       const dhMode = t.rosterDhMode ?? t.dhEnabled;
       const key = dhMode ? 'fieldingDh' : 'fieldingNoDh';
@@ -959,6 +1202,7 @@ export function useGameState() {
   }, [upd, myId]);
 
   const setConvertTarget = useCallback((pid, target) => {
+    if (economyCommitRef.current) return false;
     upd(myId, t => ({
       ...t,
       players: t.players.map(p => p.id === pid ? { ...p, convertTarget: target || null } : p),
@@ -966,6 +1210,7 @@ export function useGameState() {
   }, [upd, myId]);
 
   const setRosterDhMode = useCallback((dhMode) => {
+    if (economyCommitRef.current) return false;
     upd(myId, t => {
       const nonPitcherIds = (t.players || []).filter(p => !p.isPitcher).map(p => p.id);
       const lineupNoDh = (t.lineupNoDh || t.lineup || []).filter(id => nonPitcherIds.includes(id)).slice(0, 8);
@@ -981,6 +1226,7 @@ export function useGameState() {
   }, [upd, myId]);
 
   const setManagementPolicy = useCallback((policyId) => {
+    if (economyCommitRef.current) return false;
     if (!MANAGEMENT_POLICIES[policyId]) return;
     upd(myId, t => ({
       ...t,
@@ -994,6 +1240,7 @@ export function useGameState() {
   }, [myId, notify, upd]);
 
   const setRosterAutomationMode = useCallback((mode) => {
+    if (economyCommitRef.current) return false;
     if (!Object.values(ROSTER_AUTOMATION_MODES).includes(mode)) return;
     upd(myId, t => ({ ...t, rosterAutomationMode: mode }));
     const labels = {
@@ -1004,7 +1251,7 @@ export function useGameState() {
     notify(`編成モードを「${labels[mode]}」に変更`, 'ok');
   }, [myId, notify, upd]);
 
-  const setStarter = useCallback((pid)=>{upd(myId,t=>({...t,rotation:t.rotation.includes(pid)?t.rotation:[...t.rotation,pid]}));notify("先発ローテに追加","ok");},[upd,myId,notify]);
+  const setStarter = useCallback((pid)=>{if (economyCommitRef.current) return false;upd(myId,t=>({...t,rotation:t.rotation.includes(pid)?t.rotation:[...t.rotation,pid]}));notify("先発ローテに追加","ok");},[upd,myId,notify]);
   const moveRotation = useCallback((pid,dir)=>upd(myId,t=>{const r=[...t.rotation];const i=r.indexOf(pid);if(i<0)return t;const j=i+dir;if(j<0||j>=r.length)return t;[r[i],r[j]]=[r[j],r[i]];return{...t,rotation:r};}),[upd,myId]);
   const removeFromRotation = useCallback((pid)=>upd(myId,t=>({...t,rotation:t.rotation.filter(id=>id!==pid)})),[upd,myId]);
   const setPitchingPattern = useCallback((patch)=>upd(myId,t=>({...t,pitchingPattern:{...(t.pitchingPattern??{}), ...patch}})),[upd,myId]);
@@ -1017,6 +1264,7 @@ export function useGameState() {
   }),[upd,myId]);
 
   const applyRosterPlan = useCallback((plannedTeam) => {
+    if (economyCommitRef.current) return false;
     if (!plannedTeam || plannedTeam.id !== myId) return;
     upd(myId, current => ({
       ...plannedTeam,
@@ -1030,6 +1278,7 @@ export function useGameState() {
   }, [myId, notify, upd]);
 
   const promote = useCallback((pid)=>{
+    if (economyCommitRef.current) return false;
     if(!myTeam) return;
     const p=myTeam.farm.find(x=>x.id===pid);
     if(!p) return;
@@ -1056,6 +1305,7 @@ export function useGameState() {
   },[myTeam,upd,myId,notify]);
 
   const convertIkusei = useCallback((pid)=>{
+    if (economyCommitRef.current) return false;
     const current=rosterCommandRef.current, team=current.teams.find(t=>t.id===current.myId);
     const p=team?.farm.find(x=>x.id===pid);
     if(!p||!isIkuseiPlayer(p)) return;
@@ -1070,6 +1320,7 @@ export function useGameState() {
   },[setTeams,notify]);
 
   const demote = useCallback((pid)=>{
+    if (economyCommitRef.current) return false;
     if(!myTeam) return;
     const p=myTeam.players.find(x=>x.id===pid);
     if(!p) return;
@@ -1081,17 +1332,20 @@ export function useGameState() {
   },[myTeam,upd,myId,notify]);
 
   const hireCoach = useCallback((cd,cg)=>{
+    if (economyCommitRef.current) return false;
     if(!myTeam||myTeam.budget<cg.salary*12){notify("予算不足","warn");return;}
     upd(myId,t=>({...t,budget:t.budget-cg.salary*12,coaches:[...t.coaches,{type:cd.type,typeName:cd.name,emoji:cd.emoji,name:pname(),grade:cg.g,label:cg.label,salary:cg.salary*12,bonus:cg.bonus}]}));
     notify(`${cd.name}(Lv${cg.g})を雇いました！`,"ok");
   },[myTeam,upd,myId,notify]);
 
   const fireCoach = useCallback((idx)=>{
+    if (economyCommitRef.current) return false;
     upd(myId,t=>({...t,coaches:t.coaches.filter((_,i)=>i!==idx)}));
     notify("コーチを解雇","warn");
   },[upd,myId,notify]);
 
   const sendScout = useCallback((region)=>{
+    if (economyCommitRef.current) return false;
     if(!myTeam||!Number.isFinite(myTeam.budget)||myTeam.budget<region.cost){notify("予算不足","warn");return false;}
     upd(myId,t=>({...t,budget:t.budget-region.cost,scoutMissions:[...t.scoutMissions,{id:uid(),name:region.name,weeksLeft:region.weeks,qMin:region.qMin,qMax:region.qMax,cost:region.cost,foreign:region.foreign,regionFactor:region.regionFactor||1.0}]}));
     notify(`${region.name}へスカウト派遣！`,"ok");
@@ -1103,6 +1357,7 @@ export function useGameState() {
   },[myTeam,upd,myId,notify]);
 
   const signPlayer = useCallback((idx)=>{
+    if (economyCommitRef.current) return false;
     const current=rosterCommandRef.current, team=current.teams.find(t=>t.id===current.myId);
     const intendedId=myTeam?.scoutResults[idx]?.id;
     if(intendedId==null) return false;
@@ -1117,6 +1372,7 @@ export function useGameState() {
   },[myTeam,setTeams,notify]);
 
   const handlePressAnswer = useCallback((choiceIdx) => {
+    if (economyCommitRef.current) return false;
     if (!pressEvent) return;
     const choice = pressEvent.choices[choiceIdx];
     loadPressConferenceModule().then((mod) => {
@@ -1141,6 +1397,7 @@ export function useGameState() {
   }, [pressEvent, upd, myId, notify, gameDay]);
 
   const handleStadiumUpgrade = useCallback(()=>{
+    if (economyCommitRef.current) return false;
     const current = rosterCommandRef.current;
     if (!current || current.myId !== myId) return;
     const team = current.teams.find(t => t.id === current.myId);
@@ -1154,6 +1411,7 @@ export function useGameState() {
   },[myId,notify]);
 
   const handleSetTicketPrice = useCallback((nextPrice)=>{
+    if (economyCommitRef.current) return false;
     if(!myTeam) return;
     const parsed=Math.round(Number(nextPrice));
     if(!Number.isFinite(parsed)){notify("チケット価格が不正です","warn");return;}
@@ -1198,9 +1456,9 @@ export function useGameState() {
     allStarResult, setAllStarResult,
     allStarTriggerDay, setAllStarTriggerDay,
     isAutoSaveSuspended, setIsAutoSaveSuspended,
-    saveDirty, setSaveDirty,
+    saveDirty, setSaveDirty: setPublicSaveDirty,
     saveQueueState, saveResult,
-    saveRevision, setSaveRevision,
+    saveRevision, setSaveRevision: setPublicSaveRevision,
     persistentSummaries,
     newGameInitializationError,
     newGameInitializationStatus,
@@ -1217,6 +1475,7 @@ export function useGameState() {
     getLatestNewsId,
     markSaveDirty,
     hydrateSavedWorld, hydrateLargeSaveData, getMatchHistorySnapshot, hydrateMatchHistory, applyMatchResultPatch,
+    commitEconomyCommand, recoverEconomyCommand,
     resetSaveTracking,
     // derived
     myTeam,
@@ -1265,3 +1524,4 @@ export function useGameState() {
     handlePressAnswer,
   };
 }
+
