@@ -1,5 +1,5 @@
 import { ACCEPT_THRESHOLD } from '../constants';
-import { evalOffer } from './contract';
+import { calcPlayerDemand, evaluateRenewalOffer } from './contract';
 import { contractEconomyMode, reduceEconomyCommand, toAnnualState } from './contractEconomy';
 import { contractEmploymentAt } from './contractLedger';
 import { createSeasonContract, employmentContractId } from './seasonContract';
@@ -48,8 +48,11 @@ function inspectRequest(request) {
   }
 }
 
-function replyTiming(clock, score) {
-  const wait = score >= ACCEPT_THRESHOLD ? 2 : score >= 55 ? 3 : 4;
+function replyTiming(clock, score, version = 2) {
+  // v1 promises retain their original two/four-day schedule. New promises:
+  // strong (75+) = 2, borderline (55+) = 3, weak = 4 days/turns.
+  // Timing reflects overall appeal, not an override of salary-aware consent.
+  const wait = version === 1 ? (score >= ACCEPT_THRESHOLD ? 2 : 4) : score >= 75 ? 2 : score >= 55 ? 3 : 4;
   return { dueDate: clock.phase === 'offseason' ? null : daysAfter(clock.date, wait),
     dueTurn: clock.phase === 'offseason' ? clock.offseasonTurn + wait : null, deadlineTurn: 37 };
 }
@@ -113,17 +116,21 @@ export function validateRenewalDecisions(world) {
     const hold = [...e.engine.spending.reservations, ...e.engine.spending.resolvedReservations]
       .find(r => r.kind === 'renewal' && r.proposal.id === d.proposalId);
     const p = hold?.proposal;
-    if (d.version !== 1 || a.type !== 'offer' || request.saveId !== world.saveId || request.epoch !== e.epoch
+    if (![1, 2].includes(d.version) || a.type !== 'offer' || request.saveId !== world.saveId || request.epoch !== e.epoch
       || request.baseRevision >= e.revision || d.proposalId !== decisionId(request) || seen.has(d.proposalId)
       || !states.includes(d.status) || !p || d.playerId !== a.playerId || d.playerId !== p.contract.playerId
       || d.teamId !== p.teamId || d.season !== p.contract.signedSeason
       || a.salary !== p.contract.annualSalaryManYen || a.years !== p.contract.termYears
       || p.contract.guaranteed !== true || !Number.isInteger(d.score) || d.score < 0 || d.score > 100
-      || d.willAccept !== (d.score >= ACCEPT_THRESHOLD)
+      || (d.version === 1 ? d.willAccept !== (d.score >= ACCEPT_THRESHOLD)
+        : !d.evaluation?.valid || typeof d.evaluation.accepted !== 'boolean'
+          || d.willAccept !== d.evaluation.accepted || d.score !== d.evaluation.score
+          || !Number.isFinite(d.demand?.demandSalary) || d.demand.demandSalary <= 0
+          || !Number.isFinite(d.demand?.minAcceptSalary) || d.demand.minAcceptSalary <= 0)
       || d.offeredClock?.season !== d.season || !['season', 'offseason'].includes(d.offeredClock.phase)
       || d.offeredClock.phase !== p.contract.agreementPhase
       || !Number.isSafeInteger(d.offeredClock.offseasonTurn) || d.offeredClock.offseasonTurn < 0
-      || stable(replyTiming(d.offeredClock, d.score)) !== stable({ dueDate: d.dueDate, dueTurn: d.dueTurn, deadlineTurn: d.deadlineTurn })
+      || stable(replyTiming(d.offeredClock, d.score, d.version)) !== stable({ dueDate: d.dueDate, dueTurn: d.dueTurn, deadlineTurn: d.deadlineTurn })
       || (d.status === 'pending' ? hold.resolution !== undefined : hold.resolution !== terminalResolution[d.status]))
       fail('更改の回答予定と正式留保・回答履歴が一致しません。');
     const original = e.engine.transactions.find(t => t.id === key('offer', d.proposalId));
@@ -187,12 +194,21 @@ export function reduceRenewalRequest(world, request) {
       const team = world.teams.find(t => t.id === world.myId), player = team && ownedPlayers(team).find(p => p.id === action.playerId);
       const existing = own.find(d => d.playerId === action.playerId && d.status === 'pending');
       if (!player || (existing?.proposalId !== action.replaceProposalId)) fail('所属・差し替える提示を確認してください。');
+      if (existing && due(existing, clock)) fail('回答期日に到達しています。回答を確定してから操作してください。');
       const date = clock.phase === 'offseason' ? `${world.year}-11-30` : clock.date;
       const employment = contractEmploymentAt(e.engine.spending.ledger, date)
         .find(r => r.teamId === world.myId && r.contract.playerId === player.id);
       if (!employment) fail('現在の契約が見つかりません。');
-      const score = evalOffer(player, { salary: action.salary, years: action.years }, team, world.teams).total;
-      if (!Number.isInteger(score) || score < 0 || score > 100) fail('契約評価に必要な選手情報が未記録です。');
+      const demand = calcPlayerDemand(player, { year: world.year, team, teams: world.teams,
+        awards: world.seasonHistory?.awards?.find(a => a.year === world.year),
+        championship: world.seasonHistory?.championships?.find(c => c.year === world.year) });
+      const evaluation = evaluateRenewalOffer(player, { salary: action.salary, years: action.years }, team, world.teams, demand);
+      const score = evaluation.score;
+      if (!Number.isFinite(player.salary) || player.salary <= 0 || !evaluation.valid
+        || !Number.isInteger(score) || score < 0 || score > 100
+        || !Number.isFinite(demand.demandSalary) || demand.demandSalary <= 0
+        || !Number.isFinite(demand.minAcceptSalary) || demand.minAcceptSalary <= 0)
+        fail('契約評価に必要な選手情報・提示条件を確認してください。');
       const proposalId = decisionId(request), contractId = employmentContractId(employment.contract);
       const proposal = { id: proposalId, type: 'sign', teamId: world.myId, effectiveDate: `${world.year + 1}-02-01`,
         contract: createSeasonContract({ contractId: key('contract', proposalId), playerId: player.id, signedSeason: world.year,
@@ -202,12 +218,14 @@ export function reduceRenewalRequest(world, request) {
         proposal, contractId, ...(existing ? { proposalId: existing.proposalId } : {}) }));
       if (existing) next = withDecision(next, { ...existing, status: 'replaced', resolvedClock: { ...clock },
         resolutionTransactionId: key('offer', proposalId) });
-      next = withDecision(next, { version: 1, kind, proposalId, playerId: player.id, teamId: world.myId, season: world.year,
-        contractId, request: structuredClone(request), score, willAccept: score >= ACCEPT_THRESHOLD,
+      next = withDecision(next, { version: 2, kind, proposalId, playerId: player.id, teamId: world.myId, season: world.year,
+        contractId, request: structuredClone(request), score, willAccept: evaluation.accepted,
+        demand, evaluation,
         offeredClock: { ...clock }, ...replyTiming(clock, score), status: 'pending' });
     } else if (action.type === 'cancel') {
       const d = own.find(d => d.proposalId === action.proposalId && d.status === 'pending');
       if (!d) fail('取り消す更改の回答予定が見つかりません。');
+      if (due(d, e.clock)) fail('回答期日に到達しています。回答を確定してから操作してください。');
       const transaction = { id: key('cancel', d.proposalId, request.baseRevision), type: 'cancel-renewal', proposalId: d.proposalId };
       next = withDecision(resultWorld(native(world, transaction)), { ...d, status: 'cancelled', resolvedClock: { ...e.clock },
         resolutionRequest: structuredClone(request), resolutionTransactionId: transaction.id });

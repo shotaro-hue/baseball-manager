@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { freezeEconomy } from './fixtures/economyWorld';
 import { renewalFixture } from './fixtures/renewalWorld';
+import legacyDecisionWorld from './fixtures/renewal-v1.json';
 import { toAnnualState } from '../contractEconomy';
 import { quoteAnnualSpendingPlan } from '../annualSpending';
 import { validateEconomySave, economyOverwriteIssue } from '../economyPersistence';
@@ -19,6 +20,83 @@ const at = (w, date, turn = 0) => ({ ...structuredClone(w),
 const reply = w => perform(w, { type: 'resolve-due' });
 
 describe('human renewal decision lifecycle', () => {
+  it('keeps the v1 answer and two-day deadline captured from PR 530 before this fix', () => {
+    const w = structuredClone(legacyDecisionWorld);
+    validateEconomySave(w);
+    expect(w.contractEconomy.decisions[0]).toMatchObject({ version: 1, score: 60, willAccept: true, dueDate: '2026-07-18' });
+    const result = reply(at(w, '2026-07-18'));
+    expect(result.contractEconomy.decisions[0]).toMatchObject({ status: 'accepted', dueDate: '2026-07-18' });
+    expect(economyOverwriteIssue(w, result)).toBeNull();
+  });
+
+  it.each([420, 12000])('fixes the salary-aware answer for %i despite later player/team changes and JSON reload', salary => {
+    const w = renewalFixture();
+    w.teams[0].players[0].personality = { money: 0, winning: 100, playing: 0, hometown: 0, loyalty: 0, stability: 0, future: 0 };
+    const random = vi.spyOn(Math, 'random').mockImplementation(() => { throw new Error('unexpected random draw'); });
+    let h;
+    try { h = held(w, { salary }); } finally { random.mockRestore(); }
+    expect(h.contractEconomy.decisions[0].willAccept).toBe(salary === 12000);
+    const reloaded = at(JSON.parse(JSON.stringify(h)), '2026-07-20');
+    reloaded.teams[0].wins = 0; reloaded.teams[0].losses = 100;
+    Object.assign(reloaded.teams[0].players[0], { trust: 0, personality: { money: 100 }, stats: { PA: 0 } });
+    const result = reply(reloaded);
+    expect(result.contractEconomy.decisions[0].status).toBe(salary === 12000 ? 'accepted' : 'rejected');
+    expect(JSON.parse(JSON.stringify(result)).contractEconomy.decisions).toEqual(result.contractEconomy.decisions);
+  });
+
+  it('permits consent beyond the cut boundary when salary demand and overall evaluation allow it', () => {
+    const w = renewalFixture();
+    w.teams[0].players[0].stats = { PA: 0 };
+    w.teams[0].players[0].personality = { money: 0, winning: 100, playing: 0, hometown: 0, loyalty: 0, stability: 0, future: 0 };
+    const h = held(w, { salary: 6000 });
+    expect(h.contractEconomy.decisions[0].willAccept).toBe(true);
+    expect(reply(at(h, '2026-07-20')).contractEconomy.decisions[0].status).toBe('accepted');
+  });
+
+  it('does not create a promise when evaluation inputs are non-finite', () => {
+    const w = renewalFixture(); w.teams[0].players[0].personality.money = NaN;
+    const result = reduceRenewalRequest(w, renewalRequest(w, offer()));
+    expect(result.ok).toBe(false); expect(result.world).toBe(w);
+  });
+
+  it('uses recorded awards and championships from the saved season history', () => {
+    const w = renewalFixture(); w.teams.forEach(t => { t.league = 'セ'; });
+    w.teams[0].players[0].stats = { PA: 500, AB: 450, H: 135, BB: 40, HBP: 5, SF: 5, D: 25, T: 3, HR: 12 };
+    w.seasonHistory = { awards: [{ version: 2, year: 2026, mvp: { central: { playerId: 0 } } }],
+      championships: [{ year: 2026, championId: 0 }] };
+    const h = held(w);
+    expect(h.contractEconomy.decisions[0].demand.assessment).toMatchObject({ titleBonus: .15, teamBonus: .02 });
+  });
+
+  it.each(['season', 'offseason'])('prevents cancellation/replacement at the saved %s deadline and after resolution', phase => {
+    const h = held(renewalFixture({ phase, date: phase === 'season' ? '2026-07-16' : '2026-12-01' }));
+    const id = h.contractEconomy.decisions[0].proposalId;
+    const actions = [{ type: 'cancel', proposalId: id }, offer({ salary: 13000, replaceProposalId: id })];
+    const before = at(h, phase === 'season' ? '2026-07-17' : '2026-12-01', phase === 'season' ? 0 : 1);
+    const due = at(h, phase === 'season' ? '2026-07-18' : '2026-12-01', phase === 'season' ? 0 : 2);
+    for (const action of actions) {
+      expect(reduceRenewalRequest(before, renewalRequest(before, action)).ok).toBe(true);
+      const blocked = reduceRenewalRequest(due, renewalRequest(due, action));
+      expect(blocked.ok).toBe(false); expect(blocked.world).toBe(due);
+      const resolved = reply(due);
+      expect(reduceRenewalRequest(resolved, renewalRequest(resolved, action)).ok).toBe(false);
+      expect(resolved.contractEconomy.decisions[0].status).toBe('accepted');
+    }
+  });
+
+  // With money-only preferences, these offers produce scores 54/55/74/75.
+  // Strong >=75: 2 days; borderline >=55: 3; lower scores: 4. Same for turns.
+  it.each(['season', 'offseason'])('reaches each reply-time boundary in %s', phase => {
+    for (const [salary, score, wait] of [[7900, 54, 4], [8100, 55, 3], [12100, 74, 3], [12300, 75, 2]]) {
+      const w = renewalFixture({ phase, date: phase === 'season' ? '2026-07-16' : '2026-12-01', turn: phase === 'season' ? 0 : 10 });
+      w.teams[0].players[0].personality = { money: 100, winning: 0, playing: 0, hometown: 0, loyalty: 0, stability: 0, future: 0 };
+      const d = held(w, { salary }).contractEconomy.decisions[0];
+      expect(d.score).toBe(score);
+      expect(d.dueDate).toBe(phase === 'season' ? `2026-07-${16 + wait}` : null);
+      expect(d.dueTurn).toBe(phase === 'offseason' ? 10 + wait : null);
+    }
+  });
+
   it('reserves 12000 for three future years, then records one agreement without raising current salary', () => {
     const w = renewalFixture(), h = held(w);
     expect(h.teams[0].players[0].salary).toBe(10000);

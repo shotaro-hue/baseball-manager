@@ -418,12 +418,26 @@ for (const width of [360, 390, 1440]) test(`save generations: human renewal draf
   await page.reload(); await mountHumanRenewal(page, { reload: true });
   await page.getByRole('button', { name: 'Aの契約を確認', exact: true }).click();
   await expect(page.getByText('回答予定：2026-07-18', { exact: true })).toBeVisible();
+  await expect(page.getByRole('spinbutton', { name: '提示年俸（万円）', exact: true })).toHaveValue('12000');
+  await expect(page.getByRole('combobox', { name: '契約年数', exact: true })).toHaveValue('3');
+  await captureRenewal(page, testInfo, 'reloaded', width);
   const saved = await page.evaluate(async () => {
     const w = await (await import('/baseball-manager/src/engine/saveload.js')).loadGame();
     return { salary: w.teams[0].players[0].salary, decisions: w.contractEconomy.decisions.length,
       receipts: w.contractEconomy.engine.transactions.length, reservations: w.contractEconomy.engine.spending.reservations.length };
   });
   expect(saved).toEqual({ salary: 10000, decisions: 1, receipts: 1, reservations: 1 });
+  await page.getByRole('spinbutton', { name: '提示年俸（万円）', exact: true }).fill('13000');
+  await page.getByRole('combobox', { name: '契約年数', exact: true }).selectOption('2');
+  await page.getByRole('button', { name: '提示条件を確認する', exact: true }).click();
+  const confirmation = page.getByRole('region', { name: '提示条件の最終確認', exact: true });
+  await expect(confirmation).toContainText('保存済みの提示：年俸1.20億円・3年');
+  await expect(confirmation).toContainText('差替後の提示：2027年度から年俸1.30億円・2年');
+  await captureRenewal(page, testInfo, 'replacement', width);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.getByRole('button', { name: 'この条件で提示する', exact: true }).click();
+  await expect(page.getByText('提示を保存しました。回答待ちです。', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.renewalHarness.current().contractEconomy.decisions.map(d => d.status))).toEqual(['replaced', 'pending']);
   await page.getByRole('button', { name: '提示を取り消す', exact: true }).click();
   await page.getByRole('button', { name: '取消を確定する', exact: true }).click();
   await expect(page.getByText('提示を取り消しました。', { exact: true })).toBeVisible();
@@ -433,6 +447,9 @@ test('save generations: human renewal due reply survives missing mail and cold r
   await page.goto('/'); await mountHumanRenewal(page, { due: true, offseason: true });
   // Standalone offseason routes must own a readable canvas, independent of the hub shell.
   expect(await page.locator('[data-ds="annual-renewal-screen"]').evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(244, 246, 249)');
+  await page.getByRole('button', { name: 'Aの契約を確認', exact: true }).click();
+  await expect(page.getByRole('button', { name: '提示を取り消す', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '提示条件を確認する', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: '届いた回答を確認する', exact: true }).click();
   await expect(page.getByText('届いた回答を保存しました。', { exact: true })).toBeVisible();
   await page.reload(); await mountHumanRenewal(page, { reload: true });

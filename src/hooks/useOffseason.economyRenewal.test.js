@@ -113,3 +113,35 @@ it('blocks old direct agreement and phase completion in annual mode', async () =
     expect(os.handleContractRenewalPhaseNext([])).toBe(false); });
   expect(gs.teams).toEqual(before); expect(gs.screen).toBe('title');
 });
+
+it.each([
+  ['season', 420, 'rejected'], ['season', 12000, 'accepted'],
+  ['offseason', 420, 'rejected'], ['offseason', 12000, 'accepted'],
+])('cannot evade a saved %s %s reply through write failure, cancellation or replacement', async (phase, salary, status) => {
+  const w = renewalFixture({ phase, date: phase === 'season' ? '2026-07-16' : '2026-12-01' });
+  w.teams[0].players[0].personality = { money: 0, winning: 100, playing: 0, hometown: 0, loyalty: 0, stability: 0, future: 0 };
+  const offered = reduceRenewalRequest(w, renewalRequest(w, { type: 'offer', playerId: 0, salary, years: 3 }));
+  expect(offered.ok).toBe(true);
+  const held = offered.world;
+  if (phase === 'season') { held.contractEconomy.clock.date = '2026-07-18'; held.schedule[1].date.day = 18; }
+  else held.contractEconomy.clock.offseasonTurn = 2;
+  await setup(held);
+  const oldRoot = storage.get(primary), before = structuredClone(gs.contractEconomy), proposalId = before.decisions[0].proposalId;
+  const write = localStorage.setItem;
+  localStorage.setItem = (key, value) => { if (key === primary) throw new Error('quota'); write(key, value); };
+  expect(await run(() => os.handleResolveRenewals())).toMatchObject({ ok: false });
+  expect(gs.contractEconomy).toEqual(before); expect(storage.get(primary)).toBe(oldRoot);
+  localStorage.setItem = write;
+  expect(await run(() => os.handleCancelRenewal(proposalId))).toMatchObject({ ok: false, reason: 'economy_command_invalid' });
+  expect(await run(() => os.handleContractOffer(0, 14000, 3, { replaceProposalId: proposalId }))).toMatchObject({ ok: false, reason: 'economy_command_invalid' });
+  expect(storage.get(primary)).toBe(oldRoot);
+  const reloaded = await loadGame();
+  act(() => expect(gs.hydrateSavedWorld(reloaded, { progressToken: gs.getProgressToken(), sessionToken: gs.getProgressSessionToken() })).toBe(true));
+  expect(await run(() => os.handleResolveRenewals())).toMatchObject({ ok: true });
+  expect(await run(() => os.handleResolveRenewals())).toMatchObject({ ok: true, replayed: true });
+  const saved = await loadGame();
+  expect(saved.contractEconomy.decisions[0].status).toBe(status);
+  expect(saved.contractEconomy.engine.transactions).toHaveLength(2);
+  expect(saved.contractEconomy.engine.spending.reservations).toHaveLength(0);
+  expect(saved.teams[0].players[0].salary).toBe(10000);
+});
