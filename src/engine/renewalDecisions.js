@@ -5,7 +5,7 @@ import { contractEmploymentAt } from './contractLedger';
 import { createSeasonContract, employmentContractId } from './seasonContract';
 import { isIkuseiPlayer } from './rosterCapacity';
 import { ownedPlayers } from './renewalRules';
-import { parseContractDate } from './contractCalendar';
+import { replyTiming, isDecisionDue as due } from './decisionClock';
 
 const kind = 'human-renewal';
 const fail = message => { throw new Error(message); };
@@ -19,12 +19,6 @@ const resolutionEvidence = d => ({ proposalId: d.proposalId, status: d.status, r
   ...(d.failureReason ? { failureReason: d.failureReason } : {}) });
 const states = ['pending', 'accepted', 'rejected', 'cancelled', 'replaced', 'invalidated'];
 const terminalResolution = { accepted: 'accepted', rejected: 'rejected', cancelled: 'cancelled', replaced: 'replaced', invalidated: 'cancelled' };
-const daysAfter = (date, days) => {
-  parseContractDate(date);
-  const d = new Date(`${date}T00:00:00.000Z`); d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-};
-
 // Capture identity and user intent, never a caller-controlled acceptance result.
 export function renewalRequest(world, action) {
   return { saveId: world.saveId, epoch: world.contractEconomy?.epoch,
@@ -47,26 +41,6 @@ function inspectRequest(request) {
       || (i.optOut !== undefined && i.optOut !== false)) fail('新しい更改では出来高・オプトアウト条項を指定できません。');
   }
 }
-
-function replyTiming(clock, score, version = 2) {
-  // v1 promises retain their original two/four-day schedule. New promises:
-  // strong (75+) = 2, borderline (55+) = 3, weak = 4 days/turns.
-  // Timing reflects overall appeal, not an override of salary-aware consent.
-  const wait = version === 1 ? (score >= ACCEPT_THRESHOLD ? 2 : 4) : score >= 75 ? 2 : score >= 55 ? 3 : 4;
-  return { dueDate: clock.phase === 'offseason' ? null : daysAfter(clock.date, wait),
-    dueTurn: clock.phase === 'offseason' ? clock.offseasonTurn + wait : null, deadlineTurn: 37 };
-}
-
-const due = (d, clock) => {
-  if (d.season !== clock.season) return true;
-  if (clock.phase === 'offseason') {
-    if (d.dueTurn !== null) return clock.offseasonTurn >= d.dueTurn;
-    // Offseason has a fixed December 1 civil date. Preserve the waiting
-    // interval of a late-November offer using the corresponding turn.
-    return d.dueDate <= daysAfter(clock.date, clock.offseasonTurn);
-  }
-  return d.dueDate !== null && clock.date >= d.dueDate;
-};
 
 export function dueRenewalDecisions(world) {
   const e = world.contractEconomy;
@@ -110,6 +84,7 @@ export function validateRenewalDecisions(world) {
   if (e?.mode !== 'annual') return true;
   const seen = new Set();
   for (const d of e.decisions) {
+    if (d?.kind === 'human-acquisition') continue;
     if (d?.kind !== kind) fail('未対応の契約回答予定です。');
     inspectRequest(d.request);
     const request = d.request, a = request.action;
@@ -246,6 +221,7 @@ export function reduceRenewalRequest(world, request) {
           resolutionTransactionId: transaction.id, ...(failureReason ? { failureReason } : {}) });
       }
     }
+    next = { ...next, contractEconomy: { ...next.contractEconomy, revision: e.revision + 1 } };
     validateRenewalDecisions(next); toAnnualState(next);
     return { ok: true, world: next, replayed: false };
   } catch (error) { return { ok: false, world, replayed: false, error: error.message }; }

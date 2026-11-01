@@ -488,3 +488,111 @@ test('save generations: human renewal recovers acknowledgement without a second 
   expect(await page.evaluate(() => localStorage.getItem('baseball_manager_v1'))).toBe(root);
   expect(await page.evaluate(() => window.renewalHarness.current().contractEconomy.engine.transactions.length)).toBe(1);
 });
+
+async function mountHumanAcquisition(page, { reload = false, legacy = false, reply = null } = {}) {
+  await page.evaluate(async ({ reload, legacy, reply }) => {
+    const { acquisitionFixture, acquisitionClock } = await import('/baseball-manager/src/engine/__tests__/fixtures/acquisitionWorld.js');
+    const { acquisitionRequest, reduceAcquisitionRequest } = await import('/baseball-manager/src/engine/acquisitionDecisions.js');
+    const { saveGame, loadGame } = await import('/baseball-manager/src/engine/saveload.js');
+    const { mountAcquisitionView } = await import('/baseball-manager/tests/helpers/acquisition-hook-harness.jsx');
+    let world = reload ? await loadGame() : acquisitionFixture(reply === 'offseason' ? { phase: 'offseason', date: '2026-12-01' } : {});
+    if (reply && !reload) {
+      const offered = reduceAcquisitionRequest(world, acquisitionRequest(world, { type: 'offer', playerId: 'free', salary: 12000, years: 3 }));
+      if (!offered.ok) throw Error(offered.error);
+      world = acquisitionClock(offered.world, reply === 'offseason' ? '2026-12-01' : reply === 'expired' ? '2026-08-01' : '2026-07-20', reply === 'offseason' ? 4 : 0);
+      world.mailbox = [];
+    }
+    if (!reload && !(await saveGame(world, { skipCompression: true })).ok) throw Error('fixture save failed');
+    window.acquisitionHarness?.unmount();
+    window.acquisitionHarness = mountAcquisitionView(world, { legacy, offseason: reply === 'offseason' });
+  }, { reload, legacy, reply });
+}
+const selectAcquisition = page => page.getByRole('button', { name: '市場選手の交渉を確認', exact: true }).click();
+async function captureAcquisition(page, testInfo, stage, width) {
+  if (process.env.ACQUISITION_CAPTURE) await page.screenshot({ path: `${process.env.ACQUISITION_CAPTURE}/${testInfo.project.name}-${width}-${stage}.png`, fullPage: true });
+}
+for (const width of [360, 390, 1440]) test(`save generations: human acquisition draft, replacement, retry and cold reload at ${width}px`, async ({ page }, testInfo) => {
+  await page.setViewportSize({ width, height: 900 }); await page.goto('/');
+  await mountHumanAcquisition(page, { legacy: true });
+  await page.getByRole('button', { name: /市場選手/ }).first().click();
+  await captureAcquisition(page, testInfo, 'before', width);
+  await mountHumanAcquisition(page, { reload: true }); await selectAcquisition(page);
+  await page.getByRole('spinbutton', { name: '提示年俸（万円）', exact: true }).fill('12000');
+  await page.getByRole('combobox', { name: '契約年数', exact: true }).selectOption('3');
+  await captureAcquisition(page, testInfo, 'after', width);
+  await page.getByRole('button', { name: '提示条件を確認する', exact: true }).click();
+  await page.evaluate(() => {
+    window.acquisitionWrite = Storage.prototype.setItem; window.acquisitionRoot = localStorage.getItem('baseball_manager_v1');
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'baseball_manager_v1') throw new DOMException('full', 'QuotaExceededError');
+      return window.acquisitionWrite.call(this, key, value);
+    };
+  });
+  await page.getByRole('button', { name: 'この条件で提示する', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('保存できません');
+  await expect(page.getByText('提示を保存しました。回答待ちです。', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('spinbutton', { name: '提示年俸（万円）', exact: true })).toHaveValue('12000');
+  expect(await page.evaluate(() => localStorage.getItem('baseball_manager_v1') === window.acquisitionRoot)).toBe(true);
+  await captureAcquisition(page, testInfo, 'write-error', width);
+  await page.evaluate(() => { Storage.prototype.setItem = window.acquisitionWrite; });
+  await page.getByRole('button', { name: 'この条件で提示する', exact: true }).click();
+  await expect(page.getByText('提示を保存しました。回答待ちです。', { exact: true })).toBeVisible();
+  await page.reload(); await mountHumanAcquisition(page, { reload: true }); await selectAcquisition(page);
+  await expect(page.getByRole('spinbutton', { name: '提示年俸（万円）', exact: true })).toHaveValue('12000');
+  await expect(page.getByRole('combobox', { name: '契約年数', exact: true })).toHaveValue('3');
+  await page.getByText('年度別の予算と契約負担', { exact: true }).click();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await captureAcquisition(page, testInfo, 'pending', width);
+  await page.getByRole('spinbutton', { name: '提示年俸（万円）', exact: true }).fill('13000');
+  await page.getByRole('button', { name: '提示条件を確認する', exact: true }).click();
+  await expect(page.locator('.decision-detail')).toContainText('保存済みの提示：年俸1.20億円・3年');
+  await expect(page.getByRole('region', { name: '提示条件の最終確認' })).toContainText('差替後の提示：年俸1.30億円・3年');
+  await page.getByRole('button', { name: 'この条件で提示する', exact: true }).click();
+  await expect(page.getByText('提示を保存しました。回答待ちです。', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.acquisitionHarness.current().contractEconomy.decisions.map(d => d.status))).toEqual(['replaced', 'pending']);
+  await page.getByRole('button', { name: '提示を取り消す', exact: true }).click();
+  await page.getByRole('button', { name: '取消を確定する', exact: true }).click();
+  await expect(page.getByText('提示を取り消しました。', { exact: true })).toBeVisible();
+});
+
+for (const reply of ['season', 'offseason', 'expired']) test(`save generations: human acquisition ${reply} reply without mail survives cold reload`, async ({ page }, testInfo) => {
+  await page.goto('/'); await mountHumanAcquisition(page, { reply }); await selectAcquisition(page);
+  if (reply === 'offseason') {
+    expect(await page.locator('[data-ds="annual-market-screen"]').evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(244, 246, 249)');
+    await captureAcquisition(page, testInfo, 'offseason-due', page.viewportSize().width);
+  }
+  await expect(page.getByRole('button', { name: '提示を取り消す', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '届いた回答を確認する', exact: true }).click();
+  await expect(page.getByText('届いた回答を保存しました。', { exact: true })).toBeVisible();
+  await page.reload(); await mountHumanAcquisition(page, { reload: true, reply }); await selectAcquisition(page);
+  const result = await page.evaluate(() => {
+    const gs = window.acquisitionHarness.current();
+    return { status: gs.contractEconomy.decisions[0].status, receipts: gs.contractEconomy.engine.transactions.length,
+      holds: gs.contractEconomy.engine.spending.reservations.length, pool: gs.faPool.length,
+      pending: gs.contractEconomy.engine.acquisitions.length,
+      roster: [...gs.myTeam.players, ...gs.myTeam.farm].some(p => p.id === 'free') };
+  });
+  expect(result).toEqual({ status: reply === 'expired' ? 'expired' : 'accepted', receipts: 2, holds: 0,
+    pool: reply === 'expired' ? 1 : 0, pending: reply === 'offseason' ? 1 : 0, roster: reply === 'season' });
+  if (reply === 'offseason') await expect(page.locator('.decision-detail')).toContainText('翌春の加入待ち');
+});
+
+test('save generations: human acquisition recovers acknowledgement without signing twice', async ({ page }) => {
+  await page.goto('/'); await mountHumanAcquisition(page); await selectAcquisition(page);
+  await page.getByRole('button', { name: '提示条件を確認する', exact: true }).click();
+  await page.evaluate(() => {
+    window.acquisitionRead = Storage.prototype.getItem; let interrupted = false;
+    Storage.prototype.getItem = function (key) {
+      if (key === 'baseball_manager_v1' && window.acquisitionHarness.current().contractEconomy.revision === 1 && !interrupted) { interrupted = true; throw Error('ack interrupted'); }
+      return window.acquisitionRead.call(this, key);
+    };
+  });
+  await page.getByRole('button', { name: 'この条件で提示する', exact: true }).click();
+  await expect(page.getByRole('button', { name: '保存済みの交渉を復旧する', exact: true })).toBeVisible();
+  await expect(page.getByText('提示を保存しました。回答待ちです。', { exact: true })).toHaveCount(0);
+  const root = await page.evaluate(() => { Storage.prototype.getItem = window.acquisitionRead; return localStorage.getItem('baseball_manager_v1'); });
+  await page.getByRole('button', { name: '保存済みの交渉を復旧する', exact: true }).click();
+  await expect(page.getByText('保存済みの交渉を復旧しました。', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('baseball_manager_v1'))).toBe(root);
+  expect(await page.evaluate(() => window.acquisitionHarness.current().contractEconomy.engine.transactions.length)).toBe(1);
+});

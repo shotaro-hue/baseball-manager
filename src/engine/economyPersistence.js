@@ -4,6 +4,7 @@ import { contractEmploymentAt, isContractLedgerExtension } from './contractLedge
 import { employmentPlayerFields } from './seasonContract';
 import { quoteAnnualSpendingPlan } from './annualSpending';
 import { validateRenewalDecisions, preservesRenewalDecisions } from './renewalDecisions';
+import { validateAcquisitionDecisions, preservesAcquisitionDecisions } from './acquisitionDecisions';
 
 // Storage validation only. Commit acknowledgements/barrier live in saveload;
 // activation and application hydration remain separate A1-1d stages.
@@ -11,6 +12,7 @@ export function validateEconomySave(world) {
   const mode = contractEconomyMode(world);
   if (mode === 'annual') {
     validateRenewalDecisions(world);
+    validateAcquisitionDecisions(world);
     // The legacy writer may normalize/mint save IDs. Annual identities must
     // survive serialization exactly (including their receipt references).
     if (typeof world.saveId !== 'string' || !world.saveId.trim()
@@ -49,6 +51,7 @@ export function economySaveMetadata(world) {
 function preservesEconomyHistory(before, after) {
   if (canonical(before.randomRoot) !== canonical(after.randomRoot)) return false;
   if (!preservesRenewalDecisions(before, after)) return false;
+  if (!preservesAcquisitionDecisions(before, after)) return false;
   const oldLedger = before.engine.spending.ledger, newLedger = after.engine.spending.ledger;
   // Reuse ledger semantics (including closed years); additionally retain the
   // exact persisted evidence and record order, which the semantic check ignores.

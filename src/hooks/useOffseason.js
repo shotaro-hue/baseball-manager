@@ -34,6 +34,7 @@ import { rankLeague, standingsContext } from '../engine/standings';
 import { draftPicksForTeam } from '../engine/offseasonResume';
 import { hasRecordedFirstTeamSeason } from '../engine/seasonParticipants';
 import { renewalRequest } from '../engine/renewalDecisions';
+import { acquisitionRequest } from '../engine/acquisitionDecisions';
 
 let offseasonPlayerModulePromise = null;
 let offseasonScheduleModulePromise = null;
@@ -68,7 +69,16 @@ export function useOffseason(gs) {
     ? gs.commitRenewalRequest(renewalRequest(gs, action), renewalSession)
     : Promise.resolve({ ok: false, reason: 'economy_not_active' });
   const handleCancelRenewal = proposalId => commitRenewal({ type: 'cancel', proposalId });
-  const handleResolveRenewals = () => commitRenewal({ type: 'resolve-due' });
+  const commitAcquisition = action => gs.commitAcquisitionRequest
+    ? gs.commitAcquisitionRequest(acquisitionRequest(gs, action), renewalSession)
+    : Promise.resolve({ ok: false, reason: 'economy_not_active' });
+  const handleAcquisitionOffer = (playerId, salary, years, options = {}) =>
+    commitAcquisition({ type: 'offer', playerId, salary, years, ...options });
+  const handleCancelAcquisition = proposalId => commitAcquisition({ type: 'cancel', proposalId });
+  const handleResolveEconomyDecisions = () => gs.commitDueEconomyRequest
+    ? gs.commitDueEconomyRequest(acquisitionRequest(gs, { type: 'resolve-due' }), renewalSession)
+    : Promise.resolve({ ok: false, reason: 'economy_not_active' });
+  const handleResolveRenewals = handleResolveEconomyDecisions;
   const {
     teams, setTeams, myId, myTeam,
     year, setYear, gameDay, setGameDay,
@@ -743,6 +753,7 @@ export function useOffseason(gs) {
   };
 
   const handleFaPhaseNext = () => {
+    if (!legacyContracts) return false;
     if (gs.screen !== 'offseason_fa_phase' || faPhaseCompletedYear.current === year) return false;
     faPhaseCompletedYear.current = year;
     setScreen('contract_renewal_phase');
@@ -951,6 +962,7 @@ export function useOffseason(gs) {
     handleResolveRenewals,
     handleContractRenewalSign,
     handleFaPhaseNext,
+    handleAcquisitionOffer, handleCancelAcquisition, handleResolveEconomyDecisions,
     handleContractRenewalPhaseNext,
     handleTrade,
     acceptCpuOffer,

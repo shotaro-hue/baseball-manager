@@ -25,6 +25,7 @@ import { releaseWaiverPlayers } from '../../engine/offseasonReview';
 import { planningResumeScreen } from '../../engine/offseasonPlanning';
 import { standingsContext } from '../../engine/standings';
 import HubFaTab from './HubFaTab';
+import { AnnualMarketTab } from '../tabs/AnnualMarketTab';
 import HubScoutTab from './HubScoutTab';
 import HubTabFallback from './HubTabFallback';
 import HubManagementTab from './HubManagementTab';
@@ -372,6 +373,9 @@ export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTab
   }
 
   if (tab === 'fa') {
+    if (gs.contractEconomy !== undefined && !(gs.contractEconomy?.schemaVersion === 1
+      && gs.contractEconomy.mode === 'legacy' && gs.contractEconomy.engine === undefined))
+      return <AnnualMarketTab gs={gs} os={os} comparison={comparison} />;
     return (
       <HubFaTab
         myTeam={myTeam}
