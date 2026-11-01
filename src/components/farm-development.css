@@ -36,6 +36,11 @@
 .farm-registration-dialog dt { color:var(--ds-muted); font-size:14px; }
 .farm-registration-dialog dd { text-align:right; }
 .farm-registration-dialog p { font-size:14px; line-height:1.65; }
+.farm-registration-dialog .farm-annual-costs { width:100%; border-collapse:collapse; table-layout:fixed; font-size:14px; font-variant-numeric:tabular-nums; }
+.farm-registration-dialog .farm-annual-costs caption { text-align:left; font-weight:700; padding:12px 0 8px; }
+.farm-registration-dialog .farm-annual-costs :is(th,td) { padding:8px 4px; border-bottom:1px solid var(--ds-divider); text-align:right; overflow-wrap:anywhere; }
+.farm-registration-dialog .farm-annual-costs :is(th,td):first-child { width:20%; text-align:left; }
+.farm-registration-dialog .farm-annual-costs thead { color:var(--ds-muted); }
 .farm-dialog-actions { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:12px; margin-top:16px; }
 .roster-settings .farm-registration-dialog [data-ds=button][data-variant=primary] { background:var(--ds-accent); color:var(--ds-inverse); }
 :is(.farm-development,.player-talk,.farm-registration-dialog) :is(button,select,summary,[tabindex]):focus-visible { outline:3px solid var(--ds-focus); outline-offset:3px; }

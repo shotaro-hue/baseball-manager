@@ -116,6 +116,7 @@ export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTab
     return (
       <>
         <RosterTab
+          annualGs={gs.contractEconomy?.mode === 'annual' ? gs : undefined}
           farmState={{farmCompetition:gs.farmCompetition,year:gs.year,teams:gs.teams,seasonHistory:gs.getSeasonHistory?.()??gs.seasonHistory}}
           team={myTeam}
           allTeams={teams}

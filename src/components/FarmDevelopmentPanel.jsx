@@ -9,6 +9,7 @@ import {promotionReasons,registrationPreview} from './farmDevelopmentDisplay';
 import {DEV_GOALS_BATTER,DEV_GOALS_PITCHER,MAX_ROSTER,MAX_SHIHAKA_TOTAL} from '../constants';
 import {fmtSal} from '../utils';
 import './farm-development.css';
+import AnnualDevelopmentDialog from './AnnualDevelopmentDialog';
 
 const money=v=>Number.isFinite(v)?fmtSal(v):'— 未記録';
 function RegistrationDialog({team,player,onClose,onConfirm,draftContext}) {
@@ -32,8 +33,10 @@ function RegistrationDialog({team,player,onClose,onConfirm,draftContext}) {
   </div>
  </div>;
 }
-export function FarmDevelopmentPanel({team,farmState,onSetDevGoal,onPlayerClick,onPromo,onConvertIkusei,draftContext={}}) {
+export function FarmDevelopmentPanel({team,farmState,onSetDevGoal,onPlayerClick,onPromo,onConvertIkusei,draftContext={},annualGs}) {
  const [confirmId,setConfirmId]=useState(null);
+ const [feedback,setFeedback]=useState('');
+ const [recovering,setRecovering]=useState(false),recoveringRef=useRef(false);
  const closeConfirmation=useCallback(()=>setConfirmId(null),[]);
  const confirming=team.farm.find(p=>p.id===confirmId);
  const eligible=team.farm.filter(p=>!isIkuseiPlayer(p)&&(p.injuryDaysLeft??0)===0&&(p.registrationCooldownDays??0)===0);
@@ -43,6 +46,14 @@ export function FarmDevelopmentPanel({team,farmState,onSetDevGoal,onPlayerClick,
   <header className="farm-development-heading"><h2>二軍育成・起用（{team.farm.length}人）</h2><p>目標と記録を確認して、一軍への起用を判断する。</p></header>
   <p className="farm-capacity">一軍 {team.players.length}/{MAX_ROSTER}人</p>
   <RosterCapacitySummary capacity={capacity} className="farm-capacity"/>
+  {feedback&&<p role="status">{feedback}</p>}
+  {!confirming&&annualGs?.saveResult?.reason==='economy_adoption_required'&&<div role="alert">
+   <p>保存した契約の反映確認が必要です。</p><Button disabled={recovering} onClick={async()=>{
+    if(recoveringRef.current)return;recoveringRef.current=true;setRecovering(true);
+    try{const result=await annualGs.recoverEconomyCommand?.();setFeedback(result?.ok?'保存済みの契約を復旧しました。':'保存した契約の反映を確認できませんでした。再試行してください。');}
+    catch{setFeedback('保存した契約の反映を確認できませんでした。再試行してください。');}
+    finally{recoveringRef.current=false;setRecovering(false);}
+   }}>保存済みの契約を復旧する</Button></div>}
   <FarmRecordScope state={farmState} teamId={team.id}/>
   {recommendations.length>0&&<p className="farm-recommendation">一軍枠に空き（{MAX_ROSTER-team.players.length}枠）· 昇格推薦：{recommendations.map(p=>p.name).join('、')}<small>既存の潜在能力順。実行可否は各選手の表示を確認してください。</small></p>}
   <DataTableFrame label="二軍育成・起用一覧。横にスクロールできます" className="farm-development-table">
@@ -63,9 +74,9 @@ export function FarmDevelopmentPanel({team,farmState,onSetDevGoal,onPlayerClick,
       <label className="farm-goal-label">育成目標<select aria-label={`${p.name}の育成目標`} value={p.devGoal||''} disabled={!onSetDevGoal} onChange={e=>onSetDevGoal?.(p.id,e.target.value||null)}>{goals.map(g=><option key={g.key} value={g.key}>{g.label}</option>)}</select></label>
       <p className="farm-current-goal">現在：{goalLabel??'不明な保存設定'}</p>
       <div className="farm-row-actions">{isIkuseiPlayer(p)
-       ?<Button aria-label={`${p.name}を支配下登録する`} disabled={registration.reasons.length>0||!onConvertIkusei} onClick={()=>setConfirmId(p.id)}>支配下登録</Button>
+       ?<Button aria-label={`${p.name}を支配下登録する`} disabled={(!annualGs&&registration.reasons.length>0)||annualGs?.saveQueueState?.isSaving||!onConvertIkusei} onClick={()=>{setFeedback('');setConfirmId(p.id);}}>支配下登録</Button>
        :<Button aria-label={`${p.name}を一軍へ`} disabled={promotion.length>0||!onPromo} onClick={()=>{if(!promotion.length)onPromo?.(p.id);}}>一軍へ</Button>}</div>
-      {(isIkuseiPlayer(p)?registration.reasons:promotion).length>0&&<p className="farm-warning">{(isIkuseiPlayer(p)?registration.reasons:promotion).join(' / ')}</p>}
+      {(isIkuseiPlayer(p)?(annualGs?[]:registration.reasons):promotion).length>0&&<p className="farm-warning">{(isIkuseiPlayer(p)?registration.reasons:promotion).join(' / ')}</p>}
       <div className="farm-row-record"><FarmRecordSummary state={farmState} player={p} compact/></div>
      </td></tr>;
     })}
@@ -73,6 +84,7 @@ export function FarmDevelopmentPanel({team,farmState,onSetDevGoal,onPlayerClick,
   </DataTableFrame>
   {!team.farm.length&&<p className="farm-empty">二軍選手なし</p>}
   <details className="farm-help"><summary>記録と操作の見方</summary><p>二軍実測は年度・記録開始時点を確認してください。一軍成績や旧推定とは合算しません。数値0は記録済み、分母不足の「—」は算出不可。育成目標は実データへの反映後に表示が切り替わります。保存状態は画面上部で確認してください。</p></details>
-  {isIkuseiPlayer(confirming)&&<RegistrationDialog team={team} player={confirming} draftContext={draftContext} onClose={closeConfirmation} onConfirm={onConvertIkusei}/>}
+  {annualGs&&confirming?<AnnualDevelopmentDialog gs={annualGs} player={confirming} onClose={closeConfirmation} onConfirm={onConvertIkusei} onSaved={setFeedback}/>
+   :isIkuseiPlayer(confirming)&&<RegistrationDialog team={team} player={confirming} draftContext={draftContext} onClose={closeConfirmation} onConfirm={onConvertIkusei}/>}
  </section>;
 }
