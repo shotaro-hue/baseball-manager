@@ -2,6 +2,7 @@ import { reduceEconomyCommand, toAnnualState } from './contractEconomy';
 import { createSeasonContract } from './seasonContract';
 import { evaluateRosterCapacity, isIkuseiPlayer } from './rosterCapacity';
 import { validContractTerms } from './renewalRules';
+import { draftContractSalary } from './draftSalary';
 
 const fail = message => { throw new Error(message); };
 const key = (...parts) => JSON.stringify(['human-rookie', ...parts]);
@@ -9,14 +10,14 @@ const stable = value => JSON.stringify(value, (_, v) => v && typeof v === 'objec
   ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v);
 const decode = value => { try { return JSON.parse(value); } catch { return null; } };
 const acceptedPlayers = capacity => capacity.ok ? [...capacity.acceptedPicks, ...capacity.acceptedDevelopmentPicks] : [];
-function recordedSalary(team, context, player) {
+function recordedSalary(team, context, player, salary = player.salary) {
   // Joining deliberately ignores stale salary metadata. Human winter funding
   // instead needs one unambiguous recorded salary among assignment-valid copies.
   for (const p of context.draftPool.filter(p => p.id === player.id)) {
     if (!acceptedPlayers(evaluateRosterCapacity(team, { ...context, draftPool: [p] })).length) continue;
     if (p.salary !== player.salary) fail('同じ新人の指名時年俸が一致しません。');
   }
-  if (!Number.isSafeInteger(player.salary) || !validContractTerms(player, player.salary, 1))
+  if (!Number.isSafeInteger(player.salary) || !validContractTerms(player, salary, 1))
     fail('指名時の年俸が未記録または不正です。');
 }
 function proposalFor(id, teamId, player, season) {
@@ -110,8 +111,17 @@ export function reduceRookieRequest(world, request) {
     const player = acceptedPlayers(capacity).find(p => p.id === a.playerId);
     if (!player) fail('自球団の受諾済み未加入の新人を選んでください。');
     if (a.type === 'decline') return reduceEconomyCommand(world, envelope({ id, type: 'decline-rookie', teamId: world.myId, playerId: player.id }));
-    recordedSalary(team, { ...state.draftContext, teams: world.teams }, player);
-    const proposal = proposalFor(id, world.myId, player, world.year);
-    return reduceEconomyCommand(world, envelope({ id, type: 'reserve-rookie', proposal }));
+    const context = { ...state.draftContext, teams: world.teams }, salary = draftContractSalary(player);
+    // Old unfunded picks may predate the generation floor. Quote exactly the
+    // amount shown in confirmation, checking raw duplicates before correction.
+    // validateRookieContracts above still checks all existing evidence strictly.
+    recordedSalary(team, context, player, salary);
+    const proposal = proposalFor(id, world.myId, { ...player, salary }, world.year);
+    const candidate = salary === player.salary ? world : { ...world, offseasonPlan: { ...world.offseasonPlan,
+      draftResult: { ...world.offseasonPlan.draftResult, pool: context.draftPool.map(p =>
+        p.id === player.id && acceptedPlayers(evaluateRosterCapacity(team, { ...context, draftPool: [p] })).length
+          ? { ...p, salary } : p) } } };
+    const result = reduceEconomyCommand(candidate, envelope({ id, type: 'reserve-rookie', proposal }));
+    return result.ok ? result : { ...result, world };
   } catch (error) { return { ok: false, world, replayed: false, error: error.message }; }
 }

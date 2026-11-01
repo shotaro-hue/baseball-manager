@@ -5,6 +5,8 @@ import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { useGameState } from './useGameState';
 import { useOffseason } from './useOffseason';
 import { saveGame, loadGame } from '../engine/saveload';
+import { quoteAnnualSpendingPlan } from '../engine/annualSpending';
+import { toAnnualState } from '../engine/contractEconomy';
 import { rookieFixture } from '../engine/__tests__/fixtures/rookieWorld';
 
 let gs, os, view, storage;
@@ -17,7 +19,10 @@ beforeEach(() => {
   for (const level of ['log', 'warn', 'error', 'table']) vi.spyOn(console, level).mockImplementation(() => {});
 });
 afterEach(() => { if (view) act(() => view.unmount()); view = null; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
-async function setup(world = rookieFixture()) {
+function oldRookieFixture() {
+  const w = rookieFixture(); w.offseasonPlan.draftResult.pool[0].salary = 240; return w;
+}
+async function setup(world = oldRookieFixture()) {
   expect((await saveGame(world, { skipCompression: true })).ok).toBe(true);
   function Harness() { gs = useGameState(); os = useOffseason(gs); return null; }
   await act(async () => { view = create(React.createElement(Harness)); });
@@ -96,3 +101,21 @@ it('rejects a retained legacy draft callback after annual hydration', async () =
   expect(gs.myTeam.farm).toEqual([]); expect(gs.offseasonPlan.draftApplied).not.toBe(true);
 });
 
+
+it.each([['rookie', 240, 420], ['rookie', 600, 600], ['development', 240, 240]])(
+  'persists and reloads the exact reviewed %s salary %s through real hooks', async (id, rawSalary, salary) => {
+    const w = rookieFixture(); w.offseasonPlan.draftResult.pool.find(p => p.id === id).salary = rawSalary;
+    await setup(w);
+    expect((await loadGame()).offseasonPlan.draftResult.pool.find(p => p.id === id).salary).toBe(rawSalary);
+    const row = world => quoteAnnualSpendingPlan(toAnnualState(world).spending).find(r => r.teamId === 0 && r.season === 2027);
+    const beforeReserved = row(w).reservedManYen;
+    expect(await run(() => os.handleReserveRookie(id))).toMatchObject({ ok: true });
+    const saved = await loadGame(), contract = saved.contractEconomy.engine.spending.reservations[0].proposal.contract;
+    expect(contract).toMatchObject({ annualSalaryManYen: salary, termYears: 1, guaranteed: true });
+    expect(saved.offseasonPlan.draftResult.pool.find(p => p.id === id).salary).toBe(salary);
+    expect(JSON.parse(saved.contractEconomy.engine.transactions[0].signature).proposal.contract).toEqual(contract);
+    expect(row(saved).reservedManYen - beforeReserved).toBe(salary);
+    act(() => gs.setScreen('title'));
+    act(() => expect(gs.hydrateSavedWorld(saved, { progressToken: gs.getProgressToken(), sessionToken: gs.getProgressSessionToken() })).toBe(true));
+    expect(gs.contractEconomy.engine.spending.reservations[0].proposal.contract).toEqual(contract);
+  });

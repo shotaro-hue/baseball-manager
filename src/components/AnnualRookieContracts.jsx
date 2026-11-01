@@ -4,6 +4,7 @@ import { toAnnualState } from '../engine/contractEconomy';
 import { evaluateRosterCapacity, isIkuseiPlayer } from '../engine/rosterCapacity';
 import { quoteAnnualSpendingPlan } from '../engine/annualSpending';
 import { rookieRequest, reduceRookieRequest } from '../engine/rookieContracts';
+import { draftContractSalary } from '../engine/draftSalary';
 import { Button, MetricBand } from './design-system/primitives';
 import { DecisionConfirmation, money, moneyMetric } from './management/DecisionParts';
 
@@ -23,7 +24,8 @@ function rookieView(gs) {
       const hold = [...state.spending.reservations, ...state.spending.resolvedReservations]
         .find(h => h.kind === 'rookie' && h.proposal.teamId === gs.myId && h.proposal.contract.playerId === player.id);
       const contract = hold?.proposal.contract;
-      return { player, salary: contract?.annualSalaryManYen ?? player.salary,
+      const salary = contract?.annualSalaryManYen ?? (declined.has(player.id) ? player.salary : draftContractSalary(player));
+      return { player, salary, adjusted: !hold && !declined.has(player.id) && Number.isSafeInteger(salary) && salary > 0 && salary !== player.salary,
         development: contract ? contract.registrationType === 'development' : isIkuseiPlayer(player),
         status: declined.has(player.id) ? 'declined' : hold ? 'reserved' : 'unfunded' };
     });
@@ -60,7 +62,7 @@ export default function AnnualRookieContracts({ gs, os }) {
   const error = blocked ? '保存・復旧の完了を待ってください。' : preview && !preview.ok ? preview.error : null;
   return <section className="draft-panel management-decisions" data-ds="contract-management" aria-label="翌年度の新人契約">
     <h2 tabIndex={-1} ref={heading}>翌年度の新人契約</h2>
-    <p>指名時の年俸で単年契約を留保するか、指名を辞退します。留保した選手は翌春の加入待ちとなり、今季の名簿には加わりません。</p>
+    <p>表示された年俸で単年契約を留保するか、指名を辞退します。留保した選手は翌春の加入待ちとなり、今季の名簿には加わりません。</p>
     <MetricBand items={[moneyMetric(`${gs.year + 1}年度の追加余力`, money(model.row?.remainingManYen)),
       { label: '新人契約の留保', value: model.entries.filter(e => e.status === 'reserved').length, unit: '人' }]} />
     {busy && <p role="status">保存・反映を確認しています…</p>}
@@ -70,6 +72,7 @@ export default function AnnualRookieContracts({ gs, os }) {
     {!model.entries.length && <p>契約する自球団の新人はいません。</p>}
     {model.entries.map(e => <div className="draft-result-row" key={e.player.id}>
       <strong>{e.player.name}</strong><p>{e.development ? '育成' : '支配下'} · {gs.year + 1}年度 年俸 {money(e.salary)} · 単年</p>
+      {e.adjusted && <p>指名記録の年俸 {money(e.player.salary)} は最低年俸未満のため、契約条件は {money(e.salary)} です。</p>}
       <p>{e.status === 'declined' ? '辞退済み' : e.status === 'reserved' ? '留保済み・翌春加入待ち' : '契約未留保'}</p>
       <div className="decision-actions">
         {e.status === 'unfunded' && <Button disabled={blocked} onClick={() => choose('reserve', e.player.id)}>{e.player.name}の留保条件を確認</Button>}
@@ -80,6 +83,7 @@ export default function AnnualRookieContracts({ gs, os }) {
       title="新人契約の最終確認" fallbackFocus={heading} onCancel={() => { if (!inFlight.current) setAction(null); }}
       confirmLabel={action.type === 'reserve' ? 'この条件を留保する' : '辞退を確定する'} onConfirm={confirm} error={error} danger={action.type === 'decline'}>
       <p>{selected.player.name} · {selected.development ? '育成' : '支配下'} · 年俸 {money(selected.salary)} · 単年</p>
+      {selected.adjusted && action.type === 'reserve' && <p>指名記録の {money(selected.player.salary)} から最低年俸の {money(selected.salary)} に補正して留保します。</p>}
       <p>{action.type === 'reserve' ? `${gs.year + 1}年度の年俸を確保します。正式な留保は保存成功後に反映されます。`
         : '指名の辞退を確定します。留保済みの年俸と新人の登録枠を解放します。この指名を再開することはできません。'}</p>
     </DecisionConfirmation>}

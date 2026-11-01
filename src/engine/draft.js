@@ -2,6 +2,7 @@ import { rng, clamp } from '../utils';
 import { POSITIONS, DRAFT_POOL_SIZE, PROSPECT_TYPE_WEIGHTS, PROSPECT_ENTRY_AGE, PROSPECT_READINESS_RANGE } from '../constants';
 import { makePlayer } from './playerCore';
 import { analyzeTeamNeeds } from './trade';
+import { draftContractSalary } from './draftSalary';
 
 /* ═══════════════════════════════════════════════
    DRAFT SYSTEM
@@ -98,5 +99,7 @@ export function initDraftPool(myTeam) {
   combined.slice(0, 3).forEach((p, i) => {
     p.spotlight = ["👑 今年の目玉", "⭐ 超高評価", "🔥 注目株"][i];
   });
-  return combined;
+  // Fix draft terms before any candidate/result screen sees them. Keep the
+  // general player generator and its random stream unchanged.
+  return combined.map(p => ({ ...p, salary: draftContractSalary(p) }));
 }

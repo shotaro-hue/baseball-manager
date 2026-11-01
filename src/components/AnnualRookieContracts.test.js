@@ -57,3 +57,15 @@ it('preserves the legacy review end action', () => {
   const w = rookieFixture(); delete w.contractEconomy; mount(w);
   expect(button('2027年シーズン開幕！')).toBeTruthy(); expect(text(view.root)).not.toContain('翌年度の新人契約');
 });
+
+it('shows the corrected old offer before confirmation without changing the save', () => {
+  const w = rookieFixture(); w.offseasonPlan.draftResult.pool[0].salary = 240;
+  const before = JSON.stringify(w); mount(w);
+  expect(text(view.root)).toContain('420万円');
+  click('支配下新人の留保条件を確認');
+  const region = view.root.findByProps({ role: 'region', 'aria-label': '新人契約の最終確認' });
+  expect(text(region)).toContain('年俸 420万円');
+  expect(text(region)).toContain('240万円');
+  expect(button('この条件を留保する').props.disabled).toBe(false);
+  expect(JSON.stringify(w)).toBe(before);
+});

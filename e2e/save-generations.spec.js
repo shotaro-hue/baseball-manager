@@ -9,6 +9,9 @@ async function mountHumanRookies(page, { reload = false, legacy = false } = {}) 
     const { saveGame, loadGame } = await import('/baseball-manager/src/engine/saveload.js');
     const { mountRookieView } = await import('/baseball-manager/tests/helpers/rookie-hook-harness.jsx');
     const world = reload ? await loadGame() : rookieFixture();
+    // Pre-fix saves can contain a 240 controlled pick; review the correction
+    // before committing, then retain exactly that offer through failure/reload.
+    if (!reload) world.offseasonPlan.draftResult.pool[0].salary = 240;
     window.rookieHarness?.unmount();
     if (!reload && !(await saveGame(world, { skipCompression: true })).ok) throw Error('fixture save failed');
     window.rookieHarness = mountRookieView(world, { legacy });
@@ -31,6 +34,9 @@ for (const width of [360, 390, 1440]) test(`save generations: human rookie reser
   await captureRookie(page, testInfo, 'after', width);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.getByRole('button', { name: '支配下新人の留保条件を確認', exact: true }).click();
+  const confirmation = page.getByRole('region', { name: '新人契約の最終確認', exact: true });
+  await expect(confirmation).toContainText('年俸 420万円');
+  await expect(confirmation).toContainText('240万円 から最低年俸の 420万円');
   await page.evaluate(() => {
     window.rookieWrite = Storage.prototype.setItem; window.rookieRoot = localStorage.getItem('baseball_manager_v1');
     Storage.prototype.setItem = function (key, value) {
@@ -41,12 +47,23 @@ for (const width of [360, 390, 1440]) test(`save generations: human rookie reser
   await page.getByRole('button', { name: 'この条件を留保する', exact: true }).click();
   await expect(page.getByText('新人契約を保存できませんでした。確認内容を保持しています。再試行してください。', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('baseball_manager_v1') === window.rookieRoot)).toBe(true);
+  expect(await page.evaluate(() => window.rookieHarness.current().offseasonPlan.draftResult.pool[0].salary)).toBe(240);
   await captureRookie(page, testInfo, 'failed', width);
   await page.evaluate(() => { Storage.prototype.setItem = window.rookieWrite; });
   await page.getByRole('button', { name: 'この条件を留保する', exact: true }).click();
   await expect(page.getByText('契約留保を保存しました。翌春の加入待ちです。', { exact: true })).toBeVisible();
   await page.reload(); await mountHumanRookies(page, { reload: true });
   await expect(page.getByText('留保済み・翌春加入待ち', { exact: true })).toBeVisible();
+  await expect(page.getByText('支配下 · 2027年度 年俸 420万円 · 単年', { exact: true })).toBeVisible();
+  expect(await page.evaluate(async () => {
+    const { quoteAnnualSpendingPlan } = await import('/baseball-manager/src/engine/annualSpending.js');
+    const { toAnnualState } = await import('/baseball-manager/src/engine/contractEconomy.js');
+    const gs = window.rookieHarness.current(), engine = gs.contractEconomy.engine;
+    return { recorded: gs.offseasonPlan.draftResult.pool[0].salary,
+      proposal: engine.spending.reservations[0].proposal.contract.annualSalaryManYen,
+      receipt: JSON.parse(engine.transactions[0].signature).proposal.contract.annualSalaryManYen,
+      reserved: quoteAnnualSpendingPlan(toAnnualState(gs).spending).find(r => r.teamId === 0 && r.season === 2027).reservedManYen };
+  })).toEqual({ recorded: 420, proposal: 420, receipt: 420, reserved: 420 });
   await page.getByRole('button', { name: '育成新人の留保条件を確認', exact: true }).click();
   await page.getByRole('button', { name: 'この条件を留保する', exact: true }).click();
   await expect(page.getByText('契約留保を保存しました。翌春の加入待ちです。', { exact: true })).toBeVisible();
