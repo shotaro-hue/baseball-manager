@@ -82,7 +82,7 @@ function prepare(plan) {
     if (!resolved || !['cancelled', 'replaced', 'accepted', 'lost', 'rejected'].includes(resolved.resolution)) fail('オファーの解決履歴を確認してください。');
     const proposal = normalizedProposal(resolved.proposal);
     if (!matchingPurpose(resolved.kind, proposal) || resolvedIds.has(proposal.id)
-      || (proposal.marketEntry && resolved.kind !== 'offer') || (resolved.resolution === 'rejected' && resolved.kind !== 'offer')) fail('オファーの解決履歴が重複または無効です。');
+      || (proposal.marketEntry && resolved.kind !== 'offer') || (resolved.resolution === 'rejected' && !['offer', 'renewal'].includes(resolved.kind))) fail('オファーの解決履歴が重複または無効です。');
     resolvedIds.add(proposal.id);
     const hasAccepted = Object.hasOwn(resolved, 'acceptedProposal');
     if (hasAccepted && resolved.resolution !== 'accepted') fail('未受諾の履歴に受諾条件を記録できません。');
@@ -259,7 +259,7 @@ export function assessAnnualSpendingChange(before, after, { mode = 'spend' } = {
   // Use the OLD ledger: conversion/other changes cannot borrow this exception
   // to introduce a higher future planning floor while already over budget.
   const cancelled = new Set(before.reservations.filter(h => h.kind === 'renewal'
-    && nextResolved.get(h.proposal.id)?.resolution === 'cancelled').map(h => h.proposal.id));
+    && ['cancelled', 'rejected'].includes(nextResolved.get(h.proposal.id)?.resolution)).map(h => h.proposal.id));
   const restoredPlans = new Map();
   if (cancelled.size) for (const p of activeRenewalPlans({ ...before,
     reservations: before.reservations.filter(h => !cancelled.has(h.proposal.id)) })) {

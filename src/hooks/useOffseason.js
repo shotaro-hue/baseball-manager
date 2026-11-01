@@ -33,6 +33,7 @@ import { planningPlayer, planningSummary } from '../engine/offseasonPlanning';
 import { rankLeague, standingsContext } from '../engine/standings';
 import { draftPicksForTeam } from '../engine/offseasonResume';
 import { hasRecordedFirstTeamSeason } from '../engine/seasonParticipants';
+import { renewalRequest } from '../engine/renewalDecisions';
 
 let offseasonPlayerModulePromise = null;
 let offseasonScheduleModulePromise = null;
@@ -59,6 +60,15 @@ function createEmptyStats() {
 }
 
 export function useOffseason(gs) {
+  // Only absent/explicit legacy envelopes may enter the old wallet handlers.
+  const legacyContracts = gs.contractEconomy === undefined
+    || (gs.contractEconomy?.schemaVersion === 1 && gs.contractEconomy.mode === 'legacy' && gs.contractEconomy.engine === undefined);
+  const renewalSession = gs.getProgressSessionToken?.();
+  const commitRenewal = action => gs.commitRenewalRequest
+    ? gs.commitRenewalRequest(renewalRequest(gs, action), renewalSession)
+    : Promise.resolve({ ok: false, reason: 'economy_not_active' });
+  const handleCancelRenewal = proposalId => commitRenewal({ type: 'cancel', proposalId });
+  const handleResolveRenewals = () => commitRenewal({ type: 'resolve-due' });
   const {
     teams, setTeams, myId, myTeam,
     year, setYear, gameDay, setGameDay,
@@ -344,6 +354,9 @@ export function useOffseason(gs) {
   };
 
   const handleContractOffer = (pid, sal, yrs, meta = {}) => {
+    if (!legacyContracts) return commitRenewal({ type: 'offer', playerId: pid, salary: sal, years: yrs,
+      ...(meta.replaceProposalId !== undefined ? { replaceProposalId: meta.replaceProposalId } : {}),
+      ...(meta.incentives !== undefined ? { incentives: meta.incentives } : {}) });
     const p=ownedPlayers(myTeam).find(x=>x.id===pid);
     if (!p || !renewalEligible(p, year) || !validContractOffer(p, sal, yrs)) { notify('選手の契約状況・提示金額・年数を確認してください', 'warn'); return false; }
     const incentives = meta.incentives || {};
@@ -738,6 +751,7 @@ export function useOffseason(gs) {
 
   // 契約更改フェーズ: 合意確定（ダイアログUI側から呼ばれる）
   const handleContractRenewalSign = (pid, finalSalary, years, moraleDelta, trustDelta) => {
+    if (!legacyContracts) return false;
     const p = ownedPlayers(myTeam).find(x => x.id === pid);
     const actionKey = `sign:${JSON.stringify([year, typeof pid, pid])}`;
     if (!p || planningActionIds.current.has(actionKey) || !renewalEligible(p, year) || !validContractTerms(p, finalSalary, years)) return false;
@@ -753,6 +767,7 @@ export function useOffseason(gs) {
 
   // 契約更改フェーズ完了: CPU球団の更改シミュ + 人気計算 → development_phase へ
   const handleContractRenewalPhaseNext = (faDeclaredPlayerIds = [], options = {}) => {
+    if (!legacyContracts) return false;
     const safeDeclaredIds = Array.isArray(faDeclaredPlayerIds)
       ? [...new Set(faDeclaredPlayerIds.filter(id => (typeof id === "string" && id.trim().length > 0) || (typeof id === "number" && Number.isFinite(id))))]
       : [];
@@ -932,6 +947,8 @@ export function useOffseason(gs) {
     handleDraftComplete,
     handleSpringTrainingComplete,
     handleContractOffer,
+    handleCancelRenewal,
+    handleResolveRenewals,
     handleContractRenewalSign,
     handleFaPhaseNext,
     handleContractRenewalPhaseNext,

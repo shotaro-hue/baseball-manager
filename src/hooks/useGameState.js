@@ -5,6 +5,7 @@ import {createFarmCompetition} from '../engine/farmRecords';
 import {validateFarmSaveState} from '../engine/farmMigration';
 import { contractEconomyMode, reduceEconomyCommand } from '../engine/contractEconomy';
 import { validateEconomySave } from '../engine/economyPersistence';
+import { reduceRenewalRequest } from '../engine/renewalDecisions';
 import { saveFeedback } from '../engine/saveFeedback';
 import { emptyBattedBallReceipt, validateBattedBallReceipt } from '../engine/battedBallRun';
 import { useState, useReducer, useMemo, useCallback, useEffect, useLayoutEffect, useRef } from "react";
@@ -672,7 +673,9 @@ export function useGameState() {
 
   // Internal annual-fixture transaction route. UI/CPU/Worker remain gated OFF
   // until A1-2/A1-3 integrate all producers.
-  const commitEconomyCommand = useCallback(async command => {
+  const commitEconomyOperation = useCallback(async (command, reduce, sessionToken) => {
+    if (sessionToken !== undefined && sessionToken !== progressSessionRef.current)
+      return { ok: false, reason: 'economy_session_conflict' };
     if (economyCommitRef.current) return { ok: false, reason: 'economy_commit_pending' };
     const snapshot = economySnapshotRef.current;
     if (!economyMountedRef.current || !snapshot || newGameInitializationRef.current
@@ -683,7 +686,7 @@ export function useGameState() {
     const base = snapshot.world;
     try { if (contractEconomyMode(base) !== 'annual') return { ok: false, reason: 'economy_not_active' }; }
     catch { return { ok: false, reason: 'economy_candidate_invalid' }; }
-    const reduced = reduceEconomyCommand(base, command);
+    const reduced = reduce(base, command);
     if (!reduced.ok) return { ok: false, reason: 'economy_command_invalid', error: reduced.error };
     if (reduced.replayed) return { ok: true, replayed: true };
     const expected = { saveId: base.saveId, epoch: base.contractEconomy.epoch,
@@ -713,6 +716,13 @@ export function useGameState() {
     if (!result.ok) setSaveResult(result);
     return result;
   }, [economyCommitBindings, finalizeEconomyCommit, refreshSaveQueueState]);
+
+  const commitEconomyCommand = useCallback(command =>
+    commitEconomyOperation(command, reduceEconomyCommand), [commitEconomyOperation]);
+  const commitRenewalRequest = useCallback((request, sessionToken) => {
+    if (!Number.isSafeInteger(sessionToken)) return Promise.resolve({ ok: false, reason: 'economy_session_conflict' });
+    return commitEconomyOperation(request, reduceRenewalRequest, sessionToken);
+  }, [commitEconomyOperation]);
 
   const recoverEconomyCommand = useCallback(async () => {
     if (!economyMountedRef.current) return { ok: false, reason: 'economy_recovery_unavailable' };
@@ -1475,7 +1485,7 @@ export function useGameState() {
     getLatestNewsId,
     markSaveDirty,
     hydrateSavedWorld, hydrateLargeSaveData, getMatchHistorySnapshot, hydrateMatchHistory, applyMatchResultPatch,
-    commitEconomyCommand, recoverEconomyCommand,
+    commitEconomyCommand, commitRenewalRequest, recoverEconomyCommand,
     resetSaveTracking,
     // derived
     myTeam,

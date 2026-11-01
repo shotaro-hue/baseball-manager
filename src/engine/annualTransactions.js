@@ -45,7 +45,7 @@ const kinds = {
   'submit-fa-protection': ['proposalId', 'teamId', 'protectedPlayerIds'],
   'settle-fa-personnel': ['selections'], 'join-fa-personnel': ['proposalId'],
   'offer-renewal': ['proposal', 'contractId'], 'replace-renewal': ['proposalId', 'proposal', 'contractId'],
-  'accept-renewal': ['proposalId', 'contractId'], 'cancel-renewal': ['proposalId'],
+  'accept-renewal': ['proposalId', 'contractId'], 'cancel-renewal': ['proposalId'], 'reject-renewal': ['proposalId'],
   'reserve-rookie': ['proposal'], 'decline-rookie': ['teamId', 'playerId'], 'join-rookie': ['proposalId'],
   trade: ['fromId', 'toId', 'outgoingIds', 'incomingIds', 'cashManYen', 'mode'],
   'convert-to-controlled': ['teamId', 'playerId', 'contractId', 'annualSalaryManYen'],
@@ -297,7 +297,8 @@ function renewalCandidate(state, c) {
   const p = proposing ? c.proposal : previous?.proposal;
   if (!p || (c.type === 'replace-renewal' && (!previous || previous.proposal.id === p.id
     || previous.proposal.teamId !== p.teamId || previous.proposal.contract.playerId !== p.contract.playerId))) fail('有効な更改オファーが見つかりません。');
-  if (c.type === 'cancel-renewal') return { ...state, spending: cancelContractReservation(state.spending, p.id) };
+  if (['cancel-renewal', 'reject-renewal'].includes(c.type)) return { ...state,
+    spending: cancelContractReservation(state.spending, p.id, { resolution: c.type === 'reject-renewal' ? 'rejected' : 'cancelled' }) };
   if (!['season', 'offseason'].includes(state.phase)) fail('翌年度更改のフェーズを確認してください。');
   const team = state.teams.find(t => t.id === p.teamId), terms = p.contract;
   const player = team && ownedPlayers(team).find(p => p.id === terms.playerId);

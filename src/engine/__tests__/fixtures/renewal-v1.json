@@ -1,0 +1,600 @@
+{
+  "teams": [
+    {
+      "id": 0,
+      "budget": 40000,
+      "players": [
+        {
+          "id": 0,
+          "name": "A",
+          "pos": "一塁手",
+          "salary": 10000,
+          "contractYearsLeft": 1,
+          "contractId": "[\"initial-contract\",\"test-save\",0]",
+          "育成": false,
+          "isIkusei": false,
+          "age": 27,
+          "trust": 90,
+          "hometown": "東京",
+          "personality": {
+            "money": 80,
+            "winning": 0,
+            "playing": 0,
+            "hometown": 0,
+            "loyalty": 0,
+            "stability": 20,
+            "future": 0
+          },
+          "contractYears": 1,
+          "contractSignedYear": 2026
+        }
+      ],
+      "farm": [],
+      "name": "球団0",
+      "wins": 40,
+      "losses": 20,
+      "league": "C",
+      "city": "東京"
+    },
+    {
+      "id": 1,
+      "budget": 49000,
+      "players": [
+        {
+          "id": "b",
+          "name": "B",
+          "pos": "一塁手",
+          "salary": 1000,
+          "contractYearsLeft": 1,
+          "contractId": "[\"initial-contract\",\"test-save\",\"b\"]",
+          "育成": false,
+          "isIkusei": false,
+          "age": 27,
+          "trust": 90,
+          "hometown": "東京",
+          "personality": {
+            "money": 80,
+            "winning": 0,
+            "playing": 0,
+            "hometown": 0,
+            "loyalty": 0,
+            "stability": 20,
+            "future": 0
+          },
+          "contractYears": 1,
+          "contractSignedYear": 2026
+        }
+      ],
+      "farm": [],
+      "name": "球団1",
+      "wins": 40,
+      "losses": 20,
+      "league": "C",
+      "city": "東京"
+    }
+  ],
+  "faPool": [
+    {
+      "id": "free",
+      "name": "FA",
+      "pos": "一塁手",
+      "salary": 1000,
+      "isForeign": true,
+      "isFA": true,
+      "marketEntry": {
+        "id": "[\"initial-market\",\"test-save\",\"free\"]",
+        "kind": "released",
+        "enteredDate": "2026-02-01"
+      }
+    }
+  ],
+  "myId": 0,
+  "saveId": "test-save",
+  "year": 2026,
+  "gameDay": 1,
+  "schedule": [
+    null,
+    {
+      "date": {
+        "month": 7,
+        "day": 16
+      }
+    }
+  ],
+  "faYears": {},
+  "offseasonPlan": null,
+  "mailbox": [
+    {
+      "id": "[\"human-renewal\",\"mail\",\"[\\\"human-renewal\\\",\\\"test-save\\\",\\\"[\\\\\\\"new-game\\\\\\\",\\\\\\\"test-save\\\\\\\"]\\\",0,0]\"]",
+      "type": "economy_renewal_pending",
+      "read": false,
+      "resolved": false,
+      "resolution": "pending",
+      "economyProposalId": "[\"human-renewal\",\"test-save\",\"[\\\"new-game\\\",\\\"test-save\\\"]\",0,0]",
+      "title": "【契約回答予定】A",
+      "from": "A / 代理人",
+      "dateLabel": "2026年",
+      "body": "回答待ち：翌2027年度から年俸8000万円・3年。今季の年俸・所属は維持します。",
+      "decision": {
+        "playerId": 0,
+        "teamId": 0,
+        "offeredYear": 2026,
+        "salary": 8000,
+        "years": 3
+      }
+    }
+  ],
+  "news": [],
+  "contractEconomy": {
+    "schemaVersion": 1,
+    "mode": "annual",
+    "epoch": "[\"new-game\",\"test-save\"]",
+    "revision": 1,
+    "randomRoot": {
+      "algorithmVersion": 1,
+      "seed": "test-seed"
+    },
+    "clock": {
+      "season": 2026,
+      "phase": "season",
+      "date": "2026-07-16",
+      "offseasonTurn": 0
+    },
+    "cycle": {
+      "season": 2026,
+      "stage": "new-season",
+      "transitionReceipts": []
+    },
+    "engine": {
+      "version": 2,
+      "spending": {
+        "version": 1,
+        "budgetSeason": 2026,
+        "ledger": {
+          "version": 1,
+          "closedThroughSeason": 0,
+          "records": [
+            {
+              "contract": {
+                "version": 1,
+                "contractId": "[\"initial-contract\",\"test-save\",0]",
+                "playerId": 0,
+                "signedSeason": 2026,
+                "agreementPhase": "preseason",
+                "purpose": "acquisition",
+                "startSeason": 2026,
+                "endSeason": 2026,
+                "termYears": 1,
+                "annualSalaryManYen": 10000,
+                "guaranteed": true,
+                "registrationType": "controlled"
+              },
+              "actionId": "[\"initial-sign\",\"test-save\",0]",
+              "initialTeamId": 0,
+              "effectiveDate": "2026-02-01",
+              "changes": []
+            },
+            {
+              "contract": {
+                "version": 1,
+                "contractId": "[\"initial-contract\",\"test-save\",\"b\"]",
+                "playerId": "b",
+                "signedSeason": 2026,
+                "agreementPhase": "preseason",
+                "purpose": "acquisition",
+                "startSeason": 2026,
+                "endSeason": 2026,
+                "termYears": 1,
+                "annualSalaryManYen": 1000,
+                "guaranteed": true,
+                "registrationType": "controlled"
+              },
+              "actionId": "[\"initial-sign\",\"test-save\",\"b\"]",
+              "initialTeamId": 1,
+              "effectiveDate": "2026-02-01",
+              "changes": []
+            }
+          ]
+        },
+        "authorizations": [
+          {
+            "teamId": 0,
+            "season": 2026,
+            "approvedManYen": 50000,
+            "minimumRosterReserveManYen": 0
+          },
+          {
+            "teamId": 0,
+            "season": 2027,
+            "approvedManYen": 50000,
+            "minimumRosterReserveManYen": 0
+          },
+          {
+            "teamId": 0,
+            "season": 2028,
+            "approvedManYen": 50000,
+            "minimumRosterReserveManYen": 0
+          },
+          {
+            "teamId": 0,
+            "season": 2029,
+            "approvedManYen": 50000,
+            "minimumRosterReserveManYen": 0
+          },
+          {
+            "teamId": 0,
+            "season": 2030,
+            "approvedManYen": 50000,
+            "minimumRosterReserveManYen": 420
+          },
+          {
+            "teamId": 0,
+            "season": 2031,
+            "approvedManYen": 50000,
+            "minimumRosterReserveManYen": 420
+          },
+          {
+            "teamId": 0,
+            "season": 2032,
+            "approvedManYen": 50000,
+            "minimumRosterReserveManYen": 420
+          },
+          {
+            "teamId": 0,
+            "season": 2033,
+            "approvedManYen": 50000,
+            "minimumRosterReserveManYen": 420
+          },
+          {
+            "teamId": 1,
+            "season": 2026,
+            "approvedManYen": 50000,
+            "minimumRosterReserveManYen": 0
+          },
+          {
+            "teamId": 1,
+            "season": 2027,
+            "approvedManYen": 50000,
+            "minimumRosterReserveManYen": 420
+          },
+          {
+            "teamId": 1,
+            "season": 2028,
+            "approvedManYen": 50000,
+            "minimumRosterReserveManYen": 420
+          },
+          {
+            "teamId": 1,
+            "season": 2029,
+            "approvedManYen": 50000,
+            "minimumRosterReserveManYen": 420
+          },
+          {
+            "teamId": 1,
+            "season": 2030,
+            "approvedManYen": 50000,
+            "minimumRosterReserveManYen": 420
+          },
+          {
+            "teamId": 1,
+            "season": 2031,
+            "approvedManYen": 50000,
+            "minimumRosterReserveManYen": 420
+          },
+          {
+            "teamId": 1,
+            "season": 2032,
+            "approvedManYen": 50000,
+            "minimumRosterReserveManYen": 420
+          },
+          {
+            "teamId": 1,
+            "season": 2033,
+            "approvedManYen": 50000,
+            "minimumRosterReserveManYen": 420
+          }
+        ],
+        "reservations": [
+          {
+            "kind": "renewal",
+            "proposal": {
+              "id": "[\"human-renewal\",\"test-save\",\"[\\\"new-game\\\",\\\"test-save\\\"]\",0,0]",
+              "type": "sign",
+              "teamId": 0,
+              "effectiveDate": "2027-02-01",
+              "contract": {
+                "version": 1,
+                "contractId": "[\"human-renewal\",\"contract\",\"[\\\"human-renewal\\\",\\\"test-save\\\",\\\"[\\\\\\\"new-game\\\\\\\",\\\\\\\"test-save\\\\\\\"]\\\",0,0]\"]",
+                "playerId": 0,
+                "signedSeason": 2026,
+                "agreementPhase": "season",
+                "purpose": "renewal",
+                "startSeason": 2027,
+                "endSeason": 2029,
+                "termYears": 3,
+                "annualSalaryManYen": 8000,
+                "guaranteed": true,
+                "registrationType": "controlled"
+              }
+            }
+          }
+        ],
+        "resolvedReservations": [],
+        "oneOffCosts": []
+      },
+      "transactions": [
+        {
+          "id": "[\"human-renewal\",\"offer\",\"[\\\"human-renewal\\\",\\\"test-save\\\",\\\"[\\\\\\\"new-game\\\\\\\",\\\\\\\"test-save\\\\\\\"]\\\",0,0]\"]",
+          "signature": "{\"contractId\":\"[\\\"initial-contract\\\",\\\"test-save\\\",0]\",\"id\":\"[\\\"human-renewal\\\",\\\"offer\\\",\\\"[\\\\\\\"human-renewal\\\\\\\",\\\\\\\"test-save\\\\\\\",\\\\\\\"[\\\\\\\\\\\\\\\"new-game\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"test-save\\\\\\\\\\\\\\\"]\\\\\\\",0,0]\\\"]\",\"proposal\":{\"contract\":{\"agreementPhase\":\"season\",\"annualSalaryManYen\":8000,\"contractId\":\"[\\\"human-renewal\\\",\\\"contract\\\",\\\"[\\\\\\\"human-renewal\\\\\\\",\\\\\\\"test-save\\\\\\\",\\\\\\\"[\\\\\\\\\\\\\\\"new-game\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"test-save\\\\\\\\\\\\\\\"]\\\\\\\",0,0]\\\"]\",\"endSeason\":2029,\"guaranteed\":true,\"playerId\":0,\"purpose\":\"renewal\",\"registrationType\":\"controlled\",\"signedSeason\":2026,\"startSeason\":2027,\"termYears\":3,\"version\":1},\"effectiveDate\":\"2027-02-01\",\"id\":\"[\\\"human-renewal\\\",\\\"test-save\\\",\\\"[\\\\\\\"new-game\\\\\\\",\\\\\\\"test-save\\\\\\\"]\\\",0,0]\",\"teamId\":0,\"type\":\"sign\"},\"type\":\"offer-renewal\"}",
+          "renewalDecision": {
+            "version": 1,
+            "kind": "human-renewal",
+            "proposalId": "[\"human-renewal\",\"test-save\",\"[\\\"new-game\\\",\\\"test-save\\\"]\",0,0]",
+            "playerId": 0,
+            "teamId": 0,
+            "season": 2026,
+            "contractId": "[\"initial-contract\",\"test-save\",0]",
+            "request": {
+              "saveId": "test-save",
+              "epoch": "[\"new-game\",\"test-save\"]",
+              "baseRevision": 0,
+              "action": {
+                "type": "offer",
+                "playerId": 0,
+                "salary": 8000,
+                "years": 3
+              }
+            },
+            "score": 60,
+            "willAccept": true,
+            "offeredClock": {
+              "season": 2026,
+              "phase": "season",
+              "date": "2026-07-16",
+              "offseasonTurn": 0
+            },
+            "dueDate": "2026-07-18",
+            "dueTurn": null,
+            "deadlineTurn": 37
+          }
+        }
+      ],
+      "rosterRequirements": [
+        {
+          "teamId": 0,
+          "season": 2026,
+          "requiredControlledCount": 1
+        },
+        {
+          "teamId": 0,
+          "season": 2027,
+          "requiredControlledCount": 1
+        },
+        {
+          "teamId": 0,
+          "season": 2028,
+          "requiredControlledCount": 1
+        },
+        {
+          "teamId": 0,
+          "season": 2029,
+          "requiredControlledCount": 1
+        },
+        {
+          "teamId": 0,
+          "season": 2030,
+          "requiredControlledCount": 1
+        },
+        {
+          "teamId": 0,
+          "season": 2031,
+          "requiredControlledCount": 1
+        },
+        {
+          "teamId": 0,
+          "season": 2032,
+          "requiredControlledCount": 1
+        },
+        {
+          "teamId": 0,
+          "season": 2033,
+          "requiredControlledCount": 1
+        },
+        {
+          "teamId": 1,
+          "season": 2026,
+          "requiredControlledCount": 1
+        },
+        {
+          "teamId": 1,
+          "season": 2027,
+          "requiredControlledCount": 1
+        },
+        {
+          "teamId": 1,
+          "season": 2028,
+          "requiredControlledCount": 1
+        },
+        {
+          "teamId": 1,
+          "season": 2029,
+          "requiredControlledCount": 1
+        },
+        {
+          "teamId": 1,
+          "season": 2030,
+          "requiredControlledCount": 1
+        },
+        {
+          "teamId": 1,
+          "season": 2031,
+          "requiredControlledCount": 1
+        },
+        {
+          "teamId": 1,
+          "season": 2032,
+          "requiredControlledCount": 1
+        },
+        {
+          "teamId": 1,
+          "season": 2033,
+          "requiredControlledCount": 1
+        }
+      ],
+      "acquisitions": [],
+      "faProtectionLists": [],
+      "faPersonnelMoves": [],
+      "faCompensationStandings": [],
+      "offseasonDepartures": []
+    },
+    "budgetPolicies": [
+      {
+        "teamId": 0,
+        "season": 2026,
+        "policyVersion": "explicit-test-policy",
+        "approvedManYen": 50000
+      },
+      {
+        "teamId": 0,
+        "season": 2027,
+        "policyVersion": "explicit-test-policy",
+        "approvedManYen": 50000
+      },
+      {
+        "teamId": 0,
+        "season": 2028,
+        "policyVersion": "explicit-test-policy",
+        "approvedManYen": 50000
+      },
+      {
+        "teamId": 0,
+        "season": 2029,
+        "policyVersion": "explicit-test-policy",
+        "approvedManYen": 50000
+      },
+      {
+        "teamId": 0,
+        "season": 2030,
+        "policyVersion": "explicit-test-policy",
+        "approvedManYen": 50000
+      },
+      {
+        "teamId": 0,
+        "season": 2031,
+        "policyVersion": "explicit-test-policy",
+        "approvedManYen": 50000
+      },
+      {
+        "teamId": 0,
+        "season": 2032,
+        "policyVersion": "explicit-test-policy",
+        "approvedManYen": 50000
+      },
+      {
+        "teamId": 0,
+        "season": 2033,
+        "policyVersion": "explicit-test-policy",
+        "approvedManYen": 50000
+      },
+      {
+        "teamId": 1,
+        "season": 2026,
+        "policyVersion": "explicit-test-policy",
+        "approvedManYen": 50000
+      },
+      {
+        "teamId": 1,
+        "season": 2027,
+        "policyVersion": "explicit-test-policy",
+        "approvedManYen": 50000
+      },
+      {
+        "teamId": 1,
+        "season": 2028,
+        "policyVersion": "explicit-test-policy",
+        "approvedManYen": 50000
+      },
+      {
+        "teamId": 1,
+        "season": 2029,
+        "policyVersion": "explicit-test-policy",
+        "approvedManYen": 50000
+      },
+      {
+        "teamId": 1,
+        "season": 2030,
+        "policyVersion": "explicit-test-policy",
+        "approvedManYen": 50000
+      },
+      {
+        "teamId": 1,
+        "season": 2031,
+        "policyVersion": "explicit-test-policy",
+        "approvedManYen": 50000
+      },
+      {
+        "teamId": 1,
+        "season": 2032,
+        "policyVersion": "explicit-test-policy",
+        "approvedManYen": 50000
+      },
+      {
+        "teamId": 1,
+        "season": 2033,
+        "policyVersion": "explicit-test-policy",
+        "approvedManYen": 50000
+      }
+    ],
+    "staffContracts": [],
+    "incomeReceipts": [],
+    "decisions": [
+      {
+        "version": 1,
+        "kind": "human-renewal",
+        "proposalId": "[\"human-renewal\",\"test-save\",\"[\\\"new-game\\\",\\\"test-save\\\"]\",0,0]",
+        "playerId": 0,
+        "teamId": 0,
+        "season": 2026,
+        "contractId": "[\"initial-contract\",\"test-save\",0]",
+        "request": {
+          "saveId": "test-save",
+          "epoch": "[\"new-game\",\"test-save\"]",
+          "baseRevision": 0,
+          "action": {
+            "type": "offer",
+            "playerId": 0,
+            "salary": 8000,
+            "years": 3
+          }
+        },
+        "score": 60,
+        "willAccept": true,
+        "offeredClock": {
+          "season": 2026,
+          "phase": "season",
+          "date": "2026-07-16",
+          "offseasonTurn": 0
+        },
+        "dueDate": "2026-07-18",
+        "dueTurn": null,
+        "deadlineTurn": 37,
+        "status": "pending"
+      }
+    ],
+    "migration": {
+      "version": 1,
+      "status": "applied",
+      "migrationId": "[\"new-game\",\"test-save\"]",
+      "fromSaveId": "test-save",
+      "observedSeason": 2026,
+      "earliestOffseason": 2026,
+      "issues": []
+    },
+    "legacyEvidence": {
+      "contracts": [],
+      "marketEntries": [],
+      "staff": [],
+      "clauses": []
+    }
+  }
+}
