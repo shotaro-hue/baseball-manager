@@ -122,6 +122,12 @@ async function mountHumanRookies(page, { reload = false, legacy = false } = {}) 
     if (!reload && !(await saveGame(world, { skipCompression: true })).ok) throw Error('fixture save failed');
     window.rookieHarness = mountRookieView(world, { legacy });
   }, { reload, legacy });
+  // Opening draft_review dirties the harness and schedules a normal autosave.
+  // Finish that setup write before injecting failure into the rookie transaction.
+  await expect.poll(() => page.evaluate(() => {
+    const gs = window.rookieHarness.current();
+    return !gs.saveDirty && !gs.saveQueueState?.isSaving && !gs.saveQueueState?.hasQueuedSave;
+  })).toBe(true);
 }
 async function captureRookie(page, testInfo, stage, width) {
   if (process.env.ROOKIE_CAPTURE) {

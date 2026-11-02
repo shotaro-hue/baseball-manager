@@ -75,3 +75,10 @@ npx vitest run src/hooks/useGameState.legacyScout.test.js src/hooks/useGameState
 - `management-lists.spec.js`に既にある通知消去の条件待ちを、該当decisionテストの保存直後にも追加。固定sleep・retry・skip・期待値緩和は追加せず、後続のクリック・focus・比較・全teams同一性の検査は維持。手動保存通知を含む既存UI動作自体の変更は今回の範囲に含めない。
 - ローカルWebKitは、展開済みlibGLESを`LD_LIBRARY_PATH`で使用し、Playwrightのシステム依存事前検査だけを省略すると起動できた。未修正ケースの再現試行5回はすべてpassed（タイミング依存）。通常の依存インストールを行う最終PR CIを必須の判定根拠とする。
 - 修正後の360pxケースをChromium/mobile WebKit各3回、`--retries=0`で実行して**6 passed**。2回目CIの他の12ジョブはすべてsuccess、集約gateはmanagement UIの失敗を正しく反映してfailure。修正後HEADで全CIを再実行する。
+
+## 基準mainからの新人保存E2E不安定性の切り分け
+
+- [3回目CI 41397454165](https://github.com/shotaro-hue/baseball-manager/actions/runs/41397454165)では管理画面**80 passed**、新人保存を含むsave-integrityは129 passed / mobile WebKit・360px/1440pxで2 failed。基準mainでも発生していた新人保存の同系統であり、直前2回のCIでは131 passedだった。今回はその新人契約・保存処理を変更していない。
+- [失敗trace](https://github.com/shotaro-hue/baseball-manager/actions/runs/41397454165/artifacts/13120457503)と実コードを確認。`mountRookieView`の`setScreen('draft_review')`はdirtyを立て、750ms後の通常オートセーブを予約する。テストはその完了前にストレージ障害を注入し、保存中の操作ブロックと契約ボタン操作が競合していた。1440pxのtraceではmountが712874ms、故障注入713551ms、保存開始713850ms。失敗後の画面も「変更あり・保存待ち」のまま。単なる期待値不一致として緩和しない。
+- 未変更ケースをローカルmobile WebKitで3幅×3回実行し、**8 passed / 1440px 1 failed**で同じ失敗を再現。fixtureのmount完了条件に`saveDirty=false`かつ保存キューが実行中/待機中でないことを追加し、故障注入対象を新人契約の書込に絞る。実オートセーブ・契約・失敗保護・reload・辞退の各処理と既存の全assertionは維持し、retry/skip/timeout変更は行わない。
+- traceには1440pxのpointer入力時（713843ms）、360pxの両クリック直後に「保存・復旧の完了を待ってください」のブロック表示も記録されていた。修正後はChromium/mobile WebKit×360/390/1440px×3回、`--retries=0`で**18 passed**。3回目CIの他の12ジョブはsuccess。最終HEADの全CIで再確認する。
