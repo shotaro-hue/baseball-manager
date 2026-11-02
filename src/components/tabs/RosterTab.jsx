@@ -32,7 +32,7 @@ import {
 
 const TRAINING_OPTIONS=[["","バランス"],["contact","ミート"],["power","長打"],["eye","選球"],["speed","走力"],["arm","肩"],["defense","守備"],["velocity","球速"],["control","制球"],["breaking","変化球"],["stamina","スタミナ"]];
 
-export function RosterTab({farmState,team,allTeams,onReplaceLineup,onSetLineupOrder,onSetRosterDhMode,onSetPlayerPosition,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onReplaceRotation,onApplyRosterPlan,onPlayerClick,onSetDevGoal,onPlayerTalk,onSetConvertTarget,onSetManagementPolicy,onSetRosterAutomationMode,gameDay,draftContext={}}){
+export function RosterTab({annualGs,farmState,team,allTeams,onReplaceLineup,onSetLineupOrder,onSetRosterDhMode,onSetPlayerPosition,onSetStarter,onPromo,onDemo,onSetTrainingFocus,onConvertIkusei,onMoveRotation,onRemoveFromRotation,onSetPitchingPattern,onReplaceRotation,onApplyRosterPlan,onPlayerClick,onSetDevGoal,onPlayerTalk,onSetConvertTarget,onSetManagementPolicy,onSetRosterAutomationMode,gameDay,draftContext={}}){
   const capacity=evaluateRosterCapacity(team,{...draftContext,teams:allTeams ?? [team]});
   const settingsRef = useRef(null);
   const summaryRef = useRef(null);
@@ -509,7 +509,7 @@ export function RosterTab({farmState,team,allTeams,onReplaceLineup,onSetLineupOr
           </div>
         );
       })()}
-      {view==="farm"&&<FarmDevelopmentPanel team={team} draftContext={{...draftContext,teams:allTeams ?? [team]}} farmState={farmState} onPlayerClick={onPlayerClick} onSetDevGoal={onSetDevGoal} onPromo={onPromo} onConvertIkusei={onConvertIkusei}/>}
+      {view==="farm"&&<FarmDevelopmentPanel annualGs={annualGs} team={team} draftContext={{...draftContext,teams:allTeams ?? [team]}} farmState={farmState} onPlayerClick={onPlayerClick} onSetDevGoal={onSetDevGoal} onPromo={onPromo} onConvertIkusei={onConvertIkusei}/>}
       {view==="talk"&&<PlayerTalkPanel team={team} gameDay={gameDay} onPlayerClick={onPlayerClick} onPlayerTalk={onPlayerTalk}/>}
       <div className="roster-settings-ui settings-footer"><Button variant="secondary" onClick={returnToOverview}>編成概要へ戻る</Button><p>試合へ戻るには、既存メニューの「ホーム」を選んでください。</p></div>
       </details>

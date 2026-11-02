@@ -3,6 +3,111 @@ import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 const fixture = JSON.parse(gunzipSync(readFileSync(new URL('./fixtures/new-game.json.gz', import.meta.url))).toString());
 
+async function mountHumanDevelopment(page, { reload = false, legacy = false } = {}) {
+  await page.evaluate(async ({ reload, legacy }) => {
+    const { developmentFixture } = await import('/baseball-manager/src/engine/__tests__/fixtures/developmentWorld.js');
+    const { saveGame, loadGame } = await import('/baseball-manager/src/engine/saveload.js');
+    const { mountDevelopmentView } = await import('/baseball-manager/tests/helpers/development-hook-harness.jsx');
+    const world = reload ? await loadGame() : developmentFixture();
+    window.developmentHarness?.unmount();
+    if (!reload && !(await saveGame(world, { skipCompression: true })).ok) throw Error('fixture save failed');
+    window.developmentHarness = mountDevelopmentView(world, { legacy });
+  }, { reload, legacy });
+  await page.getByRole('button', { name: '二軍', exact: true }).click();
+  await page.getByRole('button', { name: '二軍の育成・起用設定へ', exact: true }).click();
+}
+async function captureDevelopment(page, testInfo, stage, width) {
+  if (process.env.DEVELOPMENT_CAPTURE)
+    await page.screenshot({ path: `${process.env.DEVELOPMENT_CAPTURE}/${testInfo.project.name}-${width}-${stage}.png`, fullPage: true });
+}
+for (const width of [360, 390, 1440]) test(`save generations: human development confirm, failed write, retry and reload at ${width}px`, async ({ page }, testInfo) => {
+  await page.setViewportSize({ width, height: 900 }); await page.goto('/');
+  await mountHumanDevelopment(page, { legacy: true });
+  await page.getByRole('button', { name: '育成選手を支配下登録する', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('1年・残り1年');
+  await captureDevelopment(page, testInfo, 'before', width);
+  await mountHumanDevelopment(page, { reload: true });
+  await page.getByRole('button', { name: '育成選手を支配下登録する', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('322万円');
+  await expect(page.getByRole('dialog')).toContainText('2028年度（変更なし）');
+  await expect(page.getByRole('dialog')).toContainText('1 → 2 / 70人');
+  await captureDevelopment(page, testInfo, 'after', width);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.evaluate(() => {
+    window.developmentWrite = Storage.prototype.setItem; window.developmentRoot = localStorage.getItem('baseball_manager_v1');
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'baseball_manager_v1') throw new DOMException('full', 'QuotaExceededError');
+      return window.developmentWrite.call(this, key, value);
+    };
+  });
+  await page.getByRole('button', { name: '登録を確定', exact: true }).click();
+  await expect(page.getByText('支配下登録を保存できませんでした。確認内容を保持しています。再試行してください。', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('baseball_manager_v1') === window.developmentRoot)).toBe(true);
+  expect(await page.evaluate(() => window.developmentHarness.current().myTeam.farm[0].salary)).toBe(240);
+  await captureDevelopment(page, testInfo, 'failed', width);
+  await page.evaluate(() => { Storage.prototype.setItem = window.developmentWrite; });
+  await page.getByRole('button', { name: '登録を確定', exact: true }).click();
+  await expect(page.getByText('支配下登録を保存しました。', { exact: true })).toBeVisible();
+  await page.reload(); await mountHumanDevelopment(page, { reload: true });
+  await expect(page.getByRole('button', { name: '育成選手を一軍へ', exact: true })).toBeVisible();
+  expect(await page.evaluate(async () => {
+    const { contractLiabilityRows } = await import('/baseball-manager/src/engine/contractLedger.js');
+    const gs = window.developmentHarness.current(), p = gs.myTeam.farm[0], engine = gs.contractEconomy.engine;
+    return { salary: p.salary, years: p.contractYearsLeft, development: p.isIkusei,
+      receipts: engine.transactions.length,
+      costs: contractLiabilityRows(engine.spending.ledger).filter(r => r.playerId === 0).map(r => r.amountManYen) };
+  })).toEqual({ salary: 420, years: 3, development: false, receipts: 1, costs: [322, 420, 420] });
+  await captureDevelopment(page, testInfo, 'reload', width);
+});
+test('save generations: human development refreshes an open quote and rejects the old callback after another contract', async ({ page }) => {
+  await page.goto('/'); await mountHumanDevelopment(page);
+  await page.getByRole('button', { name: '育成選手を支配下登録する', exact: true }).click();
+  const costs2027 = page.getByRole('dialog').getByRole('row').filter({ hasText: '2027' });
+  await expect(costs2027).toContainText('4.96億円');
+  expect(await page.evaluate(async () => {
+    const { renewalEnvelope } = await import('/baseball-manager/src/engine/__tests__/fixtures/economyWorld.js');
+    const gs = window.developmentHarness.current();
+    window.oldDevelopmentConfirm = gs.convertIkusei;
+    const command = renewalEnvelope(gs); command.transaction.proposal.contract.playerId = 'active-0';
+    return (await gs.commitEconomyCommand(command)).ok;
+  })).toBe(true);
+  await expect(costs2027).toContainText('4.80億円');
+  expect(await page.evaluate(async () => {
+    const root = localStorage.getItem('baseball_manager_v1');
+    const result = await window.oldDevelopmentConfirm(0);
+    return { ok: result.ok, reason: result.reason, sameRoot: root === localStorage.getItem('baseball_manager_v1'),
+      receipts: window.developmentHarness.current().contractEconomy.engine.transactions.length };
+  })).toEqual({ ok: false, reason: 'economy_command_invalid', sameRoot: true, receipts: 1 });
+  await expect(page.getByRole('dialog')).toContainText('322万円');
+  await page.getByRole('button', { name: '登録を確定', exact: true }).click();
+  await expect(page.getByText('支配下登録を保存しました。', { exact: true })).toBeVisible();
+  await page.reload(); await mountHumanDevelopment(page, { reload: true });
+  expect(await page.evaluate(() => {
+    const gs = window.developmentHarness.current();
+    return { salary: gs.myTeam.farm[0].salary, receipts: gs.contractEconomy.engine.transactions.length };
+  })).toEqual({ salary: 420, receipts: 2 });
+});
+test('save generations: human development published acknowledgement recovery survives returning to farm', async ({ page }) => {
+  await page.goto('/'); await mountHumanDevelopment(page);
+  await page.getByRole('button', { name: '育成選手を支配下登録する', exact: true }).click();
+  await page.evaluate(() => {
+    window.developmentRead = Storage.prototype.getItem; let interrupted = false;
+    Storage.prototype.getItem = function (key) {
+      if (key === 'baseball_manager_v1' && window.developmentHarness.current().contractEconomy.revision === 1 && !interrupted) { interrupted = true; throw Error('ack interrupted'); }
+      return window.developmentRead.call(this, key);
+    };
+  });
+  await page.getByRole('button', { name: '登録を確定', exact: true }).click();
+  await expect(page.getByRole('button', { name: '保存済みの支配下登録を復旧する', exact: true })).toBeVisible();
+  await expect(page.getByText('支配下登録を保存しました。', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '戻る', exact: true }).click();
+  const root = await page.evaluate(() => { Storage.prototype.getItem = window.developmentRead; return localStorage.getItem('baseball_manager_v1'); });
+  await page.getByRole('button', { name: '保存済みの契約を復旧する', exact: true }).click();
+  await expect(page.getByText('保存済みの契約を復旧しました。', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('baseball_manager_v1'))).toBe(root);
+  expect(await page.evaluate(() => window.developmentHarness.current().contractEconomy.engine.transactions.length)).toBe(1);
+});
+
 async function mountHumanRookies(page, { reload = false, legacy = false } = {}) {
   await page.evaluate(async ({ reload, legacy }) => {
     const { rookieFixture } = await import('/baseball-manager/src/engine/__tests__/fixtures/rookieWorld.js');

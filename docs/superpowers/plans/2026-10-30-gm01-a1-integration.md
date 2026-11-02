@@ -146,6 +146,11 @@ PR #521レビュー修正: revision増加でもrandomRoot・確定済み台帳�
 
 ## Task 6: A1-2b 新人・育成・移籍・発掘
 
+2026-11-01進捗: 新人の冬の留保/辞退は#532でマージ済み。育成の支配下登録は
+[A1-2b-2計画](./2026-11-01-gm01-a1-human-development.md)と
+[検証記録](../../validation/gm-01-a1-human-development/README.md)の範囲で接続。
+移籍・発掘は次の分割工程、翌春加入はTask 10。複合項目は全体の完了まで未チェックとする。
+
 **Files:** Modify `src/hooks/useOffseason.js`, `src/hooks/useGameState.js`, `src/components/Draft.jsx`, `src/engine/draftRules.js`, `src/engine/contractEconomy.js`, `src/engine/contractPayroll.js`; extend `src/hooks/useGameState.rosterCapacity.test.js`, `src/hooks/useOffseason.trade.test.js`; create `src/hooks/useOffseason.economyRookies.test.js`。
 
 **Interfaces:** reserve/decline/join-rookie、convert-to-controlled、trade、sign-scouted。`evaluateRosterCapacity`、#515の加入待ちcontextを再利用する。これらの確定もworld/保存へまとめる。

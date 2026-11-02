@@ -1,5 +1,6 @@
 import { draftCapacityContext, evaluateRosterCapacity, isIkuseiPlayer } from '../engine/rosterCapacity';
 import { reduceRookieRequest } from '../engine/rookieContracts';
+import { developmentRequest, reduceDevelopmentRequest } from '../engine/developmentRegistration';
 import { stadiumUpgradeCosts } from '../engine/clubFinance';
 import { marketRosterError } from '../engine/marketRoster';
 import {createFarmCompetition} from '../engine/farmRecords';
@@ -1329,7 +1330,14 @@ export function useGameState() {
     notify(`${p.name}を一軍昇格！`,"ok");
   },[myTeam,upd,myId,notify]);
 
+  const developmentSession = getProgressSessionToken();
   const convertIkusei = useCallback((pid)=>{
+    if (developmentSession !== getProgressSessionToken()) return Promise.resolve({ ok: false, reason: 'economy_session_conflict' });
+    if (gameState.contractEconomy?.mode === 'annual')
+      return commitEconomyOperation(developmentRequest(gameState, pid), reduceDevelopmentRequest, developmentSession);
+    try {
+      if (contractEconomyMode(rosterCommandRef.current) !== 'legacy') return Promise.resolve({ ok: false, reason: 'economy_not_active' });
+    } catch { return Promise.resolve({ ok: false, reason: 'economy_candidate_invalid' }); }
     if (economyCommitRef.current) return false;
     const current=rosterCommandRef.current, team=current.teams.find(t=>t.id===current.myId);
     const p=team?.farm.find(x=>x.id===pid);
@@ -1342,7 +1350,7 @@ export function useGameState() {
     if(diff>0&&team.budget<diff){notify("予算不足（差額"+Math.round(diff/10000)+"万円必要）","warn");return;}
     commitRosterCommand(current,{...team,budget:team.budget-diff,farm:team.farm.map(x=>x.id===pid?{...x,育成:false,isIkusei:false,salary:newSal,contractYears:1,contractYearsLeft:1,ikuseiYears:0}:x)});
     notify(`${p.name}を支配下登録！`,"ok");
-  },[setTeams,notify]);
+  },[gameState,developmentSession,getProgressSessionToken,commitEconomyOperation,notify]);
 
   const demote = useCallback((pid)=>{
     if (economyCommitRef.current) return false;
