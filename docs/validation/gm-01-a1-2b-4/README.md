@@ -67,3 +67,11 @@ npx vitest run src/hooks/useGameState.legacyScout.test.js src/hooks/useGameState
 - [初回CI 41394339865](https://github.com/shotaro-hue/baseball-manager/actions/runs/41394339865)の全単体テストで、`scripts/gm00-contract-audit.test.js`に旧契約成功の期待が残り、1 failed / 3647 passed / 既存2 skipped。今回の終了仕様に追随できていなかった監査用テストであり、合格とは扱わない。
 - 成功期待を、旧派遣/契約のfalseとteams・市場・契約・dirty・通知の完全非変更に置換。旧候補・派遣記録を保持することも検査し、他のFA・新人・育成・トレード・コーチ・年度更新の監査は維持。保存済みGM-00検証出力は変更しない。
 - 修正後の`npx vitest run scripts/gm00-contract-audit.test.js src/hooks/useGameState.legacyScout.test.js`は**8 passed**。最終HEADの全CI結果はPR本文で確認する。
+
+## 2回目CIで検出した手動保存通知とクリックの競合
+
+- [CI 41395154761](https://github.com/shotaro-hue/baseball-manager/actions/runs/41395154761)の単体/統合は**3648 passed / 既存2 skipped**。management UIは79 passed / mobile WebKit・360pxの1件が旧記録へ遷移せずtimeout。
+- [失敗trace/画面](https://github.com/shotaro-hue/baseball-manager/actions/runs/41395154761/artifacts/13119318853)では手動保存完了がtrace時刻365449ms、旧記録ボタンのpointer操作が368945–368970ms。既存の手動保存通知の3500ms期限と重なり、画面から通知が消えてボタン位置が変わっていた。候補消失・保存失敗ではなく、テスト準備の手動保存通知と後続ポインター操作の競合。
+- `management-lists.spec.js`に既にある通知消去の条件待ちを、該当decisionテストの保存直後にも追加。固定sleep・retry・skip・期待値緩和は追加せず、後続のクリック・focus・比較・全teams同一性の検査は維持。手動保存通知を含む既存UI動作自体の変更は今回の範囲に含めない。
+- ローカルWebKitは、展開済みlibGLESを`LD_LIBRARY_PATH`で使用し、Playwrightのシステム依存事前検査だけを省略すると起動できた。未修正ケースの再現試行5回はすべてpassed（タイミング依存）。通常の依存インストールを行う最終PR CIを必須の判定根拠とする。
+- 修正後の360pxケースをChromium/mobile WebKit各3回、`--retries=0`で実行して**6 passed**。2回目CIの他の12ジョブはすべてsuccess、集約gateはmanagement UIの失敗を正しく反映してfailure。修正後HEADで全CIを再実行する。

@@ -22,6 +22,9 @@ for (const width of [360, 390, 1440]) test(`management decisions ${width}px read
   test.setTimeout(90000); await page.setViewportSize({ width, height: width === 360 ? 800 : width === 390 ? 844 : 900 });
   const f = managementFixture(); await loadManagementFixture(page, f.fixture);
   const before = teamsHash(await saveHub(page));
+  // The manual-save notice expires after 3.5s and shifts the page. As in the
+  // list-return test, finish that fixture setup before testing pointer/focus flow.
+  await expect(page.locator('.notif.nok').filter({ hasText: '💾 セーブしました' })).toHaveCount(0);
   await open(page, 'contract'); const contract = active(page, 'contract');
   const row = contract.getByRole('button', { name: `${f.contract.name}の契約を確認`, exact: true });
   await row.focus(); await page.keyboard.press('Enter');
