@@ -449,3 +449,8 @@ Nodeの長期ハーネスは既存どおりプレーオフ/賞金/不変receipt�
 [ootp-finance]: https://wiki.ootpdevelopments.com/index.php?title=OOTP_Baseball:Screens_and_Menus/Team_Menu/Front_Office/Finances
 [ootp-owner]: https://manuals.ootpdevelopments.com/index.php?man=ootp24&page=ownership
 [ootp-development]: https://wiki.ootpdevelopments.com/index.php?title=OOTP_Baseball:Screens_and_Menus/Team_Menu/Player_Development
+
+
+### 2026-11-02 旧スカウト方針の置換
+
+本書の過去の観測・検証結果は当時の記録として保持する。旧派遣の時計/再開/精度改修・発掘の2年契約接続・旧候補のドラフトへの追加は、[A1-2b-4の終了・保全仕様](2026-11-02-legacy-scout-retirement.md)で置換し、方針変更により不要化（実装完了ではない）。旧方式の復活はA1完了条件に含めない。ドラフト内の調査・外国人市場・コーチ・球場投資は存続。翌春加入・CPU・年度更新・移行・公開検証の残課題は維持する。

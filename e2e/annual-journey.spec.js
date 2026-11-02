@@ -30,8 +30,15 @@ test('annual journey actual 143 games, all clubs, offseason, next year and persi
     Math.random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
   });
   const checkpoints = [];
+  let oldScoutRecords;
+  const readScoutRecords = () => page.evaluate(async () => {
+    const w = await (await import('/baseball-manager/src/engine/saveload.js')).loadGame();
+    const t = w.teams.find(t => t.id === w.myId);
+    return { results: t.scoutResults, missions: t.scoutMissions };
+  });
   const inspect = async (label, games) => {
     const s = await annualSnapshot(page);
+    expect(await readScoutRecords()).toEqual(oldScoutRecords);
     checkpoints.push({ label, ...s });
     expect(s.teams).toHaveLength(12);
     expect(s.duplicateIds).toEqual([]);
@@ -49,6 +56,18 @@ test('annual journey actual 143 games, all clubs, offseason, next year and persi
   };
   try {
     await startNewGame(page);
+    await saveHub(page);
+    // Seed archival records through the normal save writer. The journey still
+    // exercises fresh player generation, then single/batch/CPU/year progression.
+    await page.evaluate(async () => {
+      const io = await import('/baseball-manager/src/engine/saveload.js');
+      const w = await io.loadGame(), t = w.teams.find(t => t.id === w.myId);
+      t.scoutResults = [{ ...structuredClone(t.players[0]), id: 'archival-scout-report', name: '旧候補保全' }];
+      t.scoutMissions = [{ id: 'archival-pending', name: '旧派遣', cost: 3000, weeksLeft: 1, qMin: 40, qMax: 60 }];
+      if (!(await io.saveGame(w)).ok) throw Error('archival scout fixture failed');
+    });
+    oldScoutRecords = await readScoutRecords();
+    await reloadAndLoad(page);
     await runSingle(page, mobile);
     await saveHub(page, { progressOnly: true });
     const first = await inspect('single', 1);

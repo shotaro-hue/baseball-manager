@@ -42,9 +42,9 @@
 | 3 / A1-1c | 1b | OFF | 年度許可/未更改計画/スタッフ費の見積 |
 | 4 / A1-1d | 1c | OFF | 保存/hydration/移行candidate/降格防止 |
 | 5 / A1-2a | 1d | OFF | 人の更改/FA/自由契約/外国人の接続 |
-| 6 / A1-2b | 2a | OFF | 新人/育成/トレード/発掘契約 |
+| 6 / A1-2b | 2a | OFF | 新人/育成/トレード/旧スカウト終了 |
 | 7 / A1-2c | 2b | OFF | 冬/期中の退団・市場・海外離脱・収入 |
-| 8 / A1-2d | 2c | OFF | コーチ年度雇用/調査/投資 |
+| 8 / A1-2d | 2c | OFF | コーチ年度雇用/球場投資 |
 | 9 / A1-3a | 2d | OFF | CPU全操作・有限fallback/再建 |
 | 10 / A1-3b-1 | 3a | OFF | 年次候補/前年成長/操作別乱数/翌春 |
 | 11 / A1-3b-2 | 3b-1 | OFF | 不可避な試合不能の不戦結果・収支・保存 |
@@ -144,7 +144,7 @@ PR #521レビュー修正: revision増加でもrandomRoot・確定済み台帳�
 
 **受入:** 人が初期の接続済み操作をannual fixtureで完了でき、通常buildではlegacyのまま。残る新ルール未接続操作はfixtureでも旧財布へ逃がさず明示拒否。
 
-## Task 6: A1-2b 新人・育成・移籍・発掘
+## Task 6: A1-2b 新人・育成・移籍・旧スカウト終了
 
 2026-11-01進捗: 新人の冬の留保/辞退は#532でマージ済み。育成の支配下登録は
 [A1-2b-2計画](./2026-11-01-gm01-a1-human-development.md)と
@@ -152,16 +152,18 @@ PR #521レビュー修正: revision増加でもrandomRoot・確定済み台帳�
 2026-11-02進捗: 育成は#533でマージ済み。人の移籍は
 [A1-2b-3計画](./2026-11-02-gm01-a1-human-trade.md)と
 [検証記録](../../validation/gm-01-a1-2b-3/README.md)の範囲で接続。
-発掘は次の分割工程、翌春加入はTask 10。複合項目は全体の完了まで未チェックとする。
+2026-11-02方針変更（A1-2b-4）: `sign-scouted` と発掘選手の2年契約接続は
+**方針変更により不要化**（実装完了ではない）。[旧方式終了・保全仕様](../specs/2026-11-02-legacy-scout-retirement.md)へ置換。
+翌春加入はTask 10、CPUはTask 9。複合項目は全体の完了まで未チェックとする。
 
 **Files:** Modify `src/hooks/useOffseason.js`, `src/hooks/useGameState.js`, `src/components/Draft.jsx`, `src/engine/draftRules.js`, `src/engine/contractEconomy.js`, `src/engine/contractPayroll.js`; extend `src/hooks/useGameState.rosterCapacity.test.js`, `src/hooks/useOffseason.trade.test.js`; create `src/hooks/useOffseason.economyRookies.test.js`。
 
-**Interfaces:** reserve/decline/join-rookie、convert-to-controlled、trade、sign-scouted。`evaluateRosterCapacity`、#515の加入待ちcontextを再利用する。これらの確定もworld/保存へまとめる。
+**Interfaces:** reserve/decline/join-rookie、convert-to-controlled、trade。`evaluateRosterCapacity`、#515の加入待ちcontextを再利用する。これらの確定もworld/保存へまとめる。
 
 - [ ] 69人＋支配下新人1＋未回答FA、70/71人、育成新人、FA/人的待ちと獲得競合をRED。育成は420万円や支配下枠に数えない。
 - [ ] 7/16に240→420万円の当年費用322万円、元endSeason維持、将来育成契約との競合をRED。
 - [ ] 金銭±500、移籍給与5484/4516、将来契約の移管、旧控除0、負担を悪化させない赤字交換をRED。
-- [ ] 旧draft即加入と翌春joinの併走を止める。`育成/isIkusei`片方だけの表示/通知/集計を共通selectorへ接続する。発掘契約は明示した2年契約として当年を含め、署名なしの残数2だけを作らない。
+- [ ] 旧draft即加入と翌春joinの併走を止める。`育成/isIkusei`片方だけの表示/通知/集計を共通selectorへ接続する。旧スカウトはlegacy/annualの両方で派遣・生成・直接獲得を停止し、候補・派遣待ち・獲得済み選手を保全する。未契約候補のドラフト等への自動転送と返金は行わない。
 - [ ] 新規対象＋既存annual rookie/development/trade/roster回帰と対象E2EをGREEN、CI。
 
 **受入:** 新人は冬の留保/辞退まで、春加入はTask 10の年度候補からのみ。手動joinと旧draftAppliedによる二重加入なし。
@@ -181,16 +183,16 @@ PR #521レビュー修正: revision増加でもrandomRoot・確定済み台帳�
 
 **受入:** 退団したが債務は残る状態と、自然満了を表現可能。古い支払・保証を補って通さない。
 
-## Task 8: A1-2d コーチ・調査・投資
+## Task 8: A1-2d コーチ・球場投資
 
 **Files:** Create `src/engine/annualClubCosts.js`, `src/engine/__tests__/annualClubCosts.test.js`; modify `src/hooks/useGameState.js`, `src/components/hub/HubContentRouter.jsx`, `src/components/tabs/FinanceActions.jsx`, `src/engine/contractEconomy.js`, `src/engine/player.js`のコーチ入力selector。成長式自体は変更しない。
 
-**Interfaces:** hire/fire-coach、send/receive-scout、upgrade-stadium、staff年度契約。価格は明示policyから受け、Task 11まで候補扱い。
+**Interfaces:** hire/fire-coach、upgrade-stadium、staff年度契約。価格は明示policyから受け、Task 11まで候補扱い。
 
 - [ ] 別grade含む同職種2人目の拒否、当年度確定費の返金なし、非更新年度0、採用/年次費の二重計上0をRED。
-- [ ] 調査費/球場効果の失敗非変更、同mission二重受信拒否、保存/冷起動後のpending結果再開をRED。
+- [ ] 球場投資の費用/効果の失敗非変更・二重計上拒否をRED。旧send-scout / receive-scoutの再接続・pending結果再開は方針変更により不要化。
 - [ ] 旧コーチの重複/未記録条件は黙って削除/12分の1にしない。初回移行選択とlegacy延期をテストする。
-- [ ] 年度担当の効果だけを既存成長/回復/戦術へ供給し、全種類を旧budget直控除から外す。3秒通知方式を維持しながら結果snapshotを永続化する。
+- [ ] 年度担当の効果だけを既存成長/回復/戦術へ供給し、全種類を旧budget直控除から外す。旧3秒通知方式の維持・永続化はA1完了条件から撤回。新しい調査・評価は別工程とし、旧方式の復活を既定にしない。
 - [ ] 対象テスト＋staff/finance/成長の既存回帰と対象E2EをGREEN、CI。
 
 **受入:** 安い価格だけ先行公開しない。未履行の継続費、UIだけの重複禁止を残さない。

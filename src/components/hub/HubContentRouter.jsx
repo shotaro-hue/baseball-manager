@@ -18,7 +18,6 @@ import {
   POP_RELEASE_SALARY_THRESHOLD,
   COACH_DEFS,
   COACH_GRADES,
-  SCOUT_REGIONS,
 } from '../../constants';
 import { ownedPlayers, renewalEligible } from '../../engine/renewalRules';
 import { releaseWaiverPlayers } from '../../engine/offseasonReview';
@@ -406,23 +405,10 @@ export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTab
       <HubScoutTab
         myTeam={myTeam}
         active={active}
-        teams={teams}
-        capacityContext={draftCapacityContext(gs.offseasonPlan, year, teams)}
-        scoutRegions={SCOUT_REGIONS}
-        onSendScout={gs.sendScout}
-        onSignPlayer={gs.signPlayer}
+        onNavigate={onTabChange}
         onPlayerClick={gs.handlePlayerClick}
         onToggleCompare={comparison?.onToggle}
         comparePlayerIds={comparison?.players?.map(player => player.id) || []}
-        onRemoveScoutResult={(index) => {
-          const id = myTeam.scoutResults[index]?.id;
-          if (id == null) return false;
-          gs.upd(myId, (team) => ({
-            ...team,
-            scoutResults: team.scoutResults.filter(p => p.id !== id),
-          }));
-          return true;
-        }}
       />
     );
   }

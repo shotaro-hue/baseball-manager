@@ -5,14 +5,14 @@ import {evaluateRosterCapacity} from '../rosterCapacity';
 const p=(id,extra={})=>({id,pos:'捕手',age:22,potential:60,...extra});
 const t=(count=0)=>({id:0,players:[],farm:Array.from({length:count},(_,i)=>p(`owned-${i}`))});
 afterEach(()=>vi.restoreAllMocks());
-it('creates 160 raw candidates with 80 pitchers in 32/27/21 roles plus existing scout players',()=>{
+it('creates 160 raw candidates with 80 pitchers in 32/27/21 roles without importing old scout reports',()=>{
  vi.spyOn(Math,'random').mockReturnValue(.5);
  const pool=initDraftPool({scoutResults:[p('scouted',{batting:{contact:60,power:60,eye:60}})]});
- expect(pool).toHaveLength(161);
+ expect(pool).toHaveLength(160);
  const raw=pool.filter(p=>!p.fromScout),pitchers=raw.filter(p=>p.isPitcher);
  expect(pitchers).toHaveLength(80);expect(raw.filter(p=>!p.isPitcher)).toHaveLength(80);
  expect(['先発','中継ぎ','抑え'].map(role=>pitchers.filter(p=>p.subtype===role).length)).toEqual([32,27,21]);
- expect(pool.find(p=>p.id==='scouted')).toMatchObject({fromScout:true});
+ expect(pool.some(p=>p.id==='scouted'||p.fromScout)).toBe(false);
 });
 it('fixes new conferences at ten while missing or unrecognized rules remain old six',()=>{
  expect(conference.newDraftRules()).toEqual({version:2,maxPicks:10});

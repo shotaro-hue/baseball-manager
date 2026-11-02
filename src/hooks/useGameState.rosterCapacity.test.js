@@ -44,17 +44,12 @@ it('rechecks the latest roster and accepted draft reservations even through a st
  act(()=>{gs.setTeams([roster(69)]);gs.setOffseasonPlan({year:2026,draftPool:[{id:0,_drafted:true,_r1winner:0}]});});act(()=>gs.convertIkusei('dev'));
  expect(gs.myTeam.farm.find(p=>p.id==='dev').isIkusei).toBe(true);
 });
-it('rechecks scouting acquisitions against reserved and newly occupied slots',()=>{
- setup(69,{year:2026,draftPool:[{id:0,_drafted:true,_r1winner:0}]});act(()=>gs.signPlayer(0));
- expect(gs.myTeam.scoutResults).toHaveLength(1);expect(gs.myTeam.budget).toBe(10000);
- act(()=>gs.setOffseasonPlan(null));const sign=gs.signPlayer;act(()=>{sign(0);sign(0);});
- expect(gs.myTeam.farm.filter(p=>p.id==='scout')).toHaveLength(1);expect(gs.myTeam.budget).toBe(9500);
-});
-it('binds a repeated scouting action to its intended player rather than the next row at that index',()=>{
- setup(68);act(()=>gs.setTeams([{...roster(68),scoutResults:[{id:'A',name:'候補A',salary:500},{id:'B',name:'候補B',salary:600}]}]));
- const sign=gs.signPlayer;act(()=>{sign(0);sign(0);});
- expect(gs.myTeam.farm.filter(p=>['A','B'].includes(p.id)).map(p=>p.id)).toEqual(['A']);expect(gs.myTeam.budget).toBe(9500);expect(gs.myTeam.scoutResults.map(p=>p.id)).toEqual(['B']);
- act(()=>gs.signPlayer(0));expect(gs.myTeam.farm.filter(p=>['A','B'].includes(p.id)).map(p=>p.id)).toEqual(['A','B']);expect(gs.myTeam.budget).toBe(8900);
+it('rejects old scouting acquisitions regardless of available or reserved slots',()=>{
+ setup(68); const before=structuredClone(gs.myTeam),sign=gs.signPlayer;
+ act(()=>{expect(sign(0)).toBe(false);expect(sign(0)).toBe(false);});
+ expect(gs.myTeam).toEqual(before);
+ act(()=>gs.setOffseasonPlan({year:2026,draftPool:[{id:0,_drafted:true,_r1winner:0}]}));
+ act(()=>expect(sign(0)).toBe(false));expect(gs.myTeam).toEqual(before);
 });
 it.each([{育成:true},{isIkusei:true}])('allows the last real conversion slot despite an accepted development rookie: %j',flags=>{
  setup(69,{year:2026,draftPool:[{id:'dev-pick',_drafted:true,_r1winner:0,...flags}]});

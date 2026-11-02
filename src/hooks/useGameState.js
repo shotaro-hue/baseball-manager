@@ -3,7 +3,6 @@ import { reduceRookieRequest } from '../engine/rookieContracts';
 import { reduceTradeRequest } from '../engine/humanTrade';
 import { developmentRequest, reduceDevelopmentRequest } from '../engine/developmentRegistration';
 import { stadiumUpgradeCosts } from '../engine/clubFinance';
-import { marketRosterError } from '../engine/marketRoster';
 import {createFarmCompetition} from '../engine/farmRecords';
 import {validateFarmSaveState} from '../engine/farmMigration';
 import { contractEconomyMode, reduceEconomyCommand } from '../engine/contractEconomy';
@@ -24,7 +23,7 @@ import { uid, clamp, rng, pname, scoutedValue } from '../utils';
 // Player helpers are loaded lazily to keep the initial title flow lighter.
 import { SEASON_PARAMS, getDefaultParams } from '../data/scheduleParams.js';
 import {
-  TEAM_DEFS, POSITIONS, COACH_DEFS, COACH_GRADES, SCOUT_REGIONS,
+  TEAM_DEFS, COACH_DEFS, COACH_GRADES,
   MAX_ROSTER, MAX_外国人_一軍, MIN_SALARY_SHIHAKA,
   MAX_SHIHAKA_TOTAL, REGISTRATION_COOLDOWN_DAYS, TALK_COOLDOWN_DAYS,
   PRESS_CONFERENCE_INTERVAL,
@@ -1398,32 +1397,10 @@ export function useGameState() {
     notify("コーチを解雇","warn");
   },[upd,myId,notify]);
 
-  const sendScout = useCallback((region)=>{
-    if (economyCommitRef.current) return false;
-    if(!myTeam||!Number.isFinite(myTeam.budget)||myTeam.budget<region.cost){notify("予算不足","warn");return false;}
-    upd(myId,t=>({...t,budget:t.budget-region.cost,scoutMissions:[...t.scoutMissions,{id:uid(),name:region.name,weeksLeft:region.weeks,qMin:region.qMin,qMax:region.qMax,cost:region.cost,foreign:region.foreign,regionFactor:region.regionFactor||1.0}]}));
-    notify(`${region.name}へスカウト派遣！`,"ok");
-    setTimeout(()=>{
-      loadPlayerModule().then((playerMod)=>{upd(myId,t=>{const mis=t.scoutMissions.find(m=>m.name===region.name);if(!mis) return t;const np=playerMod.makePlayer(Math.random()<0.4?"先発":POSITIONS[rng(0,7)],rng(mis.qMin,mis.qMax),Math.random()<0.4,undefined,mis.foreign&&Math.random()<0.7);return{...t,scoutMissions:t.scoutMissions.filter(m=>m!==mis),scoutResults:[...t.scoutResults,{...np,_scoutRegionFactor:mis.regionFactor||1.0,_scoutBudgetFactor:t.budget>300000?0.7:t.budget>150000?0.85:1.0}]};});}).catch((error)=>{console.error('Failed to resolve scout result:', error);notify("スカウト結果の生成に失敗しました","error");});
-      notify("スカウト報告が届きました！","ok");
-    },3000);
-    return true;
-  },[myTeam,upd,myId,notify]);
-
-  const signPlayer = useCallback((idx)=>{
-    if (economyCommitRef.current) return false;
-    const current=rosterCommandRef.current, team=current.teams.find(t=>t.id===current.myId);
-    const intendedId=myTeam?.scoutResults[idx]?.id;
-    if(intendedId==null) return false;
-    const p=team?.scoutResults.find(candidate=>candidate.id===intendedId);
-    if(!p) return false;
-    if(!Number.isFinite(p.salary)||!Number.isFinite(team.budget)||team.budget<p.salary){notify("予算不足","warn");return false;}
-    const error=marketRosterError(team,p,current.teams,draftCapacityContext(current.offseasonPlan,current.year,current.teams));
-    if(error){notify(error,"warn");return false;}
-    commitRosterCommand(current,{...team,budget:team.budget-p.salary,farm:[...team.farm,{...p,contractYearsLeft:2}],scoutResults:team.scoutResults.filter(candidate=>candidate.id!==intendedId)});
-    notify(`${p.name}を獲得！`,"ok");
-    return true;
-  },[myTeam,setTeams,notify]);
+  // Compatibility entry points only. No dispatch, timer, dirty mark or success
+  // notification: old reports/missions remain untouched in both economy modes.
+  const sendScout = useCallback(() => false, []);
+  const signPlayer = useCallback(() => false, []);
 
   const handlePressAnswer = useCallback((choiceIdx) => {
     if (economyCommitRef.current) return false;
