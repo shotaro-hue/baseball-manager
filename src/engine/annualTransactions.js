@@ -219,7 +219,8 @@ function inspect(state) {
 function withFloors(state) {
   // Derived only from validated engine records; never persist a second source.
   const departures = inspectAnnualDepartures(state);
-  state = { ...state, spending: { ...state.spending, offseasonDepartures: departures } };
+  const { offseasonDepartures: previousProjection, ...spending } = state.spending;
+  state = { ...state, spending: { ...spending, ...(departures.length ? { offseasonDepartures: departures } : {}) } };
   const { teams, players } = inspect(state), requirements = new Map();
   for (const r of state.rosterRequirements) {
     const k = key(r.teamId, r.season);
