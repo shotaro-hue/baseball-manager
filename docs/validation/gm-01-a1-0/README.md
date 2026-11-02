@@ -165,3 +165,8 @@ P01〜P03はA1-0未実施。WebKitのモバイルviewport、fake-indexeddb、実
 単体/実hook/両browser/旧保存/長期/実iPhoneの必須項目を同一release sourceと選定policyへ紐付ける。各記録は`ID, sourceSHA, policyVersion, seed/fixture, browser/device, command, expected, actual, status, evidence`を持つ。未実施/CI待ち/環境障害は成功に含めない。
 
 A1-1〜4aはゲートOFFなら段階PRとして評価できる。A1-4bは全必須ゲートと不変条件を満たすまでマージ推奨しない。実機/長期が未確認だから期待値を緩める、legacyへ黙って戻す、失敗seedを外すことは禁止する。
+
+
+### 2026-11-02 旧スカウト方針の置換
+
+本書の過去の観測・検証結果は当時の記録として保持する。旧派遣の時計/再開/精度改修・発掘の2年契約接続・旧候補のドラフトへの追加は、[A1-2b-4の終了・保全仕様](../../superpowers/specs/2026-11-02-legacy-scout-retirement.md)で置換し、方針変更により不要化（実装完了ではない）。旧方式の復活はA1完了条件に含めない。ドラフト内の調査・外国人市場・コーチ・球場投資は存続。翌春加入・CPU・年度更新・移行・公開検証の残課題は維持する。

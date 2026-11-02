@@ -210,6 +210,7 @@ export default function HubShell({ state, flows, app }) {
 
           {tab !== 'dashboard' && !AUXILIARY_TABS.includes(tab) && <HubTabsNav
             activeSection={activeSection}
+            myTeam={myTeam}
             tab={tab}
             tabBadges={uiBadges}
             onTabChange={handleTabChange}

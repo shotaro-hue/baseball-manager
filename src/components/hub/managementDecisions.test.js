@@ -65,7 +65,7 @@ it.each(['rejected', 'signed'])('contract stops local reply-waiting when the rea
 it.each([ContractTab, HubScoutTab])('returning to a candidate list clears the previous detail rather than claiming the player departed', Component => {
   const props = Component === ContractTab ? { team: mine, allTeams: [mine], year: 2026 } : { myTeam: { ...mine, scoutResults: [player(0)] }, scoutRegions: [] };
   const ui = mount(Component, props);
-  ui.click(Component === ContractTab ? '選手0の契約を確認' : '選手0の条件を見る'); ui.click('← 選手一覧に戻る');
+  ui.click(Component === ContractTab ? '選手0の契約を確認' : '選手0の旧報告を見る'); ui.click('← 選手一覧に戻る');
   expect(ui.text()).not.toContain('この選手は現在所属していません'); expect(ui.text()).not.toContain('この候補は現在の報告一覧にいません');
   expect(view.root.findAllByType('h3').some(n => text(n) === '選手0')).toBe(false);
 });
@@ -77,39 +77,24 @@ it.each([null, '200'])('an expiring player with unavailable salary can still be 
   ui.click('自由契約を確定する'); expect(onRelease).toHaveBeenCalledWith(0);
 });
 
-it('scout signing confirms its actual one-year deduction and two-year farm contract, then resolves the latest candidate index', () => {
-  const onSignPlayer = vi.fn(() => true), candidate = player(8);
-  const team = { ...mine, scoutResults: [player(7), candidate], scoutMissions: [] };
-  const ui = mount(HubScoutTab, { myTeam: team, teams: [team], scoutRegions: [], onSignPlayer });
-  ui.click('選手8の条件を見る'); ui.click('契約条件を確認する');
-  expect(onSignPlayer).not.toHaveBeenCalled(); expect(ui.text()).toContain('9,000万円');
-  expect(ui.text()).toContain('2年'); expect(ui.text()).toContain('ファーム');
-  ui.update({ myTeam: { ...team, scoutResults: [candidate] } });
-  const submit = ui.button('契約を確定する').props.onClick;
-  act(() => { submit(); submit(); }); expect(onSignPlayer.mock.calls).toEqual([[0]]);
+it('old scout records are readable without contract, dispatch or deletion actions', () => {
+  const team = { ...mine, scoutResults: [player(8)], scoutMissions: [{ id: 'old', name: '関東', cost: 100 }] };
+  const before = structuredClone(team);
+  const ui = mount(HubScoutTab, { myTeam: team });
+  ui.click('選手8の旧報告を見る');
+  expect(ui.text()).toContain('機能終了により停止');
+  expect(ui.text()).toContain('返金');
+  expect(ui.button('契約条件を確認する')).toBeUndefined();
+  expect(ui.button('候補から外す')).toBeUndefined();
+  expect(ui.button('派遣先・調査中')).toBeUndefined();
+  expect(ui.text()).not.toContain('年俸1年分');
+  ui.click('← 選手一覧に戻る'); expect(team).toEqual(before);
 });
-
-it('scout revalidates current budget, capacity, and candidate availability at confirmation', () => {
-  const onSignPlayer = vi.fn(() => true), candidate = player(8);
-  const team = { ...mine, scoutResults: [candidate], scoutMissions: [] };
-  const ui = mount(HubScoutTab, { myTeam: team, teams: [team], scoutRegions: [], onSignPlayer });
-  ui.click('選手8の条件を見る'); ui.click('契約条件を確認する');
-  const submit = ui.button('契約を確定する').props.onClick;
-  ui.update({ myTeam: { ...team, budget: 0 } });
-  act(() => submit()); expect(onSignPlayer).not.toHaveBeenCalled(); expect(ui.text()).toContain('予算');
-  ui.update({ myTeam: { ...team, budget: 10000, scoutResults: [] } });
-  act(() => submit()); expect(onSignPlayer).not.toHaveBeenCalled();
-});
-
-it('scout dispatch and report removal require explicit confirmation and can be cancelled without executing', () => {
-  const onSendScout = vi.fn(() => true), onRemoveScoutResult = vi.fn(() => true);
-  const region = { id: 1, name: '関東', cost: 100, weeks: 2, qMin: 40, qMax: 60 };
-  const ui = mount(HubScoutTab, { myTeam: { ...mine, scoutResults: [player(8)] }, scoutRegions: [region], onSendScout, onRemoveScoutResult });
-  ui.click('派遣先・調査中'); ui.click('関東への派遣を検討'); expect(onSendScout).not.toHaveBeenCalled();
-  ui.click('戻って見直す'); expect(onSendScout).not.toHaveBeenCalled();
-  ui.click('関東への派遣を検討'); ui.click('派遣を確定する'); expect(onSendScout).toHaveBeenCalledWith(region);
-  ui.click('報告済み候補'); ui.click('選手8の条件を見る'); ui.click('候補から外す'); expect(onRemoveScoutResult).not.toHaveBeenCalled();
-  ui.click('戻って見直す'); expect(onRemoveScoutResult).not.toHaveBeenCalled();
+it.each([{}, { scoutResults: [], scoutMissions: [] }])('old scout tab without records offers an exit and no old operations: %j', fields => {
+  const onNavigate = vi.fn(), ui = mount(HubScoutTab, { myTeam: { ...mine, ...fields }, onNavigate });
+  expect(ui.text()).toContain('終了');
+  expect(ui.text()).toContain('旧スカウト記録はありません');
+  ui.click('補強トップへ'); expect(onNavigate).toHaveBeenCalledWith('reinforcement');
 });
 
 it('trade proposal confirms player and cash effects without executing, and checks latest budgets before contacting the CPU', () => {

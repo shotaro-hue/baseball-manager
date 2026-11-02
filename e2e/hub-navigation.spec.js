@@ -145,7 +145,8 @@ for (const width of [360, 390, 760, 761, 1023, 1024, 1440]) {
     await expect(active(page).getByRole('heading', { name: '球団経営', exact: true })).toBeVisible();
     await expect(active(page)).toContainText('編成予算の残枠'); await layout(page);
     await page.getByRole('navigation', { name: '経営メニュー' }).getByRole('button', { name: '補強', exact: true }).click();
-    for (const label of ['FA', 'トレード', 'スカウト']) {
+    await expect(page.getByRole('button', { name: /スカウト/ })).toHaveCount(0);
+    for (const label of ['FA', 'トレード']) {
       await page.getByRole('navigation', { name: '補強メニュー' }).getByRole('button', { name: new RegExp(`^${label}`) }).click();
       await expect(active(page)).toHaveAttribute('data-hub-route', { FA: 'fa', トレード: 'trade', スカウト: 'scout' }[label]);
       await layout(page);

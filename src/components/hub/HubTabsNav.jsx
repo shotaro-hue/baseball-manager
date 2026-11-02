@@ -1,6 +1,6 @@
 import { parentTab, secondaryTabs } from './hubNavigation';
-export default function HubTabsNav({ activeSection, tab, tabBadges = {}, onTabChange }) {
-  const nested = secondaryTabs(tab);
+export default function HubTabsNav({ activeSection, tab, tabBadges = {}, myTeam, onTabChange }) {
+  const nested = secondaryTabs(tab, myTeam);
   return (
     <div className="tabs-nav redesigned-tabs">
       <div className="tab-group">
@@ -20,7 +20,7 @@ export default function HubTabsNav({ activeSection, tab, tabBadges = {}, onTabCh
         </nav>
         {nested.length > 0 && <nav className="hub-secondary-nav" aria-label={parentTab(tab) === 'reinforcement' ? '補強メニュー' : '記録・球団史メニュー'}>
           {nested.map(([id, label]) => <button key={id} aria-current={tab === id ? 'page' : undefined} onClick={() => onTabChange(id)}>{label}
-            {tabBadges[id]?.n > 0 && <span className="hub-count">{tabBadges[id].label || (id === 'trade' ? '要対応' : '候補')} {tabBadges[id].n}</span>}
+            {id !== 'scout' && tabBadges[id]?.n > 0 && <span className="hub-count">{tabBadges[id].label || (id === 'trade' ? '要対応' : '候補')} {tabBadges[id].n}</span>}
           </button>)}
         </nav>}
       </div>

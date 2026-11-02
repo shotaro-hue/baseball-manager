@@ -1,3 +1,4 @@
+import { hasLegacyScoutRecords } from './hubNavigation';
 import { Button, MetricBand, Section } from '../design-system/primitives';
 import { contractPayroll } from '../../engine/contractPayroll';
 import { evaluateRosterCapacity } from '../../engine/rosterCapacity';
@@ -13,12 +14,11 @@ export default function HubManagementTab({ team, recruitment = false, onNavigate
   const links = <div className="hub-entry-links">
     <Button variant="secondary" onClick={() => onNavigate('fa')}>FA市場</Button>
     <Button variant="secondary" onClick={() => onNavigate('trade')}>トレード</Button>
-    <Button variant="secondary" onClick={() => onNavigate('scout')}>スカウト</Button>
     {!recruitment && <><Button variant="secondary" onClick={() => onNavigate('contract')}>契約状況</Button><Button variant="secondary" onClick={() => onNavigate('finance')}>財務を確認</Button></>}
   </div>;
   return <main className="hub-management club-management" data-ds="management-entry">
     <h1>{recruitment ? '補強' : '球団経営'}</h1>
-    <p>{recruitment ? '市場・トレード・スカウトから、必要な戦力を探します。' : '編成枠と対応待ちを確認して、次の判断へ。'}</p>
+    <p>{recruitment ? '市場・トレードから、必要な戦力を探します。' : '編成枠と対応待ちを確認して、次の判断へ。'}</p>
     <MetricBand items={recruitment ? [budget] : [budget,
       { label: '契約年俸総額 / 年', value: payrollText(payroll.total) },
       { label: '支配下登録', value: capacity.ok ? capacity.controlledCount : null, unit: `/ ${MAX_SHIHAKA_TOTAL}人`, state: 'unavailable' },
@@ -41,5 +41,6 @@ export default function HubManagementTab({ team, recruitment = false, onNavigate
         <Section title="球団の状態"><dl className="finance-rows"><div><dt>球団人気</dt><dd>{state('popularity')}</dd></div><div><dt>オーナー信頼度</dt><dd>{state('ownerTrust')}</dd></div></dl></Section>
       </div>
     </div>}
+    {hasLegacyScoutRecords(team) && <div className="hub-help"><Button variant="secondary" onClick={() => onNavigate('scout')}>旧スカウト記録</Button><p>過去の報告・停止した派遣記録の閲覧専用です。</p></div>}
   </main>;
 }

@@ -13,12 +13,13 @@ export const TAB_TO_SECTION = {
 export const AUXILIARY_TABS = ['mailbox', 'news', 'settings', 'balance'];
 // Inbox/news are subtabs of one notification visit, not separate return steps.
 export const navigationSlot = tab => ['mailbox', 'news'].includes(tab) ? 'notifications' : tab;
-export const RECRUITMENT_TABS = [['reinforcement', '補強トップ'], ['fa', 'FA'], ['trade', 'トレード'], ['scout', 'スカウト']];
+export const RECRUITMENT_TABS = [['reinforcement', '補強トップ'], ['fa', 'FA'], ['trade', 'トレード'], ['scout', '旧スカウト記録']];
 export function parentTab(tab) {
   return ['fa', 'trade', 'scout'].includes(tab) ? 'reinforcement' : tab === 'alumni' ? 'records' : tab;
 }
-export function secondaryTabs(tab) {
-  return parentTab(tab) === 'reinforcement' ? RECRUITMENT_TABS
+export const hasLegacyScoutRecords = team => Boolean(team?.scoutResults?.length || team?.scoutMissions?.length);
+export function secondaryTabs(tab, team) {
+  return parentTab(tab) === 'reinforcement' ? RECRUITMENT_TABS.filter(([id]) => id !== 'scout' || hasLegacyScoutRecords(team))
     : parentTab(tab) === 'records' ? [['records', '記録'], ['alumni', 'OB']] : [];
 }
 export const deliveredMailbox = (mailbox = [], gameDay) => mailbox.filter(m => m && Number(m.deliverOnDay ?? 0) <= gameDay);

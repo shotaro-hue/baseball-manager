@@ -11,7 +11,7 @@ async function open(page, tab) {
   const nav = page.getByRole('navigation', { name: '経営メニュー', exact: true });
   await nav.getByRole('button', { name: '概要', exact: true }).click();
   if (tab === 'contract') await nav.getByRole('button', { name: /^契約/ }).click();
-  else await page.getByRole('button', { name: { trade: 'トレード', scout: 'スカウト', fa: 'FA市場' }[tab], exact: true }).click();
+  else await page.getByRole('button', { name: { trade: 'トレード', scout: '旧スカウト記録', fa: 'FA市場' }[tab], exact: true }).click();
   return active(page, tab);
 }
 async function layout(route, page) {
@@ -240,18 +240,17 @@ test('management lists trade searches both clubs, retains selection and compares
   await layout(route, page); expect((await saveHub(page)).teams).toEqual(before);
 });
 
-test('management lists scout deletion restores the next stable candidate at the original position', async ({ page }) => {
+test('management lists old scout report remains in its original position and cannot be deleted', async ({ page }) => {
   test.setTimeout(60000); await page.setViewportSize({ width: 390, height: 844 });
   const f = managementLoadFixture(); await loadManagementFixture(page, f.fixture);
-  const route = await open(page, 'scout'), row = route.getByRole('button', { name: '調査候補050の条件を見る', exact: true });
+  const route = await open(page, 'scout'), row = route.getByRole('button', { name: '調査候補050の旧報告を見る', exact: true });
   await row.scrollIntoViewIfNeeded(); const previous = await row.boundingBox(); await row.click();
-  await route.getByText('報告の整理', { exact: true }).click(); await route.getByRole('button', { name: '候補から外す', exact: true }).click();
-  await route.getByRole('button', { name: '候補から外すことを確定', exact: true }).click();
+  await expect(route.getByRole('button', { name: /候補から外す|契約|派遣/ })).toHaveCount(0);
   await route.getByRole('button', { name: '← 選手一覧に戻る', exact: true }).click();
-  const next = route.getByRole('button', { name: '調査候補051の条件を見る', exact: true }); await expect(next).toBeFocused();
+  const next = route.getByRole('button', { name: '調査候補050の旧報告を見る', exact: true }); await expect(next).toBeFocused();
   expect(Math.abs((await next.boundingBox()).y - previous.y)).toBeLessThan(4);
   const mine = (await saveHub(page)).teams.find(t => t.id === f.mine.id);
-  expect(mine.scoutResults.map(p => p.id)).not.toContain('load-scout-50'); expect(mine.budget).toBe(f.mine.budget);
+  expect(mine.scoutResults).toEqual(f.mine.scoutResults); expect(mine.budget).toBe(f.mine.budget);
 });
 
 test('management lists contract badge matches actionable active, farm and ikusei players', async ({ page }) => {
@@ -300,15 +299,19 @@ test('management lists notification for a departed ID replaces the previous cont
   await expect(route.getByLabel('選手名', { exact: true })).toBeFocused();
 });
 
-test('management lists scout dispatch roundtrip preserves the report row focus on return', async ({ page }) => {
+test('management lists old scout navigation roundtrip reopens read-only reports without data changes', async ({ page }) => {
   test.setTimeout(60000); await page.setViewportSize({ width: 390, height: 844 });
-  const f = managementLoadFixture(); await loadManagementFixture(page, f.fixture); const route = await open(page, 'scout');
-  const row = route.getByRole('button', { name: '調査候補030の条件を見る', exact: true });
-  await row.scrollIntoViewIfNeeded(); const position = await row.boundingBox(); await row.click();
-  await route.getByRole('button', { name: '派遣先・調査中', exact: true }).click();
-  await route.getByRole('button', { name: '報告済み候補', exact: true }).click();
-  await route.getByRole('button', { name: '← 選手一覧に戻る', exact: true }).click();
-  await expect(row).toBeFocused(); expect(Math.abs((await row.boundingBox()).y - position.y)).toBeLessThan(4);
+  const f = managementLoadFixture(); await loadManagementFixture(page, f.fixture); const before = (await saveHub(page)).teams;
+  const route = await open(page, 'scout');
+  await route.getByRole('button', { name: '調査候補030の旧報告を見る', exact: true }).click();
+  await route.getByRole('button', { name: '補強トップへ', exact: true }).click();
+  await page.getByRole('navigation', { name: '補強メニュー' }).getByRole('button', { name: '旧スカウト記録', exact: true }).click();
+  // Ordinary primary navigation remounts the route; the deleted internal
+  // dispatch tab no longer owns a pending selection to restore.
+  await expect(route.getByRole('heading', { name: '旧スカウト記録', exact: true })).toBeVisible();
+  await expect(route.locator('.player-list-row')).toHaveCount(120);
+  await expect(route.getByRole('button', { name: /派遣|契約|候補から外す/ })).toHaveCount(0);
+  expect((await saveHub(page)).teams).toEqual(before);
 });
 
 test('management lists trade comparison reachable from a deep picker and side switches keep keyboard context', async ({ page }) => {

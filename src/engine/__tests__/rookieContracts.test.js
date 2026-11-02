@@ -155,13 +155,14 @@ it('funds a low-ability real generated draft pick at the controlled minimum', ()
     annualSalaryManYen: 420, registrationType: 'controlled', guaranteed: true, termYears: 1 });
 });
 
-it('prepares scouted draft salaries without changing class or higher offers', () => {
+it('does not import or alter old scouting reports while generating new draft candidates', () => {
   const scouts = [{ id: 'low', salary: 240 }, { id: 'high', salary: 600 }, { id: 'dev', salary: 240, isIkusei: true }]
     .map(p => ({ ...p, age: 18, prospectType: '高卒', readinessScore: 30, batting: { contact: 30, power: 30, eye: 30 } }));
   const pool = withFixedRandom(() => initDraftPool({ scoutResults: scouts }));
   expect(scouts.map(p => p.salary)).toEqual([240, 600, 240]);
-  expect(['low', 'high', 'dev'].map(id => pool.find(p => p.id === id).salary)).toEqual([420, 600, 240]);
-  expect(pool.find(p => p.id === 'dev').isIkusei).toBe(true);
+  expect(pool.some(p => ['low', 'high', 'dev'].includes(p.id))).toBe(false);
+  expect(pool).toHaveLength(160);
+  expect(pool.every(p => p.salary >= 420)).toBe(true);
 });
 
 it.each([['rookie', 240, 420], ['rookie', 419, 420], ['rookie', 600, 600], ['development', 240, 240], ['development', 239, 240]])(

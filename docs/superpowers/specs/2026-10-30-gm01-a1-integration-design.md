@@ -75,7 +75,7 @@ annual向けに旧`upd`/UIからsalary、契約年数、budgetを直接更新す
 
 初期のmarket外国人は新しく生成した候補なので、生成イベントを根拠とする`released` entryを2/1で明示し、架空の元球団/FA補償を付けない。選定policyから初年度と全審査年度の許可を作り、旧team.budgetやnextClubBudgetを使わない。初期化/初回保存が失敗したら旧セーブを維持する。最初の通常進行でschedule初日の暦日とseasonフェーズへ移り、2/1と最初の試合日を同一視しない。
 
-**初版の全ての新native契約は`guaranteed:true`**とする。人/CPU、更改/FA/新人/発掘/初期契約に共通の、今後のゲーム規則である。UI/commandからfalseを選んで保証負担を免除できない。既存v1 fixtureの非保証契約は維持し、旧保存のunknownをtrueへ変換する規則とは分離する。正式な引退/海外移籍の現在の解除合意は別のend commandで処理する。
+**初版の全ての新native契約は`guaranteed:true`**とする。人/CPU、更改/FA/新人/初期契約に共通の、今後のゲーム規則である。UI/commandからfalseを選んで保証負担を免除できない。既存v1 fixtureの非保証契約は維持し、旧保存のunknownをtrueへ変換する規則とは分離する。正式な引退/海外移籍の現在の解除合意は別のend commandで処理する。
 
 ## 3. 年度別予算と費用
 
@@ -131,7 +131,7 @@ commitEconomyCandidate(candidate, {saveId, epoch, baseRevision, progressToken, s
 
 `quote`は乱数・UID生成・メール送信・state変更・保存を行わない。UIは同じIDのcommandを保持し、確定時は最新worldで再検証する。ID再利用で条件が異なれば拒否、同一command再実行は同じ結果。失敗は入力worldの参照/JSON/所属/費用を維持する。
 
-既存のoffer/replace/accept/cancel、rookie、trade、compensation、protection/personnel/joinは委譲する。新たに必要なのは、`reject-renewal / enter-market / end-contract / sign-scouted / hire-coach / fire-coach / send-scout / receive-scout-result / upgrade-stadium / record-extraordinary-income / approve-emergency-registration`および年度操作。更改の本人拒否はv2の解決履歴でもrejectedとし、球団取消と区別する。これらも同じ費用・名簿・receipt検証を通し、直接旧関数を呼ぶ別経路にしない。
+既存のoffer/replace/accept/cancel、rookie、trade、compensation、protection/personnel/joinは委譲する。新たに必要なのは、`reject-renewal / enter-market / end-contract / hire-coach / fire-coach / upgrade-stadium / record-extraordinary-income / approve-emergency-registration`および年度操作。更改の本人拒否はv2の解決履歴でもrejectedとし、球団取消と区別する。これらも同じ費用・名簿・receipt検証を通し、直接旧関数を呼ぶ別経路にしない。
 
 ### 4.2 原子性と永続化
 
@@ -199,7 +199,7 @@ FA獲得件数上限の現実制度を今回新設しない。70人枠・金額�
 
 旧スタッフはraw記録を保全し、初回オフで職種ごとの翌年度担当/条件をゲーム画面で確定する。締める年Yの成長には、重複を含め旧年に在任した元のコーチ配列を経過入力として使用し、その年の効果や費用を遡って再計算しない。新しい1担当/年度費はY+1から。stored salaryを12で割った推定年俸へ黙って変更しない。重複/金額不明を自動で最安に置換しない。移行の事前確認で担当を確定できなければそのオフはlegacy継続とし、元のコーチを消さない。これはChatで再承認を要求するものではなく、製品内の移行選択の仕様。
 
-調査/投資はoneOffとmission/球場効果を同じcommandにする。スカウトは初版で既存の3秒通知方式を維持するが、送信時にmission IDと生成済み結果snapshotを保存し、受信commandを冪等にして再開可能にする。未取得の旧結果は捏造しない。調査力やゲーム時計を変える設計は別工程。費用を支払う経路だけ旧budgetに残すことは禁止。
+球場投資はoneOffと球場効果を同じcommandにする。2026-11-02方針変更: 旧スカウトの3秒通知・mission再開・直接獲得接続は方針変更により不要化。[終了・保全仕様](./2026-11-02-legacy-scout-retirement.md)に従い、両モードで旧操作を無変更拒否し、記録だけ保持する。新しい調査・評価は別工程。コーチ・球場など存続する費用経路だけ旧budgetに残すことは禁止。
 
 ## 6. 年度更新の状態遷移
 

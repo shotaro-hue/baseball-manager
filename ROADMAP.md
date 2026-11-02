@@ -1,6 +1,8 @@
 # ROADMAP — NPB Franchise Manager
 
 > 最終更新: 2026-10-30（#515マージ済みmainをA1-0で監査。接続設計・後続PR計画・検証仕様を文書化。新制度は本番未接続。完全バックアップ・復元は保留）
+> 2026-11-02 方針変更: A1-2b-4は旧スカウト直接獲得の終了・既存データ保全へ置換。sign-scouted / send-scout / receive-scout再接続は不要化。Task 6全体・A1全体は未完了。次はA1-2cだが本工程では着手しない。[仕様](./docs/superpowers/specs/2026-11-02-legacy-scout-retirement.md)。
+
 > 目的: **OOTP / Football Manager のように「何年も遊べる、意思決定が積み重なる経営シミュレーション」**を作る。
 
 > 現在の進捗は第1節を参照。第2・3・5節の旧チェックリストと期日は2026-05-01時点の履歴であり、現在の完了認定ではない。UI/UX改革の一次監査・推奨PR分割は [全体改革の青写真 v1](./docs/REFORM_BLUEPRINT_V1.md)、現行の設計方針は [UI/UX設計基準](./docs/DESIGN_SYSTEM.md) を参照。着手時には最新mainと再照合する。

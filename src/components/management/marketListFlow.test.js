@@ -23,12 +23,12 @@ it('trade renders one compact club list at a time, including farm players, with 
   expect(text(view.root)).toContain('スカウト評価');
 });
 
-it('scout separates reports and dispatch without losing a pending report selection', () => {
-  act(() => { view = create(React.createElement(HubScoutTab, { myTeam: { ...mine, scoutResults: [p(3)] }, scoutRegions: [{ id: 0, name: '関東', cost: 100 }] })); });
-  expect(button('関東への派遣を検討')).toBeUndefined();
-  click('派遣先・調査中'); expect(button('関東への派遣を検討')).toBeTruthy();
-  click('報告済み候補'); click('候補3の条件を見る');
-  expect(text(view.root)).toContain('獲得条件');
+it('old scout report selection is read-only and details remain available on demand', () => {
+  act(() => { view = create(React.createElement(HubScoutTab, { myTeam: { ...mine, scoutResults: [p(3)] } })); });
+  expect(button('派遣先・調査中')).toBeUndefined();
+  click('候補3の旧報告を見る');
+  expect(view.root.findAllByProps({ 'aria-label': '保存された一軍成績' })).toHaveLength(1);
+  expect(button('契約条件を確認する')).toBeUndefined();
 });
 
 it('FA rows defer statistics and compare controls to the selected candidate', () => {

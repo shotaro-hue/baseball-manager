@@ -7,7 +7,7 @@ async function open(page, tab) {
   const nav = page.getByRole('navigation', { name: '経営メニュー', exact: true });
   await nav.getByRole('button', { name: '概要', exact: true }).click();
   if (tab === 'contract') await nav.getByRole('button', { name: /^契約/ }).click();
-  else await page.getByRole('button', { name: tab === 'scout' ? 'スカウト' : tab === 'fa' ? 'FA市場' : 'トレード', exact: true }).click();
+  else await page.getByRole('button', { name: tab === 'scout' ? '旧スカウト記録' : tab === 'fa' ? 'FA市場' : 'トレード', exact: true }).click();
 }
 const active = (page, tab) => page.locator(`[data-hub-route="${tab}"]:not([hidden])`);
 const teamsHash = saved => JSON.stringify(saved.teams);
@@ -32,11 +32,10 @@ for (const width of [360, 390, 1440]) test(`management decisions ${width}px read
   await expect(contract.getByRole('button', { name: '提示条件を確認する', exact: true })).toBeFocused();
   await contract.getByRole('button', { name: '← 選手一覧に戻る', exact: true }).click(); await expect(row).toBeFocused();
   await open(page, 'scout'); const scout = active(page, 'scout');
-  await scout.getByRole('button', { name: `${f.scout.name}の条件を見る`, exact: true }).click();
+  await scout.getByRole('button', { name: `${f.scout.name}の旧報告を見る`, exact: true }).click();
   await scout.getByRole('button', { name: '比較に追加', exact: true }).click();
-  await scout.getByRole('button', { name: '契約条件を確認する', exact: true }).click();
-  await expect(scout.getByRole('region', { name: 'スカウト契約の最終確認' })).toContainText('ファーム配属');
-  await scout.getByRole('button', { name: '戻って見直す', exact: true }).click();
+  await expect(scout.getByRole('button', { name: '契約条件を確認する', exact: true })).toHaveCount(0);
+  await expect(scout.getByRole('button', { name: '候補から外す', exact: true })).toHaveCount(0);
   await open(page, 'fa'); const fa = active(page, 'fa');
   await fa.getByRole('button', { name: 'FA比較候補の条件を見る', exact: true }).click();
   await fa.getByRole('button', { name: '比較に追加', exact: true }).first().click();
@@ -54,39 +53,33 @@ for (const width of [360, 390, 1440]) test(`management decisions ${width}px read
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
-test('management decisions scout signing commits once and survives save/reload', async ({ page }) => {
+test('management decisions old scout reports and acquired players survive save/reload unchanged', async ({ page }) => {
   test.setTimeout(60000); await page.setViewportSize({ width: 390, height: 844 });
-  const f = managementFixture(); await loadManagementFixture(page, f.fixture); await open(page, 'scout');
-  await active(page, 'scout').getByRole('button', { name: `${f.scout.name}の条件を見る`, exact: true }).click();
-  await active(page, 'scout').getByRole('button', { name: '契約条件を確認する', exact: true }).click();
-  await active(page, 'scout').getByRole('button', { name: '契約を確定する', exact: true }).focus();
-  await active(page, 'scout').getByRole('button', { name: '契約を確定する', exact: true }).evaluate(b => { b.click(); b.click(); });
-  await expect(active(page, 'scout').getByRole('status').filter({ hasText: '契約を確定しました' })).toBeVisible();
+  const f = managementFixture();
+  f.mine.farm[0]._scoutRegionFactor = 0.8;
+  await loadManagementFixture(page, f.fixture);
+  const before = await saveHub(page); await open(page, 'scout');
+  await active(page, 'scout').getByRole('button', { name: `${f.scout.name}の旧報告を見る`, exact: true }).click();
   await expect(active(page, 'scout').getByRole('heading', { name: f.scout.name, exact: true })).toBeFocused();
-  const saved = await saveHub(page), team = saved.teams.find(t => t.id === f.mine.id);
-  expect(team.budget).toBe(f.mine.budget - 1000);
-  expect(team.farm.filter(p => p.id === f.scout.id)).toHaveLength(1);
-  expect(team.farm.find(p => p.id === f.scout.id).contractYearsLeft).toBe(2);
-  expect(team.scoutResults.map(p => p.id)).toEqual(['ui04c-scout-1']);
-  expect(saved.teams.filter(t => t.id !== f.mine.id)).toEqual(f.fixture.teams.filter(t => t.id !== f.mine.id));
+  await expect(active(page, 'scout').getByRole('button', { name: /契約|候補から外す|派遣/ })).toHaveCount(0);
+  const saved = await saveHub(page); expect(saved.teams).toEqual(before.teams);
   await reloadAndLoad(page); expect((await saveHub(page)).teams).toEqual(saved.teams);
 });
 
-test('management decisions scout dispatch restores focus when spending the remaining budget disables its opener', async ({ page }) => {
+test('management decisions old pending missions remain stopped with no refund after time and reload', async ({ page }) => {
   test.setTimeout(60000); await page.setViewportSize({ width: 390, height: 844 });
-  const f = managementFixture(); f.mine.budget = 3000;
-  await loadManagementFixture(page, f.fixture); await open(page, 'scout');
+  const f = managementFixture(); f.mine.scoutResults = [];
+  f.mine.scoutMissions = [{ id: 'old-mission', name: '国内独立リーグ', cost: 3000, weeksLeft: 2, qMin: 40, qMax: 60 }];
+  await loadManagementFixture(page, f.fixture); const before = await saveHub(page); await open(page, 'scout');
   const scout = active(page, 'scout');
-  await scout.getByRole('button', { name: '派遣先・調査中', exact: true }).click();
-  const opener = scout.getByRole('button', { name: '国内独立リーグへの派遣を検討', exact: true });
-  await opener.focus(); await page.keyboard.press('Enter');
-  await expect(scout.getByRole('heading', { name: 'スカウト派遣の確認', exact: true })).toBeFocused();
-  await page.keyboard.press('Tab'); await page.keyboard.press('Tab'); await page.keyboard.press('Enter');
-  await expect(scout.getByRole('status').filter({ hasText: '国内独立リーグへ派遣しました' })).toBeVisible();
-  await expect(opener).toBeDisabled();
-  await expect(scout.getByRole('heading', { name: 'スカウト派遣', exact: true })).toBeFocused();
-  const saved = await saveHub(page);
-  expect(saved.teams.find(t => t.id === f.mine.id).budget).toBe(0);
+  await expect(scout.getByRole('region', { name: '旧派遣記録' })).toContainText('機能終了により停止');
+  await expect(scout).toContainText('返金はありません');
+  await expect(scout.getByRole('button', { name: /派遣|契約|削除/ })).toHaveCount(0);
+  await page.waitForTimeout(3200);
+  expect((await saveHub(page)).teams).toEqual(before.teams);
+  await reloadAndLoad(page); await open(page, 'scout');
+  await page.waitForTimeout(3200);
+  expect((await saveHub(page)).teams).toEqual(before.teams);
 });
 
 test('management decisions contract offer persists as waiting without immediate payroll or budget mutation', async ({ page }) => {

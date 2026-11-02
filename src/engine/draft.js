@@ -1,4 +1,4 @@
-import { rng, clamp } from '../utils';
+import { rng } from '../utils';
 import { POSITIONS, DRAFT_POOL_SIZE, PROSPECT_TYPE_WEIGHTS, PROSPECT_ENTRY_AGE, PROSPECT_READINESS_RANGE } from '../constants';
 import { makePlayer } from './playerCore';
 import { analyzeTeamNeeds } from './trade';
@@ -65,7 +65,7 @@ export function recommendForTeam(team, pool) {
     .slice(0, 5);
 }
 
-export function initDraftPool(myTeam) {
+export function initDraftPool() {
   const pitPos = [...Array(32)].map(() => "先発")
     .concat([...Array(27)].map(() => "中継ぎ"))
     .concat([...Array(21)].map(() => "抑え"));  // 80 slots
@@ -79,18 +79,9 @@ export function initDraftPool(myTeam) {
     p.readinessScore = readinessFromType(prospectType);
     return p;
   });
-  const scoutedPlayers = (myTeam?.scoutResults || []).map((p) => {
-    const prospectType = p.prospectType ?? pickProspectType();
-    const age = p.age ?? entryAgeFromType(prospectType);
-    return {
-      ...p,
-      fromScout: true,
-      age: clamp(age, 18, 25),
-      prospectType,
-      readinessScore: p.readinessScore ?? readinessFromType(prospectType),
-    };
-  });
-  const combined = [...raw, ...scoutedPlayers].sort((a, b) => {
+  // Old direct-scout reports are archival records, not eligible draft entrants.
+  // Existing saved draft pools are preserved by their normal resume path.
+  const combined = raw.sort((a, b) => {
     const ov = (x) => x.isPitcher
       ? (x.pitching.velocity + x.pitching.control + x.pitching.breaking) / 3
       : (x.batting.contact + x.batting.power + x.batting.eye) / 3;

@@ -51,3 +51,8 @@ WebKitは実ブラウザで検証。ローカル共有ライブラリを `LD_LIB
 | WebKit 1440 | [before](mobile-webkit-1440-before.png) | [after](mobile-webkit-1440-after.png) | [failed](mobile-webkit-1440-failed.png) | [history](mobile-webkit-1440-history.png) |
 
 横はみ出しなし、操作到達と状態表示を確認。実機タッチ端末での検証は未実施。育成の支配下転換・トレード・発掘・CPU・日次/年度更新・activation/fenceは後続工程。
+
+
+### 2026-11-02 旧スカウト方針の置換
+
+本書の過去の観測・検証結果は当時の記録として保持する。旧派遣の時計/再開/精度改修・発掘の2年契約接続・旧候補のドラフトへの追加は、[A1-2b-4の終了・保全仕様](../../superpowers/specs/2026-11-02-legacy-scout-retirement.md)で置換し、方針変更により不要化（実装完了ではない）。旧方式の復活はA1完了条件に含めない。ドラフト内の調査・外国人市場・コーチ・球場投資は存続。翌春加入・CPU・年度更新・移行・公開検証の残課題は維持する。
