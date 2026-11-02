@@ -170,6 +170,8 @@ PR #521レビュー修正: revision増加でもrandomRoot・確定済み台帳�
 
 ## Task 7: A1-2c 退団・市場・海外離脱
 
+2026-11-02: #535マージ後、[A1-2c-1](./2026-11-02-gm01-a1-winter-departures.md)で冬の満了/解雇/自由契約市場の共通処理を分離。期中・FA宣言・海外/収入・人のhook/UI接続は残工程。Task 7全体は未完了。
+
 **Files:** Create `src/engine/annualDepartures.js`, `src/engine/__tests__/annualDepartures.test.js`; modify `src/engine/annualTransactions.js`, `src/engine/contractEconomy.js`, `src/hooks/useOffseason.js`, `src/components/hub/HubContentRouter.jsx`, `src/components/screenRoutes/ContractRenewalRoute.jsx`。
 
 **Interfaces:** `enter-market / end-contract / record-extraordinary-income`、winter `offseasonDepartures`、source contract/旧年俸/行使歴/順位根拠を伴うmarketEntry。ledgerのend/retain/waiveを再利用する。

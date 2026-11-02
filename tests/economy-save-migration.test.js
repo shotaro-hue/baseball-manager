@@ -1,3 +1,4 @@
+import { winter, departureCommand } from '../src/engine/__tests__/fixtures/winterDepartures';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
 import { saveGame, loadGame, getLastLoadResult, enqueueSaveGame } from '../src/engine/saveload';
@@ -375,4 +376,29 @@ it('requires the progression producer to increment revision when the economy clo
   next.contractEconomy.revision++;
   expect((await save(next)).ok).toBe(true);
   expect((await loadGame()).contractEconomy.clock.date).toBe('2026-07-17');
+});
+
+it.each([false, true])('winter departure survives real save/reload and failed replacement (large=%s)', async large => {
+  const before = winter(3), command = departureCommand(before, 'release');
+  const result = reduceEconomyCommand(before, command);
+  expect(result.ok, result.error).toBe(true);
+  const next = result.world;
+  if (large) next.padding = 'winter'.repeat(20000);
+  expect((await save(before)).ok).toBe(true);
+  expect((await save(next)).ok).toBe(true);
+  freshStorageSurface();
+  let loaded = await loadGame();
+  expect(loaded.contractEconomy).toEqual(next.contractEconomy);
+  expect(loaded.faPool).toEqual(JSON.parse(JSON.stringify(next.faPool)));
+  expect(loaded.teams[0].players).toEqual([]);
+  const oldRoots = roots(), set = localStorage.setItem;
+  localStorage.setItem = (k, v) => { if (k === primary) throw new Error('disk full'); set(k, v); };
+  expect((await save(loaded)).ok).toBe(false);
+  expect(roots()).toEqual(oldRoots);
+  localStorage.setItem = set;
+  expect((await save(loaded)).ok).toBe(true);
+  freshStorageSurface(); loaded = await loadGame();
+  expect(loaded.contractEconomy).toEqual(next.contractEconomy);
+  const replay = reduceEconomyCommand(loaded, command);
+  expect(replay.ok, replay.error).toBe(true); expect(replay.replayed).toBe(true); expect(replay.world).toBe(loaded);
 });

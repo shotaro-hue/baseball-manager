@@ -1,7 +1,9 @@
 # ROADMAP — NPB Franchise Manager
 
+> 2026-11-02 続行: #535マージ後のA1-2c-1は冬の満了・解雇・自由契約市場の共通処理。人の操作接続・期中/FA/海外/収入は残工程。Task 7/A1は未完了、公開ゲートOFF。[計画](./docs/superpowers/plans/2026-11-02-gm01-a1-winter-departures.md)。
+
 > 最終更新: 2026-10-30（#515マージ済みmainをA1-0で監査。接続設計・後続PR計画・検証仕様を文書化。新制度は本番未接続。完全バックアップ・復元は保留）
-> 2026-11-02 方針変更: A1-2b-4は旧スカウト直接獲得の終了・既存データ保全へ置換。sign-scouted / send-scout / receive-scout再接続は不要化。Task 6全体・A1全体は未完了。次はA1-2cだが本工程では着手しない。[仕様](./docs/superpowers/specs/2026-11-02-legacy-scout-retirement.md)。
+> 2026-11-02 方針変更: A1-2b-4は旧スカウト直接獲得の終了・既存データ保全へ置換。sign-scouted / send-scout / receive-scout再接続は不要化。Task 6全体・A1全体は未完了。旧スカウト工程ではA1-2cに着手しない。[仕様](./docs/superpowers/specs/2026-11-02-legacy-scout-retirement.md)。
 
 > 目的: **OOTP / Football Manager のように「何年も遊べる、意思決定が積み重なる経営シミュレーション」**を作る。
 

@@ -34,6 +34,8 @@ export function activeRenewalPlans(spending) {
     if(superseded)continue;
     if(spending.reservations.some(h=>h.kind==='renewal'&&h.proposal.teamId===p.teamId&&h.proposal.contract.playerId===p.playerId
       &&h.proposal.contract.startSeason<=p.season&&h.proposal.contract.endSeason>=p.season))continue;
+    if ((spending.offseasonDepartures ?? []).some(d => d.teamId === p.teamId && d.sourceContractId === p.sourceContractId
+      && d.player.id === p.playerId && d.season + 1 === p.season)) continue;
     active.push({...p,amountManYen:Math.max(p.amountManYen,e.registrationType==='development'?MIN_SALARY_IKUSEI:MIN_SALARY_SHIHAKA),registrationType:e.registrationType});
   }
   return active;
