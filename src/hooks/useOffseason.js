@@ -427,6 +427,7 @@ export function useOffseason(gs) {
   const tradeContextRef = useRef(null);
   tradeContextRef.current = { teams, gameDay, schedule, year, offseasonPlan: gs.offseasonPlan };
   const handleTrade = (myOut, theirIn, tgtTeam, cash = 0) => {
+    if (!canProgressLegacy()) return false;
     const current = tradeContextRef.current;
     if (current.pending) { notify('取引の反映中です', 'warn'); return false; }
     const date = gameDayToDate(current.gameDay, current.schedule);

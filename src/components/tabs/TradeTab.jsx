@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { rngf } from '../../utils';
+import { tradeRequest, previewHumanTrade } from '../../engine/humanTrade';
+import { AnnualTradeTerms } from '../management/AnnualTradeTerms';
 import { tradeValue, evalTradeForCpu, analyzeTeamNeeds } from '../../engine/trade';
 import { applyTradeTransaction } from '../../engine/tradeTransaction';
 import { evaluateRosterCapacity } from '../../engine/rosterCapacity';
@@ -7,7 +9,7 @@ import { Button, MetricBand, StateLabel } from '../design-system/primitives';
 import { DecisionConfirmation, PlayerActions, PlayerFacts, money, moneyMetric } from '../management/DecisionParts';
 import { TradePlayerPicker, TradeSelectionSummary, initialTradeView } from '../management/TradePlayerPicker';
 
-function TradeTerms({ mine, target, outgoing = [], incoming = [], cash, preview, capacityContext }) {
+function TradeTerms({ mine, target, outgoing = [], incoming = [], cash, preview, capacityContext, annual = false }) {
   const after = preview?.ok ? preview.teams.find(t => t.id === mine.id) : null;
   const otherAfter = preview?.ok ? preview.teams.find(t => t.id === target?.id) : null;
   const capacity = after ? evaluateRosterCapacity(after, { ...capacityContext, teams: preview.teams }) : null;
@@ -15,11 +17,11 @@ function TradeTerms({ mine, target, outgoing = [], incoming = [], cash, preview,
     <p>支払金額 {money(Math.max(0, cash))}</p></div><div><strong>あなたが受け取る</strong><ul>{incoming.map(p => <li key={p.id}>{p.name}</li>)}</ul>{!incoming.length && <p>選手なし</p>}
     <p>受取金額 {money(Math.max(0, -cash))}</p></div></div>
     {after && <><p>取引後の予算：自球団 {money(after.budget)} / {target?.name} {money(otherAfter.budget)}</p>
-      <p>自球団の支配下 {capacity?.ok ? `${capacity.controlledCount}人 · 残り${capacity.remainingSlots}枠` : '算出不可'} · 配属先は登録枠・故障・外国人枠などの条件で決まります。</p></>}
+      <p>自球団の支配下 {capacity?.ok ? `${capacity.controlledCount}人${annual ? '（在籍）' : ` · 残り${capacity.remainingSlots}枠`}` : '算出不可'} · 配属先は登録枠・故障・外国人枠などの条件で決まります。</p></>}
   </>;
 }
 
-export function TradeTab({ myTeam, teams, onTrade, cpuOffers = [], offerMails, onAcceptOffer, onDeclineOffer,
+export function TradeTab({ annualGs, myTeam, teams, onTrade, cpuOffers = [], offerMails, onAcceptOffer, onDeclineOffer,
   deadlinePassed = false, onPlayerClick, onToggleCompare, comparePlayerIds, capacityContext = {}, focusRequest, active = true }) {
   const [phase, setPhase] = useState('top'), [targetId, setTargetId] = useState(null);
   const [myOut, setMyOut] = useState([]), [theirIn, setTheirIn] = useState([]), [myCash, setMyCash] = useState(0);
@@ -27,7 +29,12 @@ export function TradeTab({ myTeam, teams, onTrade, cpuOffers = [], offerMails, o
   const [confirmation, setConfirmation] = useState(null), [error, setError] = useState(null);
   const [selectedMailId, setSelectedMailId] = useState(null), [mailReceipt, setMailReceipt] = useState(null);
   const [pickerView, setPickerView] = useState(initialTradeView), [comparing, setComparing] = useState(false);
+  const [saving, setSaving] = useState(false), [saveFailure, setSaveFailure] = useState(null);
+  const approved = useRef(null);
+  const recovery = annualGs && (saveFailure?.reason === 'economy_adoption_required' || annualGs.saveResult?.reason === 'economy_adoption_required');
   const busy = useRef(false), current = useRef(null), handled = useRef(new Set());
+  const appliedFocus = useRef(null);
+  const focusBlocked = Boolean(annualGs && (saving || recovery || (saveFailure && confirmation)));
   const caseHeading = useRef(null), negotiationHeading = useRef(null), comparisonHeading = useRef(null), wasComparing = useRef(false);
   useEffect(() => {
     const opened = comparing && !wasComparing.current; wasComparing.current = comparing;
@@ -37,12 +44,30 @@ export function TradeTab({ myTeam, teams, onTrade, cpuOffers = [], offerMails, o
   const selectedMail = offers.find(m => m.id === selectedMailId);
   const targetTeam = teams.find(t => t.id === targetId);
   const others = teams.filter(t => t.id !== myTeam.id);
-  const reset = () => { setPhase('top'); setTargetId(null); setMyOut([]); setTheirIn([]); setMyCash(0); setTradeResult(null); setCounter(null); setCounterRound(0); setCpuReasons([]); setConfirmation(null); setSelectedMailId(null); setMailReceipt(null); setError(null); setPickerView(initialTradeView()); setComparing(false); busy.current = false; };
-  const open = action => { setError(null); busy.current = false; setConfirmation(action); };
+  const reset = () => { if (annualGs && busy.current) return; approved.current = null; setSaveFailure(null); setPhase('top'); setTargetId(null); setMyOut([]); setTheirIn([]); setMyCash(0); setTradeResult(null); setCounter(null); setCounterRound(0); setCpuReasons([]); setConfirmation(null); setSelectedMailId(null); setMailReceipt(null); setError(null); setPickerView(initialTradeView()); setComparing(false); busy.current = false; };
+  const requestFor = (outgoing, incoming, target, cash, mailId) => tradeRequest(annualGs, {
+    toId: target?.id, outgoingIds: outgoing.map(p => p.id), incomingIds: incoming.map(p => p.id), cashManYen: cash,
+    ...(mailId !== undefined ? { mailId } : {}) });
+  const open = action => {
+    if (saving || recovery) return;
+    setError(null); setSaveFailure(null); approved.current = null; busy.current = false;
+    if (annualGs) {
+      const mail = ['accept', 'decline'].includes(action.kind) ? selectedMail : null, o = mail?.offer;
+      action = { ...action, request: requestFor(o ? o.want : action.outgoing, o ? o.offer : action.incoming,
+        o ? o.from : targetTeam, o ? -(o.cash ?? 0) / 10000 : action.cash, mail?.id), session: annualGs.getProgressSessionToken() };
+    }
+    if (annualGs && action.kind === 'decline') action.request.action.decline = true;
+    setConfirmation(action);
+  };
   useEffect(() => {
-    if (focusRequest?.id == null) return;
+    if (focusRequest?.id == null || focusBlocked || (annualGs && busy.current)
+      || (appliedFocus.current?.id === focusRequest.id && appliedFocus.current?.token === focusRequest.token)) return;
+    // Keep a notification pending while the current annual request is saving
+    // or awaiting retry/recovery, then consume it once that operation finishes.
+    appliedFocus.current = focusRequest;
+    approved.current = null; setSaveFailure(null);
     setSelectedMailId(focusRequest.id); setConfirmation(null); setError(null); setMailReceipt(null); busy.current = false;
-  }, [focusRequest?.token]);
+  }, [focusRequest?.id, focusRequest?.token, focusBlocked]);
   useEffect(() => {
     if (active && selectedMailId != null) {
       caseHeading.current?.focus({ preventScroll: true });
@@ -50,15 +75,33 @@ export function TradeTab({ myTeam, teams, onTrade, cpuOffers = [], offerMails, o
     }
   }, [selectedMailId, focusRequest?.token, active]);
   const buildQuote = (outgoing, incoming, target, cash) => deadlinePassed ? { ok: false, error: 'トレード期限を過ぎています' }
+    : annualGs ? previewHumanTrade(annualGs, requestFor(outgoing, incoming, target, cash))
     : applyTradeTransaction(teams, { fromId: myTeam.id, toId: target?.id, outgoing, incoming, cash }, capacityContext);
-  const quote = confirmation && ['proposal', 'counter'].includes(confirmation.kind)
+  const quote = confirmation?.request ? previewHumanTrade(annualGs, confirmation.request) : confirmation && ['proposal', 'counter'].includes(confirmation.kind)
     ? buildQuote(confirmation.outgoing, confirmation.incoming, targetTeam, confirmation.cash)
     : selectedMail?.offer && !selectedMail.resolved ? buildQuote(selectedMail.offer.want, selectedMail.offer.offer, selectedMail.offer.from, -(selectedMail.offer.cash ?? 0) / 10000) : null;
-  const issue = confirmation?.kind === 'decline' ? !selectedMail || selectedMail.resolved || handled.current.has(selectedMail.id) ? 'この案件は対応済み、または一覧にありません。' : null
-    : confirmation?.kind === 'accept' && (!selectedMail || selectedMail.resolved || handled.current.has(selectedMail.id)) ? 'この案件は対応済み、または一覧にありません。'
-      : confirmation && quote && !quote.ok ? quote.error : null;
+  const issue = (() => {
+    if (recovery) return null;
+    if (confirmation?.request && (!annualGs || confirmation.session !== annualGs.getProgressSessionToken()))
+      return 'セッションが変更されています。条件を確認し直してください。';
+    if (['accept', 'decline'].includes(confirmation?.kind) && (!selectedMail || selectedMail.resolved || handled.current.has(selectedMail.id)))
+      return 'この案件は対応済み、または一覧にありません。';
+    return confirmation && (annualGs || confirmation.kind !== 'decline') && quote && !quote.ok ? quote.error : null;
+  })();
   current.current = { confirmation, selectedMail, offers, quote, issue, targetTeam, myTeam, teams };
+  const saveAnnual = async (action, recover = false) => {
+    approved.current = action; busy.current = true; setSaving(true); setSaveFailure(null);
+    try {
+      const result = await (recover ? annualGs.recoverEconomyCommand() : annualGs.commitTradeRequest(action.request, action.session));
+      if (!result?.ok) { setSaveFailure(result ?? { reason: 'economy_commit_failed' }); return; }
+      setConfirmation(null);
+      if (['accept', 'decline'].includes(action.kind)) setMailReceipt({ id: action.request.action.mailId, action: action.kind });
+      else if (action.kind !== 'recovery') setTradeResult('accept');
+    } catch { setSaveFailure({ reason: 'economy_commit_failed' }); }
+    finally { busy.current = false; setSaving(false); }
+  };
   const executeTrade = (outgoing, incoming, cash) => {
+    if (annualGs) { saveAnnual(current.current.confirmation); return; }
     setTradeResult(onTrade?.(outgoing, incoming, targetTeam, cash) === true ? 'accept' : 'invalid');
   };
   // The negotiation's scoring, random thresholds and counter rules are unchanged.
@@ -87,6 +130,15 @@ export function TradeTab({ myTeam, teams, onTrade, cpuOffers = [], offerMails, o
   const confirm = () => {
     const c = current.current;
     if (busy.current || !c.confirmation || c.issue) return;
+    if (annualGs) {
+      if (recovery) { saveAnnual(c.confirmation, true); return; }
+      if (annualGs.saveQueueState?.isSaving || !c.quote?.ok) return;
+      busy.current = true;
+      if (approved.current === c.confirmation || ['accept', 'counter', 'decline'].includes(c.confirmation.kind)) executeTrade(c.quote.outgoing, c.quote.incoming, c.confirmation.cash);
+      else proposeTrade(c.quote.outgoing, c.quote.incoming, c.confirmation.cash);
+      if (approved.current !== c.confirmation) { busy.current = false; setConfirmation(null); }
+      return;
+    }
     busy.current = true; current.current = { ...c, confirmation: null };
     const action = c.confirmation;
     if (action.kind === 'accept' || action.kind === 'decline') {
@@ -106,14 +158,15 @@ export function TradeTab({ myTeam, teams, onTrade, cpuOffers = [], offerMails, o
   const capacity = evaluateRosterCapacity(myTeam, { ...capacityContext, teams });
   return <main className="management-decisions" data-ds="trade-management">
     <h1>トレード</h1><p>選手と金銭条件を比べて提案します。</p>
-    <MetricBand items={[moneyMetric('編成予算の残枠', money(myTeam.budget)), { label: '残り支配下枠', value: capacity.ok ? capacity.remainingSlots : null, unit: '人', state: 'unavailable' }, { label: '未解決の提案', value: offers.filter(m => !m.resolved).length, unit: '件' }]} />
+    <MetricBand items={[moneyMetric('編成予算の残枠', money(myTeam.budget)), { label: annualGs ? '在籍支配下' : '残り支配下枠', value: capacity.ok ? annualGs ? capacity.controlledCount : capacity.remainingSlots : null, unit: '人', state: 'unavailable' }, { label: '未解決の提案', value: offers.filter(m => !m.resolved).length, unit: '件' }]} />
+    <fieldset className="decision-trade-controls" disabled={saving || Boolean(recovery)}>
     {offers.length > 0 && <section aria-label="受信したトレード提案"><h2>受信した提案</h2><div className="decision-actions">{offers.filter(m => !m.resolved || m.id === selectedMailId).map(m => <Button key={m.id} variant="secondary" aria-pressed={selectedMailId === m.id}
       onClick={() => { setSelectedMailId(m.id); setConfirmation(null); setMailReceipt(null); setError(null); }}>{m.title || `${m.offer.from?.name}からのオファー`}</Button>)}</div></section>}
     {selectedMailId != null ? <section className="decision-detail" aria-label="選択したトレード案件">
       <Button variant="secondary" onClick={() => { setSelectedMailId(null); setConfirmation(null); }}>交渉画面へ戻る</Button>
       {!selectedMail ? <p role="status">この案件は現在の受信箱にありません。最新の通知を確認してください。</p> : <>
         <h2 ref={caseHeading} tabIndex={-1}>{selectedMail.title || `${selectedMail.offer.from?.name}からのオファー`}</h2><StateLabel tone={mailDone ? 'success' : 'warning'}>{mailDone ? '対応済み' : '要対応'}</StateLabel>
-        <TradeTerms mine={myTeam} target={selectedMail.offer.from} outgoing={selectedMail.offer.want} incoming={selectedMail.offer.offer} cash={-(selectedMail.offer.cash ?? 0) / 10000} preview={!mailDone ? quote : null} capacityContext={capacityContext} />
+        <TradeTerms mine={myTeam} target={selectedMail.offer.from} outgoing={selectedMail.offer.want} incoming={selectedMail.offer.offer} cash={-(selectedMail.offer.cash ?? 0) / 10000} preview={!mailDone ? quote : null} capacityContext={capacityContext} annual={Boolean(annualGs)} />
         <div className="decision-exchange">{[...(selectedMail.offer.want || []), ...(selectedMail.offer.offer || [])].map(p => {
           const owner = teams.find(t => [...(t.players || []), ...(t.farm || [])].some(x => x.id === p.id));
           const live = owner && [...owner.players, ...(owner.farm || [])].find(x => x.id === p.id);
@@ -150,14 +203,21 @@ export function TradeTab({ myTeam, teams, onTrade, cpuOffers = [], offerMails, o
         </section>}
       </section>}
     </>}
+    </fieldset>
     {error && <p className="decision-error" role="alert">{error}</p>}
-    {confirmation && <DecisionConfirmation fallbackFocus={selectedMailId != null ? caseHeading : negotiationHeading} title={confirmation.kind === 'decline' ? '提案辞退の確認' : 'トレード条件の最終確認'} onCancel={() => setConfirmation(null)} onConfirm={confirm} error={issue}
-      confirmLabel={confirmation.kind === 'accept' ? '承諾を確定する' : confirmation.kind === 'decline' ? '辞退を確定する' : confirmation.kind === 'counter' ? '逆提案を確定する' : '確認して提案する'}>
+    {recovery && !confirmation && <section className="decision-confirm" aria-label="保存済みトレードの復旧"><p>保存済みの操作を画面へ反映してください。</p>
+      <Button disabled={saving} onClick={() => { if (!busy.current) saveAnnual({ kind: 'recovery' }, true); }}>保存済みのトレードを復旧する</Button></section>}
+    {confirmation && <DecisionConfirmation fallbackFocus={selectedMailId != null ? caseHeading : negotiationHeading} title={confirmation.kind === 'decline' ? '提案辞退の確認' : 'トレード条件の最終確認'} onCancel={() => { if (!busy.current) setConfirmation(null); }} onConfirm={confirm} error={issue} busy={saving}
+      confirmDisabled={Boolean(annualGs?.saveQueueState?.isSaving) || (recovery && !annualGs.recoverEconomyCommand)}
+      confirmLabel={recovery ? '保存済みのトレードを復旧する' : approved.current === confirmation ? '同じ条件で保存を再試行する' : confirmation.kind === 'accept' ? '承諾を確定する' : confirmation.kind === 'decline' ? '辞退を確定する' : confirmation.kind === 'counter' ? '逆提案を確定する' : '確認して提案する'}>
       {confirmation.kind === 'decline' ? <p>{selectedMail?.title}を辞退します。所属と予算は変わりません。辞退した提案へは戻せません。</p>
         : <><TradeTerms mine={myTeam} target={confirmation.kind === 'accept' ? selectedMail?.offer.from : targetTeam}
           outgoing={confirmation.kind === 'accept' ? selectedMail?.offer.want : confirmation.outgoing} incoming={confirmation.kind === 'accept' ? selectedMail?.offer.offer : confirmation.incoming}
-          cash={confirmation.kind === 'accept' ? -(selectedMail?.offer.cash ?? 0) / 10000 : confirmation.cash} preview={quote} capacityContext={capacityContext} />
+          cash={confirmation.kind === 'accept' ? -(selectedMail?.offer.cash ?? 0) / 10000 : confirmation.cash} preview={quote} capacityContext={capacityContext} annual={Boolean(annualGs)} />
+          {annualGs && <AnnualTradeTerms preview={quote} mine={myTeam} target={confirmation.kind === 'accept' ? selectedMail?.offer.from : targetTeam} />}
           <p>{confirmation.kind === 'proposal' ? '相手が受諾した場合、この条件で取引が確定します。逆提案は改めて確認します。' : '確定すると選手の所属と金銭を反映します。取消はできません。'}</p></>}
+      {saving && <p role="status">保存・反映を確認しています…</p>}
+      {saveFailure && <p role="alert">{saveFailure.error || (recovery ? '保存済みのトレードを画面へ反映できませんでした。復旧してください。' : 'トレードを保存できませんでした。同じ条件で再試行できます。')}</p>}
     </DecisionConfirmation>}
     <p className="decision-note">金額は万円。成立後は編成で登録と起用を確認できます。</p>
   </main>;

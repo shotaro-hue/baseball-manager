@@ -290,6 +290,7 @@ export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTab
   if (tab === 'mailbox') {
     return (
       <MailboxTab
+        annualContracts={gs.contractEconomy?.mode === 'annual'}
         mailbox={mailboxForView}
         onRead={os.handleMailRead}
         onAction={os.handleMailAction}
@@ -314,6 +315,7 @@ export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTab
     })();
     return (
       <TradeTab
+        annualGs={gs.contractEconomy?.mode === 'annual' ? gs : undefined}
         myTeam={myTeam}
         teams={teams}
         onTrade={os.handleTrade}

@@ -672,7 +672,7 @@ async function saveGameImpl(state, options = {}, onPublished) {
     // These chunks are part of the same economic world as the root ledger.
     // Reusing an older notification chunk would create a mixed revision.
     if (economyMode === 'annual' && Array.isArray(generationDirtyScopes))
-      generationDirtyScopes = [...new Set([...generationDirtyScopes, 'news', 'mailbox'])];
+      generationDirtyScopes = [...new Set([...generationDirtyScopes, 'news', 'mailbox', 'seasonHistory'])];
     if(safeState.farmCompetition && previous?.farmCompetition?.archiveSignature!==safeState.farmCompetition.archiveSignature
       && Array.isArray(generationDirtyScopes)) {
       generationDirtyScopes=[...new Set([...generationDirtyScopes,'seasonHistory','matchHistory'])];
@@ -930,7 +930,7 @@ function releaseEconomyCommit(storage, entry) {
 const canonicalEconomy = value => JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item)
   ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
 const adoptionFields = ['saveId', 'myId', 'year', 'gameDay', 'teams', 'faPool', 'faYears',
-  'offseasonPlan', 'schedule', 'news', 'mailbox', 'contractEconomy', 'farmCompetition', 'farmCompetitionVersion', 'battedBallReceipt'];
+  'offseasonPlan', 'schedule', 'news', 'mailbox', 'seasonHistory', 'contractEconomy', 'farmCompetition', 'farmCompetitionVersion', 'battedBallReceipt'];
 // Presence and undefined are part of the state contract, not JSON omissions.
 const adoptionContent = world => canonicalEconomy(adoptionFields.map(key =>
   [key, Object.hasOwn(world ?? {}, key), typeof world?.[key], world?.[key]]));

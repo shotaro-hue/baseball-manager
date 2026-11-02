@@ -12,6 +12,7 @@ const label = type => ({
   cpu_fa_summary: 'FA移籍情報'
 })[type] ?? 'お知らせ';
 export function MailboxTab({
+  annualContracts = false,
   mailbox = [],
   unreadCount = 0,
   onRead,
@@ -77,7 +78,8 @@ export function MailboxTab({
         {selected.type === 'trade' && selected.offer && !selected.resolved && <>
           <div className="reading-offer"><section><h3>あなたが出す</h3>{selected.offer.want.map(p => <p key={p.id}>{p.name} <small>{p.pos}</small></p>)}</section>
             <section><h3>あなたが受け取る</h3>{selected.offer.offer.map(p => <p key={p.id}>{p.name} <small>{p.pos}</small></p>)}{selected.offer.cash > 0 && <p>金銭受取 {money(selected.offer.cash / 10000)}</p>}</section></div>
-          <div className="reading-actions"><Button disabled={handled.current.has(selected.id)} onClick={() => decide('accept')}>✅ 承諾する</Button><Button variant="secondary" disabled={handled.current.has(selected.id)} onClick={() => decide('decline')}>❌ 断る</Button></div>
+          {annualContracts ? <p>トレード画面で年度別の負担を確認してから、承諾・辞退してください。</p>
+            : <div className="reading-actions"><Button disabled={handled.current.has(selected.id)} onClick={() => decide('accept')}>✅ 承諾する</Button><Button variant="secondary" disabled={handled.current.has(selected.id)} onClick={() => decide('decline')}>❌ 断る</Button></div>}
         </>}
         {selected.type === 'posting_request' && !selected.resolved && <>
           <h3>ポスティング判断</h3><p>承認すると選手はMLBへ移籍し、球団に移籍金収入が入ります。拒否すると残留し、モラルが10下がります。</p>
