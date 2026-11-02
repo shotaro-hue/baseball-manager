@@ -89,14 +89,13 @@ function inspectEnvelope(world) {
     || !Array.isArray(spending.resolvedReservations)) fail('契約台帳・正式留保が未記録です。');
   inspectBudgetApprovals(spending.authorizations, e.budgetPolicies);
   inspectAnnualBudgetCoverage(world);
-  if (Object.hasOwn(spending, 'staffContracts')) fail('スタッフ契約の正本はworldです。');
+  if (Object.hasOwn(spending, 'staffContracts') || Object.hasOwn(spending, 'offseasonDepartures')) fail('スタッフ契約・退団記録の投影を支出正本へ重複保存できません。');
   // All NEW native terms are guaranteed; v1 fixtures remain independent.
   const contracts = recordedContracts(spending);
   contracts.forEach(validateAnnualEmploymentContract);
   typedIds(e.engine.transactions.map(r => r?.id));
   inspectContractClaims(spending);
   typedIds([...spending.reservations, ...spending.resolvedReservations].map(r => r.proposal?.id));
-  if (e.engine.offseasonDepartures.length) fail('冬の退団は後続工程で接続されます。');
 }
 
 export function contractEconomyMode(world) {
@@ -152,7 +151,7 @@ export function fromAnnualState(world, input) {
     return { ...t, players: t.players.map(projectPlayer), farm: t.farm.map(projectPlayer), budget: row.remainingManYen };
   });
   const engine = Object.fromEntries(['version', 'spending', ...engineArrays].map(k => [k, state[k]]));
-  const { staffContracts, ...persistedSpending } = engine.spending;
+  const { staffContracts, offseasonDepartures, ...persistedSpending } = engine.spending;
   engine.spending = persistedSpending;
   const next = { ...world, teams, faPool: state.faPool, offseasonPlan: projectDraftPlan(world, state),
     contractEconomy: { ...world.contractEconomy, engine } };

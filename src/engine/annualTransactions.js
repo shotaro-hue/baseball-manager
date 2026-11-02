@@ -1,3 +1,4 @@
+import { inspectAnnualDepartures, createWinterDeparture, isWinterDepartureCommand, normalizeWinterDeparture } from './annualDepartures';
 import { activeRenewalPlans } from './renewalPlanning';
 import { employmentContractId, projectEmploymentPlayer, validateAnnualEmploymentContract } from './seasonContract';
 import { MIN_SALARY_SHIHAKA, MAX_SHIHAKA_TOTAL } from '../constants';
@@ -51,6 +52,7 @@ const kinds = {
   'convert-to-controlled': ['teamId', 'playerId', 'contractId', 'annualSalaryManYen'],
 };
 function commandFor(input) {
+  if (isWinterDepartureCommand(input)) return normalizeWinterDeparture(input);
   if (!input || !validId(input.id) || !Object.hasOwn(kinds, input.type)
     || Object.keys(input).some(k => !['id', 'type', ...kinds[input.type]].includes(k))) fail('取引の種類・ID・入力項目を確認してください。');
   const c = { id: input.id, type: input.type };
@@ -107,6 +109,11 @@ function inspect(state) {
   const date = parseContractDate(state.date);
   if (date.year !== state.season || state.spending?.budgetSeason !== state.season + Number(state.phase === 'offseason')
     || !['preseason', 'season', 'offseason'].includes(state.phase)) fail('取引年度・フェーズを確認してください。');
+  const departures = inspectAnnualDepartures(state);
+  // Project only the records validated above. Share this snapshot with floors;
+  // neither a caller-supplied projection nor a second inspection is needed.
+  const { offseasonDepartures: previousProjection, ...spending } = state.spending;
+  state = { ...state, spending: { ...spending, ...(departures.length ? { offseasonDepartures: departures } : {}) } };
   const pendingAcquisitions = inspectAnnualAcquisitions(state);
   const pendingPersonnel = inspectFaPersonnelMoves(state);
   const teams = new Map(), players = new Map(), owners = new Map(), receipts = new Set(), acceptedRookies = new Map();
@@ -147,7 +154,8 @@ function inspect(state) {
     }
   }
   const employed = contractEmploymentAt(state.spending.ledger, rosterDate(state)).filter(e =>
-    !pendingAcquisitions.some(h => h.proposal.contract.contractId === employmentContractId(e.contract))
+    !(state.phase === 'offseason' && departures.some(d => d.season === state.season && d.sourceContractId === employmentContractId(e.contract)))
+    && !pendingAcquisitions.some(h => h.proposal.contract.contractId === employmentContractId(e.contract))
     && !pendingPersonnel.some(m => m.player.id === e.contract.playerId));
   if (employed.length !== owners.size || employed.some(e => owners.get(e.contract.playerId) !== e.teamId)) fail('名簿と有効な契約の所属が一致しません。');
   if (employed.some(e => e.registrationType !== undefined
@@ -173,7 +181,7 @@ function inspect(state) {
   }
   const personnelTransfers = (state.faPersonnelMoves ?? []).flatMap(m => m.transfers);
   for (const record of state.spending.ledger.records) if (record.effectiveDate <= state.date
-    && record.changes.some(c => c.effectiveDate > state.date && !personnelTransfers.some(a => stable(a) === stable(c))))
+    && record.changes.some(c => c.effectiveDate > state.date && !personnelTransfers.some(a => stable(a) === stable(c)) && !departures.some(d => stable(d.endAction) === stable(c))))
     fail('未来の取引を現在の名簿へ反映できません。');
   for (const future of futureEmployments(state)) {
     if (future.contract.purpose === 'acquisition' && !owners.has(future.contract.playerId)
@@ -207,13 +215,14 @@ function inspect(state) {
   }
   inspectFaProtectionLists(state);
   quoteAnnualSpendingPlan(state.spending);
-  return { teams, players, employed };
+  return { state, teams, players, employed };
 }
 
 // Planner counts belong to the trusted snapshot, never the incoming command.
 // An unowned accepted rookie still needs funding; a funded hold counts once.
 function withFloors(state) {
-  const { teams, players } = inspect(state), requirements = new Map();
+  const inspected = inspect(state), { teams, players } = inspected, requirements = new Map();
+  state = inspected.state;
   for (const r of state.rosterRequirements) {
     const k = key(r.teamId, r.season);
     if (!teams.has(r.teamId) || !Number.isInteger(r.season) || !Number.isInteger(r.requiredControlledCount)
@@ -460,9 +469,9 @@ function candidate(input, command) {
     return { state: input, rows: quoteAnnualSpendingPlan(before.spending), replayed: true,
       ...(receipt.faPersonnel ? { personnel: { winnerProposalIds: [...receipt.faPersonnel.winnerProposalIds], lostProposalIds: [...receipt.faPersonnel.lostProposalIds] } } : {}) };
   }
-  if (input.phase === 'offseason' && !c.type.endsWith('renewal') && !c.type.endsWith('rookie') && !c.type.endsWith('fa') && !['settle-fa-compensation', 'submit-fa-protection', 'settle-fa-personnel', 'join-fa-personnel'].includes(c.type)) fail('オフの新制度取引は翌年度契約だけが接続済みです。');
+  if (input.phase === 'offseason' && !isWinterDepartureCommand(c) && !c.type.endsWith('renewal') && !c.type.endsWith('rookie') && !c.type.endsWith('fa') && !['settle-fa-compensation', 'submit-fa-protection', 'settle-fa-personnel', 'join-fa-personnel'].includes(c.type)) fail('オフの新制度取引は翌年度契約だけが接続済みです。');
   // Snapshot and receipt enter validation together; no unaudited intermediate state.
-  let protectedState;
+  let protectedState = isWinterDepartureCommand(c) ? createWinterDeparture(before, c, signature) : undefined;
   if (c.type === 'submit-fa-protection') {
     const record = createFaProtectionList(before, c);
     protectedState = { ...before, faProtectionLists: [...(before.faProtectionLists ?? []), record],
@@ -489,7 +498,7 @@ function candidate(input, command) {
   // Releasing a prorated bid may restore a larger conservative annual floor.
   // Cancellation/losing bids create no obligation; winner admission is above.
   // Departures must still account for real vacancies created by outgoing players.
-  if (['trade', 'settle-fa-personnel'].includes(c.type)
+  if (['trade', 'settle-fa-personnel', 'enter-market'].includes(c.type)
     && rows.some(r => r.remainingManYen < 0 && r.remainingManYen < oldRows.get(key(r.teamId, r.season)).remainingManYen)) fail('赤字年度の追加余力を悪化させる取引です。');
   return { state: { ...after, transactions: protectedState ? after.transactions : [...after.transactions, { id: c.id, signature }] }, rows, replayed: false,
     ...(personnel ? { personnel } : {}) };

@@ -1,3 +1,4 @@
+import { winter, departureCommand } from '../src/engine/__tests__/fixtures/winterDepartures';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
 import { saveGame, loadGame, getLastLoadResult, enqueueSaveGame } from '../src/engine/saveload';
@@ -375,4 +376,91 @@ it('requires the progression producer to increment revision when the economy clo
   next.contractEconomy.revision++;
   expect((await save(next)).ok).toBe(true);
   expect((await loadGame()).contractEconomy.clock.date).toBe('2026-07-17');
+});
+
+it.each([false, true])('winter departure survives real save/reload and failed replacement (large=%s)', async large => {
+  const before = winter(3), command = departureCommand(before, 'release');
+  const result = reduceEconomyCommand(before, command);
+  expect(result.ok, result.error).toBe(true);
+  const next = result.world;
+  if (large) next.padding = 'winter'.repeat(20000);
+  expect((await save(before)).ok).toBe(true);
+  expect((await save(next)).ok).toBe(true);
+  freshStorageSurface();
+  let loaded = await loadGame();
+  expect(loaded.contractEconomy).toEqual(next.contractEconomy);
+  expect(loaded.faPool).toEqual(JSON.parse(JSON.stringify(next.faPool)));
+  expect(loaded.teams[0].players).toEqual([]);
+  const oldRoots = roots(), set = localStorage.setItem;
+  localStorage.setItem = (k, v) => { if (k === primary) throw new Error('disk full'); set(k, v); };
+  expect((await save(loaded)).ok).toBe(false);
+  expect(roots()).toEqual(oldRoots);
+  localStorage.setItem = set;
+  expect((await save(loaded)).ok).toBe(true);
+  freshStorageSurface(); loaded = await loadGame();
+  expect(loaded.contractEconomy).toEqual(next.contractEconomy);
+  const replay = reduceEconomyCommand(loaded, command);
+  expect(replay.ok, replay.error).toBe(true); expect(replay.replayed).toBe(true); expect(replay.world).toBe(loaded);
+});
+
+it.each([false, true])('rejects an unacquirable winter listing without replacing either saved root (large=%s)', async large => {
+  const before = winter(3), result = reduceEconomyCommand(before, departureCommand(before, 'release'));
+  expect(result.ok, result.error).toBe(true);
+  if (large) result.world.padding = 'winter'.repeat(20000);
+  expect((await save(before)).ok).toBe(true);
+  expect((await save(result.world)).ok).toBe(true);
+  const savedRoots = roots(); freshStorageSurface();
+  const invalid = await loadGame(); invalid.faPool.find(p => p.id === 0).isFA = false;
+  expect(await save(invalid)).toMatchObject({ ok: false, reason: 'economy_payload_invalid' });
+  expect(roots()).toEqual(savedRoots);
+  freshStorageSurface();
+  const restored = await loadGame();
+  expect(restored.faPool.find(p => p.id === 0).isFA).toBe(true);
+  expect((await save(restored)).ok).toBe(true);
+});
+
+it('cold saves formal re-acquisition, joining and next-winter departure with both histories intact', async () => {
+  let world = winter(3);
+  const other = world.contractEconomy.engine.spending.ledger.records[1].contract;
+  other.termYears = 3; other.endSeason = 2028;
+  world = commandWorld(world, departureCommand(world, 'release').transaction);
+  const firstHistory = structuredClone(world.contractEconomy.engine.offseasonDepartures[0]);
+  const proposal = { id: 'winter-rebid', type: 'sign', teamId: 1, offeredDate: '2026-12-01', effectiveDate: '2027-02-01',
+    marketEntry: world.faPool.find(p => p.id === 0).marketEntry,
+    contract: createSeasonContract({ contractId: 'winter-rejoined', playerId: 0, signedSeason: 2026,
+      agreementPhase: 'offseason', purpose: 'acquisition', termYears: 1, annualSalaryManYen: 800,
+      guaranteed: true, registrationType: 'controlled' }) };
+  world = commandWorld(world, { id: 'winter-offer', type: 'offer-fa', proposal });
+  world = commandWorld(world, { id: 'winter-accept', type: 'accept-fa', proposalId: proposal.id });
+  expect((await save(world)).ok).toBe(true);
+  freshStorageSurface(); world = await loadGame();
+  expect(world.contractEconomy.engine.offseasonDepartures).toEqual([firstHistory]);
+  expect(world.faPool.some(p => p.id === 0)).toBe(false);
+
+  // Set up the next trusted clock; live rollover wiring is outside this PR.
+  world.year = 2027;
+  world.contractEconomy.clock = { season: 2027, phase: 'preseason', date: '2027-02-01', offseasonTurn: 0 };
+  world.contractEconomy.cycle.season = 2027;
+  world.contractEconomy.revision++;
+  world = commandWorld(world, { id: 'winter-join', type: 'join-fa', proposalId: proposal.id });
+  const joined = world.teams[1].farm.find(p => p.id === 0);
+  expect(joined.isFA).toBe(false); expect(joined.contractId).toBe('winter-rejoined');
+  joined.age = 27; joined.power = 75; joined.stats = { hr: 23 };
+  expect((await save(world)).ok).toBe(true);
+  freshStorageSurface(); world = await loadGame();
+  expect(world.teams[1].farm.find(p => p.id === 0)).toMatchObject({ isFA: false, age: 27, power: 75, stats: { hr: 23 } });
+  expect(world.contractEconomy.engine.offseasonDepartures).toEqual([firstHistory]);
+
+  world.contractEconomy.clock = { season: 2027, phase: 'offseason', date: '2027-12-01', offseasonTurn: 0 };
+  world.contractEconomy.engine.spending.budgetSeason = 2028;
+  world.contractEconomy.revision++;
+  world = commandWorld(world, { id: 'winter-second-exit', type: 'enter-market', teamId: 1, playerId: 0,
+    contractId: 'winter-rejoined', reason: 'expiry' });
+  expect((await save(world)).ok).toBe(true);
+  freshStorageSurface(); world = await loadGame();
+  expect(validateEconomySave(world)).toBe('annual');
+  expect(world.contractEconomy.engine.offseasonDepartures).toHaveLength(2);
+  expect(world.contractEconomy.engine.offseasonDepartures[0]).toEqual(firstHistory);
+  expect(world.faPool.find(p => p.id === 0)).toMatchObject({ isFA: true, departureReason: 'expiry',
+    contractId: 'winter-rejoined', stats: { hr: 23 }, marketEntry: { originTeamId: 1 } });
 });
