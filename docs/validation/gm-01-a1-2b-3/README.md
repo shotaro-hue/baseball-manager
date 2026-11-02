@@ -60,3 +60,40 @@ E2Eは3幅で確認→主保存失敗→同条件再試行→cold reload、別�
 履歴も確定worldに含めたため、annual保存では履歴chunkも書き込む。履歴400件上限を維持。
 
 独立最終レビューと最新HEADのCI結果はPR本文を正本とする。マージ/自動マージは行わない。
+
+## PR #534 レビュー修正（GM-01 A1-2b-3-FIX）
+
+開始HEAD: `d63a60839185070aaba455f1a91149f06248dd98`。mainは`7b2d860ab6f46452ef7aebeccde815aebfef24fa`。
+開始時のCI #634は成功、GitHubレビューコメントはなし。ユーザー提供のP2/P3を現行コードで再現した。
+
+- **P2:** 無金銭交換すべてを「双方の追加余力が悪化しない」赤字例外で審査していた。通常審査を先に実行し、不成立かつ双方が選手を出す完全無金銭交換だけ既存例外へ渡す。共通の予算・最低維持費・留保・契約移管の処理は変更しない。
+- 両審査は同じworld/request/transaction IDを使用する。replayでは通常/例外のどちらも共通reducerで完全なreceipt signatureを照合し、修正前のcashless receiptも保持する。保存機構・revision・epoch・抽選は変更しない。
+- **P3:** legacy確定後も残る`busy`が通知遷移を止めていた。annualの保存中・失敗後の再試行待ち・adoption復旧待ちだけ通知の適用を保留し、完了後に最新通知を一度だけ適用する。処理中のrequestや確認内容を差し替えない。
+
+| 検証 | 結果 |
+| --- | --- |
+| RED（humanTrade / TradeTab） | 50件中6 failed、44 passed。異年俸無金銭交換1、legacy承諾/辞退後の通知2、annual保存/失敗/復旧時の通知3 |
+| GREEN（pure / UI / real hook / 年度負担表示） | 4ファイル70 passed、0 failed/skip |
+| 契約・予算・最低維持費・留保・新人・育成・保存・legacy回帰 | 17ファイル531 passed、0 failed/skip |
+| 通常/例外境界 | 予算十分の同年俸/異年俸、赤字同額交換、当年/将来年度悪化拒否、将来だけ予算不足、片方向/金銭付き例外禁止 |
+| replay・保存 | 旧cashless receipt、receipt改変拒否、revision/日付が進んだ後のreplay、無金銭の保存失敗→同条件再試行とCPU抽選一回性 |
+| Chromium | 9 passed。既存7件に、legacy通知A辞退→B承諾、annual異年俸無金銭交換→cold reloadを追加 |
+| ローカルmobile WebKit | `libGLESv2`（libgles2）不足で9件ともブラウザ起動前に失敗。アプリ検証済みとは扱わず、同一HEADのCIで確認する |
+| ビルド / diff check | 成功。既存のmixed import / chunk size警告あり |
+| 独立コードレビュー | 追加のP1/P2/P3指摘なし。ブラウザ/ビルド/CIの結果は実行記録で別途確認 |
+
+ブラウザ初回の非TTY実行は結果を出さず終了したため成功に含めない。TTY実行ではChromium9件が成功し、WebKitの不足ライブラリを特定。
+WebKit用パッケージ導入は実行環境のapt/setgroups制約で完了できず、CIにある既存の`playwright install --with-deps`で検証する。
+テスト用ハーネスだけに通知遷移操作を公開し、legacy worldのhydrationも許可した。本番の公開ゲートや保存形式は変更していない。
+
+360/390/1440pxのlegacy確認・annual確認・保存失敗の9画像を再取得し、上記掲載済みの画像とRGBピクセル単位で完全一致した。画像の重複追加は省略する。レイアウト/CSS変更なし。実iPhone・大規模worldの新規性能測定は未実施。
+
+```sh
+npx vitest run src/engine/__tests__/humanTrade.test.js src/components/tabs/TradeTab.test.js src/hooks/useGameState.economyTrade.test.js src/components/management/AnnualTradeTerms.test.js
+npx vitest run src/engine/__tests__/annualSpending.test.js src/engine/__tests__/annualTransactions.test.js src/engine/__tests__/annualRenewalTransactions.test.js src/engine/__tests__/annualAcquisitionSpending.test.js src/engine/__tests__/annualDelayedFaTransactions.test.js src/engine/__tests__/annualDevelopmentTransactions.test.js src/engine/__tests__/annualRookieTransactions.test.js src/engine/__tests__/faCompensationSpending.test.js src/engine/__tests__/saveload.test.js src/engine/__tests__/saveloadScopes.test.js src/hooks/useGameState.economyCommit.test.js src/hooks/useGameState.economyDevelopment.test.js src/hooks/useOffseason.economyRenewal.test.js src/hooks/useOffseason.economyAcquisition.test.js src/hooks/useOffseason.economyRookies.test.js src/hooks/useOffseason.trade.test.js src/hooks/useGameState.rosterCapacity.test.js
+npx playwright test save-generations.spec.js --grep 'human trade' --project=chromium --project=mobile-webkit --workers=1 --retries=0 --reporter=list
+npm run build
+git diff --check
+```
+
+後続工程の範囲は変わらない。最新コミットの全単体/統合/負荷/物理演算・両ブラウザE2E・集約ゲートの結果はPR本文に記載する。

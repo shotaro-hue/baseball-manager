@@ -33,6 +33,8 @@ export function TradeTab({ annualGs, myTeam, teams, onTrade, cpuOffers = [], off
   const approved = useRef(null);
   const recovery = annualGs && (saveFailure?.reason === 'economy_adoption_required' || annualGs.saveResult?.reason === 'economy_adoption_required');
   const busy = useRef(false), current = useRef(null), handled = useRef(new Set());
+  const appliedFocus = useRef(null);
+  const focusBlocked = Boolean(annualGs && (saving || recovery || (saveFailure && confirmation)));
   const caseHeading = useRef(null), negotiationHeading = useRef(null), comparisonHeading = useRef(null), wasComparing = useRef(false);
   useEffect(() => {
     const opened = comparing && !wasComparing.current; wasComparing.current = comparing;
@@ -58,9 +60,14 @@ export function TradeTab({ annualGs, myTeam, teams, onTrade, cpuOffers = [], off
     setConfirmation(action);
   };
   useEffect(() => {
-    if (focusRequest?.id == null || busy.current) return;
+    if (focusRequest?.id == null || focusBlocked || (annualGs && busy.current)
+      || (appliedFocus.current?.id === focusRequest.id && appliedFocus.current?.token === focusRequest.token)) return;
+    // Keep a notification pending while the current annual request is saving
+    // or awaiting retry/recovery, then consume it once that operation finishes.
+    appliedFocus.current = focusRequest;
+    approved.current = null; setSaveFailure(null);
     setSelectedMailId(focusRequest.id); setConfirmation(null); setError(null); setMailReceipt(null); busy.current = false;
-  }, [focusRequest?.token]);
+  }, [focusRequest?.id, focusRequest?.token, focusBlocked]);
   useEffect(() => {
     if (active && selectedMailId != null) {
       caseHeading.current?.focus({ preventScroll: true });

@@ -6,14 +6,35 @@ async function mount(page, options = {}) {
     const { saveGame, loadGame } = await import('/baseball-manager/src/engine/saveload.js');
     const { mountTradeView } = await import('/baseball-manager/tests/helpers/trade-hook-harness.jsx');
     const world = options.reload ? await loadGame() : tradeFixture();
+    if (options.legacySession) delete world.contractEconomy;
     if (options.mailbox && !options.reload) world.mailbox = ['first', 'offer'].map(id => ({ id, type: 'trade',
       title: id === 'first' ? '最初のトレード提案' : '相手球団からのトレード提案', read: false,
-      offer: { from: world.teams[1], want: [world.teams[0].players[0]], offer: [world.teams[1].players[0]], cash: 5000000 } }));
+      offer: { from: world.teams[1], want: [world.teams[0].players[0]], offer: [world.teams[1].players[0]], cash: (options.cashManYen ?? 500) * 10000 } }));
     window.tradeHarness?.unmount();
     if (!options.reload && !(await saveGame(world, { skipCompression: true })).ok) throw Error('save failed');
     window.tradeHarness = mountTradeView(world, options);
   }, options);
 }
+for (const legacySession of [true, false]) test(`save generations: human trade notification switches after completion (${legacySession ? 'legacy' : 'annual cashless'})`, async ({ page }) => {
+  await page.goto('/'); await mount(page, { mailbox: true, legacySession, cashManYen: 0 });
+  await page.evaluate(() => window.tradeHarness.openCase('first'));
+  await page.getByRole('button', { name: '辞退内容を確認する', exact: true }).click();
+  await page.getByRole('button', { name: '辞退を確定する', exact: true }).click();
+  await expect(page.getByText('この提案は対応済みです。再実行はできません。', { exact: true })).toBeVisible();
+  await page.evaluate(() => window.tradeHarness.openCase('offer'));
+  const detail = page.getByRole('region', { name: '選択したトレード案件', exact: true });
+  await expect(detail.getByRole('heading', { level: 2 })).toHaveText('相手球団からのトレード提案');
+  await page.getByRole('button', { name: '承諾内容を確認する', exact: true }).click();
+  await page.getByRole('button', { name: '承諾を確定する', exact: true }).click();
+  await expect(page.getByText('この提案は対応済みです。再実行はできません。', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => ({ owner: window.tradeHarness.current().teams[0].players[0].id,
+    resolved: window.tradeHarness.current().mailbox.map(m => Boolean(m.resolved)) })))
+    .toEqual({ owner: 'b', resolved: [true, true] });
+  if (!legacySession) {
+    await page.reload(); await mount(page, { reload: true });
+    expect(await savedTrade(page)).toEqual({ owners: ['b', 0], cash: [], salaries: [5484, 4516], receipts: 2, history: 1, news: 1 });
+  }
+});
 async function open(page) {
   await page.getByRole('button', { name: '相手球団と交渉する', exact: true }).click();
   await page.getByRole('checkbox', { name: '放出選手を放出候補に選ぶ', exact: true }).check();

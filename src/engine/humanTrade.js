@@ -30,13 +30,22 @@ export function reduceTradeRequest(world, request) {
     const id = stable(['human-trade', r]);
     const command = { id, type: 'trade', fromId: r.teamId, toId: a.toId,
       outgoingIds: a.outgoingIds, incomingIds: a.incomingIds, cashManYen: a.cashManYen,
-      mode: a.cashManYen === 0 && a.outgoingIds.length && a.incomingIds.length ? 'cashless-trade' : 'spend' };
+      mode: 'spend' };
     const envelope = { saveId: r.saveId, epoch: r.epoch, baseRevision: r.baseRevision, transaction: command };
+    const reduce = () => {
+      const ordinary = reduceEconomyCommand(world, envelope);
+      if (ordinary.ok || a.cashManYen !== 0 || !a.outgoingIds.length || !a.incomingIds.length) return ordinary;
+      // Only a full cashless exchange may use the unchanged deficit exception.
+      // Both attempts use the same immutable base and transaction ID. On replay,
+      // the common reducer must match the complete signature of either receipt,
+      // including cashless receipts written before ordinary-first admission.
+      return reduceEconomyCommand(world, { ...envelope, transaction: { ...command, mode: 'cashless-trade' } });
+    };
     // Replay before ownership/date checks: the same players have already moved.
     const receipt = state.transactions.find(t => t.id === id);
     const declineSignature = stable({ id, type: 'decline-trade', request: r });
     if (receipt) {
-      if (!a.decline) return reduceEconomyCommand(world, envelope);
+      if (!a.decline) return reduce();
       if (receipt.signature !== declineSignature) fail('トレード辞退の確定履歴が一致しません。');
       return { ok: true, world, replayed: true };
     }
@@ -63,7 +72,7 @@ export function reduceTradeRequest(world, request) {
     // native trade cancellation silently orphan that decision or release funds.
     if (state.spending.reservations.some(h => h.kind === 'renewal' && ids.has(h.proposal.contract.playerId)))
       fail('移籍対象選手の未回答の更改提示を取り消してから、条件を確認してください。');
-    const result = reduceEconomyCommand(world, envelope);
+    const result = reduce();
     if (!result.ok) return result;
     const mine = world.teams.find(t => t.id === r.teamId), other = world.teams.find(t => t.id === a.toId);
     const outgoing = ownedPlayers(mine).filter(p => a.outgoingIds.includes(p.id)), incoming = ownedPlayers(other).filter(p => a.incomingIds.includes(p.id));

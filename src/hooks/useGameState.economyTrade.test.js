@@ -52,12 +52,12 @@ const content = n => n == null ? '' : typeof n === 'object' ? (Array.isArray(n) 
 const button = label => view.root.findAllByType('button').find(b => content(b) === label);
 const click = label => act(() => button(label).props.onClick());
 const confirmation = () => content(view.root.findByProps({ 'aria-label': 'トレード条件の最終確認' }));
-function openTrade() {
+function openTrade(cashManYen = 500) {
   click('相手球団と交渉する');
   act(() => view.root.findByProps({ 'aria-label': '放出選手を放出候補に選ぶ' }).props.onChange({ target: { checked: true } }));
   click('獲得候補を選ぶ');
   act(() => view.root.findByProps({ 'aria-label': '獲得選手を獲得候補に選ぶ' }).props.onChange({ target: { checked: true } }));
-  act(() => view.root.findByProps({ 'aria-label': '支払金額（万円）' }).props.onChange({ target: { value: '500' } }));
+  act(() => view.root.findByProps({ 'aria-label': '支払金額（万円）' }).props.onChange({ target: { value: String(cashManYen) } }));
   click('トレードを提案する');
 }
 it('commits once, rejects double clicks and replays exactly after adoption', async () => {
@@ -73,8 +73,8 @@ it('commits once, rejects double clicks and replays exactly after adoption', asy
   act(() => expect(gs.hydrateSavedWorld(saved, { progressToken: gs.getProgressToken(), sessionToken: gs.getProgressSessionToken() })).toBe(true));
   expect(await run(() => gs.commitTradeRequest(r, session))).toMatchObject({ ok: false, reason: 'economy_session_conflict' });
 });
-it('retains accepted terms after a failed save and retries without another negotiation roll', async () => {
-  await setup(tradeFixture(), true); openTrade();
+it.each([500, 0])('retains accepted terms after a failed save and retries without another negotiation roll (cash=%s)', async cashManYen => {
+  await setup(tradeFixture(), true); openTrade(cashManYen);
   expect(confirmation()).toContain('5,484万円'); expect(confirmation()).toContain('4,516万円');
   const root = storage.get(primary), before = structuredClone(gs.teams), economy = structuredClone(gs.contractEconomy), write = localStorage.setItem;
   localStorage.setItem = (k, v) => { if (k === primary) throw Error('quota'); write(k, v); };

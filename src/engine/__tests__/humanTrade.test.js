@@ -7,6 +7,7 @@ import { contractLiabilityRows, contractEmploymentAt, applyContractLedgerAction 
 import { validateEconomySave } from '../economyPersistence';
 import { pendingDevelopmentFixture } from './fixtures/pendingDevelopmentWorld';
 import { own } from './faPersonnelFixtures';
+import { quoteAnnualSpendingPlan } from '../annualSpending';
 
 const action = extra => ({ toId: 1, outgoingIds: [0], incomingIds: ['b'], cashManYen: 500, ...extra });
 const success = r => { expect(r.ok, r.error).toBe(true); return r.world; };
@@ -80,6 +81,66 @@ it('allows only nonworsening cashless deficit swaps', () => {
   const w = tradeFixture({ salary: 1000, years: 3, approved: 900 });
   success(reduceTradeRequest(w, tradeRequest(w, action({ cashManYen: 0 }))));
   reject(w, tradeRequest(w, action({ cashManYen: 1 })));
+});
+it.each([1000, 2000])('allows a funded cashless swap with outgoing salary %s and replays it once', salary => {
+  const w = freezeEconomy(tradeFixture({ salary, years: 3 }));
+  const request = tradeRequest(w, action({ cashManYen: 0 }));
+  const next = success(reduceTradeRequest(w, request));
+  expect(next.teams.map(t => t.players[0].id)).toEqual(['b', 0]);
+  expect(next.contractEconomy.engine.spending.oneOffCosts).toEqual([]);
+  expect(next.contractEconomy.revision).toBe(1);
+  expect(next.contractEconomy.engine.transactions).toHaveLength(1);
+  expect(next.news).toHaveLength(1); expect(next.seasonHistory.transfers).toHaveLength(1);
+  expect(next.teams.map(t => t.history.length)).toEqual([1, 1]);
+  const restored = JSON.parse(JSON.stringify(next));
+  expect(validateEconomySave(restored)).toBe('annual');
+  expect(reduceTradeRequest(restored, JSON.parse(JSON.stringify(request))))
+    .toMatchObject({ ok: true, replayed: true, world: restored });
+  expect(restored).toEqual(next);
+});
+it('preserves the deficit exception and its receipt after later world changes', () => {
+  const w = tradeFixture({ salary: 1000, years: 3, approved: 900 });
+  const request = tradeRequest(w, action({ cashManYen: 0 }));
+  const next = success(reduceTradeRequest(w, request));
+  const command = JSON.parse(next.contractEconomy.engine.transactions[0].signature);
+  expect(reduceEconomyCommand(w, { saveId: w.saveId, epoch: request.epoch, baseRevision: 0,
+    transaction: { ...command, mode: 'spend' } }).ok).toBe(false);
+  const rows = world => quoteAnnualSpendingPlan(toAnnualState(world).spending).map(r => r.remainingManYen);
+  expect(rows(next)).toEqual(rows(w));
+  expect(rows(next)).toContain(-100);
+  const restored = JSON.parse(JSON.stringify(next));
+  restored.contractEconomy.revision++;
+  restored.contractEconomy.clock.date = '2026-07-17'; restored.schedule[1].date.day = 17;
+  expect(reduceTradeRequest(restored, request)).toMatchObject({ ok: true, replayed: true, world: restored });
+  expect(restored.contractEconomy.engine.transactions).toHaveLength(1);
+  expect(restored.seasonHistory.transfers).toHaveLength(1);
+});
+it('replays a cashless receipt created before ordinary-first admission without accepting changed terms', () => {
+  const w = tradeFixture({ salary: 1000, years: 3 }), request = tradeRequest(w, action({ cashManYen: 0 }));
+  const next = success(reduceTradeRequest(w, request));
+  const command = JSON.parse(next.contractEconomy.engine.transactions[0].signature);
+  const old = success(reduceEconomyCommand(w, { saveId: w.saveId, epoch: request.epoch, baseRevision: 0,
+    transaction: { ...command, mode: 'cashless-trade' } }));
+  expect(reduceTradeRequest(old, request)).toMatchObject({ ok: true, replayed: true, world: old });
+  const tampered = structuredClone(old), receipt = tampered.contractEconomy.engine.transactions[0];
+  receipt.signature = receipt.signature.replace('"cashManYen":0', '"cashManYen":1');
+  reject(tampered, request);
+});
+it.each([
+  { salary: 2000, years: 3, season: 2026, approved: 900 },
+  { salary: 1000, years: 1, season: 2027, approved: 900 },
+  { salary: 2000, years: 3, season: 2028, approved: 1500 },
+])('rejects worsening current/future cashless budgets: %j', ({ season, approved, ...options }) => {
+  let w = tradeFixture(options);
+  for (const list of [w.contractEconomy.budgetPolicies, w.contractEconomy.engine.spending.authorizations])
+    for (const row of list.filter(r => r.season === season)) row.approvedManYen = approved;
+  w = fromAnnualState(w, toAnnualState(w));
+  reject(w, tradeRequest(w, action({ cashManYen: 0 })));
+});
+it.each([{ outgoingIds: [] }, { incomingIds: [] }, { cashManYen: 1 }, { cashManYen: -1 }])
+('does not use the deficit exception for one-way or paid trades: %j', extra => {
+  const w = tradeFixture({ salary: 1000, years: 3, approved: 900 });
+  reject(w, tradeRequest(w, action({ cashManYen: 0, ...extra })));
 });
 it('revalidates future budgets and ignores the legacy displayed wallet', () => {
   let w = tradeFixture(); const r = tradeRequest(w, action()); expect(previewHumanTrade(w, r).ok).toBe(true);
