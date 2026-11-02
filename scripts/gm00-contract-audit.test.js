@@ -129,12 +129,20 @@ it('GM-00: observes real transaction paths and quotes the staged monthly/season 
 
   const { contractSignedYear: oldSignedYear, ...scoutSource } = p;
   const scout = { ...scoutSource, id: 'scout' };
-  act(() => gs.setTeams([bareTeam(0, { scoutResults: [scout] })]));
-  act(() => expect(gs.signPlayer(0)).toBe(true));
-  observations.scoutContract = { budgetDeltaManYen: buyer.budget - gs.myTeam.budget,
-    salaryManYen: gs.myTeam.farm[0]?.salary ?? null,
-    years: gs.myTeam.farm[0]?.contractYearsLeft ?? null,
-    signedSeason: gs.myTeam.farm[0]?.contractSignedYear ?? null };
+  const mission = { id: 'old-mission', name: '旧派遣', cost: 3000, weeksLeft: 2 };
+  act(() => gs.setTeams([bareTeam(0, { scoutResults: [scout], scoutMissions: [mission] })]));
+  const scoutingState = () => ({ teams: gs.teams, economy: gs.contractEconomy,
+    faPool: gs.faPool, draftPool: gs.draftPool, dirty: gs.saveDirty, notif: gs.notif });
+  const beforeScout = structuredClone(scoutingState());
+  // 2026-11-02 policy supersedes successful scouting; archived GM-00 evidence stays intact.
+  act(() => {
+    expect(gs.sendScout({ name: '関東', cost: 100, weeks: 1, qMin: 40, qMax: 60 })).toBe(false);
+    expect(gs.signPlayer(0)).toBe(false);
+  });
+  expect(scoutingState()).toEqual(beforeScout);
+  observations.scoutRetirement = { policyChange: '2026-11-02 GM-01 A1-2b-4',
+    dispatchRejected: true, signingRejected: true, budgetDeltaManYen: 0,
+    retainedReports: gs.myTeam.scoutResults.length, retainedMissions: gs.myTeam.scoutMissions.length };
   const development = { ...p, id: 'development', 育成: true, isIkusei: true, salary: 240 };
   act(() => gs.setTeams([bareTeam(0, { farm: [development] })]));
   act(() => gs.convertIkusei(development.id));

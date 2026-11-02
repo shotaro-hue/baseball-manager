@@ -61,3 +61,9 @@ npx vitest run src/hooks/useGameState.legacyScout.test.js src/hooks/useGameState
 - ローカルmobile WebKitは`libgles2`不足で起動前失敗。aptのシステムディレクトリ書込権限制約、ローカル展開＋LD_LIBRARY_PATHでも依存検査を満たせなかった。ローカルWebKit合格とは扱わず、PR CIの同一HEADで確認する。
 - 独立コードレビュー: Critical/Importantのコード指摘なし。Task 8の工程表に残った「調査」の文書指摘1件は、ユーザー要件の「計画の矛盾解消」に該当するため修正。仕様・テスト・6画像を確認したレビューであり、テスト/CI結果の独立再実行を意味しない。
 - レビューで未判定とした実行結果は本記録/PR CIで実装者が確認する。実iPhone・追加大規模world性能・更新前JS停止は明示した検証/保証範囲外のまま。
+
+## 初回PR CIで検出した監査テストの残存期待
+
+- [初回CI 41394339865](https://github.com/shotaro-hue/baseball-manager/actions/runs/41394339865)の全単体テストで、`scripts/gm00-contract-audit.test.js`に旧契約成功の期待が残り、1 failed / 3647 passed / 既存2 skipped。今回の終了仕様に追随できていなかった監査用テストであり、合格とは扱わない。
+- 成功期待を、旧派遣/契約のfalseとteams・市場・契約・dirty・通知の完全非変更に置換。旧候補・派遣記録を保持することも検査し、他のFA・新人・育成・トレード・コーチ・年度更新の監査は維持。保存済みGM-00検証出力は変更しない。
+- 修正後の`npx vitest run scripts/gm00-contract-audit.test.js src/hooks/useGameState.legacyScout.test.js`は**8 passed**。最終HEADの全CI結果はPR本文で確認する。
