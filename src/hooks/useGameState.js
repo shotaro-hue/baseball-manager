@@ -1,5 +1,6 @@
 import { draftCapacityContext, evaluateRosterCapacity, isIkuseiPlayer } from '../engine/rosterCapacity';
 import { reduceRookieRequest } from '../engine/rookieContracts';
+import { reduceTradeRequest } from '../engine/humanTrade';
 import { developmentRequest, reduceDevelopmentRequest } from '../engine/developmentRegistration';
 import { stadiumUpgradeCosts } from '../engine/clubFinance';
 import { marketRosterError } from '../engine/marketRoster';
@@ -600,7 +601,10 @@ export function useGameState() {
     const adopted = adoption && gameState.saveId === adoption.committed.saveId
       && gameState.contractEconomy?.epoch === adoption.committed.epoch
       && gameState.contractEconomy?.revision === adoption.committed.revision
-      && context.adoptionWorlds.some(world => gameState.teams === world.teams);
+      && context.adoptionWorlds.some(world => gameState.teams === world.teams
+        // Recovery may enqueue another clone of the same published history
+        // while the first reducer action is suspended. Observe content, too.
+        && (seasonHistory === world.seasonHistory || JSON.stringify(seasonHistory) === JSON.stringify(world.seasonHistory)));
     if (adopted && !context.adoptionObserved) {
       context.adoptionObserved = true;
       progressTokenRef.current++;
@@ -644,6 +648,7 @@ export function useGameState() {
         const expiration = setTimeout(() => finish(false), 10000);
         pendingEconomyAdoptionRef.current = { world, committed, resolve: finish };
         // Increment the progress fence only once React commits the world.
+        setSeasonHistoryState(world.seasonHistory);
         dispatch(action);
       });
     },
@@ -677,7 +682,7 @@ export function useGameState() {
 
   // Internal annual-fixture transaction route. UI/CPU/Worker remain gated OFF
   // until A1-2/A1-3 integrate all producers.
-  const commitEconomyOperation = useCallback(async (command, reduce, sessionToken) => {
+  const commitEconomyOperation = useCallback(async (command, reduce, sessionToken, { flushPendingBase = false } = {}) => {
     if (sessionToken !== undefined && sessionToken !== progressSessionRef.current)
       return { ok: false, reason: 'economy_session_conflict' };
     if (economyCommitRef.current) return { ok: false, reason: 'economy_commit_pending' };
@@ -705,8 +710,19 @@ export function useGameState() {
     setSaveResult(null);
     let result;
     try {
+      // Reading another offer during the autosave cooldown advances the live
+      // revision. Persist that validated base under the same mutation barrier
+      // before the candidate CAS; ordinary saves retain foreign-root fencing.
+      if (flushPendingBase && saveDirtyRef.current) {
+        const request = beginTrackedSave();
+        result = await queueSave(base, request.options, request.snapshot);
+        if (!result.ok) return result;
+        completeTrackedSave(request.snapshot);
+        setSaveExists(true);
+        context.pendingCareerEntries = [...pendingCareerEntriesRef.current];
+      }
       const mod = await loadSaveModule();
-      const options = { careerEntries: structuredClone(pendingCareerEntries) };
+      const options = { careerEntries: structuredClone(context.pendingCareerEntries) };
       if (Array.isArray(dirtySnapshot.dirtyScopes)) options.dirtyScopes = dirtySnapshot.dirtyScopes;
       result = await mod.commitEconomyCandidate(world, expected, economyCommitBindings(), options);
       if (result.ok) result = await finalizeEconomyCommit(context, result);
@@ -719,7 +735,7 @@ export function useGameState() {
     }
     if (!result.ok) setSaveResult(result);
     return result;
-  }, [economyCommitBindings, finalizeEconomyCommit, refreshSaveQueueState]);
+  }, [economyCommitBindings, finalizeEconomyCommit, refreshSaveQueueState, beginTrackedSave, queueSave, completeTrackedSave]);
 
   const commitEconomyCommand = useCallback(command =>
     commitEconomyOperation(command, reduceEconomyCommand), [commitEconomyOperation]);
@@ -738,6 +754,11 @@ export function useGameState() {
   const commitRookieRequest = useCallback((request, sessionToken) => {
     if (!Number.isSafeInteger(sessionToken)) return Promise.resolve({ ok: false, reason: 'economy_session_conflict' });
     return commitEconomyOperation(request, reduceRookieRequest, sessionToken);
+  }, [commitEconomyOperation]);
+
+  const commitTradeRequest = useCallback((request, sessionToken) => {
+    if (!Number.isSafeInteger(sessionToken)) return Promise.resolve({ ok: false, reason: 'economy_session_conflict' });
+    return commitEconomyOperation(request, reduceTradeRequest, sessionToken, { flushPendingBase: true });
   }, [commitEconomyOperation]);
 
   const recoverEconomyCommand = useCallback(async () => {
@@ -1508,7 +1529,7 @@ export function useGameState() {
     getLatestNewsId,
     markSaveDirty,
     hydrateSavedWorld, hydrateLargeSaveData, getMatchHistorySnapshot, hydrateMatchHistory, applyMatchResultPatch,
-    commitEconomyCommand, commitRenewalRequest, commitAcquisitionRequest, commitDueEconomyRequest, commitRookieRequest, recoverEconomyCommand,
+    commitEconomyCommand, commitRenewalRequest, commitAcquisitionRequest, commitDueEconomyRequest, commitRookieRequest, commitTradeRequest, recoverEconomyCommand,
     resetSaveTracking,
     // derived
     myTeam,

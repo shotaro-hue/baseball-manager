@@ -23,7 +23,7 @@ export const G = {
 };
 
 const domainFields = ['teams', 'gameDay', 'year', 'myId', 'saveId', 'farmCompetition', 'farmCompetitionVersion', 'battedBallReceipt',
-  'faPool', 'faYears', 'offseasonPlan', 'mailbox', 'news', 'schedule', 'contractEconomy'];
+  'faPool', 'faYears', 'offseasonPlan', 'mailbox', 'news', 'seasonHistory', 'schedule', 'contractEconomy'];
 const legacyWrites = new Set([G.APPLY_PROGRESS, G.SET_TEAMS, G.UPD_TEAM, G.SET_GAME_DAY, G.SET_YEAR,
   G.SET_MY_ID, G.SET_SAVE_ID, G.SET_FA_POOL, G.SET_FA_YEARS, G.SET_OFFSEASON_PLAN, G.SET_SCHEDULE,
   G.SET_FARM_COMPETITION, G.ANSWER_INTERVIEW]);

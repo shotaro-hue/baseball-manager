@@ -33,7 +33,7 @@ export function PlayerActions({ player, teamName, onPlayerClick, onToggleCompare
 }
 
 // Inline confirmation: no new game state or nested dialog is introduced.
-export function DecisionConfirmation({ title, children, onCancel, onConfirm, confirmLabel, error, danger = false, fallbackFocus }) {
+export function DecisionConfirmation({ title, children, onCancel, onConfirm, confirmLabel, error, danger = false, fallbackFocus, busy = false, confirmDisabled = false }) {
   const heading = useRef(null);
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -47,12 +47,12 @@ export function DecisionConfirmation({ title, children, onCancel, onConfirm, con
     };
   }, []);
   return <section className="decision-confirm" role="region" aria-label={title} onKeyDown={e => {
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onCancel(); }
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!busy) onCancel(); }
   }}>
     <h3 ref={heading} tabIndex={-1}>{title}</h3>{children}
     {error && <p className="decision-warning" role="alert">{error}</p>}
-    <div className="decision-actions"><Button variant="secondary" onClick={onCancel}>戻って見直す</Button>
-      <Button data-danger={danger || undefined} disabled={Boolean(error)} onClick={onConfirm}>{confirmLabel}</Button></div>
+    <div className="decision-actions"><Button variant="secondary" disabled={busy} onClick={onCancel}>戻って見直す</Button>
+      <Button data-danger={danger || undefined} disabled={busy || confirmDisabled || Boolean(error)} onClick={onConfirm}>{confirmLabel}</Button></div>
   </section>;
 }
 
