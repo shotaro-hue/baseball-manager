@@ -189,3 +189,30 @@ it('does not publish a retiring player as an acquirable released candidate', () 
   const result = reduceEconomyCommand(freezeEconomy(w), command(w));
   expect(result.ok).toBe(false); expect(result.world).toBe(w);
 });
+
+it.each([
+  ['already joined', { isFA: false }],
+  ['retired', { isRetired: true }],
+  ['retiring', { _retireNow: true }],
+  ['departure reason', { departureReason: 'expiry' }],
+  ['source contract', { contractId: 'forged' }],
+  ['release evidence', { isWaiverReleased: false }],
+  ['entry reason', { marketEntryReason: '国内FA' }],
+  ['entry year', { faEnteredYear: 2025 }],
+  ['origin team', { faOriginTeamId: 1 }],
+])('rejects a released listing with changed %s during cold save validation', (_, changes) => {
+  const w = JSON.parse(JSON.stringify(apply(winter(3), command(winter(3), 'release'))));
+  Object.assign(w.faPool.find(p => p.id === 0), changes);
+  const before = structuredClone(w); freezeEconomy(w);
+  expect(() => validateEconomySave(w)).toThrow();
+  expect(w).toEqual(before);
+});
+
+it('allows current market ability and statistics to change while retaining the departure snapshot', () => {
+  const w = apply(winter(3), command(winter(3), 'release'));
+  const history = structuredClone(w.contractEconomy.engine.offseasonDepartures);
+  const p = w.faPool.find(p => p.id === 0);
+  Object.assign(p, { age: 27, power: 75, stats: { hr: 23 }, careerStats: { hr: 123 } });
+  expect(validateEconomySave(JSON.parse(JSON.stringify(w)))).toBe('annual');
+  expect(w.contractEconomy.engine.offseasonDepartures).toEqual(history);
+});

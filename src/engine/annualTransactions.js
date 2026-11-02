@@ -110,6 +110,10 @@ function inspect(state) {
   if (date.year !== state.season || state.spending?.budgetSeason !== state.season + Number(state.phase === 'offseason')
     || !['preseason', 'season', 'offseason'].includes(state.phase)) fail('取引年度・フェーズを確認してください。');
   const departures = inspectAnnualDepartures(state);
+  // Project only the records validated above. Share this snapshot with floors;
+  // neither a caller-supplied projection nor a second inspection is needed.
+  const { offseasonDepartures: previousProjection, ...spending } = state.spending;
+  state = { ...state, spending: { ...spending, ...(departures.length ? { offseasonDepartures: departures } : {}) } };
   const pendingAcquisitions = inspectAnnualAcquisitions(state);
   const pendingPersonnel = inspectFaPersonnelMoves(state);
   const teams = new Map(), players = new Map(), owners = new Map(), receipts = new Set(), acceptedRookies = new Map();
@@ -211,17 +215,14 @@ function inspect(state) {
   }
   inspectFaProtectionLists(state);
   quoteAnnualSpendingPlan(state.spending);
-  return { teams, players, employed };
+  return { state, teams, players, employed };
 }
 
 // Planner counts belong to the trusted snapshot, never the incoming command.
 // An unowned accepted rookie still needs funding; a funded hold counts once.
 function withFloors(state) {
-  // Derived only from validated engine records; never persist a second source.
-  const departures = inspectAnnualDepartures(state);
-  const { offseasonDepartures: previousProjection, ...spending } = state.spending;
-  state = { ...state, spending: { ...spending, ...(departures.length ? { offseasonDepartures: departures } : {}) } };
-  const { teams, players } = inspect(state), requirements = new Map();
+  const inspected = inspect(state), { teams, players } = inspected, requirements = new Map();
+  state = inspected.state;
   for (const r of state.rosterRequirements) {
     const k = key(r.teamId, r.season);
     if (!teams.has(r.teamId) || !Number.isInteger(r.season) || !Number.isInteger(r.requiredControlledCount)

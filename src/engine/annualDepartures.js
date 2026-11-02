@@ -3,6 +3,7 @@ import { employmentContractId } from './seasonContract';
 import { parseContractDate } from './contractCalendar';
 import { removeDepartingPlayers } from './tradeTransaction';
 import { cancelContractReservation } from './annualSpending';
+import { validateMarketPlayer } from './annualAcquisitions';
 
 const fail = () => { throw new Error('冬の退団・元契約・確定履歴を確認してください。'); };
 const validId = id => (typeof id === 'string' && id.trim()) || (Number.isSafeInteger(id) && id >= 0);
@@ -17,16 +18,27 @@ export function normalizeWinterDeparture(c) {
   return { id: c.id, type: c.type, teamId: c.teamId, playerId: c.playerId, contractId: c.contractId, reason: c.reason };
 }
 
-function recordFor(state, c, player, season, notifiedDate) {
+// Per-inspection only: the ledger remains the sole source, including its full
+// validation. Histories in the same winter share one employment reconstruction.
+function departureContracts(ledger) {
+  const records = new Map(ledger.records.map(r => [employmentContractId(r.contract), r])), dates = new Map();
+  return { records, at(season) {
+    if (!dates.has(season)) dates.set(season, new Map(contractEmploymentAt(ledger, day(season, '11-30'))
+      .map(e => [employmentContractId(e.contract), e])));
+    return dates.get(season);
+  } };
+}
+
+function recordFor(state, c, player, season, notifiedDate, lookup = departureContracts(state.spending.ledger)) {
   if (parseContractDate(notifiedDate).year !== season || notifiedDate < day(season, '11-30')) fail();
-  const e = contractEmploymentAt(state.spending.ledger, day(season, '11-30'))
-    .find(e => e.teamId === c.teamId && e.contract.playerId === c.playerId && employmentContractId(e.contract) === c.contractId);
-  if (!e || player?.id !== c.playerId || (c.reason === 'expiry' && e.contract.endSeason !== season)) fail();
+  const e = lookup.at(season).get(c.contractId);
+  if (!e || e.teamId !== c.teamId || e.contract.playerId !== c.playerId
+    || player?.id !== c.playerId || (c.reason === 'expiry' && e.contract.endSeason !== season)) fail();
   const natural = e.contract.endSeason === season;
   const effectiveDate = natural ? day(season, '12-01') : day(season + 1, '02-01');
   const endAction = natural ? null : { id: JSON.stringify([c.id, 'winter-end']), type: 'end', contractId: c.contractId,
     teamId: c.teamId, effectiveDate, reason: 'release', settlement: 'retain' };
-  const source = state.spending.ledger.records.find(r => employmentContractId(r.contract) === c.contractId);
+  const source = lookup.records.get(c.contractId);
   const sourceRecord = structuredClone({ ...source, changes: source.changes.filter(a => a.id !== endAction?.id) });
   return { id: c.id, season, sourceRecord, teamId: c.teamId, player: structuredClone(player), sourceContractId: c.contractId,
     sourceAnnualSalaryManYen: e.annualSalaryManYen, reason: c.reason, notifiedDate, effectiveDate, endAction,
@@ -39,6 +51,7 @@ export function inspectAnnualDepartures(state) {
   const departures = state.offseasonDepartures ?? [];
   if (!Array.isArray(departures)) fail();
   const seen = new Set(), contracts = new Set();
+  const lookup = departures.length ? departureContracts(state.spending.ledger) : null;
   for (const d of departures) {
     if (!d || !validId(d.id) || seen.has(String(d.id)) || contracts.has(String(d.sourceContractId))
       || !Number.isInteger(d.season) || d.season > state.season || d.season < 1
@@ -49,14 +62,23 @@ export function inspectAnnualDepartures(state) {
     const receipt = receipts[0];
     let c; try { c = normalizeWinterDeparture(JSON.parse(receipt.signature)); } catch { fail(); }
     if (c.id !== d.id || stable(c) !== receipt.signature || stable(receipt.departure) !== stable(d)
-      || stable(recordFor(state, c, d.player, d.season, d.notifiedDate)) !== stable(d)) fail();
+      || stable(recordFor(state, c, d.player, d.season, d.notifiedDate, lookup)) !== stable(d)) fail();
     const team = state.teams.find(t => t.id === d.teamId);
     if (!team?.history?.some(p => stable(p) === stable(departureHistory(d)))) fail();
     const acquired = state.spending.resolvedReservations.some(r => r.kind === 'offer' && r.resolution === 'accepted'
       && r.proposal.contract.playerId === d.player.id && stable(r.proposal.marketEntry) === stable(d.marketEntry));
-    if (!acquired && !state.faPool.some(p => p.id === d.player.id && stable(p.marketEntry) === stable(d.marketEntry))) fail();
+    if (!acquired) {
+      const listing = state.faPool.find(p => p.id === d.player.id && stable(p.marketEntry) === stable(d.marketEntry));
+      if (!listing) fail();
+      validateMarketPlayer(listing);
+      // Listing provenance is immutable; current ability, age and statistics
+      // are not the historical departure snapshot. Acquired entries are history.
+      if (listing.contractId !== d.sourceContractId || listing.departureReason !== d.reason
+        || listing.isWaiverReleased !== true || listing.marketEntryReason !== '自由契約'
+        || listing.faEnteredYear !== d.season || listing.faOriginTeamId !== d.teamId) fail();
+    }
     if (d.endAction) {
-      const record = state.spending.ledger.records.find(r => employmentContractId(r.contract) === d.sourceContractId);
+      const record = lookup.records.get(d.sourceContractId);
       if (!record?.changes.some(a => stable(a) === stable(d.endAction))) fail();
     }
   }
