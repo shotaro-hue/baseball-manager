@@ -19,6 +19,8 @@ v2/season の enter-market/releaseを既存の冬の退団取引に追加する�
 
 独立静的レビューで、退団記録とreceiptの対削除により当日のend/release actionが孤立しても通るP2を検出。実際のinspectAnnualDepartures関数をV8上で評価し、対削除した入力を受理するREDと、台帳から証跡への逆照合を追加して拒否するGREENを確認した。完全なworldのcold reloadケースもVitestへ追加した。逆照合はv2のrelease actionが対象で、v1の台帳利用は維持する。
 
+初回CIでは期中退団32件を含む3769件が成功し、保存テストの小root fixtureが実際には64 KiBを超えていた1件だけ失敗した。root種別の期待値は維持し、保存テスト専用fixtureの不要な能力payloadを省きsaveIdを短縮する。完全な選手データは実bundledデータの別回帰で検証する。
+
 最新HEADの独立レビュー、CI結果と限界はPR本文へ記録する。
 
 ## 残工程・限界

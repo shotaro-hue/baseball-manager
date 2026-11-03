@@ -17,11 +17,11 @@ export function atDate(world, date, gameDay = world.gameDay) {
   return { ...world, year, gameDay, schedule, contractEconomy: { ...world.contractEconomy,
     clock: { season: year, phase: 'season', date, offseasonTurn: 0 } } };
 }
-export function inSeasonWorld({ years = 3, teams = [playableClub(), playableClub(1)], date = '2026-07-16' } = {}) {
+export function inSeasonWorld({ years = 3, teams = [playableClub(), playableClub(1)], date = '2026-07-16', saveId = 'inseason-release' } = {}) {
   const source = structuredClone(teams);
   source[0].players[0].contractYearsLeft = years;
   const world = createAnnualNewGameWorld({ teams: source, faPool: [], myId: source[0].id, season: 2026,
-    saveId: 'inseason-release', policy: economyPolicy(source, 2026, 1000000),
+    saveId, policy: economyPolicy(source, 2026, 1000000),
     randomRoot: { algorithmVersion: 1, seed: 'inseason-release' } });
   const current = atDate(world, date, 100);
   return fromAnnualState(current, toAnnualState(current));

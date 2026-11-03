@@ -14,8 +14,13 @@ beforeEach(async () => {
     setItem: (k, v) => rows.set(k, String(v)), removeItem: k => rows.delete(k) });
   vi.stubGlobal('indexedDB', new IDBFactory()); vi.stubGlobal('IDBKeyRange', IDBKeyRange);
   for (const level of ['log', 'warn', 'error', 'table']) vi.spyOn(console, level).mockImplementation(() => {});
-  // One playable club keeps the unpadded root below the real 64 KiB boundary.
-  current = { world: inSeasonWorld({ teams: [playableClub()] }), sessionToken: 7, progressToken: 3 };
+  // Keep full role/cooldown/contract evidence, but avoid ability payloads in
+  // this storage-boundary fixture. Full player data is exercised separately.
+  const club = playableClub();
+  for (const player of [...club.players, ...club.farm]) {
+    for (const field of ['batting', 'pitching', 'stats', 'age', 'name']) delete player[field];
+  }
+  current = { world: inSeasonWorld({ teams: [club], saveId: 'r' }), sessionToken: 7, progressToken: 3 };
   expected = { saveId: current.world.saveId, epoch: current.world.contractEconomy.epoch,
     baseRevision: 0, sessionToken: 7, progressToken: 3 };
   bindings = { readCurrent: () => current, adopt: async (world, ack, canAdopt) => {
