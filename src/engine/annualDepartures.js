@@ -115,6 +115,14 @@ export function inspectAnnualDepartures(state) {
     if ((isWinterDepartureCommand(c) || receipt.departure !== undefined)
       && !departures.some(d => d.id === receipt.id)) fail();
   }
+  // Every v2 release action must retain its departure and receipt, including
+  // after its effective date. Forward-only checks miss paired history removal.
+  if (state.version === 2) {
+    const provenEnds = new Set(departures.filter(d => d.endAction).map(d => stable(d.endAction)));
+    for (const record of state.spending.ledger.records) for (const action of record.changes) {
+      if (action.type === 'end' && action.reason === 'release' && !provenEnds.has(stable(action))) fail();
+    }
+  }
   return departures;
 }
 

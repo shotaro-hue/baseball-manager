@@ -191,6 +191,10 @@ describe('A1-2c-2b in-season release', () => {
   it.each([
     ['orphan', w => { w.contractEconomy.engine.transactions = []; }],
     ['missing record', w => { w.contractEconomy.engine.offseasonDepartures = []; }],
+    ['paired history removal', w => {
+      w.contractEconomy.engine.offseasonDepartures = [];
+      w.contractEconomy.engine.transactions = [];
+    }],
     ['changed snapshot', w => { w.contractEconomy.engine.offseasonDepartures[0].player.age++; }],
     ['missing end', w => { spending(w).ledger.records[0].changes = []; }],
     ['changed phase', w => { delete w.contractEconomy.engine.offseasonDepartures[0].phase; }],

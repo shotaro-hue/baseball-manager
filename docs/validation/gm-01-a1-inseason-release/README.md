@@ -17,6 +17,8 @@ v2/season の enter-market/releaseを既存の冬の退団取引に追加する�
 - 現行createInitialTeamsの実bundledデータに対する正常例と、捕手適性を失った拒否例を含む。
 - 保存テストは実64 KiB境界の小/大root、保存失敗で旧world/バックアップを維持すること、再試行、再読込、二重適用防止を含む。
 
+独立静的レビューで、退団記録とreceiptの対削除により当日のend/release actionが孤立しても通るP2を検出。実際のinspectAnnualDepartures関数をV8上で評価し、対削除した入力を受理するREDと、台帳から証跡への逆照合を追加して拒否するGREENを確認した。完全なworldのcold reloadケースもVitestへ追加した。逆照合はv2のrelease actionが対象で、v1の台帳利用は維持する。
+
 最新HEADの独立レビュー、CI結果と限界はPR本文へ記録する。
 
 ## 残工程・限界
