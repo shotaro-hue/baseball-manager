@@ -170,6 +170,12 @@ PR #521レビュー修正: revision増加でもrandomRoot・確定済み台帳�
 
 ## Task 7: A1-2c 退団・市場・海外離脱
 
+2026-11-03 Codex引継ぎ: #535と#536はマージ済み。確認したmainは`4c6b0f02b3ddafcfccec6eab5a2359061bcdcd41`（以後の着手時には最新mainを再確認）。#536の冬の退団共通処理・市場整合性検証・退団検証の重複/同日再計算削減まで完了。[計画](./2026-11-02-gm01-a1-winter-departures.md)と[検証記録](../../validation/gm-01-a1-2c-1/README.md)を参照。Task 7全体・A1全体の完了ではない。
+
+次の開発依頼ではA1-2c-2以降の期中退団・契約満了・市場接続の残工程を現行コードと照合し、独立して検証できる範囲を選ぶ。人のhook/UI、CPU、年度更新、移行/公開への接続を実装済みと推定しない。本追記は引継ぎであり、後続実装の開始許可ではない。
+
+旧スカウトの派遣生成・直接獲得は終了方針を維持し、sign-scouted等を再接続しない。annual一般公開ゲートはOFF、schema/DB versionは現状を維持する。CodexはルートAGENTS.mdに従い、依頼された工程の実装・独立レビュー・修正・検証・最新HEADのCI確認・PR提示まで担当し、ユーザーのマージ判断で止める。
+
 2026-11-02: #535マージ後、[A1-2c-1](./2026-11-02-gm01-a1-winter-departures.md)で冬の満了/解雇/自由契約市場の共通処理を分離。期中・FA宣言・海外/収入・人のhook/UI接続は残工程。Task 7全体は未完了。
 
 **Files:** Create `src/engine/annualDepartures.js`, `src/engine/__tests__/annualDepartures.test.js`; modify `src/engine/annualTransactions.js`, `src/engine/contractEconomy.js`, `src/hooks/useOffseason.js`, `src/components/hub/HubContentRouter.jsx`, `src/components/screenRoutes/ContractRenewalRoute.jsx`。
