@@ -5,8 +5,9 @@ import { inSeasonWorld, playableClub, releaseCommand } from '../src/engine/__tes
 import { reduceEconomyCommand } from '../src/engine/contractEconomy';
 import { validateEconomySave } from '../src/engine/economyPersistence';
 import { gameStateReducer, G } from '../src/hooks/gameStateReducer';
+import { rootBodyReference, readRootBody, MAX_INLINE_ROOT_BYTES } from '../src/engine/saveRootBodies';
 
-const key = 'baseball_manager_v1', options = { skipCompression: true };
+const key = 'baseball_manager_v1', options = {};
 let rows, current, expected, bindings;
 const roots = () => [key, key + '_bk1', key + '_bk2'].map(k => rows.get(k));
 beforeEach(async () => {
@@ -14,13 +15,9 @@ beforeEach(async () => {
     setItem: (k, v) => rows.set(k, String(v)), removeItem: k => rows.delete(k) });
   vi.stubGlobal('indexedDB', new IDBFactory()); vi.stubGlobal('IDBKeyRange', IDBKeyRange);
   for (const level of ['log', 'warn', 'error', 'table']) vi.spyOn(console, level).mockImplementation(() => {});
-  // Keep full role/cooldown/contract evidence, but avoid ability payloads in
-  // this storage-boundary fixture. Full player data is exercised separately.
-  const club = playableClub();
-  for (const player of [...club.players, ...club.farm]) {
-    for (const field of ['batting', 'pitching', 'stats', 'age', 'name']) delete player[field];
-  }
-  current = { world: inSeasonWorld({ teams: [club], saveId: 'r' }), sessionToken: 7, progressToken: 3 };
+  // The normal compressed writer keeps this full playable club inline.
+  // The large case explicitly disables compression and adds a large payload.
+  current = { world: inSeasonWorld({ teams: [playableClub()] }), sessionToken: 7, progressToken: 3 };
   expected = { saveId: current.world.saveId, epoch: current.world.contractEconomy.epoch,
     baseRevision: 0, sessionToken: 7, progressToken: 3 };
   bindings = { readCurrent: () => current, adopt: async (world, ack, canAdopt) => {
@@ -36,9 +33,12 @@ it.each([false, true])('publishes and reloads the complete release exactly once 
   const command = releaseCommand(current.world), result = reduceEconomyCommand(current.world, command);
   expect(result.ok, result.error).toBe(true);
   if (large) result.world.padding = 'large'.repeat(20000);
-  const committed = await saves.commitEconomyCandidate(result.world, expected, bindings, options);
+  const writeOptions = { ...options, skipCompression: large };
+  const committed = await saves.commitEconomyCandidate(result.world, expected, bindings, writeOptions);
   expect(committed.ok, committed.reason).toBe(true);
-  expect(JSON.parse(rows.get(key)).rootBodyVersion === 1).toBe(large);
+  const raw = rows.get(key), body = await readRootBody(raw);
+  expect(body.length * 2 > MAX_INLINE_ROOT_BYTES).toBe(large);
+  expect(Boolean(rootBodyReference(raw))).toBe(large);
   const loaded = await saves.loadGame(); expect(validateEconomySave(loaded)).toBe('annual');
   expect(loaded.teams[0].players.some(p => p.id === 0)).toBe(false);
   expect(loaded.faPool.map(p => p.id)).toEqual([0]);
@@ -50,12 +50,13 @@ it.each([false, true])('publishes and reloads the complete release exactly once 
 it.each([false, true])('does not adopt or lose debt/history on failed publication, then retries (large=%s)', async large => {
   const old = current.world, result = reduceEconomyCommand(old, releaseCommand(old)); expect(result.ok, result.error).toBe(true);
   if (large) result.world.padding = 'large'.repeat(20000);
+  const writeOptions = { ...options, skipCompression: large };
   const before = roots(), set = localStorage.setItem;
   localStorage.setItem = (k, v) => { if (k === key) throw new Error('disk unavailable'); return set(k, v); };
-  expect((await saves.commitEconomyCandidate(result.world, expected, bindings, options)).ok).toBe(false);
+  expect((await saves.commitEconomyCandidate(result.world, expected, bindings, writeOptions)).ok).toBe(false);
   expect(current.world).toBe(old); expect(roots()).toEqual(before);
   expect((await saves.loadGame()).contractEconomy.engine.offseasonDepartures).toEqual([]);
   localStorage.setItem = set;
-  expect((await saves.commitEconomyCandidate(result.world, expected, bindings, options)).ok).toBe(true);
+  expect((await saves.commitEconomyCandidate(result.world, expected, bindings, writeOptions)).ok).toBe(true);
   expect(current.world.contractEconomy.engine.offseasonDepartures).toHaveLength(1);
 });

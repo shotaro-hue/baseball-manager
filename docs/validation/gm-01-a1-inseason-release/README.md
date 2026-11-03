@@ -21,6 +21,8 @@ v2/season の enter-market/releaseを既存の冬の退団取引に追加する�
 
 初回CIでは期中退団32件を含む3769件が成功し、保存テストの小root fixtureが実際には64 KiBを超えていた1件だけ失敗した。root種別の期待値は維持し、保存テスト専用fixtureの不要な能力payloadを省きsaveIdを短縮する。完全な選手データは実bundledデータの別回帰で検証する。
 
+fixture縮小後も無圧縮では64 KiBを超えたため、保存経路を調査。writerが各選手へ2つの通算summaryを付け、空summaryだけでも20人で30240 bytesになることを実関数で確認した。能力payloadは元に戻し、小rootは通常の圧縮保存、大rootは明示的な無圧縮＋paddingで検証する。rootBodyReferenceと実payloadサイズの両方を期待する境界側と照合し、期待値を緩和しない。その他の33件を含む3770件はこの調査時点のCIで成功していた。
+
 最新HEADの独立レビュー、CI結果と限界はPR本文へ記録する。
 
 ## 残工程・限界
