@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import * as saves from '../src/engine/saveload';
-import { inSeasonWorld, playableClub, releaseCommand } from '../src/engine/__tests__/fixtures/inSeasonDepartures';
+import { inSeasonWorld, playableClub, releaseCommand, nextSeasonForDepartureTest } from '../src/engine/__tests__/fixtures/inSeasonDepartures';
 import { reduceEconomyCommand } from '../src/engine/contractEconomy';
 import { validateEconomySave } from '../src/engine/economyPersistence';
 import { gameStateReducer, G } from '../src/hooks/gameStateReducer';
@@ -17,7 +17,9 @@ beforeEach(async () => {
   for (const level of ['log', 'warn', 'error', 'table']) vi.spyOn(console, level).mockImplementation(() => {});
   // The normal compressed writer keeps this full playable club inline.
   // The large case explicitly disables compression and adds a large payload.
-  current = { world: inSeasonWorld({ teams: [playableClub()] }), sessionToken: 7, progressToken: 3 };
+  const club = playableClub();
+  [...club.players, ...club.farm].forEach(p => { p.contractYearsLeft = 3; });
+  current = { world: inSeasonWorld({ teams: [club] }), sessionToken: 7, progressToken: 3 };
   expected = { saveId: current.world.saveId, epoch: current.world.contractEconomy.epoch,
     baseRevision: 0, sessionToken: 7, progressToken: 3 };
   bindings = { readCurrent: () => current, adopt: async (world, ack, canAdopt) => {
@@ -59,4 +61,21 @@ it.each([false, true])('does not adopt or lose debt/history on failed publicatio
   localStorage.setItem = set;
   expect((await saves.commitEconomyCandidate(result.world, expected, bindings, writeOptions)).ok).toBe(true);
   expect(current.world.contractEconomy.engine.offseasonDepartures).toHaveLength(1);
+});
+
+it('hydrates the archived calendar before validating past departures and rejects paired tampering before publication', async () => {
+  const result = reduceEconomyCommand(current.world, releaseCommand(current.world));
+  expect(result.ok, result.error).toBe(true);
+  result.world.schedule[99] = { gameNo: 99, date: { month: 7, day: 15 } };
+  const nextYear = nextSeasonForDepartureTest(result.world);
+  expect((await saves.saveGame(nextYear)).ok).toBe(true);
+  const loaded = await saves.loadGame();
+  expect(loaded.year).toBe(2027);
+  expect(loaded.scheduleArchive[0].schedule[100].date).toEqual({ month: 7, day: 16 });
+  expect(validateEconomySave(loaded)).toBe('annual');
+  const before = roots(), engine = loaded.contractEconomy.engine;
+  engine.offseasonDepartures[0].gameDay = engine.transactions[0].departure.gameDay = 99;
+  expect((await saves.saveGame(loaded)).ok).toBe(false);
+  expect(roots()).toEqual(before);
+  expect(validateEconomySave(await saves.loadGame())).toBe('annual');
 });

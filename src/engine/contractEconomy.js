@@ -6,6 +6,7 @@ import { applyAnnualTransaction, projectAnnualState } from './annualTransactions
 import { quoteAnnualSpendingPlan } from './annualSpending';
 import { draftCapacityContext, isIkuseiPlayer } from './rosterCapacity';
 import { economyClockFor, validateEconomyClock } from './economyCalendar';
+import { inspectAnnualDepartureCalendar } from './annualDepartures';
 
 // A1-1a is a pure, fixture-only boundary. Activation/persistence is A1-1d/4b.
 export const ANNUAL_ECONOMY_RELEASE_ENABLED = false;
@@ -84,6 +85,7 @@ function inspectEnvelope(world) {
     || !['pending', 'applied', 'deferred'].includes(e.migration.status) || !Array.isArray(e.migration.issues)
     || !e.legacyEvidence || evidenceArrays.some(k => !Array.isArray(e.legacyEvidence[k]))) fail('新契約worldの必須データ・versionを確認してください。');
   validateEconomyClock(world);
+  inspectAnnualDepartureCalendar(world);
   const spending = e.engine.spending;
   if (!spending || !Array.isArray(spending.ledger?.records) || !Array.isArray(spending.reservations)
     || !Array.isArray(spending.resolvedReservations)) fail('契約台帳・正式留保が未記録です。');

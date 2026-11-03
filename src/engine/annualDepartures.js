@@ -1,6 +1,7 @@
 import { applyContractLedgerAction, contractEmploymentAt } from './contractLedger';
 import { employmentContractId } from './seasonContract';
 import { parseContractDate } from './contractCalendar';
+import { economyClockFor } from './economyCalendar';
 import { removeDepartingPlayers } from './tradeTransaction';
 import { cancelContractReservation } from './annualSpending';
 import { validateMarketPlayer } from './annualAcquisitions';
@@ -64,6 +65,27 @@ function seasonRecordFor(state, c, player, season, notifiedDate, gameDay, lookup
     player: structuredClone(player), sourceContractId: c.contractId, sourceAnnualSalaryManYen: e.annualSalaryManYen,
     reason: c.reason, notifiedDate, effectiveDate: notifiedDate, endAction,
     marketEntry: { id: JSON.stringify([c.id, 'released-market']), kind: 'released', enteredDate: notifiedDate, originTeamId: c.teamId } };
+}
+
+// Calendar evidence belongs to world/match-history, never the persisted engine.
+// Run at the world boundary as well as the engine's provenance inspection below.
+export function inspectAnnualDepartureCalendar(world) {
+  for (const d of world.contractEconomy.engine.offseasonDepartures) {
+    if (d?.phase !== 'season') continue;
+    let schedules;
+    if (d.season === world.year) schedules = [world.schedule];
+    else {
+      const archive = world.scheduleArchive ?? [];
+      if (!Array.isArray(archive)) fail();
+      // Older saves and the five-year retention limit may lack this calendar.
+      // Check every available copy; missing evidence cannot be reconstructed.
+      schedules = archive.filter(a => a?.year === d.season && a.schedule != null).map(a => a.schedule);
+    }
+    for (const schedule of schedules) {
+      const { date } = economyClockFor({ season: d.season, phase: 'season', schedule, gameDay: d.gameDay });
+      if (date !== d.notifiedDate) throw new Error('退団通知日と公式戦日程が一致しません。');
+    }
+  }
 }
 
 // Records and receipts are checked in both directions. Only a proven departure

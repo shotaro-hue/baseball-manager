@@ -1,5 +1,6 @@
 import { createAnnualNewGameWorld, fromAnnualState, toAnnualState } from '../../contractEconomy';
 import { economyPolicy } from './economyWorld';
+import { nextSeasonMatchHistory } from '../../matchHistory';
 
 export function playableClub(id = 0) {
   const players = Array.from({ length: 21 }, (_, i) => ({ id: id === 0 ? i : 'club-' + id + '-' + i,
@@ -31,4 +32,19 @@ export function releaseCommand(world, playerId = world.teams[0].players[0].id, o
   return { saveId: world.saveId, epoch: world.contractEconomy.epoch, baseRevision: world.contractEconomy.revision,
     transaction: { id: 'release-' + playerId, type: 'enter-market', reason: 'release',
       teamId: world.teams[0].id, playerId, contractId: player?.contractId, ...overrides } };
+}
+
+// Isolate historical validation from the still-private annual rollover command.
+// Remaining players must already have contracts covering the following year.
+export function nextSeasonForDepartureTest(world) {
+  const next = structuredClone(world), year = world.year + 1, e = next.contractEconomy;
+  Object.assign(next, nextSeasonMatchHistory(world, world.year, world.schedule, world.myId));
+  next.year = year; next.gameDay = 1; next.schedule = [];
+  e.clock = { season: year, phase: 'preseason', date: `${year}-02-01`, offseasonTurn: 0 };
+  e.cycle.season = year; e.engine.spending.budgetSeason = year;
+  const policy = economyPolicy(next.teams, year, 1000000), tail = list => list.filter(r => r.season === year + 7);
+  e.budgetPolicies.push(...tail(policy.budgetPolicies));
+  e.engine.rosterRequirements.push(...tail(policy.rosterRequirements));
+  e.engine.spending.authorizations.push(...tail(policy.authorizations));
+  return fromAnnualState(next, toAnnualState(next));
 }
