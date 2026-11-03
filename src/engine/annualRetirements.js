@@ -163,3 +163,19 @@ export function createAnnualRetirement(state, c, signature) {
       history: [...(t.history ?? []), finalization.history] } : t),
     transactions: [...state.transactions, { id: c.id, signature, retirement: structuredClone(finalization) }] };
 }
+
+// Called only after validateEconomySave, before staging the new save generation.
+// Observe the committed root's independent metadata: current-format caches do
+// not retain the full world, and a caller may have mutated a loaded object.
+export function retirementCareerEntries(world, previous) {
+  if (world.contractEconomy?.mode !== 'annual') return [];
+  const finalized = (world.contractEconomy.engine.retirementReservations ?? []).filter(r => r.finalization);
+  if (!finalized.length) return [];
+  const before = previous?.saveId !== world.saveId ? undefined : previous.economySave
+    ? JSON.parse(previous.economySave.terms) : previous.contractEconomy;
+  const committed = new Set(before?.epoch === world.contractEconomy.epoch
+    ? (before.engine?.retirementReservations ?? []).filter(r => r.finalization).map(r => r.finalization.id) : []);
+  return finalized.filter(r => !committed.has(r.finalization.id)).map(r => ({
+    playerId: String(r.playerId), careerEntry: structuredClone(r.finalization.careerEntry),
+  }));
+}

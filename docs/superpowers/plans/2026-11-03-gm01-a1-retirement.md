@@ -34,11 +34,15 @@ Files: new `src/engine/annualRetirements.js`; integrate `annualTransactions.js`,
 Files: `tests/economy-retirement.test.js`, this plan, `docs/validation/gm-01-a1-retirement/README.md`.
 - [x] Add actual save/commit/load tests for both commands, failed publication and retry, cold restart/replay and tamper refusal; use compressed inline and padded external root.
 - [x] Run targeted save/commit and annual budget/renewal regressions.
-- [ ] Dispatch independent reviewer with base/head, requirements and bootstrap entry; reproduce and fix P1/P2 with RED/GREEN.
-- [ ] Commit/push feature branch; create new PR. Record exact HEAD CI results, reuse CI full suite, leave PR unmerged.
+- [x] Dispatch independent reviewer with base/head, requirements and bootstrap entry; reproduce and fix P1/P2 with RED/GREEN.
+- [x] Commit/push feature branch; create new PR. Record exact HEAD CI results, reuse CI full suite, leave PR unmerged.
 
 ## Execution record
 - Latest main equals specified a6a61e6; #539 merged. Read AGENTS/CONTRIBUTING, approved design/Task 7/10 and all nine required source files.
 - Existing legacy skip-retire marks players unavailable immediately; annual implementation will not invoke it. Winter release uses February 1 for continuing contracts, unlike this December 1 retirement boundary.
 
 - Target 44/44 and scoped regressions 498/498 GREEN; see validation record. Independent review dispatched at bd9f70c9.
+
+- Final review P2 career generation omission reproduced (4 RED), fixed in saver common path; 80/80 correction and close regressions GREEN. No other confirmed P1/P2, no deferred minors. Decision: save-derived new career patches rather than caller-only staging, to preserve all common entry points and atomicity.
+
+- Corrected tree final scoped verification: 15 files / 578 tests passed. PR #540 open, unmerged; exact final HEAD CI pending at commit time and recorded in PR conversation. No automatic rollover connection.

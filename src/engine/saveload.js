@@ -1,3 +1,4 @@
+import { retirementCareerEntries } from './annualRetirements';
 import { validateEconomyClock } from './economyCalendar';
 import { saveFailure } from './saveDiagnostics';
 import { validateEconomySave, economySaveMetadata, economyOverwriteIssue,
@@ -677,7 +678,12 @@ async function saveGameImpl(state, options = {}, onPublished) {
       && Array.isArray(generationDirtyScopes)) {
       generationDirtyScopes=[...new Set([...generationDirtyScopes,'seasonHistory','matchHistory'])];
     }
-    const careerData = await prepareCareerData(safeState, previous, options, legacyCareerSeeds.get(previous),state);
+    // Final retirement detail and the alumni/ledger root publish atomically.
+    // Do not depend on a UI caller staging a separate career patch.
+    const retirementEntries = retirementCareerEntries(state, previous);
+    const careerOptions = retirementEntries.length ? { ...options,
+      careerEntries: [...(options.careerEntries ?? []), ...retirementEntries] } : options;
+    const careerData = await prepareCareerData(safeState, previous, careerOptions, legacyCareerSeeds.get(previous),state);
     let prepared;
     try { prepared = await prepareGeneration(safeState, previous, generationDirtyScopes, careerData); }
     catch (error) {

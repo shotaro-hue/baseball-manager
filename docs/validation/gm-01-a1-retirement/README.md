@@ -30,12 +30,12 @@ Natural expiry adds no ledger end. Continuing contracts add `end/retirement/reta
 - Pending reservation carried into a later year: fail closed, requiring Task 10 to finalize first. Completed history survives the following year and old commands replay.
 - Unoffered renewal estimates remain stored and funded at reservation; only finalization excludes them from active planning, using the validated departure projection.
 - Retirement finalization uses narrowly constrained spending assessment: only December 1 retirement/retain end actions; no new contracts, holds, expenses, compensation, closure or total liability changes. A vacancy raises the minimum roster reserve. This may expose a negative remaining budget; quote rows and the team budget preserve that deficit. No automatic extra authorization, debt forgiveness or forced withdrawal. Subsequent spending uses normal approval rules.
-- Career entry uses the existing compaction/summary helper exactly once. Already archived same-year/team career entries are refused to prevent double counting. Full production annual ordering and any additional IndexedDB career archive staging belong to Task 10; the candidate/save currently preserve the final compact career evidence in alumni and receipts.
+- Career entry uses the existing compaction/summary helper exactly once. Already archived same-year/team career entries are refused to prevent double counting. The saver also derives the newly finalized career patch from the validated receipt and stages it with the same committed career generation; no separate caller/hook staging is required. Full production annual ordering belongs to Task 10.
 
 ## Verification record
 
 - Initial RED: 37 tests, 29 failed / 8 existing rejection cases passed; missing command normalization caused normal paths to fail.
-- Target GREEN: `npx vitest run src/engine/__tests__/annualRetirements.test.js tests/economy-retirement.test.js` — **44 passed** (39 engine / 5 actual persistence), 0 failures.
+- Target GREEN: `npx vitest run src/engine/__tests__/annualRetirements.test.js tests/economy-retirement.test.js` — **45 passed** (39 engine / 6 actual persistence), 0 failures.
 - Regression GREEN: annualDepartures (42), annualInSeasonDepartures (33), annualTransactions (39), annualSpending (55), contractLedger (30), contractEconomy (79), renewalDecisions (28), economy-commit (18), economy-commit-recovery (18), economy-save-migration (151), inseason-release-commit (5) — **498 passed / 11 files**, 0 failures.
 - Coverage includes active/farm batter/pitcher, player/command ID 0, last usable roles, unchanged eligibility/money, 7/31–8/1–11/30 notice dates, early/late finalization refusal, natural vs continuing liability, real migration unknown guarantee, pending/accepted renewals, subsequent operations, unresolved year rollover, completed year rollover/replay, career stats updated after notice, paired tampering and missing proof, current `createInitialTeams()` success and wrong-source rejection.
 - Actual fake-indexeddb/localStorage save barrier exercises both compressed inline and padded uncompressed external root paths (readRootBody/rootBodyReference and payload threshold checked), root acknowledgement, separate reservation/finalization publication failure and retry, reducer adoption, load/replay and refusing corrupted final proof.
@@ -43,4 +43,16 @@ Natural expiry adds no ledger end. Continuing contracts add `end/retirement/reta
 - Existing spending guard rejected current-year Dec1 end when budgetSeason had become Y+1; explicit retirement assessment now allows only that boundary with total liabilities unchanged. BigInt totals compare directly, without JSON serialization.
 - Save test advances revision when changing the fixture clock/budget year, matching the normal world mutation contract; a same-revision budget mutation is correctly refused by existing persistence.
 
-Independent review and exact HEAD CI results will be added after they complete. Full suite/build/browser E2E are delegated to the normal exact-commit CI; local focused runs are not represented as production UI/Worker integration tests.
+## Independent review and correction
+
+Fresh-context reviewer independently ran the original 44 tests and a Vite SSR/fake-IDB reproduction, and inspected real bootstrap veteran histories. One confirmed **P2**: finalization added inline recent career but not the existing committed career generation. A veteran with a 2025 detail entry still displayed detail only through 2025 after retirement, because CareerTable preferred that nonempty generation over inline 2026. No other confirmed P1/P2 findings.
+
+Reproduced with **4 RED / 2 passing** actual-save tests: both root modes returned stale detail, successful retry still omitted the final season, and a forced career-chunk abort did not prevent publication because no chunk was written. Fixed by deriving new retirement career patches in `saveGameImpl` after full annual validation and before `prepareCareerData`. The previous root's independent `economySave.terms` is used because current-format cache metadata omits the full world. Existing staged patches and retirement patches publish with the same generation/root; failed root or IDB publication leaves previous career/world/roots visible.
+
+Correction verification: **80 passed / 4 files**, including retirement engine39, actual persistence6, career-generations17 and real useGameState economy commit18. Existing 2025 HR17 and final 2026 HR30 are both visible through `loadPlayerCareerLogById` after cold load; ID0, failed publication, aborted career generation, retry and repeated save preserve each year exactly once. The independent reviewer did not run full suite/build/browser CI and did not independently certify the final patch; the implementer verified the fix through the reproduced tests.
+
+Final corrected tree focused verification: **578 passed / 15 files**, 0 failed; includes all 45 new retirement tests and all 533 scoped existing contract/budget/renewal/save/career/hook regressions. `git diff --check` passed.
+
+## CI
+
+PR [#540](https://github.com/shotaro-hue/baseball-manager/pull/540) is open and unmerged. Final exact HEAD CI results are recorded in the PR conversation after completion (to avoid changing HEAD solely to record its own CI result). Full suite/build/browser E2E are delegated to the normal exact-commit CI; local focused runs are not represented as production UI/Worker integration tests.

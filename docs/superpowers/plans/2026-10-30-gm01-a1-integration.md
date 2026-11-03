@@ -170,6 +170,9 @@ PR #521レビュー修正: revision増加でもrandomRoot・確定済み台帳�
 
 ## Task 7: A1-2c 退団・市場・海外離脱
 
+2026-11-03 A1-2c-2c: #539後、期中引退予約と12月1日の独立した確定候補commandを追加。[計画](./2026-11-03-gm01-a1-retirement.md)／[検証](../../validation/gm-01-a1-retirement/README.md)／[#540](https://github.com/shotaro-hue/baseball-manager/pull/540)。予約中は雇用・配置・給与を維持し、確定時に名簿整理・保証retain・career世代/引退履歴/receiptを原子的に保存する。年度更新への自動接続はTask 10、UI/CPU/Workerと公開は未接続。Task 7/A1全体未完了・公開ゲートOFFを維持する。最新HEAD/CI/マージ状況はPRを参照。
+
+
 2026-11-03 A1-2c-2a: #537後、期中退団の前提となる共通 `assessPostTransactionPlayability` を分離。[計画](./2026-11-03-gm01-a1-playability.md)／[検証](../../validation/gm-01-a1-playability/README.md)。最小成立配置の純粋判定のみで、期中command・引退予約・台帳/履歴更新・人/CPU接続は未実装。証明用配置を保存候補として採用しない。Task 7/A1未完了、公開ゲートOFFを維持する。マージ状況・最新HEADのCIは対象PRを参照。
 
 2026-11-03 Codex引継ぎ: #535と#536はマージ済み。確認したmainは`4c6b0f02b3ddafcfccec6eab5a2359061bcdcd41`（以後の着手時には最新mainを再確認）。#536の冬の退団共通処理・市場整合性検証・退団検証の重複/同日再計算削減まで完了。[計画](./2026-11-02-gm01-a1-winter-departures.md)と[検証記録](../../validation/gm-01-a1-2c-1/README.md)を参照。Task 7全体・A1全体の完了ではない。
