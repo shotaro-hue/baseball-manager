@@ -1,3 +1,4 @@
+import { inspectRetirementCalendar } from './annualRetirements';
 import { inspectAnnualBudgetCoverage } from './annualBudgetPolicy';
 import { employmentContractId, projectEmploymentPlayer, validateAnnualEmploymentContract, normalizeEmploymentContract } from './seasonContract';
 import { createSeasonContract } from './seasonContract';
@@ -86,6 +87,7 @@ function inspectEnvelope(world) {
     || !e.legacyEvidence || evidenceArrays.some(k => !Array.isArray(e.legacyEvidence[k]))) fail('新契約worldの必須データ・versionを確認してください。');
   validateEconomyClock(world);
   inspectAnnualDepartureCalendar(world);
+  inspectRetirementCalendar(world);
   const spending = e.engine.spending;
   if (!spending || !Array.isArray(spending.ledger?.records) || !Array.isArray(spending.reservations)
     || !Array.isArray(spending.resolvedReservations)) fail('契約台帳・正式留保が未記録です。');
@@ -154,7 +156,8 @@ export function fromAnnualState(world, input) {
     if (!row) fail('現在の予算年度の追加余力が未記録です。');
     return { ...t, players: t.players.map(projectPlayer), farm: t.farm.map(projectPlayer), budget: row.remainingManYen };
   });
-  const engine = Object.fromEntries(['version', 'spending', ...engineArrays].map(k => [k, state[k]]));
+  const engine = Object.fromEntries(['version', 'spending', ...engineArrays,
+    ...(state.retirementReservations !== undefined ? ['retirementReservations'] : [])].map(k => [k, state[k]]));
   const { staffContracts, offseasonDepartures, ...persistedSpending } = engine.spending;
   engine.spending = persistedSpending;
   const next = { ...world, teams, faPool: state.faPool, offseasonPlan: projectDraftPlan(world, state),
@@ -170,9 +173,9 @@ function runCommand(world, command) {
     || command.baseRevision > current.baseRevision || !command.transaction) fail('取引のsaveId・epoch・revisionが古いか未記録です。');
   const c = command.transaction;
   typedIds([...state.transactions.map(r => r.id), c.id]);
-  if (c.type === 'enter-market' && state.phase === 'season'
+  if (['enter-market', 'reserve-retirement', 'finalize-retirement'].includes(c.type) && (state.phase === 'season' || c.type === 'finalize-retirement')
     && !state.transactions.some(r => r.id === c.id)
-    && world.contractEconomy.decisions.some(d => d.kind === 'human-renewal' && d.status === 'pending' && d.playerId === c.playerId))
+    && world.contractEconomy.decisions.some(d => d.kind === 'human-renewal' && d.status === 'pending' && d.playerId === (c.playerId ?? state.retirementReservations?.find(r => r.id === c.reservationId)?.playerId)))
     fail('回答待ちの更改を解決してから退団してください。');
   if (c.proposal) {
     if (c.proposal.contract?.guaranteed !== true) fail('新しい契約の保証を外すことはできません。');

@@ -209,13 +209,23 @@ function newLedgerActions(before, after) {
 
 export function assessAnnualSpendingChange(before, after, { mode = 'spend' } = {}) {
   const a = prepare(before), b = prepare(after);
-  if (!['spend', 'cashless-trade'].includes(mode) || before.budgetSeason !== after.budgetSeason
+  if (!['spend', 'cashless-trade', 'retirement'].includes(mode) || before.budgetSeason !== after.budgetSeason
     || a.authorizations !== b.authorizations || a.historicalFloors !== b.historicalFloors
     || !isContractLedgerExtension(before.ledger, after.ledger)) fail('支出審査で既存の許可額や契約履歴を書き換えることはできません。');
   if (sorted(before.renewalPlans ?? []) !== sorted(after.renewalPlans ?? [])) fail('通常取引で未更改計画の根拠を変更できません。');
   if (sorted(a.staffCosts) !== sorted(b.staffCosts)) fail('スタッフ年度契約の変更は専用処理が必要です。');
   const actions = newLedgerActions(before.ledger, after.ledger);
-  if (actions.some(action => parseContractDate(action.effectiveDate).year < before.budgetSeason)) fail('過去年度の取引を追加できません。');
+  const retirement = mode === 'retirement';
+  if (retirement && (actions.some(action => action.type !== 'end' || action.reason !== 'retirement'
+    || action.settlement !== 'retain' || action.effectiveDate !== `${String(before.budgetSeason - 1).padStart(4, '0')}-12-01`)
+    || a.reservations !== b.reservations || sorted(a.resolutions) !== sorted(b.resolutions)
+    || sorted(a.expenses) !== sorted(b.expenses) || sorted(a.faCompensations) !== sorted(b.faCompensations)
+    || before.ledger.closedThroughSeason !== after.ledger.closedThroughSeason
+    || a.rows.some(row => { const k = keyFor(row.teamId, row.season);
+      const old = a.contractTotals.get(k), next = b.contractTotals.get(k);
+      return old.size !== next.size || [...old].some(([id, amount]) => next.get(id) !== amount); })))
+    fail('引退確定では既存債務をretainし、新しい支出・留保を追加できません。');
+  if (!retirement && actions.some(action => parseContractDate(action.effectiveDate).year < before.budgetSeason)) fail('過去年度の取引を追加できません。');
   const nextResolved = new Map(b.resolutions.map(r => [r.proposal.id, r]));
   for (const old of a.resolutions) if (JSON.stringify(nextResolved.get(old.proposal.id)) !== JSON.stringify(old)) fail('解決済みオファーの履歴を消去・変更できません。');
   for (const old of before.reservations) {
@@ -282,7 +292,9 @@ export function assessAnnualSpendingChange(before, after, { mode = 'spend' } = {
       planRestoredManYen: Math.max(0, numeric(restoredPlans.get(key) ?? 0n) - old.renewalPlanReserveManYen),
       changeManYen: numeric(BigInt(row.remainingManYen) - BigInt(old.remainingManYen)) };
   });
-  const violations = rows.filter(row => row.affected
+  // Retirement may reveal a minimum-roster funding deficit. Preserve/report it;
+  // it is neither a new spending approval nor permission to waive old debt.
+  const violations = rows.filter(row => !retirement && row.affected
     && (mode === 'cashless-trade' ? row.changeManYen < 0
       : row.remainingManYen < 0 && (!row.onlyRemovals || row.changeManYen + row.planRestoredManYen < 0)));
   return { ok: violations.length === 0, violations, rows };
