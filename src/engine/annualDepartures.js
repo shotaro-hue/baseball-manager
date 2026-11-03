@@ -4,8 +4,10 @@ import { parseContractDate } from './contractCalendar';
 import { removeDepartingPlayers } from './tradeTransaction';
 import { cancelContractReservation } from './annualSpending';
 import { validateMarketPlayer } from './annualAcquisitions';
+import { assessPostTransactionPlayability } from './postTransactionPlayability';
+import { SEASON_GAMES } from '../constants';
 
-const fail = () => { throw new Error('冬の退団・元契約・確定履歴を確認してください。'); };
+const fail = () => { throw new Error('退団・元契約・確定履歴を確認してください。'); };
 const validId = id => (typeof id === 'string' && id.trim()) || (Number.isSafeInteger(id) && id >= 0);
 const stable = value => JSON.stringify(value, (_, v) => v && !Array.isArray(v) && typeof v === 'object'
   ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v);
@@ -45,6 +47,25 @@ function recordFor(state, c, player, season, notifiedDate, lookup = departureCon
     marketEntry: { id: JSON.stringify([c.id, 'released-market']), kind: 'released', enteredDate: notifiedDate, originTeamId: c.teamId } };
 }
 
+
+function seasonRecordFor(state, c, player, season, notifiedDate, gameDay, lookup) {
+  if (c.reason !== 'release' || parseContractDate(notifiedDate).year !== season
+    || !Number.isSafeInteger(gameDay) || gameDay < 1 || gameDay > SEASON_GAMES) fail();
+  const endAction = { id: JSON.stringify([c.id, 'season-end']), type: 'end', contractId: c.contractId,
+    teamId: c.teamId, effectiveDate: notifiedDate, reason: 'release', settlement: 'retain' };
+  const source = lookup.records.get(c.contractId);
+  if (!source || player?.id !== c.playerId) fail();
+  const sourceRecord = structuredClone({ ...source, changes: source.changes.filter(a => a.id !== endAction.id) });
+  // Reconstruct this source only. Removing the end from the whole ledger would
+  // create overlapping employment after a valid later re-acquisition.
+  const e = contractEmploymentAt({ ...state.spending.ledger, records: [sourceRecord] }, notifiedDate)[0];
+  if (!e || e.teamId !== c.teamId || e.contract.playerId !== c.playerId) fail();
+  return { id: c.id, season, phase: 'season', gameDay, sourceRecord, teamId: c.teamId,
+    player: structuredClone(player), sourceContractId: c.contractId, sourceAnnualSalaryManYen: e.annualSalaryManYen,
+    reason: c.reason, notifiedDate, effectiveDate: notifiedDate, endAction,
+    marketEntry: { id: JSON.stringify([c.id, 'released-market']), kind: 'released', enteredDate: notifiedDate, originTeamId: c.teamId } };
+}
+
 // Records and receipts are checked in both directions. Only a proven departure
 // can exempt a November employment from the winter roster reconciliation.
 export function inspectAnnualDepartures(state) {
@@ -55,14 +76,21 @@ export function inspectAnnualDepartures(state) {
   for (const d of departures) {
     if (!d || !validId(d.id) || seen.has(String(d.id)) || contracts.has(String(d.sourceContractId))
       || !Number.isInteger(d.season) || d.season > state.season || d.season < 1
-      || (d.season === state.season && (state.phase !== 'offseason' || d.notifiedDate > state.date))) fail();
+      || (d.phase !== undefined && d.phase !== 'season')
+      || (d.season === state.season && (d.notifiedDate > state.date
+        || (d.phase === 'season' ? !['season', 'offseason'].includes(state.phase)
+          || (state.phase === 'season' && (!Number.isSafeInteger(state.gameDay) || state.gameDay < 1
+            || state.gameDay > SEASON_GAMES || d.gameDay > state.gameDay)) : state.phase !== 'offseason')))) fail();
     seen.add(String(d.id)); contracts.add(String(d.sourceContractId));
     const receipts = state.transactions.filter(r => r.id === d.id);
     if (receipts.length !== 1) fail();
     const receipt = receipts[0];
     let c; try { c = normalizeWinterDeparture(JSON.parse(receipt.signature)); } catch { fail(); }
+    const expected = d.phase === 'season'
+      ? seasonRecordFor(state, c, d.player, d.season, d.notifiedDate, d.gameDay, lookup)
+      : recordFor(state, c, d.player, d.season, d.notifiedDate, lookup);
     if (c.id !== d.id || stable(c) !== receipt.signature || stable(receipt.departure) !== stable(d)
-      || stable(recordFor(state, c, d.player, d.season, d.notifiedDate, lookup)) !== stable(d)) fail();
+      || stable(expected) !== stable(d)) fail();
     const team = state.teams.find(t => t.id === d.teamId);
     if (!team?.history?.some(p => stable(p) === stable(departureHistory(d)))) fail();
     const acquired = state.spending.resolvedReservations.some(r => r.kind === 'offer' && r.resolution === 'accepted'
@@ -94,7 +122,8 @@ const departureHistory = d => ({ ...d.player, exitYear: d.season, exitReason: d.
 
 export function createWinterDeparture(state, command, signature) {
   const c = normalizeWinterDeparture(command);
-  if (state.version !== 2 || state.phase !== 'offseason') fail();
+  const inSeason = state.phase === 'season';
+  if (state.version !== 2 || (!inSeason && state.phase !== 'offseason')) fail();
   const team = state.teams.find(t => t.id === c.teamId);
   const player = team && [...team.players, ...team.farm].find(p => p.id === c.playerId);
   if (!player || player.isRetired || player._retireNow || state.offseasonDepartures.some(d => d.sourceContractId === c.contractId)) fail();
@@ -102,7 +131,12 @@ export function createWinterDeparture(state, command, signature) {
   if (state.spending.ledger.records.some(r => r.contract.playerId === c.playerId
     && r.effectiveDate > state.date && contractEmploymentAt(state.spending.ledger, r.effectiveDate)
       .some(e => employmentContractId(e.contract) === employmentContractId(r.contract)))) fail();
-  const departure = recordFor(state, c, player, state.season, state.date);
+  const departure = inSeason
+    ? seasonRecordFor(state, c, player, state.season, state.date, state.gameDay, departureContracts(state.spending.ledger))
+    : recordFor(state, c, player, state.season, state.date);
+  const remainingTeam = removeDepartingPlayers(team, new Set([c.playerId]));
+  if (inSeason && !assessPostTransactionPlayability(remainingTeam, { round: state.gameDay }).ok)
+    throw new Error('退団後の一軍・二軍の試合成立を確認できません。');
   let spending = state.spending;
   for (const hold of state.spending.reservations.filter(h => h.proposal.contract.playerId === c.playerId)) {
     if (hold.kind !== 'renewal' || hold.proposal.teamId !== c.teamId) fail();
@@ -114,7 +148,7 @@ export function createWinterDeparture(state, command, signature) {
     marketLastStats: player.stats, faEnteredYear: state.season, faOriginTeamId: team.id, faOriginTeamName: team.name,
     faOriginRoster: team.farm.some(p => p.id === c.playerId) ? 'farm' : 'active' };
   return { ...state, spending, faPool: [...state.faPool, marketPlayer],
-    teams: state.teams.map(t => t.id === team.id ? { ...removeDepartingPlayers(t, new Set([c.playerId])),
+    teams: state.teams.map(t => t.id === team.id ? { ...remainingTeam,
       history: [...(t.history ?? []), departureHistory(departure)] } : t),
     offseasonDepartures: [...state.offseasonDepartures, departure],
     transactions: [...state.transactions, { id: c.id, signature, departure: structuredClone(departure) }] };

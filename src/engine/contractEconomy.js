@@ -77,7 +77,7 @@ function inspectEnvelope(world) {
     || !Object.hasOwn(world, 'offseasonPlan') || (world.offseasonPlan !== null && (typeof world.offseasonPlan !== 'object' || Array.isArray(world.offseasonPlan)))
     || !world.faYears || typeof world.faYears !== 'object' || Array.isArray(world.faYears)
     || !e.engine || e.engine.version !== 2 || engineArrays.some(k => !Array.isArray(e.engine[k]))
-    || ['teams', 'faPool', 'draftContext', 'season', 'phase', 'date', 'economyIdentity'].some(k => Object.hasOwn(e.engine, k))
+    || ['teams', 'faPool', 'draftContext', 'season', 'phase', 'date', 'gameDay', 'economyIdentity'].some(k => Object.hasOwn(e.engine, k))
     || ['budgetPolicies', 'staffContracts', 'incomeReceipts', 'decisions'].some(k => !Array.isArray(e[k]))
     || e.cycle?.season !== world.year || !['playing', 'postseason', 'offseason-open', 'planning', 'ready-for-spring', 'new-season'].includes(e.cycle.stage)
     || !Array.isArray(e.cycle.transitionReceipts) || e.migration?.version !== 1
@@ -111,6 +111,7 @@ export function toAnnualState(world) {
   if (contractEconomyMode(world) !== 'annual') fail('新契約制度のworldが必要です。');
   const e = world.contractEconomy;
   return projectAnnualState({ ...e.engine, spending: { ...e.engine.spending, staffContracts: e.staffContracts }, ...e.clock, teams: world.teams, faPool: world.faPool,
+    gameDay: world.gameDay,
     economyIdentity: identity(world), draftContext: draftCapacityContext(world.offseasonPlan, world.year, world.teams) });
 }
 
@@ -132,7 +133,8 @@ function projectDraftPlan(world, state) {
 
 export function fromAnnualState(world, input) {
   if (contractEconomyMode(world) !== 'annual' || !sameIdentity(input.economyIdentity, identity(world))
-    || input.season !== world.year || input.phase !== world.contractEconomy.clock.phase || input.date !== world.contractEconomy.clock.date)
+    || input.season !== world.year || input.phase !== world.contractEconomy.clock.phase || input.date !== world.contractEconomy.clock.date
+    || input.gameDay !== world.gameDay)
     fail('取引結果のworld・年度・revisionが一致しません。');
   if (JSON.stringify(input.spending?.staffContracts) !== JSON.stringify(world.contractEconomy.staffContracts)) fail('スタッフ年度契約の投影が正本と一致しません。');
   const state = projectAnnualState(input), rows = quoteAnnualSpendingPlan(state.spending);
@@ -166,6 +168,10 @@ function runCommand(world, command) {
     || command.baseRevision > current.baseRevision || !command.transaction) fail('取引のsaveId・epoch・revisionが古いか未記録です。');
   const c = command.transaction;
   typedIds([...state.transactions.map(r => r.id), c.id]);
+  if (c.type === 'enter-market' && state.phase === 'season'
+    && !state.transactions.some(r => r.id === c.id)
+    && world.contractEconomy.decisions.some(d => d.kind === 'human-renewal' && d.status === 'pending' && d.playerId === c.playerId))
+    fail('回答待ちの更改を解決してから退団してください。');
   if (c.proposal) {
     if (c.proposal.contract?.guaranteed !== true) fail('新しい契約の保証を外すことはできません。');
     typedIds([...state.spending.reservations, ...state.spending.resolvedReservations].map(r => r.proposal.id).concat(c.proposal.id));
