@@ -6,6 +6,7 @@ import { validateTeamRoster } from '../rosterAutomation';
 import { selectFarmTeam } from '../farmSelection';
 import { freezeEconomy } from './fixtures/economyWorld';
 import { createInitialTeams } from '../bootstrapTeams';
+import { projectTradeRosters } from '../tradeTransaction';
 
 // Two disjoint nine-batter lineups, each with a real catcher, and two pitchers.
 function minimalTeam() {
@@ -61,6 +62,40 @@ describe('post-transaction simultaneous playability', () => {
     t.farm[0].registrationCooldownDays = 0;
     prove(assess(t), t);
   });
+
+  it('respects incoming recall cooldown in the actual post-trade roster projection', () => {
+    const t = minimalTeam(); t.farm[0].registrationCooldownDays = 3;
+    const incoming = { ...structuredClone(t.players[0]), id: 'incoming', registrationCooldownDays: 3 };
+    const other = { id: 1, players: [incoming], farm: [] };
+    const project = () => projectTradeRosters([t, other], {
+      fromId: t.id, toId: other.id, outgoing: [t.players[0]], incoming: [incoming],
+    });
+    const before = structuredClone([t, other]), blocked = project();
+    expect(blocked.ok).toBe(true);
+    const blockedTeam = blocked.teams.find(team => team.id === t.id);
+    expect(blockedTeam.farm.some(p => p.id === incoming.id)).toBe(true);
+    expect(assess(blockedTeam).ok).toBe(false);
+    expect([t, other]).toEqual(before);
+    incoming.registrationCooldownDays = 0;
+    const allowed = project(); expect(allowed.ok).toBe(true);
+    prove(assess(allowed.teams.find(team => team.id === t.id)), allowed.teams.find(team => team.id === t.id));
+  });
+
+  it.each([{}, 'invalid', 1, true])('rejects malformed farm pitching history %j instead of throwing', history => {
+    const t = minimalTeam(); t.farm.find(p => p.isPitcher).recentPitchingDays = history;
+    const before = structuredClone(t); freezeEconomy(t);
+    expect(() => assess(t)).not.toThrow();
+    expect(assess(t)).toEqual({ ok: false, reasons: ['invalid-roster'] });
+    expect(t).toEqual(before);
+    expect(assess(JSON.parse(JSON.stringify(t)))).toEqual({ ok: false, reasons: ['invalid-roster'] });
+  });
+
+  it.each([undefined, null, [], [98, 99], [0, 100, 101, null, '99']])(
+    'keeps existing farm rest/rescue behavior for supported history %j', history => {
+      const t = minimalTeam(); t.farm.find(p => p.isPitcher).recentPitchingDays = history;
+      prove(assess(freezeEconomy(t)), t);
+    },
+  );
 
   it('can reallocate an active surplus catcher to the farm', () => {
     const t = minimalTeam(); t.players.push(t.farm.shift());

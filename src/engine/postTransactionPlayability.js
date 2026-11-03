@@ -57,7 +57,14 @@ export function assessPostTransactionPlayability(team, { round } = {}) {
       if (!validateTeamRoster(candidate).valid) continue;
       // Retired players never provide evidence of availability, even if an
       // old roster still contains them. Preserve them in the returned snapshot.
-      const farm = selectFarmTeam({ ...candidate, farm: candidate.farm.filter(healthy) }, { round });
+      let farm;
+      try {
+        farm = selectFarmTeam({ ...candidate, farm: candidate.farm.filter(healthy) }, { round });
+      } catch {
+        // The selector also reads optional history not checked by
+        // validateFarmTeams. Invalid input must reject the assessment.
+        return reject('invalid-roster');
+      }
       if (farm.status === 'ready') return { ok: true, reasons: [], team: candidate };
     }
   }

@@ -16,6 +16,18 @@
 - `npm run build` 成功。既存のchunk-size警告あり。
 - 最新HEADの必須CIと独立レビューはPR本文へ記録する。
 
+## PR #538 レビュー修正（2026-11-03）
+
+P2を現行HEAD `bda1fe7` で再現。健康な二軍投手の `recentPitchingDays` が `{}` / 文字列 / 正数 / `true` の場合、名簿の事前検証は通るが `selectFarmTeam` 内の `.filter()` がTypeErrorとなり、判定結果を返さず例外が漏れる。追加した4件がREDになったことを確認した。
+
+二軍選出の呼出し境界だけで例外を `ok:false, reasons:['invalid-roster']` へ変換する。履歴の補正・破棄やselector自体の仕様変更はしない。不正snapshotは凍結・JSON再読込後も非変更で拒否し、未記録/null/空配列/最近の登板/従来無視される配列要素と救済登板の正常例を維持する。
+
+再登録待機は今回のロジック修正不要と判断した。`projectTradeRosters` は待機中の加入選手を二軍に置き、本判定も一軍への昇格根拠に使わない。実投影を通した捕手交換のテストで、待機ありは拒否、待機0は成立を確認した。二軍に残る捕手の待機値と元snapshotも保全する。
+
+本判定は**取引後snapshotの `players` を現在一軍と解釈する**。加入前/異動前の配置は引数にないため、後続commandは既存の配置処理を通し、待機値を勝手に0にしたり、待機中の二軍選手を先に `players` へ入れたりしてから検査しないこと。旧一軍選手の継続を許す既存仕様は変更しない。この呼出し契約と証明用配置の非採用はcommand接続時の受入条件として残す。
+
+修正後は対象35件＋ `farmSelection` 8件＋ `farmGame` 19件＋ `annualDepartures` 42件、計4ファイル104件がGREEN。`npm run build` も成功（既存chunk-size警告あり）。独立レビューと最新HEAD必須CIはPR本文へ記録する。
+
 ## 残工程
 
 期中 `enter-market/end-contract`、年末効力の引退予約とreceipt、債務維持・保存再開、人のhook/UI、CPU/Worker、年度更新は未接続。今回の関数だけで期中退団を有効にしない。年次の新制度公開ゲートOFF、schema/DB version、旧保存と旧スカウト終了方針を維持する。Task 7/A1全体は未完了。実ブラウザ・実iPhone・長期耐久は今回の変更対象外。
