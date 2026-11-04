@@ -1,3 +1,4 @@
+import { isFaDeclarationCommand, normalizeFaDeclarationCommand, inspectAnnualFaDeclarations, createFaDeclaration } from './annualFaDeclarations';
 import { isRetirementCommand, normalizeRetirementCommand, inspectAnnualRetirements, createAnnualRetirement, assertRetirementCommandCompatible } from './annualRetirements';
 import { inspectAnnualDepartures, createWinterDeparture, isWinterDepartureCommand, normalizeWinterDeparture } from './annualDepartures';
 import { activeRenewalPlans } from './renewalPlanning';
@@ -53,6 +54,7 @@ const kinds = {
   'convert-to-controlled': ['teamId', 'playerId', 'contractId', 'annualSalaryManYen'],
 };
 function commandFor(input) {
+  if (isFaDeclarationCommand(input)) return normalizeFaDeclarationCommand(input);
   if (isRetirementCommand(input)) return normalizeRetirementCommand(input);
   if (isWinterDepartureCommand(input)) return normalizeWinterDeparture(input);
   if (!input || !validId(input.id) || !Object.hasOwn(kinds, input.type)
@@ -111,7 +113,7 @@ function inspect(state) {
   const date = parseContractDate(state.date);
   if (date.year !== state.season || state.spending?.budgetSeason !== state.season + Number(state.phase === 'offseason')
     || !['preseason', 'season', 'offseason'].includes(state.phase)) fail('取引年度・フェーズを確認してください。');
-  const departures = [...inspectAnnualDepartures(state), ...inspectAnnualRetirements(state)];
+  const departures = [...inspectAnnualDepartures(state), ...inspectAnnualRetirements(state), ...inspectAnnualFaDeclarations(state)];
   // Project only the records validated above. Share this snapshot with floors;
   // neither a caller-supplied projection nor a second inspection is needed.
   const { offseasonDepartures: previousProjection, ...spending } = state.spending;
@@ -474,7 +476,8 @@ function candidate(input, command) {
   assertRetirementCommandCompatible(before, c);
   if (input.phase === 'offseason' && !isRetirementCommand(c) && !isWinterDepartureCommand(c) && !c.type.endsWith('renewal') && !c.type.endsWith('rookie') && !c.type.endsWith('fa') && !['settle-fa-compensation', 'submit-fa-protection', 'settle-fa-personnel', 'join-fa-personnel'].includes(c.type)) fail('オフの新制度取引は翌年度契約だけが接続済みです。');
   // Snapshot and receipt enter validation together; no unaudited intermediate state.
-  let protectedState = isRetirementCommand(c) ? createAnnualRetirement(before, c, signature)
+  let protectedState = isFaDeclarationCommand(c) ? createFaDeclaration(before, c, signature)
+    : isRetirementCommand(c) ? createAnnualRetirement(before, c, signature)
     : isWinterDepartureCommand(c) ? createWinterDeparture(before, c, signature) : undefined;
   if (c.type === 'submit-fa-protection') {
     const record = createFaProtectionList(before, c);
@@ -502,7 +505,7 @@ function candidate(input, command) {
   // Releasing a prorated bid may restore a larger conservative annual floor.
   // Cancellation/losing bids create no obligation; winner admission is above.
   // Departures must still account for real vacancies created by outgoing players.
-  if (['trade', 'settle-fa-personnel', 'enter-market'].includes(c.type)
+  if (['trade', 'settle-fa-personnel', 'enter-market', 'declare-fa'].includes(c.type)
     && rows.some(r => r.remainingManYen < 0 && r.remainingManYen < oldRows.get(key(r.teamId, r.season)).remainingManYen)) fail('赤字年度の追加余力を悪化させる取引です。');
   return { state: { ...after, transactions: protectedState ? after.transactions : [...after.transactions, { id: c.id, signature }] }, rows, replayed: false,
     ...(personnel ? { personnel } : {}) };

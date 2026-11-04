@@ -109,7 +109,7 @@ describe('A1-2c-2c retirement',()=>{
     let w=inSeasonWorld(), teams=structuredClone(w.teams);while(teams.length<12)teams.push({id:teams.length,players:[],farm:[],budget:0});
     for(const t of teams)for(const p of [...t.players,...t.farm]){p.contractSignedYear=2024;p.contractYearsLeft=p.id===0?4:2;p.contractYears=p.contractYearsLeft;}
     const m=prepareEconomyMigration({...w,teams,year:2025,phase:'season',contractEconomy:undefined},{season:2025,stage:'unstarted-offseason',legacyOffseasonStarted:false});
-    expect(m.ok,JSON.stringify(m.issues)).toBe(true);w.contractEconomy.engine.spending.ledger=m.candidate.ledger;w=fromAnnualState(w,toAnnualState(w));
+    expect(m.ok,JSON.stringify(m.issues)).toBe(true);w.contractEconomy.engine.spending.ledger=m.candidate.ledger;delete w.contractEconomy.engine.faExerciseOrigins;w=fromAnnualState(w,toAnnualState(w));
     const n=apply(w,reserve(w)), off=winter(n), done=apply(off,finish(off));
     expect(ledger(done).records[0].contract.guaranteeStatus).toBe('unknown');expect(ledger(done).records[0].changes[0].settlement).toBe('retain');
     expect(validateEconomySave(done)).toBe('annual');

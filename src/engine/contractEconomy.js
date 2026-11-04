@@ -1,3 +1,4 @@
+import { nativeFaExerciseOrigins } from './annualFaDeclarations';
 import { inspectRetirementCalendar } from './annualRetirements';
 import { inspectAnnualBudgetCoverage } from './annualBudgetPolicy';
 import { employmentContractId, projectEmploymentPlayer, validateAnnualEmploymentContract, normalizeEmploymentContract } from './seasonContract';
@@ -157,7 +158,7 @@ export function fromAnnualState(world, input) {
     return { ...t, players: t.players.map(projectPlayer), farm: t.farm.map(projectPlayer), budget: row.remainingManYen };
   });
   const engine = Object.fromEntries(['version', 'spending', ...engineArrays,
-    ...(state.retirementReservations !== undefined ? ['retirementReservations'] : [])].map(k => [k, state[k]]));
+    ...['retirementReservations', 'faDeclarations', 'faExerciseOrigins'].filter(k => state[k] !== undefined)].map(k => [k, state[k]]));
   const { staffContracts, offseasonDepartures, ...persistedSpending } = engine.spending;
   engine.spending = persistedSpending;
   const next = { ...world, teams, faPool: state.faPool, offseasonPlan: projectDraftPlan(world, state),
@@ -173,7 +174,7 @@ function runCommand(world, command) {
     || command.baseRevision > current.baseRevision || !command.transaction) fail('取引のsaveId・epoch・revisionが古いか未記録です。');
   const c = command.transaction;
   typedIds([...state.transactions.map(r => r.id), c.id]);
-  if (['enter-market', 'reserve-retirement', 'finalize-retirement'].includes(c.type) && (state.phase === 'season' || c.type === 'finalize-retirement')
+  if (['enter-market', 'reserve-retirement', 'finalize-retirement', 'declare-fa'].includes(c.type) && (state.phase === 'season' || ['finalize-retirement', 'declare-fa'].includes(c.type))
     && !state.transactions.some(r => r.id === c.id)
     && world.contractEconomy.decisions.some(d => d.kind === 'human-renewal' && d.status === 'pending' && d.playerId === (c.playerId ?? state.retirementReservations?.find(r => r.id === c.reservationId)?.playerId)))
     fail('回答待ちの更改を解決してから退団してください。');
@@ -245,6 +246,7 @@ export function createAnnualNewGameWorld({ teams, faPool, myId, saveId, season, 
     budgetPolicies: policy.budgetPolicies, staffContracts: [], incomeReceipts: [], decisions: [],
     migration: { version: 1, status: 'applied', migrationId: initialId, fromSaveId: saveId, observedSeason: season, earliestOffseason: season, issues: [] },
     legacyEvidence: { contracts: [], marketEntries: [], staff: [], clauses: [] } } };
+  world.contractEconomy.engine.faExerciseOrigins = nativeFaExerciseOrigins(world);
   // This pure constructor is intentionally not called by normal new-game hooks.
   const next = fromAnnualState(world, toAnnualState(world));
   return structuredClone(next);

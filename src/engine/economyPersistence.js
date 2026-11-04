@@ -54,6 +54,11 @@ function preservesEconomyHistory(before, after) {
   if (canonical(before.randomRoot) !== canonical(after.randomRoot)) return false;
   if (!preservesRenewalDecisions(before, after)) return false;
   if (!preservesAcquisitionDecisions(before, after)) return false;
+  if (canonical(before.engine.faExerciseOrigins ?? []) !== canonical(after.engine.faExerciseOrigins ?? [])) return false;
+  for (const key of ['faDeclarations']) {
+    const old = before.engine[key] ?? [], next = after.engine[key] ?? [];
+    if (next.length < old.length || !old.every((row, i) => canonical(row) === canonical(next[i]))) return false;
+  }
   const oldLedger = before.engine.spending.ledger, newLedger = after.engine.spending.ledger;
   // Reuse ledger semantics (including closed years); additionally retain the
   // exact persisted evidence and record order, which the semantic check ignores.

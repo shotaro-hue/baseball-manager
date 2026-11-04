@@ -1,0 +1,35 @@
+# GM-01 A1-2c-3 FA declaration implementation plan
+
+> Execute inline with superpowers:executing-plans and TDD; independent final review.
+
+**Goal:** Turn an explicit domestic/overseas FA intention into a validated, persistent NPB market entry using the common annual command/save path.
+**Architecture:** `declare-fa {id,teamId,playerId,contractId,kind}` is v2/offseason December 1 only, for expiring controlled employment. Optional engine FA declaration records join the validated departure projection. Existing market/acquisition/compensation/receipt and save barrier APIs remain authoritative.
+**Spec:** approved 2026-10-30 A1 integration design §5.1/5.2 and the accepted next-task plan in the conversation.
+**Tech stack:** JavaScript / Vitest / existing annual world and IndexedDB generations.
+
+## Constraints and decisions
+- Base latest main ea27ee4970234cdbb0d78374aa046b18d463fed8 (#540 merged). Dedicated feature branch; gate OFF, schema/DB unchanged, legacy/scout policy unchanged, no merge/main push.
+- Only this next PR; overseas-club departure, posting/income, UI, CPU probability, Worker and automatic rollover remain later tasks.
+- Qualification uses existing getFaProgress; preserve measured/estimated provenance. kind is explicit, never inferred from nationality. Foreign FA eligibility/exempt behavior stays consistent with existing validateMarketPlayer.
+- Rank uses closing-year November 30 ledger employment and contract annual rates, including farm controlled players, excluding foreign/development players. Freeze the classification roster at declaration. A=positions1–3/B=4–10/C=11 onward; a tied block crossing either boundary is refused, not ID-sorted into a rank. Source amounts/ownership/classes are reconstructed from the ledger at inspection, not from mutable UI salaries.
+- Native new-game origins explicitly record game exercise count0 for initial owned/market players; retain historical origin evidence. Old v2 without origins and migrated players remain unknown. Before the first recorded declaration, unknown uses legacy-conservative-max; any proven prior declaration makes later exercises repeat, even if total lifetime count is unknown. faYears remains a UI contract-length selection.
+- Pending formal/human renewals, accepted future employment, retirement reservation, invalid dates/owner/source/qualification and duplicate declarations are refused without deleting promises. Unoffered renewal plans remain stored but cease funding this departure.
+- Natural expiry adds no end and changes no existing payroll/guarantee. Market/history/declaration/exercise proof/receipt update atomically. Replays survive later acquisition and later seasons. Listings are validated until accepted; accepted proposal metadata remains historical authority afterwards.
+- Keep same-year declarations in the common departure projection so winter ownership/floors reconcile. Preserve old v1/v2 records and prevent erasing origin/declaration evidence on overwrite.
+
+## Review focus
+- Salary ranking after prior declarations/releases/retirements, later transfers/raises, tied rank boundaries and classification evidence.
+- Exact/native first, repeat after unknown, unknown conservative basis; no misuse of faYears.
+- Source/receipt/listing/alumni tampering in either direction, including paired deletion and later acquisition/replay.
+- Pending decisions, future promises and retirement conflicts; no salary/guarantee changes.
+- Real createInitialTeams positive and negative examples; save failure/IDB root paths/cold reload.
+
+## Task 1: common declaration and immutable proof
+- [ ] Add normal/rejection tests first; run RED for missing declare-fa.
+- [ ] Implement a focused annualFaDeclarations module, command routing, validated departure projection, optional world persistence and explicit native origin seeding.
+- [ ] GREEN target tests including real bootstrap, qualification/rank/basis/conflicts, acquisition/cash/personnel handoff and later replay.
+
+## Task 2: persistence, regression and delivery
+- [ ] Actual commit/save/load with inline/external roots, failure/retry/replay and invalid evidence refusal; old modes remain valid.
+- [ ] Scoped departure/retirement/market/compensation/renewal/migration/save regressions; reuse exact HEAD CI for full suite/build/browser checks.
+- [ ] Independent review; reproduce/fix P1/P2. Record evidence in docs and PR, create new PR, confirm latest HEAD CI; stop unmerged.

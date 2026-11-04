@@ -144,6 +144,7 @@ describe('A1-2c-2b in-season release', () => {
       { season: 2025, stage: 'unstarted-offseason', legacyOffseasonStarted: false });
     expect(migration.ok, JSON.stringify(migration.issues)).toBe(true);
     spending(w).ledger = migration.candidate.ledger;
+    delete w.contractEconomy.engine.faExerciseOrigins; // Migration replaces the native fixture source.
     w = fromAnnualState(w, toAnnualState(w));
     const original = structuredClone(spending(w).ledger.records[0].contract), next = apply(w);
     expect(original.guaranteeStatus).toBe('unknown'); expect(original).not.toHaveProperty('signedSeason');
