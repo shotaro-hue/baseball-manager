@@ -158,7 +158,7 @@ export function fromAnnualState(world, input) {
     return { ...t, players: t.players.map(projectPlayer), farm: t.farm.map(projectPlayer), budget: row.remainingManYen };
   });
   const engine = Object.fromEntries(['version', 'spending', ...engineArrays,
-    ...['retirementReservations', 'faDeclarations', 'faExerciseOrigins'].filter(k => state[k] !== undefined)].map(k => [k, state[k]]));
+    ...['retirementReservations', 'faDeclarations', 'faExerciseOrigins', 'faDeclarationContexts'].filter(k => state[k] !== undefined)].map(k => [k, state[k]]));
   const { staffContracts, offseasonDepartures, ...persistedSpending } = engine.spending;
   engine.spending = persistedSpending;
   const next = { ...world, teams, faPool: state.faPool, offseasonPlan: projectDraftPlan(world, state),

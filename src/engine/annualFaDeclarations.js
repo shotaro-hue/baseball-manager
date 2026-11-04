@@ -34,9 +34,11 @@ function inspectOrigins(state) {
   if (!Array.isArray(origins)) fail();
   const saveId=state.economyIdentity?.saveId;
   const records=new Map(state.spending.ledger.records.map(r=>[employmentContractId(r.contract),r]));
+  const legacyPlayers=new Set(state.spending.ledger.records.filter(r=>isLegacyOpening(r.contract)).map(r=>r.contract.playerId));
   for (const o of origins) {
     if (!o || !id(o.playerId) || seen.has(String(o.playerId)) || o.basis!=='native-new-game' || o.count!==0
       || !['contract','market'].includes(o.sourceType) || Object.keys(o).sort().join(',')!==(o.sourceType==='market'?'basis,count,playerId,sourceEntry,sourceId,sourceType':'basis,count,playerId,sourceId,sourceType')) fail();
+    if (legacyPlayers.has(o.playerId)) fail('旧移行契約の行使歴を新規ゲームの0回へ変換できません。');
     seen.add(String(o.playerId));
     const expected=JSON.stringify([o.sourceType==='contract'?'initial-contract':'initial-market',saveId,o.playerId]);
     if (o.sourceId!==expected) fail();
@@ -48,6 +50,7 @@ function inspectOrigins(state) {
       // A birth record outlives delisting/relisting, retirement and acquisition.
       // Never require the original listing to remain live. Its immutable source
       // snapshot is seeded only at new-game construction and frozen on overwrite.
+      if (records.get(JSON.stringify(['initial-contract',saveId,o.playerId]))?.actionId===JSON.stringify(['initial-sign',saveId,o.playerId])) fail();
       const date=parseContractDate(o.sourceEntry?.enteredDate);
       if(date.year>state.season || stable(o.sourceEntry)!==stable({id:o.sourceId,kind:'released',enteredDate:day(date.year,'02-01')}))fail();
     }
@@ -65,10 +68,14 @@ function employmentLookup(state) {
   const dates=new Map();
   return season=>{if(!dates.has(season))dates.set(season,contractEmploymentAt(state.spending.ledger,day(season,'11-30')));return dates.get(season);};
 }
-function rankingFor(state,teamId,season,at) {
-  const metadata=[...state.teams.flatMap(owned),...state.faPool,
+function classificationPlayers(state) {
+  return [...state.teams.flatMap(owned),
     ...(state.offseasonDepartures??[]).map(d=>d.player),...(state.retirementReservations??[]).flatMap(r=>r.finalization?[r.finalization.player]:[]),
-    ...declarations(state).map(d=>d.player),...(state.acquisitions??[]).map(a=>a.player)];
+    ...declarations(state).map(d=>d.player),...(state.acquisitions??[]).map(a=>a.player),
+    ...(state.faPersonnelMoves??[]).map(m=>m.player),...state.faPool];
+}
+function rankingFor(state,teamId,season,at) {
+  const metadata=at.metadata??=classificationPlayers(state);
   const members=at(season).filter(e=>e.teamId===teamId).map(e=>{
     const p=metadata.find(p=>p?.id===e.contract.playerId && p.contractId===employmentContractId(e.contract));
     if(!p)fail('年俸順位の元名簿・外国人区分を確認できません。');
@@ -77,13 +84,20 @@ function rankingFor(state,teamId,season,at) {
   });
   return {season,teamId,date:day(season,'11-30'),members:ordered(members)};
 }
-function inspectRanking(r,at) {
+function inspectRanking(state,r,at) {
   const b=r.ranking;
   if (!b || b.season!==r.season || b.teamId!==r.teamId || b.date!==day(r.season,'11-30') || !Array.isArray(b.members)) fail();
   const actual=at(r.season).filter(e=>e.teamId===r.teamId).map(e=>({playerId:e.contract.playerId,contractId:employmentContractId(e.contract),
     annualSalaryManYen:e.annualSalaryManYen,registrationType:e.registrationType}));
   if (stable(ordered(b.members.map(({isForeign,...m})=>m)))!==stable(ordered(actual))
     || b.members.some(m=>typeof m.isForeign!=='boolean') || stable(ordered(b.members))!==stable(b.members)) fail();
+  if (r.season===state.season) {
+    const metadata=at.metadata??=classificationPlayers(state);
+    for (const member of b.members) {
+      const p=metadata.find(p=>p?.id===member.playerId && p.contractId===member.contractId);
+      if (!p || Boolean(p.isForeign)!==member.isForeign) fail('FA順位の外国人区分が元名簿・退団証跡と一致しません。');
+    }
+  }
   const own=b.members.find(m=>m.playerId===r.player.id && m.contractId===r.sourceContractId);
   if(!own || own.isForeign!==Boolean(r.player.isForeign) || own.registrationType!=='controlled')fail();
   if(own.isForeign)return 'exempt';
@@ -105,7 +119,7 @@ function expectedRecord(state,c,player,season,ranking,origins,at) {
   const r={id:c.id,season,teamId:c.teamId,player:structuredClone(player),sourceContractId:c.contractId,sourceRecord:structuredClone(source),
     sourceAnnualSalaryManYen:e.annualSalaryManYen,kind:c.kind,notifiedDate:day(season,'12-01'),effectiveDate:day(season,'12-01'),
     eligibility,ranking:structuredClone(ranking),exercise:exerciseFor(state,c.playerId,season,origins)};
-  const rank=inspectRanking(r,at);
+  const rank=inspectRanking(state,r,at);
   r.marketEntry={id:JSON.stringify([c.id,'fa-market']),kind:c.kind,enteredDate:r.notifiedDate,originTeamId:c.teamId,compensationRank:rank,
     ...(['A','B'].includes(rank)?{compensationBasis:{previousAnnualSalaryManYen:e.annualSalaryManYen,exercise:r.exercise.exercise}}:{})};
   return r;
@@ -115,14 +129,25 @@ const history = d=>({...d.player,exitYear:d.season,exitReason:reason(d),tenure:d
 
 export function inspectAnnualFaDeclarations(state) {
   const list=declarations(state),origins=inspectOrigins(state),at=employmentLookup(state),seen=new Set(),people=new Set();
-  if(!Array.isArray(list) || (state.version!==2 && (list.length||origins.length)))fail();
+  const contexts=state.faDeclarationContexts===undefined?[]:state.faDeclarationContexts;
+  if(!Array.isArray(list) || !Array.isArray(contexts) || (state.version!==2 && (list.length||origins.length||contexts.length)))fail();
+  const contextIds=new Set(),contextKeys=new Set();
+  for(const b of contexts){
+    const key=stable([b?.teamId,b?.season]);
+    if(!b || !id(b.id) || contextIds.has(String(b.id)) || contextKeys.has(key)
+      || Object.keys(b).sort().join(',')!=='date,id,members,season,teamId'
+      || !list.some(d=>b.id===JSON.stringify([d.id,'fa-ranking']) && d.teamId===b.teamId && d.season===b.season && d.ranking?.id===b.id))fail();
+    contextIds.add(String(b.id));contextKeys.add(key);
+  }
   for(const d of list) {
     if(!d || !id(d.id) || seen.has(String(d.id)) || !Number.isInteger(d.season) || d.season<1 || d.season>state.season
       || (d.season===state.season && (state.phase!=='offseason' || state.date<d.notifiedDate)))fail();
     const identity=JSON.stringify([String(d.player?.id),d.season]);if(people.has(identity))fail();people.add(identity);seen.add(String(d.id));
     const receipts=state.transactions.filter(t=>t.id===d.id),receipt=receipts[0];let c;
     try{c=normalizeFaDeclarationCommand(JSON.parse(receipt?.signature));}catch{fail();}
-    const expected=expectedRecord(state,c,d.player,d.season,d.ranking,origins,at);
+    const context=contexts.find(b=>b.id===d.ranking?.id && b.teamId===d.teamId && b.season===d.season);
+    if(!context || stable(context)!==stable(d.ranking))fail('FA年俸順位の独立した確定根拠が一致しません。');
+    const expected=expectedRecord(state,c,d.player,d.season,context,origins,at);
     if(receipts.length!==1 || c.id!==d.id || receipt.signature!==stable(c) || stable(receipt.faDeclaration)!==stable(d) || stable(expected)!==stable(d))fail();
     const alumni=state.teams.find(t=>t.id===d.teamId)?.history?.filter(p=>p.faDeclarationId===d.id)??[];
     if(alumni.length!==1 || stable(alumni[0])!==stable(history(d)))fail();
@@ -153,12 +178,15 @@ export function createFaDeclaration(state,c,signature) {
   if(state.spending.ledger.records.some(r=>r.contract.playerId===c.playerId && r.effectiveDate>state.date
     && contractEmploymentAt(state.spending.ledger,r.effectiveDate).some(e=>employmentContractId(e.contract)===employmentContractId(r.contract))))
     fail('受諾済み将来契約があるためFA宣言できません。');
-  const at=employmentLookup(state),ranking=rankingFor(state,c.teamId,state.season,at);
+  const at=employmentLookup(state),contexts=state.faDeclarationContexts??[];
+  const ranking=contexts.find(b=>b.teamId===c.teamId && b.season===state.season)
+    ?? {id:JSON.stringify([c.id,'fa-ranking']),...rankingFor(state,c.teamId,state.season,at)};
   const d=expectedRecord(state,c,player,state.season,ranking,inspectOrigins(state),at);
   const p={...player,salary:d.sourceAnnualSalaryManYen,isFA:true,isWaiverReleased:false,contractYearsLeft:0,marketEntry:d.marketEntry,
     faDeclarationId:d.id,departureReason:c.kind,marketEntryReason:reason(d),faPreviousSalary:d.sourceAnnualSalaryManYen,
     marketLastStats:player.stats,faEnteredYear:state.season,faOriginTeamId:team.id,faOriginTeamName:team.name,
     faOriginRoster:team.farm.some(p=>p.id===player.id)?'farm':'active'};
   return {...state,teams:state.teams.map(t=>t===team?{...removeDepartingPlayers(t,new Set([player.id])),history:[...(t.history??[]),history(d)]}:t),
+    faDeclarationContexts:contexts.some(b=>b.id===ranking.id)?contexts:[...contexts,structuredClone(ranking)],
     faPool:[...state.faPool,p],faDeclarations:[...declarations(state),d],transactions:[...state.transactions,{id:c.id,signature,faDeclaration:structuredClone(d)}]};
 }

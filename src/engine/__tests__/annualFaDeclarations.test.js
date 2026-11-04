@@ -82,6 +82,11 @@ describe('A1-2c-3 common FA declaration',()=>{
     let w=faWinter();w=apply(w,envelope(w,{id:'expire',type:'enter-market',teamId:0,playerId:0,contractId:w.teams[0].players[0].contractId,reason:'expiry'}));
     w=apply(w,declaration(w,3));expect(w.faPool.find(p=>p.id===3).marketEntry.compensationRank).toBe('B');expect(validateEconomySave(w)).toBe('annual');
   });
+  it('uses the immutable departure classification rather than mutable released-listing metadata for rank',()=>{
+    let w=faWinter();w=apply(w,envelope(w,{id:'expire',type:'enter-market',teamId:0,playerId:0,contractId:w.teams[0].players[0].contractId,reason:'expiry'}));
+    w.faPool[0].isForeign=true;expect(validateEconomySave(w)).toBe('annual');
+    const n=apply(w,declaration(w,3));expect(n.faPool.find(p=>p.id===3).marketEntry.compensationRank).toBe('B');
+  });
   it('rejects pending formal/human renewal and accepted future employment without cancelling promises',()=>{
     const w=faWinter(),p=renewalEnvelope(w);p.transaction.proposal.contract.agreementPhase='offseason';
     const held=apply(w,p);denied(held,declaration(held));
@@ -111,6 +116,9 @@ describe('A1-2c-3 common FA declaration',()=>{
     engine(w).spending.ledger=m.candidate.ledger;delete engine(w).faExerciseOrigins;w=fromAnnualState(w,toAnnualState(w));
     const n=apply(w,declaration(w));expect(n.faPool[0].marketEntry.compensationBasis).toEqual({previousAnnualSalaryManYen:12000,exercise:'legacy-conservative-max'});
     expect(engine(n).spending.ledger).toEqual(engine(w).spending.ledger);expect(validateEconomySave(n)).toBe('annual');
+    const fake=structuredClone(w),sourceId=JSON.stringify(['initial-market',w.saveId,0]);
+    engine(fake).faExerciseOrigins=[{playerId:0,sourceType:'market',sourceId,sourceEntry:{id:sourceId,kind:'released',enteredDate:'2026-02-01'},basis:'native-new-game',count:0}];
+    denied(fake,declaration(fake));
   });
   it.each([0,1])('hands real declaration evidence to same/other-club acquisition and funded cash settlement (club=%s)',teamId=>{
     let w=faWinter();const c=declaration(w);w=apply(w,c);const p=marketOffer(w,teamId);
@@ -150,6 +158,13 @@ describe('A1-2c-3 common FA declaration',()=>{
     const w=faWinter({teams:[club,...teams.filter(t=>t!==club)]}),c=declaration(w,candidate.id);denied(w,c);
     const eligible=structuredClone(w);[...eligible.teams[0].players,...eligible.teams[0].farm].find(p=>p.id===candidate.id).daysOnActiveRoster=1080;
     const n=apply(eligible,c);expect(validateEconomySave(n)).toBe('annual');
+  });
+  it.each([false,true])('rejects coordinated foreign-peer/rank/receipt/history/listing tampering (including context=%s)',includeContext=>{
+    const w=faWinter(),n=apply(w,declaration(w,3)),d=engine(n).faDeclarations[0];
+    d.ranking.members.find(m=>m.playerId===0).isForeign=true;d.marketEntry.compensationRank='A';
+    if(includeContext)engine(n).faDeclarationContexts[0].members.find(m=>m.playerId===0).isForeign=true;
+    engine(n).transactions[0].faDeclaration=structuredClone(d);n.faPool[0].marketEntry=structuredClone(d.marketEntry);n.teams[0].history[0].marketEntry=structuredClone(d.marketEntry);
+    expect(()=>validateEconomySave(n)).toThrow();
   });
   it.each([
     ['receipt',w=>engine(w).transactions.pop()],['row',w=>engine(w).faDeclarations=[]],['both',w=>{engine(w).transactions=[];engine(w).faDeclarations=[];}],

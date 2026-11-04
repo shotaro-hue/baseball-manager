@@ -51,3 +51,14 @@ it('refuses paired history/receipt removal without replacing committed roots',as
   const before=roots(),bad=structuredClone(current.world);bad.contractEconomy.revision++;bad.teams[0].history=[];bad.contractEconomy.engine.transactions=[];
   expect((await saves.saveGame(bad)).ok).toBe(false);expect(roots()).toEqual(before);surface();expect(validateEconomySave(await saves.loadGame())).toBe('annual');
 });
+it('reuses one immutable closing snapshot for two committed declarations and rejects its later edit',async()=>{
+  expect((await saves.saveGame(current.world)).ok).toBe(true);
+  expect((await saves.commitEconomyCandidate(candidate(declaration(current.world)),expected,bindings)).ok).toBe(true);
+  expected={...expected,baseRevision:1,progressToken:current.progressToken};
+  expect((await saves.commitEconomyCandidate(candidate(declaration(current.world,3)),expected,bindings)).ok).toBe(true);
+  expect(current.world.contractEconomy.engine.faDeclarationContexts).toHaveLength(1);
+  const saved=roots(),bad=structuredClone(current.world);bad.contractEconomy.revision++;
+  bad.contractEconomy.engine.faDeclarationContexts[0].members[0].isForeign=true;
+  expect((await saves.saveGame(bad)).ok).toBe(false);expect(roots()).toEqual(saved);
+  surface();const loaded=await saves.loadGame();expect(validateEconomySave(loaded)).toBe('annual');expect(loaded.contractEconomy.engine.faDeclarations).toHaveLength(2);
+});

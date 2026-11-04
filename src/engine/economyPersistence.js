@@ -55,7 +55,7 @@ function preservesEconomyHistory(before, after) {
   if (!preservesRenewalDecisions(before, after)) return false;
   if (!preservesAcquisitionDecisions(before, after)) return false;
   if (canonical(before.engine.faExerciseOrigins ?? []) !== canonical(after.engine.faExerciseOrigins ?? [])) return false;
-  for (const key of ['faDeclarations']) {
+  for (const key of ['faDeclarations', 'faDeclarationContexts']) {
     const old = before.engine[key] ?? [], next = after.engine[key] ?? [];
     if (next.length < old.length || !old.every((row, i) => canonical(row) === canonical(next[i]))) return false;
   }

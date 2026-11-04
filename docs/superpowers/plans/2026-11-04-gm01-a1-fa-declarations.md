@@ -3,7 +3,7 @@
 > Execute inline with superpowers:executing-plans and TDD; independent final review.
 
 **Goal:** Turn an explicit domestic/overseas FA intention into a validated, persistent NPB market entry using the common annual command/save path.
-**Architecture:** `declare-fa {id,teamId,playerId,contractId,kind}` is v2/offseason December 1 only, for expiring controlled employment. Optional engine FA declaration records join the validated departure projection. Existing market/acquisition/compensation/receipt and save barrier APIs remain authoritative.
+**Architecture:** `declare-fa {id,teamId,playerId,contractId,kind}` is v2/offseason December 1 only, for expiring controlled employment. Optional engine FA declaration records join the validated departure projection; independent club/year contexts freeze ranking provenance. Existing market/acquisition/compensation/receipt and save barrier APIs remain authoritative.
 **Spec:** approved 2026-10-30 A1 integration design §5.1/5.2 and the accepted next-task plan in the conversation.
 **Tech stack:** JavaScript / Vitest / existing annual world and IndexedDB generations.
 
@@ -25,11 +25,17 @@
 - Real createInitialTeams positive and negative examples; save failure/IDB root paths/cold reload.
 
 ## Task 1: common declaration and immutable proof
-- [ ] Add normal/rejection tests first; run RED for missing declare-fa.
-- [ ] Implement a focused annualFaDeclarations module, command routing, validated departure projection, optional world persistence and explicit native origin seeding.
-- [ ] GREEN target tests including real bootstrap, qualification/rank/basis/conflicts, acquisition/cash/personnel handoff and later replay.
+- [x] Add normal/rejection tests first; run RED for missing declare-fa.
+- [x] Implement a focused annualFaDeclarations module, command routing, validated departure projection, optional world persistence and explicit native origin seeding.
+- [x] GREEN target tests including real bootstrap, qualification/rank/basis/conflicts, acquisition/cash/personnel handoff and later replay.
 
 ## Task 2: persistence, regression and delivery
-- [ ] Actual commit/save/load with inline/external roots, failure/retry/replay and invalid evidence refusal; old modes remain valid.
-- [ ] Scoped departure/retirement/market/compensation/renewal/migration/save regressions; reuse exact HEAD CI for full suite/build/browser checks.
+- [x] Actual commit/save/load with inline/external roots, failure/retry/replay and invalid evidence refusal; old modes remain valid.
+- [x] Scoped departure/retirement/market/compensation/renewal/migration/save regressions; reuse exact HEAD CI for full suite/build/browser checks.
 - [ ] Independent review; reproduce/fix P1/P2. Record evidence in docs and PR, create new PR, confirm latest HEAD CI; stop unmerged.
+
+## Execution record
+- Initial RED25/41; final new49 engine +7 save cases. Final scoped21 files/882 tests passed. Main CI completed success.
+- Independent review2 P2 plus author classification-source-priority repro fixed with RED/GREEN. No new rule inferring unknown history or nationality.
+- Added immutable club/year faDeclarationContexts; current source nationality is reconciled, origins cannot attach to legacy-opening players or confuse native owned/market birth. See validation record.
+- Real bootstrap starts service0: normal stock refusal and a clearly labeled qualification-only scenario are separate. Five migration fixture setups drop native birth origins when substituting actual migration source; assertions unchanged.
