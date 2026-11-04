@@ -57,5 +57,11 @@ Consumes Task1 normalizer, exact NPB profile IDs and realPlayerId from bootstrap
   tests and 12 source lookup tests passed with literal boundary expectations.
 - Related regression: 12 files / 183 passed. Build passed with existing
   mixed-import/chunk-size warnings. No runtime/save/command integration changes.
+- Independent review found one P2: sparse array holes skipped by map/some could
+  be counted as seasons or pass as missing source IDs. Four reproductions were
+  RED; materializing every element before validation fixed them. Final scoped
+  GREEN: 12 files / 187 passed, including 52 new tests (40 assessor / 12 lookup).
+- Initial HEAD CI #677 was cancelled for the reviewed fix. Final HEAD/CI status
+  is recorded in the PR; no expectations, timeout or permanent skips changed.
 - Native inline implementation. The current stage does not choose market policy;
   recognized seasons remain supplied documented evidence, not inferred data.

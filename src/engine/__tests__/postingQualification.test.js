@@ -77,3 +77,14 @@ it('normalizes detached evidence and reproduces identical JSON without changing 
   const result = await assess(n); expect(await assess(JSON.parse(JSON.stringify(n)))).toEqual(result);
   n.professionalSeasons.seasons[0].sourceIds.push('changed'); expect(e).toEqual(old);
 });
+
+it.each([
+  e => { e.professionalSeasons.seasons = Array(6); },
+  e => { e.professionalSeasons.seasons.length = 6; },
+  e => { e.birthDate.sourceIds = Array(1); },
+  e => { e.professionalSeasons.seasons[0].sourceIds = Array(1); },
+])('rejects missing array elements instead of counting holes as documented seasons/sources', async edit => {
+  const { assessPostingBonusPoolExemption } = await module(); expect(assessPostingBonusPoolExemption).toBeTypeOf('function');
+  const e = facts({ professionalSeasons: pro([2021, 2022, 2023, 2024, 2025]) }); edit(e);
+  expect(() => assessPostingBonusPoolExemption(e, '2026-12-01')).toThrow();
+});

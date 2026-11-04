@@ -40,7 +40,8 @@ rule-update service or a claim that every foreign professional is in this class.
 Dates use the existing strict civil calendar. IDs include numeric 0. Reject
 unknown fields/versions, malformed dates, missing provenance, duplicate season
 years (including different teams/leagues), future seasons and impossible
-pre-birth records. Sort cloned evidence to make JSON/repeat results stable.
+pre-birth records. Sparse season/source arrays are invalid, not implicit facts.
+Sort cloned evidence to make JSON/repeat results stable.
 Null means unrecorded, not zero. Complete with an empty season set is known zero;
 partial empty evidence proves no upper bound. Evidence completeness is a supplied
 documented fact, never inferred by the normalizer or from a source URL alone.

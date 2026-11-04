@@ -7,7 +7,7 @@ const fields = (o, names) => {
     || Object.keys(o).some(k => !names.includes(k))) fail();
 };
 function sources(list) {
-  if (!Array.isArray(list) || !list.length || list.some(s => typeof s !== 'string' || !s.trim() || s !== s.trim())
+  if (!Array.isArray(list) || !list.length || [...list].some(s => typeof s !== 'string' || !s.trim() || s !== s.trim())
     || new Set(list).size !== list.length) fail();
   return [...list].sort();
 }
@@ -28,7 +28,7 @@ export function normalizePostingQualificationEvidence(input) {
     if (!['partial', 'complete'].includes(p.coverage) || !Array.isArray(p.seasons)
       || (birthDate && p.asOfDate < birthDate.date)) fail();
     const seen = new Set(), birthYear = birthDate && parseContractDate(birthDate.date).year;
-    const seasons = p.seasons.map(r => {
+    const seasons = Array.from(p.seasons, r => {
       fields(r, ['season', 'sourceIds']);
       if (!Number.isInteger(r.season) || r.season < 1 || r.season > asOf.year || seen.has(r.season)
         || (birthYear && r.season < birthYear)) fail();

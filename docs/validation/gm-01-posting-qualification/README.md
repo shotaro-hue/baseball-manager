@@ -47,6 +47,18 @@ truth of an arbitrary source ID or a caller-supplied completeness claim.
 Final regression/build, independent review, submitted SHA/tree and exact-HEAD CI
 results are recorded in the PR description. Do not infer CI from scoped tests.
 
+## Independent review and correction
+
+Review of HEAD 9bd5f52 found one P2: JavaScript map/some skipped sparse-array
+holes, so six absent season slots could become a count of six/exempt, or an
+absent source slot could survive until JSON reload. The reviewer reproduced
+both; the implementer confirmed four RED cases (six holes, five years plus hole,
+birth source hole, professional-season source hole). Materializing every array
+element before validation rejects those missing facts. Final related GREEN:
+12 files / 187 passed, including 40 assessor + 12 lookup new tests. No other
+confirmed findings. The initial HEAD CI #677 was cancelled for the correction;
+the final submitted HEAD's CI is the acceptance gate.
+
 ## Remaining ownership
 
 The qualification API is intentionally not connected to existing application,
