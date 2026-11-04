@@ -116,6 +116,9 @@ function inspect(state) {
   if (date.year !== state.season || state.spending?.budgetSeason !== state.season + Number(state.phase === 'offseason')
     || !['preseason', 'season', 'offseason'].includes(state.phase)) fail('取引年度・フェーズを確認してください。');
   const departures = [...inspectAnnualDepartures(state), ...inspectAnnualRetirements(state), ...inspectAnnualFaDeclarations(state)];
+  // One employment can end by only one route. Individually valid records from
+  // incompatible branches must not jointly exempt the same source contract.
+  if (new Set(departures.map(d => d.sourceContractId)).size !== departures.length) fail('同じ元契約の退団経路が重複しています。');
   // Project only the records validated above. Share this snapshot with floors;
   // neither a caller-supplied projection nor a second inspection is needed.
   const { offseasonDepartures: previousProjection, ...spending } = state.spending;
