@@ -159,7 +159,7 @@ export function fromAnnualState(world, input) {
     return { ...t, players: t.players.map(projectPlayer), farm: t.farm.map(projectPlayer), budget: row.remainingManYen };
   });
   const engine = Object.fromEntries(['version', 'spending', ...engineArrays,
-    ...['retirementReservations', 'faDeclarations', 'faExerciseOrigins', 'faDeclarationContexts'].filter(k => state[k] !== undefined)].map(k => [k, state[k]]));
+    ...['retirementReservations', 'faDeclarations', 'faExerciseOrigins', 'faDeclarationContexts', 'overseasDepartures'].filter(k => state[k] !== undefined)].map(k => [k, state[k]]));
   const { staffContracts, offseasonDepartures, ...persistedSpending } = engine.spending;
   engine.spending = persistedSpending;
   const next = { ...world, teams, faPool: state.faPool, offseasonPlan: projectDraftPlan(world, state),
@@ -175,6 +175,9 @@ function runCommand(world, command) {
     || command.baseRevision > current.baseRevision || !command.transaction) fail('取引のsaveId・epoch・revisionが古いか未記録です。');
   const c = command.transaction;
   typedIds([...state.transactions.map(r => r.id), c.id]);
+  if (c.type === 'depart-overseas' && !state.transactions.some(r => r.id === c.id)
+    && world.contractEconomy.decisions.some(d => d.kind === 'human-acquisition' && d.status === 'pending' && d.playerId === c.playerId))
+    fail('回答待ちのNPB獲得を解決してから海外離脱してください。');
   if (['enter-market', 'reserve-retirement', 'finalize-retirement', 'declare-fa'].includes(c.type) && (state.phase === 'season' || ['finalize-retirement', 'declare-fa'].includes(c.type))
     && !state.transactions.some(r => r.id === c.id)
     && world.contractEconomy.decisions.some(d => d.kind === 'human-renewal' && d.status === 'pending' && d.playerId === (c.playerId ?? state.retirementReservations?.find(r => r.id === c.reservationId)?.playerId)))

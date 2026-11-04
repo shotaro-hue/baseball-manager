@@ -170,6 +170,8 @@ PR #521レビュー修正: revision増加でもrandomRoot・確定済み台帳�
 
 ## Task 7: A1-2c 退団・市場・海外離脱
 
+2026-11-04 A1-2c-4a: #541マージ済みmain `b14aaf9`から、海外FA宣言済み選手のNPB市場退出を共通commandへ接続。[設計](../specs/2026-11-04-gm01-a1-overseas-fa-departure-design.md)／[計画](./2026-11-04-gm01-a1-overseas-fa-departure.md)／[検証](../../validation/gm-01-a1-overseas-fa-departure/README.md)。資格/自然満了/元球団履歴/行使証跡は既存宣言が所有し、退出参照とreceiptを同時保存する。給与・保証・国内FA補償・臨時収入は変更しない。継続契約の海外移籍/解除合意、posting/引退試合収入、人の操作、CPU/年度進行/Workerは後続。Task7/A1未完了、公開ゲートOFF、schemaVersion1/DB5を維持。提出HEAD・独立レビュー・CI・マージ状況は対象PR本文を正本とする。
+
 2026-11-04 A1-2c-3: #540マージ済みmain `ea27ee4970234cdbb0d78374aa046b18d463fed8`から、明示FA宣言→資格/旧年俸順位/行使歴根拠→国内NPB市場の共通commandを実装。[計画](./2026-11-04-gm01-a1-fa-declarations.md)／[検証](../../validation/gm-01-a1-fa-declarations/README.md)。国内/海外FA権の市場区分を扱い、海外球団への実離脱・posting/引退試合収入・人の操作・CPU・年度進行/Workerは後続。Task7/A1全体未完了・公開ゲートOFFを維持。過去の未マージ/未実装記述は記録時点の情報であり、現在のPR状況/最終CIは対象PRを正本とする。
 
 
