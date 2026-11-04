@@ -5,6 +5,7 @@ import { getFaProgress } from './contract';
 import { isIkuseiPlayer } from './rosterCapacity';
 import { removeDepartingPlayers } from './tradeTransaction';
 import { validateMarketPlayer } from './annualAcquisitions';
+import { inspectAnnualOverseasDepartures } from './annualOverseasDepartures';
 
 const fail = (message='FA宣言・元契約・資格・補償根拠・確定証跡を確認してください。') => { throw new Error(message); };
 const id = n => (typeof n === 'string' && n.trim()) || (Number.isSafeInteger(n) && n >= 0);
@@ -143,6 +144,7 @@ const reason = d=>d.kind==='domestic-fa'?'国内FA宣言':'海外FA宣言';
 const history = d=>({...d.player,exitYear:d.season,exitReason:reason(d),tenure:d.player.serviceYears??1,faDeclarationId:d.id,marketEntry:d.marketEntry});
 
 export function inspectAnnualFaDeclarations(state) {
+  const overseas = new Set(inspectAnnualOverseasDepartures(state).map(d => d.declarationId));
   const list=declarations(state),origins=inspectOrigins(state),at=employmentLookup(state),seen=new Set(),people=new Set();
   const contexts=state.faDeclarationContexts===undefined?[]:state.faDeclarationContexts;
   if(!Array.isArray(list) || !Array.isArray(contexts) || (state.version!==2 && (list.length||origins.length||contexts.length)))fail();
@@ -168,7 +170,7 @@ export function inspectAnnualFaDeclarations(state) {
     if(alumni.length!==1 || stable(alumni[0])!==stable(history(d)))fail();
     const acquired=state.spending.resolvedReservations.some(h=>h.kind==='offer' && h.resolution==='accepted'
       && h.proposal.contract.playerId===d.player.id && stable(h.proposal.marketEntry)===stable(d.marketEntry));
-    if(!acquired) {
+    if(!acquired && !overseas.has(d.id)) {
       const p=state.faPool.find(p=>p.id===d.player.id && stable(p.marketEntry)===stable(d.marketEntry));
       if(!p || p.faDeclarationId!==d.id || p.contractId!==d.sourceContractId || p.isFA!==true || p.isWaiverReleased!==false
         || p.departureReason!==d.kind || p.faPreviousSalary!==d.sourceAnnualSalaryManYen || p.marketEntryReason!==reason(d)
