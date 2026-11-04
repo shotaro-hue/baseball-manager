@@ -14,7 +14,7 @@ beforeEach(() => {
 });
 afterEach(() => { if (view) act(() => view.unmount()); view = null; vi.restoreAllMocks(); });
 
-function setup() {
+function setup(contractEconomy) {
   let current;
   const notify = vi.fn(), addNews = vi.fn();
   const pitcher = { id: 'posting-player', name: '移籍投手', isPitcher: true, age: 25,
@@ -26,7 +26,7 @@ function setup() {
       lineupDh: [pitcher.id, teammate.id], rotation: [pitcher.id, teammate.id] },
     { id: 1, name: '他球団', budget: 5000, players: [] }]);
     const [mailbox, setMailbox] = useState([{ id: 'request', type: 'posting_request', playerId: pitcher.id }]);
-    const gs = { teams, setTeams, myId: 0, myTeam: teams[0], year: 2026, mailbox, setMailbox,
+    const gs = { contractEconomy, teams, setTeams, myId: 0, myTeam: teams[0], year: 2026, mailbox, setMailbox,
       getMailboxItemById: id => mailbox.find(m => m.id === id), notify, addNews,
       upd: (id, update) => setTeams(prev => prev.map(t => t.id === id ? update(t) : t)) };
     current = { gs, os: useOffseason(gs) };
@@ -73,4 +73,21 @@ it('does not credit or remove a player on rejection and retains the existing mor
   expect(h.current.gs.mailbox).toEqual([expect.objectContaining({ resolved: true, read: true })]);
   expect(calcPostingBid).not.toHaveBeenCalled();
   expect(h.addNews).not.toHaveBeenCalled();
+});
+
+it.each(['accept', 'decline'])('blocks legacy posting %s in annual mode before any mutation', action => {
+  const h = setup({ schemaVersion: 1, mode: 'annual' });
+  const before = JSON.stringify({ teams: h.current.gs.teams, mailbox: h.current.gs.mailbox });
+  act(() => expect(h.current.os.handleMailAction('request', action)).toBe(false));
+  expect(JSON.stringify({ teams: h.current.gs.teams, mailbox: h.current.gs.mailbox })).toBe(before);
+  expect(calcPostingBid).not.toHaveBeenCalled(); expect(h.addNews).not.toHaveBeenCalled();
+});
+it('blocks an old legacy mail callback after the latest mode changes', () => {
+  const h = setup(), old = h.current.os.handleMailAction;
+  // Mutate the current state object observed by the hook ref, as activation does
+  // before any old callback is allowed to make its first state update.
+  h.current.gs.contractEconomy = { schemaVersion: 1, mode: 'annual' };
+  act(() => expect(old('request', 'accept')).toBe(false));
+  expect(h.current.gs.myTeam.budget).toBe(1000); expect(h.current.gs.myTeam.players).toHaveLength(2);
+  expect(calcPostingBid).not.toHaveBeenCalled();
 });

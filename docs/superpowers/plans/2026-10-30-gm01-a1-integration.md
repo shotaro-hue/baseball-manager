@@ -170,6 +170,9 @@ PR #521レビュー修正: revision増加でもrandomRoot・確定済み台帳�
 
 ## Task 7: A1-2c 退団・市場・海外離脱
 
+2026-11-04 #545後: [申請・GM判断の設計](../specs/2026-11-04-gm01-posting-applications-design.md)と[残工程監査](../../validation/gm-01-posting-applications/README.md)。承認を成立扱いしない申請event/一回の判断を共通保存へ追加。MLB資格の根拠・市場policy・受諾/辞退/不成立を次の依存工程として整理。人UI/CPU/年度Worker/引退試合producerは未接続、Task7/A1未完了・公開OFF。最終SHA/レビュー/CIは対象PRを参照。
+
+
 2026-11-04 #544マージ後: 引退試合の共通`record-extraordinary-income`を[設計](../specs/2026-11-04-gm01-retirement-income-design.md)／[計画](./2026-11-04-gm01-retirement-income.md)へ分離。未確定引退予約とworld日程を根拠に明示収入を一回だけ保存し、当年支出枠/通常収支/給与/保証を変えない。後続Task10は保持した証跡を翌年度審査へ接続し、postingの年度限定追加枠と二重配分しない。開催/価格producer・人UI/CPU・年度Workerは未接続。Task7/A1未完了・公開OFFを維持。最終HEAD/レビュー/CIは対象PRを正本とする。
 
 2026-11-04 posting収入の方針変更: Yオフに成立した譲渡金をY+1の補強へ使えるよう、通常予算とは別の年度限定追加承認を採用。#543に依存する共通`complete-posting`で退団/収入/追加枠を原子的に扱う。[改訂設計](../specs/2026-11-04-gm01-posting-income-budget-design.md)／[実装計画](./2026-11-04-gm01-posting-income-budget.md)。この工程は明示済み海外契約金額を入力とする基盤のみ。申請/MLB資格根拠/市場抽選/人の承認UI/CPU判断/年度・Worker接続は未実装。Task7/A1未完了、公開OFFを維持する。Task9は同じ追加許可でCPU審査、Task10はincome履歴・対象年許可を保持し、通常予算へ再配分しないことを受入に追加する。

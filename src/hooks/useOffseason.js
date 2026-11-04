@@ -481,6 +481,7 @@ export function useOffseason(gs) {
 
     // ポスティング申請の承諾/拒否
     if(mail.type==="posting_request"){
+      if (!canProgressLegacy()) return false;
       // resolved protects loaded saves; IDs also protect stale callbacks after a mail-read update.
       if(mail.resolved || handledPostingRequests.current.has(mail.id)) return;
       handledPostingRequests.current.add(mail.id);
