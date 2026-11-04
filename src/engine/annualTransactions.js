@@ -1,3 +1,4 @@
+import { isRetirementCommand, normalizeRetirementCommand, inspectAnnualRetirements, createAnnualRetirement, assertRetirementCommandCompatible } from './annualRetirements';
 import { inspectAnnualDepartures, createWinterDeparture, isWinterDepartureCommand, normalizeWinterDeparture } from './annualDepartures';
 import { activeRenewalPlans } from './renewalPlanning';
 import { employmentContractId, projectEmploymentPlayer, validateAnnualEmploymentContract } from './seasonContract';
@@ -52,6 +53,7 @@ const kinds = {
   'convert-to-controlled': ['teamId', 'playerId', 'contractId', 'annualSalaryManYen'],
 };
 function commandFor(input) {
+  if (isRetirementCommand(input)) return normalizeRetirementCommand(input);
   if (isWinterDepartureCommand(input)) return normalizeWinterDeparture(input);
   if (!input || !validId(input.id) || !Object.hasOwn(kinds, input.type)
     || Object.keys(input).some(k => !['id', 'type', ...kinds[input.type]].includes(k))) fail('取引の種類・ID・入力項目を確認してください。');
@@ -109,7 +111,7 @@ function inspect(state) {
   const date = parseContractDate(state.date);
   if (date.year !== state.season || state.spending?.budgetSeason !== state.season + Number(state.phase === 'offseason')
     || !['preseason', 'season', 'offseason'].includes(state.phase)) fail('取引年度・フェーズを確認してください。');
-  const departures = inspectAnnualDepartures(state);
+  const departures = [...inspectAnnualDepartures(state), ...inspectAnnualRetirements(state)];
   // Project only the records validated above. Share this snapshot with floors;
   // neither a caller-supplied projection nor a second inspection is needed.
   const { offseasonDepartures: previousProjection, ...spending } = state.spending;
@@ -469,9 +471,11 @@ function candidate(input, command) {
     return { state: input, rows: quoteAnnualSpendingPlan(before.spending), replayed: true,
       ...(receipt.faPersonnel ? { personnel: { winnerProposalIds: [...receipt.faPersonnel.winnerProposalIds], lostProposalIds: [...receipt.faPersonnel.lostProposalIds] } } : {}) };
   }
-  if (input.phase === 'offseason' && !isWinterDepartureCommand(c) && !c.type.endsWith('renewal') && !c.type.endsWith('rookie') && !c.type.endsWith('fa') && !['settle-fa-compensation', 'submit-fa-protection', 'settle-fa-personnel', 'join-fa-personnel'].includes(c.type)) fail('オフの新制度取引は翌年度契約だけが接続済みです。');
+  assertRetirementCommandCompatible(before, c);
+  if (input.phase === 'offseason' && !isRetirementCommand(c) && !isWinterDepartureCommand(c) && !c.type.endsWith('renewal') && !c.type.endsWith('rookie') && !c.type.endsWith('fa') && !['settle-fa-compensation', 'submit-fa-protection', 'settle-fa-personnel', 'join-fa-personnel'].includes(c.type)) fail('オフの新制度取引は翌年度契約だけが接続済みです。');
   // Snapshot and receipt enter validation together; no unaudited intermediate state.
-  let protectedState = isWinterDepartureCommand(c) ? createWinterDeparture(before, c, signature) : undefined;
+  let protectedState = isRetirementCommand(c) ? createAnnualRetirement(before, c, signature)
+    : isWinterDepartureCommand(c) ? createWinterDeparture(before, c, signature) : undefined;
   if (c.type === 'submit-fa-protection') {
     const record = createFaProtectionList(before, c);
     protectedState = { ...before, faProtectionLists: [...(before.faProtectionLists ?? []), record],
@@ -486,7 +490,7 @@ function candidate(input, command) {
     : c.type === 'convert-to-controlled' ? conversionCandidate(before, c)
     : c.type.endsWith('renewal') ? renewalCandidate(before, c)
     : c.type.endsWith('rookie') ? rookieCandidate(before, c) : faCandidate(before, c)));
-  const mode = c.type === 'trade' ? c.mode : 'spend';
+  const mode = c.type === 'finalize-retirement' ? 'retirement' : c.type === 'trade' ? c.mode : 'spend';
   // A derived floor restored by a losing/cancelled bid is not new spending.
   // Use final floors for admission; independently check actual headroom changes.
   const comparison = mode === 'cashless-trade' ? before.spending
