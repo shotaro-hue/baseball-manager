@@ -40,6 +40,8 @@ function mixedWorld(occupied) {
   Object.assign(world.contractEconomy.engine,
     Object.fromEntries(['transactions', 'acquisitions', 'faProtectionLists', 'faPersonnelMoves', 'faCompensationStandings'].map(k => [k, state[k]])),
     { spending: { ...state.spending, authorizations: [...state.spending.authorizations.filter(a => a.season === 2026), ...policy.authorizations] } });
+  // Imported historical ledger has no native initial-sign birth evidence.
+  delete world.contractEconomy.engine.faExerciseOrigins; delete world.contractEconomy.faExerciseBirth;
   world.contractEconomy.budgetPolicies = world.contractEconomy.engine.spending.authorizations.map(({ teamId, season, approvedManYen }) =>
     ({ teamId, season, approvedManYen, policyVersion: 'explicit-test-policy' }));
   return fromAnnualState(world, toAnnualState(world));

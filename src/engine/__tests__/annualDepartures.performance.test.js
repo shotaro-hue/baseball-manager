@@ -30,6 +30,8 @@ function longHistory(years = 12, playersPerYear = 12) {
     records.push(...state.spending.ledger.records); receipts.push(...state.transactions);
     listings.push(...state.faPool); exits.push(...state.offseasonDepartures); history.push(...state.teams[0].history);
   }
+  // This composite retains independent games' histories, not one native birth.
+  delete state.faExerciseBirth; delete state.faExerciseOrigins;
   return { ...state, faPool: listings, transactions: receipts, offseasonDepartures: exits,
     teams: [{ ...state.teams[0], history }], spending: { ...state.spending,
       ledger: { ...state.spending.ledger, records } } };

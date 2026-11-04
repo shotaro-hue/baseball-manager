@@ -170,6 +170,9 @@ PR #521レビュー修正: revision増加でもrandomRoot・確定済み台帳�
 
 ## Task 7: A1-2c 退団・市場・海外離脱
 
+2026-11-04 A1-2c-3: #540マージ済みmain `ea27ee4970234cdbb0d78374aa046b18d463fed8`から、明示FA宣言→資格/旧年俸順位/行使歴根拠→国内NPB市場の共通commandを実装。[計画](./2026-11-04-gm01-a1-fa-declarations.md)／[検証](../../validation/gm-01-a1-fa-declarations/README.md)。国内/海外FA権の市場区分を扱い、海外球団への実離脱・posting/引退試合収入・人の操作・CPU・年度進行/Workerは後続。Task7/A1全体未完了・公開ゲートOFFを維持。過去の未マージ/未実装記述は記録時点の情報であり、現在のPR状況/最終CIは対象PRを正本とする。
+
+
 2026-11-03 A1-2c-2c: #539後、期中引退予約と12月1日の独立した確定候補commandを追加。[計画](./2026-11-03-gm01-a1-retirement.md)／[検証](../../validation/gm-01-a1-retirement/README.md)／[#540](https://github.com/shotaro-hue/baseball-manager/pull/540)。予約中は雇用・配置・給与を維持し、確定時に名簿整理・保証retain・career世代/引退履歴/receiptを原子的に保存する。年度更新への自動接続はTask 10、UI/CPU/Workerと公開は未接続。Task 7/A1全体未完了・公開ゲートOFFを維持する。最新HEAD/CI/マージ状況はPRを参照。
 
 
