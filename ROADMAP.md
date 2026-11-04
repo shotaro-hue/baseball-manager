@@ -1,5 +1,7 @@
 # ROADMAP — NPB Franchise Manager
 
+> 2026-11-04 #544マージ済みmain `417b83d`から、引退試合の明示収入を共通command・一回限りの証跡・実保存へ接続する。[設計](./docs/superpowers/specs/2026-11-04-gm01-retirement-income-design.md)。当年枠/通常収支/給与/保証は維持し、後続年度審査へ証跡を残す。開催/価格producer・UI/CPU・年度Workerは未接続、Task7/A1未完了、公開ゲートOFF。以下の未マージ記述は記録時点のもの。
+
 > 2026-11-04 posting収入の改訂: Yオフの成立譲渡金をY+1年度限定の追加枠として配分する。[設計・今回の基盤範囲](./docs/superpowers/specs/2026-11-04-gm01-posting-income-budget-design.md)。#543依存の未マージ工程。申請/市場/人UI/CPU/年度Workerと長期校正は後続、Task7/A1未完了、公開ゲートOFF。
 
 > 2026-11-02 続行: #535マージ後のA1-2c-1は冬の満了・解雇・自由契約市場の共通処理。人の操作接続・期中/FA/海外/収入は残工程。Task 7/A1は未完了、公開ゲートOFF。[計画](./docs/superpowers/plans/2026-11-02-gm01-a1-winter-departures.md)。

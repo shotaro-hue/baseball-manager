@@ -1,7 +1,8 @@
 import { isFaDeclarationCommand, normalizeFaDeclarationCommand, inspectAnnualFaDeclarations, createFaDeclaration } from './annualFaDeclarations';
 import { isOverseasDepartureCommand, normalizeOverseasDeparture, createOverseasDeparture } from './annualOverseasDepartures';
 import { isPostingDepartureCommand, normalizePostingDeparture, inspectAnnualPostingDepartures, createPostingDeparture } from './annualPostingDepartures';
-import { isPostingCompletionCommand, normalizePostingCompletion, createPostingCompletion, inspectPostingIncome } from './postingIncome';
+import { isPostingCompletionCommand, normalizePostingCompletion, createPostingCompletion } from './postingIncome';
+import { isExtraordinaryIncomeCommand, normalizeExtraordinaryIncome, createExtraordinaryIncome, inspectAnnualIncome } from './annualIncome';
 import { isRetirementCommand, normalizeRetirementCommand, inspectAnnualRetirements, createAnnualRetirement, assertRetirementCommandCompatible } from './annualRetirements';
 import { inspectAnnualDepartures, createWinterDeparture, isWinterDepartureCommand, normalizeWinterDeparture } from './annualDepartures';
 import { activeRenewalPlans } from './renewalPlanning';
@@ -57,6 +58,7 @@ const kinds = {
   'convert-to-controlled': ['teamId', 'playerId', 'contractId', 'annualSalaryManYen'],
 };
 function commandFor(input) {
+  if (isExtraordinaryIncomeCommand(input)) return normalizeExtraordinaryIncome(input);
   if (isPostingCompletionCommand(input)) return normalizePostingCompletion(input);
   if (isPostingDepartureCommand(input)) return normalizePostingDeparture(input);
   if (isOverseasDepartureCommand(input)) return normalizeOverseasDeparture(input);
@@ -120,7 +122,7 @@ function inspect(state) {
   if (date.year !== state.season || state.spending?.budgetSeason !== state.season + Number(state.phase === 'offseason')
     || !['preseason', 'season', 'offseason'].includes(state.phase)) fail('取引年度・フェーズを確認してください。');
   const departures = [...inspectAnnualDepartures(state), ...inspectAnnualRetirements(state), ...inspectAnnualPostingDepartures(state), ...inspectAnnualFaDeclarations(state)];
-  inspectPostingIncome(state);
+  inspectAnnualIncome(state);
   // One employment can end by only one route. Individually valid records from
   // incompatible branches must not jointly exempt the same source contract.
   if (new Set(departures.map(d => d.sourceContractId)).size !== departures.length) fail('同じ元契約の退団経路が重複しています。');
@@ -486,7 +488,8 @@ function candidate(input, command) {
   assertRetirementCommandCompatible(before, c);
   if (input.phase === 'offseason' && !isPostingCompletionCommand(c) && !isPostingDepartureCommand(c) && !isOverseasDepartureCommand(c) && !isRetirementCommand(c) && !isWinterDepartureCommand(c) && !c.type.endsWith('renewal') && !c.type.endsWith('rookie') && !c.type.endsWith('fa') && !['settle-fa-compensation', 'submit-fa-protection', 'settle-fa-personnel', 'join-fa-personnel'].includes(c.type)) fail('オフの新制度取引は翌年度契約だけが接続済みです。');
   // Snapshot and receipt enter validation together; no unaudited intermediate state.
-  let protectedState = isPostingCompletionCommand(c) ? createPostingCompletion(before, c, signature)
+  let protectedState = isExtraordinaryIncomeCommand(c) ? createExtraordinaryIncome(before, c, signature)
+    : isPostingCompletionCommand(c) ? createPostingCompletion(before, c, signature)
     : isPostingDepartureCommand(c) ? createPostingDeparture(before, c, signature)
     : isOverseasDepartureCommand(c) ? createOverseasDeparture(before, c, signature)
     : isFaDeclarationCommand(c) ? createFaDeclaration(before, c, signature)
