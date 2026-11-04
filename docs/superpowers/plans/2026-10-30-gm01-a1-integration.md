@@ -170,6 +170,8 @@ PR #521レビュー修正: revision増加でもrandomRoot・確定済み台帳�
 
 ## Task 7: A1-2c 退団・市場・海外離脱
 
+2026-11-04 #544マージ後: 引退試合の共通`record-extraordinary-income`を[設計](../specs/2026-11-04-gm01-retirement-income-design.md)／[計画](./2026-11-04-gm01-retirement-income.md)へ分離。未確定引退予約とworld日程を根拠に明示収入を一回だけ保存し、当年支出枠/通常収支/給与/保証を変えない。後続Task10は保持した証跡を翌年度審査へ接続し、postingの年度限定追加枠と二重配分しない。開催/価格producer・人UI/CPU・年度Workerは未接続。Task7/A1未完了・公開OFFを維持。最終HEAD/レビュー/CIは対象PRを正本とする。
+
 2026-11-04 posting収入の方針変更: Yオフに成立した譲渡金をY+1の補強へ使えるよう、通常予算とは別の年度限定追加承認を採用。#543に依存する共通`complete-posting`で退団/収入/追加枠を原子的に扱う。[改訂設計](../specs/2026-11-04-gm01-posting-income-budget-design.md)／[実装計画](./2026-11-04-gm01-posting-income-budget.md)。この工程は明示済み海外契約金額を入力とする基盤のみ。申請/MLB資格根拠/市場抽選/人の承認UI/CPU判断/年度・Worker接続は未実装。Task7/A1未完了、公開OFFを維持する。Task9は同じ追加許可でCPU審査、Task10はincome履歴・対象年許可を保持し、通常予算へ再配分しないことを受入に追加する。
 
 2026-11-04 A1-2c-4b: #542マージ済みmain `3b6192e`から、ポスティング退団と明示解除合意を共通end-contractへ接続。[設計](../specs/2026-11-04-gm01-a1-posting-departure-design.md)／[計画](./2026-11-04-gm01-a1-posting-departure.md)／[検証](../../validation/gm-01-a1-posting-departure/README.md)。12月1日の通知/合意と翌2月1日の終了効力を分け、原則retain・明示合意のみwaiveとし、旧保証不明・過去給与・現在負担者・最低維持費を維持。元契約/名簿/履歴/action/receiptを一括保存する。posting/引退試合収入、人のUI・CPU・年度/Worker自動接続は後続。Task7/A1未完了・公開OFF・schemaVersion1/DB5を維持する。最終HEAD/独立レビュー/CI/マージ状況は対象PR本文を正本とする。

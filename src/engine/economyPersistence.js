@@ -60,9 +60,13 @@ function preservesEconomyHistory(before, after) {
   const newDepartures = new Set((after.engine.postingDepartures ?? [])
     .slice((before.engine.postingDepartures ?? []).length).map(d => d.id));
   const newTransactions = new Set(after.engine.transactions.slice(before.engine.transactions.length).map(t => t.id));
+  const oldFinalizedRetirements = new Set((before.engine.retirementReservations ?? [])
+    .filter(r => r.finalization).map(r => r.id));
   if (nextIncome.slice(oldIncome.length).some(r => r.kind === 'posting'
     && (!newDepartures.has(r.postingDepartureId) || !newTransactions.has(r.postingDepartureId)
       || !newTransactions.has(r.transactionId)))) return false;
+  if (nextIncome.slice(oldIncome.length).some(r => r.kind === 'retirement-game'
+    && (!newTransactions.has(r.transactionId) || oldFinalizedRetirements.has(r.retirementReservationId)))) return false;
   if (!preservesRenewalDecisions(before, after)) return false;
   if (!preservesAcquisitionDecisions(before, after)) return false;
   if (canonical(before.faExerciseBirth) !== canonical(after.faExerciseBirth)) return false;

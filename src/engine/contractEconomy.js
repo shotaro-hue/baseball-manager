@@ -9,7 +9,8 @@ import { quoteAnnualSpendingPlan } from './annualSpending';
 import { draftCapacityContext, isIkuseiPlayer } from './rosterCapacity';
 import { economyClockFor, validateEconomyClock } from './economyCalendar';
 import { inspectAnnualDepartureCalendar } from './annualDepartures';
-import { inspectPostingIncome, postingBudgetSupplement } from './postingIncome';
+import { postingBudgetSupplement } from './postingIncome';
+import { inspectAnnualIncome, inspectAnnualIncomeCalendar } from './annualIncome';
 
 // A1-1a is a pure, fixture-only boundary. Activation/persistence is A1-1d/4b.
 export const ANNUAL_ECONOMY_RELEASE_ENABLED = false;
@@ -95,10 +96,11 @@ function inspectEnvelope(world) {
   validateEconomyClock(world);
   inspectAnnualDepartureCalendar(world);
   inspectRetirementCalendar(world);
+  inspectAnnualIncomeCalendar(world);
   const spending = e.engine.spending;
   if (!spending || !Array.isArray(spending.ledger?.records) || !Array.isArray(spending.reservations)
     || !Array.isArray(spending.resolvedReservations)) fail('契約台帳・正式留保が未記録です。');
-  const supplements = inspectPostingIncome({ ...e.engine, ...e.clock, incomeReceipts: e.incomeReceipts, economyIdentity: identity(world) });
+  const supplements = inspectAnnualIncome({ ...e.engine, ...e.clock, gameDay: world.gameDay, incomeReceipts: e.incomeReceipts, economyIdentity: identity(world) });
   inspectBudgetApprovals(spending.authorizations, e.budgetPolicies, supplements);
   inspectAnnualBudgetCoverage(world);
   if (Object.hasOwn(spending, 'staffContracts') || Object.hasOwn(spending, 'offseasonDepartures')) fail('スタッフ契約・退団記録の投影を支出正本へ重複保存できません。');

@@ -1,6 +1,7 @@
 import { toAnnualState } from './contractEconomy';
 import { validateContractLedger } from './contractLedger';
-import { inspectPostingIncome, postingBudgetSupplement } from './postingIncome';
+import { postingBudgetSupplement } from './postingIncome';
+import { inspectAnnualIncome } from './annualIncome';
 
 const fail = () => { throw new Error('年度予算の根拠・係数・全審査年度を確認してください。'); };
 const year = n => Number.isInteger(n) && n >= 1 && n <= 9999;
@@ -45,7 +46,7 @@ export function quoteAnnualBudgetPolicy(world, policy) {
   if (e?.mode !== 'annual' || !Array.isArray(world.teams) || !world.teams.length
     || !year(world.year) || world.year !== e.clock?.season
     || spending?.budgetSeason !== world.year + Number(e.clock?.phase === 'offseason') || !Array.isArray(policy?.forecasts)) fail();
-  const supplements = inspectPostingIncome(toAnnualState(world)); // Never repair an invalid input world.
+  const supplements = inspectAnnualIncome(toAnnualState(world)); // Never repair an invalid input world.
   const end=annualBudgetHorizon(spending), teams=new Map(), typed=new Set();
   for (const t of world.teams) { if(!id(t.id)||typed.has(String(t.id)))fail(); typed.add(String(t.id)); teams.set(t.id,t); }
   const forecasts=new Map();

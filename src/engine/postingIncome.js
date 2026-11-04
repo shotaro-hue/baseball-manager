@@ -89,7 +89,7 @@ export function createPostingCompletion(state, c, signature) {
   const incomeReceipts = [...state.incomeReceipts, income];
   const transactions = [...next.transactions, { id: c.id, signature, postingIncomeId: income.id }];
   const pending = { ...next, incomeReceipts, transactions };
-  inspectPostingIncome(pending);
+  inspectPostingIncome({ ...pending, incomeReceipts: incomeReceipts.filter(r => r.kind === 'posting') });
   let found = false;
   const authorizations = next.spending.authorizations.map(a => {
     if (a.teamId !== c.teamId || a.season !== income.budgetAllocation.season) return a;
