@@ -116,6 +116,8 @@ describe('A1-2c-2b in-season release', () => {
     let w = inSeasonWorld(), ledger = spending(w).ledger, record = ledger.records[0];
     record.contract = createSeasonContract({ ...record.contract, signedSeason: 2025, termYears: 4 });
     record.effectiveDate = '2025-02-01';
+    // This historical source predates the discarded native fixture's creation.
+    delete w.contractEconomy.engine.faExerciseOrigins; delete w.contractEconomy.faExerciseBirth;
     ledger = applyContractLedgerAction(ledger, { id: 'transfer', type: 'transfer', teamId: 0, toTeamId: 1,
       contractId: record.contract.contractId, effectiveDate: '2026-07-01' });
     ledger = applyContractLedgerAction(ledger, { id: 'raise', type: 'increase', teamId: 1,
@@ -144,7 +146,7 @@ describe('A1-2c-2b in-season release', () => {
       { season: 2025, stage: 'unstarted-offseason', legacyOffseasonStarted: false });
     expect(migration.ok, JSON.stringify(migration.issues)).toBe(true);
     spending(w).ledger = migration.candidate.ledger;
-    delete w.contractEconomy.engine.faExerciseOrigins; // Migration replaces the native fixture source.
+    delete w.contractEconomy.engine.faExerciseOrigins; delete w.contractEconomy.faExerciseBirth; // Migration replaces the native fixture source.
     w = fromAnnualState(w, toAnnualState(w));
     const original = structuredClone(spending(w).ledger.records[0].contract), next = apply(w);
     expect(original.guaranteeStatus).toBe('unknown'); expect(original).not.toHaveProperty('signedSeason');

@@ -162,7 +162,7 @@ it('roundtrips opening employment through the annual world without enabling live
   w.contractEconomy.clock = { season: 2026, phase: 'offseason', date: '2026-12-01', offseasonTurn: 0 };
   w.contractEconomy.engine.spending = { ...w.contractEconomy.engine.spending, budgetSeason: 2027,
     ledger: { version: 2, closedThroughSeason: 2026, records } };
-  delete w.contractEconomy.engine.faExerciseOrigins; // This fixture replaces native contracts with migration evidence.
+  delete w.contractEconomy.engine.faExerciseOrigins; delete w.contractEconomy.faExerciseBirth; // This fixture replaces native contracts with migration evidence.
   const restored = json(w), next = fromAnnualState(restored, toAnnualState(freeze(restored)));
   expect(toAnnualState(json(next)).spending.ledger).toEqual(w.contractEconomy.engine.spending.ledger);
   expect(next.teams[0].players[0]).toMatchObject({ contractId: 'o-0', contractYearsLeft: 3 });

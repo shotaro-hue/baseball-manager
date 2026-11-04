@@ -1,7 +1,7 @@
 import { describe,it,expect } from 'vitest';
 import { faWinter, declaration, envelope } from './fixtures/faDeclarations';
 import { freezeEconomy,renewalEnvelope } from './fixtures/economyWorld';
-import { reduceEconomyCommand,quoteEconomyCommand,toAnnualState,fromAnnualState } from '../contractEconomy';
+import { createAnnualNewGameWorld,reduceEconomyCommand,quoteEconomyCommand,toAnnualState,fromAnnualState } from '../contractEconomy';
 import { validateEconomySave,economyOverwriteIssue } from '../economyPersistence';
 import { contractLiabilityRows } from '../contractLedger';
 import { createSeasonContract } from '../seasonContract';
@@ -15,6 +15,17 @@ import { applyAnnualTransaction } from '../annualTransactions';
 const apply=(w,c)=>{const r=reduceEconomyCommand(w,c);expect(r.ok,r.error).toBe(true);return r.world;};
 const denied=(w,c)=>{const old=structuredClone(w);freezeEconomy(w);expect(quoteEconomyCommand(w,c).ok).toBe(false);const r=reduceEconomyCommand(w,c);expect(r.ok).toBe(false);expect(r.world).toBe(w);expect(w).toEqual(old);return r;};
 const engine=w=>w.contractEconomy.engine;
+function initialMarketAcquisition(unknown=false) {
+  const teams=structuredClone(faWinter().teams);for(const t of teams)for(const p of [...t.players,...t.farm])p.contractYearsLeft=3;
+  let w=createAnnualNewGameWorld({teams,faPool:[{id:'native-free',name:'Initial free agent',pos:'一塁手',age:33,salary:5000,entryType:'高卒',daysOnActiveRoster:1080}],
+    myId:0,saveId:'market-fa-origin',season:2026,policy:economyPolicy(teams,2026,1000000),randomRoot:{algorithmVersion:1,seed:'market-fa-origin'}});
+  if(unknown){delete engine(w).faExerciseOrigins;delete w.contractEconomy.faExerciseBirth;}
+  const p=w.faPool[0],proposal={id:'initial-offer',type:'sign',teamId:0,offeredDate:'2026-02-01',effectiveDate:'2026-02-01',marketEntry:p.marketEntry,
+    contract:createSeasonContract({contractId:'market-acquisition',playerId:p.id,signedSeason:2026,agreementPhase:'preseason',purpose:'acquisition',termYears:1,annualSalaryManYen:5000,registrationType:'controlled',guaranteed:true})};
+  w=apply(w,envelope(w,{id:'offer-initial',type:'offer-fa',proposal}));w=apply(w,envelope(w,{id:'accept-initial',type:'accept-fa',proposalId:proposal.id}));
+  w.contractEconomy.clock={season:2026,phase:'offseason',date:'2026-12-01',offseasonTurn:0};engine(w).spending.budgetSeason=2027;
+  return fromAnnualState(w,toAnnualState(w));
+}
 const marketOffer=(w,teamId=1)=>{const p=w.faPool[0];return {id:'bid',type:'sign',teamId,offeredDate:'2026-12-01',effectiveDate:'2027-02-01',marketEntry:p.marketEntry,
   contract:createSeasonContract({contractId:'new-contract',playerId:p.id,signedSeason:2026,agreementPhase:'offseason',purpose:'acquisition',termYears:1,
     annualSalaryManYen:5000,registrationType:'controlled',guaranteed:true})};};
@@ -106,18 +117,39 @@ describe('A1-2c-3 common FA declaration',()=>{
     const legacy={...s,version:1};expect(applyAnnualTransaction(legacy,c.transaction).ok).toBe(false);
   });
   it('uses conservative unknown history without inventing zero or reading faYears',()=>{
-    const w=faWinter();delete engine(w).faExerciseOrigins;w.faYears={0:7};const n=apply(w,declaration(w));
+    const w=faWinter();delete engine(w).faExerciseOrigins;delete w.contractEconomy.faExerciseBirth;w.faYears={0:7};const n=apply(w,declaration(w));
     expect(n.faPool[0].marketEntry.compensationBasis.exercise).toBe('legacy-conservative-max');expect(n.faYears).toEqual({0:7});
+  });
+  it('rejects adding native owned origins to a cold old-v2 world without creation evidence',()=>{
+    const w=faWinter(),origins=structuredClone(engine(w).faExerciseOrigins);delete engine(w).faExerciseOrigins;delete w.contractEconomy.faExerciseBirth;
+    expect(apply(w,declaration(w)).faPool[0].marketEntry.compensationBasis.exercise).toBe('legacy-conservative-max');
+    engine(w).faExerciseOrigins=origins;expect(()=>validateEconomySave(JSON.parse(JSON.stringify(w)))).toThrow();
+  });
+  it.each(['2025-02-01','2026-02-01'])('rejects synthetic market birth after a real old-v2 acquisition (date=%s)',enteredDate=>{
+    const w=initialMarketAcquisition(true),c=declaration(w,'native-free');
+    expect(apply(w,c).faPool[0].marketEntry.compensationBasis.exercise).toBe('legacy-conservative-max');
+    const fake=structuredClone(w),sourceId=JSON.stringify(['initial-market',w.saveId,'native-free']);
+    engine(fake).faExerciseOrigins=[{playerId:'native-free',sourceType:'market',sourceId,sourceEntry:{id:sourceId,kind:'released',enteredDate},basis:'native-new-game',count:0}];
+    denied(fake,c);expect(()=>validateEconomySave(JSON.parse(JSON.stringify(fake)))).toThrow();
+  });
+  it('retains native-market first-exercise evidence after real acquisition and rejects a changed birth date',()=>{
+    const w=initialMarketAcquisition(),c=declaration(w,'native-free');expect(apply(w,c).faPool[0].marketEntry.compensationBasis.exercise).toBe('first');
+    engine(w).faExerciseOrigins.find(o=>o.playerId==='native-free').sourceEntry.enteredDate='2025-02-01';
+    expect(()=>validateEconomySave(w)).toThrow();
+  });
+  it('rejects a missing native origin while retaining its independent creation evidence',()=>{
+    const w=faWinter();engine(w).faExerciseOrigins.pop();expect(()=>validateEconomySave(w)).toThrow();
   });
   it('preserves real migration unknown guarantee/history and uses the observed ledger rate',()=>{
     let w=faWinter(),teams=structuredClone(w.teams);while(teams.length<12)teams.push({id:teams.length,players:[],farm:[],budget:0});
     for(const t of teams)for(const p of [...t.players,...t.farm]){p.contractSignedYear=2024;p.contractYearsLeft=2;p.contractYears=2;}
     const m=prepareEconomyMigration({...w,teams,year:2025,phase:'season',contractEconomy:undefined},{season:2025,stage:'unstarted-offseason',legacyOffseasonStarted:false});expect(m.ok,JSON.stringify(m.issues)).toBe(true);
-    engine(w).spending.ledger=m.candidate.ledger;delete engine(w).faExerciseOrigins;w=fromAnnualState(w,toAnnualState(w));
+    engine(w).spending.ledger=m.candidate.ledger;delete engine(w).faExerciseOrigins;delete w.contractEconomy.faExerciseBirth;w=fromAnnualState(w,toAnnualState(w));
     const n=apply(w,declaration(w));expect(n.faPool[0].marketEntry.compensationBasis).toEqual({previousAnnualSalaryManYen:12000,exercise:'legacy-conservative-max'});
     expect(engine(n).spending.ledger).toEqual(engine(w).spending.ledger);expect(validateEconomySave(n)).toBe('annual');
     const fake=structuredClone(w),sourceId=JSON.stringify(['initial-market',w.saveId,0]);
     engine(fake).faExerciseOrigins=[{playerId:0,sourceType:'market',sourceId,sourceEntry:{id:sourceId,kind:'released',enteredDate:'2026-02-01'},basis:'native-new-game',count:0}];
+    fake.contractEconomy.faExerciseBirth={version:1,season:2026,marketPlayerIds:[0]}; // Legacy ledger independently disproves both forged copies.
     denied(fake,declaration(fake));
   });
   it.each([0,1])('hands real declaration evidence to same/other-club acquisition and funded cash settlement (club=%s)',teamId=>{
@@ -129,7 +161,7 @@ describe('A1-2c-3 common FA declaration',()=>{
     expect(validateEconomySave(JSON.parse(JSON.stringify(w)))).toBe('annual');expect(reduceEconomyCommand(w,c)).toMatchObject({ok:true,replayed:true});
   });
   it.each([false,true])('records repeat exercise after a real first declaration and later re-signing (unknown=%s)',unknown=>{
-    let w=faWinter();if(unknown)delete engine(w).faExerciseOrigins;
+    let w=faWinter();if(unknown){delete engine(w).faExerciseOrigins;delete w.contractEconomy.faExerciseBirth;}
     for(const r of engine(w).spending.ledger.records)if(r.contract.playerId!==0){r.contract.termYears=3;r.contract.endSeason=2028;}
     w=fromAnnualState(w,toAnnualState(w));const first=declaration(w);w=apply(w,first);const p=marketOffer(w,0);
     w=apply(w,envelope(w,{id:'offer',type:'offer-fa',proposal:p}));w=apply(w,envelope(w,{id:'accept',type:'accept-fa',proposalId:p.id}));
@@ -172,5 +204,6 @@ describe('A1-2c-3 common FA declaration',()=>{
     ['source amount',w=>engine(w).spending.ledger.records[0].contract.annualSalaryManYen=99999],
     ['proof+receipt',w=>{engine(w).faDeclarations[0].marketEntry.compensationBasis.previousAnnualSalaryManYen=99999;engine(w).transactions[0].faDeclaration.marketEntry.compensationBasis.previousAnnualSalaryManYen=99999;}],
     ['history+receipt',w=>{w.teams[0].history=[];engine(w).transactions=[];}],['origin count',w=>engine(w).faExerciseOrigins[0].count=1],
+    ['creation evidence',w=>delete w.contractEconomy.faExerciseBirth],
   ])('refuses cold tampering of %s',(_,edit)=>{const w=faWinter(),n=JSON.parse(JSON.stringify(apply(w,declaration(w))));edit(n);expect(()=>validateEconomySave(freezeEconomy(n))).toThrow();});
 });

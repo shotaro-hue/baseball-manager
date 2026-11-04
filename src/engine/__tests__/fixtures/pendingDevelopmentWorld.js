@@ -17,7 +17,7 @@ export function pendingDevelopmentFixture(kind) {
     ...Object.fromEntries(['transactions', 'acquisitions', 'faProtectionLists', 'faPersonnelMoves', 'faCompensationStandings'].map(k => [k, s[k]])),
     spending: { ...s.spending, authorizations: [...s.spending.authorizations.filter(r => r.season === 2026), ...policy.authorizations] } };
   // Imported historical ledger has no native initial-sign birth evidence.
-  delete w.contractEconomy.engine.faExerciseOrigins;
+  delete w.contractEconomy.engine.faExerciseOrigins; delete w.contractEconomy.faExerciseBirth;
   w.contractEconomy.budgetPolicies = w.contractEconomy.engine.spending.authorizations.map(({ teamId, season, approvedManYen }) =>
     ({ teamId, season, approvedManYen, policyVersion: 'explicit-test-policy' }));
   return fromAnnualState(w, toAnnualState(w));

@@ -102,7 +102,7 @@ it('preserves unknown legacy guarantees and never invents signature history', ()
     { season: 2026, stage: 'unstarted-offseason', legacyOffseasonStarted: false });
   expect(migration.ok, JSON.stringify(migration.issues)).toBe(true);
   w.contractEconomy.engine.spending.ledger = migration.candidate.ledger;
-  delete w.contractEconomy.engine.faExerciseOrigins; // Real migration has no native-game origin.
+  delete w.contractEconomy.engine.faExerciseOrigins; delete w.contractEconomy.faExerciseBirth; // Real migration has no native-game origin.
   w = fromAnnualState(w, toAnnualState(w));
   const original = structuredClone(spending(w).ledger.records[0].contract);
   const next = apply(w, command(w, 'release')), ledger = spending(next).ledger;

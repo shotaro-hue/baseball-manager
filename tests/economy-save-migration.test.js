@@ -223,7 +223,7 @@ it('retains an observed opening and unknown guarantee without inventing signatur
     engine: { ...base.contractEconomy.engine, rosterRequirements: policy.rosterRequirements,
       spending: { ...base.contractEconomy.engine.spending, budgetSeason: 2027, ledger: result.candidate.ledger, authorizations: policy.authorizations } },
   } };
-  delete world.contractEconomy.engine.faExerciseOrigins; // Migrated origins remain unknown.
+  delete world.contractEconomy.engine.faExerciseOrigins; delete world.contractEconomy.faExerciseBirth; // Migrated origins remain unknown.
   const projected = fromAnnualState(world, toAnnualState(world));
   expect((await save(projected)).ok).toBe(true); const loaded = await loadGame();
   expect(loaded.contractEconomy).toEqual(projected.contractEconomy);

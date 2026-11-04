@@ -34,10 +34,25 @@ function inspectOrigins(state) {
   if (!Array.isArray(origins)) fail();
   const saveId=state.economyIdentity?.saveId;
   const records=new Map(state.spending.ledger.records.map(r=>[employmentContractId(r.contract),r]));
+  // This creation manifest is authoritative envelope metadata, not an origin
+  // row. Old v2 saves cannot acquire a native zero merely by adding engine rows.
+  const birth=state.faExerciseBirth;
+  if (birth===undefined) { if(origins.length)fail('新規ゲームのFA行使出生証跡がありません。');return origins; }
+  if (!birth || Object.keys(birth).sort().join(',')!=='marketPlayerIds,season,version' || birth.version!==1
+    || !Number.isSafeInteger(birth.season) || birth.season<1 || birth.season>state.season || !Array.isArray(birth.marketPlayerIds)) fail();
+  const initial=[...records.values()].filter(r=>r.actionId===JSON.stringify(['initial-sign',saveId,r.contract.playerId]));
+  if(initial.some(r=>r.effectiveDate!==day(birth.season,'02-01') || r.contract.signedSeason!==birth.season))fail();
+  const expectedTypes=new Map(initial.map(r=>[r.contract.playerId,'contract'])),birthIds=new Set([...expectedTypes.keys()].map(String));
+  for(const playerId of birth.marketPlayerIds) {
+    if(!id(playerId) || birthIds.has(String(playerId)))fail();
+    birthIds.add(String(playerId));expectedTypes.set(playerId,'market');
+  }
+  if(origins.length!==expectedTypes.size)fail('新規ゲームのFA行使出生名簿と行使証跡が一致しません。');
   const legacyPlayers=new Set(state.spending.ledger.records.filter(r=>isLegacyOpening(r.contract)).map(r=>r.contract.playerId));
   for (const o of origins) {
     if (!o || !id(o.playerId) || seen.has(String(o.playerId)) || o.basis!=='native-new-game' || o.count!==0
       || !['contract','market'].includes(o.sourceType) || Object.keys(o).sort().join(',')!==(o.sourceType==='market'?'basis,count,playerId,sourceEntry,sourceId,sourceType':'basis,count,playerId,sourceId,sourceType')) fail();
+    if(expectedTypes.get(o.playerId)!==o.sourceType)fail('新規ゲームのFA行使出生名簿にない選手です。');
     if (legacyPlayers.has(o.playerId)) fail('旧移行契約の行使歴を新規ゲームの0回へ変換できません。');
     seen.add(String(o.playerId));
     const expected=JSON.stringify([o.sourceType==='contract'?'initial-contract':'initial-market',saveId,o.playerId]);
@@ -52,7 +67,7 @@ function inspectOrigins(state) {
       // snapshot is seeded only at new-game construction and frozen on overwrite.
       if (records.get(JSON.stringify(['initial-contract',saveId,o.playerId]))?.actionId===JSON.stringify(['initial-sign',saveId,o.playerId])) fail();
       const date=parseContractDate(o.sourceEntry?.enteredDate);
-      if(date.year>state.season || stable(o.sourceEntry)!==stable({id:o.sourceId,kind:'released',enteredDate:day(date.year,'02-01')}))fail();
+      if(date.year!==birth.season || stable(o.sourceEntry)!==stable({id:o.sourceId,kind:'released',enteredDate:day(birth.season,'02-01')}))fail();
     }
   }
   return origins;

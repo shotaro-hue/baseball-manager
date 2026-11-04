@@ -39,12 +39,21 @@ it.each([false,true])('keeps the original roots/world on failed declaration publ
   surface();const loaded=await saves.loadGame();expect(reduceEconomyCommand(loaded,c)).toMatchObject({ok:true,replayed:true});expect(loaded.teams[0].history).toHaveLength(1);
 });
 it('preserves unknown old-v2 history and refuses later insertion of a fabricated native count',async()=>{
-  delete current.world.contractEconomy.engine.faExerciseOrigins;expect((await saves.saveGame(current.world)).ok).toBe(true);const before=roots();
-  const fake=structuredClone(current.world);fake.contractEconomy.engine.faExerciseOrigins=nativeFaExerciseOrigins(fake);
+  const birth=structuredClone(current.world.contractEconomy.faExerciseBirth);
+  delete current.world.contractEconomy.engine.faExerciseOrigins;delete current.world.contractEconomy.faExerciseBirth;
+  expect((await saves.saveGame(current.world)).ok).toBe(true);const before=roots();
+  const fake=structuredClone(current.world);fake.contractEconomy.engine.faExerciseOrigins=nativeFaExerciseOrigins(fake);fake.contractEconomy.faExerciseBirth=birth;
   const forged=reduceEconomyCommand(fake,declaration(fake));expect(forged.ok,forged.error).toBe(true);
   expect(await saves.saveGame(forged.world)).toMatchObject({ok:false,reason:'economy_history_conflict'});expect(roots()).toEqual(before);
   const actual=candidate(declaration(current.world));expect(actual.faPool[0].marketEntry.compensationBasis.exercise).toBe('legacy-conservative-max');
   expect((await saves.commitEconomyCandidate(actual,expected,bindings)).ok).toBe(true);surface();expect(validateEconomySave(await saves.loadGame())).toBe('annual');
+});
+it('refuses coordinated deletion of creation manifest and native origins on overwrite',async()=>{
+  expect((await saves.saveGame(current.world)).ok).toBe(true);const before=roots(),bad=structuredClone(current.world);
+  bad.contractEconomy.revision++;delete bad.contractEconomy.faExerciseBirth;delete bad.contractEconomy.engine.faExerciseOrigins;
+  expect(validateEconomySave(bad)).toBe('annual');
+  expect(await saves.saveGame(bad)).toMatchObject({ok:false,reason:'economy_history_conflict'});expect(roots()).toEqual(before);
+  surface();expect((await saves.loadGame()).contractEconomy.faExerciseBirth).toEqual(current.world.contractEconomy.faExerciseBirth);
 });
 it('refuses paired history/receipt removal without replacing committed roots',async()=>{
   expect((await saves.saveGame(current.world)).ok).toBe(true);expect((await saves.commitEconomyCandidate(candidate(declaration(current.world)),expected,bindings)).ok).toBe(true);
