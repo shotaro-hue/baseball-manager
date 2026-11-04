@@ -30,11 +30,11 @@ Actual fake-IDB/localStorage tests exercise compressed inline and padded externa
 
 **Real data:** current `createInitialTeams()` produces 1,059 players with initial active-roster service0. There is no naturally FA-qualified player at bootstrap; the test verifies the actual stock refusal first. It then changes only one expiring, domestic controlled player's qualification days to1080, preserving the real roster, salaries, classification and terms, and verifies successful declaration/cold validation. This is an explicitly qualified scenario, not a claim that stock bootstrap players can declare immediately or that a multi-year production journey was tested.
 
-**Migration fixture corrections:** five existing tests previously replaced a native factory ledger with real legacy-opening data. Their setup now also removes the native-game exercise origins: real migration does not emit native birth evidence. Their behavioral assertions/expected guarantee/payroll outcomes are unchanged.
+**Migration fixture corrections:** seven existing test fixtures previously replaced a native factory ledger with real legacy-opening data. Their setup now also removes the native-game exercise origins: real migration does not emit native birth evidence. Their behavioral assertions/expected guarantee/payroll outcomes are unchanged.
 
 **Existing market regression:** initially requiring the original initial-market listing to remain live rejected valid delisting/relisting scenarios (26 failures). Retained immutable birth snapshots instead; old acquisition/missing-listing invalidation behavior is preserved, while overwrite and legacy-source guards prevent a fabricated zero.
 
-Final scoped run: **21 files / 882 passed**, zero failures, containing all56 new tests and826 existing departure/retirement/transaction/budget/market/compensation/renewal/migration/hook/save tests. Full suite/build/important browser E2E use the exact-HEAD CI, avoiding a redundant local full run.
+Final scoped run: **23 files / 899 passed**, zero failures, containing all56 new tests and843 existing departure/retirement/transaction/budget/market/compensation/renewal/migration/hook/save tests. Full suite/build/important browser E2E use the exact-HEAD CI, avoiding a redundant local full run.
 
 ## Independent review / reproduced corrections
 
@@ -46,10 +46,12 @@ Confirmed P2 findings, reproduced before correction:
 
 Author also reproduced/fixed a separate classification-source priority issue: after winter release, mutating a released listing's foreign flag changed another player's B rank to A. Historical departure metadata now wins over mutable listing data. Dedicated RED→GREEN retained.
 
-No other confirmed P1/P2 from independent review; no deferred minor finding. All reproduced fixes and nearby normal cases are included in the final882 GREEN run.
+No other confirmed P1/P2 from independent review; no deferred minor finding. All reproduced fixes and nearby normal cases are included in the final899 scoped GREEN results.
 
 ## Delivery / remaining work
 
 PR and exact final HEAD CI results are recorded in the PR description/conversation after completion, so recording CI does not change its own tested commit. End state remains unmerged for the user's decision.
 
 Next tasks remain overseas departure/termination agreements, posting/retirement-game extraordinary income, then human operation integration. Task10 owns automatic year-end/spring/daily/Worker integration. Initial-player eligibility accumulation and policy calibration must be validated before eventual public activation; this PR grants no FA qualification or extra annual funding automatically.
+
+Additional fixture audit: economyMigrationProjection and useGameState.hydration had the same native-envelope/legacy-ledger setup mismatch (5 RED /12 passing). Removed only their native fixture origins before projection, preserving every behavioral assertion. Both files now17/17 GREEN; previous21-file882 GREEN plus these17 give23 files/899 distinct scoped passes. Production source is unchanged from the882 run.

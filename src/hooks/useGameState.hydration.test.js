@@ -115,6 +115,7 @@ it('keeps observed legacy opening and unknown guarantee through hook hydration a
     engine: { ...base.contractEconomy.engine, rosterRequirements: policy.rosterRequirements,
       spending: { ...base.contractEconomy.engine.spending, budgetSeason: 2027, ledger: migrated.candidate.ledger, authorizations: policy.authorizations } },
   } };
+  delete world.contractEconomy.engine.faExerciseOrigins; // The substituted migration has no native birth evidence.
   const projected = fromAnnualState(world, toAnnualState(world));
   expect((await saveGame(projected)).ok).toBe(true);
   await setup(); expect(hydrate(await loadGame())).toBe(true);

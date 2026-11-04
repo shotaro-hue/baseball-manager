@@ -20,6 +20,7 @@ function fixture(signed = 2025) {
   const w = createAnnualNewGameWorld({ teams, faPool: [], myId: 0, saveId: legacy.saveId,
     season: 2026, policy: economyPolicy(teams), randomRoot: { algorithmVersion: 1, seed: 'legacy-fields' } });
   w.teams = json(teams); w.contractEconomy.engine.spending.ledger = result.candidate.ledger;
+  delete w.contractEconomy.engine.faExerciseOrigins; // Migration retains unknown history, not the native fixture birth.
   w.contractEconomy.engine.spending.budgetSeason = 2027;
   w.contractEconomy.clock = { season: 2026, phase: 'offseason', date: '2026-12-01', offseasonTurn: 0 };
   return w;

@@ -35,7 +35,9 @@
 - [ ] Independent review; reproduce/fix P1/P2. Record evidence in docs and PR, create new PR, confirm latest HEAD CI; stop unmerged.
 
 ## Execution record
-- Initial RED25/41; final new49 engine +7 save cases. Final scoped21 files/882 tests passed. Main CI completed success.
+- Initial RED25/41; final new49 engine +7 save cases. Final scoped23 files/899 distinct tests passed. Main CI completed success.
 - Independent review2 P2 plus author classification-source-priority repro fixed with RED/GREEN. No new rule inferring unknown history or nationality.
 - Added immutable club/year faDeclarationContexts; current source nationality is reconciled, origins cannot attach to legacy-opening players or confuse native owned/market birth. See validation record.
-- Real bootstrap starts service0: normal stock refusal and a clearly labeled qualification-only scenario are separate. Five migration fixture setups drop native birth origins when substituting actual migration source; assertions unchanged.
+- Real bootstrap starts service0: normal stock refusal and a clearly labeled qualification-only scenario are separate. Seven migration fixture setups drop native birth origins when substituting actual migration source; assertions unchanged.
+
+Additional fixture audit: economyMigrationProjection and useGameState.hydration had the same native-envelope/legacy-ledger setup mismatch (5 RED /12 passing). Removed only their native fixture origins before projection, preserving every behavioral assertion. Both files now17/17 GREEN; previous21-file882 GREEN plus these17 give23 files/899 distinct scoped passes. Production source is unchanged from the882 run.
