@@ -91,7 +91,8 @@ annual向けに旧`upd`/UIからsalary、契約年数、budgetを直接更新す
 - 支出審査対象の`budgetSeason`から`max(既存契約/提示の最終年, budgetSeason+7)`まで、`authorizations / budgetPolicies / rosterRequirements`を同じ範囲で用意する。承認額だけ延長して最低人数の予算行を欠かせない。ここで基準にするのはcalendarの`clock.season`ではない。新規2026年は2033年まで、2026年オフは`clock.season=2026 / budgetSeason=2027`なので2034年までをオフ開始の承認receiptで準備する。これにより春の再配布なしで、2027年中に合意する2028〜2034年の7年更改も審査できる。既存契約/提示がさらに先まであればその最終年まで必要。3年だけを審査する実装は禁止。
 - 通常取引中はauthorizationsを変更しない。年度境界での再審査は専用receipt付き操作で行い、既存負担を消さない。下振れで赤字になっても契約は履行し、新しい任意支出を止める。
 - 配分率50/65/80%、平滑化1/3年、通常増減上限10/15%は**実験候補**。支援額もA1-4の12球団静的表→1seed×3年→3seed×10年で選ぶ。テスト内の固定許可額は本番係数の根拠にしない。
-- 初版は当年の通常収益を追加配分しない。`applyClubGameFinance`は収支だけを進め、annualのbudget投影を増やさない。ポスティング/引退試合等も独立収支receiptへ記録し、翌年度審査の入力にする。旧ルールの当年は維持する。
+- 初版は当年の通常収益を追加配分しない。`applyClubGameFinance`は収支だけを進め、annualのbudget投影を増やさない。引退試合等は独立収支receiptへ記録し、翌年度審査の入力にする。旧ルールの当年は維持する。
+- 2026-11-04ユーザー承認による変更: ポスティング成立収入はYオフの成立保存時にY+1だけへ100%追加承認する。通常の`budgetPolicies.approvedManYen`を維持し、`authorizations.approvedManYen`は通常額＋検証済みincomeReceiptの年度限定配分とする。成立/退団/収入/追加枠を同じcandidateへ保存し、通常取引の許可額変更禁止を緩めない。通常収益・平滑化・前年基準へ混ぜず、Y+2への繰越/再配分をしない。[改訂仕様](./2026-11-04-gm01-posting-income-budget-design.md)。
 
 ### 3.2 留保の置換
 

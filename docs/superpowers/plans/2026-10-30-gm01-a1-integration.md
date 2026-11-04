@@ -170,6 +170,8 @@ PR #521レビュー修正: revision増加でもrandomRoot・確定済み台帳�
 
 ## Task 7: A1-2c 退団・市場・海外離脱
 
+2026-11-04 posting収入の方針変更: Yオフに成立した譲渡金をY+1の補強へ使えるよう、通常予算とは別の年度限定追加承認を採用。#543に依存する共通`complete-posting`で退団/収入/追加枠を原子的に扱う。[改訂設計](../specs/2026-11-04-gm01-posting-income-budget-design.md)／[実装計画](./2026-11-04-gm01-posting-income-budget.md)。この工程は明示済み海外契約金額を入力とする基盤のみ。申請/MLB資格根拠/市場抽選/人の承認UI/CPU判断/年度・Worker接続は未実装。Task7/A1未完了、公開OFFを維持する。Task9は同じ追加許可でCPU審査、Task10はincome履歴・対象年許可を保持し、通常予算へ再配分しないことを受入に追加する。
+
 2026-11-04 A1-2c-4b: #542マージ済みmain `3b6192e`から、ポスティング退団と明示解除合意を共通end-contractへ接続。[設計](../specs/2026-11-04-gm01-a1-posting-departure-design.md)／[計画](./2026-11-04-gm01-a1-posting-departure.md)／[検証](../../validation/gm-01-a1-posting-departure/README.md)。12月1日の通知/合意と翌2月1日の終了効力を分け、原則retain・明示合意のみwaiveとし、旧保証不明・過去給与・現在負担者・最低維持費を維持。元契約/名簿/履歴/action/receiptを一括保存する。posting/引退試合収入、人のUI・CPU・年度/Worker自動接続は後続。Task7/A1未完了・公開OFF・schemaVersion1/DB5を維持する。最終HEAD/独立レビュー/CI/マージ状況は対象PR本文を正本とする。
 
 2026-11-04 A1-2c-4a: #541マージ済みmain `b14aaf9`から、海外FA宣言済み選手のNPB市場退出を共通commandへ接続。[設計](../specs/2026-11-04-gm01-a1-overseas-fa-departure-design.md)／[計画](./2026-11-04-gm01-a1-overseas-fa-departure.md)／[検証](../../validation/gm-01-a1-overseas-fa-departure/README.md)。資格/自然満了/元球団履歴/行使証跡は既存宣言が所有し、退出参照とreceiptを同時保存する。給与・保証・国内FA補償・臨時収入は変更しない。継続契約の海外移籍/解除合意、posting/引退試合収入、人の操作、CPU/年度進行/Workerは後続。Task7/A1未完了、公開ゲートOFF、schemaVersion1/DB5を維持。提出HEAD・独立レビュー・CI・マージ状況は対象PR本文を正本とする。
