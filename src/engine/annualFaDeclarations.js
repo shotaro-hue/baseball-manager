@@ -86,7 +86,7 @@ function employmentLookup(state) {
 }
 function classificationPlayers(state) {
   return [...state.teams.flatMap(owned),
-    ...(state.offseasonDepartures??[]).map(d=>d.player),...(state.retirementReservations??[]).flatMap(r=>r.finalization?[r.finalization.player]:[]),
+    ...(state.offseasonDepartures??[]).map(d=>d.player),...(state.postingDepartures??[]).map(d=>d.player),...(state.retirementReservations??[]).flatMap(r=>r.finalization?[r.finalization.player]:[]),
     ...declarations(state).map(d=>d.player),...(state.acquisitions??[]).map(a=>a.player),
     ...(state.faPersonnelMoves??[]).map(m=>m.player),...state.faPool];
 }
