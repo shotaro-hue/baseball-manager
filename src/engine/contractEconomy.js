@@ -9,6 +9,7 @@ import { quoteAnnualSpendingPlan } from './annualSpending';
 import { draftCapacityContext, isIkuseiPlayer } from './rosterCapacity';
 import { economyClockFor, validateEconomyClock } from './economyCalendar';
 import { inspectAnnualDepartureCalendar } from './annualDepartures';
+import { inspectPostingIncome, postingBudgetSupplement } from './postingIncome';
 
 // A1-1a is a pure, fixture-only boundary. Activation/persistence is A1-1d/4b.
 export const ANNUAL_ECONOMY_RELEASE_ENABLED = false;
@@ -48,7 +49,7 @@ function inspectContractClaims(spending, proposal) {
   }
 }
 
-function inspectBudgetApprovals(authorizations, budgetPolicies) {
+function inspectBudgetApprovals(authorizations, budgetPolicies, supplements = []) {
   // Validate supplied evidence only; generating/rolling annual budgets is A1-1c.
   // Include extra supplied years, not only the minimum season..season+7 range.
   const approvals = list => {
@@ -68,8 +69,13 @@ function inspectBudgetApprovals(authorizations, budgetPolicies) {
   const authorized = approvals(authorizations), recorded = approvals(budgetPolicies);
   if (authorized.size !== recorded.size || [...authorized.keys()].some(key => !recorded.has(key)))
     fail('同一球団・年度の予算policy・許可が未記録です。');
-  for (const [key, amount] of authorized) if (amount !== recorded.get(key))
+  for (const [key, amount] of authorized) {
+    const [teamId, season] = JSON.parse(key);
+    if (BigInt(amount) !== BigInt(recorded.get(key)) + BigInt(postingBudgetSupplement(supplements, teamId, season)))
     fail('同一球団・年度の予算policyと許可の承認額が一致しません。');
+  }
+  for (const a of supplements) if (!authorized.has(JSON.stringify([a.teamId, a.season])))
+    fail('追加枠の対象年度の予算policyと許可が未記録です。');
 }
 
 function inspectEnvelope(world) {
@@ -92,7 +98,8 @@ function inspectEnvelope(world) {
   const spending = e.engine.spending;
   if (!spending || !Array.isArray(spending.ledger?.records) || !Array.isArray(spending.reservations)
     || !Array.isArray(spending.resolvedReservations)) fail('契約台帳・正式留保が未記録です。');
-  inspectBudgetApprovals(spending.authorizations, e.budgetPolicies);
+  const supplements = inspectPostingIncome({ ...e.engine, ...e.clock, incomeReceipts: e.incomeReceipts, economyIdentity: identity(world) });
+  inspectBudgetApprovals(spending.authorizations, e.budgetPolicies, supplements);
   inspectAnnualBudgetCoverage(world);
   if (Object.hasOwn(spending, 'staffContracts') || Object.hasOwn(spending, 'offseasonDepartures')) fail('スタッフ契約・退団記録の投影を支出正本へ重複保存できません。');
   // All NEW native terms are guaranteed; v1 fixtures remain independent.
@@ -116,7 +123,7 @@ export function toAnnualState(world) {
   if (contractEconomyMode(world) !== 'annual') fail('新契約制度のworldが必要です。');
   const e = world.contractEconomy;
   return projectAnnualState({ ...e.engine, spending: { ...e.engine.spending, staffContracts: e.staffContracts }, ...e.clock, teams: world.teams, faPool: world.faPool,
-    gameDay: world.gameDay,
+    gameDay: world.gameDay, incomeReceipts: e.incomeReceipts,
     economyIdentity: identity(world), faExerciseBirth: e.faExerciseBirth, draftContext: draftCapacityContext(world.offseasonPlan, world.year, world.teams) });
 }
 
@@ -163,7 +170,7 @@ export function fromAnnualState(world, input) {
   const { staffContracts, offseasonDepartures, ...persistedSpending } = engine.spending;
   engine.spending = persistedSpending;
   const next = { ...world, teams, faPool: state.faPool, offseasonPlan: projectDraftPlan(world, state),
-    contractEconomy: { ...world.contractEconomy, engine } };
+    contractEconomy: { ...world.contractEconomy, engine, incomeReceipts: state.incomeReceipts ?? world.contractEconomy.incomeReceipts } };
   toAnnualState(next);
   return next;
 }
@@ -178,7 +185,7 @@ function runCommand(world, command) {
   if (c.type === 'depart-overseas' && !state.transactions.some(r => r.id === c.id)
     && world.contractEconomy.decisions.some(d => d.kind === 'human-acquisition' && d.status === 'pending' && d.playerId === c.playerId))
     fail('回答待ちのNPB獲得を解決してから海外離脱してください。');
-  if (['enter-market', 'reserve-retirement', 'finalize-retirement', 'declare-fa', 'end-contract'].includes(c.type) && (state.phase === 'season' || ['finalize-retirement', 'declare-fa', 'end-contract'].includes(c.type))
+  if (['enter-market', 'reserve-retirement', 'finalize-retirement', 'declare-fa', 'end-contract', 'complete-posting'].includes(c.type) && (state.phase === 'season' || ['finalize-retirement', 'declare-fa', 'end-contract', 'complete-posting'].includes(c.type))
     && !state.transactions.some(r => r.id === c.id)
     && world.contractEconomy.decisions.some(d => d.kind === 'human-renewal' && d.status === 'pending' && d.playerId === (c.playerId ?? state.retirementReservations?.find(r => r.id === c.reservationId)?.playerId)))
     fail('回答待ちの更改を解決してから退団してください。');

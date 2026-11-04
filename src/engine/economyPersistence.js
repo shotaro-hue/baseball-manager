@@ -52,6 +52,17 @@ export function economySaveMetadata(world) {
 
 function preservesEconomyHistory(before, after) {
   if (canonical(before.randomRoot) !== canonical(after.randomRoot)) return false;
+  const oldIncome = before.incomeReceipts, nextIncome = after.incomeReceipts;
+  if (!Array.isArray(oldIncome) || !Array.isArray(nextIncome) || nextIncome.length < oldIncome.length
+    || !oldIncome.every((row, i) => canonical(row) === canonical(nextIncome[i]))) return false;
+  // Income may not be backfilled onto a previously published standalone exit.
+  // Its departure and both transaction receipts must enter this same extension.
+  const newDepartures = new Set((after.engine.postingDepartures ?? [])
+    .slice((before.engine.postingDepartures ?? []).length).map(d => d.id));
+  const newTransactions = new Set(after.engine.transactions.slice(before.engine.transactions.length).map(t => t.id));
+  if (nextIncome.slice(oldIncome.length).some(r => r.kind === 'posting'
+    && (!newDepartures.has(r.postingDepartureId) || !newTransactions.has(r.postingDepartureId)
+      || !newTransactions.has(r.transactionId)))) return false;
   if (!preservesRenewalDecisions(before, after)) return false;
   if (!preservesAcquisitionDecisions(before, after)) return false;
   if (canonical(before.faExerciseBirth) !== canonical(after.faExerciseBirth)) return false;

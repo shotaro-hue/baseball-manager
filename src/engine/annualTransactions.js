@@ -1,6 +1,7 @@
 import { isFaDeclarationCommand, normalizeFaDeclarationCommand, inspectAnnualFaDeclarations, createFaDeclaration } from './annualFaDeclarations';
 import { isOverseasDepartureCommand, normalizeOverseasDeparture, createOverseasDeparture } from './annualOverseasDepartures';
 import { isPostingDepartureCommand, normalizePostingDeparture, inspectAnnualPostingDepartures, createPostingDeparture } from './annualPostingDepartures';
+import { isPostingCompletionCommand, normalizePostingCompletion, createPostingCompletion, inspectPostingIncome } from './postingIncome';
 import { isRetirementCommand, normalizeRetirementCommand, inspectAnnualRetirements, createAnnualRetirement, assertRetirementCommandCompatible } from './annualRetirements';
 import { inspectAnnualDepartures, createWinterDeparture, isWinterDepartureCommand, normalizeWinterDeparture } from './annualDepartures';
 import { activeRenewalPlans } from './renewalPlanning';
@@ -56,6 +57,7 @@ const kinds = {
   'convert-to-controlled': ['teamId', 'playerId', 'contractId', 'annualSalaryManYen'],
 };
 function commandFor(input) {
+  if (isPostingCompletionCommand(input)) return normalizePostingCompletion(input);
   if (isPostingDepartureCommand(input)) return normalizePostingDeparture(input);
   if (isOverseasDepartureCommand(input)) return normalizeOverseasDeparture(input);
   if (isFaDeclarationCommand(input)) return normalizeFaDeclarationCommand(input);
@@ -118,6 +120,7 @@ function inspect(state) {
   if (date.year !== state.season || state.spending?.budgetSeason !== state.season + Number(state.phase === 'offseason')
     || !['preseason', 'season', 'offseason'].includes(state.phase)) fail('取引年度・フェーズを確認してください。');
   const departures = [...inspectAnnualDepartures(state), ...inspectAnnualRetirements(state), ...inspectAnnualPostingDepartures(state), ...inspectAnnualFaDeclarations(state)];
+  inspectPostingIncome(state);
   // One employment can end by only one route. Individually valid records from
   // incompatible branches must not jointly exempt the same source contract.
   if (new Set(departures.map(d => d.sourceContractId)).size !== departures.length) fail('同じ元契約の退団経路が重複しています。');
@@ -481,9 +484,10 @@ function candidate(input, command) {
       ...(receipt.faPersonnel ? { personnel: { winnerProposalIds: [...receipt.faPersonnel.winnerProposalIds], lostProposalIds: [...receipt.faPersonnel.lostProposalIds] } } : {}) };
   }
   assertRetirementCommandCompatible(before, c);
-  if (input.phase === 'offseason' && !isPostingDepartureCommand(c) && !isOverseasDepartureCommand(c) && !isRetirementCommand(c) && !isWinterDepartureCommand(c) && !c.type.endsWith('renewal') && !c.type.endsWith('rookie') && !c.type.endsWith('fa') && !['settle-fa-compensation', 'submit-fa-protection', 'settle-fa-personnel', 'join-fa-personnel'].includes(c.type)) fail('オフの新制度取引は翌年度契約だけが接続済みです。');
+  if (input.phase === 'offseason' && !isPostingCompletionCommand(c) && !isPostingDepartureCommand(c) && !isOverseasDepartureCommand(c) && !isRetirementCommand(c) && !isWinterDepartureCommand(c) && !c.type.endsWith('renewal') && !c.type.endsWith('rookie') && !c.type.endsWith('fa') && !['settle-fa-compensation', 'submit-fa-protection', 'settle-fa-personnel', 'join-fa-personnel'].includes(c.type)) fail('オフの新制度取引は翌年度契約だけが接続済みです。');
   // Snapshot and receipt enter validation together; no unaudited intermediate state.
-  let protectedState = isPostingDepartureCommand(c) ? createPostingDeparture(before, c, signature)
+  let protectedState = isPostingCompletionCommand(c) ? createPostingCompletion(before, c, signature)
+    : isPostingDepartureCommand(c) ? createPostingDeparture(before, c, signature)
     : isOverseasDepartureCommand(c) ? createOverseasDeparture(before, c, signature)
     : isFaDeclarationCommand(c) ? createFaDeclaration(before, c, signature)
     : isRetirementCommand(c) ? createAnnualRetirement(before, c, signature)
@@ -514,7 +518,7 @@ function candidate(input, command) {
   // Releasing a prorated bid may restore a larger conservative annual floor.
   // Cancellation/losing bids create no obligation; winner admission is above.
   // Departures must still account for real vacancies created by outgoing players.
-  if (['trade', 'settle-fa-personnel', 'enter-market', 'declare-fa', 'end-contract'].includes(c.type)
+  if (['trade', 'settle-fa-personnel', 'enter-market', 'declare-fa', 'end-contract', 'complete-posting'].includes(c.type)
     && rows.some(r => r.remainingManYen < 0 && r.remainingManYen < oldRows.get(key(r.teamId, r.season)).remainingManYen)) fail('赤字年度の追加余力を悪化させる取引です。');
   return { state: { ...after, transactions: protectedState ? after.transactions : [...after.transactions, { id: c.id, signature }] }, rows, replayed: false,
     ...(personnel ? { personnel } : {}) };

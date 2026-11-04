@@ -1,5 +1,7 @@
 # ROADMAP — NPB Franchise Manager
 
+> 2026-11-04 posting収入の改訂: Yオフの成立譲渡金をY+1年度限定の追加枠として配分する。[設計・今回の基盤範囲](./docs/superpowers/specs/2026-11-04-gm01-posting-income-budget-design.md)。#543依存の未マージ工程。申請/市場/人UI/CPU/年度Workerと長期校正は後続、Task7/A1未完了、公開ゲートOFF。
+
 > 2026-11-02 続行: #535マージ後のA1-2c-1は冬の満了・解雇・自由契約市場の共通処理。人の操作接続・期中/FA/海外/収入は残工程。Task 7/A1は未完了、公開ゲートOFF。[計画](./docs/superpowers/plans/2026-11-02-gm01-a1-winter-departures.md)。
 
 > 最終更新: 2026-10-30（#515マージ済みmainをA1-0で監査。接続設計・後続PR計画・検証仕様を文書化。新制度は本番未接続。完全バックアップ・復元は保留）
