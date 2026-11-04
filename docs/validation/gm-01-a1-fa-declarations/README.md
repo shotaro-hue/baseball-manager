@@ -4,7 +4,7 @@
 
 Latest main `ea27ee4970234cdbb0d78374aa046b18d463fed8` (#540 merged), source tree matched the previous submitted retirement tree. Main CI [41753604642](https://github.com/shotaro-hue/baseball-manager/actions/runs/41753604642) completed successfully. Work is on `feat/gm01-a1-fa-declarations`.
 
-This PR implements the next task in the accepted plan, not the entire later roadmap. Gate remains OFF; schema/DB version5, legacy behavior and old scout retirement policy remain unchanged. No live UI, CPU probability, Worker, overseas-club departure, posting/income or automatic annual rollover connection. Existing legacy FA functions are not plugged directly into annual state.
+This PR implements the next task in the accepted plan, not the entire later roadmap. Gate remains OFF; schemaVersion1 / DB version5, legacy behavior and old scout retirement policy remain unchanged. No live UI, CPU probability, Worker, overseas-club departure, posting/income or automatic annual rollover connection. Existing legacy FA functions are not plugged directly into annual state.
 
 ## Interface / authoritative data
 
