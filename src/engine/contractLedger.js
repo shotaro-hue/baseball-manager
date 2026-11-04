@@ -42,8 +42,9 @@ function normalize(action) {
   if (action.type === 'end') {
     if (!['release', 'retirement', 'posting'].includes(action.reason) || !['retain', 'waive'].includes(action.settlement)) fail('終了理由と残債の合意が未確認です。');
     const agreement = action.terminationAgreement;
-    if (agreement !== undefined && (!agreement || !id(agreement.id) || agreement.agreedDate !== action.effectiveDate
+    if (agreement !== undefined && (!agreement || !id(agreement.id) || agreement.agreedDate > action.effectiveDate
       || Object.keys(agreement).some(k => !['id', 'agreedDate'].includes(k)))) fail('新しい解除合意の日付・IDを確認してください。');
+    if (agreement !== undefined) parseContractDate(agreement.agreedDate);
     return { ...next, reason: action.reason, settlement: action.settlement,
       ...(agreement !== undefined ? { terminationAgreement: { id: agreement.id, agreedDate: agreement.agreedDate } } : {}) };
   }
@@ -64,6 +65,8 @@ function projectRecord(record) {
     registrations: [{ startDate: first.effectiveDate, registrationType: c.registrationType }] };
   for (const raw of record.changes) {
     const action = normalize(raw), date = action.effectiveDate, current = view.payers.at(-1);
+    if (action.terminationAgreement && action.terminationAgreement.agreedDate < view.lastDate)
+      fail('解除合意は現在の雇用・給与条件の確定後に記録してください。');
     if (['sign', 'legacy-opening'].includes(action.type) || action.contractId !== employmentContractId(c) || view.ended
       || date < view.lastDate || date >= endDate || current.teamId !== action.teamId) fail('取引日または給与負担者が変わっています。');
     if (['transfer', 'increase', 'convert-to-controlled'].includes(action.type)) {
