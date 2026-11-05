@@ -244,8 +244,32 @@ for (const width of [360,390,1440]) {
     await nav.getByRole('button',{name:'保存して再開',exact:true}).click();
     await expect(page.getByRole('status').filter({hasText:'保存・再開済み'})).toBeVisible();
     const snapshot=await page.evaluate(()=>window.s3Snapshot);
-    expect(snapshot.after).toEqual(snapshot.before);
+    for(const p of snapshot.before[0].players) expect(p.eligibility).toBeUndefined();
+    // A legacy save gains only the explicit eligibility extension. Every old
+    // key/value (including stored OPS and missing counts) must remain exact.
+    const priorFields=(p,original)=>Object.fromEntries(Object.entries(p).filter(([key])=>
+      !['eligibility','proStartYear','birthDate','draftYear'].includes(key)||Object.hasOwn(original,key)));
+    const legacyAfter=snapshot.after.map((team,i)=>({...team,
+      players:team.players.map((p,j)=>priorFields(p,snapshot.before[i].players[j])),
+      farm:team.farm.map((p,j)=>priorFields(p,snapshot.before[i].farm[j])),
+    }));
+    expect(legacyAfter).toEqual(snapshot.before);
+    const expectedMigrated=await page.evaluate(async world=>{
+      const {migrateEligibilityWorld}=await import('/baseball-manager/src/engine/eligibilityMigration.js');
+      return migrateEligibilityWorld(world).teams;
+    },snapshot.beforeWorld);
+    expect(snapshot.after).toEqual(expectedMigrated);
+    for(const p of snapshot.after[0].players) {
+      expect(p).toMatchObject({birthDate:'2005-03-27',proStartYear:2023,
+        eligibility:{version:2,entry:{draftYear:2022},fa:{days:402.375,cycleStartDays:0,season:{year:2026,creditedDays:145}}}});
+      expect(p.eligibility.fa.season.processedDays).toEqual(Array.from({length:143},(_,i)=>i+1));
+    }
     expect(snapshot.after[0].players[0].recentCareerLog[0].stats.OPS).toBe(.8);
+    await nav.getByRole('button',{name:'保存して再開',exact:true}).click();
+    await page.waitForFunction(()=>window.s3Snapshot.before[0].players.every(p=>p.eligibility?.version===2));
+    const secondSnapshot=await page.evaluate(()=>window.s3Snapshot);
+    expect(secondSnapshot.before).toEqual(snapshot.after);
+    expect(secondSnapshot.after).toEqual(snapshot.after);
     await nav.getByRole('button',{name:'年度別・通算',exact:true}).click();
     await expect(page.locator('.career-detail tbody tr').first()).toContainText('0.797');
     await expect(page.locator('.career-detail tbody tr').last()).toContainText('0.797');

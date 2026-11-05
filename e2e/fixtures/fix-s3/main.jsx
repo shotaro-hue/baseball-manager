@@ -32,10 +32,11 @@ function Fixture() {
   const toggle=p=>setCompared(prev=>prev.some(x=>x.id===p.id)?prev.filter(x=>x.id!==p.id):prev.length<2?[...prev,{...p,_teamName:team.name}]:prev);
   const restore=async()=>{
     const state={saveId:'fix-s3-browser',year:2026,gameDay:144,myId:team.id,teams,seasonHistory:{},news:[],mailbox:[],gameResultsMap:{}};
+    const beforeWorld=structuredClone(state);
     const saved=await saveGame(state,{initialCareerLogs:[{playerId:'s3-low',careerEntries:log}]});
     if(!saved.ok)throw new Error(saved.error||'save failed');
     const loaded=await loadGame();setTeams(loaded.teams);setStatus('保存・再開済み');
-    window.s3Snapshot={before:state.teams,after:loaded.teams};
+    window.s3Snapshot={before:beforeWorld.teams,beforeWorld,after:loaded.teams};
   };
   if(!ready)return <p>検証用の旧履歴を保存中</p>;
   return <div className="app calm-shell" style={{padding:12,maxWidth:1320,margin:'auto'}}>

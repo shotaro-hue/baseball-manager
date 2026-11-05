@@ -11,7 +11,8 @@
     "old-joined-market-pending-recontract",
     "entry-source-provenance",
     "explicit-legacy-zero",
-    "future-opening-real-factory"
+    "future-opening-real-factory",
+    "legacy-browser-additive-migration-and-second-exact-roundtrip"
   ],
   "independentFocusedTests": 11,
   "sourceSha256": {
@@ -21,7 +22,9 @@
     "src/data/openingEligibility2026.js": "d4e6231f3bd16ba97d7657c78d095529611f26d0aac3594393fc5da7cbdd41f6",
     "src/data/openingEligibility2026.json": "a3ea590a47fb3ae2aa168868d70a6dd1b3ef692fe8919a0cddebc385bff740ed",
     "src/App.jsx": "24a0ec42862b20c3ef98d78e666cca54ad083e447480bab1755537281499c228",
-    "src/hooks/useGameState.js": "29710b27d5e05a1b03b24414535a83ac75236be9bebbceddfc8752acc18edefa"
+    "src/hooks/useGameState.js": "29710b27d5e05a1b03b24414535a83ac75236be9bebbceddfc8752acc18edefa",
+    "e2e/player-detail.spec.js": "0c4aad9ae4f59dda770586eebdb7d3201dacf5d957eb92a042eda389c04f5209",
+    "e2e/fixtures/fix-s3/main.jsx": "aeb7b4a7db5b5ca69c840dbafa5c3de8a296a0c5bc78517dd88c51e8b175ffdd"
   },
   "limits": [
     "source completeness not independently certified",
