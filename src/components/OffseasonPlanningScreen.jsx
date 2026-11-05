@@ -167,6 +167,6 @@ export default function OffseasonPlanningScreen({ gs, os, myTeam, myId, year }) 
       {failure && <p role="alert">{failure}</p>}
       {overview.needs.length > 0 && <p>人数の不足目安：{overview.needs.join('、')}。補強やドラフト後の編成で確認してください。</p>}
     </Confirm>}
-    {profile && <Suspense fallback={<p>選手詳細を読み込み中です。</p>}><PlayerModal farmState={{farmCompetition:gs.farmCompetition,year:gs.year,teams:gs.teams,seasonHistory:gs.getSeasonHistory?.()??gs.seasonHistory}} player={profile} teamName={myTeam.name} teams={gs.teams} saveId={gs.saveId} year={year} isMyTeam onClose={() => setProfile(null)} /></Suspense>}
+    {profile && <Suspense fallback={<p>選手詳細を読み込み中です。</p>}><PlayerModal farmState={{farmCompetition:gs.farmCompetition,year:gs.year,teams:gs.teams,seasonHistory:gs.getSeasonHistory?.()??gs.seasonHistory}} player={profile} teamName={myTeam.name} teams={gs.teams} saveId={gs.saveId} year={year} completedSeasonYear={year} isMyTeam onClose={() => setProfile(null)} /></Suspense>}
   </main>;
 }

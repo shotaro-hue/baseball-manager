@@ -7,6 +7,7 @@ import OffseasonPlanningScreen from '../../../src/components/OffseasonPlanningSc
 import OffseasonFaPhaseScreen from '../../../src/components/OffseasonFaPhaseScreen';
 import { GrowthSummaryScreen } from '../../../src/components/OffseasonReviewScreens';
 import { record as measuredRecord } from '../../../src/engine/__tests__/farmRankingFixtures';
+import { initializePlayerEligibility } from '../../../src/engine/playerEligibility';
 import '../../../src/styles.css';
 import '../../../src/calm-ui.css';
 import '../../../src/mobile-flow.css';
@@ -15,6 +16,15 @@ import '../../../src/calm-details.css';
 const state = new URLSearchParams(location.search).get('state') || 'normal';
 const team = structuredClone(source);
 const players = [team.players.find(p => !p.isPitcher), team.players.find(p => p.isPitcher), team.farm.find(p => !p.isPitcher)];
+if (state.startsWith('eligibility-')) players.forEach((p, index) => {
+  // Display-only, fixed evidence: official rights do not certify model days.
+  const qualified = state === 'eligibility-overseas' ? 'overseas' : 'domestic';
+  Object.assign(p, initializePlayerEligibility({ ...p, eligibility: undefined, isForeign: index === 1,
+    isIkusei: state === 'eligibility-development', 育成: false, birthDate: '2001-01-01', proStartYear: 2021,
+    daysOnActiveRoster: undefined, serviceYears: 0, history: [{ year: 2025, G: p.isPitcher ? 36 : 100 }],
+  }, { year: 2026, opening: { qualified, proStartYear: 2021 } }));
+  p.serviceYears = 1; // Current-club tenure is independent of the fixed balance.
+});
 if (state === 'long') players.forEach(p => { p.name += '・ロングネーム確認選手ロングネーム確認'; });
 if (state === 'injured') players.forEach(p => { p.injuryDaysLeft = 4; p.injury = '負傷確認'; });
 if (state === 'missing') players.forEach(p => { delete p.stats; delete p.condition; delete p.morale; delete p.batting; delete p.pitching; });

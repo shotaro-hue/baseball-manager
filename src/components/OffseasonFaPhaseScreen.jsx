@@ -70,7 +70,7 @@ function LegacyOffseasonFaPhaseScreen({ gs, os, myTeam, myId, year, embedded }) 
     {!embedded && <footer><p>補強後も既存選手の更改が残っています。予算と年俸を確認して進んでください。</p><button className="fa-primary" onClick={() => setFinishOpen(true)}>補強を終了して契約更改へ</button></footer>}
     <PlayerComparisonTray players={compared} onRemove={remove} onClear={() => { setCompared([]); setCompareOpen(false); }} onOpen={() => setCompareOpen(true)} />
     {compareOpen && <PlayerComparisonDialog year={year} teams={gs.teams} faPool={gs.faPool} players={compared} onRemove={remove} onClose={closeCompare} />}
-    {profile && <Suspense fallback={<p role="status">選手詳細を読み込み中です。</p>}><PlayerModal farmState={{farmCompetition:gs.farmCompetition,year:gs.year,teams:gs.teams,seasonHistory:gs.getSeasonHistory?.()??gs.seasonHistory}} player={profile.player} teamName={profile.teamName} isMyTeam={profile.teamName === myTeam?.name} saveId={gs.saveId} year={year} teams={gs.teams} onClose={() => setProfile(null)} onToggleCompare={toggle} isCompared={compared.some(p => p.id === profile.player.id)} /></Suspense>}
+    {profile && <Suspense fallback={<p role="status">選手詳細を読み込み中です。</p>}><PlayerModal farmState={{farmCompetition:gs.farmCompetition,year:gs.year,teams:gs.teams,seasonHistory:gs.getSeasonHistory?.()??gs.seasonHistory}} player={profile.player} teamName={profile.teamName} isMyTeam={profile.teamName === myTeam?.name} saveId={gs.saveId} year={year} completedSeasonYear={year} teams={gs.teams} onClose={() => setProfile(null)} onToggleCompare={toggle} isCompared={compared.some(p => p.id === profile.player.id)} /></Suspense>}
     {finishOpen && <FinishDialog acquired={acquired} onClose={closeFinish} onConfirm={next} />}
   </Frame>;
 }

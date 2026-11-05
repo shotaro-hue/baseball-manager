@@ -279,6 +279,7 @@ export default function HubShell({ state, flows, app }) {
                 initialSection={gs.playerModal.initialSection}
                 saveId={gs.saveId}
                 year={year}
+                completedSeasonYear={gs.gameDay > 143 ? year : year - 1}
                 teams={gs.teams}
                 isCompared={comparePlayers.some((entry) => entry.id === gs.playerModal.player?.id)}
                 onToggleCompare={toggleCompare}

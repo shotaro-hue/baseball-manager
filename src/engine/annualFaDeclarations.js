@@ -2,7 +2,7 @@ import { parseContractDate } from './contractCalendar';
 import { contractEmploymentAt } from './contractLedger';
 import { employmentContractId, isLegacyOpening } from './seasonContract';
 import { getFaProgress, getLegacyFaProgress } from './contract';
-import { initializePlayerEligibility } from './playerEligibility';
+import { initializePlayerEligibility, getHistoricalPlayerFaProgress } from './playerEligibility';
 import { isIkuseiPlayer } from './rosterCapacity';
 import { removeDepartingPlayers } from './tradeTransaction';
 import { validateMarketPlayer } from './annualAcquisitions';
@@ -127,10 +127,10 @@ function inspectRanking(state,r,at) {
   if(rank(first)!==rank(last))fail('同額年俸がFA補償ランク境界をまたぐため、宣言を確定できません。');
   return rank(first);
 }
-function expectedRecord(state,c,player,season,ranking,origins,at,legacy = false) {
+function expectedRecord(state,c,player,season,ranking,origins,at,legacy = false, historicalEvidence = false) {
   const source=state.spending.ledger.records.find(r=>employmentContractId(r.contract)===c.contractId);
   const e=at(season).find(e=>employmentContractId(e.contract)===c.contractId);
-  const eligibility=legacy?getLegacyFaProgress(player):getFaProgress(player);
+  const eligibility=legacy?getLegacyFaProgress(player):historicalEvidence?getHistoricalPlayerFaProgress(player):getFaProgress(player);
   if(!source || !e || e.teamId!==c.teamId || e.contract.playerId!==c.playerId || e.contract.endSeason!==season
     || e.registrationType!=='controlled' || player?.id!==c.playerId || player.contractId!==c.contractId
     || player.isRetired || player._retireNow || isIkuseiPlayer(player) || !eligibility.recorded
@@ -167,7 +167,8 @@ export function inspectAnnualFaDeclarations(state) {
     try{c=normalizeFaDeclarationCommand(JSON.parse(receipt?.signature));}catch{fail();}
     const context=contexts.find(b=>b.id===d.ranking?.id && b.teamId===d.teamId && b.season===d.season);
     if(!context || stable(context)!==stable(d.ranking))fail('FA年俸順位の独立した確定根拠が一致しません。');
-    const expected=expectedRecord(state,c,d.player,d.season,context,origins,at,d.eligibility?.ruleVersion !== 2);
+    const expected=expectedRecord(state,c,d.player,d.season,context,origins,at,d.eligibility?.ruleVersion !== 2,
+      d.eligibility?.evidenceVersion === undefined);
     if(receipts.length!==1 || c.id!==d.id || receipt.signature!==stable(c) || stable(receipt.faDeclaration)!==stable(d) || stable(expected)!==stable(d))fail();
     const alumni=state.teams.find(t=>t.id===d.teamId)?.history?.filter(p=>p.faDeclarationId===d.id)??[];
     if(alumni.length!==1 || stable(alumni[0])!==stable(history(d)))fail();

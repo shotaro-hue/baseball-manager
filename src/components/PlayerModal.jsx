@@ -4,6 +4,7 @@ import { CareerTable } from './tabs/CareerTable';
 import { BattedBallAnalysisPanel } from './BattedBallAnalysisPanel';
 import '../mobile-flow.css';
 import { getFaProgress } from '../engine/contract';
+import { professionalYearsAtSeasonEnd } from '../engine/playerEligibility';
 import { isIkuseiPlayer } from '../engine/renewalRules';
 import { Button, Section } from './design-system/primitives';
 import { useResultDialog } from './useResultDialog';
@@ -151,7 +152,7 @@ function resolveInitialSection(player, requestedSection) {
 
 export function PlayerModal({
   farmState, player: p, teamName, isMyTeam, initialSection = "profile",
-  saveId, year, teams, isCompared = false, onToggleCompare, onNavigate,
+  saveId, year, completedSeasonYear = Number.isInteger(year) ? year - 1 : null, teams, isCompared = false, onToggleCompare, onNavigate,
   onSetConvertTarget, onClose,
 }) {
   const [activeSection, setActiveSection] = useState(() => resolveInitialSection(p, initialSection));
@@ -179,13 +180,22 @@ export function PlayerModal({
   const contractEvidence = changedOpeningTerms ? null : p.dataQuality?.contract;
   const salaryQualifier = !salaryEvidence ? '' : salaryEvidence === 'official' ? '（公式）' : salaryEvidence === 'reported' ? '（報道推定）' : salaryEvidence.startsWith('game-assumption') ? '（ゲーム設定・実額未確認）' : '（実額未確認）';
   const unknownInitialService = p.dataQuality?.serviceTime === 'game-baseline-unknown';
-  const faLabel = isIkuseiPlayer(p) ? (p.isFA ? '自由契約（育成）' : '育成契約中・FA対象外') : p.isFA ? 'FA中'
-    : `${faProgress.domestic.eligible ? '国内FA資格あり' : `国内FA 最短あと${faProgress.domestic.years}年（${faProgress.domestic.remainingDays}日）`}${faProgress.estimated ? '・推定' : ''}`;
+  const faLabel = key => {
+    const label = key === 'domestic' ? '国内FA' : '海外FA', progress = faProgress[key];
+    const official = p.eligibility?.fa.grants[key] && faProgress.basis.kind === 'official';
+    return progress.eligible ? `${label}資格あり（${official ? '公式' : 'ゲーム内判定'}）`
+      : `${label} 最短あと${progress.years}年（${progress.remainingDays}日）${faProgress.estimated ? '・推定' : ''}`;
+  };
+  const faState = isIkuseiPlayer(p) ? (p.isFA ? '自由契約（育成）' : '育成契約中・FA対象外') : p.isFA ? 'FA中' : null;
+  const dayBasisLabel = { official: '公式', reference: '参考値', 'game-estimate': 'ゲーム推定', 'game-history': 'ゲーム内記録・換算' }[faProgress.daysBasis.kind];
+  const proStartEstimated = ['game-estimate', 'reference'].includes(p.eligibility?.proStart.kind);
+  const hasProStart = Number.isInteger(p.proStartYear);
+  const proYears = hasProStart && Number.isInteger(completedSeasonYear)
+    ? `${professionalYearsAtSeasonEnd(p.proStartYear, completedSeasonYear)}年（${completedSeasonYear}年終了時）` : '— 未記録';
   const phase = { growth: '成長期', peak: '全盛期', earlyDecline: '衰退初期', decline: '衰退期' }[p.growthPhase] || '成長段階未記録';
   const abilities = p.isPitcher ? [['球速', 'velocity'], ['制球', 'control'], ['スタミナ', 'stamina'], ['変化球', 'breaking'], ['球種', 'variety'], ['ピンチ', 'clutchP']]
     : [['ミート', 'contact'], ['長打', 'power'], ['走力', 'speed'], ['守備', 'defense'], ['選球眼', 'eye'], ['クラッチ', 'clutch']];
   const careerTeamId = teams?.find(t => t.name === teamName)?.id;
-  const foreignExemptDays = p.isForeign && !p.isFA ? faProgress.overseas.remainingDays : 0;
   const safeName = String(p.name ?? '名前未記録').slice(0, 60);
   const safeTeam = typeof teamName === 'string' ? teamName.slice(0, 80) : '球団未記録';
   const stat = (label, key) => <StatRow key={label} label={label} value={detailNumber(s[key])} />;
@@ -209,7 +219,9 @@ export function PlayerModal({
         {activeSection === 'profile' && <>
           <div className="player-profile-grid">
             <Section title="能力・状態"><div className="player-ability-list">{abilities.map(([label, key]) => <AbilityBar key={key} label={label} value={(p.isPitcher ? p.pitching : p.batting)?.[key]} />)}</div><StatRow label="潜在能力" value={detailNumber(p.potential)} /><p className="player-record-note">能力はゲーム内評価値です。投手の球速能力はkm/hではありません。</p></Section>
-            <Section title="契約"><StatRow label="年俸" value={`${detailSalary(p.salary)}${salaryQualifier}`} /><StatRow label="残年数" value={Number.isFinite(p.contractYearsLeft) ? `${p.contractYearsLeft}年` : '— 未記録'} /><StatRow label="在籍" value={unknownInitialService ? '開始前未確認' : Number.isFinite(p.serviceYears) ? `${p.serviceYears}年` : '— 未記録'} /><p className="player-record-note">{faLabel}</p>{contractEvidence === 'legacy-unverified' && <p className="player-record-note">初期契約期間は旧データを維持しています。実際の契約条件は未確認です。</p>}{contractEvidence === 'game-assumption' && <p className="player-record-note">初期契約期間はゲーム設定です。実際の終了年は未確認です。</p>}{foreignExemptDays > 0 && <p className="player-record-note">海外FA取得まで {foreignExemptDays}日</p>}</Section>
+            <Section title="契約"><StatRow label="年俸" value={`${detailSalary(p.salary)}${salaryQualifier}`} /><StatRow label="残年数" value={Number.isFinite(p.contractYearsLeft) ? `${p.contractYearsLeft}年` : '— 未記録'} /><StatRow label="在籍" value={unknownInitialService ? '開始前未確認' : Number.isFinite(p.serviceYears) ? `${p.serviceYears}年` : '— 未記録'} /><StatRow label="プロ入り年" value={hasProStart ? `${p.proStartYear}年${proStartEstimated ? '（推定）' : p.eligibility?.proStart.kind === 'official' ? '（公式）' : '（ゲーム内記録）'}` : '— 未記録'} /><StatRow label="プロ経過年数" value={proYears} /><p className="player-record-note">プロ経過年数は終了済みシーズンまで。在籍年数とは別です。</p>
+              {faState ? <p className="player-record-note">{faState}</p> : <>{['domestic', 'overseas'].map(key => <p key={key} className="player-record-note">{faLabel(key)}</p>)}<p className="player-record-note">登録日数の根拠：{dayBasisLabel}。資格保有の根拠とは別です。</p></>}
+              {contractEvidence === 'legacy-unverified' && <p className="player-record-note">初期契約期間は旧データを維持しています。実際の契約条件は未確認です。</p>}{contractEvidence === 'game-assumption' && <p className="player-record-note">初期契約期間はゲーム設定です。実際の終了年は未確認です。</p>}</Section>
           </div>
         </>}
         {activeSection === 'stats' && <>

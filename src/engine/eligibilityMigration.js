@@ -1,4 +1,5 @@
 import { initializePlayerEligibility, validatePlayerEligibility } from './playerEligibility';
+import { getCareerEntryKey } from './careerStats';
 
 // Optional player extension; never rewrite engine receipts, historical player
 // snapshots, contracts, save identity, epoch, revision, clocks or RNG.
@@ -18,19 +19,28 @@ function completedFaCycles(world, player) {
   if (world.teams?.some(t => [...(t.players ?? []), ...(t.farm ?? [])].some(p => p.id === player.id))) {
     for (const h of world.teams.flatMap(t => t.history ?? [])) {
       if (h.id !== player.id || !['FA宣言', '国内FA宣言', '海外FA宣言'].includes(h.exitReason)
-        || !Number.isInteger(h.exitYear) || !Number.isFinite(h.daysOnActiveRoster)
+        || !Number.isInteger(h.exitYear)
         || events.some(e => e.season === h.exitYear)) continue;
+      // Match the historical FA getter: a recorded zero wins over the
+      // serviceYears fallback, while an absent/invalid counter may use it.
+      const legacyDays = Number.isFinite(h.daysOnActiveRoster) && h.daysOnActiveRoster >= 0 ? h.daysOnActiveRoster
+        : Number.isFinite(h.serviceYears) && h.serviceYears >= 0 ? h.serviceYears * 120 : null;
+      if (legacyDays === null) continue;
       events.push({ id: JSON.stringify(['legacy-fa-history', player.id, h.exitYear]), season: h.exitYear,
-        baseline: h.daysOnActiveRoster * 145 / 120, countAfter: null, openingCount: 0 });
+        baseline: legacyDays * 145 / 120, countAfter: null, openingCount: 0 });
     }
   }
   return events.sort((a, b) => a.season - b.season);
 }
 
-export function migratePlayerEligibility(p, world) {
+export function migratePlayerEligibility(p, world, { registrationHistory } = {}) {
     const year = world.year ?? world.season ?? 2026;
     if (p.eligibility !== undefined) { validatePlayerEligibility(p, { year }); return p; }
-    const n = initializePlayerEligibility(p, { year });
+    // A selected save generation may hold more than the live three-season tail.
+    // Merge by season/team so a shared row is not counted twice.
+    const history = registrationHistory?.length ? [...new Map([...(p.history ?? []), ...registrationHistory]
+      .map(row => [getCareerEntryKey(row), row])).values()] : undefined;
+    const n = initializePlayerEligibility(p, { year, registrationHistory: history });
     const fa = n.eligibility.fa;
     const events = completedFaCycles(world, p), last = events.at(-1);
     if (last) {
@@ -59,8 +69,8 @@ export function migratePlayerEligibility(p, world) {
     return n;
 }
 
-export function migrateEligibilityWorld(world) {
-  const migrate = p => migratePlayerEligibility(p, world);
+export function migrateEligibilityWorld(world, { registrationHistoryByPlayerId } = {}) {
+  const migrate = p => migratePlayerEligibility(p, world, { registrationHistory: registrationHistoryByPlayerId?.get(String(p.id)) });
   return { ...world, teams: world.teams.map(t => ({ ...t, players: (t.players ?? []).map(migrate), farm: (t.farm ?? []).map(migrate) })),
     ...(Array.isArray(world.faPool) ? { faPool: world.faPool.map(migrate) } : {}) };
 }

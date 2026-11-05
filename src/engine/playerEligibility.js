@@ -28,7 +28,7 @@ export function faQualifiedThresholds(player) {
 // Opening balances are a model, not reconstructed official registration days.
 // Count each pre-opening season once, including split-team performance rows.
 function estimateDays(player, year, startYear) {
-  const rows = player.history ?? player.recentCareerLog ?? player.careerLog ?? [];
+  const rows = player.history ?? (player.careerLog?.length ? player.careerLog : player.recentCareerLog ?? []);
   const seasons = new Map();
   for (const h of rows) {
     if (!yearValue(h.year) || h.year >= year) continue;
@@ -142,17 +142,30 @@ export function getPlayerFaProgress(player) {
     const remainingDays = f.grants[key] ? 0 : Math.max(0, Math.ceil(required - balance - 1e-9));
     return { remainingDays, years: Math.ceil(remainingDays / 145), eligible: remainingDays === 0 };
   };
-  return { ruleVersion: 2, recorded: true, estimated: f.qualificationBasis.kind !== 'official'
-    && (f.basis.kind === 'game-estimate' || p.dataQuality?.serviceTime === 'game-baseline-unknown'), days: balance,
-    basis: structuredClone(f.qualificationBasis), domestic: progress('domestic', thresholds.domestic), overseas: progress('overseas', thresholds.overseas) };
+  return { ruleVersion: 2, evidenceVersion: 1, recorded: true,
+    estimated: ['game-estimate', 'reference'].includes(f.basis.kind)
+      || (f.basis.kind !== 'official' && p.dataQuality?.serviceTime === 'game-baseline-unknown'), days: balance,
+    basis: structuredClone(f.qualificationBasis), daysBasis: structuredClone(f.basis),
+    domestic: progress('domestic', thresholds.domestic), overseas: progress('overseas', thresholds.overseas) };
 }
+
+// Frozen pre-evidenceVersion v2 certificates use the original shape and flag.
+// Never rewrite their snapshots/receipts when improving present-day UI evidence.
+export function getHistoricalPlayerFaProgress(player) {
+  const p = initializePlayerEligibility(player), f = p.eligibility.fa;
+  const { evidenceVersion, daysBasis, ...progress } = getPlayerFaProgress(p);
+  return { ...progress, estimated: f.qualificationBasis.kind !== 'official'
+    && (f.basis.kind === 'game-estimate' || p.dataQuality?.serviceTime === 'game-baseline-unknown') };
+}
+
+export const professionalYearsAtSeasonEnd = (proStartYear, completedSeasonYear) => Math.max(0, completedSeasonYear - proStartYear + 1);
 
 export function assessGamePostingQualification(player, { signingDate, completedSeasonYear }) {
   const date = parseContractDate(signingDate), p = initializePlayerEligibility(player, { year: date.year });
   if (!Number.isInteger(completedSeasonYear) || completedSeasonYear < 0 || completedSeasonYear > date.year
     || (completedSeasonYear === date.year && signingDate.slice(5) < '11-01') || p.birthDate > signingDate) fail();
   const ageYears = date.year - Number(p.birthDate.slice(0, 4)) - Number(signingDate.slice(5) < p.birthDate.slice(5));
-  const professionalYears = Math.max(0, completedSeasonYear - p.proStartYear + 1);
+  const professionalYears = professionalYearsAtSeasonEnd(p.proStartYear, completedSeasonYear);
   return { ruleVersion: 2, playerId: p.id, signingDate, completedSeasonYear, proStartYear: p.proStartYear,
     professionalYears, ageYears, exemption: ageYears >= 25 && professionalYears >= 6 ? 'exempt' : 'restricted' };
 }

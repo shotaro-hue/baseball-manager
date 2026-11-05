@@ -4,7 +4,6 @@ import { approvedPostingWorld, qualificationCommand, qualificationFacts, legacyQ
 import { postingWinter, postingCommand } from './fixtures/postingDepartures';
 import { postingRequest, postingDecision } from './fixtures/postingApplications';
 import { completion } from './fixtures/postingIncome';
-import { envelope } from './fixtures/faDeclarations';
 import { reduceEconomyCommand, quoteEconomyCommand, fromAnnualState, toAnnualState } from '../contractEconomy';
 import { validateEconomySave, economyOverwriteIssue } from '../economyPersistence';
 import { freezeEconomy } from './fixtures/economyWorld';

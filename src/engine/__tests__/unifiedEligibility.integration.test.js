@@ -1,7 +1,7 @@
 import { it, expect } from 'vitest';
 import { createInitialTeams } from '../bootstrapTeams';
 import { getFaProgress, getFaThreshold } from '../contract';
-import { initializePlayerEligibility, exerciseFaRights } from '../playerEligibility';
+import { initializePlayerEligibility, exerciseFaRights, accrueFaService } from '../playerEligibility';
 import { migrateEligibilityWorld } from '../eligibilityMigration';
 import { openingEligibilityFacts, OPENING_FA_FACTS } from '../../data/openingEligibility2026';
 import { applyRegularSeasonTeamUpdate } from '../regularGameUpdates';
@@ -79,6 +79,35 @@ it('migrates a real base548 declaration→accepted NPB contract→joined save in
   expect(next.contractEconomy).toEqual(original.contractEconomy);
   expect(validateEconomySave(next)).toBe('annual');
   expect(migrateEligibilityWorld(JSON.parse(JSON.stringify(next)))).toEqual(next);
+});
+
+it('restores a consumed legacy FA cycle recorded only in serviceYears and retains fractional progress', () => {
+  const p = { id: 'legacy-returned', age: 31, entryType: '高卒', serviceYears: 9.5 };
+  const h = { ...p, serviceYears: 9, exitYear: 2025, exitReason: 'FA宣言' };
+  const original = { year: 2026, gameDay: 1, teams: [{ id: 0, players: [p], farm: [], history: [h] }], faPool: [] };
+  const before = structuredClone(original), next = migrateEligibilityWorld(original), returned = next.teams[0].players[0];
+  expect(returned.eligibility.fa).toMatchObject({ exerciseCount: 1, cycleStartDays: 1305, days: 1377.5 });
+  expect(getFaProgress(returned)).toMatchObject({ days: 72.5, overseas: { eligible: false, remainingDays: 508 } });
+  let accrued = returned;
+  for (let year = 2026; year <= 2028; year++) for (let gameDay = 1; gameDay <= 143; gameDay++) accrued = accrueFaService(accrued, { year, gameDay });
+  for (let gameDay = 1; gameDay <= 71; gameDay++) accrued = accrueFaService(accrued, { year: 2029, gameDay });
+  expect(getFaProgress(accrued).overseas).toMatchObject({ eligible: false, remainingDays: 2 });
+  accrued = accrueFaService(accrued, { year: 2029, gameDay: 72 });
+  expect(getFaProgress(accrued).overseas).toMatchObject({ eligible: true, remainingDays: 0 });
+  expect(next.teams[0].history).toEqual(before.teams[0].history);
+  expect(original).toEqual(before);
+  expect(migrateEligibilityWorld(JSON.parse(JSON.stringify(next)))).toEqual(next);
+});
+
+it('does not infer a recontract for an unowned legacy market player or an unrelated release', () => {
+  const p = { id: 'legacy-market', age: 31, entryType: '高卒', serviceYears: 9 };
+  for (const world of [
+    { teams: [{ players: [], farm: [], history: [{ ...p, exitYear: 2025, exitReason: 'FA宣言' }] }], faPool: [p] },
+    { teams: [{ players: [p], farm: [], history: [{ ...p, exitYear: 2025, exitReason: '戦力外' }] }], faPool: [] },
+  ]) {
+    const next = migrateEligibilityWorld({ ...world, year: 2026, gameDay: 1 });
+    expect((next.faPool[0] ?? next.teams[0].players[0]).eligibility.fa.exerciseCount).toBe(0);
+  }
 });
 
 it('preserves an outstanding base548 certificate and reconstructs the prior cycle when a pending old acquisition joins', () => {

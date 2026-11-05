@@ -24,8 +24,10 @@ function faLabel(player, overseas = false) {
   if (isIkuseiPlayer(player)) return '育成契約中・FA対象外';
   const progress = getFaProgress(player);
   if (!progress.recorded) return '登録日数未記録';
-  const p = overseas ? progress.overseas : progress.domestic;
-  return `${p.eligible ? '取得済み' : `最短あと${p.years}年（${p.remainingDays}日）`}${progress.estimated ? '・推定' : ''}`;
+  const key = overseas ? 'overseas' : 'domestic', p = progress[key];
+  const official = player.eligibility?.fa.grants[key] && progress.basis.kind === 'official';
+  return p.eligible ? `取得済み（${official ? '公式' : 'ゲーム内判定'}）`
+    : `最短あと${p.years}年（${p.remainingDays}日）${progress.estimated ? '・推定' : ''}`;
 }
 function performance(player) {
   const s = player.stats || {};

@@ -28,6 +28,14 @@ describe('elapsed completed professional seasons (game rule v2)', () => {
 });
 
 describe('FA qualified days and separate evidence', () => {
+  it('keeps official domestic rights separate from an estimated overseas balance', () => {
+    const p = init({ daysOnActiveRoster: undefined, history: [{ year: 2025, G: 100 }] }, {
+      opening: { qualified: 'domestic', sourceIds: ['https://npb.jp/announcement/2025/fa_qualified.html'] },
+    });
+    expect(getPlayerFaProgress(p)).toMatchObject({ evidenceVersion: 1, estimated: true,
+      basis: { kind: 'official' }, daysBasis: { kind: 'game-estimate', method: 'opening-registration-model-v2' },
+      domestic: { eligible: true, remainingDays: 0 }, overseas: { eligible: false, remainingDays: 1189 } });
+  });
   it.each([{ marketEntry: { kind: 'released' } }, { isWaiverReleased: true }])('does not consume FA rights again on a later release with stale declaration text %j', listing => {
     const p = exerciseFaRights(init({ daysOnActiveRoster: 1080 }), 2026);
     p.eligibility.fa.days += 300;

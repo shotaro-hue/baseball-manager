@@ -88,15 +88,18 @@ async function validateRow(scope, ref, row) {
   if(!validData(scope,data)) throw new Error(`invalid_chunk:${scope}`);
   return data;
 }
-export async function readGeneration(state) {
+export async function readGeneration(state, { onCareerData } = {}) {
   const manifest = validateManifest(state);
   const scopes = scopesFor(manifest.version);
   const rows = await readRows(scopes.map(scope => manifest.chunks[scope].key));
   const loaded = {};
   for (const scope of scopes) {
     const ref = manifest.chunks[scope], row = rows.get(ref.key);
-    await validateRow(scope, ref, row);
-    if (scope === 'careerLogs') continue; // Validate full history without inflating live React state.
+    const data = await validateRow(scope, ref, row);
+    if (scope === 'careerLogs') {
+      onCareerData?.(data); // Transient migration input, never live React state.
+      continue;
+    }
     if (scope === 'matchHistory') Object.assign(loaded, matchHistorySnapshot(row.data));
     else loaded[scope] = row.data;
   }

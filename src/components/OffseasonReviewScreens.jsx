@@ -18,7 +18,7 @@ function Frame({ farmState, title, year, teams = [], myId, saveId, children, emb
   const myTeam = teams.find(t => t.id === myId);
   const Tag = embedded ? 'section' : 'main'; const Heading = embedded ? 'h2' : 'h1';
   return <Tag className={`offseason-review ${screenClass || ''}`} data-ds={screenClass ? 'growth-screen' : undefined}><div className="review-content"><header>{onClose && <Button variant="secondary" className="growth-close" onClick={onClose}>編成に戻る</Button>}<p>オフシーズン · {year}年</p><Heading>{title}</Heading></header>{children(setProfile)}
-    {profile && <Suspense fallback={<p role="status">選手詳細を読み込み中です。</p>}><PlayerModal farmState={farmState} key={profile.id} player={profile} teamName={myTeam?.name || '選手記録'} isMyTeam={[...(myTeam?.players || []), ...(myTeam?.farm || [])].some(p => p.id === profile.id)} saveId={saveId} teams={teams} year={year} onClose={() => setProfile(null)} /></Suspense>}
+    {profile && <Suspense fallback={<p role="status">選手詳細を読み込み中です。</p>}><PlayerModal farmState={farmState} key={profile.id} player={profile} teamName={myTeam?.name || '選手記録'} isMyTeam={[...(myTeam?.players || []), ...(myTeam?.farm || [])].some(p => p.id === profile.id)} saveId={saveId} teams={teams} year={year} completedSeasonYear={year} onClose={() => setProfile(null)} /></Suspense>}
   </div></Tag>;
 }
 function Confirm({ title, children, onClose, onConfirm, label, disabled, busy, error }) {
