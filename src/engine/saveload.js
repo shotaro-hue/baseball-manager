@@ -9,7 +9,7 @@ import { migrateEligibilityWorld } from './eligibilityMigration';
 import { validateClubFinance } from './clubFinance';
 import { GENERATION_VERSION, LEGACY_GENERATION_VERSION, prepareGeneration, readGeneration, readCareerGeneration, collectUnusedChunks } from './saveGenerations';
 import { retainBattedBallReceipt, releaseCurrentBattedBallReceipt } from './battedBallRetention';
-import { prepareCareerData, captureInlineCareerLogs } from './careerGenerations';
+import { prepareCareerData, captureInlineCareerLogs, readLegacyCareerLogs } from './careerGenerations';
 import { MATCH_HISTORY_FIELDS, matchHistorySnapshot, matchHistoryForSave } from './matchHistory';
 import LZString from 'lz-string';
 import { resolveInitialContractYears } from './realplayer';
@@ -1273,6 +1273,16 @@ export async function loadGame() {
       let registrationHistoryByPlayerId;
       await hydrateSaveCandidate(state, { onCareerData: data => { registrationHistoryByPlayerId = new Map(data.players); } });
       if (deletionChanged()) return null;
+      if (state?.saveDataVersion >= INDEXED_DB_LARGE_DATA_VERSION && state.saveDataVersion < GENERATION_VERSION) {
+        const pending = [...(state.teams ?? []).flatMap(t => [...(t.players ?? []), ...(t.farm ?? [])]), ...(state.faPool ?? [])]
+          .filter(p => p?.id != null && p.eligibility === undefined);
+        if (pending.length) {
+          try { registrationHistoryByPlayerId = await readLegacyCareerLogs([...new Set(pending.map(p => String(p.id)))]); }
+          // Fixed-key archives were optional in these versions. Keep an inline
+          // save readable when that optional legacy storage is unavailable.
+          catch (error) { console.warn('Legacy registration history unavailable; using saved inline history.', error); }
+        }
+      }
       if(!(state?.saveDataVersion >= GENERATION_VERSION)) legacyCareerSeeds.set(state,captureInlineCareerLogs(state));
       // Eligibility needs the full saved career, before display-only compaction.
       const result = validateAndMigrateSave(state, { registrationHistoryByPlayerId });

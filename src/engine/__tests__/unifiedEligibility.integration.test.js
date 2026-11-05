@@ -1,4 +1,5 @@
-import { it, expect } from 'vitest';
+import { it, expect, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import { createInitialTeams } from '../bootstrapTeams';
 import { getFaProgress, getFaThreshold } from '../contract';
 import { initializePlayerEligibility, exerciseFaRights, accrueFaService } from '../playerEligibility';
@@ -15,6 +16,26 @@ import legacyPendingMarket from './fixtures/legacyFaPendingMarket.json';
 import legacyPendingRecontract from './fixtures/legacyFaPendingRecontract.json';
 import { reduceEconomyCommand, fromAnnualState, toAnnualState } from '../contractEconomy';
 import { envelope } from './fixtures/faDeclarations';
+
+it('preserves the entire pre-fix 1059-player new game, all eligibility balances and RNG consumption', () => {
+  let seed = 42, calls = 0;
+  const random = vi.spyOn(Math, 'random').mockImplementation(() => { calls++; seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; });
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(1791508062000);
+  try {
+    const teams = createInitialTeams(), players = teams.flatMap(t => [...t.players, ...t.farm]);
+    const progress = players.map(p => ({ id: p.realPlayerId, eligibility: p.eligibility, progress: getFaProgress(p) }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+    expect(players).toHaveLength(1059);
+    expect(progress.filter(p => p.progress.domestic.eligible)).toHaveLength(79);
+    expect(progress.filter(p => p.progress.overseas.eligible)).toHaveLength(51);
+    expect(calls).toBe(18400);
+    // Captured by running the unchanged e63b622c factory with the same seed/date.
+    expect(createHash('sha256').update(JSON.stringify(teams)).digest('hex'))
+      .toBe('8594364a6628db06c9757bcdd47da4d33c21db025dd0abe73bf9ca72cc913811');
+    expect(createHash('sha256').update(JSON.stringify(progress)).digest('hex'))
+      .toBe('fd3b6b1e66e068b0d13d2ef7151a1b165375ec02bb582d17174cb8aef469e136');
+  } finally { random.mockRestore(); clock.mockRestore(); }
+});
 
 it('initializes every actual roster player once and matches 2025 official rights after exercises', () => {
   const players = createInitialTeams().flatMap(t => [...t.players, ...t.farm]);

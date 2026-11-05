@@ -1,5 +1,6 @@
 import { parseContractDate } from './contractCalendar';
 import { isIkuseiPlayer } from './rosterCapacity';
+import { TEAM_DEFS } from '../constants';
 
 export const FA_QUALIFIED_DAYS_PER_YEAR = 145;
 export const FA_GAME_DAYS_PER_SEASON = 143;
@@ -25,17 +26,62 @@ export function faQualifiedThresholds(player) {
   return repeat ? { domestic: 580, overseas: 580 } : { domestic: (seven ? 7 : 8) * 145, overseas: 1305 };
 }
 
-// Opening balances are a model, not reconstructed official registration days.
-// Count each pre-opening season once, including split-team performance rows.
-function estimateDays(player, year, startYear) {
-  const rows = player.history ?? (player.careerLog?.length ? player.careerLog : player.recentCareerLog ?? []);
+const compactClubName = name => name.normalize('NFKC').replace(/\s+/g, '');
+const historicalClubNames = ['東京ヤクルト', '横浜', '広島東洋', '阪神', '読売', '中日',
+  '福岡ソフトバンク', '東北楽天', '埼玉西武', '千葉ロッテ', '北海道日本ハム', 'オリックス'];
+const clubNames = new Map(TEAM_DEFS.flatMap(t => [t.name, t.short, historicalClubNames[t.id],
+  ...(t.id === 1 ? ['横浜DeNA'] : [])].map(name => [compactClubName(name), `club:${t.id}`])));
+function historyClub(row) {
+  const name = typeof row.teamName === 'string' ? compactClubName(row.teamName) : '';
+  // Imported career rows can all carry today's teamId, even after a transfer.
+  if (name) return clubNames.get(name) ?? `name:${name}`;
+  return (Number.isSafeInteger(row.teamId) && row.teamId >= 0) || (typeof row.teamId === 'string' && row.teamId.trim())
+    ? `club:${row.teamId}` : null;
+}
+
+// These are overlapping views, not additive sources. Explicit registration
+// input > raw history > full career > recent tail. Within a source the last
+// valid observation for the same season/club is the saved correction.
+function historySeasons(player, year, registrationHistory) {
   const seasons = new Map();
-  for (const h of rows) {
-    if (!yearValue(h.year) || h.year >= year) continue;
-    const g = h.G ?? (player.isPitcher ? h.stats?.G ?? h.stats?.W : h.stats?.G ?? (h.stats?.PA != null ? h.stats.PA / 4 : null));
-    if (nonnegative(g)) seasons.set(h.year, (seasons.get(h.year) ?? 0) + g);
+  for (const rows of [registrationHistory, player.history, player.careerLog, player.recentCareerLog]) {
+    if (!Array.isArray(rows)) continue;
+    const source = new Map();
+    for (const h of rows) {
+      if (!h || !yearValue(h.year) || h.year >= year || /通算|合計|^\d+球団/.test(h.teamName ?? '')) continue;
+      const observed = h.G ?? h.stats?.G;
+      const proxy = player.isPitcher ? h.W ?? h.stats?.W : h.PA ?? h.stats?.PA;
+      const g = observed ?? (nonnegative(proxy) ? proxy / (player.isPitcher ? 1 : 4) : null);
+      if (!nonnegative(g) || (observed != null && !Number.isSafeInteger(observed))) continue;
+      if (!source.has(h.year)) source.set(h.year, { clubs: new Map(), anonymous: new Map() });
+      const s = source.get(h.year), club = historyClub(h);
+      if (club !== null) s.clubs.set(club, g);
+      else {
+        // Equal G can belong to different legacy stints. Compare the complete
+        // observation, ignoring only its wrapper/source metadata.
+        const observation = { ...h, ...h.stats };
+        for (const key of ['year', 'teamId', 'teamName', 'stats', 'playoffStats', 'sourceId', 'sourceIds', 'sourceRefs']) delete observation[key];
+        const key = JSON.stringify(Object.entries(observation).sort(([a], [b]) => a.localeCompare(b)));
+        s.anonymous.set(key, g);
+      }
+    }
+    for (const [season, s] of source) {
+      const existing = seasons.get(season);
+      if (!existing) seasons.set(season, s);
+      // Without club identity, a lower source might be a total or the same
+      // split season. Keep the higher source's season; never add both views.
+      else if (!existing.anonymous.size && !s.anonymous.size) {
+        for (const [club, games] of s.clubs) if (!existing.clubs.has(club)) existing.clubs.set(club, games);
+      }
+    }
   }
-  if (seasons.size) return [...seasons.values()].reduce((n, g) => n + Math.min(145, Math.round(g * 145 / (player.isPitcher ? 45 : 125))), 0);
+  return new Map([...seasons].map(([season, s]) => [season, [...s.clubs.values(), ...s.anonymous.values()].reduce((a, b) => a + b, 0)]));
+}
+
+// Opening balances are a model, not reconstructed official registration days.
+function estimateDays(player, year, startYear, registrationHistory, afterYear = 0) {
+  const seasons = [...historySeasons(player, year, registrationHistory)].filter(([season]) => season > afterYear);
+  if (seasons.length) return seasons.reduce((n, [, g]) => n + Math.min(145, Math.round(g * 145 / (player.isPitcher ? 45 : 125))), 0);
   return Math.max(0, year - startYear) * 100;
 }
 
@@ -88,9 +134,8 @@ export function initializePlayerEligibility(player, { year = 2026, opening = nul
     player.birthDate ? 'preserved-birth-date' : 'age-on-initialization-march-27', opening?.birthSourceIds ?? refs);
   const measured = nonnegative(player.daysOnActiveRoster)
     && (player.dataQuality?.serviceTime !== 'game-baseline-unknown' || player.daysOnActiveRoster > 0);
-  const historyPlayer = registrationHistory ? { ...player, history: registrationHistory } : player;
   let days = firstContractYear !== null ? 0 : measured ? player.daysOnActiveRoster * 145 / 120
-    : nonnegative(player.serviceYears) && player.serviceYears > 0 ? player.serviceYears * 145 : estimateDays(historyPlayer, year, start);
+    : nonnegative(player.serviceYears) && player.serviceYears > 0 ? player.serviceYears * 145 : estimateDays(player, year, start, registrationHistory);
   const exercises = opening?.exercises ?? [];
   if (exercises.some(y => !yearValue(y) || y > 2025)) fail();
   const exerciseCount = exercises.length, lastExerciseYear = exerciseCount ? Math.max(...exercises) : null;
@@ -114,7 +159,7 @@ export function initializePlayerEligibility(player, { year = 2026, opening = nul
   if (!qualified && (grants.domestic || grants.overseas)) f.qualificationBasis = basis('game-history', 'legacy-qualified-rights-preserved');
   // A filed-and-recontracted right is consumed. Approximate only its new balance.
   if (lastExerciseYear !== null) {
-    const since = estimateDays({ ...historyPlayer, history: (historyPlayer.history ?? historyPlayer.recentCareerLog ?? []).filter(h => h.year > lastExerciseYear) }, year, lastExerciseYear + 1);
+    const since = estimateDays(player, year, lastExerciseYear + 1, registrationHistory, lastExerciseYear);
     f.cycleStartDays = Math.max(0, days - since);
   }
   // A complete dated qualified list bounds the opening estimate. It does not

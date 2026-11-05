@@ -22,7 +22,7 @@ function mergeEntries(a,b) {
   }
   return [...entries.values()].sort((a,b)=>Number(a.year)-Number(b.year));
 }
-async function readLegacy(ids) {
+export async function readLegacyCareerLogs(ids) {
   const db=await openBaseballManagerDb();
   return new Promise((resolve,reject)=>{
     const tx=db.transaction(BASEBALL_MANAGER_DB_STORES.careerLogs,'readonly'),result=new Map();
@@ -50,7 +50,7 @@ export async function prepareCareerData(state,previous,options={},legacyInline=[
   else {
     const players=playersIn(sourceState),ids=[...new Set(players.filter(p=>p?.id!=null).map(p=>String(p.id)))];
     const adoptLegacy=sameGame && initial===undefined;
-    const logs=adoptLegacy?await readLegacy(ids):new Map();
+    const logs=adoptLegacy?await readLegacyCareerLogs(ids):new Map();
     if(adoptLegacy) for(const [id,entries] of legacyInline) logs.set(id,mergeEntries(logs.get(id)||[],entries));
     const initialIds=new Set();
     if(initial!==undefined) {

@@ -1,5 +1,4 @@
 import { initializePlayerEligibility, validatePlayerEligibility } from './playerEligibility';
-import { getCareerEntryKey } from './careerStats';
 
 // Optional player extension; never rewrite engine receipts, historical player
 // snapshots, contracts, save identity, epoch, revision, clocks or RNG.
@@ -36,11 +35,8 @@ function completedFaCycles(world, player) {
 export function migratePlayerEligibility(p, world, { registrationHistory } = {}) {
     const year = world.year ?? world.season ?? 2026;
     if (p.eligibility !== undefined) { validatePlayerEligibility(p, { year }); return p; }
-    // A selected save generation may hold more than the live three-season tail.
-    // Merge by season/team so a shared row is not counted twice.
-    const history = registrationHistory?.length ? [...new Map([...(p.history ?? []), ...registrationHistory]
-      .map(row => [getCareerEntryKey(row), row])).values()] : undefined;
-    const n = initializePlayerEligibility(p, { year, registrationHistory: history });
+    // Keep sources separate until the shared estimator resolves their overlap.
+    const n = initializePlayerEligibility(p, { year, registrationHistory });
     const fa = n.eligibility.fa;
     const events = completedFaCycles(world, p), last = events.at(-1);
     if (last) {
