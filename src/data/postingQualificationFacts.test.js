@@ -63,3 +63,17 @@ it.each([
   const { createOpeningPostingQualificationLookup } = await module(); expect(createOpeningPostingQualificationLookup).toBeTypeOf('function');
   expect(() => createOpeningPostingQualificationLookup(master)).toThrow();
 });
+
+it('produces real birth-only facts and consumes explicit dated seasons without deriving history years', async () => {
+  const { createPostingQualificationProducer } = await module(); expect(createPostingQualificationProducer).toBeTypeOf('function');
+  const source = small(), produce = createPostingQualificationProducer(source), p = { id: 0, realPlayerId: 'npb:123' };
+  expect(produce(p)).toMatchObject({ playerId: 0, sourcePlayerId: 'npb:123', birthDate: { date: '2001-12-01' }, professionalSeasons: null });
+  // Synthetic producer metadata, not a real-player recognition certificate.
+  const pro = { asOfDate: '2026-12-01', coverage: 'partial', ruleId: 'synthetic-rule-v1',
+    seasons: [{ season: 2025, confirmedDate: '2025-12-01', sourceIds: ['synthetic-season'] }] };
+  const result = produce(p, pro); pro.seasons[0].sourceIds[0] = 'changed'; source.players[0].birthDate = '1990-01-01';
+  expect(result.professionalSeasons.seasons[0].sourceIds).toEqual(['synthetic-season']);
+  expect(produce(p).birthDate.date).toBe('2001-12-01');
+  expect(produce({ id: 'fictional', age: 50, serviceYears: 30 })).toMatchObject({ birthDate: null, professionalSeasons: null });
+  expect(produce({ id: 'unmatched', realPlayerId: 'npb:unmatched' })).toMatchObject({ sourcePlayerId: 'npb:unmatched', birthDate: null });
+});

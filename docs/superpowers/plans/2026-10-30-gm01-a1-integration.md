@@ -170,6 +170,8 @@ PR #521レビュー修正: revision増加でもrandomRoot・確定済み台帳�
 
 ## Task 7: A1-2c 退団・市場・海外離脱
 
+2026-11-05 #547後: [明示認定事実producerと保存snapshot](../specs/2026-11-05-gm01-posting-qualification-snapshots-design.md)を独立前提に追加。確認日/rule出典のある根拠だけを承認済み申請・固定ID・元契約・save/epochに結合する。自動認定のリーグ/育成条件、架空出生生成、MLB価格/本人受諾/契約区分、署名日、市場成立receiptは未決/未実装。Task10の年度確定producerは合意済み条件に基づく一度限りの確定事実を供給し、保存済みsnapshotを更新しない。市場側は実際の署名日で再判定し、新申請から旧complete-postingへ直接流さない。Task7/A1未完了・公開OFF・schemaVersion1/DB5。
+
 2026-11-04 #546マージ後の資格前提: [出典付きevidence/純粋判定設計](../specs/2026-11-04-gm01-posting-qualification-design.md)／[計画](./2026-11-04-gm01-posting-qualification.md)。bonus-pool免除の年齢・認定年数条件をexempt/restricted/unknownへ分け、出生日は実名簿の固定ID/profileから取得する。現行データに認定年数の完全な正本はなく、履歴掲載年を数えて補完しない。市場価格/本人受諾policyの基本方針、認定年数producer、保存済み市場receiptへのidentity紐付けは次工程。申請承認後の進行拒否・一般公開OFF・schema/DB versionを維持し、Task7/A1を完了扱いにしない。
 
 2026-11-04 #545後: [申請・GM判断の設計](../specs/2026-11-04-gm01-posting-applications-design.md)と[残工程監査](../../validation/gm-01-posting-applications/README.md)。承認を成立扱いしない申請event/一回の判断を共通保存へ追加。MLB資格の根拠・市場policy・受諾/辞退/不成立を次の依存工程として整理。人UI/CPU/年度Worker/引退試合producerは未接続、Task7/A1未完了・公開OFF。最終SHA/レビュー/CIは対象PRを参照。

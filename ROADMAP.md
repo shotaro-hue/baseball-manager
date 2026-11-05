@@ -1,5 +1,7 @@
 # ROADMAP — NPB Franchise Manager
 
+> 2026-11-05 #547後: 明示された認定事実の確認日/rule出典を検証し、承認済み申請へ固定ID・元契約・save/epoch付き資格snapshotを保存する。[設計](./docs/superpowers/specs/2026-11-05-gm01-posting-qualification-snapshots-design.md)。実名簿の認定季欠損は維持。自動認定条件・市場/受諾・UI/CPU/年度Workerは未接続。Task7/A1未完了、公開OFF、schemaVersion1/DB5。
+
 > 2026-11-04 #546マージ済みmain `3f6a665`から、postingの出生日/認定プロシーズン根拠とbonus-pool免除の純粋判定を分離。[設計](./docs/superpowers/specs/2026-11-04-gm01-posting-qualification-design.md)。実名簿の固定IDと出生日だけを参照し、年数欠損・古い根拠は不明とする。市場/受諾policy・認定年数producer・UI/CPU/年度Workerは未接続。Task7/A1未完了・公開OFFを維持。
 
 > 2026-11-04 #545後: ポスティング申請→一度のGM判断を独立単位化。市場価格/受諾の根拠不足を先に明示し、承認で退団・入金しない。[残工程と依存順](./docs/validation/gm-01-posting-applications/README.md)。資格データ/市場→人UI→CPU→年度Worker→長期/実機が残り、A1-2c/A1未完了・公開ゲートOFF。
