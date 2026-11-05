@@ -8,6 +8,8 @@ docs/validation/unified-eligibility/changed-files.txt
 docs/validation/unified-eligibility/opening-audit.json
 docs/validation/unified-eligibility/review.json
 e2e/fixtures/fix-s3/main.jsx
+e2e/helpers/renewal-app-cases.js
+e2e/helpers/renewal-design-cases.js
 e2e/player-detail.spec.js
 src/App.initialization.test.js
 src/App.jsx

@@ -15,7 +15,11 @@ export function registerRenewalDesignCases() {
     await expect(career).toContainText('ミート 60'); await expect(career.locator('.career-detail')).toContainText('2026');
     await expect(career.getByRole('row').filter({ hasText: '2026' })).toContainText(/2026.*500.*\.287.*14.*42/); await checkLayout(page);
     await career.locator('summary').click(); await expect(career.locator('.career-detail')).not.toBeVisible();
-    await page.getByText('FAまでの目安', { exact: true }).click(); await expect(page.locator('.renewal-context')).toContainText('最短あと7年');
+    await page.getByText('FAまでの目安', { exact: true }).click();
+    await expect(page.locator('.renewal-context')).toContainText('国内FA：最短あと8年（1160日）');
+    await expect(page.locator('.renewal-context')).toContainText('海外FA：最短あと9年（1305日）');
+    await expect(page.locator('.renewal-context')).toContainText('145日相当');
+    await expect(page.locator('.renewal-context')).not.toContainText('120日');
     await page.getByRole('button', { name: '← 選手一覧に戻る', exact: true }).click(); await expect(page.getByRole('button', { name: rowName, exact: true })).toBeFocused();
   });
   for (const embedded of [false, true]) test(`UI-03B parent update retains dialog focus and unlocks the next player ${embedded ? 'embedded' : 'standalone'}`, async ({ page }) => {
