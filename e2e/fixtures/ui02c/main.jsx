@@ -22,6 +22,9 @@ if (state.startsWith('eligibility-')) players.forEach((p, index) => {
   Object.assign(p, initializePlayerEligibility({ ...p, eligibility: undefined, isForeign: index === 1,
     isIkusei: state === 'eligibility-development', 育成: false, birthDate: '2001-01-01', proStartYear: 2021,
     daysOnActiveRoster: undefined, serviceYears: 0, history: [{ year: 2025, G: p.isPitcher ? 36 : 100 }],
+    // This synthetic single-season balance must not inherit the source
+    // player's other seasons now that overlapping history views are merged.
+    careerLog: [], recentCareerLog: [],
   }, { year: 2026, opening: { qualified, proStartYear: 2021 } }));
   p.serviceYears = 1; // Current-club tenure is independent of the fixed balance.
 });

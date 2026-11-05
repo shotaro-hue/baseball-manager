@@ -39,3 +39,9 @@ Using the unmodified baseline factory and then the fixed factory with seed 42 an
 The baseline values are pinned in the real-factory integration test. No existing expected value was changed. [Audit summary](./audit.json).
 
 Build succeeds with the existing mixed-import/large-chunk warnings. Final exact-HEAD CI results are recorded in PR #549 when available. No deleted tests, new skips, timeout extensions, reduced assertions, changed browser selection or new retry setting.
+
+## Browser-fixture correction
+
+The first CI for core fix d4952954 passed all 4,317 unit/integration tests, including the complete real-roster audit, but the six dedicated eligibility-display browser cases failed. That display-only preset intended one synthetic season (116 modeled days), while copying other years in the source player's careerLog/recentCareerLog. The corrected estimator legitimately included those years: the first batter had 229 days / 1,076 overseas days remaining instead of the preset's intended 116 / 1,189.
+
+Define all three history views for that synthetic preset by clearing its inherited career/tail fields. Actual source rosters and normal browser fixtures are untouched. Keep the original exact 1,189-day text, visibility, acquired-right, development, completed-season, layout and focus assertions. The unchanged browser assertions failed in all six CI cases and all three local Chromium cases before this fixture correction; afterwards Chromium 3/3 and WebKit 3/3 pass at 360/390/1440px with workers=1/retries=0 and the existing timeouts. This is controlled input correction, not a changed expectation or a return to ignoring available history. The final HEAD's complete CI remains required.
