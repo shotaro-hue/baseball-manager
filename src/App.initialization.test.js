@@ -3,11 +3,11 @@ import { act, create } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import App from './App';
 import { TEAM_DEFS } from './constants';
-const mock=vi.hoisted(()=>({load:vi.fn(),generate:vi.fn(),schedule:vi.fn(),app:null}));
+const mock=vi.hoisted(()=>({load:vi.fn(),generate:vi.fn(),schedule:vi.fn(),foreign:vi.fn(),app:null}));
 const teams=()=>TEAM_DEFS.map(t=>({...t,wins:0,losses:0,draws:0,players:[],farm:[],lineup:[],rotation:[]}));
 vi.mock('./engine/saveload',()=>({hasSave:()=>false,getSaveQueueSnapshot:()=>({isSaving:false}),getAutoSaveIntervalMs:()=>Infinity,enqueueSaveGame:async()=>({ok:true}),initializeCareerLogsInIndexedDb:async()=>({ok:true}),loadGame:()=>mock.load(),getLastLoadResult:()=>({status:'primary'})}));
 vi.mock('./engine/bootstrapTeams',()=>({createInitialTeams:()=>teams(),createInitialTeamsAsync:async()=>{mock.generate();return teams();}}));
-vi.mock('./engine/player',()=>({generateForeignFaPool:()=>[]}));
+vi.mock('./engine/player',()=>({generateForeignFaPool:(...args)=>mock.foreign(...args)}));
 vi.mock('./engine/scheduleGen',async original=>({...await original(),generateSeasonSchedule:(...args)=>mock.schedule(...args),calcAllStarTriggerDay:()=>72}));
 vi.mock('./engine/battedBallArchive',()=>({getBattedBallQueueStatus:()=>({failedRecords:0}),flushBattedBallQueue:async()=>({ok:true})}));
 vi.mock('./hooks/useSeasonFlow',()=>({useSeasonFlow:()=>({setPlayoff:()=>{}})}));
@@ -16,8 +16,19 @@ vi.mock('./components/AppScreenRouter',()=>({default:({app})=>{mock.app=app;retu
 vi.mock('./components/hub/HubShell',()=>({default:({app})=>{mock.app=app;return null;}}));
 const scheduleActual=await vi.importActual('./engine/scheduleGen');
 let view;
-beforeEach(()=>{mock.load.mockReset();mock.schedule.mockReset().mockImplementation(scheduleActual.generateSeasonSchedule);});
+beforeEach(()=>{mock.load.mockReset();mock.foreign.mockReset().mockReturnValue([]);mock.schedule.mockReset().mockImplementation(scheduleActual.generateSeasonSchedule);});
 afterEach(()=>{act(()=>view.unmount());vi.clearAllMocks();vi.restoreAllMocks();});
+it('backfills a future opening with fixed fictional births matching that saved season and age', async()=>{
+  const actual=await vi.importActual('./engine/player');
+  const {assessGamePostingQualification}=await import('./engine/playerEligibility');
+  mock.foreign.mockImplementation(actual.generateForeignFaPool);
+  mock.load.mockResolvedValue({teams:teams(),myId:0,year:2034,gameDay:1,faPool:[],saveId:'future-opening'});
+  await act(async()=>{view=create(React.createElement(App));});
+  await act(async()=>{await mock.app.handleLoad();});
+  expect(mock.app.gs.screen).toBe('hub');
+  expect(mock.app.gs.faPool.length).toBeGreaterThan(0);
+  for(const p of mock.app.gs.faPool) expect(assessGamePostingQualification(p,{signingDate:'2034-03-27',completedSeasonYear:2033}).ageYears).toBe(p.age);
+});
 it('invalidates an older load and waits for its possible legacy migration before generating new teams',async()=>{
   let resolve;mock.load.mockImplementation(()=>new Promise(r=>{resolve=r;}));
   await act(async()=>{view=create(React.createElement(App));});

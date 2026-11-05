@@ -1034,7 +1034,7 @@ export function useGameState() {
         loadPlayerModule(),
         loadScheduleModule(),
       ]);
-      const nextFaPool = playerMod.generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX));
+      const nextFaPool = playerMod.generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX), year);
       const nextSaveId = createSaveId();
       const newSchedule = scheduleMod.generateSeasonSchedule(year,nextTeams);
       const params = SEASON_PARAMS[year] || getDefaultParams(year);

@@ -38,7 +38,8 @@ Consumes: Task1の共通関数。Produces: 全実名/架空の固定eligibility�
 
 ### Task 3: 提出
 
-- [ ] buildと全unit/integration。独立レビューと必要修正。
-- [ ] SPEC/ROADMAP/検証記録へ式・人数・出典・移行・限界を記録。
-- [ ] 専用branchをpushしmain向け依存PR作成、正確なHEADの必須CI全件確認。
-- [ ] PR URL/HEAD/計算式/変更ファイル/人数/検証/限界を報告。
+- [x] buildと全unit/integration。独立レビューと必要修正（最終HEADのCI結果は提出PRへ記録）。
+- [x] SPEC/ROADMAP/検証記録へ式・人数・出典・移行・限界を記録。
+- [x] 専用branchをpushしmain向け依存PR #549を作成。
+- 最新HEADの必須CI全件の結果はPR本文を正本とする。
+- PR URL/HEAD/計算式/変更ファイル/人数/検証/限界はPR本文・最終応答へ記録する。

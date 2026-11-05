@@ -109,6 +109,7 @@ export default function App() {
 
         const openingForeignPool = playerMod.generateForeignFaPool(
           rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX),
+          saved.year,
         );
         const shouldBackfillForeignFa =
           (saved.faPool?.length ?? 0) === 0 && saved.gameDay === 1;

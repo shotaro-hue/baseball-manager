@@ -6,6 +6,8 @@ docs/validation/unified-eligibility/README.md
 docs/validation/unified-eligibility/changed-files.txt
 docs/validation/unified-eligibility/opening-audit.json
 docs/validation/unified-eligibility/review.json
+src/App.initialization.test.js
+src/App.jsx
 src/components/ContractRenewalPhaseScreen.jsx
 src/components/PlayerModal.jsx
 src/components/PlayerModal.salary.test.js
@@ -47,6 +49,7 @@ src/engine/postingQualificationSnapshot.js
 src/engine/realplayer.js
 src/engine/regularGameUpdates.js
 src/engine/saveload.js
+src/hooks/useGameState.js
 src/hooks/useOffseason.js
 src/hooks/useOffseason.market.test.js
 tests/economy-save-migration.test.js

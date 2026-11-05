@@ -55,6 +55,7 @@
 5. 旧#548の既加入・市場中・加入待ちFA保存から再取得周期を復元する不足。
 6. 個別入団区分の根拠URLとFA公示URLの混同。
 7. 旧カウンターが明示0のときにserviceYearsから「旧取得済み」を作る誤認。推定残高と旧権利保護の基準を分け、追加RED→GREEN・関連5ファイル74件・独立確認を実施。
+8. 未来年度の旧セーブで空の外国人FA市場を補充したとき、生成年の既定値2026で生年月日が保存年度の年齢と不一致になる問題。2034年の実factory読込で8歳差のREDを確認し、読込/新規開始へ年度を渡す修正後、関連6ファイル64件が成功。
 
 別コンテキストの独立レビュアーは実際のbase548モジュールで旧保存3状態を生成し、修正前の誤判定と修正後の580日/端数保持/行使回数/履歴不変/JSON冪等を確認。最終時点で未解決P0/P1/P2なし。[固定された旧snapshot/保存fixture](../../../src/engine/__tests__/fixtures/)を回帰へ残した。
 
@@ -66,7 +67,7 @@
 
 全件実行の初回にはsandbox由来の子プロセスEPERM/ローカルHTTP制限を確認し、ネットワーク権限付きで既存11件を再実行して成功。テスト/timeout/skip/CI構成の緩和は行わない。全件中に見つけた旧「無資格でも手動FA」fixtureは、資格あり/自動宣言なしの明示fixtureに直し、無資格拒否の新回帰を追加した。
 
-提出前build成功（既存mixed-import/large-chunk警告）。関連23ファイル740件のうち一度失敗した再取得中選手のfixtureは、通算値でなくcycleStartDaysからの残高を設定する形へ修正し、国内/海外FAの2ファイル80件を再確認。最終の全unit/integration・Chromium/WebKit E2Eの正確なHEADの結果とCIリンクは提出PRを正本とする。ローカルの変更途中の全件結果を最終成功扱いしない。
+提出前build成功（既存mixed-import/large-chunk警告）。関連23ファイル740件のうち一度失敗した再取得中選手のfixtureは、通算値でなくcycleStartDaysからの残高を設定する形へ修正し、国内/海外FAの2ファイル80件を再確認。追加修正後のbuildも成功。直前HEAD `b7b9e9a87e969f6feae6693865a9030c66049ef3` のCIでは328ファイル、4,269 passed/既存2 skipped。最終の全unit/integration・Chromium/WebKit E2Eの正確なHEADの結果とCIリンクは[提出PR #549](https://github.com/shotaro-hue/baseball-manager/pull/549)を正本とする。ローカルの変更途中の全件結果を最終成功扱いしない。
 
 ## 残る限界
 
