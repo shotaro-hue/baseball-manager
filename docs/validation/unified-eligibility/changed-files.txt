@@ -1,3 +1,4 @@
+CHANGELOG.md
 ROADMAP.md
 SPEC.md
 docs/superpowers/plans/2026-11-05-unified-eligibility.md
