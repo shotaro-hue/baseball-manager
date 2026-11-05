@@ -61,7 +61,7 @@ it('prepares the real class before CPU renewals and reuses it when the market fi
 });
 
 it('allows no acquisition and preserves own FA declarations after the market phase', async () => {
-  const h = setup(); await act(async () => { await h.current.os.handleRetirePhaseNext({}); });
+  const h = setup([], { entryType: '大卒', daysOnActiveRoster: 840, faDeclarationDecision: { year: 2026, declared: false } }); await act(async () => { await h.current.os.handleRetirePhaseNext({}); });
   act(() => h.current.os.handleFaPhaseNext());
   act(() => h.current.os.handleContractRenewalPhaseNext([0]));
   expect(h.current.gs.myTeam.players).toHaveLength(0);

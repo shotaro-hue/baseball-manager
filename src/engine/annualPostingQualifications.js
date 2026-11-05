@@ -1,5 +1,6 @@
 import { postingApplicationViews } from './annualPostingApplications';
-import { buildPostingQualificationSnapshot } from './postingQualificationSnapshot';
+import { buildPostingQualificationSnapshot, gamePostingQualificationFacts } from './postingQualificationSnapshot';
+import { initializePlayerEligibility } from './playerEligibility';
 
 const fail = () => { throw new Error('ポスティング資格snapshotの申請・選手ID・認定根拠・保存証跡を確認してください。'); };
 const id = v => (typeof v === 'string' && v.trim()) || (Number.isSafeInteger(v) && v >= 0);
@@ -17,14 +18,16 @@ export function normalizePostingQualificationCommand(c) {
   return { id: c.id, type: c.type, requestId: c.requestId, facts };
 }
 
-function recordFor(state, c, request, recordedDate) {
+function recordFor(state, c, request, recordedDate, restoring = false) {
   const team = state.teams.find(t => t.id === request?.teamId);
   const player = team && [...team.players, ...team.farm].find(p => p.id === request.playerId);
   const i = state.economyIdentity;
   if (state.version !== 2 || !i || !id(i.saveId) || !id(i.epoch) || !request || request.status !== 'approved'
-    || !player || player.contractId !== request.sourceContractId || c.facts.playerId !== request.playerId
-    || c.facts.sourcePlayerId !== (player.realPlayerId ?? null) || recordedDate !== request.requestedDate
+    || (!restoring && (!player || player.contractId !== request.sourceContractId)) || c.facts.playerId !== request.playerId
+    || ((!restoring || player?.contractId === request.sourceContractId) && c.facts.sourcePlayerId !== (player.realPlayerId ?? null)) || recordedDate !== request.requestedDate
     || recordedDate > state.date) fail();
+  if (!restoring && (c.facts.version !== 2 || stable(c.facts) !== stable(gamePostingQualificationFacts(
+    initializePlayerEligibility(player, { year: request.season }), request.season)))) fail();
   return { id: c.id, version: 1, requestId: request.id, season: request.season, teamId: request.teamId,
     playerId: request.playerId, sourceContractId: request.sourceContractId,
     sourceKey: JSON.stringify([i.saveId, i.epoch, 'posting-qualification', request.id]), recordedDate,
@@ -41,7 +44,7 @@ export function inspectAnnualPostingQualifications(state) {
     const receipt = receipts.get(r.id);
     let c; try { c = normalizePostingQualificationCommand(JSON.parse(receipt?.signature)); } catch { fail(); }
     if (c.id !== r.id || receipt.signature !== stable(c) || stable(receipt.postingQualification) !== stable(r)
-      || stable(r) !== stable(recordFor(state, c, applications.get(c.requestId), r.recordedDate))) fail();
+      || stable(r) !== stable(recordFor(state, c, applications.get(c.requestId), r.recordedDate, true))) fail();
     ids.add(String(r.id)); requests.add(r.requestId);
   }
   for (const t of state.transactions) {

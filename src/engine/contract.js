@@ -21,14 +21,18 @@ import { pruneRosterReferences } from './offseasonReview';
 import { marketPlacement, marketRosterError } from './marketRoster';
 import { prepareOffseasonFreeAgent } from './offseasonMarket';
 import { isIkuseiPlayer } from './rosterCapacity';
+import { getPlayerFaProgress, faQualifiedThresholds, completeFaRecontract } from './playerEligibility';
 
 /* ═══════════════════════════════════════════════
-   FA 資格閾値 (NPB公式準拠・累積日数方式)
-   高卒・外国人: 国内FA 960日 (8年×120) / 海外FA 1080日 (9年×120)
-   大卒・社会人: 国内FA 840日 (7年×120) / 海外FA 1080日
-   判定フィールド: daysOnActiveRoster（一軍在籍累積日数）
+   現行FAはeligibility.faの145日相当残高と保有権を共通判定する。
+   120日換算の関数は保存済みv1資格証明の検証専用。
 ═══════════════════════════════════════════════ */
 export function getFaThreshold(player) {
+  return faQualifiedThresholds(player);
+}
+
+// Historical v1 certificates must retain their original units and shape.
+export function getLegacyFaThreshold(player) {
   const base = (['高卒', '高校生', '外国人'].includes(player.entryType)) ? 8 : 7;
   return {
     domestic: base * ACTIVE_ROSTER_FA_DAYS_PER_YEAR,
@@ -37,11 +41,15 @@ export function getFaThreshold(player) {
 }
 
 export function getFaProgress(player) {
+  return getPlayerFaProgress(player);
+}
+
+export function getLegacyFaProgress(player) {
   const measured = Number.isFinite(player.daysOnActiveRoster) && player.daysOnActiveRoster >= 0;
   const estimated = !measured && Number.isFinite(player.serviceYears) && player.serviceYears >= 0;
   if (!measured && !estimated) return { recorded: false };
   const days = measured ? player.daysOnActiveRoster : player.serviceYears * ACTIVE_ROSTER_FA_DAYS_PER_YEAR;
-  const threshold = getFaThreshold(player);
+  const threshold = getLegacyFaThreshold(player);
   const progress = required => {
     const remainingDays = Math.max(0, required - days);
     return { remainingDays, years: Math.ceil(remainingDays / ACTIVE_ROSTER_FA_DAYS_PER_YEAR), eligible: remainingDays === 0 };
@@ -93,9 +101,7 @@ export function evaluateRenewalOffer(player, offer, team, teams, demand, round =
 export function simulateNegotiationRounds(player, team, allTeams, demandSalary, resistanceFactor, demandDetails = {}) {
   const minAllowed = renewalSalaryFloor(player);
   const demand = { ...demandDetails, demandSalary, resistanceFactor, minOfferSalary: minAllowed };
-  const threshold = getFaThreshold(player);
-  const days      = player.daysOnActiveRoster ?? (player.serviceYears ?? 0) * ACTIVE_ROSTER_FA_DAYS_PER_YEAR;
-  const isFA      = !isIkuseiPlayer(player) && days >= threshold.domestic;
+  const isFA = !isIkuseiPlayer(player) && getFaProgress(player).domestic.eligible;
 
   let budget      = team.budget;
   let moraleDelta = 0;
@@ -241,12 +247,11 @@ export function cpuRenewContracts(teams, myId, allTeams, salaryContext = {}) {
           body:`${p.name}選手は既存戦力と新人候補を比較した編成計画により自由契約となった。`});
         continue;
       }
-      const threshold = getFaThreshold(p);
-      const days = p.daysOnActiveRoster ?? (p.serviceYears ?? 0) * ACTIVE_ROSTER_FA_DAYS_PER_YEAR;
+      const progress = getFaProgress(p);
       const overseas = p.personality?.overseas || 0;
 
       // 海外志向かつ海外FA資格あり: NPB離脱（変更なし）
-      if (!isIkuseiPlayer(p) && overseas >= 70 && days >= threshold.overseas) {
+      if (!isIkuseiPlayer(p) && overseas >= 70 && progress.overseas.eligible) {
         outcomes.set(p.id,'overseas-fa');
         players = players.filter(x => x.id !== p.id);
         news.push({
@@ -260,7 +265,7 @@ export function cpuRenewContracts(teams, myId, allTeams, salaryContext = {}) {
       }
 
       // 海外志向かつ国内FA資格はあるが海外FA資格なし: 国内FAをスキップして待機（変更なし）
-      if (!isIkuseiPlayer(p) && overseas >= 70 && days < threshold.overseas) {
+      if (!isIkuseiPlayer(p) && overseas >= 70 && !progress.overseas.eligible) {
         const salary = Math.max(isIkuseiPlayer(p) ? MIN_SALARY_IKUSEI : MIN_SALARY_SHIHAKA, Math.round(p.salary * 1.03));
         if (budget-plan.rookieReserve >= salary) {
           outcomes.set(p.id,'await-overseas-rights');
@@ -297,7 +302,9 @@ export function cpuRenewContracts(teams, myId, allTeams, salaryContext = {}) {
         players = players.filter(x => x.id !== p.id);
         const declared = neg.result === 'fa_declared';
         newFaPlayers.push({ ...p, isFA: true, contractYearsLeft: 0,
+          isWaiverReleased: !declared, marketEntry: undefined, departureReason: declared ? 'domestic-fa' : 'release',
           ...(declared ? { salary: demand.demandSalary, faPreviousSalary: p.salary,
+            faEnteredYear: salaryContext.year ?? 2026,
             faNegotiationReason: '契約更改で合意できなかったため' } : {}),
           marketEntryReason: declared ? '国内FA宣言' : '自由契約' });
         if (neg.result === 'fa_declared') {
@@ -431,7 +438,7 @@ export function processCpuFaBids(teams, myId, faPool, allTeams, currentYear = nu
       const goToFarm = marketPlacement(team, player).farm;
 
       const prepared = marketMode === 'offseason' ? prepareOffseasonFreeAgent(player, currentYear, team.id) : player;
-      const newPlayerEntry = { ...prepared, isFA: false, contractYears: 1, contractYearsLeft: 1, contractSignedYear: currentYear, salary: best.salary,
+      const newPlayerEntry = { ...completeFaRecontract(prepared, currentYear ?? 2026), isFA: false, contractYears: 1, contractYearsLeft: 1, contractSignedYear: currentYear, salary: best.salary,
         ...(isIkuseiPlayer(player) && player.departureReason === 'ikusei_expiry' ? { ikuseiYears: 0 } : {}) };
       const acquireReason = player.isForeign ? '外国人獲得' : (player.isWaiverReleased ? '戦力外獲得' : 'FA獲得');
       const historyRecord = { ...newPlayerEntry, exitYear: currentYear ?? 0, exitReason: acquireReason, tenure: 0,rosterDecision:best.rosterDecision.reason };

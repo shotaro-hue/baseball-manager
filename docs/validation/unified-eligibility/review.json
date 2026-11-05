@@ -1,0 +1,15 @@
+{
+  "base": "7758f6d87ce5c7edb8d8d36cd233ba3969697bff",
+  "review": "independent-context",
+  "openP0P1P2": 0,
+  "probes": ["waiver-recontract", "local-measured-balance", "partial-exercise-history", "introduced-metadata-rejection", "canonical-v2-only-issuance", "old-joined-market-pending-recontract", "entry-source-provenance"],
+  "independentFocusedTests": 11,
+  "sourceSha256": {
+    "src/engine/playerEligibility.js": "592de06c3582fb5f01c35d3fc85eb91ab0df050c58e605010ae41699bc71aff3",
+    "src/engine/eligibilityMigration.js": "9887503051da42ab77e89b18a7cd80ca55b9f280899dd147c9e50ce97ebcc126",
+    "src/engine/annualPostingQualifications.js": "a0cd34123aaeef79eb389cf7ae3606270de1104380372f769429dce4398ea76d",
+    "src/data/openingEligibility2026.js": "d4e6231f3bd16ba97d7657c78d095529611f26d0aac3594393fc5da7cbdd41f6",
+    "src/data/openingEligibility2026.json": "a3ea590a47fb3ae2aa168868d70a6dd1b3ef692fe8919a0cddebc385bff740ed"
+  },
+  "limits": ["source completeness not independently certified", "approved posting market completion remains unconnected", "full CI belongs to PR exact HEAD"]
+}

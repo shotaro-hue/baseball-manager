@@ -65,8 +65,8 @@ it.each([
 });
 
 it('produces real birth-only facts and consumes explicit dated seasons without deriving history years', async () => {
-  const { createPostingQualificationProducer } = await module(); expect(createPostingQualificationProducer).toBeTypeOf('function');
-  const source = small(), produce = createPostingQualificationProducer(source), p = { id: 0, realPlayerId: 'npb:123' };
+  const { createLegacyPostingQualificationProducer } = await module(); expect(createLegacyPostingQualificationProducer).toBeTypeOf('function');
+  const source = small(), produce = createLegacyPostingQualificationProducer(source), p = { id: 0, realPlayerId: 'npb:123' };
   expect(produce(p)).toMatchObject({ playerId: 0, sourcePlayerId: 'npb:123', birthDate: { date: '2001-12-01' }, professionalSeasons: null });
   // Synthetic producer metadata, not a real-player recognition certificate.
   const pro = { asOfDate: '2026-12-01', coverage: 'partial', ruleId: 'synthetic-rule-v1',

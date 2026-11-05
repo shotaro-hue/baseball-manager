@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { CPU_RENEWAL_ROUNDS, NEGOTIATION_MORALE_ACCEPT_BONUS, NEGOTIATION_MORALE_CUT_PENALTY, NEGOTIATION_MORALE_ROUND_HIT, NEGOTIATION_TRUST_HAPPY, NEGOTIATION_TRUST_HOLDOUT } from '../constants';
-import { evaluateRenewalOffer, getFaThreshold, getFaProgress, calcPlayerDemand } from '../engine/contract';
+import { evaluateRenewalOffer, getFaProgress, calcPlayerDemand } from '../engine/contract';
 import { salaryCutRule, renewalEligible, ikuseiContractYears, validContractOffer } from '../engine/renewalRules';
 import { isIkuseiPlayer } from '../engine/rosterCapacity';
 import { compactRenewalSession, reconcileRenewalSession } from '../engine/offseasonPlanning';
@@ -181,7 +181,7 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, saveId, demands,
     } else if (result.freeAgencyRequested) {
       update(p.id, { status: 'free_requested', round, logs: [...logs, `選手：${result.reason}`] });
     } else if (round >= CPU_RENEWAL_ROUNDS) {
-      const isFA = !isIkuseiPlayer(p) && (p.daysOnActiveRoster ?? (p.serviceYears ?? 0) * 120) >= getFaThreshold(p).domestic;
+      const isFA = !isIkuseiPlayer(p) && getFaProgress(p).domestic.eligible;
       update(p.id, { status: isFA ? 'fa' : 'cooldown', round, logs: [...logs, isFA ? '選手：FA権を行使します。' : '選手：今回は合意できません。一度持ち帰り、再交渉します。'] });
       if (isFA) onDeclare?.(p.id);
     } else {

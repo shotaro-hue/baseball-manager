@@ -93,9 +93,15 @@ it.each([900,1080])('does not treat an isIkusei-only renewal as an overseas FA c
 });
 it.each(['育成','isIkusei'])('permits a demoted player to declare FA but excludes development flag %s', flag => {
   const decision = { year: 2026, declared: true, reasons: ['検証用の確定判断'] };
-  const farm = [p(0, { daysOnActiveRoster: 840, faDeclarationDecision: decision }), p(1, { [flag]: true, daysOnActiveRoster: 840, faDeclarationDecision: decision })];
+  const farm = [p(0, { entryType: '大卒', daysOnActiveRoster: 840, faDeclarationDecision: decision }), p(1, { [flag]: true, entryType: '大卒', daysOnActiveRoster: 840, faDeclarationDecision: decision })];
   const result = resolveOffseasonFaDeclarations([team(farm)], 2026);
   expect(result.newFaPlayers.map(p => p.id)).toEqual([0]); expect(result.updatedTeams[0].farm.map(p => p.id)).toEqual([1]);
+});
+it('rejects stale human FA declarations for unqualified or non-expiring players without side effects', () => {
+  const h = setup([p(0), p(1, { entryType: '大卒', daysOnActiveRoster: 840, contractYearsLeft: 3 })], { render: false });
+  const before = structuredClone({ teams: h.current.gs.teams, pool: h.current.gs.faPool });
+  for (const id of [0, 1]) act(() => expect(h.current.os.handleContractRenewalPhaseNext([id])).toBe(false));
+  expect({ teams: h.current.gs.teams, pool: h.current.gs.faPool }).toEqual(before);
 });
 it('updates active and farm contracts identically once, preserving newly signed multi-year terms and FA days', async () => {
   const h = setup([p(0, { contractYearsLeft: 3, contractSignedYear: 2026 }), p(1, { contractYearsLeft: 3, daysOnActiveRoster: 700 })],

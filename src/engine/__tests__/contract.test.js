@@ -3,20 +3,20 @@ import { getFaThreshold, evalOffer, processCpuFaBids } from '../contract';
 import { initGameState, processAtBat } from '../simulation';
 
 describe('getFaThreshold', () => {
-  it('高卒は国内FA 960日 (8年×120)', () => {
-    expect(getFaThreshold({ entryType: '高卒' })).toEqual({ domestic: 960, overseas: 1080 });
+  it('高卒は国内FA 1160日 (8年×145)', () => {
+    expect(getFaThreshold({ entryType: '高卒' })).toEqual({ domestic: 1160, overseas: 1305 });
   });
-  it('外国人は国内FA 960日', () => {
-    expect(getFaThreshold({ entryType: '外国人' })).toEqual({ domestic: 960, overseas: 1080 });
+  it('外国人は国内FA 1160日', () => {
+    expect(getFaThreshold({ entryType: '外国人' })).toEqual({ domestic: 1160, overseas: 1305 });
   });
-  it('大卒は国内FA 840日 (7年×120)', () => {
-    expect(getFaThreshold({ entryType: '大卒' })).toEqual({ domestic: 840, overseas: 1080 });
+  it('大卒は国内FA 1015日 (7年×145)', () => {
+    expect(getFaThreshold({ entryType: '大卒' })).toEqual({ domestic: 1015, overseas: 1305 });
   });
-  it('社会人は国内FA 840日', () => {
-    expect(getFaThreshold({ entryType: '社会人' })).toEqual({ domestic: 840, overseas: 1080 });
+  it('社会人は国内FA 1015日', () => {
+    expect(getFaThreshold({ entryType: '社会人' })).toEqual({ domestic: 1015, overseas: 1305 });
   });
-  it('entryType 未定義の場合は大卒扱い（840日）', () => {
-    expect(getFaThreshold({})).toEqual({ domestic: 840, overseas: 1080 });
+  it('entryType 未定義は明示的なその他設定（1160日）', () => {
+    expect(getFaThreshold({})).toEqual({ domestic: 1160, overseas: 1305 });
   });
 });
 

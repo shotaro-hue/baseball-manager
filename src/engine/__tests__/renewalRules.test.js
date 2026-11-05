@@ -43,12 +43,12 @@ describe('NPB cut consent and FA progress', () => {
   });
   it('high-school spelling matches generated players and zero registration is measured', () => {
     expect(getFaThreshold({ entryType: '高校生' })).toEqual(getFaThreshold({ entryType: '高卒' }));
-    expect(getFaProgress({ entryType: '高校生', daysOnActiveRoster: 0, serviceYears: 10 })).toMatchObject({ estimated: false, domestic: { years: 8, remainingDays: 960 } });
+    expect(getFaProgress({ entryType: '高校生', daysOnActiveRoster: 0, serviceYears: 10 })).toMatchObject({ estimated: false, domestic: { years: 8, remainingDays: 1160 } });
   });
   it('rounds remaining years up and distinguishes estimated and unrecorded data', () => {
-    expect(getFaProgress({ entryType: '大卒', daysOnActiveRoster: 839 }).domestic).toEqual({ years: 1, remainingDays: 1, eligible: false });
-    expect(getFaProgress({ daysOnActiveRoster: 840 }).domestic.eligible).toBe(true);
-    expect(getFaProgress({ serviceYears: 5 })).toMatchObject({ estimated: true, domestic: { years: 2 } });
-    expect(getFaProgress({}).recorded).toBe(false);
+    expect(getFaProgress({ entryType: '大卒', daysOnActiveRoster: 839 }).domestic).toEqual({ years: 1, remainingDays: 2, eligible: false });
+    expect(getFaProgress({ entryType: '大卒', daysOnActiveRoster: 840 }).domestic.eligible).toBe(true);
+    expect(getFaProgress({ entryType: '大卒', serviceYears: 5 })).toMatchObject({ estimated: true, domestic: { years: 2 } });
+    expect(getFaProgress({})).toMatchObject({ recorded: true, estimated: true, domestic: { eligible: false } });
   });
 });

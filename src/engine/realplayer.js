@@ -1,5 +1,7 @@
 import {initialRosterSlots} from './initialRoster';
 import { prepareRealPlayer } from './realPlayerProjection';
+import { initializePlayerEligibility } from './playerEligibility';
+import { openingEligibilityFacts } from '../data/openingEligibility2026';
 import { isIkuseiPlayer } from './rosterCapacity';
 import { clamp, rng, uid } from '../utils';
 import { emptyStats, makePlayer, applyPositionFields } from './playerCore';
@@ -24,6 +26,8 @@ const openingContractEvidence=source=>source.reviewedEvidence?{
 }:undefined;
 
 function applyRealPositionFields(player, source) {
+  player = initializePlayerEligibility({ ...player, birthDate: source.birthDate, draftYear: source.draftYear },
+    { year: 2026, opening: openingEligibilityFacts(source), registrationHistory: source.history });
   if (source.positions && !player.isPitcher) return {...player, positions:{...source.positions}, convertTarget:null};
   const result = applyPositionFields(player);
   if (source.dataQuality.position === 'game-assumption') result.positions = {[player.pos]:100};

@@ -7,6 +7,7 @@ import { isIkuseiPlayer } from './rosterCapacity';
 import { TEAM_DEFS } from '../constants';
 import { yieldToBrowser } from './yieldToBrowser';
 import { startClubFinance } from './clubFinance';
+import { initializePlayerEligibility } from './playerEligibility';
 
 export function createInitialTeams(master, options) {
   const rosters=getOpeningRosters(master, options);
@@ -34,7 +35,8 @@ function createInitialTeam(def,rosters) {
     const team=optimizeInitialTeam(rawTeam,farmCatcher,rosters[def.id]?.complete===true);
     const batters=team.players.filter(p=>!p.isPitcher);
     if(rosters[def.id]?.complete&&(batters.length<9||!hasCompleteFieldingCoverage(batters)||validateTeamRoster(team).errors.length))continue;
-    return startClubFinance(team, 2026);
+    return startClubFinance({ ...team, players: team.players.map(p => initializePlayerEligibility(p)),
+      farm: team.farm.map(p => initializePlayerEligibility(p)) }, 2026);
   }
   throw new Error('完全名簿では一軍・二軍の守備が成立しません。捕手と守備適性を確認してください');
 }

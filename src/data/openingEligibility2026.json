@@ -1,0 +1,573 @@
+{
+  "version": 1,
+  "asOf": "2026-03-27",
+  "checkedOn": "2026-11-05",
+  "qualifiedDate": "2025-10-22",
+  "qualified": [
+    {
+      "playerId": "npb:81285132",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:73375134",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:11515130",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:91095134",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:21925132",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:21325136",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:51955114",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:21425116",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:91995131",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:91795139",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:11215114",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:21925139",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:11515137",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:11315115",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:31735112",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:51255118",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:91895133",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:21125137",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:21225133",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:41945139",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:93195134",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:71575136",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:41245137",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:81585134",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:91995134",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:13715132",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:41945131",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:41945132",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:41245132",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:81185116",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:51455137",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:41845130",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:51755135",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:01405139",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:63165134",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:21225137",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:01305131",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:11515133",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:81785133",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:31635110",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:91095135",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:91995139",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:01305130",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:71075138",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:11915132",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:81185134",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:51355139",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:21325139",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:81185133",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:31335137",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:31135114",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:01405116",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:61565135",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:61965131",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:61965139",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:61365139",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:01405130",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:31235133",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:91295134",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:21625135",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:21125134",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:41545132",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:41445116",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:11215118",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:11015138",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:11215134",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:61765134",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:61165132",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:91795114",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:71975135",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:51155118",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:21325135",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:01505118",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:51055137",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:81985135",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:71075130",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:71775134",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:51755115",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:81085115",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:91995112",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:41645136",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:03505136",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:41145139",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:01205118",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:21525116",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:41545114",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:71675135",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:71575131",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:51455130",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:11515139",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:83185134",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:91495130",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:11515132",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:31335116",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:41645139",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:51355135",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:63965134",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:01005137",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:01005135",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:51155130",
+      "kind": "domestic"
+    },
+    {
+      "playerId": "npb:61465133",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:31335131",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:11215116",
+      "kind": "overseas"
+    },
+    {
+      "playerId": "npb:31835133",
+      "kind": "overseas"
+    }
+  ],
+  "exercises": [
+    {
+      "playerId": "npb:21325134",
+      "season": 2024,
+      "npbAgreementDate": "2024-12-19"
+    },
+    {
+      "playerId": "npb:61065131",
+      "season": 2024,
+      "npbAgreementDate": "2024-12-19"
+    },
+    {
+      "playerId": "npb:21025137",
+      "season": 2024,
+      "npbAgreementDate": "2025-01-06"
+    },
+    {
+      "playerId": "npb:31735132",
+      "season": 2024,
+      "npbAgreementDate": "2024-12-20"
+    },
+    {
+      "playerId": "npb:61165139",
+      "season": 2024,
+      "npbAgreementDate": "2024-12-19"
+    },
+    {
+      "playerId": "npb:91595133",
+      "season": 2024,
+      "npbAgreementDate": "2024-12-20"
+    },
+    {
+      "playerId": "npb:61865132",
+      "season": 2024,
+      "npbAgreementDate": "2024-12-11"
+    },
+    {
+      "playerId": "npb:71775139",
+      "season": 2024,
+      "npbAgreementDate": "2024-12-26"
+    },
+    {
+      "playerId": "npb:01005137",
+      "season": 2025,
+      "npbAgreementDate": "2026-01-26"
+    },
+    {
+      "playerId": "npb:21125134",
+      "season": 2025,
+      "npbAgreementDate": "2026-01-06"
+    },
+    {
+      "playerId": "npb:21625135",
+      "season": 2025,
+      "npbAgreementDate": "2025-11-28"
+    },
+    {
+      "playerId": "npb:11015138",
+      "season": 2025,
+      "npbAgreementDate": "2026-01-19"
+    },
+    {
+      "playerId": "npb:51055137",
+      "season": 2025,
+      "npbAgreementDate": "2026-01-20"
+    },
+    {
+      "playerId": "npb:81185116",
+      "season": 2025,
+      "npbAgreementDate": "2025-11-19"
+    },
+    {
+      "playerId": "npb:51755135",
+      "season": 2025,
+      "npbAgreementDate": "2025-12-22"
+    },
+    {
+      "playerId": "npb:21225137",
+      "season": 2025,
+      "npbAgreementDate": "2025-12-04"
+    }
+  ],
+  "filed2025": [
+    "npb:01005137",
+    "npb:21125134",
+    "npb:21625135",
+    "npb:11015138",
+    "npb:51055137",
+    "npb:81185116",
+    "npb:51755135",
+    "npb:21225137"
+  ],
+  "sources": [
+    {
+      "url": "https://npb.jp/announcement/2025/fa_qualified.html",
+      "knownBy": "2025-10-22",
+      "checkedOn": "2026-11-05",
+      "scope": "qualification-only-no-day-count"
+    },
+    {
+      "url": "https://npb.jp/announcement/2025/fa_filed.html",
+      "knownBy": "2026-01-26",
+      "checkedOn": "2026-11-05",
+      "scope": "exercise-and-npb-agreement"
+    },
+    {
+      "url": "https://npb.jp/announcement/2024/fa_filed.html",
+      "knownBy": "2025-01-06",
+      "checkedOn": "2026-11-05",
+      "scope": "exercise-and-npb-agreement"
+    }
+  ],
+  "limitations": [
+    "No unofficial registration-day data.",
+    "Historical exercise coverage is 2024-2025; earlier exercises are not certified.",
+    "No profile text, source HTML, or source tables are redistributed."
+  ],
+  "entryFacts": [
+    {
+      "playerId": "npb:41545153",
+      "entryType": "大卒",
+      "proStartYear": 2021,
+      "sourceIds": [
+        "https://npb.jp/bis/players/41545153.html"
+      ],
+      "knownBy": "2025-12-31",
+      "checkedOn": "2026-11-05"
+    },
+    {
+      "playerId": "npb:11315157",
+      "entryType": "高卒",
+      "proStartYear": 2023,
+      "sourceIds": [
+        "https://npb.jp/bis/players/11315157.html"
+      ],
+      "knownBy": "2025-12-31",
+      "checkedOn": "2026-11-05"
+    },
+    {
+      "playerId": "npb:13515159",
+      "entryType": "高卒",
+      "proStartYear": 2024,
+      "sourceIds": [
+        "https://npb.jp/bis/players/13515159.html"
+      ],
+      "knownBy": "2025-12-31",
+      "checkedOn": "2026-11-05"
+    }
+  ]
+}

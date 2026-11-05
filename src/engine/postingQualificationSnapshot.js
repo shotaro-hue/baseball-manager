@@ -1,5 +1,6 @@
 import { normalizePostingQualificationEvidence, assessPostingBonusPoolExemption } from './postingQualification';
 import { parseContractDate } from './contractCalendar';
+import { initializePlayerEligibility, assessGamePostingQualification } from './playerEligibility';
 
 const fail = () => { throw new Error('認定プロシーズンの確認日・ルール・出典を確認してください。'); };
 const fields = (o, names) => {
@@ -10,6 +11,7 @@ const fields = (o, names) => {
 // Confirmations are supplied attested facts, never inferred from league, age,
 // serviceYears or history. This date is not a fabricated legal recognition day.
 export function buildPostingQualificationSnapshot(input, assessmentDate) {
+  if (input?.version === 2) return buildGameSnapshot(input, assessmentDate);
   const p = input?.professionalSeasons;
   let professionalSeasons = p;
   if (p !== null) {
@@ -31,4 +33,30 @@ export function buildPostingQualificationSnapshot(input, assessmentDate) {
     ...evidence.professionalSeasons, ruleId: p.ruleId,
     seasons: evidence.professionalSeasons.seasons.map(row => ({ ...row, confirmedDate: confirmations.get(row.season) })) } });
   return { facts, assessment };
+}
+
+export function gamePostingQualificationFacts(player, completedSeasonYear) {
+  const p = initializePlayerEligibility(player);
+  return structuredClone({ version: 2, playerId: p.id, sourcePlayerId: p.realPlayerId ?? null,
+    birthDate: { date: p.birthDate, basis: p.eligibility.birth },
+    proStart: { year: p.proStartYear, basis: p.eligibility.proStart }, completedSeasonYear });
+}
+
+function buildGameSnapshot(input, assessmentDate) {
+  fields(input, ['version', 'playerId', 'sourcePlayerId', 'birthDate', 'proStart', 'completedSeasonYear']);
+  const validId = n => (typeof n === 'string' && n.trim()) || (Number.isSafeInteger(n) && n >= 0);
+  if (!validId(input.playerId) || !(input.sourcePlayerId === null || validId(input.sourcePlayerId))) fail();
+  fields(input.birthDate, ['date', 'basis']); fields(input.proStart, ['year', 'basis']);
+  for (const b of [input.birthDate.basis, input.proStart.basis]) {
+    const extras = ['knownBy', 'checkedOn'].filter(k => Object.hasOwn(b, k));
+    fields(b, ['kind', 'method', 'sourceIds', ...extras]);
+    for (const key of extras) parseContractDate(b[key]);
+    if (b.knownBy && b.knownBy > assessmentDate) fail();
+    if (!['official', 'reference', 'game-estimate', 'game-history'].includes(b.kind) || typeof b.method !== 'string' || !b.method.trim()
+      || !Array.isArray(b.sourceIds) || b.sourceIds.some(s => typeof s !== 'string' || !s.trim())) fail();
+  }
+  const player = initializePlayerEligibility({ id: input.playerId, birthDate: input.birthDate.date,
+    proStartYear: input.proStart.year, daysOnActiveRoster: 0 });
+  const assessment = assessGamePostingQualification(player, { signingDate: assessmentDate, completedSeasonYear: input.completedSeasonYear });
+  return { facts: structuredClone(input), assessment };
 }

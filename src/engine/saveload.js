@@ -5,6 +5,7 @@ import { validateEconomySave, economySaveMetadata, economyOverwriteIssue,
   economyRecoveryGuard, matchesEconomyRecoveryGuard } from './economyPersistence';
 import { prepareRootBody, readRootBody, rootBodyReference, compressRootJson, decodeRootJson, rootCompressionApi } from './saveRootBodies';
 import { validateFarmSaveState } from './farmMigration';
+import { migrateEligibilityWorld } from './eligibilityMigration';
 import { validateClubFinance } from './clubFinance';
 import { GENERATION_VERSION, LEGACY_GENERATION_VERSION, prepareGeneration, readGeneration, readCareerGeneration, collectUnusedChunks } from './saveGenerations';
 import { retainBattedBallReceipt, releaseCurrentBattedBallReceipt } from './battedBallRetention';
@@ -282,8 +283,9 @@ function validateAndMigrateSave(state) {
   }
   // Native terms and legacy-opening evidence are already authoritative. Never
   // fill missing economic fields or run old initial-contract corrections here.
-  if (mode === 'annual') return { ok: true, state: { ...state, ...matchHistorySnapshot(state) } };
-  const teams = state.teams.map(t => ({
+  if (mode === 'annual') return { ok: true, state: migrateEligibilityWorld({ ...state, ...matchHistorySnapshot(state) }) };
+  const eligibilityState = migrateEligibilityWorld(state);
+  const teams = eligibilityState.teams.map(t => ({
     ...t,
     wins:               t.wins               ?? 0,
     losses:             t.losses             ?? 0,
@@ -293,7 +295,7 @@ function validateAndMigrateSave(state) {
     revenueThisSeason:  t.revenueThisSeason  ?? 0,
     players: Array.isArray(t.players) ? t.players.map(migratePlayer).map(p => migrateInitialContractYears(p, t.name, state)) : [],
   }));
-  return { ok: true, state: { ...state, ...matchHistorySnapshot(state), saveId: ensureSaveId(state.saveId), teams } };
+  return { ok: true, state: { ...eligibilityState, ...matchHistorySnapshot(state), saveId: ensureSaveId(state.saveId), teams } };
 }
 
 function sanitizeSaveState(state) {
@@ -1080,7 +1082,7 @@ export function recoverLoadedEconomyCommit(bindings) {
       const { world, committed } = await readPublishedEconomy(entry.raw);
       const live = bindings.readCurrent();
       if (!unchanged() || live?.sessionToken !== identity.sessionToken
-        || live?.progressToken !== identity.progressToken || content(live?.world) !== content(world))
+        || live?.progressToken !== identity.progressToken || content(live?.world) !== content(migrateEligibilityWorld(world)))
         throw new Error('reloaded_world_not_confirmed');
       releaseEconomyCommit(storage, entry);
       return { ok: true, committed };

@@ -7,7 +7,8 @@ import { nextSeasonMatchHistory } from '../engine/matchHistory';
 import { useCallback, useRef, useState } from "react";
 import { uid, clamp, rng, rngf, fmtM, gameDayToDate } from '../utils';
 import { calcSeasonAwards, updateRecords, checkHallOfFame } from '../engine/awards';
-import { evalOffer, cpuRenewContracts, processCpuFaBids, getFaThreshold, getFaProgress, calcPlayerDemand } from '../engine/contract';
+import { evalOffer, cpuRenewContracts, processCpuFaBids, getFaProgress, calcPlayerDemand } from '../engine/contract';
+import { initializePlayerEligibility } from '../engine/playerEligibility';
 import { startClubFinance, nextClubBudget } from '../engine/clubFinance';
 import { applyDraftAcquisitions } from '../engine/draftRules';
 import { initDraftPool } from '../engine/draft';
@@ -186,7 +187,7 @@ export function useOffseason(gs) {
       loadOffseasonScheduleModule(),
     ]);
     const currentGameResultsMap = getGameResultsMap();
-    const foreignPool = playerMod.generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX));
+    const foreignPool = playerMod.generateForeignFaPool(rng(FOREIGN_FA_COUNT_MIN, FOREIGN_FA_COUNT_MAX), year + 1);
     const indexedDbEntries = [];
     const archiveSeason = (p, t) => {
       const transferredThisWinter = p.faArchivedYear === year && p.contractSignedYear === year
@@ -198,13 +199,14 @@ export function useOffseason(gs) {
     };
     const nextTeams = (Array.isArray(sourceTeams) ? sourceTeams : teams).map(t=>{
       const nextPlayers=t.players.filter(p=>!p._retireNow).map(p=>{
-        const compactPlayer = archiveSeason(p, t);
+        const compactPlayer = archiveSeason(initializePlayerEligibility(p, { year }), t);
         return {...compactPlayer,age:p.age+1,stats:createEmptyStats(),playoffStats:createEmptyStats(),recentPitchingDays:[],lastPitched:false,injury:null,injuryDaysLeft:0,condition:clamp(p.condition+20,60,100),contractYearsLeft:remainingContractAfterSeason(p, year),postingRequested:false,growthPhase:p.age+1<=24?"growth":p.age+1<=29?"peak":p.age+1<=33?"earlyDecline":"decline",retireStyle:p.retireStyle!==undefined?p.retireStyle:(p.age+1>=35?rng(0,100):undefined),serviceYears:isIkuseiPlayer(p)?(p.serviceYears||0):(p.serviceYears||0)+1,ikuseiYears:isIkuseiPlayer(p)?(p.ikuseiYears||0)+1:0};
       });
       const nextIds=new Set(nextPlayers.map(p=>p.id));
       const nextFarm = (t.farm || []).map(p => {
         const played = hasRecordedFirstTeamSeason(p) || hasRecordedFirstTeamSeason({ stats: p.playoffStats });
-        const archived = played ? archiveSeason(p, t) : p;
+        const initialized = initializePlayerEligibility(p, { year });
+        const archived = played ? archiveSeason(initialized, t) : initialized;
         return { ...archived, age: p.age + 1, stats: createEmptyStats(), playoffStats: createEmptyStats(),
           injury: null, injuryDaysLeft: 0, recentPitchingDays: [], lastPitched: false, contractYearsLeft: remainingContractAfterSeason(p, year),
           serviceYears: isIkuseiPlayer(p) ? (p.serviceYears || 0) : (p.serviceYears || 0) + 1,
@@ -674,9 +676,8 @@ export function useOffseason(gs) {
       if(t.id===myId){updatedPlayers.filter(p=>(p.morale||70)<45).forEach(p=>{setMailbox(prev=>[...prev,{id:uid(),type:"morale_warning",read:false,title:"【モラル低下】"+p.name+"のモラルが低下しています",from:"チーム管理部",dateLabel:year+"年",timestamp:Date.now(),body:p.name+"選手（"+p.pos+"）のモラルが"+Math.round(p.morale||70)+"まで低下しています。出場機会や年俸条件を確認してください。",player:p}]);});}
       const overseasDeparted=new Set();
       const playersAfterOverseas=updatedPlayers.filter(p=>{
-        const thresh=getFaThreshold(p);
         const overseas=p.personality?.overseas||0;
-        if(overseas>=70&&(p.daysOnActiveRoster??(p.serviceYears??0)*120)>=thresh.overseas){
+        if(overseas>=70&&getFaProgress(p).overseas.eligible){
           overseasDeparted.add(p.id);
           addNews({type:"season",headline:"【海外FA】"+p.name+"（"+t.name+"）が海外移籍を宣言",source:"野球速報",dateLabel:year+"年",body:p.name+"選手（"+p.age+"歳）が海外FA権を行使し、NPBを離脱した。"});
           if(t.id===myId) setMailbox(prev=>[...prev,{id:uid(),type:"overseas_fa",read:false,title:"【海外FA】"+p.name+"が海外移籍を宣言",from:p.name,dateLabel:year+"年",timestamp:Date.now(),body:p.name+"選手（"+p.age+"歳）が海外FA権を行使しました。チームを離れます。",player:p}]);
@@ -801,7 +802,8 @@ export function useOffseason(gs) {
       : [];
 
     const declaredIdSet = new Set(safeDeclaredIds);
-    if (ownedPlayers(myTeam).some(p => declaredIdSet.has(p.id) && isIkuseiPlayer(p))) return false;
+    if (ownedPlayers(myTeam).some(p => declaredIdSet.has(p.id)
+      && (isIkuseiPlayer(p) || !renewalEligible(p, year) || !getFaProgress(p).domestic.eligible))) return false;
     const declaredPlayers = ownedPlayers(myTeam).filter(p => declaredIdSet.has(p.id) && !isIkuseiPlayer(p));
 
     if (declaredPlayers.length > 0) {
@@ -812,7 +814,8 @@ export function useOffseason(gs) {
       }));
       setFaPool(prev => [
         ...prev,
-        ...declaredPlayers.map(p => ({ ...p, isFA: true, contractYearsLeft: 0, marketLastStats: p.stats, faEnteredYear: year, faOriginTeamId: myId, faOriginTeamName: myTeam?.name,
+        ...declaredPlayers.map(p => ({ ...p, isFA: true, isWaiverReleased: false, marketEntry: undefined,
+          marketEntryReason: '国内FA宣言', departureReason: 'domestic-fa', contractYearsLeft: 0, marketLastStats: p.stats, faEnteredYear: year, faOriginTeamId: myId, faOriginTeamName: myTeam?.name,
           faOriginRoster: myTeam?.farm?.some(x => x.id === p.id) ? 'farm' : 'active' })),
       ]);
       declaredPlayers.forEach(p => {
@@ -929,7 +932,7 @@ export function useOffseason(gs) {
       return { ...t, players: t.players.filter(x => x.id !== pid), farm: (t.farm || []).filter(x => x.id !== pid), ...pruneRosterReferences(t, new Set([pid])),
         history: [...(t.history || []), { ...p, exitYear: year, exitReason: 'FA宣言', tenure: p.serviceYears ?? 1 }] };
     });
-    setFaPool(prev => prev.some(x => x.id === pid) ? prev : [...prev, { ...p, isFA: true, contractYearsLeft: 0,
+    setFaPool(prev => prev.some(x => x.id === pid) ? prev : [...prev, { ...p, isFA: true, contractYearsLeft: 0, marketEntry: undefined,
       salary: declared ? gs.offseasonPlan.demands?.[pid]?.demandSalary
         ?? gs.offseasonPlan.session?.entries.find(e => e.player.id === pid)?.demand?.demandSalary
         ?? calcPlayerDemand(p, { year, team: myTeam, teams }).demandSalary : p.salary,

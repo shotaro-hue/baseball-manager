@@ -6,6 +6,7 @@ import { reduceEconomyCommand, quoteEconomyCommand, toAnnualState, fromAnnualSta
 import { validateEconomySave, economyOverwriteIssue } from '../economyPersistence';
 import { contractLiabilityRows } from '../contractLedger';
 import { createSeasonContract } from '../seasonContract';
+import { getFaProgress } from '../contract';
 import { createInitialTeams } from '../bootstrapTeams';
 import { acquisitionRequest, reduceAcquisitionRequest } from '../acquisitionDecisions';
 import { applyAnnualTransaction } from '../annualTransactions';
@@ -110,13 +111,15 @@ describe('A1-2c-4a overseas FA departure', () => {
     const teams = createInitialTeams(); let player, club;
     for (const t of teams) {
       const peers = [...t.players, ...t.farm].filter(p => !p.isIkusei && !p.育成 && !p.isForeign);
-      player = peers.find(p => p.contractYearsLeft === 1 && peers.filter(q => q.salary === p.salary).length === 1);
+      player = peers.find(p => p.contractYearsLeft === 1 && !getFaProgress(p).overseas.eligible && peers.filter(q => q.salary === p.salary).length === 1);
       if (player) { club = t; break; }
     }
     expect(player).toBeTruthy(); expect(player.daysOnActiveRoster).toBe(0);
     const w = faWinter({ teams: [club, ...teams.filter(t => t !== club)] }), c = declaration(w, player.id, { kind: 'overseas-fa' });
     reject(structuredClone(w), c);
-    [...w.teams[0].players, ...w.teams[0].farm].find(p => p.id === player.id).daysOnActiveRoster = 1080;
+    const qualified = [...w.teams[0].players, ...w.teams[0].farm].find(p => p.id === player.id);
+    qualified.eligibility.fa.days = qualified.eligibility.fa.cycleStartDays + 1305;
+    expect(getFaProgress(qualified).overseas.eligible).toBe(true);
     const market = apply(w, c), rows = contractLiabilityRows(e(market).spending.ledger);
     const exited = apply(market);
     expect(validateEconomySave(JSON.parse(JSON.stringify(exited)))).toBe('annual');
