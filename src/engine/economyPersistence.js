@@ -71,7 +71,7 @@ function preservesEconomyHistory(before, after) {
   if (!preservesAcquisitionDecisions(before, after)) return false;
   if (canonical(before.faExerciseBirth) !== canonical(after.faExerciseBirth)) return false;
   if (canonical(before.engine.faExerciseOrigins ?? []) !== canonical(after.engine.faExerciseOrigins ?? [])) return false;
-  for (const key of ['faDeclarations', 'faDeclarationContexts', 'overseasDepartures', 'postingDepartures', 'postingApplications']) {
+  for (const key of ['faDeclarations', 'faDeclarationContexts', 'overseasDepartures', 'postingDepartures', 'postingApplications', 'postingQualifications']) {
     const old = before.engine[key] ?? [], next = after.engine[key] ?? [];
     if (next.length < old.length || !old.every((row, i) => canonical(row) === canonical(next[i]))) return false;
   }

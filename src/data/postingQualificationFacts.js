@@ -1,6 +1,7 @@
 import release from './playerMaster2026.release.json';
 import { parseContractDate } from '../engine/contractCalendar';
 import { normalizePostingQualificationEvidence } from '../engine/postingQualification';
+import { buildPostingQualificationSnapshot } from '../engine/postingQualificationSnapshot';
 
 const fail = () => { throw new Error('開幕名簿のポスティング資格根拠・固定IDを確認してください。'); };
 const id = v => (typeof v === 'string' && v.trim()) || (Number.isSafeInteger(v) && v >= 0);
@@ -33,4 +34,12 @@ export function createOpeningPostingQualificationLookup(master = release) {
     const fact = people.get(player.realPlayerId) ?? { version: 1, sourcePlayerId: null, birthDate: null, professionalSeasons: null };
     return normalizePostingQualificationEvidence({ ...fact, playerId: player.id });
   };
+}
+
+// Preserve opening birth ownership; recognition must be explicitly supplied by
+// a documented source or a future finalized-year producer, not performance rows.
+export function createPostingQualificationProducer(master = release) {
+  const lookup = createOpeningPostingQualificationLookup(master), openingDate = master.asOf;
+  return (player, professionalSeasons = null) => buildPostingQualificationSnapshot(
+    { ...lookup(player), sourcePlayerId: player.realPlayerId ?? null, professionalSeasons }, professionalSeasons?.asOfDate ?? openingDate).facts;
 }

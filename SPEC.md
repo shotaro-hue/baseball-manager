@@ -378,6 +378,8 @@ baseball-manager/
 
 #### GM-01C-2B 契約更改と翌年度効力（新制度基盤・本番未接続）
 
+2026-11-05posting資格snapshot: `record-posting-qualification`は承認済み申請に一つの明示根拠を結合し、確認日・rule出典・固定player/source ID・元契約・save/epochと判定を共通取引/保存へ記録する。当年季も確認日が根拠のasOfDate以前なら利用できるが、未確定/未来確認季を数えない。記録は退団・入金・市場成立を許可しない。実名簿の認定年数欠損と旧保存を維持し、自動認定条件・価格・受諾・生成出生/年度producerは後続。[設計・制約](./docs/superpowers/specs/2026-11-05-gm01-posting-qualification-snapshots-design.md)。
+
 2026-11-04posting資格根拠: 出生日と明示された認定プロシーズンのsource付き事実から、署名日時点のbonus-pool免除条件だけを`exempt/restricted/unknown`で判定する。gameAge/serviceYears/成績掲載年/FA/外国人枠を代用しない。開幕名簿lookupはrealPlayerIdで公式profileの出生日を取り出し、認定プロ年数は未記録のまま。これはMLBへの完全な契約資格認定や市場接続ではなく、現行commandの権限・保存形式・財務を変更しない。[範囲・根拠](./docs/superpowers/specs/2026-11-04-gm01-posting-qualification-design.md)。
 
 2026-11-04引退試合収入: `record-extraordinary-income`は同年の未確定引退予約を根拠に、明示された非負整数万円（実測0を含む）を一度だけ記録する。日付/roundはworld時計/日程を照合し、契約・配置・保証・通常収支・当年許可枠は変更しない。確定済み引退への後付け入金、別IDの二重記録、履歴改変を拒否する。開催/価格生成・UI/CPU・年度予算への実接続は後続。[基盤仕様](./docs/superpowers/specs/2026-11-04-gm01-retirement-income-design.md)。

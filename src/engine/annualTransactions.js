@@ -1,4 +1,5 @@
 import { isPostingApplicationCommand, normalizePostingApplication, inspectAnnualPostingApplications, createPostingApplication } from './annualPostingApplications';
+import { isPostingQualificationCommand, normalizePostingQualificationCommand, inspectAnnualPostingQualifications, createPostingQualification } from './annualPostingQualifications';
 import { isFaDeclarationCommand, normalizeFaDeclarationCommand, inspectAnnualFaDeclarations, createFaDeclaration } from './annualFaDeclarations';
 import { isOverseasDepartureCommand, normalizeOverseasDeparture, createOverseasDeparture } from './annualOverseasDepartures';
 import { isPostingDepartureCommand, normalizePostingDeparture, inspectAnnualPostingDepartures, createPostingDeparture } from './annualPostingDepartures';
@@ -59,6 +60,7 @@ const kinds = {
   'convert-to-controlled': ['teamId', 'playerId', 'contractId', 'annualSalaryManYen'],
 };
 function commandFor(input) {
+  if (isPostingQualificationCommand(input)) return normalizePostingQualificationCommand(input);
   if (isPostingApplicationCommand(input)) return normalizePostingApplication(input);
   if (isExtraordinaryIncomeCommand(input)) return normalizeExtraordinaryIncome(input);
   if (isPostingCompletionCommand(input)) return normalizePostingCompletion(input);
@@ -126,6 +128,7 @@ function inspect(state) {
   const departures = [...inspectAnnualDepartures(state), ...inspectAnnualRetirements(state), ...inspectAnnualPostingDepartures(state), ...inspectAnnualFaDeclarations(state)];
   inspectAnnualIncome(state);
   inspectAnnualPostingApplications(state);
+  inspectAnnualPostingQualifications(state);
   // One employment can end by only one route. Individually valid records from
   // incompatible branches must not jointly exempt the same source contract.
   if (new Set(departures.map(d => d.sourceContractId)).size !== departures.length) fail('同じ元契約の退団経路が重複しています。');
@@ -489,9 +492,10 @@ function candidate(input, command) {
       ...(receipt.faPersonnel ? { personnel: { winnerProposalIds: [...receipt.faPersonnel.winnerProposalIds], lostProposalIds: [...receipt.faPersonnel.lostProposalIds] } } : {}) };
   }
   assertRetirementCommandCompatible(before, c);
-  if (input.phase === 'offseason' && !isPostingApplicationCommand(c) && !isPostingCompletionCommand(c) && !isPostingDepartureCommand(c) && !isOverseasDepartureCommand(c) && !isRetirementCommand(c) && !isWinterDepartureCommand(c) && !c.type.endsWith('renewal') && !c.type.endsWith('rookie') && !c.type.endsWith('fa') && !['settle-fa-compensation', 'submit-fa-protection', 'settle-fa-personnel', 'join-fa-personnel'].includes(c.type)) fail('オフの新制度取引は翌年度契約だけが接続済みです。');
+  if (input.phase === 'offseason' && !isPostingQualificationCommand(c) && !isPostingApplicationCommand(c) && !isPostingCompletionCommand(c) && !isPostingDepartureCommand(c) && !isOverseasDepartureCommand(c) && !isRetirementCommand(c) && !isWinterDepartureCommand(c) && !c.type.endsWith('renewal') && !c.type.endsWith('rookie') && !c.type.endsWith('fa') && !['settle-fa-compensation', 'submit-fa-protection', 'settle-fa-personnel', 'join-fa-personnel'].includes(c.type)) fail('オフの新制度取引は翌年度契約だけが接続済みです。');
   // Snapshot and receipt enter validation together; no unaudited intermediate state.
-  let protectedState = isPostingApplicationCommand(c) ? createPostingApplication(before, c, signature)
+  let protectedState = isPostingQualificationCommand(c) ? createPostingQualification(before, c, signature)
+    : isPostingApplicationCommand(c) ? createPostingApplication(before, c, signature)
     : isExtraordinaryIncomeCommand(c) ? createExtraordinaryIncome(before, c, signature)
     : isPostingCompletionCommand(c) ? createPostingCompletion(before, c, signature)
     : isPostingDepartureCommand(c) ? createPostingDeparture(before, c, signature)
