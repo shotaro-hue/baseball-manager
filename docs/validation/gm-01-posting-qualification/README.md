@@ -59,6 +59,36 @@ element before validation rejects those missing facts. Final related GREEN:
 confirmed findings. The initial HEAD CI #677 was cancelled for the correction;
 the final submitted HEAD's CI is the acceptance gate.
 
+## PR #547 birth-year boundary correction (2026-11-05)
+
+Rechecked GitHub HEAD `cdfbf4d2976963f43aa957eea55f7e1fbbc7b330`, the
+PR diff, successful CI #678, and the empty comment/review-thread lists before
+editing. #546 is merged and main remains `3f6a665`.
+
+Synthetic evidence with birthday `2000-12-31`, signing date `2026-12-01`, and
+partial, sourced seasons `[2000, 2017, 2018, 2019, 2020, 2021]` reproduced an
+incorrect `exempt` result (age 25, six seasons). The normalizer rejected only
+years strictly before birth. It now rejects years at or before the known birth
+year; no minimum playing age or missing qualification facts are inferred.
+
+- Existing qualification/lookup baseline: 2 files / 52 passed.
+- Added six synthetic boundary cases: prior year and birth year rejected for
+  both partial/complete coverage; following year accepted with six documented
+  seasons and age 25 for both coverage modes. Both exported normalization and
+  assessment paths are checked. No real-player season certificate was invented.
+- RED: the two birth-year cases failed with the expected missing rejection;
+  44 cases passed. After the one-comparison correction, GREEN: 46 / 46.
+- Scoped regression: 17 files / 255 passed. This includes existing unknown
+  birth/pro evidence, partial/complete/stale/zero, JSON, input non-mutation,
+  duplicate/sparse seasons, actual master/bootstrap/save reload, posting
+  applications/GM decisions, fee/income/budget, real economy commit, dates and
+  legacy posting hooks. Existing assertions/skips and CI configuration unchanged.
+- `npm run build` succeeded; existing mixed-import and chunk-size warnings remain.
+
+The submitted HEAD, fresh-context review and exact-HEAD CI results are recorded
+in the PR and final task report. Full-suite and browser validation use that CI;
+the local scoped run is not a substitute for it.
+
 ## Remaining ownership
 
 The qualification API is intentionally not connected to existing application,

@@ -47,6 +47,28 @@ it('does not invent unknown birthdays or treat failed conditions as permission',
 });
 
 it.each([
+  [1999, 'partial'], [2000, 'partial'], [1999, 'complete'], [2000, 'complete'],
+])('rejects synthetic season %i at or before the birth year in %s evidence', async (season, coverage) => {
+  const { normalizePostingQualificationEvidence, assessPostingBonusPoolExemption } = await module();
+  const e = facts({ playerId: 'synthetic-birth-year-boundary', sourcePlayerId: null,
+    birthDate: { date: '2000-12-31', sourceIds: ['synthetic-profile'] },
+    professionalSeasons: pro([season, 2017, 2018, 2019, 2020, 2021], coverage) });
+  expect(() => assessPostingBonusPoolExemption(e, '2026-12-01')).toThrow();
+  expect(() => normalizePostingQualificationEvidence(e)).toThrow();
+});
+
+it.each(['partial', 'complete'])('accepts synthetic seasons after the birth year in %s evidence', async coverage => {
+  // Synthetic boundary data only; this is not a real player's season certificate.
+  const { normalizePostingQualificationEvidence } = await module();
+  const e = facts({ playerId: 'synthetic-birth-year-boundary', sourcePlayerId: null,
+    birthDate: { date: '2000-12-31', sourceIds: ['synthetic-profile'] },
+    professionalSeasons: pro([2001, 2017, 2018, 2019, 2020, 2021], coverage) });
+  expect(normalizePostingQualificationEvidence(e).professionalSeasons.seasons.map(r => r.season))
+    .toEqual([2001, 2017, 2018, 2019, 2020, 2021]);
+  expect(await assess(e)).toMatchObject({ exemption: 'exempt', ageYears: 25, knownRecognizedSeasons: 6 });
+});
+
+it.each([
   { version: 2 }, { playerId: null }, { age: 99 }, { serviceYears: 99 }, { isForeign: false },
   { birthDate: undefined }, { birthDate: { date: '2001-02-29', sourceIds: ['profile'] } },
   { birthDate: { date: '2001-12-01', sourceIds: [] } },

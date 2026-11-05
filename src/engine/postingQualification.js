@@ -31,7 +31,7 @@ export function normalizePostingQualificationEvidence(input) {
     const seasons = Array.from(p.seasons, r => {
       fields(r, ['season', 'sourceIds']);
       if (!Number.isInteger(r.season) || r.season < 1 || r.season > asOf.year || seen.has(r.season)
-        || (birthYear && r.season < birthYear)) fail();
+        || (birthYear && r.season <= birthYear)) fail();
       seen.add(r.season); return { season: r.season, sourceIds: sources(r.sourceIds) };
     }).sort((a, b) => a.season - b.season);
     professionalSeasons = { asOfDate: p.asOfDate, coverage: p.coverage, seasons };
