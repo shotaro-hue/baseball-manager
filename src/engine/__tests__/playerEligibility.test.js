@@ -67,6 +67,13 @@ describe('FA qualified days and separate evidence', () => {
     expect(a.eligibility.fa.basis.kind).toBe('game-estimate'); expect(a.birthDate).toBe('1996-03-27');
     expect(p).not.toHaveProperty('eligibility');
   });
+  it('does not invent a legacy acquired-right event from serviceYears when the original counter was zero', () => {
+    const p = init({ entryType: '不明', serviceYears: 7, daysOnActiveRoster: 0,
+      dataQuality: { serviceTime: 'game-baseline-unknown' } });
+    expect(p.eligibility.fa.grants.domestic).toBe(false);
+    expect(getPlayerFaProgress(p).domestic.eligible).toBe(false);
+    expect(p.eligibility.fa.qualificationBasis.kind).toBe('game-estimate');
+  });
   it('retains official held rights independently of estimated days, then reacquires overseas at 580', () => {
     let p = init({}, { opening: { qualified: 'overseas', exercises: [], sourceIds: ['https://npb.jp/announcement/2025/fa_qualified.html'] } });
     expect(p.eligibility.fa.days).toBe(0);

@@ -97,7 +97,7 @@ export function initializePlayerEligibility(player, { year = 2026, opening = nul
   const qualified = opening?.qualified;
   const grants = { domestic: Boolean(qualified), overseas: qualified === 'overseas' };
   if (!opening && firstContractYear === null && (measured || nonnegative(player.serviceYears))) {
-    const legacyDays = measured ? player.daysOnActiveRoster : player.serviceYears * 120;
+    const legacyDays = nonnegative(player.daysOnActiveRoster) ? player.daysOnActiveRoster : player.serviceYears * 120;
     const oldDomestic = ['高卒', '高校生', '外国人'].includes(player.entryType) ? 960 : 840;
     grants.domestic ||= legacyDays >= oldDomestic;
     grants.overseas ||= legacyDays >= 1080;

@@ -64,7 +64,7 @@
     "undeterminedQualifications": 0
   },
   "productionSha256": {
-    "src/engine/playerEligibility.js": "592de06c3582fb5f01c35d3fc85eb91ab0df050c58e605010ae41699bc71aff3",
+    "src/engine/playerEligibility.js": "72cdd9f15fc7f3c3b6f585af1114dd4ff41c7772bcc73dbf1c67f5e10ff42e1f",
     "src/engine/eligibilityMigration.js": "9887503051da42ab77e89b18a7cd80ca55b9f280899dd147c9e50ce97ebcc126",
     "src/data/openingEligibility2026.js": "d4e6231f3bd16ba97d7657c78d095529611f26d0aac3594393fc5da7cbdd41f6",
     "src/engine/annualPostingQualifications.js": "a0cd34123aaeef79eb389cf7ae3606270de1104380372f769429dce4398ea76d",
