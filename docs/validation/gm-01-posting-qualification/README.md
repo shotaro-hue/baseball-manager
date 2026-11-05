@@ -1,0 +1,104 @@
+# Posting qualification evidence validation
+
+Base main `3f6a665dcf163b119ab0a3aa9fe04a34a064995f` (#546 merged).
+[Design](../../superpowers/specs/2026-11-04-gm01-posting-qualification-design.md) /
+[plan](../../superpowers/plans/2026-11-04-gm01-posting-qualification.md).
+
+## Data audit and scope
+
+The release master contains 1059 birthdays, all with matching NPB player-profile
+references; 706 rows have some performance history. No row owns an explicit
+MLB-recognized professional-season set or completeness assertion. Runtime
+bootstrap retains realPlayerId but does not retain birthDate. Therefore a single
+indexed read-only lookup snapshots birth facts from the existing master owner;
+it does not infer a birthday from gameAge or turn performance years into service.
+
+MLB [posting](https://www.mlb.com/glossary/transactions/japanese-posting-system)
+and [bonus-pool](https://www.mlb.com/glossary/transactions/international-amateur-free-agency-bonus-pool-money)
+definitions were checked 2026-11-04 for the 25/six exemption conditions. This
+assessor only checks those conditions. Full signing classification/registration,
+contract forms, player choice, pricing and pool capacity are not implemented.
+The pure evidence normalizer validates shape and temporal consistency, not the
+truth of an arbitrary source ID or a caller-supplied completeness claim.
+
+## Executed evidence
+
+- Baseline: application/income/master schema, 3 files / 70 passed.
+- RED: 48 new tests failed on missing implementation. GREEN: 36 assessor and
+  12 source tests passed. Exact birthdays/leap dates, 5/6 years, complete zero,
+  partial/unknown/stale facts, duplicate/future/pre-birth records, unknown fields,
+  invalid dates/provenance, source/identity mismatch, stable JSON and detached
+  snapshots are covered.
+- Real `createInitialTeams()` produces both inputs without altering the roster:
+  npb:21625150 birthday 2003-03-25 -> age 23/restricted on 2026-12-01;
+  npb:21325134 birthday 1994-12-19 -> age 31/unknown, not exempt, because pro
+  evidence is unrecorded. No real six-season certificate was fabricated.
+- Changing name, gameAge, serviceYears or quota flags does not change the lookup.
+  All 1059 master rows return their documented birthday and null pro evidence.
+  Legacy/fictional/unmatched real IDs retain unknowns even with a large gameAge.
+- Source and returned-fact mutation after lookup creation do not change later
+  results. Complete explicit zero differs from missing evidence; a stale complete
+  list below six becomes unknown, while six documented seasons remain sufficient.
+- Related regression: 12 files / 183 passed, including master schema/data,
+  real/generated bootstrap (100 seeds and an actual large save), civil dates,
+  application/income and real commit/reload tests. Build succeeded with existing
+  mixed-import and large-chunk warnings.
+
+Final regression/build, independent review, submitted SHA/tree and exact-HEAD CI
+results are recorded in the PR description. Do not infer CI from scoped tests.
+
+## Independent review and correction
+
+Review of HEAD 9bd5f52 found one P2: JavaScript map/some skipped sparse-array
+holes, so six absent season slots could become a count of six/exempt, or an
+absent source slot could survive until JSON reload. The reviewer reproduced
+both; the implementer confirmed four RED cases (six holes, five years plus hole,
+birth source hole, professional-season source hole). Materializing every array
+element before validation rejects those missing facts. Final related GREEN:
+12 files / 187 passed, including 40 assessor + 12 lookup new tests. No other
+confirmed findings. The initial HEAD CI #677 was cancelled for the correction;
+the final submitted HEAD's CI is the acceptance gate.
+
+## PR #547 birth-year boundary correction (2026-11-05)
+
+Rechecked GitHub HEAD `cdfbf4d2976963f43aa957eea55f7e1fbbc7b330`, the
+PR diff, successful CI #678, and the empty comment/review-thread lists before
+editing. #546 is merged and main remains `3f6a665`.
+
+Synthetic evidence with birthday `2000-12-31`, signing date `2026-12-01`, and
+partial, sourced seasons `[2000, 2017, 2018, 2019, 2020, 2021]` reproduced an
+incorrect `exempt` result (age 25, six seasons). The normalizer rejected only
+years strictly before birth. It now rejects years at or before the known birth
+year; no minimum playing age or missing qualification facts are inferred.
+
+- Existing qualification/lookup baseline: 2 files / 52 passed.
+- Added six synthetic boundary cases: prior year and birth year rejected for
+  both partial/complete coverage; following year accepted with six documented
+  seasons and age 25 for both coverage modes. Both exported normalization and
+  assessment paths are checked. No real-player season certificate was invented.
+- RED: the two birth-year cases failed with the expected missing rejection;
+  44 cases passed. After the one-comparison correction, GREEN: 46 / 46.
+- Scoped regression: 17 files / 255 passed. This includes existing unknown
+  birth/pro evidence, partial/complete/stale/zero, JSON, input non-mutation,
+  duplicate/sparse seasons, actual master/bootstrap/save reload, posting
+  applications/GM decisions, fee/income/budget, real economy commit, dates and
+  legacy posting hooks. Existing assertions/skips and CI configuration unchanged.
+- `npm run build` succeeded; existing mixed-import and chunk-size warnings remain.
+
+The submitted HEAD, fresh-context review and exact-HEAD CI results are recorded
+in the PR and final task report. Full-suite and browser validation use that CI;
+the local scoped run is not a substitute for it.
+
+## Remaining ownership
+
+The qualification API is intentionally not connected to existing application,
+end-contract, complete-posting or save handlers. Pending/approved market progress
+remains blocked. A future market producer must own recognized-season data and
+completeness, generated-year facts, birth/draft classification, exact signing
+date, rule version, and save/epoch/player-bound evidence snapshots before using
+this assessor. Existing receipt persistence is unchanged in this PR.
+
+No new live player/engine fields, master edits, data publication, market price,
+acceptance probability, random draw or financial policy. Public gate OFF,
+schemaVersion1/DB5, legacy unchanged. No production market/rollover/Worker,
+new UI, long-play or real-iPhone verification. Task7/A1 remains unfinished.

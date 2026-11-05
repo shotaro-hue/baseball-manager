@@ -1,5 +1,7 @@
 # ROADMAP — NPB Franchise Manager
 
+> 2026-11-04 #546マージ済みmain `3f6a665`から、postingの出生日/認定プロシーズン根拠とbonus-pool免除の純粋判定を分離。[設計](./docs/superpowers/specs/2026-11-04-gm01-posting-qualification-design.md)。実名簿の固定IDと出生日だけを参照し、年数欠損・古い根拠は不明とする。市場/受諾policy・認定年数producer・UI/CPU/年度Workerは未接続。Task7/A1未完了・公開OFFを維持。
+
 > 2026-11-04 #545後: ポスティング申請→一度のGM判断を独立単位化。市場価格/受諾の根拠不足を先に明示し、承認で退団・入金しない。[残工程と依存順](./docs/validation/gm-01-posting-applications/README.md)。資格データ/市場→人UI→CPU→年度Worker→長期/実機が残り、A1-2c/A1未完了・公開ゲートOFF。
 
 > 2026-11-04 #544マージ済みmain `417b83d`から、引退試合の明示収入を共通command・一回限りの証跡・実保存へ接続する。[設計](./docs/superpowers/specs/2026-11-04-gm01-retirement-income-design.md)。当年枠/通常収支/給与/保証は維持し、後続年度審査へ証跡を残す。開催/価格producer・UI/CPU・年度Workerは未接続、Task7/A1未完了、公開ゲートOFF。以下の未マージ記述は記録時点のもの。
