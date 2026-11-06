@@ -4,6 +4,7 @@ import { careerCount, careerAverage, careerInnings, careerRateText, careerMetric
 import { careerOps, careerTotalOps } from '../careerOpsMetrics';
 import { emptyStats } from '../../engine/playerCore';
 import { mergeCareerLogWithCurrentSeason } from '../../engine/careerStats';
+import { careerTeamLabel } from '../careerTeamLabel';
 
 let careerSaveModulePromise = null;
 
@@ -142,7 +143,7 @@ export function CareerTable({player,year,teamId,teamName,saveId,includeCurrentSe
                 return(
                   <tr key={row.year+"-p-"+ri}>
                     <td className="mono" style={{color:"#805700"}}>{row.year}</td>
-                    <td className="mono" style={{color:"#53657c",maxWidth:60,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.teamName||""}</td>
+                    <td className="mono" style={{color:"#53657c",whiteSpace:"nowrap"}} title={row.teamName || undefined}>{careerTeamLabel(row)}</td>
                     <td className="mono">{s.IP!==0?careerRateText(pitcherRate(s,"ERA")):"---"}</td>
                     <td className="mono" style={{color:"#14714b"}}>{careerCount(s.W)}</td>
                     <td className="mono" style={{color:"#b42332"}}>{careerCount(s.L)}</td>
@@ -192,7 +193,7 @@ export function CareerTable({player,year,teamId,teamName,saveId,includeCurrentSe
                 return(
                   <tr key={row.year+"-b-"+ri}>
                     <td className="mono" style={{color:"#805700"}}>{row.year}</td>
-                    <td className="mono" style={{color:"#53657c",maxWidth:60,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.teamName||""}</td>
+                    <td className="mono" style={{color:"#53657c",whiteSpace:"nowrap"}} title={row.teamName || undefined}>{careerTeamLabel(row)}</td>
                     <td className="mono">{careerCount(s.PA)}</td>
                     <td className="mono">{careerAverage(s)}</td>
                     <td className="mono" style={{color:s.HR>=20?"#805700":undefined}}>{careerCount(s.HR)}</td>
