@@ -70,7 +70,8 @@ export function resolveOffseasonFaDeclarations(teams, year, salaryContext = {}) 
       if (!decision.declared) return updated;
       removed.add(player.id);
       newFaPlayers.push({ ...updated, salary: demand.demandSalary, faPreviousSalary: player.salary,
-        isFA: true, contractYearsLeft: 0, marketEntryReason: '国内FA宣言', marketLastStats: player.stats,
+        isFA: true, isWaiverReleased: false, marketEntry: undefined, departureReason: 'domestic-fa',
+        contractYearsLeft: 0, marketEntryReason: '国内FA宣言', marketLastStats: player.stats,
         faEnteredYear: year, faOriginTeamId: team.id, faOriginTeamName: team.name, faOriginRoster: farmIds.has(player.id) ? 'farm' : 'active' });
       news.push({ type: 'season', headline: `【FA】${player.name}（${team.name}）が国内FA宣言`,
         source: '野球速報', dateLabel: `${year}年`,

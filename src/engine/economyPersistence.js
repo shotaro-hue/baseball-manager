@@ -6,10 +6,13 @@ import { quoteAnnualSpendingPlan } from './annualSpending';
 import { validateRenewalDecisions, preservesRenewalDecisions } from './renewalDecisions';
 import { validateAcquisitionDecisions, preservesAcquisitionDecisions } from './acquisitionDecisions';
 import { validateRookieContracts } from './rookieContracts';
+import { validatePlayerEligibility } from './playerEligibility';
 
 // Storage validation only. Commit acknowledgements/barrier live in saveload;
 // activation and application hydration remain separate A1-1d stages.
 export function validateEconomySave(world) {
+  for (const p of [...(world?.teams ?? []).flatMap(t => [...(t.players ?? []), ...(t.farm ?? [])]), ...(world?.faPool ?? [])])
+    validatePlayerEligibility(p, { year: world.year });
   const mode = contractEconomyMode(world);
   if (mode === 'annual') {
     validateRenewalDecisions(world);

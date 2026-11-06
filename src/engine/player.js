@@ -5,6 +5,7 @@ import {
   INJURY_RECURRENCE_WINDOW_YEARS, SECONDARY_POSITION_RULES, POS_TRAINING_PER_DAY,
 } from '../constants';
 import { createEmptyBattedBallProfile } from './battedBallProfile';
+import { initializePlayerEligibility } from './playerEligibility';
 
 
 /* ═══════════════════════════════════════════════
@@ -124,7 +125,7 @@ export function applyPositionFields(p) {
  * @param {number} count
  * @returns {Object[]}
  */
-export function generateForeignFaPool(count) {
+export function generateForeignFaPool(count, year = 2026) {
   const pool = [];
   const batPositions = ["一塁手","左翼手","右翼手","中堅手","指名打者"];
   const pitPositions = ["先発","先発","先発","抑え","中継ぎ"];
@@ -145,7 +146,7 @@ export function generateForeignFaPool(count) {
     p.isFA = true;
     pool.push(p);
   }
-  return pool;
+  return pool.map(p => initializePlayerEligibility(p, { year }));
 }
 
 /**

@@ -15,7 +15,7 @@ export const MAX_外国人_一軍 = 4;  // NPB規定: 一軍出場選手登録�
 export const ACCEPT_THRESHOLD = 55;
 export const MIN_SALARY_SHIHAKA = 420;  // 支配下選手最低年俸 420万円 (NPB協約 第89条)
 export const MIN_SALARY_IKUSEI  = 240;  // 育成選手最低年俸  240万円 (NPB協約)
-export const ACTIVE_ROSTER_FA_DAYS_PER_YEAR = 120; // FA権1年分の一軍登録日数（NPB145日→ゲーム換算120日）
+export const ACTIVE_ROSTER_FA_DAYS_PER_YEAR = 120; // 旧保存/v1資格履歴の換算単位。現行FAはplayerEligibilityの145日基準。
 // FA規約の金銭のみ補償率（新基盤、本番未接続）。
 export const FA_CASH_COMPENSATION_PERCENT = { first: { A: 80, B: 60 }, repeat: { A: 40, B: 30 } };
 export const FA_PERSONNEL_COMPENSATION_PERCENT = { first: { A: 50, B: 40 }, repeat: { A: 25, B: 20 } };

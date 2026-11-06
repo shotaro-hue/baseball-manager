@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { CPU_RENEWAL_ROUNDS, NEGOTIATION_MORALE_ACCEPT_BONUS, NEGOTIATION_MORALE_CUT_PENALTY, NEGOTIATION_MORALE_ROUND_HIT, NEGOTIATION_TRUST_HAPPY, NEGOTIATION_TRUST_HOLDOUT } from '../constants';
-import { evaluateRenewalOffer, getFaThreshold, getFaProgress, calcPlayerDemand } from '../engine/contract';
+import { evaluateRenewalOffer, getFaProgress, calcPlayerDemand } from '../engine/contract';
 import { salaryCutRule, renewalEligible, ikuseiContractYears, validContractOffer } from '../engine/renewalRules';
 import { isIkuseiPlayer } from '../engine/rosterCapacity';
 import { compactRenewalSession, reconcileRenewalSession } from '../engine/offseasonPlanning';
@@ -24,8 +24,10 @@ function faLabel(player, overseas = false) {
   if (isIkuseiPlayer(player)) return '育成契約中・FA対象外';
   const progress = getFaProgress(player);
   if (!progress.recorded) return '登録日数未記録';
-  const p = overseas ? progress.overseas : progress.domestic;
-  return `${p.eligible ? '取得済み' : `最短あと${p.years}年（${p.remainingDays}日）`}${progress.estimated ? '・推定' : ''}`;
+  const key = overseas ? 'overseas' : 'domestic', p = progress[key];
+  const official = player.eligibility?.fa.grants[key] && progress.basis.kind === 'official';
+  return p.eligible ? `取得済み（${official ? '公式' : 'ゲーム内判定'}）`
+    : `最短あと${p.years}年（${p.remainingDays}日）${progress.estimated ? '・推定' : ''}`;
 }
 function performance(player) {
   const s = player.stats || {};
@@ -181,7 +183,7 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, saveId, demands,
     } else if (result.freeAgencyRequested) {
       update(p.id, { status: 'free_requested', round, logs: [...logs, `選手：${result.reason}`] });
     } else if (round >= CPU_RENEWAL_ROUNDS) {
-      const isFA = !isIkuseiPlayer(p) && (p.daysOnActiveRoster ?? (p.serviceYears ?? 0) * 120) >= getFaThreshold(p).domestic;
+      const isFA = !isIkuseiPlayer(p) && getFaProgress(p).domestic.eligible;
       update(p.id, { status: isFA ? 'fa' : 'cooldown', round, logs: [...logs, isFA ? '選手：FA権を行使します。' : '選手：今回は合意できません。一度持ち帰り、再交渉します。'] });
       if (isFA) onDeclare?.(p.id);
     } else {
@@ -320,7 +322,7 @@ export function ContractRenewalPhaseScreen({ teams, myId, year, saveId, demands,
           {!contractOnly && <details><summary>減額制限・要求年俸の理由</summary><h4>要求年俸の理由</h4><ul>{(selected.demand?.assessment?.reasons || []).map((r, i) => <li key={i}>{r.label}{r.bonus != null ? `（${r.bonus >= 0 ? '+' : ''}${Math.round(r.bonus * 100)}%）` : ''}</li>)}</ul>{!selected.demand?.assessment?.reasons?.length && <p>査定の詳細は未記録です。</p>}{selected.demand?.assessment?.roleSource && <p>投手の分類：{selected.demand.assessment.roleSource}</p>}<p>合意判定の下限：{money(selected.demand?.minAcceptSalary)}。下限以上でも、条件によって不合意になる場合があります。</p><p>タイトル加点は最大25%、チーム加点は最大5%。実際の合意額は契約条件によって変わります。</p><p>減額制限：{cut.recorded ? `${Math.round(cut.rate * 100)}%（制限内の年俸 ${money(cut.boundary)}以上）` : '前年年俸未記録'}。超過は選手の同意が必要です。最低年俸保障は契約成立時に適用します。</p></details>}
           <details className="renewal-career" onToggle={event => setCareerOpen(event.currentTarget.open)}><summary>選手の詳細・年度別成績</summary>{planning && <button aria-label={`${selectedPlayer.name}の選手詳細・年度別成績`} onClick={() => planning.onProfile(selectedPlayer)}>選手詳細を開く</button>}<div className="renewal-stats">{Object.entries(selectedPlayer.isPitcher ? selectedPlayer.pitching || {} : selectedPlayer.batting || {}).map(([key, value]) => <span key={key}>{abilityNames[key] || key} {stat(value)}</span>)}<span>士気 {stat(selectedPlayer.morale)}</span><span>信頼 {stat(selectedPlayer.trust)}</span></div>{careerOpen && <Suspense fallback={<p>年度別成績を読み込み中です。</p>}><CareerTable player={selectedPlayer} year={year} teamId={myId} teamName={myTeam?.name} saveId={saveId} /></Suspense>}</details>
           <details><summary>交渉履歴（再交渉 {selected.retries ?? 0}回）</summary><ol>{(selected.logs || []).map((log, i) => <li key={i}>{log}</li>)}</ol>{!selected.logs?.length && <p>交渉履歴はありません。</p>}</details>
-          <details><summary>FAまでの目安</summary><p>国内FA：{faLabel(selectedPlayer)}</p><p>海外FA：{faLabel(selectedPlayer, true)}</p><p className="renewal-note">ゲーム内では一軍登録120日で1年分。毎年120日を積む場合の最短目安です。旧データは在籍年数から推定します。</p></details>
+          <details><summary>FAまでの目安</summary><p>国内FA：{faLabel(selectedPlayer)}</p><p>海外FA：{faLabel(selectedPlayer, true)}</p><p className="renewal-note">一軍に通年登録すると145日相当を加算します。抹消期間は加算せず、部分年は翌年へ持ち越します。推定を含む開始残高は固定です。</p></details>
           {canNegotiate && !finished(selected.status) && !['free_requested', 'continuing'].includes(selected.status) && <details className="renewal-release"><summary>契約を更新しない場合</summary><p>戦力外を確定すると球団から外れ、この画面では取り消せません。</p><button className="renewal-danger" onClick={() => setModal({ type: 'release', id: selectedId })}>戦力外を検討する</button></details>}
         </div>
       </section>}

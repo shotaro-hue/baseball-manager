@@ -1,0 +1,335 @@
+{
+  "provenance": "Frozen v1 command results captured before v2-only issuance; restore/replay fixtures, not current issuance rules.",
+  "cases": [
+    {
+      "record": {
+        "id": "qualification",
+        "version": 1,
+        "requestId": "request",
+        "season": 2026,
+        "teamId": 0,
+        "playerId": 0,
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",0]",
+        "sourceKey": "[\"inseason-release\",\"[\\\"new-game\\\",\\\"inseason-release\\\"]\",\"posting-qualification\",\"request\"]",
+        "recordedDate": "2026-12-01",
+        "facts": {
+          "version": 1,
+          "playerId": 0,
+          "sourcePlayerId": null,
+          "birthDate": {
+            "date": "2000-01-01",
+            "sourceIds": [
+              "synthetic-profile"
+            ]
+          },
+          "professionalSeasons": null
+        },
+        "assessment": {
+          "ruleVersion": 1,
+          "playerId": 0,
+          "signingDate": "2026-12-01",
+          "exemption": "unknown",
+          "ageYears": 26,
+          "knownRecognizedSeasons": null,
+          "reasons": [
+            "professional-seasons-unrecorded"
+          ],
+          "evidence": {
+            "version": 1,
+            "playerId": 0,
+            "sourcePlayerId": null,
+            "birthDate": {
+              "date": "2000-01-01",
+              "sourceIds": [
+                "synthetic-profile"
+              ]
+            },
+            "professionalSeasons": null
+          }
+        }
+      },
+      "receipt": {
+        "id": "qualification",
+        "signature": "{\"facts\":{\"birthDate\":{\"date\":\"2000-01-01\",\"sourceIds\":[\"synthetic-profile\"]},\"playerId\":0,\"professionalSeasons\":null,\"sourcePlayerId\":null,\"version\":1},\"id\":\"qualification\",\"requestId\":\"request\",\"type\":\"record-posting-qualification\"}",
+        "postingQualification": {
+          "id": "qualification",
+          "version": 1,
+          "requestId": "request",
+          "season": 2026,
+          "teamId": 0,
+          "playerId": 0,
+          "sourceContractId": "[\"initial-contract\",\"inseason-release\",0]",
+          "sourceKey": "[\"inseason-release\",\"[\\\"new-game\\\",\\\"inseason-release\\\"]\",\"posting-qualification\",\"request\"]",
+          "recordedDate": "2026-12-01",
+          "facts": {
+            "version": 1,
+            "playerId": 0,
+            "sourcePlayerId": null,
+            "birthDate": {
+              "date": "2000-01-01",
+              "sourceIds": [
+                "synthetic-profile"
+              ]
+            },
+            "professionalSeasons": null
+          },
+          "assessment": {
+            "ruleVersion": 1,
+            "playerId": 0,
+            "signingDate": "2026-12-01",
+            "exemption": "unknown",
+            "ageYears": 26,
+            "knownRecognizedSeasons": null,
+            "reasons": [
+              "professional-seasons-unrecorded"
+            ],
+            "evidence": {
+              "version": 1,
+              "playerId": 0,
+              "sourcePlayerId": null,
+              "birthDate": {
+                "date": "2000-01-01",
+                "sourceIds": [
+                  "synthetic-profile"
+                ]
+              },
+              "professionalSeasons": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "record": {
+        "id": "qualification",
+        "version": 1,
+        "requestId": "request",
+        "season": 2026,
+        "teamId": 0,
+        "playerId": 0,
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",0]",
+        "sourceKey": "[\"inseason-release\",\"[\\\"new-game\\\",\\\"inseason-release\\\"]\",\"posting-qualification\",\"request\"]",
+        "recordedDate": "2026-12-01",
+        "facts": {
+          "version": 1,
+          "playerId": 0,
+          "sourcePlayerId": null,
+          "birthDate": {
+            "date": "2000-01-01",
+            "sourceIds": [
+              "synthetic-profile"
+            ]
+          },
+          "professionalSeasons": {
+            "asOfDate": "2026-12-01",
+            "coverage": "complete",
+            "seasons": [],
+            "ruleId": "synthetic-v1"
+          }
+        },
+        "assessment": {
+          "ruleVersion": 1,
+          "playerId": 0,
+          "signingDate": "2026-12-01",
+          "exemption": "restricted",
+          "ageYears": 26,
+          "knownRecognizedSeasons": 0,
+          "reasons": [
+            "recognized-seasons-below-6"
+          ],
+          "evidence": {
+            "version": 1,
+            "playerId": 0,
+            "sourcePlayerId": null,
+            "birthDate": {
+              "date": "2000-01-01",
+              "sourceIds": [
+                "synthetic-profile"
+              ]
+            },
+            "professionalSeasons": {
+              "asOfDate": "2026-12-01",
+              "coverage": "complete",
+              "seasons": []
+            }
+          }
+        }
+      },
+      "receipt": {
+        "id": "qualification",
+        "signature": "{\"facts\":{\"birthDate\":{\"date\":\"2000-01-01\",\"sourceIds\":[\"synthetic-profile\"]},\"playerId\":0,\"professionalSeasons\":{\"asOfDate\":\"2026-12-01\",\"coverage\":\"complete\",\"ruleId\":\"synthetic-v1\",\"seasons\":[]},\"sourcePlayerId\":null,\"version\":1},\"id\":\"qualification\",\"requestId\":\"request\",\"type\":\"record-posting-qualification\"}",
+        "postingQualification": {
+          "id": "qualification",
+          "version": 1,
+          "requestId": "request",
+          "season": 2026,
+          "teamId": 0,
+          "playerId": 0,
+          "sourceContractId": "[\"initial-contract\",\"inseason-release\",0]",
+          "sourceKey": "[\"inseason-release\",\"[\\\"new-game\\\",\\\"inseason-release\\\"]\",\"posting-qualification\",\"request\"]",
+          "recordedDate": "2026-12-01",
+          "facts": {
+            "version": 1,
+            "playerId": 0,
+            "sourcePlayerId": null,
+            "birthDate": {
+              "date": "2000-01-01",
+              "sourceIds": [
+                "synthetic-profile"
+              ]
+            },
+            "professionalSeasons": {
+              "asOfDate": "2026-12-01",
+              "coverage": "complete",
+              "seasons": [],
+              "ruleId": "synthetic-v1"
+            }
+          },
+          "assessment": {
+            "ruleVersion": 1,
+            "playerId": 0,
+            "signingDate": "2026-12-01",
+            "exemption": "restricted",
+            "ageYears": 26,
+            "knownRecognizedSeasons": 0,
+            "reasons": [
+              "recognized-seasons-below-6"
+            ],
+            "evidence": {
+              "version": 1,
+              "playerId": 0,
+              "sourcePlayerId": null,
+              "birthDate": {
+                "date": "2000-01-01",
+                "sourceIds": [
+                  "synthetic-profile"
+                ]
+              },
+              "professionalSeasons": {
+                "asOfDate": "2026-12-01",
+                "coverage": "complete",
+                "seasons": []
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "record": {
+        "id": "qualification",
+        "version": 1,
+        "requestId": "request",
+        "season": 2026,
+        "teamId": 0,
+        "playerId": 0,
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",0]",
+        "sourceKey": "[\"inseason-release\",\"[\\\"new-game\\\",\\\"inseason-release\\\"]\",\"posting-qualification\",\"request\"]",
+        "recordedDate": "2026-12-01",
+        "facts": {
+          "version": 1,
+          "playerId": 0,
+          "sourcePlayerId": null,
+          "birthDate": {
+            "date": "2000-01-01",
+            "sourceIds": [
+              "synthetic-profile"
+            ]
+          },
+          "professionalSeasons": {
+            "asOfDate": "2026-11-30",
+            "coverage": "complete",
+            "seasons": [],
+            "ruleId": "synthetic-v1"
+          }
+        },
+        "assessment": {
+          "ruleVersion": 1,
+          "playerId": 0,
+          "signingDate": "2026-12-01",
+          "exemption": "unknown",
+          "ageYears": 26,
+          "knownRecognizedSeasons": 0,
+          "reasons": [
+            "professional-seasons-stale"
+          ],
+          "evidence": {
+            "version": 1,
+            "playerId": 0,
+            "sourcePlayerId": null,
+            "birthDate": {
+              "date": "2000-01-01",
+              "sourceIds": [
+                "synthetic-profile"
+              ]
+            },
+            "professionalSeasons": {
+              "asOfDate": "2026-11-30",
+              "coverage": "complete",
+              "seasons": []
+            }
+          }
+        }
+      },
+      "receipt": {
+        "id": "qualification",
+        "signature": "{\"facts\":{\"birthDate\":{\"date\":\"2000-01-01\",\"sourceIds\":[\"synthetic-profile\"]},\"playerId\":0,\"professionalSeasons\":{\"asOfDate\":\"2026-11-30\",\"coverage\":\"complete\",\"ruleId\":\"synthetic-v1\",\"seasons\":[]},\"sourcePlayerId\":null,\"version\":1},\"id\":\"qualification\",\"requestId\":\"request\",\"type\":\"record-posting-qualification\"}",
+        "postingQualification": {
+          "id": "qualification",
+          "version": 1,
+          "requestId": "request",
+          "season": 2026,
+          "teamId": 0,
+          "playerId": 0,
+          "sourceContractId": "[\"initial-contract\",\"inseason-release\",0]",
+          "sourceKey": "[\"inseason-release\",\"[\\\"new-game\\\",\\\"inseason-release\\\"]\",\"posting-qualification\",\"request\"]",
+          "recordedDate": "2026-12-01",
+          "facts": {
+            "version": 1,
+            "playerId": 0,
+            "sourcePlayerId": null,
+            "birthDate": {
+              "date": "2000-01-01",
+              "sourceIds": [
+                "synthetic-profile"
+              ]
+            },
+            "professionalSeasons": {
+              "asOfDate": "2026-11-30",
+              "coverage": "complete",
+              "seasons": [],
+              "ruleId": "synthetic-v1"
+            }
+          },
+          "assessment": {
+            "ruleVersion": 1,
+            "playerId": 0,
+            "signingDate": "2026-12-01",
+            "exemption": "unknown",
+            "ageYears": 26,
+            "knownRecognizedSeasons": 0,
+            "reasons": [
+              "professional-seasons-stale"
+            ],
+            "evidence": {
+              "version": 1,
+              "playerId": 0,
+              "sourcePlayerId": null,
+              "birthDate": {
+                "date": "2000-01-01",
+                "sourceIds": [
+                  "synthetic-profile"
+                ]
+              },
+              "professionalSeasons": {
+                "asOfDate": "2026-11-30",
+                "coverage": "complete",
+                "seasons": []
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

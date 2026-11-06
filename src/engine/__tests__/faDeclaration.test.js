@@ -18,6 +18,12 @@ const lowDrawPlayer = t => {
 };
 
 describe('common offseason expiry', () => {
+  it('dates a new CPU declaration with this season even when the player carries an older declaration', () => {
+    const p = player(8, { faEnteredYear: 2026, marketEntryReason: '国内FA宣言' });
+    const cpu = { ...team(1, [p]), budget: 0 };
+    const result = cpuRenewContracts([cpu], null, [cpu], { year: 2028 });
+    expect(result.newFaPlayers[0]).toMatchObject({ faEnteredYear: 2028, isWaiverReleased: false, departureReason: 'domestic-fa' });
+  });
   it.each([1000, 50000])('keeps the shared asking salary after CPU renewal failure (previous %i)', previous => {
     const p = player(7, { salary: previous, ...(previous === 50000 ? { stats: { PA: 0 } } : {}) });
     const cpu = { ...team(1, [p]), budget: 0 };
@@ -55,8 +61,9 @@ describe('common offseason expiry', () => {
 });
 
 describe('independent FA declaration', () => {
-  it('excludes ineligible/unknown/recorded-zero days, foreigners, ikusei and ongoing contracts', () => {
-    for (const extra of [{ daysOnActiveRoster: 839 }, { daysOnActiveRoster: undefined, serviceYears: undefined }, { daysOnActiveRoster: 0, serviceYears: 10 }, { isForeign: true }, { 育成: true }, { contractYearsLeft: 2 }, { isRetired: true }, { contractSignedYear: year }]) expect(assessFaDeclaration(player(0, extra), team(), year)).toBeNull();
+  it('excludes ineligible/recorded-zero days, foreigners, ikusei and ongoing contracts', () => {
+    for (const extra of [{ daysOnActiveRoster: 839 }, { daysOnActiveRoster: 0, serviceYears: 10 }, { isForeign: true }, { 育成: true }, { contractYearsLeft: 2 }, { isRetired: true }, { contractSignedYear: year }]) expect(assessFaDeclaration(player(0, extra), team(), year)).toBeNull();
+    expect(assessFaDeclaration(player(0, { daysOnActiveRoster: undefined, serviceYears: undefined }), team(), year)).toEqual(assessFaDeclaration(player(0, { daysOnActiveRoster: undefined, serviceYears: undefined }), team(), year));
     expect(assessFaDeclaration(player(0, { daysOnActiveRoster: undefined, serviceYears: 7 }), team(), year)).not.toBeNull();
   });
   it('keeps overseas hopeful policy unchanged', () => {

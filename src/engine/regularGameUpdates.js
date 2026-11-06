@@ -4,6 +4,7 @@ import { applyGameStatsFromLog, applyPostGameCondition } from './postGame';
 import { applyPopularityDelta } from './fanSentiment';
 import { calcRevenue } from './finance';
 import { applyClubGameFinance } from './clubFinance';
+import { accrueFaService } from './playerEligibility';
 
 function tickCooldowns(players) {
   return players.map(p => (p.registrationCooldownDays ?? 0) > 0
@@ -37,7 +38,11 @@ export function applyRegularSeasonTeamUpdate(team, result, { isFirstTeam, isHome
   let players = applyGameStatsFromLog(team.players, log, isFirstTeam, won, gameDay);
   players = applyPostGameCondition(players, log, isFirstTeam, gameDay, isHomeTeam);
   players = playerRules.tickPositionTraining(playerRules.tickInjuries(players));
-  players = tickCooldowns(players.map(p => ({ ...p, daysOnActiveRoster: (p.daysOnActiveRoster ?? 0) + 1 })));
+  players = tickCooldowns(players.map(p => {
+    const credited = accrueFaService(p, { year, gameDay });
+    const duplicate = p.eligibility?.fa.season.year === year && p.eligibility.fa.season.processedDays.includes(gameDay);
+    return { ...credited, daysOnActiveRoster: (p.daysOnActiveRoster ?? 0) + (duplicate || p.育成 || p.isIkusei ? 0 : 1) };
+  }));
   players = applyDefenseCoachRecovery(players, team.coaches);
   const injuries = playerRules.checkForInjuries(players, year);
   const injuriesById = new Map(injuries.map(i => [i.id, i]));

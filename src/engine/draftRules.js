@@ -9,6 +9,7 @@ import { draftPicksForTeam } from './offseasonResume';
 import { evaluateOrganizationNeeds } from './organizationNeeds';
 import { draftReport } from './draftReports';
 import {emitCpuDecision} from './cpuDecisionTrace';
+import { initializePlayerEligibility } from './playerEligibility';
 
 export const registeredDraftCount = team => controlledRosterCounts(team).controlledCount;
 export const remainingDraftSlots = (team, pool = [], drafted = {}, context = {}) => {
@@ -221,8 +222,9 @@ export function applyDraftAcquisitions(teams, pool, drafted, year, context={}) {
     emitCpuDecision({type:'draft-complete',teamId:t.id,year,controlledBefore:registeredDraftCount(t),controlledAfter:registeredDraftCount(t)+picks.length,
       pickIds:picks.map(p=>p.id),committedRookiePayroll:picks.reduce((n,p)=>n+Math.max(MIN_SALARY_SHIHAKA,p.salary||0),0),
       immediateSpending:0,budget:t.budget});
-    return !picks.length ? t : { ...t, farm: [...(t.farm || []), ...picks.map(p => ({ ...p,
+    return !picks.length ? t : { ...t, farm: [...(t.farm || []), ...picks.map(p => initializePlayerEligibility({ ...p,
+      entryType: p.prospectType ?? p.entryType, draftYear: year,
       育成: false, isIkusei: false, salary: Math.max(MIN_SALARY_SHIHAKA, Number.isFinite(p.salary) ? p.salary : MIN_SALARY_SHIHAKA),
-      contractYears: 1, contractYearsLeft: 1, contractSignedYear: year, ikuseiYears: 0 }))] };
+      contractYears: 1, contractYearsLeft: 1, contractSignedYear: year, ikuseiYears: 0 }, { year, firstContractYear: year }))] };
   }) };
 }

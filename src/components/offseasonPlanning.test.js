@@ -88,7 +88,7 @@ it('confirms individual renewal terms, updates live salary once, and preserves t
   expect(latest.gs.myTeam.players[0].salary).toBe(1500);
 });
 it('moves a negotiation FA to market immediately, and reconciles declaration-and-stay to a signed entry', () => {
-  const ui = setup({ teams: [team([p(0, { daysOnActiveRoster: 840 })])], plan: plan({ stage: 'open' }) });
+  const ui = setup({ teams: [team([p(0, { entryType: '大卒', daysOnActiveRoster: 840 })])], plan: plan({ stage: 'open' }) });
   act(() => expect(latest.os.handlePlanningRelease(0, 'fa')).toBe(true));
   expect(latest.gs.faPool.find(p => p.id === 0)).toMatchObject({ salary: 1500, faPreviousSalary: 1000, marketEntryReason: '国内FA宣言' });
   ui.click('補強市場');

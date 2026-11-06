@@ -1,7 +1,9 @@
 import release from './playerMaster2026.release.json';
 import { parseContractDate } from '../engine/contractCalendar';
 import { normalizePostingQualificationEvidence } from '../engine/postingQualification';
-import { buildPostingQualificationSnapshot } from '../engine/postingQualificationSnapshot';
+import { buildPostingQualificationSnapshot, gamePostingQualificationFacts } from '../engine/postingQualificationSnapshot';
+import { initializePlayerEligibility } from '../engine/playerEligibility';
+import { openingEligibilityFacts } from './openingEligibility2026';
 
 const fail = () => { throw new Error('開幕名簿のポスティング資格根拠・固定IDを確認してください。'); };
 const id = v => (typeof v === 'string' && v.trim()) || (Number.isSafeInteger(v) && v >= 0);
@@ -38,8 +40,22 @@ export function createOpeningPostingQualificationLookup(master = release) {
 
 // Preserve opening birth ownership; recognition must be explicitly supplied by
 // a documented source or a future finalized-year producer, not performance rows.
-export function createPostingQualificationProducer(master = release) {
+export function createLegacyPostingQualificationProducer(master = release) {
   const lookup = createOpeningPostingQualificationLookup(master), openingDate = master.asOf;
   return (player, professionalSeasons = null) => buildPostingQualificationSnapshot(
     { ...lookup(player), sourcePlayerId: player.realPlayerId ?? null, professionalSeasons }, professionalSeasons?.asOfDate ?? openingDate).facts;
+}
+
+// Canonical game producer: completed years are supplied by the caller's season
+// boundary. The default is the last completed season at the fixed opening date.
+export function createPostingQualificationProducer(master = release) {
+  const lookup = createOpeningPostingQualificationLookup(master);
+  const people = new Map(master.players.map(p => [p.playerId, structuredClone(p)]));
+  return (player, completedSeasonYear = 2025) => {
+    if (!Number.isInteger(completedSeasonYear)) fail();
+    const row = people.get(player.realPlayerId), birth = lookup(player).birthDate;
+    const p = player.eligibility ? player : initializePlayerEligibility({ ...row, ...player,
+      ...(birth ? { birthDate: birth.date } : {}) }, { year: 2026, opening: row ? openingEligibilityFacts(row) : null });
+    return gamePostingQualificationFacts(p, completedSeasonYear);
+  };
 }

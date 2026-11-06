@@ -11,6 +11,8 @@ import { marketRosterError, marketPlacement } from './marketRoster';
 import { ownedPlayers, validContractTerms } from './renewalRules';
 import { requiresFaCompensation } from './faCompensation';
 import { faPersonnelCapacityContext } from './faPersonnel';
+import { completeFaRecontract } from './playerEligibility';
+import { migratePlayerEligibility } from './eligibilityMigration';
 
 // GM-01 opt-in lifecycle only. The live FA pool and saves remain unchanged.
 const fail = message => { throw new Error(message); };
@@ -98,7 +100,7 @@ export function acquisitionRosterError(state, team, player) {
   return null;
 }
 
-const acquiredPlayer = (player, terms, season) => ({ ...player, isFA: false,
+const acquiredPlayer = (player, terms, season, state) => ({ ...completeFaRecontract(migratePlayerEligibility(player, state), terms.signedSeason), isFA: false,
   salary: terms.annualSalaryManYen, contractId: terms.contractId, contractYears: terms.termYears,
   contractYearsLeft: contractSeasonsRemaining(terms, season), contractSignedYear: terms.signedSeason,
   育成: development(terms), isIkusei: development(terms), ikuseiYears: 0 });
@@ -124,7 +126,7 @@ export function explicitAcquisitionCandidate(state, c, reserveProposal) {
       fail('FA補償の選択・精算を完了してから加入してください。');
     if (!team || state.phase !== 'preseason' || state.season !== p.contract.startSeason || state.date < p.effectiveDate)
       fail('市場獲得選手の翌春加入日を確認してください。');
-    const acquired = acquiredPlayer(pending.player, p.contract, state.season);
+    const acquired = acquiredPlayer(pending.player, p.contract, state.season, state);
     return { ...state, teams: state.teams.map(t => t.id === team.id ? { ...t, farm: [...t.farm, acquired] } : t),
       acquisitions: state.acquisitions.map(h => h.proposalId === p.id ? { ...h, joinedDate: state.date } : h) };
   }
@@ -163,7 +165,7 @@ export function explicitAcquisitionCandidate(state, c, reserveProposal) {
     { answeredDate: state.date, ...(off ? {} : { effectiveDate: state.date }) });
   const common = { ...state, spending, faPool: state.faPool.filter(x => x.id !== player.id) };
   if (off) return { ...common, acquisitions: [...(state.acquisitions ?? []), { proposalId: p.id, player }] };
-  const acquired = acquiredPlayer(player, terms, state.season);
+  const acquired = acquiredPlayer(player, terms, state.season, state);
   const farm = acquired.injuryDaysLeft > 0 || acquired.registrationCooldownDays > 0 || marketPlacement(team, acquired).farm;
   return { ...common, teams: state.teams.map(t => t.id === team.id ? { ...t,
     players: [...t.players, ...(!farm ? [acquired] : [])], farm: [...t.farm, ...(farm ? [acquired] : [])] } : t) };

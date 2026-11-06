@@ -5,10 +5,11 @@ import { validateEconomySave, economySaveMetadata, economyOverwriteIssue,
   economyRecoveryGuard, matchesEconomyRecoveryGuard } from './economyPersistence';
 import { prepareRootBody, readRootBody, rootBodyReference, compressRootJson, decodeRootJson, rootCompressionApi } from './saveRootBodies';
 import { validateFarmSaveState } from './farmMigration';
+import { migrateEligibilityWorld } from './eligibilityMigration';
 import { validateClubFinance } from './clubFinance';
 import { GENERATION_VERSION, LEGACY_GENERATION_VERSION, prepareGeneration, readGeneration, readCareerGeneration, collectUnusedChunks } from './saveGenerations';
 import { retainBattedBallReceipt, releaseCurrentBattedBallReceipt } from './battedBallRetention';
-import { prepareCareerData, captureInlineCareerLogs } from './careerGenerations';
+import { prepareCareerData, captureInlineCareerLogs, readLegacyCareerLogs } from './careerGenerations';
 import { MATCH_HISTORY_FIELDS, matchHistorySnapshot, matchHistoryForSave } from './matchHistory';
 import LZString from 'lz-string';
 import { resolveInitialContractYears } from './realplayer';
@@ -269,7 +270,7 @@ function migrateInitialContractYears(player, teamName, state) {
   };
 }
 
-function validateAndMigrateSave(state) {
+function validateAndMigrateSave(state, eligibilityContext) {
   if (!state || !hasSelectedTeam(state.teams, state.myId) || !state.year) {
     return { ok: false };
   }
@@ -282,8 +283,9 @@ function validateAndMigrateSave(state) {
   }
   // Native terms and legacy-opening evidence are already authoritative. Never
   // fill missing economic fields or run old initial-contract corrections here.
-  if (mode === 'annual') return { ok: true, state: { ...state, ...matchHistorySnapshot(state) } };
-  const teams = state.teams.map(t => ({
+  if (mode === 'annual') return { ok: true, state: migrateEligibilityWorld({ ...state, ...matchHistorySnapshot(state) }, eligibilityContext) };
+  const eligibilityState = migrateEligibilityWorld(state, eligibilityContext);
+  const teams = eligibilityState.teams.map(t => ({
     ...t,
     wins:               t.wins               ?? 0,
     losses:             t.losses             ?? 0,
@@ -293,7 +295,7 @@ function validateAndMigrateSave(state) {
     revenueThisSeason:  t.revenueThisSeason  ?? 0,
     players: Array.isArray(t.players) ? t.players.map(migratePlayer).map(p => migrateInitialContractYears(p, t.name, state)) : [],
   }));
-  return { ok: true, state: { ...state, ...matchHistorySnapshot(state), saveId: ensureSaveId(state.saveId), teams } };
+  return { ok: true, state: { ...eligibilityState, ...matchHistorySnapshot(state), saveId: ensureSaveId(state.saveId), teams } };
 }
 
 function sanitizeSaveState(state) {
@@ -1080,7 +1082,7 @@ export function recoverLoadedEconomyCommit(bindings) {
       const { world, committed } = await readPublishedEconomy(entry.raw);
       const live = bindings.readCurrent();
       if (!unchanged() || live?.sessionToken !== identity.sessionToken
-        || live?.progressToken !== identity.progressToken || content(live?.world) !== content(world))
+        || live?.progressToken !== identity.progressToken || content(live?.world) !== content(migrateEligibilityWorld(world)))
         throw new Error('reloaded_world_not_confirmed');
       releaseEconomyCommit(storage, entry);
       return { ok: true, committed };
@@ -1189,9 +1191,9 @@ async function prepareRotationRoot(raw) {
   return prepareRootBody(raw); // Staging failures abort before any root is published.
 }
 
-async function hydrateSaveCandidate(state, { strict = false } = {}) {
+async function hydrateSaveCandidate(state, { strict = false, onCareerData } = {}) {
   if (state?.saveDataVersion >= LEGACY_GENERATION_VERSION) {
-    Object.assign(state, await readGeneration(state));
+    Object.assign(state, await readGeneration(state, { onCareerData }));
   } else if (state?.saveDataVersion >= INDEXED_DB_LARGE_DATA_VERSION) {
     try {
       state.seasonHistory = (await idbRead(IDB_STORES.chunks, 'seasonHistory')) ?? state.seasonHistory;
@@ -1268,10 +1270,23 @@ export async function loadGame() {
       // fences older backups; unsupported schema is never a legacy fallback.
       if (!recoveryGuard) recoveryGuard = economyRecoveryGuard(state);
       if (!matchesEconomyRecoveryGuard(state, recoveryGuard)) continue;
-      await hydrateSaveCandidate(state);
+      let registrationHistoryByPlayerId;
+      await hydrateSaveCandidate(state, { onCareerData: data => { registrationHistoryByPlayerId = new Map(data.players); } });
       if (deletionChanged()) return null;
+      if (state?.saveDataVersion >= INDEXED_DB_LARGE_DATA_VERSION && state.saveDataVersion < GENERATION_VERSION) {
+        const pending = [...(state.teams ?? []).flatMap(t => [...(t.players ?? []), ...(t.farm ?? [])]), ...(state.faPool ?? [])]
+          .filter(p => p?.id != null && p.eligibility === undefined);
+        if (pending.length) {
+          try { registrationHistoryByPlayerId = await readLegacyCareerLogs([...new Set(pending.map(p => String(p.id)))]); }
+          // Fixed-key archives were optional in these versions. Keep an inline
+          // save readable when that optional legacy storage is unavailable.
+          catch (error) { console.warn('Legacy registration history unavailable; using saved inline history.', error); }
+        }
+      }
       if(!(state?.saveDataVersion >= GENERATION_VERSION)) legacyCareerSeeds.set(state,captureInlineCareerLogs(state));
-      for (const team of (state?.teams || [])) {
+      // Eligibility needs the full saved career, before display-only compaction.
+      const result = validateAndMigrateSave(state, { registrationHistoryByPlayerId });
+      for (const team of (result.state?.teams || [])) {
         for (const bucket of ['players', 'farm']) {
           for (const player of (team?.[bucket] || [])) {
             const legacyCareerLog = Array.isArray(player?.careerLog) ? player.careerLog : [];
@@ -1285,7 +1300,6 @@ export async function loadGame() {
           }
         }
       }
-      const result = validateAndMigrateSave(state);
       if (result.ok) {
         if(legacyCareerSeeds.has(state)) legacyCareerSeeds.set(result.state,legacyCareerSeeds.get(state));
         // Acquire a native live reference before publishing a loaded snapshot.

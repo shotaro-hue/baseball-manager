@@ -1,3 +1,4 @@
+import { migrateEligibilityWorld } from '../src/engine/eligibilityMigration';
 import { winter, departureCommand } from '../src/engine/__tests__/fixtures/winterDepartures';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
@@ -159,7 +160,7 @@ it('recovers a complete same-epoch annual backup without applying legacy contrac
   const loaded = await loadGame();
   expect(getLastLoadResult().status).toBe('recovered');
   expect(loaded.contractEconomy).toEqual(world.contractEconomy);
-  expect(loaded.teams).toEqual(world.teams.map(t => ({ ...t, players: t.players.map(p => ({
+  expect(loaded.teams).toEqual(migrateEligibilityWorld(world).teams.map(t => ({ ...t, players: t.players.map(p => ({
     ...p, careerLog: [], recentCareerLog: [], careerLogSummary: expect.any(Object), trimmedCareerLogSummary: expect.any(Object),
   })) })));
 });
@@ -390,7 +391,7 @@ it.each([false, true])('winter departure survives real save/reload and failed re
   freshStorageSurface();
   let loaded = await loadGame();
   expect(loaded.contractEconomy).toEqual(next.contractEconomy);
-  expect(loaded.faPool).toEqual(JSON.parse(JSON.stringify(next.faPool)));
+  expect(loaded.faPool).toEqual(migrateEligibilityWorld(JSON.parse(JSON.stringify(next))).faPool);
   expect(loaded.teams[0].players).toEqual([]);
   const oldRoots = roots(), set = localStorage.setItem;
   localStorage.setItem = (k, v) => { if (k === primary) throw new Error('disk full'); set(k, v); };

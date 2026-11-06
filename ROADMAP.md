@@ -1,5 +1,7 @@
 # ROADMAP — NPB Franchise Manager
 
+> 2026-11-05 資格統合: #548 HEAD `7758f6d`に依存する専用ブランチ。終了済みプロ経過年数と145日相当FAを共通化し、新規判定の不明を廃止。公式2025名簿/行使、明示推定、旧120日保存・行使後再取得・v1歴史復元を分離。[人数・検証・限界](./docs/validation/unified-eligibility/README.md)。以前の「認定年数producer未接続」は今回の簡略ゲームルールで置換し、旧v1根拠は歴史専用。実際のMLB認定制度の完全再現、市場価格/受諾・承認申請からの退団/年度完結・人UI/CPUの新市場接続は残る。Task7/A1全体未完了、公開OFF/schema1/DB5。
+
 > 2026-11-05 #547後: 明示された認定事実の確認日/rule出典を検証し、承認済み申請へ固定ID・元契約・save/epoch付き資格snapshotを保存する。[設計](./docs/superpowers/specs/2026-11-05-gm01-posting-qualification-snapshots-design.md)。実名簿の認定季欠損は維持。自動認定条件・市場/受諾・UI/CPU/年度Workerは未接続。Task7/A1未完了、公開OFF、schemaVersion1/DB5。
 
 > 2026-11-04 #546マージ済みmain `3f6a665`から、postingの出生日/認定プロシーズン根拠とbonus-pool免除の純粋判定を分離。[設計](./docs/superpowers/specs/2026-11-04-gm01-posting-qualification-design.md)。実名簿の固定IDと出生日だけを参照し、年数欠損・古い根拠は不明とする。市場/受諾policy・認定年数producer・UI/CPU/年度Workerは未接続。Task7/A1未完了・公開OFFを維持。

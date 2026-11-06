@@ -11,6 +11,7 @@ import { reduceRenewalRequest,renewalRequest } from '../renewalDecisions';
 import { nextSeasonForDepartureTest } from './fixtures/inSeasonDepartures';
 import { economyPolicy } from './fixtures/economyWorld';
 import { applyAnnualTransaction } from '../annualTransactions';
+import { getFaProgress } from '../contract';
 
 const apply=(w,c)=>{const r=reduceEconomyCommand(w,c);expect(r.ok,r.error).toBe(true);return r.world;};
 const denied=(w,c)=>{const old=structuredClone(w);freezeEconomy(w);expect(quoteEconomyCommand(w,c).ok).toBe(false);const r=reduceEconomyCommand(w,c);expect(r.ok).toBe(false);expect(r.world).toBe(w);expect(w).toEqual(old);return r;};
@@ -169,7 +170,10 @@ describe('A1-2c-3 common FA declaration',()=>{
     w.contractEconomy.clock={season:2027,phase:'offseason',date:'2027-12-01',offseasonTurn:0};engine(w).spending.budgetSeason=2028;
     const policy=economyPolicy(w.teams,2028,1000000),tail=list=>list.filter(r=>r.season===2035);
     engine(w).spending.authorizations.push(...tail(policy.authorizations));engine(w).rosterRequirements.push(...tail(policy.rosterRequirements));w.contractEconomy.budgetPolicies.push(...tail(policy.budgetPolicies));
-    w=fromAnnualState(w,toAnnualState(w));const second=envelope(w,{id:'second-declaration',type:'declare-fa',teamId:0,playerId:0,contractId:p.contract.contractId,kind:'domestic-fa'});
+    w=fromAnnualState(w,toAnnualState(w));const rejoined=[...w.teams[0].players,...w.teams[0].farm].find(p=>p.id===0);
+    expect(getFaProgress(rejoined).overseas).toMatchObject({eligible:false,remainingDays:580});
+    rejoined.eligibility.fa.days+=580;
+    const second=envelope(w,{id:'second-declaration',type:'declare-fa',teamId:0,playerId:0,contractId:p.contract.contractId,kind:'domestic-fa'});
     w=apply(w,second);expect(w.faPool[0].marketEntry.compensationBasis.exercise).toBe('repeat');
     expect(engine(w).faDeclarations[1].exercise).toMatchObject({countBefore:unknown?null:1,countAfter:unknown?null:2,priorDeclarationIds:[first.transaction.id]});
     expect(validateEconomySave(JSON.parse(JSON.stringify(w)))).toBe('annual');expect(reduceEconomyCommand(w,first)).toMatchObject({ok:true,replayed:true});
@@ -182,13 +186,15 @@ describe('A1-2c-3 common FA declaration',()=>{
     expect(engine(w).spending.faCompensations[0].resolution).toBe('player-and-cash');expect(engine(w).faPersonnelMoves[0].player.id).toBe('other');
     expect(engine(w).spending.oneOffCosts.map(r=>r.amountManYen)).toEqual([6000,-6000]);expect(validateEconomySave(w)).toBe('annual');
   });
-  it('rejects the real zero-service bootstrap and accepts its explicitly qualified player scenario',()=>{
+  it('rejects an unqualified real bootstrap and accepts its explicit v2 qualified balance',()=>{
     const teams=createInitialTeams();let candidate,club;
     for(const t of teams){const ps=[...t.players,...t.farm].filter(p=>!p.isIkusei&&!p.育成&&!p.isForeign);
-      candidate=ps.find(p=>p.contractYearsLeft===1&&ps.filter(q=>q.salary===p.salary).length===1);if(candidate){club=t;break;}}
+      candidate=ps.find(p=>p.contractYearsLeft===1&&!getFaProgress(p).domestic.eligible&&ps.filter(q=>q.salary===p.salary).length===1);if(candidate){club=t;break;}}
     expect(candidate).toBeTruthy();expect(candidate.daysOnActiveRoster).toBe(0);
     const w=faWinter({teams:[club,...teams.filter(t=>t!==club)]}),c=declaration(w,candidate.id);denied(w,c);
-    const eligible=structuredClone(w);[...eligible.teams[0].players,...eligible.teams[0].farm].find(p=>p.id===candidate.id).daysOnActiveRoster=1080;
+    const eligible=structuredClone(w), qualified=[...eligible.teams[0].players,...eligible.teams[0].farm].find(p=>p.id===candidate.id);
+    qualified.eligibility.fa.days=qualified.eligibility.fa.cycleStartDays+1305;
+    expect(getFaProgress(qualified).domestic.eligible).toBe(true);
     const n=apply(eligible,c);expect(validateEconomySave(n)).toBe('annual');
   });
   it.each([false,true])('rejects coordinated foreign-peer/rank/receipt/history/listing tampering (including context=%s)',includeContext=>{

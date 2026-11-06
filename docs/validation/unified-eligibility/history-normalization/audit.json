@@ -1,0 +1,24 @@
+{
+  "baselineHead": "e63b622cd11072f4188bf78c340db9a3efbd6ebd",
+  "factory": "createInitialTeams()",
+  "seed": 42,
+  "dateNow": 1791508062000,
+  "before": {
+    "players": 1059,
+    "domesticIncludingOverseas": 79,
+    "overseas": 51,
+    "rngCalls": 18400,
+    "worldSha256": "8594364a6628db06c9757bcdd47da4d33c21db025dd0abe73bf9ca72cc913811",
+    "eligibilityProgressSha256": "fd3b6b1e66e068b0d13d2ef7151a1b165375ec02bb582d17174cb8aef469e136"
+  },
+  "after": {
+    "players": 1059,
+    "domesticIncludingOverseas": 79,
+    "overseas": 51,
+    "rngCalls": 18400,
+    "worldSha256": "8594364a6628db06c9757bcdd47da4d33c21db025dd0abe73bf9ca72cc913811",
+    "eligibilityProgressSha256": "fd3b6b1e66e068b0d13d2ef7151a1b165375ec02bb582d17174cb8aef469e136"
+  },
+  "completeWorldEqual": true,
+  "changedPlayers": []
+}

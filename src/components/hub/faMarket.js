@@ -4,6 +4,7 @@ import { saberBatter } from '../../engine/sabermetrics';
 import { marketPlacement, marketRosterError } from '../../engine/marketRoster';
 export { marketPlacement } from '../../engine/marketRoster';
 import { prepareOffseasonFreeAgent } from '../../engine/offseasonMarket';
+import { completeFaRecontract } from '../../engine/playerEligibility';
 import { isIkuseiPlayer } from '../../engine/rosterAutomation';
 
 export function marketMetrics(player) {
@@ -47,7 +48,7 @@ export function addMarketSigning(team, player, salary, years, year, marketMode =
   if (marketRosterError(team, player, draftContext.teams ?? [team], draftContext)) return team;
   const placement = marketPlacement(team, player);
   const prepared = marketMode === 'offseason' ? prepareOffseasonFreeAgent(player, year, team.id) : player;
-  const signed = { ...prepared, isFA: false, salary, contractYears: years, contractYearsLeft: years, contractSignedYear: year,
+  const signed = { ...completeFaRecontract(prepared, year), isFA: false, salary, contractYears: years, contractYearsLeft: years, contractSignedYear: year,
     ...(isIkuseiPlayer(player) && player.departureReason === 'ikusei_expiry' ? { ikuseiYears: 0 } : {}) };
   return { ...team, budget: team.budget - salary * years,
     players: placement.farm ? team.players : [...team.players, signed],

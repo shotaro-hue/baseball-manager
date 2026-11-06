@@ -40,7 +40,7 @@ it.each([false, true])('cold-loads one immutable qualification snapshot and repl
   expect(Boolean(rootBodyReference(rows.get(primary)))).toBe(large);
   const loaded = await saves.loadGame(); expect(validateEconomySave(loaded)).toBe('annual');
   expect(loaded.contractEconomy).toEqual(next.contractEconomy);
-  expect(loaded.contractEconomy.engine.postingQualifications[0].assessment).toMatchObject({ exemption: 'exempt', knownRecognizedSeasons: 6 });
+  expect(loaded.contractEconomy.engine.postingQualifications[0].assessment).toMatchObject({ exemption: 'exempt', professionalYears: 6 });
   expect(loaded.teams).toEqual(durableBefore.teams); expect(loaded.contractEconomy.engine.spending).toEqual(old.contractEconomy.engine.spending);
   expect(loaded.contractEconomy.incomeReceipts).toEqual(old.contractEconomy.incomeReceipts);
   expect(reduceEconomyCommand(loaded, command)).toMatchObject({ ok: true, replayed: true, world: loaded });
@@ -76,7 +76,8 @@ it('rejects deletion or paired valid replacement of a published snapshot', async
   expect(validateEconomySave(deleted)).toBe('annual');
   expect(await saves.saveGame(deleted)).toMatchObject({ ok: false, reason: 'economy_history_conflict' }); expect(roots()).toEqual(before);
   const facts = qualificationFacts(); facts.birthDate.date = '1990-01-01';
-  const rewritten = reduceEconomyCommand(old, qualificationCommand(old, { facts })); expect(rewritten.ok, rewritten.error).toBe(true);
+  const corrected = structuredClone(old); corrected.teams[0].players[0].birthDate = '1990-01-01';
+  const rewritten = reduceEconomyCommand(corrected, qualificationCommand(corrected, { facts })); expect(rewritten.ok, rewritten.error).toBe(true);
   rewritten.world.contractEconomy.revision++; expect(validateEconomySave(rewritten.world)).toBe('annual');
   expect(await saves.saveGame(rewritten.world)).toMatchObject({ ok: false, reason: 'economy_history_conflict' }); expect(roots()).toEqual(before);
 });
@@ -88,7 +89,7 @@ it('rejects stale adoption context before publication', async () => {
   expect(roots()).toEqual(before);
 });
 
-it('runs an actual opening-roster application, records unknown pro evidence and cold-loads its fixed source identity', async () => {
+it('runs an actual opening-roster application, records v2 game evidence and cold-loads its fixed source identity', async () => {
   const realPlayerId = 'npb:21325134', team = createInitialTeams().find(t => [...t.players, ...t.farm].some(p => p.realPlayerId === realPlayerId));
   let w = postingWinter({ teams: [team] });
   const p = [...w.teams[0].players, ...w.teams[0].farm].find(p => p.realPlayerId === realPlayerId);
@@ -97,16 +98,16 @@ it('runs an actual opening-roster application, records unknown pro evidence and 
     { id: 'real-decision', type: 'decide-posting', requestId: 'real-request', decision: 'approve' },
   ]) { const r = reduceEconomyCommand(w, envelope(w, transaction)); expect(r.ok, r.error).toBe(true); w = r.world; }
   current.world = w; expected = { ...expected, saveId: w.saveId, epoch: w.contractEconomy.epoch, baseRevision: w.contractEconomy.revision };
-  const facts = createPostingQualificationProducer()(p), command = qualificationCommand(w, { id: 0, requestId: 'real-request', facts });
+  const facts = createPostingQualificationProducer()(p, 2026), command = qualificationCommand(w, { id: 0, requestId: 'real-request', facts });
   const next = candidate(command), options = { skipCompression: true };
   expect((await saves.saveGame(w, options)).ok).toBe(true);
   expect((await saves.commitEconomyCandidate(next, expected, bindings, options)).ok).toBe(true);
   const loaded = await saves.loadGame(), snapshot = loaded.contractEconomy.engine.postingQualifications[0];
-  expect(snapshot.facts).toMatchObject({ sourcePlayerId: realPlayerId, birthDate: { date: '1994-12-19' }, professionalSeasons: null });
-  expect(snapshot.assessment).toMatchObject({ exemption: 'unknown', knownRecognizedSeasons: null });
+  expect(snapshot.facts).toMatchObject({ sourcePlayerId: realPlayerId, birthDate: { date: '1994-12-19' }, proStart: { year: 2017 }, completedSeasonYear: 2026 });
+  expect(snapshot.assessment).toMatchObject({ exemption: 'exempt', professionalYears: 10, ruleVersion: 2 });
   const player = [...loaded.teams[0].players, ...loaded.teams[0].farm].find(p => p.id === snapshot.playerId);
   Object.assign(player, { name: 'display changed', age: 99, serviceYears: 99, isForeign: !player.isForeign });
   expect(validateEconomySave(loaded)).toBe('annual');
   expect(reduceEconomyCommand(loaded, command)).toMatchObject({ ok: true, replayed: true, world: loaded });
-  expect(snapshot.assessment.exemption).toBe('unknown');
+  expect(snapshot.assessment.exemption).toBe('exempt');
 });

@@ -1,0 +1,77 @@
+{
+  "asOf": "2026-03-27",
+  "checkedOn": "2026-11-05",
+  "baseMain": "9ea1468f1f45e5dda97c7db16e16d5d1bb00715e",
+  "dependency548": "7758f6d87ce5c7edb8d8d36cd233ba3969697bff",
+  "population": 1059,
+  "realPlayerIds": 1059,
+  "confidence": {
+    "birth": {
+      "official": 1059
+    },
+    "proStart": {
+      "game-estimate": 1056,
+      "official": 3
+    },
+    "entry": {
+      "game-estimate": 1055,
+      "official": 3,
+      "game-history": 1
+    },
+    "faBalance": {
+      "game-estimate": 1059
+    }
+  },
+  "entryTypes": {
+    "その他": 1055,
+    "大卒": 1,
+    "高卒": 2,
+    "外国人": 1
+  },
+  "proStartMethods": {
+    "documented-npb-draft-following-season-unverified-first-pro": 956,
+    "entry-history-age-estimate": 100,
+    "individually-reviewed-profile-and-entry-season": 3
+  },
+  "fa": {
+    "official2025Listed": 104,
+    "listedInOpening": 87,
+    "listedOutsideOpening": [
+      "npb:11515130",
+      "npb:21925132",
+      "npb:91995131",
+      "npb:31735112",
+      "npb:41245137",
+      "npb:01405139",
+      "npb:81785133",
+      "npb:91995139",
+      "npb:81185133",
+      "npb:31335137",
+      "npb:01405116",
+      "npb:61965139",
+      "npb:71975135",
+      "npb:21325135",
+      "npb:41145139",
+      "npb:71575131",
+      "npb:01005135"
+    ],
+    "filed2025InOpening": 8,
+    "domesticHeld": 79,
+    "domesticOnlyHeld": 28,
+    "overseasHeld": 51,
+    "officialExercisePlayers2024_25": 15,
+    "unofficialReferenceDaysImported": 0,
+    "undeterminedQualifications": 0
+  },
+  "productionSha256": {
+    "src/engine/playerEligibility.js": "72cdd9f15fc7f3c3b6f585af1114dd4ff41c7772bcc73dbf1c67f5e10ff42e1f",
+    "src/engine/eligibilityMigration.js": "9887503051da42ab77e89b18a7cd80ca55b9f280899dd147c9e50ce97ebcc126",
+    "src/data/openingEligibility2026.js": "d4e6231f3bd16ba97d7657c78d095529611f26d0aac3594393fc5da7cbdd41f6",
+    "src/engine/annualPostingQualifications.js": "a0cd34123aaeef79eb389cf7ae3606270de1104380372f769429dce4398ea76d",
+    "src/engine/postingQualificationSnapshot.js": "e3fb1ccb9e6f06d73026f4dcf7f19f87a703a22e3128b927c460cf9243fb25af",
+    "src/engine/annualFaDeclarations.js": "78a7db625accfd98d3cda3565d3e9f40f08d0226c5f5cf5d08fa87adacf5f168",
+    "src/engine/annualAcquisitions.js": "847f143afee07a9595a4588f8ba69d807f18c05b84eb43712d4805bdec1e4441",
+    "src/engine/regularGameUpdates.js": "6e35277b5af8ba234010a70f6f5643c80b77e8734a9bc6f9d5b7c4ed8e150a87",
+    "src/engine/saveload.js": "255a17a4bc45aada425627f9bfcd8e20981d6383c5ce1c40afa8a7844d702e57"
+  }
+}

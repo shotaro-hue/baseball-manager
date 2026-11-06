@@ -18,6 +18,7 @@ import { parseContractDate, registrationDateAllowed } from './contractCalendar';
 import { ownedPlayers, validContractTerms } from './renewalRules';
 import { evaluateRosterCapacity, isIkuseiPlayer } from './rosterCapacity';
 import { marketPlacement } from './marketRoster';
+import { initializePlayerEligibility, completeFaRecontract } from './playerEligibility';
 import { projectTradeRosters } from './tradeTransaction';
 import { acquisitionOfferMetadata, normalizeMarketEntry } from './acquisitionMarket';
 import { inspectAnnualAcquisitions, acquisitionRosterError, explicitAcquisitionCandidate } from './annualAcquisitions';
@@ -314,7 +315,7 @@ function faCandidate(state, c) {
     return { ...state, spending: reserveAnnualProposal(state, 'offer', p) };
   }
   const spending = commitContractReservation(state.spending, p, { effectiveDate: state.date });
-  const acquired = { ...player, isFA: false, salary: p.contract.annualSalaryManYen, contractId: p.contract.contractId,
+  const acquired = { ...completeFaRecontract(player, p.contract.signedSeason), isFA: false, salary: p.contract.annualSalaryManYen, contractId: p.contract.contractId,
     contractYears: p.contract.termYears, contractYearsLeft: contractSeasonsRemaining(p.contract, state.season), contractSignedYear: p.contract.signedSeason };
   const farm = acquired.injuryDaysLeft > 0 || acquired.registrationCooldownDays > 0 || marketPlacement(team, acquired).farm;
   const nextTeam = { ...team, players: [...team.players, ...(!farm ? [acquired] : [])], farm: [...team.farm, ...(farm ? [acquired] : [])] };
@@ -393,10 +394,11 @@ function rookieCandidate(state, c) {
       || !validContractTerms(player, terms.annualSalaryManYen, terms.termYears))
       fail('新人の入団年度・区分・年俸・合意済み効力日を確認してください。');
     const spending = commitContractReservation(state.spending, p);
-    const acquired = { ...player, salary: terms.annualSalaryManYen, contractId: terms.contractId,
+    const acquired = initializePlayerEligibility({ ...player, entryType: player.prospectType ?? player.entryType,
+      draftYear: terms.signedSeason, salary: terms.annualSalaryManYen, contractId: terms.contractId,
       contractYears: terms.termYears, contractYearsLeft: contractSeasonsRemaining(terms, state.season),
       contractSignedYear: terms.signedSeason, 育成: terms.registrationType === 'development',
-      isIkusei: terms.registrationType === 'development', ikuseiYears: 0, isFA: false };
+      isIkusei: terms.registrationType === 'development', ikuseiYears: 0, isFA: false }, { year: state.season, firstContractYear: terms.signedSeason });
     return { ...state, spending, teams: state.teams.map(t => t.id === team.id ? { ...t, farm: [...t.farm, acquired] } : t) };
   }
   if (c.type === 'reserve-rookie') {

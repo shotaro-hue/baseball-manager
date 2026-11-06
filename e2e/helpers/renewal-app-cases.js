@@ -5,10 +5,21 @@ async function seedRenewal(page, embedded) {
   await loadFixture(page, 'draw-complete'); await waitSaveIdle(page); await page.goto('/');
   const info = await page.evaluate(async embedded => {
     const { loadGame, saveGame } = await import('/baseball-manager/src/engine/saveload.js');
+    const { faQualifiedThresholds } = await import('/baseball-manager/src/engine/playerEligibility.js');
+    const { getFaProgress } = await import('/baseball-manager/src/engine/contract.js');
     const s = await loadGame(), team = s.teams.find(t => t.id === s.myId);
     [...team.players, ...team.farm].forEach(p => { p.contractYearsLeft = 3; p.contractYears = 3; });
     const targets = [...team.players.slice(0, 4), ...team.farm.slice(0, 3)];
     targets.forEach((p, i) => { p.contractYearsLeft = 1; p.salary = i === 6 ? 300 : i === 0 || i === 4 ? 1000 : 10000; p.daysOnActiveRoster = i === 3 ? 10000 : 0; p.育成 = i === 6; p.ikuseiYears = i === 6 ? 2 : 0; });
+    // Loading already fixed the new qualification state. Seed the intended
+    // synthetic negotiation cases there, without changing protected history.
+    targets.forEach((p,i)=>{
+      const fa=p.eligibility.fa;
+      fa.days=fa.cycleStartDays+(i===3?faQualifiedThresholds(p).domestic:0);
+      fa.grants={domestic:false,overseas:false};
+      fa.basis=fa.qualificationBasis={kind:'game-history',method:'synthetic-renewal-fixture',sourceIds:[]};
+    });
+    if(targets.some((p,i)=>getFaProgress(p).domestic.eligible!==(i===3))) throw Error('renewal qualification fixture mismatch');
     // The numeric-zero identity is exercised through the real farm update path.
     targets[4].id = 0;
     const demands = Object.fromEntries(targets.map((p, i) => [p.id, { demandSalary: [1, 2, 3, 5].includes(i) ? 50000 : p.salary, minAcceptSalary: [1, 2, 3, 5].includes(i) ? 40000 : p.salary }]));

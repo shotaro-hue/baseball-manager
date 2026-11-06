@@ -34,7 +34,9 @@ for (const seed of [7,42,20261009]) it('preserves complete generated data and ra
   const baselineCalls=calls();
   // Pin every pre-existing generated field and RNG call. The additive annual
   // receipts ledger is separately covered by clubFinance lifecycle/roundtrip tests.
-  const digest=createHash('sha256').update(JSON.stringify(teams.map(({clubFinance,...existing})=>existing))).digest('hex');
+  const priorFields = ({ eligibility, proStartYear, birthDate, draftYear, ...existing }) => existing;
+  for (const p of all) { expect(p.eligibility.version).toBe(2); expect(Number.isInteger(p.proStartYear)).toBe(true); }
+  const digest=createHash('sha256').update(JSON.stringify(teams.map(({clubFinance,...existing})=>({ ...existing, players: existing.players.map(priorFields), farm: existing.farm.map(priorFields) })))).digest('hex');
   // DATA-PLAYER-2026 intentionally changes abilities to pre-opening projections,
   // removes randomized service time, adds source identity/confidence, and keeps
   // two development players outside the 65 controlled slots. Pin this new-game
