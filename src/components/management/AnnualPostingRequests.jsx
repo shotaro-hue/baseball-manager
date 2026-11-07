@@ -27,14 +27,14 @@ export function AnnualPostingRequests({ gs }) {
     } catch { if (mounted.current) setFailure({ reason: 'economy_commit_failed' }); }
     finally { busy.current = false; if (mounted.current) setSaving(false); }
   };
-  return <section className="management-decisions" aria-label="海外挑戦の希望確認">
+  return <section className="management-decisions" aria-label="年度の海外挑戦">
     <h2 ref={heading} tabIndex={-1}>{gs.year}年度の海外挑戦</h2>
     {generation ? <p role="status">希望確認済み · 希望者 {generation.candidates.filter(c => c.requestId !== null).length}人。申請ごとに球団判断を行ってください。</p>
       : <><p>自球団の支配下選手の希望を年一度確認します。希望があった選手は、受信箱で承認・拒否を判断できます。</p>
-        {!confirmation && <Button disabled={blocked} onClick={() => {
-          if (busy.current || blocked) return;
+        <Button disabled={blocked} aria-expanded={Boolean(confirmation)} onClick={() => {
+          if (busy.current || blocked || confirmation) return;
           setFailure(null); setConfirmation({ request: postingGenerationRequest(gs), session: gs.getProgressSessionToken() });
-        }}>海外挑戦の希望を確認する</Button>}</>}
+        }}>海外挑戦の希望を確認する</Button></>}
     {saving && <p role="status">希望の保存・反映を確認しています…</p>}
     {failure && <p role="alert">{failure.error || (recovery ? '保存済みの希望を画面へ反映できませんでした。復旧してください。'
       : '希望を保存できませんでした。同じ希望判定で再試行できます。')}</p>}

@@ -28,9 +28,9 @@ Files: `generatedPostingRequests.js`, `postingPreference.js`, `annualTransaction
 test `src/engine/__tests__/generatedPostingRequests.test.js`。
 Interface: `generate-posting-requests {id,type,teamId}`、年/球団の決定的ID。
 
-- [ ] 希望生成/ゼロ/除外/改変/順序/再実行の回帰を書き、REDを確認する。
-- [ ] 共通request子取引と年一度receipt、歴史入力検証を実装する。
-- [ ] 対象回帰と既存数値互換をGREENにする。
+- [x] 希望生成/ゼロ/除外/改変/順序/再実行の回帰を書き、REDを確認する。
+- [x] 共通request子取引と年一度receipt、歴史入力検証を実装する。
+- [x] 対象回帰と既存数値互換をGREENにする。
 
 ### Task 2: Human save and inbox
 
@@ -39,12 +39,14 @@ test `useGameState.economyPosting.test.js`, `tests/generated-posting-requests-co
 Interface: `postingGenerationRequest(world)` / `reducePostingGenerationRequest(world,request)` /
 `commitPostingGenerationRequest(request,sessionToken)`。
 
-- [ ] 実保存/失敗/二重操作/復旧/staleのREDを確認する。
-- [ ] 既存barrierと確認部品で受信箱を接続し、既存判断/交渉の回帰を確認する。
-- [ ] 両ブラウザの実操作と同状態画面比較を実施する。
+- [x] 実保存/失敗/二重操作/復旧/staleのREDを確認する。
+- [x] 既存barrierと確認部品で受信箱を接続し、既存判断/交渉の回帰を確認する。
+- [x] 両ブラウザの実操作と同状態画面比較を実施する。
 
 ### Task 3: Review and PR
 
-- [ ] 実装SHA、要件、実名簿入口を独立レビュアーへ渡し、具体的指摘を検証/修正する。
-- [ ] 計画/検証記録を更新し、専用branchのPRを作る。
-- [ ] 最新HEADの全必須CI結果を確認してPRを提示する。ユーザーのマージ判断で止める。
+- [x] 実装SHA、要件、実名簿入口を独立レビュアーへ渡し、具体的指摘を検証/修正する。
+- [x] 計画/検証記録を更新し、専用branchのPR #555を作る。
+- [x] 最新HEADのCI追跡先をPR本文へ設ける。必須CIが失敗/未完了なら提出完了扱いにしない。マージ判断はユーザーへ返す。
+
+実行SHA・最新CI結果・提出状態は[PR #555](https://github.com/shotaro-hue/baseball-manager/pull/555)を正本にする。
