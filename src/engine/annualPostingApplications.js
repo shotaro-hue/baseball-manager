@@ -1,6 +1,7 @@
 import { contractEmploymentAt } from './contractLedger';
 import { employmentContractId } from './seasonContract';
 import { isIkuseiPlayer } from './rosterCapacity';
+import { inspectAnnualPostingMarketResults } from './annualPostingMarketResults';
 
 const fail = () => { throw new Error('ポスティング申請・GM判断・元契約・市場未接続の状態を確認してください。'); };
 const id = v => (typeof v === 'string' && v.trim()) || (Number.isSafeInteger(v) && v >= 0);
@@ -24,8 +25,9 @@ export function normalizePostingApplication(c) {
 // the facts; approval is deliberately not a market outcome or a departure.
 export function postingApplicationViews(state) {
   const list = records(state), decisions = new Map(list.filter(r => r.kind === 'decision').map(r => [r.requestId, r]));
+  const results = new Map((state.postingMarketResults ?? []).map(r => [r.requestId, r]));
   return list.filter(r => r.kind === 'request').map(r => ({ ...r,
-    status: decisions.has(r.id) ? decisions.get(r.id).decision === 'approve' ? 'approved' : 'rejected' : 'pending' }));
+    status: results.get(r.id)?.outcome ?? (decisions.has(r.id) ? decisions.get(r.id).decision === 'approve' ? 'approved' : 'rejected' : 'pending') }));
 }
 function assertAvailable(state, r) {
   const t = state.teams.find(t => t.id === r.teamId), p = t && [...t.players, ...t.farm].find(p => p.id === r.playerId);
@@ -47,6 +49,7 @@ function decisionRecord(c, r) {
 export function inspectAnnualPostingApplications(state) {
   const list = records(state), ids = new Set(), sources = new Set(), requests = new Map(), answered = new Set(), employments = new Map();
   if (!Array.isArray(list) || (list.length && state.version !== 2)) fail();
+  const results = new Map(inspectAnnualPostingMarketResults(state).map(r => [r.requestId, r]));
   const receipts = new Map(state.transactions.map(t => [t.id, t]));
   for (const r of list) {
     if (!r || !id(r.id) || ids.has(String(r.id))) fail();
@@ -76,8 +79,11 @@ export function inspectAnnualPostingApplications(state) {
   }
   for (const r of postingApplicationViews(state)) {
     // No direct completion can masquerade as this new workflow's market step.
-    if ((state.postingDepartures ?? []).some(d => d.season === r.season && d.player.id === r.playerId)) fail();
-    if (r.status === 'rejected') continue;
+    const result = results.get(r.id), departures = (state.postingDepartures ?? []).filter(d => d.season === r.season && d.player.id === r.playerId);
+    if (result?.outcome === 'signed') {
+      if (departures.length !== 1 || departures[0].id !== JSON.stringify([result.completionId, 'posting-departure'])) fail();
+    } else if (departures.length) fail();
+    if (result || r.status === 'rejected') continue;
     if (r.season !== state.season || assertAvailable(state, r).postingRequested !== true) fail();
   }
   return list;

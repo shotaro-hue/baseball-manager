@@ -63,6 +63,11 @@ function preservesEconomyHistory(before, after) {
   const newDepartures = new Set((after.engine.postingDepartures ?? [])
     .slice((before.engine.postingDepartures ?? []).length).map(d => d.id));
   const newTransactions = new Set(after.engine.transactions.slice(before.engine.transactions.length).map(t => t.id));
+  // A market result cannot retrospectively claim a completion already published
+  // through the old explicit boundary. Parent and both children commit together.
+  if ((after.engine.postingMarketResults ?? []).slice((before.engine.postingMarketResults ?? []).length)
+    .some(r => r.outcome === 'signed' && (!newTransactions.has(r.id) || !newTransactions.has(r.completionId)
+      || !newDepartures.has(JSON.stringify([r.completionId, 'posting-departure']))))) return false;
   const oldFinalizedRetirements = new Set((before.engine.retirementReservations ?? [])
     .filter(r => r.finalization).map(r => r.id));
   if (nextIncome.slice(oldIncome.length).some(r => r.kind === 'posting'
@@ -74,7 +79,7 @@ function preservesEconomyHistory(before, after) {
   if (!preservesAcquisitionDecisions(before, after)) return false;
   if (canonical(before.faExerciseBirth) !== canonical(after.faExerciseBirth)) return false;
   if (canonical(before.engine.faExerciseOrigins ?? []) !== canonical(after.engine.faExerciseOrigins ?? [])) return false;
-  for (const key of ['faDeclarations', 'faDeclarationContexts', 'overseasDepartures', 'postingDepartures', 'postingApplications', 'postingQualifications']) {
+  for (const key of ['faDeclarations', 'faDeclarationContexts', 'overseasDepartures', 'postingDepartures', 'postingApplications', 'postingQualifications', 'postingMarketResults']) {
     const old = before.engine[key] ?? [], next = after.engine[key] ?? [];
     if (next.length < old.length || !old.every((row, i) => canonical(row) === canonical(next[i]))) return false;
   }
