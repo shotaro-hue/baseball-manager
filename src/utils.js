@@ -3,8 +3,8 @@
 ═══════════════════════════════════════════════ */
 
 // 乱数
-export const rng  = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
-export const rngf = (a, b) => Math.random() * (b - a) + a;
+export const rng  = (a, b, context) => Math.floor((context === undefined ? Math.random() : context.random()) * (b - a + 1)) + a;
+export const rngf = (a, b, context) => (context === undefined ? Math.random() : context.random()) * (b - a) + a;
 export const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 // 丸め

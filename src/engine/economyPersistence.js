@@ -63,6 +63,14 @@ function preservesEconomyHistory(before, after) {
   const newDepartures = new Set((after.engine.postingDepartures ?? [])
     .slice((before.engine.postingDepartures ?? []).length).map(d => d.id));
   const newTransactions = new Set(after.engine.transactions.slice(before.engine.transactions.length).map(t => t.id));
+  if (after.engine.transactions.slice(before.engine.transactions.length).some(t => {
+    const g = t.generatedPostingMarket;
+    // A reused explicit qualification may itself be unpublished in this valid
+    // multi-revision extension. Only qualifications created by this parent must
+    // enter alongside it; its result must always be new in either case.
+    return g && (!newTransactions.has(g.resultId)
+      || g.qualificationCreated && !newTransactions.has(g.qualificationId));
+  })) return false;
   // A market result cannot retrospectively claim a completion already published
   // through the old explicit boundary. Parent and both children commit together.
   if ((after.engine.postingMarketResults ?? []).slice((before.engine.postingMarketResults ?? []).length)
