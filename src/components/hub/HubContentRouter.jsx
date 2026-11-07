@@ -30,6 +30,7 @@ import HubTabFallback from './HubTabFallback';
 import HubManagementTab from './HubManagementTab';
 import HubSettingsTab from './HubSettingsTab';
 import { deliveredMailbox } from './hubNavigation';
+import { postingMailbox } from '../../engine/humanPosting';
 
 const StatsTab = lazy(() =>
   import('../tabs/StatsTab').then((module) => ({ default: module.StatsTab })),
@@ -71,7 +72,7 @@ export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTab
   const { myTeam, myId, teams, year, gameDay, schedule, faPool } = gs;
 
   const allMailbox = gs.getMailboxBySelector();
-  const mailboxForView = deliveredMailbox(allMailbox, gameDay);
+  const mailboxForView = deliveredMailbox(postingMailbox(gs, allMailbox), gameDay);
   const newsForView = gs.getNewsBySelector({ limit: 200 });
   const unreadMailboxCount = gs.getUnreadMailboxCount(gameDay);
   const latestNewsId = gs.getLatestNewsId();
@@ -290,6 +291,7 @@ export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTab
     return (
       <MailboxTab
         annualContracts={gs.contractEconomy?.mode === 'annual'}
+        annualGs={gs.contractEconomy?.mode === 'annual' ? gs : undefined}
         mailbox={mailboxForView}
         onRead={os.handleMailRead}
         onAction={os.handleMailAction}

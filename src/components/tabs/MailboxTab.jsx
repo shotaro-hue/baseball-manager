@@ -2,7 +2,9 @@ import React, { useRef, useState } from 'react';
 import { DecisionConfirmation, money } from '../management/DecisionParts';
 import { Button, StateLabel } from '../design-system/primitives';
 import { ReadingList, ReadingFilters, ReadingDetail, useReadingSelection } from '../reading/ReadingParts';
-const actionable = m => !m.resolved && (m.type === 'posting_request' || m.type === 'trade' && m.offer);
+import { AnnualPostingDecision } from '../management/AnnualPostingDecision';
+import { postingStatusText } from '../../engine/humanPosting';
+const actionable = m => !m.resolved && !m.postingUnavailable && (m.type === 'posting_request' || m.type === 'trade' && m.offer);
 const label = type => ({
   trade: 'トレードオファー',
   posting_request: 'ポスティング申請',
@@ -11,8 +13,13 @@ const label = type => ({
   posting_result: 'ポスティング結果',
   cpu_fa_summary: 'FA移籍情報'
 })[type] ?? 'お知らせ';
+function MailStatus({ mail }) {
+  if (mail.annualPosting) return <StateLabel tone={mail.resolved ? 'neutral' : 'warning'}>{postingStatusText[mail.annualPosting.status]}</StateLabel>;
+  return <>{!mail.read && <StateLabel>未読</StateLabel>}{actionable(mail) && <StateLabel tone="warning">要対応</StateLabel>}{mail.resolved && <StateLabel>対応済み</StateLabel>}</>;
+}
 export function MailboxTab({
   annualContracts = false,
+  annualGs,
   mailbox = [],
   unreadCount = 0,
   onRead,
@@ -69,11 +76,11 @@ export function MailboxTab({
           setFilter(value);
           selection.close();
         }} />
-        <ReadingList key={filter} items={shown} label="通知" selection={rowSelection} searchText={m => [m.title, m.from, label(m.type)].join(' ')} renderItem={m => <><strong>{m.title}</strong><span className="reading-status">{!m.read && <StateLabel>未読</StateLabel>}{actionable(m) && <StateLabel tone="warning">要対応</StateLabel>}{m.resolved && <StateLabel>対応済み</StateLabel>}</span><small>{label(m.type)} · {m.from} · {m.dateLabel}</small></>} />
+        <ReadingList key={filter} items={shown} label="通知" selection={rowSelection} searchText={m => [m.title, m.from, label(m.type)].join(' ')} renderItem={m => <><strong>{m.title}</strong><span className="reading-status"><MailStatus mail={m} /></span><small>{label(m.type)} · {m.from} · {m.dateLabel}</small></>} />
       </section>
       {selected && <ReadingDetail selection={selection} title={selected.title}>
         <p className="reading-muted">{label(selected.type)} · 差出人: {selected.from} · {selected.dateLabel}</p>
-        <div className="reading-status">{actionable(selected) && <StateLabel tone="warning">要対応</StateLabel>}{selected.resolved && <StateLabel>対応済み</StateLabel>}</div>
+        <div className="reading-status"><MailStatus mail={selected} /></div>
         <p className="reading-body">{selected.body}</p>
         {selected.type === 'trade' && selected.offer && !selected.resolved && <>
           <div className="reading-offer"><section><h3>あなたが出す</h3>{selected.offer.want.map(p => <p key={p.id}>{p.name} <small>{p.pos}</small></p>)}</section>
@@ -81,7 +88,9 @@ export function MailboxTab({
           {annualContracts ? <p>トレード画面で年度別の負担を確認してから、承諾・辞退してください。</p>
             : <div className="reading-actions"><Button disabled={handled.current.has(selected.id)} onClick={() => decide('accept')}>✅ 承諾する</Button><Button variant="secondary" disabled={handled.current.has(selected.id)} onClick={() => decide('decline')}>❌ 断る</Button></div>}
         </>}
-        {selected.type === 'posting_request' && !selected.resolved && <>
+        {selected.annualPosting && annualGs && <AnnualPostingDecision key={selected.id} gs={annualGs} application={selected.annualPosting} fallbackFocus={selection.detailRef} />}
+        {selected.type === 'posting_request' && !selected.annualPosting && annualContracts && <p>旧方式の通知です。保存済みの新しい申請から球団判断を行ってください。</p>}
+        {selected.type === 'posting_request' && !selected.resolved && !annualContracts && <>
           <h3>ポスティング判断</h3><p>承認すると選手はMLBへ移籍し、球団に移籍金収入が入ります。拒否すると残留し、モラルが10下がります。</p>
           <div className="reading-actions"><Button disabled={handled.current.has(selected.id)} onClick={() => decide('accept')}>✅ 承認する</Button><Button variant="secondary" disabled={handled.current.has(selected.id)} onClick={() => decide('decline')}>❌ 拒否する</Button></div>
         </>}
