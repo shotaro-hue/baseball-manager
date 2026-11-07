@@ -168,7 +168,7 @@ export function fromAnnualState(world, input) {
     return { ...t, players: t.players.map(projectPlayer), farm: t.farm.map(projectPlayer), budget: row.remainingManYen };
   });
   const engine = Object.fromEntries(['version', 'spending', ...engineArrays,
-    ...['retirementReservations', 'faDeclarations', 'faExerciseOrigins', 'faDeclarationContexts', 'overseasDepartures', 'postingDepartures', 'postingApplications', 'postingQualifications'].filter(k => state[k] !== undefined)].map(k => [k, state[k]]));
+    ...['retirementReservations', 'faDeclarations', 'faExerciseOrigins', 'faDeclarationContexts', 'overseasDepartures', 'postingDepartures', 'postingApplications', 'postingQualifications', 'postingMarketResults'].filter(k => state[k] !== undefined)].map(k => [k, state[k]]));
   const { staffContracts, offseasonDepartures, ...persistedSpending } = engine.spending;
   engine.spending = persistedSpending;
   const next = { ...world, teams, faPool: state.faPool, offseasonPlan: projectDraftPlan(world, state),
@@ -187,9 +187,9 @@ function runCommand(world, command) {
   if (c.type === 'depart-overseas' && !state.transactions.some(r => r.id === c.id)
     && world.contractEconomy.decisions.some(d => d.kind === 'human-acquisition' && d.status === 'pending' && d.playerId === c.playerId))
     fail('回答待ちのNPB獲得を解決してから海外離脱してください。');
-  if (['request-posting', 'enter-market', 'reserve-retirement', 'finalize-retirement', 'declare-fa', 'end-contract', 'complete-posting'].includes(c.type) && (state.phase === 'season' || ['request-posting', 'finalize-retirement', 'declare-fa', 'end-contract', 'complete-posting'].includes(c.type))
+  if (['request-posting', 'enter-market', 'reserve-retirement', 'finalize-retirement', 'declare-fa', 'end-contract', 'complete-posting', 'resolve-posting'].includes(c.type) && (state.phase === 'season' || ['request-posting', 'finalize-retirement', 'declare-fa', 'end-contract', 'complete-posting', 'resolve-posting'].includes(c.type))
     && !state.transactions.some(r => r.id === c.id)
-    && world.contractEconomy.decisions.some(d => d.kind === 'human-renewal' && d.status === 'pending' && d.playerId === (c.playerId ?? state.retirementReservations?.find(r => r.id === c.reservationId)?.playerId)))
+    && world.contractEconomy.decisions.some(d => d.kind === 'human-renewal' && d.status === 'pending' && d.playerId === (c.playerId ?? state.postingApplications?.find(r => r.kind === 'request' && r.id === c.requestId)?.playerId ?? state.retirementReservations?.find(r => r.id === c.reservationId)?.playerId)))
     fail('回答待ちの更改を解決してから退団してください。');
   if (c.proposal) {
     if (c.proposal.contract?.guaranteed !== true) fail('新しい契約の保証を外すことはできません。');

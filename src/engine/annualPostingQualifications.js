@@ -22,7 +22,8 @@ function recordFor(state, c, request, recordedDate, restoring = false) {
   const team = state.teams.find(t => t.id === request?.teamId);
   const player = team && [...team.players, ...team.farm].find(p => p.id === request.playerId);
   const i = state.economyIdentity;
-  if (state.version !== 2 || !i || !id(i.saveId) || !id(i.epoch) || !request || request.status !== 'approved'
+  if (state.version !== 2 || !i || !id(i.saveId) || !id(i.epoch) || !request
+    || !(request.status === 'approved' || (restoring && ['signed', 'no-offer', 'declined'].includes(request.status)))
     || (!restoring && (!player || player.contractId !== request.sourceContractId)) || c.facts.playerId !== request.playerId
     || ((!restoring || player?.contractId === request.sourceContractId) && c.facts.sourcePlayerId !== (player.realPlayerId ?? null)) || recordedDate !== request.requestedDate
     || recordedDate > state.date) fail();
