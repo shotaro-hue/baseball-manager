@@ -170,6 +170,47 @@ PR #521レビュー修正: revision増加でもrandomRoot・確定済み台帳�
 
 ## Task 7: A1-2c 退団・市場・海外離脱
 
+### 2026-11-07: #554 P1修正 — JavaScriptエンジン間の保存互換性
+
+対象公開HEAD `c2dccd3aa472f4e3ec48e0ea617aa6b42108f89d` / base `4c3d8c1133f0271a0e4c8f6c89dcfc30e9550729`。ユーザーの本P1仕様を受入条件とし、既存PR/同ブランチへ追記する。新PR・main push・merge/automerge・履歴書換は禁止。公開OFF/schema1/DB5、既存価格係数、CPU/Workerの工程範囲を維持する。
+
+レビュー受領・原因調査・実装計画/TDDの手順で実装する。開始時のPR HEAD/baseは指定値と同じ、レビュー/inline/Conversationは0件、旧CI #703は成功。ローカルHEADは公開時のメタデータ差で`f5db1bf`だが、公開HEADとtree `ba0f657fbd906cc606bebf09327458826104e35a`が一致する。既存ローカル/公開履歴を保存し、修正をそれぞれの末尾へ追記する。
+
+- [x] RED: 5700万円・26歳先発65・seed review-math-6を現行コードで生成。Node v24.22.1→WebKit2215、逆方向ともvalidateEconomySaveが拒否。moneyScoreは84.89815806161393/84.89815806161391、契約/結果は同じ。変更前の両worldを圧縮fixtureへ保持する。
+- [x] 実装: `postingMarketNumbers.js`にposting専用のBigInt数値処理を置く。対数/2のべき乗/年齢係数は固定精度整数で評価、価格は有理数からUSD単位へ一度丸める。moneyScore/総合scoreは12桁へ丸めた同じ値を判定/保存/再検証に用いる。新評価はversion2、価格policy名/係数とRNG用途/消費数は維持する。
+- [x] 旧v1: 原本を無変更で検証する。旧Math.log2の近傍ULP候補からmoneyScoreを再現し、その保存値から旧score/結果を厳密再計算する。旧べき乗の近傍候補から旧価格の丸め結果を列挙し、整数金額はその正確な候補・子取引・収入と一致させる。全評価/全金額への一律epsilonは使わない。既存prefix保護を維持し、旧履歴の再抽選・移行書換をしない。
+- [x] 回帰: 指定の旧V8/JSC両fixture、旧価格丸め境界/受諾閾値、通常/微小差を越えた改変、三分岐、旧明示結果、失敗/再試行/復旧を確認。`postingMarketNumbers`/model/generated/saveテストと既存関連7ファイルを実行する。
+- [x] エンジン間受入: `e2e/save-generations.spec.js`の既存CI経路へ独立caseを接続。Node生成worldをページ内でsave/load/validateし、ページ生成worldをNode側の実save/load/validateへ戻す。両方向の旧/新履歴で金額・結果・退団・収入・翌年枠・revisionの不変、再試行の一度限り確定、改変拒否を確認。実iPhone確認とは分ける。
+- [ ] 別コンテキスト独立レビュー→指摘実証/修正→同PR更新→最終HEADの必須CI。新しい数値/旧履歴規則とRED/GREEN/エンジン版を既存検証READMEへ記録し、ユーザーのマージ判断で止める。
+
+### 2026-11-07: #554予定 — 海外提示・本人判断から保存結果まで
+
+基準main `4c3d8c1133f0271a0e4c8f6c89dcfc30e9550729`（#553マージ済み）。親目標は通常プレイでのポスティング完結。今回は、既存の承認済み申請→海外交渉結果の確認→成立/提示なし/本人辞退→既存の退団・収入・翌年度限定枠と結果表示までを接続する統合工程。開始は通知→受信箱の球団承認済み申請。承認操作自体の意味は#553のままとし、市場の結果確認を別操作にする。
+
+価格方針は2026-11-07のユーザー回答「実相場で」により、**実際のMLB契約相場を基準にし、球団経済への影響を校正する**を採用。能力・実績・年齢の市場評価と、海外志向/残留条件を比較する本人判断を接続する。固定円係数の旧入札額や、NPB年俸への一律倍率を提示価格の根拠にしない。実名選手を名指しで価格付けせず、同じ役割/入力には共通のversion付きモデルを使う。
+
+価格方針の比較用試算（係数の採用ではない）。既存quotePostingIncomeのJPY150/USD・100%翌年限定配分で、[鈴木誠也の5年$85M](https://www.mlb.com/news/seiya-suzuki-signs-5-year-deal-with-cubs)相当の保証額は追加枠219,375万円、[今永昇太の4年$53M](https://www.mlb.com/news/cubs-introduce-free-agent-pitcher-shota-imanaga)相当は147,375万円。比較用NPB年俸をそれぞれ3億/2億円、MLB年俸をその2倍と仮置きすると、追加枠は60,000/31,999万円となる。NPB年俸は架空の比較条件で、両実選手の年俸という主張ではない。MLB実例は保証額の尺度を比較する参考であり、特定選手を名指しで価格付けする実装は行わない。
+
+**正本と制約:** createInitialTeamsの実12球団1,059選手を確認。既存tradeValueの野手/投手・年齢補正をそのまま金額尺度へしない。実名簿のpersonalityにはoverseas未記録があり、未記録を0という実測値にしない。能力・直近実績と元契約/債務は保存時点の正本から取得し、ゲーム内推定は事実と分ける。保証retainでは既存負担が残留/海外移籍の両方に残るため、本人評価で残留側だけへ二重加算しない。自動waive/旧保証unknownのtrue化は行わない。
+
+先行作業では共通入力/抽選26件と既存の契約・トレード・posting回帰を確認。入力は実名簿ID、資格snapshotの年齢、台帳の年俸/将来負担、実測0/未記録、旧保証unknownを保持する。以下の統合受入を満たすまで工程全体の完了にしない。
+
+**Files/Interfaces:** 共通乱数は予定済み`src/engine/economyRandom.js`と既存`utils.rng/rngf`の任意contextを使い、save/epoch/season/request/purpose別に再現する。入力snapshotは`postingMarketInputs`で実能力/実績/元契約/資格/記録有無を組み立てる。後続の市場model→共通annual transaction→fromAnnualStateで一つのworld候補へ戻し、一操作一revisionで保存する。資格＋市場結果を別world revisionで合成し、commitのbaseRevision+1制約を回避する実装は行わない。
+
+`postingMarketModel.evaluatePostingMarket(inputs,randomRoot,scope)`は野手/先発/救援の能力と直近実績、年齢から提示を作り、MLB保証総額/minor契約金を区別する。`run-posting-market {id,type,requestId}`は金額や結果を受け取らず、必要なv2資格・評価snapshot・既存resolve-postingの結果と親receiptを同一native候補へ入れる。`generatedPostingMarket`の追記receiptを復元時もversion別に再計算し、孤立・改変・旧結果への後付けを拒否する。人/CPU共通の市場処理と、人のsession/自球団を検査するrequest adapterを分ける。
+
+モデルv1は実例の金額尺度を参考にした簡略化。MLB30球団や各球団の国際bonus pool残高は再現しない。minor上限はゲーム内校正値で制度上の普遍的上限とは主張しない。未記録の海外志向はsave/epoch/season/player別のゲーム内推定として明示し、元データへ書き戻さない。生成結果は原則retainのみ。予算/保存拒否を市場の提示なしや本人辞退へ書き換えない。
+
+- [x] 共通入力と乱数: 実名簿と欠測/実測0、元契約と保証、数値ID0、purpose独立、再読込/再試行、既存rng呼出互換を検証する。
+- [x] 価格方針: ユーザー選択を受けて候補を比較/校正し、major/minor、提示なし/受諾/辞退と理由をversion付きで具体化する。実例の契約額は参考事実であり、現実の制度全体/将来相場を再現したと主張しない。
+- [x] 統合: 人が任意の金額/結果を注入する入口を作らず、保存済み申請・資格・固定入力/評価根拠を既存resolve-postingへ渡す。一回限りの保存・receipt・履歴を保持し、失敗で退団/収入を先行させない。
+- [x] 受入: 実名簿の正常/拒否、三結果、minor実測0、retained負担、stale identity/revision/session、二重操作、保存失敗→cold load→同じ結果、過年度履歴を技術検証。360/390/1440pxの結果確認と再開を両ブラウザで確認する。
+- [ ] 独立レビュー、指摘検証/修正、対象検証、専用PRとexact HEAD必須CI。公開OFF/schema1/DB5を維持し、main push/マージ/自動マージはしない。
+
+関連18ファイル合計385テスト、受信箱経路の両ブラウザ36ケースを確認。独立レビューで実証された未公開資格のまとめ保存の過剰拒否と、承認済み案件が要対応から消える問題を修正し、回帰を追加。再現用入力・実相場参照・経済影響・画面比較は[検証記録](../../validation/gm-01-posting-market-model/README.md)。
+
+**残工程:** 通常プレイの自動希望発生・CPU判断・年度Worker、A1全体の統合プレイ/長期経済/実機/公開判断。今回もannual保存fixtureの統合と機能全体の通常プレイ完成を分け、Task7/A1全体は未完了とする。次優先はこの申請→結果の経路を通常の年度進行へ接続すること。
+
 ### 2026-11-07: ポスティングの球団判断・結果確認を受信箱へ統合
 
 基準main `e15c57d5f2f813e2223b777129f74027052c0b33`（#551・#552マージ済み）。PR種別は統合。親目標は、プレイヤーが申請から球団判断・海外交渉・成立/不成立・翌年度反映まで完結できること。今回は通知→受信箱から、保存済みの自球団申請の承認/拒否と結果確認を可能にする。承認で退団・入金せず、拒否でも契約・財務を維持する。市場結果は#551の保存証跡を表示し、画面で金額や結果を生成しない。

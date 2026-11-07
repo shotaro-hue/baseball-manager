@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
-import { postingDecisionRequest, reducePostingDecisionRequest, postingMailbox } from '../humanPosting';
+import { postingDecisionRequest, reducePostingDecisionRequest, postingMailbox, postingMarketRequest, reducePostingMarketRequest } from '../humanPosting';
+import { generatedPostingWorld } from './fixtures/postingMarketResults';
 import { reduceEconomyCommand } from '../contractEconomy';
 import { validateEconomySave } from '../economyPersistence';
 import { postingWinter } from './fixtures/postingDepartures';
@@ -10,6 +11,21 @@ import { freezeEconomy } from './fixtures/economyWorld';
 import { notificationSummary } from '../../components/hub/hubNavigation';
 
 const pending = () => reduceEconomyCommand(postingWinter(), postingRequest(postingWinter())).world;
+it.each([{ teamId: 1 }, { saveId: 'other' }, { epoch: 'other' }, { baseRevision: 0 }, { baseRevision: 99 },
+  { season: 2025 }, { date: '2026-12-02' }, { requestId: 'absent' }, { outcome: 'signed' }])('rejects foreign, stale or caller-directed human market input %j', extra => {
+  const w = generatedPostingWorld(), before = structuredClone(w), request = { ...postingMarketRequest(w, 'request'), ...extra };
+  expect(reducePostingMarketRequest(freezeEconomy(w), request)).toMatchObject({ ok: false, world: w }); expect(w).toEqual(before);
+});
+it('requires approval for a human market and derives a readable offer and decision from saved evidence', () => {
+  const p = pending(); expect(reducePostingMarketRequest(p, postingMarketRequest(p, 'request')).ok).toBe(false);
+  for (const outcome of ['signed', 'no-offer', 'declined']) {
+    const w = generatedPostingWorld(outcome), r = reducePostingMarketRequest(w, postingMarketRequest(w, 'request'));
+    expect(r.ok, r.error).toBe(true);
+    const notice = postingMailbox(r.world).find(m => m.annualPosting);
+    expect(notice.body).toContain('市場評価'); expect(notice.annualPosting.status).toBe(outcome);
+    if (outcome !== 'no-offer') expect(notice.body).toContain('提示条件：');
+  }
+});
 it.each(['approve', 'reject'])('saves the human %s once without moving the player or money', decision => {
   const w = pending(), before = structuredClone(w), request = postingDecisionRequest(w, 'request', decision);
   const result = reducePostingDecisionRequest(freezeEconomy(w), request);
@@ -47,9 +63,9 @@ it('derives pending and approved states from transactions, disabling stale legac
   expect(notificationSummary({ mailbox: mails, gameDay: w.gameDay })).toMatchObject({ posting: 1, actionable: 1 });
   const next = reducePostingDecisionRequest(w, postingDecisionRequest(w, 'request', 'approve')).world;
   const approved = postingMailbox(next, [old]).find(m => m.annualPosting);
-  expect(approved.id).toBe(notice.id); expect(approved.resolved).toBe(true);
+  expect(approved.id).toBe(notice.id); expect(approved.resolved).toBe(false);
   expect(approved.body).toContain('市場結果待ち'); expect(approved.body).toContain('入金');
-  expect(notificationSummary({ mailbox: postingMailbox(next, [old]), gameDay: w.gameDay })).toMatchObject({ posting: 0, actionable: 0 });
+  expect(notificationSummary({ mailbox: postingMailbox(next, [old]), gameDay: w.gameDay })).toMatchObject({ posting: 1, actionable: 1 });
 });
 it.each(['signed', 'no-offer', 'declined'])('shows a saved %s result, including after a historical year transition', outcome => {
   const teams = [playableClub(), playableClub(1)];
@@ -58,6 +74,7 @@ it.each(['signed', 'no-offer', 'declined'])('shows a saved %s result, including 
   expect(result.ok, result.error).toBe(true);
   const notice = postingMailbox(result.world, []).find(m => m.annualPosting);
   expect(notice.annualPosting.status).toBe(outcome); expect(notice.resolved).toBe(true);
+  expect(notificationSummary({ mailbox: postingMailbox(result.world), gameDay: w.gameDay })).toMatchObject({ posting: 0, actionable: 0 });
   expect(notice.body).toContain(outcome === 'signed' ? '2027年度限定' : outcome === 'no-offer' ? '提示なし' : '本人辞退');
   const later = nextSeasonForDepartureTest(result.world);
   expect(postingMailbox(later, []).find(m => m.id === notice.id).body).toBe(notice.body);

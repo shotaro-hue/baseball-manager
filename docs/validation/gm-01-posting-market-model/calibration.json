@@ -1,0 +1,381 @@
+{
+  "sourcePlayers": 1059,
+  "development": 268,
+  "missingSourceId": 0,
+  "evaluatedPlayers": 791,
+  "seeds": 3,
+  "sourceSha256": "fbc5d18ab0807b1baa48449c7adbe1b200c2db9ffc56df036202e7f367c3c999",
+  "inputsSha256": "708b534317975e02d764b31e478428df0f6d0b3324dc45c3a4c4416e1ac97b83",
+  "cases": 2373,
+  "outcomes": {
+    "no-offer": 1568,
+    "declined": 426,
+    "signed": 379
+  },
+  "exemptions": {
+    "exempt": 1251,
+    "restricted": 1122
+  },
+  "groups": {
+    "batter": {
+      "cases": 1161,
+      "outcome": {
+        "no-offer": 926,
+        "declined": 162,
+        "signed": 73
+      },
+      "offers": {
+        "minor": 168,
+        "major": 67
+      },
+      "majorUsd": {
+        "min": 1450000,
+        "median": 5000000,
+        "max": 97500000
+      },
+      "minorUsd": {
+        "min": 6000,
+        "median": 80000,
+        "max": 550000
+      }
+    },
+    "starter": {
+      "cases": 315,
+      "outcome": {
+        "no-offer": 205,
+        "declined": 60,
+        "signed": 50
+      },
+      "offers": {
+        "minor": 56,
+        "major": 54
+      },
+      "majorUsd": {
+        "min": 1000000,
+        "median": 6900000,
+        "max": 162400000
+      },
+      "minorUsd": {
+        "min": 10000,
+        "median": 160000,
+        "max": 1850000
+      }
+    },
+    "relief": {
+      "cases": 897,
+      "outcome": {
+        "signed": 256,
+        "no-offer": 437,
+        "declined": 204
+      },
+      "offers": {
+        "major": 217,
+        "minor": 243
+      },
+      "majorUsd": {
+        "min": 1000000,
+        "median": 4400000,
+        "max": 80000000
+      },
+      "minorUsd": {
+        "min": 11000,
+        "median": 250000,
+        "max": 6500000
+      }
+    }
+  },
+  "highestMajor": [
+    {
+      "seed": "calibration-2",
+      "name": "宮城 大弥",
+      "playerId": "npb:71875151",
+      "teamId": 11,
+      "role": "starter",
+      "age": 25,
+      "exemption": "exempt",
+      "score": 85.01288242104634,
+      "outcome": "declined",
+      "kind": "major",
+      "years": 7,
+      "guaranteedUsdCents": 16240000000,
+      "incomeManYen": 393525,
+      "payrollManYen": 342640
+    },
+    {
+      "seed": "calibration-3",
+      "name": "宮城 大弥",
+      "playerId": "npb:71875151",
+      "teamId": 11,
+      "role": "starter",
+      "age": 25,
+      "exemption": "exempt",
+      "score": 85.01288242104634,
+      "outcome": "signed",
+      "kind": "major",
+      "years": 7,
+      "guaranteedUsdCents": 14175000000,
+      "incomeManYen": 347062,
+      "payrollManYen": 342640
+    },
+    {
+      "seed": "calibration-1",
+      "name": "宮城 大弥",
+      "playerId": "npb:71875151",
+      "teamId": 11,
+      "role": "starter",
+      "age": 25,
+      "exemption": "exempt",
+      "score": 85.01288242104634,
+      "outcome": "signed",
+      "kind": "major",
+      "years": 7,
+      "guaranteedUsdCents": 13895000000,
+      "incomeManYen": 340762,
+      "payrollManYen": 342640
+    },
+    {
+      "seed": "calibration-3",
+      "name": "近藤 健介",
+      "playerId": "npb:41745135",
+      "teamId": 6,
+      "role": "batter",
+      "age": 33,
+      "exemption": "exempt",
+      "score": 69.51095197993655,
+      "outcome": "signed",
+      "kind": "major",
+      "years": 3,
+      "guaranteedUsdCents": 9750000000,
+      "incomeManYen": 247500,
+      "payrollManYen": 723150
+    },
+    {
+      "seed": "calibration-2",
+      "name": "近藤 健介",
+      "playerId": "npb:41745135",
+      "teamId": 6,
+      "role": "batter",
+      "age": 33,
+      "exemption": "exempt",
+      "score": 69.51095197993655,
+      "outcome": "signed",
+      "kind": "major",
+      "years": 3,
+      "guaranteedUsdCents": 9690000000,
+      "incomeManYen": 246150,
+      "payrollManYen": 723150
+    },
+    {
+      "seed": "calibration-1",
+      "name": "伊藤 大海",
+      "playerId": "npb:51355153",
+      "teamId": 10,
+      "role": "starter",
+      "age": 29,
+      "exemption": "exempt",
+      "score": 83.43173744604694,
+      "outcome": "signed",
+      "kind": "major",
+      "years": 5,
+      "guaranteedUsdCents": 9400000000,
+      "incomeManYen": 239625,
+      "payrollManYen": 452180
+    },
+    {
+      "seed": "calibration-1",
+      "name": "杉山 一樹",
+      "playerId": "npb:91995138",
+      "teamId": 6,
+      "role": "relief",
+      "age": 28,
+      "exemption": "exempt",
+      "score": 82.13596983304548,
+      "outcome": "signed",
+      "kind": "major",
+      "years": 5,
+      "guaranteedUsdCents": 8000000000,
+      "incomeManYen": 208125,
+      "payrollManYen": 723150
+    },
+    {
+      "seed": "calibration-2",
+      "name": "杉山 一樹",
+      "playerId": "npb:91995138",
+      "teamId": 6,
+      "role": "relief",
+      "age": 28,
+      "exemption": "exempt",
+      "score": 82.13596983304548,
+      "outcome": "signed",
+      "kind": "major",
+      "years": 5,
+      "guaranteedUsdCents": 8000000000,
+      "incomeManYen": 208125,
+      "payrollManYen": 723150
+    },
+    {
+      "seed": "calibration-3",
+      "name": "杉山 一樹",
+      "playerId": "npb:91995138",
+      "teamId": 6,
+      "role": "relief",
+      "age": 28,
+      "exemption": "exempt",
+      "score": 82.13596983304548,
+      "outcome": "declined",
+      "kind": "major",
+      "years": 5,
+      "guaranteedUsdCents": 8000000000,
+      "incomeManYen": 208125,
+      "payrollManYen": 723150
+    },
+    {
+      "seed": "calibration-1",
+      "name": "近藤 健介",
+      "playerId": "npb:41745135",
+      "teamId": 6,
+      "role": "batter",
+      "age": 33,
+      "exemption": "exempt",
+      "score": 69.51095197993655,
+      "outcome": "signed",
+      "kind": "major",
+      "years": 3,
+      "guaranteedUsdCents": 7695000000,
+      "incomeManYen": 201262,
+      "payrollManYen": 723150
+    }
+  ],
+  "highestMinor": [
+    {
+      "seed": "calibration-1",
+      "name": "松山 晋也",
+      "playerId": "npb:61865157",
+      "teamId": 5,
+      "role": "relief",
+      "age": 26,
+      "exemption": "restricted",
+      "score": 87.00222222222222,
+      "outcome": "declined",
+      "kind": "minor",
+      "years": 1,
+      "signingBonusUsdCents": 650000000,
+      "incomeManYen": 24375,
+      "payrollManYen": 271180
+    },
+    {
+      "seed": "calibration-2",
+      "name": "松山 晋也",
+      "playerId": "npb:61865157",
+      "teamId": 5,
+      "role": "relief",
+      "age": 26,
+      "exemption": "restricted",
+      "score": 87.00222222222222,
+      "outcome": "declined",
+      "kind": "minor",
+      "years": 1,
+      "signingBonusUsdCents": 650000000,
+      "incomeManYen": 24375,
+      "payrollManYen": 271180
+    },
+    {
+      "seed": "calibration-3",
+      "name": "松山 晋也",
+      "playerId": "npb:61865157",
+      "teamId": 5,
+      "role": "relief",
+      "age": 26,
+      "exemption": "restricted",
+      "score": 87.00222222222222,
+      "outcome": "declined",
+      "kind": "minor",
+      "years": 1,
+      "signingBonusUsdCents": 650000000,
+      "incomeManYen": 24375,
+      "payrollManYen": 271180
+    },
+    {
+      "seed": "calibration-1",
+      "name": "大勢",
+      "playerId": "npb:81085155",
+      "teamId": 4,
+      "role": "relief",
+      "age": 27,
+      "exemption": "restricted",
+      "score": 80.12037777777779,
+      "outcome": "declined",
+      "kind": "minor",
+      "years": 1,
+      "signingBonusUsdCents": 446000000,
+      "incomeManYen": 16725,
+      "payrollManYen": 421170
+    },
+    {
+      "seed": "calibration-2",
+      "name": "大勢",
+      "playerId": "npb:81085155",
+      "teamId": 4,
+      "role": "relief",
+      "age": 27,
+      "exemption": "restricted",
+      "score": 80.12037777777779,
+      "outcome": "declined",
+      "kind": "minor",
+      "years": 1,
+      "signingBonusUsdCents": 415000000,
+      "incomeManYen": 15562,
+      "payrollManYen": 421170
+    }
+  ],
+  "largestIncomePayrollRatio": [
+    {
+      "seed": "calibration-2",
+      "name": "宮城 大弥",
+      "playerId": "npb:71875151",
+      "teamId": 11,
+      "role": "starter",
+      "age": 25,
+      "exemption": "exempt",
+      "score": 85.01288242104634,
+      "outcome": "declined",
+      "kind": "major",
+      "years": 7,
+      "guaranteedUsdCents": 16240000000,
+      "incomeManYen": 393525,
+      "payrollManYen": 342640
+    },
+    {
+      "seed": "calibration-3",
+      "name": "宮城 大弥",
+      "playerId": "npb:71875151",
+      "teamId": 11,
+      "role": "starter",
+      "age": 25,
+      "exemption": "exempt",
+      "score": 85.01288242104634,
+      "outcome": "signed",
+      "kind": "major",
+      "years": 7,
+      "guaranteedUsdCents": 14175000000,
+      "incomeManYen": 347062,
+      "payrollManYen": 342640
+    },
+    {
+      "seed": "calibration-1",
+      "name": "宮城 大弥",
+      "playerId": "npb:71875151",
+      "teamId": 11,
+      "role": "starter",
+      "age": 25,
+      "exemption": "exempt",
+      "score": 85.01288242104634,
+      "outcome": "signed",
+      "kind": "major",
+      "years": 7,
+      "guaranteedUsdCents": 13895000000,
+      "incomeManYen": 340762,
+      "payrollManYen": 342640
+    }
+  ]
+}

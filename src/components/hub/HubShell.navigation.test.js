@@ -56,11 +56,11 @@ it('keeps unread and actionable counts separate, including read offers but exclu
   ], news: [{ id: 5, type: 'interview', answered: false }] });
   expect(button('通知（未読2件・要対応2件）')).toBeTruthy();
 });
-it.each([false, true])('links only saved pending posting applications from the home notification counts (approved=%s)', approved => {
+it.each([false, true])('links saved posting applications needing a decision or market result from home (approved=%s)', approved => {
   const pending = postingUiWorld(), w = approved ? reducePostingDecisionRequest(pending, postingDecisionRequest(pending, 'request', 'approve')).world : pending;
   const changed = mount({ mailbox: w.mailbox, contractEconomy: w.contractEconomy });
-  expect(button(`通知（未読0件・要対応${approved ? 0 : 1}件）`)).toBeTruthy();
-  if (!approved) { click('ポスティング申請 1件'); expect(changed).toHaveBeenLastCalledWith('mailbox'); }
+  expect(button('通知（未読0件・要対応1件）')).toBeTruthy();
+  click('ポスティング申請 1件'); expect(changed).toHaveBeenLastCalledWith('mailbox');
 });
 it('returns from notifications to the mounted original page', () => {
   mount({ initialTab: 'fa' });

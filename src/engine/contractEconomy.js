@@ -125,7 +125,7 @@ export function toAnnualState(world) {
   if (contractEconomyMode(world) !== 'annual') fail('新契約制度のworldが必要です。');
   const e = world.contractEconomy;
   return projectAnnualState({ ...e.engine, spending: { ...e.engine.spending, staffContracts: e.staffContracts }, ...e.clock, teams: world.teams, faPool: world.faPool,
-    gameDay: world.gameDay, incomeReceipts: e.incomeReceipts,
+    gameDay: world.gameDay, incomeReceipts: e.incomeReceipts, economyRandomRoot: e.randomRoot,
     economyIdentity: identity(world), faExerciseBirth: e.faExerciseBirth, draftContext: draftCapacityContext(world.offseasonPlan, world.year, world.teams) });
 }
 
@@ -187,7 +187,7 @@ function runCommand(world, command) {
   if (c.type === 'depart-overseas' && !state.transactions.some(r => r.id === c.id)
     && world.contractEconomy.decisions.some(d => d.kind === 'human-acquisition' && d.status === 'pending' && d.playerId === c.playerId))
     fail('回答待ちのNPB獲得を解決してから海外離脱してください。');
-  if (['request-posting', 'enter-market', 'reserve-retirement', 'finalize-retirement', 'declare-fa', 'end-contract', 'complete-posting', 'resolve-posting'].includes(c.type) && (state.phase === 'season' || ['request-posting', 'finalize-retirement', 'declare-fa', 'end-contract', 'complete-posting', 'resolve-posting'].includes(c.type))
+  if (['request-posting', 'enter-market', 'reserve-retirement', 'finalize-retirement', 'declare-fa', 'end-contract', 'complete-posting', 'resolve-posting', 'run-posting-market'].includes(c.type) && (state.phase === 'season' || ['request-posting', 'finalize-retirement', 'declare-fa', 'end-contract', 'complete-posting', 'resolve-posting', 'run-posting-market'].includes(c.type))
     && !state.transactions.some(r => r.id === c.id)
     && world.contractEconomy.decisions.some(d => d.kind === 'human-renewal' && d.status === 'pending' && d.playerId === (c.playerId ?? state.postingApplications?.find(r => r.kind === 'request' && r.id === c.requestId)?.playerId ?? state.retirementReservations?.find(r => r.id === c.reservationId)?.playerId)))
     fail('回答待ちの更改を解決してから退団してください。');

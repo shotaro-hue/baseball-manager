@@ -6,7 +6,8 @@ import { useGameState } from './useGameState';
 import { useOffseason } from './useOffseason';
 import HubContentRouter from '../components/hub/HubContentRouter';
 import { saveGame, loadGame, getSaveQueueSnapshot } from '../engine/saveload';
-import { postingDecisionRequest } from '../engine/humanPosting';
+import { postingDecisionRequest, postingMarketRequest } from '../engine/humanPosting';
+import { generatedPostingWorld } from '../engine/__tests__/fixtures/postingMarketResults';
 import { postingUiWorld } from '../engine/__tests__/fixtures/postingUi';
 import { postingApplicationViews } from '../engine/annualPostingApplications';
 import { reduceEconomyCommand, toAnnualState } from '../engine/contractEconomy';
@@ -46,6 +47,53 @@ const content = n => typeof n === 'string' ? n : (n.children || []).map(content)
 const button = label => view.root.findAllByType('button').find(b => content(b) === label);
 const click = label => act(() => button(label).props.onClick());
 const open = () => act(() => view.root.findAllByType('button').find(b => content(b).includes('【ポスティング申請】')).props.onClick());
+
+it.each(['signed', 'no-offer', 'declined'])('generates %s once through the human save path and replays after cold load', async outcome => {
+  await setup(generatedPostingWorld(outcome));
+  const before = structuredClone(gs.teams), revision = gs.contractEconomy.revision;
+  const request = postingMarketRequest(gs, 'request'), session = gs.getProgressSessionToken();
+  let duplicate;
+  expect(await run(() => { const p = gs.commitPostingMarketRequest(request, session); duplicate = gs.commitPostingMarketRequest(request, session); return p; })).toMatchObject({ ok: true });
+  expect(await duplicate).toMatchObject({ ok: false, reason: 'economy_commit_pending' });
+  expect(gs.contractEconomy.revision).toBe(revision + 1);
+  const cold = await loadGame(), e = cold.contractEconomy;
+  expect(e.engine.postingMarketResults).toHaveLength(1); expect(e.engine.postingMarketResults[0].outcome).toBe(outcome);
+  expect(e.engine.postingQualifications).toHaveLength(1);
+  expect(e.incomeReceipts).toHaveLength(outcome === 'signed' ? 1 : 0);
+  if (outcome !== 'signed') expect(cold.teams).toEqual(before);
+  expect(await run(() => gs.commitPostingMarketRequest(request, session))).toMatchObject({ ok: true, replayed: true });
+  expect((await loadGame()).contractEconomy).toEqual(e);
+});
+it('retains market confirmation on failed publication and retries one identical generated result in the inbox', async () => {
+  await setup(generatedPostingWorld(), true); open(); click('海外交渉の結果を確認する');
+  const root = rows.get(primary), before = structuredClone(gs.teams), write = localStorage.setItem;
+  localStorage.setItem = (k, v) => { if (k === primary) throw Error('disk full'); write(k, v); };
+  await run(() => button('海外交渉を進めて保存する').props.onClick());
+  expect(content(view.root)).toContain('交渉結果を保存できませんでした');
+  expect(rows.get(primary)).toBe(root); expect(gs.teams).toEqual(before);
+  expect(gs.contractEconomy.engine.postingMarketResults ?? []).toHaveLength(0);
+  localStorage.setItem = write;
+  for (let i = 0; i < 150 && button('同じ交渉で保存を再試行する').props.disabled; i++)
+    await act(async () => { await new Promise(r => setTimeout(r, 10)); });
+  await run(() => button('同じ交渉で保存を再試行する').props.onClick());
+  expect(content(view.root)).toContain('海外契約成立');
+  expect(content(view.root)).toContain('市場評価'); expect((await loadGame()).contractEconomy.incomeReceipts).toHaveLength(1);
+});
+it('recovers a published market result in the inbox without another receipt or root write', async () => {
+  await setup(generatedPostingWorld(), true); open(); click('海外交渉の結果を確認する');
+  const revision = gs.contractEconomy.revision, read = localStorage.getItem; let interrupted = false;
+  localStorage.getItem = key => {
+    if (key === primary && gs.contractEconomy?.revision === revision + 1 && !interrupted) { interrupted = true; throw Error('ack interrupted'); }
+    return read(key);
+  };
+  await run(() => button('海外交渉を進めて保存する').props.onClick());
+  expect(button('保存済みの交渉結果を復旧する')).toBeDefined();
+  localStorage.getItem = read; const root = rows.get(primary);
+  await run(() => button('保存済みの交渉結果を復旧する').props.onClick());
+  expect(rows.get(primary)).toBe(root); expect(gs.contractEconomy.incomeReceipts).toHaveLength(1);
+  expect((await loadGame()).contractEconomy.engine.postingMarketResults).toHaveLength(1);
+  expect(content(view.root)).toContain('海外契約成立');
+});
 
 it.each(['approve', 'reject'])('commits %s once through real save, preserves the roster and reloads the decision', async decision => {
   await setup(); const before = structuredClone(gs.teams), request = postingDecisionRequest(gs, 'request', decision), session = gs.getProgressSessionToken();
