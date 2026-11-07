@@ -62,7 +62,8 @@ export function postingMailbox(world, mailbox = []) {
       const income = incomes.get(result.completionId), c = result.overseasContract;
       const cents = c.kind === 'major' ? c.guaranteedUsdCents : c.signingBonusUsdCents;
       body += `${c.kind === 'major' ? 'メジャー契約・保証総額' : 'マイナー契約・契約金'} ${(cents / 100).toLocaleString('ja-JP', { maximumFractionDigits: 2 })}米ドル\n`
-        + `所属を離れ、元契約の雇用を終了しました。保証債務は${result.settlement === 'retain' ? '維持' : '明示合意により免除'}します。\n`
+        + `所属を離れました（退団通知日 ${departure?.notifiedDate ?? '未記録'}）。\n`
+        + `元契約終了日 ${departure?.effectiveDate ?? '未記録'}。保証債務は${result.settlement === 'retain' ? '維持' : '明示合意により免除'}します。\n`
         + `球団受取譲渡金 ${money(income?.amountManYen)}\n${r.season + 1}年度限定の追加支出枠 ${money(income?.budgetAllocation?.amountManYen)}（通常予算とは別枠・翌々年度へ繰越なし）`;
     }
     return { id: JSON.stringify(['annual-posting-notice', r.id]), type: 'posting_request', read: true,

@@ -70,6 +70,13 @@ it('displays a recorded zero minor fee, without substituting missing data or a n
   expect(notice.body).toContain('0万円'); expect(notice.body).toContain('マイナー');
   expect(notice.body).not.toContain('未記録');
 });
+it.each([1, 3])('shows the saved notice and contract end dates separately for a %s-year contract', years => {
+  const w = qualifiedPostingWorld(postingWinter({ years })), next = reduceEconomyCommand(w, marketResult(w)).world;
+  const notice = postingMailbox(next, []).find(m => m.annualPosting);
+  expect(notice.body).toContain('退団通知日 2026-12-01');
+  expect(notice.body).toContain(`元契約終了日 ${years === 1 ? '2026-12-01' : '2027-02-01'}`);
+  expect(notice.body).not.toContain('雇用を終了しました');
+});
 it('leaves legacy mail and its array identity unchanged', () => {
   const mail = [{ id: 0, type: 'posting_request' }];
   expect(postingMailbox({ myId: 0 }, mail)).toBe(mail);

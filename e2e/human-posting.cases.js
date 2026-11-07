@@ -100,6 +100,10 @@ for (const [outcome, zero] of [['signed', false], ['no-offer', false], ['decline
     await page.goto('/'); await mount(page, { outcome, zero }); const before = await state(page); await open(page);
     const expected = outcome === 'signed' ? '2027年度限定の追加支出枠' : outcome === 'no-offer' ? '提示なし・不成立' : '本人辞退・不成立';
     await expect(detail(page)).toContainText(expected);
+    if (outcome === 'signed') {
+      await expect(detail(page)).toContainText('退団通知日 2026-12-01');
+      await expect(detail(page)).toContainText('元契約終了日 2027-02-01');
+    }
     if (zero) await expect(detail(page)).toContainText('球団受取譲渡金 0万円');
     await page.reload(); await mount(page, { reload: true }); await open(page);
     await expect(detail(page)).toContainText(expected);
