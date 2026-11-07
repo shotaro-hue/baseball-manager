@@ -2,6 +2,16 @@
 
 What problem does this pull request solve?
 
+## Player experience / feature scope
+
+<!-- For small bug fixes, display fixes, or docs-only changes, keep this brief and cover only relevant items. Mark unrelated sections Not applicable with a reason; do not add unnecessary integration work. -->
+
+- PR type: 基盤 (foundation) / 統合 (integration) / 機能完成 (feature complete) / 修正 (fix)
+- Parent player experience / feature goal:
+- Scope completed in this PR:
+- Normal-play entry (screen / action) and connection status (connected / partial / not connected):
+- Observable player result and how feature completion will be verified:
+
 ## Change
 
 What changed?
@@ -11,6 +21,8 @@ What changed?
 Why is this the right tradeoff for the simulator and its maintenance?
 
 ## Validation
+
+Use checks appropriate to the change. For docs-only changes, record minimal diff, consistency, and reference checks; the existing required CI still applies. Distinguish technical unit/save tests from actual gameplay verification. Never mark an unperformed check as successful.
 
 - [ ] `npm test`
 - [ ] `npm run build`
@@ -22,6 +34,23 @@ Commands / scenarios:
 ```text
 
 ```
+
+## Feature completion status / next priority
+
+Record `Met`, `Not met`, or `Not applicable`, with evidence or an exclusion reason. A foundation PR may finish its scope while the parent feature remains incomplete. Complete the table when claiming feature completion; for small fixes or docs-only changes, describe only relevant criteria or explain why the table is not applicable.
+
+| Feature completion criterion | Status / evidence / exclusion reason |
+| --- | --- |
+| Available through normal gameplay screens and actions | |
+| Correct effects on players, contracts, budgets, stats, etc. | |
+| Required CPU / annual Worker automation connected | |
+| Results retained through save, reload, and year transition | |
+| Normal and important failure scenarios verified | |
+| Player can understand the result and its reasons | |
+| Existing features and old-save compatibility preserved | |
+
+- Remaining work to complete the parent feature, including normal-play connections:
+- Next priority and why it advances feature completion (explain any urgent bug, save-integrity, or technical-dependency exception):
 
 ## Risk / regression areas
 
