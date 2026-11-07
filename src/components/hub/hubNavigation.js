@@ -26,7 +26,7 @@ export const deliveredMailbox = (mailbox = [], gameDay) => mailbox.filter(m => m
 export function notificationSummary({ mailbox = [], news = [], gameDay, unreadCount }) {
   const visible = deliveredMailbox(mailbox, gameDay);
   const trades = visible.filter(m => m.type === 'trade' && m.offer && !m.resolved);
-  const posting = visible.filter(m => m.type === 'posting_request' && !m.resolved);
+  const posting = visible.filter(m => m.type === 'posting_request' && !m.resolved && !m.postingUnavailable);
   const interviews = news.filter(n => n.type === 'interview' && !n.answered);
   return { unread: Number.isSafeInteger(unreadCount) && unreadCount >= 0 ? unreadCount : visible.filter(m => !m.read).length,
     trades: trades.length, posting: posting.length, interviews: interviews.length,

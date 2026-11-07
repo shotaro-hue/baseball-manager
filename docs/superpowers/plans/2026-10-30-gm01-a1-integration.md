@@ -170,6 +170,22 @@ PR #521レビュー修正: revision増加でもrandomRoot・確定済み台帳�
 
 ## Task 7: A1-2c 退団・市場・海外離脱
 
+### 2026-11-07: ポスティングの球団判断・結果確認を受信箱へ統合
+
+基準main `e15c57d5f2f813e2223b777129f74027052c0b33`（#551・#552マージ済み）。PR種別は統合。親目標は、プレイヤーが申請から球団判断・海外交渉・成立/不成立・翌年度反映まで完結できること。今回は通知→受信箱から、保存済みの自球団申請の承認/拒否と結果確認を可能にする。承認で退団・入金せず、拒否でも契約・財務を維持する。市場結果は#551の保存証跡を表示し、画面で金額や結果を生成しない。
+
+**正本/接続:** `bootstrapTeams.createInitialTeams` → 共通request-posting → engine.postingApplications/transactions → 球団判断 → 共通commitEconomyOperation → 既存saveGame/commitEconomyCandidate → cold load/受信箱。結果はpostingMarketResults・postingDepartures・incomeReceiptsを参照する。受信箱のメール本文を判断権限に使わず、保存済み申請から表示を導出する。自動希望producerが未接続のため、一般公開の通常プレイから発生する機能の完成ではない。公開OFF、schema1/DB5を維持する。
+
+**Files/Interfaces:** `src/engine/humanPosting.js` に `postingDecisionRequest(world,requestId,decision)`、`reducePostingDecisionRequest(world,request)`、`postingMailbox(world,mailbox)`。`useGameState.commitPostingDecisionRequest(request,sessionToken)` は自球団/保存identity/revision/日付を再検査し、既存の保存・採用・復旧barrierを使う。`MailboxTab`・`AnnualPostingDecision`・HubShell/HubContentRouterで既存通知/確認部品へ接続する。
+
+- [x] RED: 自球団の承認/拒否、他球団/旧通知/古いrevision・sessionの拒否、二重操作の一度限り確定、旧方式の互換性。対応するcore/hook/UIテストを先に失敗確認する。
+- [x] 実装: 判断待ち/市場結果待ち/成立/提示なし/本人辞退を区別。成立の譲渡金と翌年度限定追加枠を表示し、実測0を未記録と区別。公開済み取引をメールの表示だけで再実行しない。
+- [x] GREEN: 実createInitialTeamsの支配下正常/育成拒否を含め、実保存失敗→同じ判断で再試行→cold load、公開済み判断の採用復旧、状態更新後の確認拒否、再表示/再操作を検証する。
+- [x] 実画面: 既存受信箱と実hook/保存を通すfixtureで360/390/1440pxの変更前後・保存失敗・再開・三市場結果を確認する。通常プレイでの自動申請・市場交渉・年度Worker成功と混同しない。CSS境界は変更しない。
+- [ ] 独立レビュー、指摘の実証/修正、対象検証、専用PRのexact HEAD必須CI。main push/マージ/自動マージなし。
+
+**残作業/次優先:** 価格・本人受諾・希望発生policyの具体化と校正→再現可能な市場producer→CPU/年度Worker→A1全体の統合プレイと公開判断。UI後に別の基盤を無制限に追加せず、この依存を解消する。年度移行の保存・旧セーブ互換は今回の判断/表示範囲だけを検証し、Task7/A1やポスティング全体を完成扱いにしない。
+
 2026-11-05 #547後: [明示認定事実producerと保存snapshot](../specs/2026-11-05-gm01-posting-qualification-snapshots-design.md)を独立前提に追加。確認日/rule出典のある根拠だけを承認済み申請・固定ID・元契約・save/epochに結合する。自動認定のリーグ/育成条件、架空出生生成、MLB価格/本人受諾/契約区分、署名日、市場成立receiptは未決/未実装。Task10の年度確定producerは合意済み条件に基づく一度限りの確定事実を供給し、保存済みsnapshotを更新しない。市場側は実際の署名日で再判定し、新申請から旧complete-postingへ直接流さない。Task7/A1未完了・公開OFF・schemaVersion1/DB5。
 
 2026-11-04 #546マージ後の資格前提: [出典付きevidence/純粋判定設計](../specs/2026-11-04-gm01-posting-qualification-design.md)／[計画](./2026-11-04-gm01-posting-qualification.md)。bonus-pool免除の年齢・認定年数条件をexempt/restricted/unknownへ分け、出生日は実名簿の固定ID/profileから取得する。現行データに認定年数の完全な正本はなく、履歴掲載年を数えて補完しない。市場価格/本人受諾policyの基本方針、認定年数producer、保存済み市場receiptへのidentity紐付けは次工程。申請承認後の進行拒否・一般公開OFF・schema/DB versionを維持し、Task7/A1を完了扱いにしない。

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { act, create } from 'react-test-renderer';
 import { afterEach, expect, it, vi } from 'vitest';
 import HubShell from './HubShell';
+import { postingUiWorld } from '../../engine/__tests__/fixtures/postingUi';
+import { postingDecisionRequest, reducePostingDecisionRequest } from '../../engine/humanPosting';
 
 vi.mock('./HubContentRouter', () => ({ default: function Content({ tab, onTabChange }) {
   const [draft, setDraft] = useState('');
@@ -17,12 +19,12 @@ afterEach(() => { if (view) act(() => view.unmount()); view = null; });
 const text = n => typeof n === 'string' ? n : (n.children || []).map(text).join('');
 const button = (label, parent = view.root) => parent.findAllByType('button').find(n => text(n) === label || n.props['aria-label'] === label);
 const click = label => { const b = button(label); expect(b, `button ${label}`).toBeTruthy(); act(() => b.props.onClick()); };
-function mount({ initialTab = 'dashboard', mailbox = [], news = [], year = 2026, saveId = 'navigation', notif = null, saveResult = null } = {}) {
+function mount({ initialTab = 'dashboard', mailbox = [], news = [], year = 2026, saveId = 'navigation', notif = null, saveResult = null, contractEconomy } = {}) {
   const setTabSpy = vi.fn();
   function Harness({ year, saveId }) {
     const [tab, update] = useState(initialTab);
     const gs = { myTeam: team, teams: [team, opponent], myId: 0, year, gameDay: 1, schedule,
-      gameResultsMap: {}, tab, tabBadges: {}, saveId, mailbox, news, notif, saveResult,
+      gameResultsMap: {}, tab, tabBadges: {}, saveId, mailbox, news, notif, saveResult, contractEconomy,
       getMailboxBySelector: () => mailbox, getNewsBySelector: () => news,
       getUnreadMailboxCount: () => mailbox.filter(m => !m.read && (m.deliverOnDay ?? 0) <= 1).length,
       setTab: id => { setTabSpy(id); update(id); }, notify: vi.fn() };
@@ -53,6 +55,12 @@ it('keeps unread and actionable counts separate, including read offers but exclu
     { id: 4, type: 'posting_request', read: false, resolved: true },
   ], news: [{ id: 5, type: 'interview', answered: false }] });
   expect(button('通知（未読2件・要対応2件）')).toBeTruthy();
+});
+it.each([false, true])('links only saved pending posting applications from the home notification counts (approved=%s)', approved => {
+  const pending = postingUiWorld(), w = approved ? reducePostingDecisionRequest(pending, postingDecisionRequest(pending, 'request', 'approve')).world : pending;
+  const changed = mount({ mailbox: w.mailbox, contractEconomy: w.contractEconomy });
+  expect(button(`通知（未読0件・要対応${approved ? 0 : 1}件）`)).toBeTruthy();
+  if (!approved) { click('ポスティング申請 1件'); expect(changed).toHaveBeenLastCalledWith('mailbox'); }
 });
 it('returns from notifications to the mounted original page', () => {
   mount({ initialTab: 'fa' });

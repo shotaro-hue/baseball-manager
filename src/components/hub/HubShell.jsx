@@ -1,4 +1,5 @@
 import { regularSeasonProgress, regularSeasonRequest } from '../../engine/seasonProgress';
+import { postingMailbox } from '../../engine/humanPosting';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { contractEntries } from '../management/playerListModel';
 import { ErrorBoundary } from '../ErrorBoundary';
@@ -53,7 +54,7 @@ export default function HubShell({ state, flows, app }) {
   // the restored row or a pressed control without automatic scroll anchoring.
   const redundantAutoSave = ['contract', 'trade', 'scout', 'fa', 'mailbox', 'news', 'alumni'].includes(tab)
     && notif?.type === 'ok' && notif.msg === '💾 オートセーブ' && gs.saveResult?.ok === true;
-  const mailbox = gs.getMailboxBySelector?.() ?? gs.mailbox;
+  const mailbox = postingMailbox(gs, gs.getMailboxBySelector?.() ?? gs.mailbox);
   const notifications = notificationSummary({ mailbox,
     news: gs.getNewsBySelector?.() ?? gs.news, gameDay, unreadCount: gs.getUnreadMailboxCount?.(gameDay) });
   const actionableContracts = useMemo(() => contractEntries(myTeam, mailbox, year).filter(e => e.state === 'actionable').length, [myTeam, mailbox, year]);
