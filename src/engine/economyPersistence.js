@@ -71,6 +71,8 @@ function preservesEconomyHistory(before, after) {
     return g && (!newTransactions.has(g.resultId)
       || g.qualificationCreated && !newTransactions.has(g.qualificationId));
   })) return false;
+  if (after.engine.transactions.slice(before.engine.transactions.length).some(t =>
+    t.generatedPostingRequests?.candidates.some(c => c.requestId !== null && !newTransactions.has(c.requestId)))) return false;
   // A market result cannot retrospectively claim a completion already published
   // through the old explicit boundary. Parent and both children commit together.
   if ((after.engine.postingMarketResults ?? []).slice((before.engine.postingMarketResults ?? []).length)

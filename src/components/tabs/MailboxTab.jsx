@@ -3,6 +3,7 @@ import { DecisionConfirmation, money } from '../management/DecisionParts';
 import { Button, StateLabel } from '../design-system/primitives';
 import { ReadingList, ReadingFilters, ReadingDetail, useReadingSelection } from '../reading/ReadingParts';
 import { AnnualPostingDecision } from '../management/AnnualPostingDecision';
+import { AnnualPostingRequests } from '../management/AnnualPostingRequests';
 import { postingStatusText } from '../../engine/humanPosting';
 const actionable = m => !m.resolved && !m.postingUnavailable && (m.type === 'posting_request' || m.type === 'trade' && m.offer);
 const label = type => ({
@@ -70,6 +71,7 @@ export function MailboxTab({
   const shown = mailbox.filter(m => filter === 'unread' ? !m.read : filter === 'actionable' ? actionable(m) : filter === 'done' ? m.resolved : true);
   return <main className="club-reading" data-ds="mailbox">
     <h1>受信箱</h1><p className="reading-muted">未読 {unreadCount}件 · 要対応 {mailbox.filter(actionable).length}件。既読にしても判断は確定しません。</p>
+    {annualContracts && annualGs && <AnnualPostingRequests key={JSON.stringify([annualGs.saveId, annualGs.contractEconomy?.epoch, annualGs.year, annualGs.myId])} gs={annualGs} />}
     <div className="reading-workspace" data-detail={Boolean(selected)}>
       <section className="reading-list" aria-label="通知の一覧">
         <ReadingFilters label="通知の絞り込み" options={[['all', 'すべて'], ['unread', '未読'], ['actionable', '要対応'], ['done', '対応済み']]} value={filter} onChange={value => {
