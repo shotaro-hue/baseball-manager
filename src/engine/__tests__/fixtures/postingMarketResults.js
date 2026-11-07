@@ -2,6 +2,8 @@ import { approvedPostingWorld, qualificationCommand } from './postingQualificati
 import { gamePostingQualificationFacts } from '../../postingQualificationSnapshot';
 import { reduceEconomyCommand } from '../../contractEconomy';
 import { envelope } from './faDeclarations';
+import { playableClub } from './inSeasonDepartures';
+import { postingWinter } from './postingDepartures';
 
 export function qualifiedPostingWorld(world) {
   const approved = approvedPostingWorld(world);
@@ -26,4 +28,16 @@ export function generatedPostingWorld(outcome = 'signed', world) {
   p.personality = { ...p.personality, overseas: outcome === 'declined' ? 0 : 100,
     loyalty: outcome === 'declined' ? 100 : 0, stability: outcome === 'declined' ? 100 : 0 };
   return w;
+}
+
+// The review counterexample: a real native ledger and the ordinary approved
+// request path, before generating either a legacy or current numeric receipt.
+export function postingMathWorld() {
+  const teams = [playableClub(), playableClub(1)];
+  Object.assign(teams[0].players[0], { salary: 5700, isPitcher: true, pos: '先発', subtype: '先発',
+    pitching: { velocity: 65, control: 65, breaking: 65, stamina: 65 },
+    personality: { overseas: 100, money: 50, loyalty: 0, stability: 0 }, stats: {} });
+  const world = approvedPostingWorld(postingWinter({ teams, years: 1 }));
+  world.contractEconomy.randomRoot.seed = 'review-math-6';
+  return world;
 }

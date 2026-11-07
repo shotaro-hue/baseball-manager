@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { evaluatePostingMarket } from '../postingMarketModel';
+import { postingMathWorld } from './fixtures/postingMarketResults';
 import { postingMarketInputs } from '../postingMarketInputs';
 import { qualifiedPostingWorld } from './fixtures/postingMarketResults';
 import { toAnnualState } from '../contractEconomy';
@@ -83,3 +84,17 @@ it.each(['ability', 'salary', 'performance', 'root'])('rejects unsupported/corru
   if (field === 'root') r = { ...root, algorithmVersion: 2 };
   expect(() => evaluatePostingMarket(f, r, scope)).toThrow();
 });
+// At this comparison moneyScore=100, so score=52.5 + .4*overseas.
+it.each([[18.749999999998, 'declined', 59.999999999999], [18.749999999999, 'signed', 60],
+  [18.75, 'signed', 60], [18.750000000002, 'signed', 60.000000000001]])(
+  'uses its saved twelve-decimal score at the acceptance threshold (overseas=%s)', (overseas, outcome, score) => {
+    const w = qualifiedPostingWorld(postingMathWorld()), f = postingMarketInputs(toAnnualState(w), 'request');
+    f.npb.endSeason = 2027;
+    f.personality.overseas.value = overseas; f.personality.loyalty.value = 50;
+    const r = evaluatePostingMarket(f, w.contractEconomy.randomRoot, { saveId: w.saveId, epoch: w.contractEconomy.epoch,
+      season: 2026, subjectId: 0, operationId: 'request' });
+    expect(r.outcome).toBe(outcome);
+    expect(r.acceptance.score).toBe(score);
+    expect(r.outcome === 'signed').toBe(r.acceptance.score >= 60);
+    expect(JSON.parse(JSON.stringify(r)).acceptance.score).toBe(r.acceptance.score);
+  });

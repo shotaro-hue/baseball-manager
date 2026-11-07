@@ -170,6 +170,19 @@ PR #521レビュー修正: revision増加でもrandomRoot・確定済み台帳�
 
 ## Task 7: A1-2c 退団・市場・海外離脱
 
+### 2026-11-07: #554 P1修正 — JavaScriptエンジン間の保存互換性
+
+対象公開HEAD `c2dccd3aa472f4e3ec48e0ea617aa6b42108f89d` / base `4c3d8c1133f0271a0e4c8f6c89dcfc30e9550729`。ユーザーの本P1仕様を受入条件とし、既存PR/同ブランチへ追記する。新PR・main push・merge/automerge・履歴書換は禁止。公開OFF/schema1/DB5、既存価格係数、CPU/Workerの工程範囲を維持する。
+
+レビュー受領・原因調査・実装計画/TDDの手順で実装する。開始時のPR HEAD/baseは指定値と同じ、レビュー/inline/Conversationは0件、旧CI #703は成功。ローカルHEADは公開時のメタデータ差で`f5db1bf`だが、公開HEADとtree `ba0f657fbd906cc606bebf09327458826104e35a`が一致する。既存ローカル/公開履歴を保存し、修正をそれぞれの末尾へ追記する。
+
+- [x] RED: 5700万円・26歳先発65・seed review-math-6を現行コードで生成。Node v24.22.1→WebKit2215、逆方向ともvalidateEconomySaveが拒否。moneyScoreは84.89815806161393/84.89815806161391、契約/結果は同じ。変更前の両worldを圧縮fixtureへ保持する。
+- [x] 実装: `postingMarketNumbers.js`にposting専用のBigInt数値処理を置く。対数/2のべき乗/年齢係数は固定精度整数で評価、価格は有理数からUSD単位へ一度丸める。moneyScore/総合scoreは12桁へ丸めた同じ値を判定/保存/再検証に用いる。新評価はversion2、価格policy名/係数とRNG用途/消費数は維持する。
+- [x] 旧v1: 原本を無変更で検証する。旧Math.log2の近傍ULP候補からmoneyScoreを再現し、その保存値から旧score/結果を厳密再計算する。旧べき乗の近傍候補から旧価格の丸め結果を列挙し、整数金額はその正確な候補・子取引・収入と一致させる。全評価/全金額への一律epsilonは使わない。既存prefix保護を維持し、旧履歴の再抽選・移行書換をしない。
+- [x] 回帰: 指定の旧V8/JSC両fixture、旧価格丸め境界/受諾閾値、通常/微小差を越えた改変、三分岐、旧明示結果、失敗/再試行/復旧を確認。`postingMarketNumbers`/model/generated/saveテストと既存関連7ファイルを実行する。
+- [x] エンジン間受入: `e2e/save-generations.spec.js`の既存CI経路へ独立caseを接続。Node生成worldをページ内でsave/load/validateし、ページ生成worldをNode側の実save/load/validateへ戻す。両方向の旧/新履歴で金額・結果・退団・収入・翌年枠・revisionの不変、再試行の一度限り確定、改変拒否を確認。実iPhone確認とは分ける。
+- [ ] 別コンテキスト独立レビュー→指摘実証/修正→同PR更新→最終HEADの必須CI。新しい数値/旧履歴規則とRED/GREEN/エンジン版を既存検証READMEへ記録し、ユーザーのマージ判断で止める。
+
 ### 2026-11-07: #554予定 — 海外提示・本人判断から保存結果まで
 
 基準main `4c3d8c1133f0271a0e4c8f6c89dcfc30e9550729`（#553マージ済み）。親目標は通常プレイでのポスティング完結。今回は、既存の承認済み申請→海外交渉結果の確認→成立/提示なし/本人辞退→既存の退団・収入・翌年度限定枠と結果表示までを接続する統合工程。開始は通知→受信箱の球団承認済み申請。承認操作自体の意味は#553のままとし、市場の結果確認を別操作にする。

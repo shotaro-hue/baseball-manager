@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import './human-trade.cases.js';
 import './human-posting.cases.js';
+import './posting-numeric-compatibility.cases.js';
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 const fixture = JSON.parse(gunzipSync(readFileSync(new URL('./fixtures/new-game.json.gz', import.meta.url))).toString());

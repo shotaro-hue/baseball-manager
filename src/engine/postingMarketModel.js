@@ -1,6 +1,8 @@
 import { rng, rngf } from '../utils';
 import { economyRandomContext } from './economyRandom';
 import { assessSalaryPerformance } from './salaryDemand';
+import { POSTING_NUMERIC_SCALE as S, postingNumberRatio, postingPow2, postingAgeFactor,
+  postingPriceUsd, postingScore, postingMoneyScore } from './postingMarketNumbers';
 
 // USD scale is calibrated against published NPB -> MLB contracts, not an NPB
 // salary multiplier. Keep v1 replayable when introducing a future policy.
@@ -12,6 +14,25 @@ const money = n => Number.isSafeInteger(n) && n >= 0;
 const stable = v => JSON.stringify(v, (_, x) => x && !Array.isArray(x) && typeof x === 'object'
   ? Object.fromEntries(Object.keys(x).sort().map(k => [k, x[k]])) : x);
 const fail = () => { throw Error('海外市場の評価資料・価格モデルを確認してください。'); };
+// Legacy receipts predate numeric revision 2. Enumerate bounded libm witnesses,
+// never apply an epsilon to contracts, outcomes, IDs or the whole evaluation.
+const bits = new DataView(new ArrayBuffer(8));
+function nearby(value) {
+  const next = (x, up) => {
+    if (x === 0) return up ? Number.MIN_VALUE : -Number.MIN_VALUE;
+    bits.setFloat64(0, x); bits.setBigUint64(0, bits.getBigUint64(0) + ((x > 0) === up ? 1n : -1n));
+    return bits.getFloat64(0);
+  };
+  const values = [value]; let lo = value, hi = value;
+  for (let i = 0; i < 4; i++) { lo = next(lo, false); hi = next(hi, true); values.push(lo, hi); }
+  return values;
+}
+const oldPow2 = exponent => Number.isInteger(exponent) ? [2 ** exponent] : nearby(2 ** exponent);
+function legacyAmount(saved, field, candidates) {
+  const amount = saved?.[field];
+  if (!Number.isSafeInteger(amount) || !candidates.has(amount)) fail();
+  return amount;
+}
 export function inspectPostingMarketInputs(f) {
   if (f?.version !== 1 || ![f.requestId, f.qualificationId, f.teamId, f.playerId, f.sourceContractId].every(id)
     || !(f.sourcePlayerId === null || id(f.sourcePlayerId)) || !Number.isInteger(f.season) || f.season < 1 || f.season > 9999
@@ -63,7 +84,10 @@ function scouting(f) {
   const interestProbability = clamp(.04 + (excess + 6) * .045 - Math.max(0, f.ageYears - 32) * .03, .02, .98);
   return { raw, performanceAdjustment, potentialAdjustment, scoutScore, excess, interestProbability };
 }
-function terms(f, a, context) {
+function terms(f, a, context, legacy) {
+  const jitter = legacy ? rngf(.85, 1.15, context) : null;
+  const draw = legacy ? null : BigInt(rng(0, 4294967295, context));
+  const jitterN = legacy ? null : 85n * 4294967296n + 30n * draw, jitterD = 100n * 4294967296n;
   if (f.exemption === 'exempt' && a.excess >= 0) {
     let years = f.ageYears <= 26 ? clamp(2 + Math.floor((a.excess - 1) / 3), 1, 7)
       : f.ageYears <= 30 ? clamp(2 + Math.floor(a.excess / 5), 1, 5)
@@ -71,17 +95,34 @@ function terms(f, a, context) {
     if (f.ageYears <= 26 && a.excess >= 24) years = 12;
     years = Math.max(1, Math.min(years, 37 - f.ageYears, f.role === 'relief' ? f.ageYears >= 30 ? 3 : 5 : 12));
     const baseUsd = f.role === 'batter' ? 1.8e6 : 1e6;
-    const annualUsd = Math.round(clamp(baseUsd * 2 ** (a.excess / 4.5) * rngf(.85, 1.15, context)
-      * .93 ** Math.max(0, f.ageYears - 30), 1e6, f.role === 'relief' ? 16e6 : 35e6) / 50000) * 50000;
+    const age = Math.max(0, f.ageYears - 30), cap = f.role === 'relief' ? 16e6 : 35e6;
+    if (legacy) {
+      const ages = age < 2 ? [.93 ** age] : nearby(.93 ** age).filter(n => n >= 0);
+      const amounts = new Set(oldPow2(a.excess / 4.5).flatMap(power => ages.map(factor => {
+        const annual = Math.round(clamp(baseUsd * power * jitter * factor, 1e6, cap) / 50000) * 50000;
+        return Math.min(325e6, annual * years) * 100;
+      })));
+      return { kind: 'major', years, guaranteedUsdCents: legacyAmount(legacy.offer, 'guaranteedUsdCents', amounts) };
+    }
+    const [n, d] = postingNumberRatio(a.excess);
+    const annualUsd = postingPriceUsd(BigInt(baseUsd) * postingPow2(2n * n, 9n * d) * jitterN * postingAgeFactor(age),
+      S * S * jitterD, 50000, 1000000, cap);
     return { kind: 'major', years, guaranteedUsdCents: Math.min(325e6, annualUsd * years) * 100 };
   }
   const restricted = f.exemption === 'restricted';
   const unit = restricted ? 10000 : 1000, cap = restricted ? 6.5e6 : 100000;
-  const bonus = (restricted ? 25000 * 2 ** ((a.excess + 8) / 3.5) : 10000 * 2 ** ((a.excess + 6) / 4)) * rngf(.85, 1.15, context);
+  if (legacy) {
+    const amounts = new Set(oldPow2(restricted ? (a.excess + 8) / 3.5 : (a.excess + 6) / 4)
+      .map(power => Math.round(clamp((restricted ? 25000 : 10000) * power * jitter, 0, cap) / unit) * unit * 100));
+    return { kind: 'minor', years: 1, signingBonusUsdCents: legacyAmount(legacy.offer, 'signingBonusUsdCents', amounts) };
+  }
+  const [n, d] = postingNumberRatio(a.excess + (restricted ? 8 : 6));
+  const power = postingPow2(restricted ? 2n * n : n, (restricted ? 7n : 4n) * d);
   // A calibration bound, not a claim about each MLB club's bonus pool.
-  return { kind: 'minor', years: 1, signingBonusUsdCents: Math.round(clamp(bonus, 0, cap) / unit) * unit * 100 };
+  return { kind: 'minor', years: 1, signingBonusUsdCents: postingPriceUsd(BigInt(restricted ? 25000 : 10000) * power * jitterN,
+    S * jitterD, unit, 0, cap) * 100 };
 }
-function acceptance(f, offer, preference) {
+function acceptance(f, offer, preference, legacy) {
   const trait = k => f.personality[k].recorded ? f.personality[k].value : 50;
   const moneyWeight = .15 + trait('money') * .003;
   const retainedComparableManYen = f.npb.retainedCostsBySeason.filter(r => r.season <= f.season + offer.years)
@@ -90,16 +131,22 @@ function acceptance(f, offer, preference) {
   // future stay earnings against the MLB guarantee/bonus, at the existing FX150.
   const stayUncontractedManYen = f.npb.annualSalaryManYen * Math.max(0, offer.years - (f.npb.endSeason - f.season));
   const overseasManYen = (offer.guaranteedUsdCents ?? offer.signingBonusUsdCents) * 150 / 1e6;
-  const moneyScore = stayUncontractedManYen === 0 ? overseasManYen > 0 ? 100 : 50
-    : clamp(50 + 25 * Math.log2((overseasManYen + .015) / (stayUncontractedManYen + .015)), 0, 100);
+  let moneyScore;
+  if (legacy) {
+    const candidates = stayUncontractedManYen === 0 ? [overseasManYen > 0 ? 100 : 50]
+      : nearby(Math.log2((overseasManYen + .015) / (stayUncontractedManYen + .015))).map(log => clamp(50 + 25 * log, 0, 100));
+    if (!candidates.includes(legacy.moneyScore)) fail();
+    moneyScore = legacy.moneyScore;
+  } else moneyScore = postingMoneyScore(offer.guaranteedUsdCents ?? offer.signingBonusUsdCents, stayUncontractedManYen);
   const opportunityScore = offer.kind === 'major' ? 75 : f.ageYears <= 24 && f.potential.recorded && f.potential.value >= 70 ? 50 : 35;
-  const score = clamp(.4 * preference.value + moneyWeight * moneyScore + (.6 - moneyWeight) * opportunityScore
+  const rawScore = clamp(.4 * preference.value + moneyWeight * moneyScore + (.6 - moneyWeight) * opportunityScore
     - (trait('loyalty') - 50) * .12 - trait('stability') * (offer.kind === 'minor' ? .15 : .03), 0, 100);
+  const score = legacy ? rawScore : postingScore(rawScore);
   return { score, threshold: 60, moneyScore, opportunityScore, stayUncontractedManYen, retainedComparableManYen,
     guaranteeStatus: f.npb.guaranteeStatus,
     neutralTraits: ['money', 'loyalty', 'stability'].filter(k => !f.personality[k].recorded) };
 }
-export function evaluatePostingMarket(inputs, root, scope) {
+function evaluate(inputs, root, scope, legacy) {
   const f = inspectPostingMarketInputs(inputs);
   if (scope?.season !== f.season || scope.subjectId !== f.playerId || scope.operationId !== f.requestId) fail();
   const interest = economyRandomContext(root, scope, 'posting:interest:v1');
@@ -108,9 +155,17 @@ export function evaluatePostingMarket(inputs, root, scope) {
   const preference = f.personality.overseas.recorded ? { source: 'recorded', value: f.personality.overseas.value }
     : { source: 'game-estimate', value: rng(0, 100, estimated) };
   const assessment = { ...scouting(f), interestDraw: rngf(0, 1, interest) };
-  const offer = assessment.interestDraw < assessment.interestProbability ? terms(f, assessment, price) : null;
-  const decision = offer ? acceptance(f, offer, preference) : null;
-  return { version: 1, policyVersion: POSTING_MARKET_POLICY,
+  const offer = assessment.interestDraw < assessment.interestProbability ? terms(f, assessment, price, legacy) : null;
+  const decision = offer ? acceptance(f, offer, preference, legacy) : null;
+  return { version: legacy ? 1 : 2, policyVersion: POSTING_MARKET_POLICY,
     outcome: !offer ? 'no-offer' : decision.score >= decision.threshold ? 'signed' : 'declined',
     assessment, preference, offer, acceptance: decision };
+}
+export function evaluatePostingMarket(inputs, root, scope) { return evaluate(inputs, root, scope); }
+export function verifyPostingMarketEvaluation(saved, inputs, root, scope) {
+  if (![1, 2].includes(saved?.version)) fail();
+  const legacy = saved.version === 1 ? { offer: saved.offer, moneyScore: saved.acceptance?.moneyScore } : undefined;
+  const expected = evaluate(inputs, root, scope, legacy);
+  if (stable(saved) !== stable(expected)) fail();
+  return expected;
 }

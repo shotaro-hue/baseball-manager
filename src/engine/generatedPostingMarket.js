@@ -3,7 +3,7 @@ import { createPostingMarketResult, normalizePostingMarketResult } from './annua
 import { gamePostingQualificationFacts } from './postingQualificationSnapshot';
 import { initializePlayerEligibility } from './playerEligibility';
 import { postingMarketInputs } from './postingMarketInputs';
-import { evaluatePostingMarket } from './postingMarketModel';
+import { evaluatePostingMarket, verifyPostingMarketEvaluation } from './postingMarketModel';
 
 const stable = value => JSON.stringify(value, (_, v) => v && !Array.isArray(v) && typeof v === 'object'
   ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v);
@@ -70,9 +70,9 @@ export function inspectGeneratedPostingMarkets(state) {
       || f.sourcePlayerId !== q.facts.sourcePlayerId || f.season !== q.season || f.date !== q.recordedDate
       || f.ageYears !== q.assessment.ageYears || f.exemption !== q.assessment.exemption
       || g.qualificationCreated && q.id !== childId(c, 'qualification')) fail();
-    const evaluation = evaluatePostingMarket(f, state.economyRandomRoot, scopeFor(state, f));
+    const evaluation = verifyPostingMarketEvaluation(g.evaluation, f, state.economyRandomRoot, scopeFor(state, f));
     const result = resultCommand(c, q.id, evaluation);
-    if (stable(g.evaluation) !== stable(evaluation) || receipts.get(result.id)?.signature !== stable(result)
+    if (receipts.get(result.id)?.signature !== stable(result)
       || r.outcome !== evaluation.outcome) fail();
     ownedResults.add(g.resultId);
   }

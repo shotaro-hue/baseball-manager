@@ -7,6 +7,8 @@ import { validateEconomySave } from '../src/engine/economyPersistence';
 import { rootBodyReference } from '../src/engine/saveRootBodies';
 import { qualificationCommand } from '../src/engine/__tests__/fixtures/postingQualifications';
 import { reduceEconomyCommand } from '../src/engine/contractEconomy';
+import { readFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
 
 const primary = 'baseball_manager_v1'; let rows, current, expected, bindings;
 const roots = () => [primary, primary + '_bk1', primary + '_bk2'].map(k => rows.get(k));
@@ -84,4 +86,13 @@ it('freezes the published random root even when all generated receipts are indiv
   const fork = structuredClone(old); fork.contractEconomy.randomRoot.seed = 'different-valid-seed';
   const next = candidate(fork); expect(validateEconomySave(next)).toBe('annual');
   expect(await saveGame(next)).toMatchObject({ ok: false, reason: 'economy_history_conflict' }); expect(roots()).toEqual(before);
+});
+it('does not replace published legacy diagnostics with another engine\'s individually valid snapshot', async () => {
+  const fixtures = JSON.parse(gunzipSync(readFileSync(new URL('../src/engine/__tests__/fixtures/postingMathV1.json.gz', import.meta.url))));
+  const old = fixtures.v8, other = fixtures.jsc;
+  expect(validateEconomySave(old)).toBe('annual'); expect(validateEconomySave(other)).toBe('annual');
+  expect((await saveGame(old)).ok).toBe(true); const published = roots();
+  other.contractEconomy.revision = old.contractEconomy.revision + 1;
+  expect(await saveGame(other)).toMatchObject({ ok: false, reason: 'economy_history_conflict' });
+  expect(roots()).toEqual(published); expect((await loadGame()).contractEconomy).toEqual(old.contractEconomy);
 });
