@@ -42,6 +42,7 @@ Interfaces: `commitOffseasonPostingRequest`、`handlePrepareAnnualPosting`、ann
 - [x] 実保存失敗・career原子性/再試行・barrier/session・UI状態のREDを確認する。
 - [x] 共通commitに接続し、年度全体の進行ガードは維持する。
 - [x] Chromium/WebKit、360/390/1440px、実12球団を検証する。
+- [x] 最終導線確認で受信箱先行による順序不整合を再現（共通取引/hook/3幅RED）。新規phaseの予約確定先行と受信箱からの戻り導線を追加する。過去phaseは凍結fixtureで維持する。
 
 ### Task 3: 提出
 
@@ -49,3 +50,4 @@ Interfaces: `commitOffseasonPostingRequest`、`handlePrepareAnnualPosting`、ann
 - [x] 修正SHAの独立レビューを受け、指摘を検証・修正する（`edd6310d`、P1/P2指摘なし）。
 - [x] [PR #557](https://github.com/shotaro-hue/baseball-manager/pull/557)を作成する。
 - [ ] 最新HEADの必須CI全件を確認して停止する。最終結果はPR本文を正本とし、文書更新だけの再帰的commitは作らない。
+- 続行導線修正の独立再レビューと新しい最終HEADのCIをPR本文へ記録する。`7548de37`のCI #715はunit4,633件/保存整合性205件を含む12ジョブ成功。QA-D1の既存Enter/自動保存の競合1件はtraceを独立確認し、main/当該HEADの比較各3回は再現なし。再検証中に導線修正が入ったため、最終CIの代わりにはしない。

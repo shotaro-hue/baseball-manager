@@ -246,6 +246,14 @@ it('annual entry publishes reserved retirements, career details and CPU posting 
   expect(await run(() => os.handleRetirePhaseNext({}))).toBe(false); expect(rows.get(primary)).toBe(root);
   expect(await run(() => os.handleNextYear())).toBe(false); expect(gs.year).toBe(2026);
 });
+it('guides inbox users to saved retirement reservations before permitting a new wish check', async () => {
+  await setup(offseasonPostingWorld(), true);
+  expect(content(view.root)).toContain('希望確認の前に引退予約の確定が必要です');
+  expect(button('海外挑戦の希望を確認する')).toBeUndefined();
+  click('引退予約の確認へ'); expect(gs.screen).toBe('retire_phase');
+  expect(gs.contractEconomy.engine.retirementReservations.every(r => !r.finalization)).toBe(true);
+  expect(gs.contractEconomy.engine.transactions.some(t => t.annualPostingPhase)).toBe(false);
+});
 it('keeps both retirement career and posting unpublished after failure, and retries the same candidate', async () => {
   await setup(offseasonPostingWorld(), false, 'retire_phase');
   const before = structuredClone(gs.contractEconomy), root = rows.get(primary), request = offseasonPostingRequest(gs);

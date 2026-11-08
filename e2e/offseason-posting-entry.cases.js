@@ -36,6 +36,13 @@ for (const width of [360, 390, 1440]) test(`save generations: annual retirement 
   await expect(page.getByRole('button', { name: '引き留める', exact: true })).toHaveCount(0);
   await capture(page, info, width, 'after');
   const before = await durable(page);
+  await page.getByRole('button', { name: '受信箱へ', exact: true }).click();
+  await capture(page, info, width, 'inbox-after');
+  await expect(page.getByRole('region', { name: '年度の海外挑戦' })).toContainText('希望確認の前に引退予約の確定が必要です');
+  await expect(page.getByRole('button', { name: '海外挑戦の希望を確認する', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '引退予約の確認へ', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '引退予約と海外挑戦', exact: true })).toBeVisible();
+  expect(await durable(page)).toEqual(before);
   await page.getByRole('button', { name: '引退予約を確定して希望を確認する', exact: true }).click();
   await expect(page.getByRole('dialog')).toContainText('未確定の引退予約 2人');
   await page.evaluate(() => {

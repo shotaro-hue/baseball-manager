@@ -1,4 +1,6 @@
 import { expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
 import { offseasonPostingWorld } from './fixtures/offseasonPosting';
 import { wrap, finish } from './fixtures/annualRetirements';
 import { freezeEconomy } from './fixtures/economyWorld';
@@ -70,11 +72,22 @@ it('saves an empty retirement and wish year once without inventing decisions or 
   expect(reduceEconomyCommand(r.world, command(w))).toMatchObject({ ok: true, replayed: true, world: r.world });
 });
 
-it('rejects a wish check published before pending retirement finalization without changing old receipts', () => {
-  const w = offseasonPostingWorld(), old = reducePostingGenerationRequest(w, postingGenerationRequest(w));
-  expect(old.ok, old.error).toBe(true);
-  const before = structuredClone(old.world), r = reduceEconomyCommand(freezeEconomy(old.world), command(old.world));
-  expect(r.ok).toBe(false); expect(r.world).toBe(old.world); expect(old.world).toEqual(before);
+it.each([0, 1])('requires club %s retirement finalization before a new standalone phase and keeps the original', teamId => {
+  let w = offseasonPostingWorld();
+  const other = w.contractEconomy.engine.retirementReservations.find(r => r.teamId !== teamId);
+  const finalized = reduceEconomyCommand(w, wrap(w, { id: 'other-retired', type: 'finalize-retirement', reservationId: other.id }));
+  expect(finalized.ok, finalized.error).toBe(true);
+  w = freezeEconomy(finalized.world); const before = structuredClone(w);
+  const r = reducePostingGenerationRequest(w, postingGenerationRequest(w));
+  expect(r.ok).toBe(false); expect(r.error).toContain('引退予約'); expect(r.world).toBe(w); expect(w).toEqual(before);
+});
+it('loads a frozen old phase with pending retirements and replays it without rewriting historical decisions', () => {
+  const w = JSON.parse(gunzipSync(readFileSync(new URL('./fixtures/offseasonPostingLegacyPending.json.gz', import.meta.url))));
+  const before = structuredClone(w); freezeEconomy(w);
+  expect(validateEconomySave(w)).toBe('annual');
+  expect(reducePostingGenerationRequest(w, postingGenerationRequest(w))).toMatchObject({ ok: true, replayed: true, world: w });
+  const r = reduceEconomyCommand(w, command(w));
+  expect(r.ok).toBe(false); expect(r.world).toBe(w); expect(w).toEqual(before);
 });
 
 it('accepts already finalized reservations and uses the same native async result', async () => {
