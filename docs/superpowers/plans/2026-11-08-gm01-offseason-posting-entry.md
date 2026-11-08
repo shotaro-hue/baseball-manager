@@ -30,21 +30,22 @@ hookは既存保存barrierへ接続し、専用表示は保存正本から状態
 Files: `annualOffseasonPosting.js`, `annualTransactions.js`, `contractEconomy.js`, `economyPersistence.js`、対応engineテスト。
 Interfaces: `prepare-offseason-posting {id,humanTeamId}`、親receipt `annualOffseasonPosting`。
 
-- [ ] 既存予約fixtureから一軍/二軍/CPUと成績/保証/順序/再実行のREDを確認する。
-- [ ] 同じcandidateStepsで子を審査し、親の検証・保存境界を実装する。
-- [ ] 関連engine回帰をGREENにする。
+- [x] 既存予約fixtureから一軍/二軍/CPUと成績/保証/順序/再実行のREDを確認する。
+- [x] 同じcandidateStepsで子を審査し、親の検証・保存境界を実装する。
+- [x] 関連engine回帰をGREENにする。
 
 ### Task 2: hook・画面・保存
 
 Files: `humanPosting.js`, `useGameState.js`, `useOffseason.js`, `OffseasonReviewScreens.jsx`, `AppScreenRouter.jsx`と対応hook/E2E。
 Interfaces: `commitOffseasonPostingRequest`、`handlePrepareAnnualPosting`、annual用の予約確認表示。
 
-- [ ] 実保存失敗・career原子性/再試行・barrier/session・UI状態のREDを確認する。
-- [ ] 共通commitに接続し、年度全体の進行ガードは維持する。
-- [ ] Chromium/WebKit、360/390/1440px、実12球団を検証する。
+- [x] 実保存失敗・career原子性/再試行・barrier/session・UI状態のREDを確認する。
+- [x] 共通commitに接続し、年度全体の進行ガードは維持する。
+- [x] Chromium/WebKit、360/390/1440px、実12球団を検証する。
 
 ### Task 3: 提出
 
-- [ ] 根拠/限界/次工程を検証記録とROADMAPへ記録する。
-- [ ] 修正SHAの独立レビューを受け、指摘を検証・修正する。
-- [ ] 新規PRを提示し、最新HEADの必須CI全件を確認して停止する。
+- [x] 根拠/限界/次工程を検証記録とROADMAPへ記録する。
+- [x] 修正SHAの独立レビューを受け、指摘を検証・修正する（`edd6310d`、P1/P2指摘なし）。
+- [x] [PR #557](https://github.com/shotaro-hue/baseball-manager/pull/557)を作成する。
+- [ ] 最新HEADの必須CI全件を確認して停止する。最終結果はPR本文を正本とし、文書更新だけの再帰的commitは作らない。
