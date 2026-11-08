@@ -15,7 +15,7 @@ import { reduceEconomyCommand, toAnnualState } from '../engine/contractEconomy';
 import { envelope } from '../engine/__tests__/fixtures/faDeclarations';
 import { isIkuseiPlayer } from '../engine/rosterCapacity';
 
-let gs, view, rows;
+let gs, os, view, rows;
 const primary = 'baseball_manager_v1';
 beforeEach(() => {
   rows = new Map();
@@ -32,7 +32,7 @@ async function setup(w = postingUiWorld(), panel = false) {
   expect((await saveGame(w, { skipCompression: true })).ok).toBe(true);
   w = await loadGame();
   function Harness() {
-    gs = useGameState(); const os = useOffseason(gs);
+    gs = useGameState(); os = useOffseason(gs);
     return panel && gs.myTeam ? React.createElement(HubContentRouter, { app: { gs, os, sf: {} }, tab: 'mailbox', onOpen: vi.fn() }) : null;
   }
   await act(async () => { view = create(React.createElement(Harness)); });
@@ -60,7 +60,8 @@ it('generates annual wishes through the inbox, saves them once, then uses the ex
   const requestId = requests[0].id;
   expect(await run(() => gs.commitPostingDecisionRequest(postingDecisionRequest(gs, requestId, 'approve'), gs.getProgressSessionToken()))).toMatchObject({ ok: true });
   expect(await run(() => gs.commitPostingMarketRequest(postingMarketRequest(gs, requestId), gs.getProgressSessionToken()))).toMatchObject({ ok: true });
-  expect((await loadGame()).contractEconomy.engine.postingMarketResults).toHaveLength(1);
+  expect((await loadGame()).contractEconomy.engine.postingMarketResults.filter(r => r.teamId === 0)).toHaveLength(1);
+  expect(requests.filter(r => r.teamId === 1).every(r => !['pending', 'approved'].includes(r.status))).toBe(true);
 });
 it('keeps generation confirmation on write failure and retries the same wishes', async () => {
   await setup(requestGenerationWorld(), true); click('海外挑戦の希望を確認する');
@@ -74,7 +75,7 @@ it('keeps generation confirmation on write failure and retries the same wishes',
     await act(async () => { await new Promise(r => setTimeout(r, 10)); });
   await run(() => button('同じ希望判定で保存を再試行する').props.onClick());
   expect(content(view.root)).toContain('希望確認済み');
-  expect((await loadGame()).contractEconomy.engine.transactions.filter(t => t.generatedPostingRequests)).toHaveLength(1);
+  expect((await loadGame()).contractEconomy.engine.transactions.filter(t => t.generatedPostingRequests)).toHaveLength(2);
 });
 it('saves an empty wish check and rejects old sessions without starting another batch', async () => {
   await setup(requestGenerationWorld({ interested: false }), true);
@@ -83,7 +84,7 @@ it('saves an empty wish check and rejects old sessions without starting another 
   expect(content(view.root)).toContain('希望者 0人');
   expect(await run(() => gs.commitPostingGenerationRequest(request, session))).toMatchObject({ ok: true, replayed: true });
   expect(await run(() => gs.commitPostingGenerationRequest(request, session + 1))).toMatchObject({ ok: false, reason: 'economy_session_conflict' });
-  expect((await loadGame()).contractEconomy.engine.transactions).toHaveLength(1);
+  expect((await loadGame()).contractEconomy.engine.transactions).toHaveLength(3);
 });
 
 it.each(['signed', 'no-offer', 'declined'])('generates %s once through the human save path and replays after cold load', async outcome => {
@@ -208,4 +209,44 @@ it('uses real opening-roster identities and pairs controlled approval with devel
   const cold = await loadGame(); expect(cold.teams[0].players.some(p => p.id === playerId)).toBe(true);
   expect(cold.contractEconomy.engine.postingApplications.at(-1).decision).toBe('approve');
   expect(cold.contractEconomy.incomeReceipts).toHaveLength(0);
+});
+
+it('annual retirement entry saves the CPU posting phase but blocks unfinished year processing with an actionable reason', async () => {
+  await setup(requestGenerationWorld());
+  const beforeYear = gs.year, original = structuredClone(gs.teams[0]);
+  expect(await run(() => os.handleRetirePhaseNext({}))).toBe(false);
+  const cold = await loadGame(), views = postingApplicationViews(toAnnualState(cold));
+  expect(cold.contractEconomy.engine.transactions.some(t => t.annualPostingPhase)).toBe(true);
+  expect(views.filter(r => r.teamId !== cold.myId).every(r => !['pending', 'approved'].includes(r.status))).toBe(true);
+  expect(views.filter(r => r.teamId === cold.myId).every(r => r.status === 'pending')).toBe(true);
+  expect(gs.year).toBe(beforeYear); expect(gs.myTeam.players.map(p => p.stats)).toEqual(original.players.map(p => p.stats));
+  expect(gs.notif.msg).toContain('受信箱');
+  expect(gs.notif.msg).toContain('未接続');
+  const old = os.handleRetirePhaseNext, root = rows.get(primary);
+  act(() => gs.setScreen('title'));
+  act(() => expect(gs.hydrateSavedWorld(cold, { progressToken: gs.getProgressToken(), sessionToken: gs.getProgressSessionToken() })).toBe(true));
+  expect(await run(() => old({}))).toBe(false); expect(rows.get(primary)).toBe(root);
+});
+it('holds the common mutation barrier while the annual posting candidate yields, including duplicate calls', async () => {
+  await setup(requestGenerationWorld()); const before = structuredClone(gs.teams), request = postingGenerationRequest(gs), session = gs.getProgressSessionToken();
+  let task, duplicate;
+  act(() => {
+    task = gs.commitPostingGenerationRequest(request, session);
+    duplicate = gs.commitPostingGenerationRequest(request, session);
+    expect(gs.setTeams([])).toBe(false);
+    expect(gs.setSaveId('other-save')).toBe(false);
+    expect(gs.hydrateSavedWorld(requestGenerationWorld(), { progressToken: gs.getProgressToken(), sessionToken: session })).toBe(false);
+  });
+  expect(await duplicate).toMatchObject({ ok: false, reason: 'economy_commit_pending' });
+  expect(gs.teams).toEqual(before);
+  expect(await run(() => task)).toMatchObject({ ok: true });
+  expect((await loadGame()).contractEconomy.engine.transactions.at(-1).annualPostingPhase).toBeDefined();
+});
+it('does not publish a yielded candidate after the hook unmounts', async () => {
+  await setup(requestGenerationWorld()); const root = rows.get(primary), request = postingGenerationRequest(gs), session = gs.getProgressSessionToken();
+  let task;
+  act(() => { task = gs.commitPostingGenerationRequest(request, session); });
+  act(() => view.unmount()); view = null;
+  expect(await task).toMatchObject({ ok: false, reason: 'economy_session_conflict' });
+  expect(rows.get(primary)).toBe(root);
 });

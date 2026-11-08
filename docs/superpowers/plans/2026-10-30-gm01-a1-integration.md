@@ -298,6 +298,15 @@ PR #521レビュー修正: revision増加でもrandomRoot・確定済み台帳�
 
 **受入:** 任意のCPU操作の資金/登録/保証に例外なし。必要な場合に複数年を比較でき、全員単年しか表現できない状態を残さない。
 
+### 2026-11-08: CPU postingの最小統合
+
+#555マージ済みmain `114181d`から、[個別計画](./2026-11-08-gm01-cpu-posting.md)に従い、
+12/1の全球団希望→CPU判断→既存市場→共通保存を年度handler/受信箱へ接続する。
+人の判断は委任しない。一括候補は一revision、確定結果/理由/生成ゼロを保持。
+旧計画のCreate/未完了欄を現行実装の事実へ読み替えない。Task9のCPU全体、Task10の
+open-offseason/成長/翌春/Workerは依然別工程で、年度handlerは未接続部分を明示して停止する。
+[実名簿・経路・検証と未完成範囲](../../validation/gm-01-cpu-posting/README.md)。
+
 ## Task 10: A1-3b 日次・Worker・年度更新
 
 **Files:** Create `src/engine/annualLifecycle.js`, `src/engine/economyRandom.js`, `src/engine/unavailableFixture.js`, `src/engine/__tests__/annualLifecycle.test.js`, `src/workers/__tests__/economyProgression.test.js`; modify `src/hooks/useOffseason.js`, `src/hooks/useSeasonFlow.js`, `src/workers/seasonBatchCore.js`, `src/workers/singleDayCore.js`, `src/workers/seasonBatchWorker.js`, `src/engine/regularGameUpdates.js`, `src/engine/clubFinance.js`, `src/engine/player.js`, `src/utils.js`。本Taskは上表の3PRへ分け、全てOFFで保つ。既存関数へ任意contextを渡す変更に留め、試合乱数全体を刷新しない。

@@ -73,6 +73,11 @@ function preservesEconomyHistory(before, after) {
   })) return false;
   if (after.engine.transactions.slice(before.engine.transactions.length).some(t =>
     t.generatedPostingRequests?.candidates.some(c => c.requestId !== null && !newTransactions.has(c.requestId)))) return false;
+  if (after.engine.transactions.slice(before.engine.transactions.length).some(t => {
+    const g = t.annualPostingPhase;
+    return g && [...g.createdGenerationIds, ...g.decisions.map(d => d.decisionId), ...g.marketIds]
+      .some(id => !newTransactions.has(id));
+  })) return false;
   // A market result cannot retrospectively claim a completion already published
   // through the old explicit boundary. Parent and both children commit together.
   if ((after.engine.postingMarketResults ?? []).slice((before.engine.postingMarketResults ?? []).length)
