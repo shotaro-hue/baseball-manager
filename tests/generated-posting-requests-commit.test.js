@@ -2,7 +2,7 @@ import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { saveGame, loadGame, commitEconomyCandidate, recoverEconomyCommit } from '../src/engine/saveload';
 import { requestGenerationWorld } from '../src/engine/__tests__/fixtures/postingRequestGeneration';
-import { postingGenerationRequest, reducePostingGenerationRequest } from '../src/engine/humanPosting';
+import { postingGenerationRequest, reducePostingGenerationRequest, offseasonPostingRequest, reduceOffseasonPostingRequest } from '../src/engine/humanPosting';
 import { reduceEconomyCommand } from '../src/engine/contractEconomy';
 import { envelope } from '../src/engine/__tests__/fixtures/faDeclarations';
 import { postingGenerationId } from '../src/engine/generatedPostingRequests';
@@ -170,7 +170,14 @@ it('runs the real twelve-club phase through one publication and preserves retire
   current.world = w;
   expect((await saveGame(w)).ok).toBe(true); current.world = await loadGame(); context();
   console.info(`REAL12_POSTING_PREPARED ${JSON.stringify({ elapsedMs: Math.round(performance.now() - caseStarted) })}`);
-  const start = performance.now(), next = candidate(current.world), reducedMs = performance.now() - start;
+  // The annual entry now finalizes saved retirements before the global phase.
+  // Keep the original real-roster exclusions and publication/time budget.
+  const start = performance.now(), result = reduceOffseasonPostingRequest(current.world, offseasonPostingRequest(current.world));
+  expect(result.ok, result.error).toBe(true);
+  const next = result.world, reducedMs = performance.now() - start;
+  expect(next.contractEconomy.revision).toBe(current.world.contractEconomy.revision + 1);
+  expect(next.contractEconomy.engine.retirementReservations.find(r => r.id === 'real-retirement').finalization).toBeDefined();
+  expect(next.contractEconomy.engine.spending.reservations).toEqual(current.world.contractEconomy.engine.spending.reservations);
   console.info(`REAL12_POSTING_CANDIDATE ${JSON.stringify({ reducedMs: Math.round(reducedMs) })}`);
   const cpuGeneration = next.contractEconomy.engine.transactions.find(t => t.generatedPostingRequests?.teamId === club.id).generatedPostingRequests;
   const candidates = cpuGeneration.candidates.map(r => r.inputs.playerId);
@@ -184,7 +191,9 @@ it('runs the real twelve-club phase through one publication and preserves retire
   const saving = performance.now(); expect((await commitEconomyCandidate(next, expected, bindings)).ok).toBe(true);
   const commitMs = performance.now() - saving, cold = await loadGame();
   expect(publications).toBe(1); expect(cold.contractEconomy).toEqual(next.contractEconomy);
-  const phase = next.contractEconomy.engine.transactions.at(-1).annualPostingPhase;
+  expect(cold.teams.find(t => t.id === club.id).history.some(p => p.retirementReservationId === 'real-retirement')).toBe(true);
+  const phase = next.contractEconomy.engine.transactions.find(t => t.annualPostingPhase).annualPostingPhase;
+  expect(next.contractEconomy.engine.transactions.at(-1).annualOffseasonPosting).toBeDefined();
   // Report measurements without asserting machine-dependent timing.
   console.info(`REAL12_POSTING ${JSON.stringify({ reducedMs: Math.round(reducedMs), commitMs: Math.round(commitMs), publications,
     wishes: next.contractEconomy.engine.postingApplications.filter(r => r.kind === 'request').length,

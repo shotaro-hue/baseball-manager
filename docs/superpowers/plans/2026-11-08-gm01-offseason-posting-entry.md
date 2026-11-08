@@ -52,3 +52,4 @@ Interfaces: `commitOffseasonPostingRequest`、`handlePrepareAnnualPosting`、ann
 - [x] [PR #557](https://github.com/shotaro-hue/baseball-manager/pull/557)を作成する。
 - [ ] 最新HEADの必須CI全件を確認して停止する。最終結果はPR本文を正本とし、文書更新だけの再帰的commitは作らない。
 - 続行導線修正の独立再レビューと新しい最終HEADのCIをPR本文へ記録する。`7548de37`のCI #715はunit4,633件/保存整合性205件を含む12ジョブ成功。QA-D1の既存Enter/自動保存の競合1件はtraceを独立確認し、main/当該HEADの比較各3回は再現なし。再検証中に導線修正が入ったため、最終CIの代わりにはしない。
+- [x] CI #717で判明した実12球団保存テストの呼出先を予約確定込みの入口へ更新する。元の期待・60秒制限を維持し、予約確定/留保不変/引退履歴を追加。18件成功。最終レビューの本番コード`168ab798`は変更しない。
