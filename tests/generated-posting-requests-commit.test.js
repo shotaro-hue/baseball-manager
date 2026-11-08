@@ -136,6 +136,7 @@ it('rejects phase parent backfilled over already published CPU decisions and mar
   expect(roots()).toEqual(before);
 });
 it('runs the real twelve-club phase through one publication and preserves retirement/renewal conflicts', async () => {
+  const caseStarted = performance.now();
   const { fromAnnualState, toAnnualState } = await import('../src/engine/contractEconomy');
   const { createSeasonContract } = await import('../src/engine/seasonContract');
   const { isIkuseiPlayer } = await import('../src/engine/rosterCapacity');
@@ -168,7 +169,9 @@ it('runs the real twelve-club phase through one publication and preserves retire
   }
   current.world = w;
   expect((await saveGame(w)).ok).toBe(true); current.world = await loadGame(); context();
+  console.info(`REAL12_POSTING_PREPARED ${JSON.stringify({ elapsedMs: Math.round(performance.now() - caseStarted) })}`);
   const start = performance.now(), next = candidate(current.world), reducedMs = performance.now() - start;
+  console.info(`REAL12_POSTING_CANDIDATE ${JSON.stringify({ reducedMs: Math.round(reducedMs) })}`);
   const cpuGeneration = next.contractEconomy.engine.transactions.find(t => t.generatedPostingRequests?.teamId === club.id).generatedPostingRequests;
   const candidates = cpuGeneration.candidates.map(r => r.inputs.playerId);
   expect(candidates).not.toContain(retiring.id);
