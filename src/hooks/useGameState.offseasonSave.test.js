@@ -5,6 +5,7 @@ import { useGameState } from './useGameState';
 import { enqueueSaveGame } from '../engine/saveload';
 import { useSeasonFlow } from './useSeasonFlow';
 import { initPlayoff, recordSeriesGame } from '../engine/playoff';
+import { generateSeasonSchedule } from '../engine/scheduleGen';
 vi.mock('../engine/saveload', () => ({ hasSave: () => true, getAutoSaveIntervalMs: () => 30000, getSaveQueueSnapshot: () => ({ isSaving: false }),
   enqueueSaveGame: vi.fn(async () => ({ ok: true })) }));
 vi.mock('../engine/battedBallArchive', () => ({ getBattedBallQueueStatus: () => ({ failedRecords: 0 }), flushBattedBallQueue: async () => ({ ok: true }) }));
@@ -58,4 +59,27 @@ it('saves playoff progress with teams, restores it in the season hook and preser
   act(() => { gs.setScreen('retire_phase'); gs.setOffseasonPlan({ ...plan, resumeScreen: 'retire_phase' }); });
   await act(async () => { expect((await gs.handleSave({ silent: true })).ok).toBe(true); });
   expect(enqueueSaveGame.mock.lastCall[0].offseasonPlan.resumeScreen).toBe('retire_phase');
+});
+
+it('retries a failed dated postseason save without changing its frozen dates or results', async () => {
+  let sf;
+  function Harness() { gs = useGameState(); sf = useSeasonFlow(gs); return null; }
+  await act(async () => { view = create(React.createElement(Harness)); });
+  const teams = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(id => ({ id, name: `球団${id}`, league: id < 6 ? 'セ' : 'パ',
+    wins: 90 - id % 6 * 4, losses: 50 + id % 6 * 4, draws: 3, players: [], farm: [] }));
+  const schedule = generateSeasonSchedule(2026, teams);
+  act(() => { gs.setTeams(teams); gs.setYear(2026); gs.setMyId(0); gs.setSchedule(schedule); gs.setScreen('playoff'); });
+  const p = initPlayoff(teams, { year: 2026, schedule });
+  p.cs1_se = recordSeriesGame(p.cs1_se, { score: { my: 0, opp: 0 } });
+  act(() => sf.setPlayoff(p));
+  const frozen = JSON.parse(JSON.stringify(gs.offseasonPlan));
+  enqueueSaveGame.mockResolvedValueOnce({ ok: false }).mockResolvedValue({ ok: true });
+  await act(async () => expect((await gs.handleSave({ silent: true })).ok).toBe(false));
+  expect(gs.saveDirty).toBe(true);
+  expect(gs.offseasonPlan).toEqual(frozen);
+  await act(async () => expect((await gs.handleSave({ silent: true })).ok).toBe(true));
+  const saved = JSON.parse(JSON.stringify(enqueueSaveGame.mock.lastCall[0].offseasonPlan));
+  act(() => { gs.setOffseasonPlan(saved); sf.setPlayoff(null); });
+  expect(sf.playoff).toEqual(frozen.playoff);
+  expect(sf.playoff.cs1_se.games).toHaveLength(1);
 });

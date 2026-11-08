@@ -11,6 +11,7 @@ import { applyRegularSeasonTeamUpdate } from '../engine/regularGameUpdates';
 import { generateCpuOffer, generateCpuCpuTrade, classifyTeam, evaluateFrontOfficePlan } from '../engine/trade';
 import { executeCpuTrade } from '../engine/cpuTradeExecution';
 import { encodePlayoff, initPlayoff } from '../engine/playoff';
+import { createPostseasonCalendar, validatePlayoffCalendar } from '../engine/postseasonCalendar';
 import { standingsContext } from '../engine/standings';
 import { processCpuFaBids } from '../engine/contract';
 import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, MAX_ROSTER } from '../constants';
@@ -111,6 +112,7 @@ export function useSeasonFlow(gs) {
   const [playoffState, setPlayoffState] = useState(null);
   const savedPostseason = gs.offseasonPlan?.stage === 'postseason'
     && gs.offseasonPlan.year === year && gs.offseasonPlan.myId === myId ? gs.offseasonPlan.playoff : null;
+  if (savedPostseason) validatePlayoffCalendar(savedPostseason, { year, schedule });
   const playoff = playoffState ?? savedPostseason;
   const setPlayoff = value => {
     const next = typeof value === 'function' ? value(playoff) : value;
@@ -118,7 +120,7 @@ export function useSeasonFlow(gs) {
     if (next) gs.setOffseasonPlan?.({ version: 1, year, myId, stage: 'postseason',
       resumeScreen: 'playoff', playoff: encodePlayoff(next) });
   };
-  const startPlayoff = teamList => initPlayoff(teamList, { year,
+  const startPlayoff = teamList => initPlayoff(teamList, { year, schedule,
     ...standingsContext(getSeasonHistory?.(), getGameResultsMap?.(), year) });
   const [currentGameTeams, setCurrentGameTeams] = useState(null);
   const [batchProgress, setBatchProgress] = useState(null);
@@ -129,6 +131,10 @@ export function useSeasonFlow(gs) {
   const allowRegularGames = count => {
     const request = requestRegularGames(count);
     if (!request.count) notify(request.reason, 'warn');
+    if (request.count && gameDay + request.count > SEASON_GAMES) {
+      try { createPostseasonCalendar({ year, schedule }); }
+      catch (error) { notify(error.message, 'warn'); return 0; }
+    }
     return request.count;
   };
   const isBatchCancelledRef = useRef(false);

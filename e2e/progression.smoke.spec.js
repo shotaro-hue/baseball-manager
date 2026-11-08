@@ -116,7 +116,7 @@ test('E2 final regular game, postseason save/reload, offseason and next year', a
   await press.getByRole('button', { name: '回答する', exact: true }).click();
   await expect(press).toHaveCount(0);
   await expect(page.locator('.topbar')).toContainText('残り1試合');
-  await startSingle(page, false);
+  await startSingle(page, page.viewportSize().width < 768);
   await page.getByRole('button', { name: /オートシムモード/ }).click();
   await expect(page.getByRole('heading', { name: `${before.year}年 ポストシーズン`, exact:true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'まとめてシム', exact:true })).toHaveCount(0);
@@ -127,6 +127,10 @@ test('E2 final regular game, postseason save/reload, offseason and next year', a
   await waitSaveIdle(page);
   const during = await readSave(page);
   expect(Object.values(during.offseasonPlan?.playoff ?? {}).reduce((n,s) => n + (s?.games?.length ?? 0),0)).toBe(1);
+  const finalDate = during.schedule[143].date;
+  expect(during.offseasonPlan.playoff.calendar).toEqual({ version: 1,
+    regularSeasonEndDate: `${before.year}-${String(finalDate.month).padStart(2, '0')}-${String(finalDate.day).padStart(2, '0')}` });
+  expect(during.offseasonPlan.playoff.cs1_se.games[0].date).toBe(during.offseasonPlan.playoff.cs1_se.startDate);
   expect(progressSignature(during).played).toBe(143);
   const series = await page.locator('.playoff-series[data-active="true"]').innerText();
   await reloadAndLoad(page);
@@ -137,6 +141,15 @@ test('E2 final regular game, postseason save/reload, offseason and next year', a
   await expect(page.getByRole('button', { name: 'まとめてシム', exact:true })).toHaveCount(0);
   await page.getByRole('button', { name: 'ポストシーズンに戻る', exact:true }).click();
   await page.getByRole('button', { name: '残り全試合をまとめてシム', exact:true }).click();
+  await expect(page.getByRole('button', { name: '引退・シーズン終了後の手続きへ', exact:true })).toBeVisible();
+  await waitSaveIdle(page);
+  await page.getByRole('button', { name: '進行を保存', exact:true }).click();
+  await waitSaveIdle(page);
+  const closed = await readSave(page);
+  expect(await page.evaluate(async s => {
+    const { postseasonClosingDate } = await import('/baseball-manager/src/engine/playoff.js');
+    return postseasonClosingDate(s.offseasonPlan.playoff, { year: s.year, schedule: s.schedule });
+  }, closed)).toBe(closed.offseasonPlan.playoff.jpSeries.games.at(-1).date);
   await page.getByRole('button', { name: '引退・シーズン終了後の手続きへ', exact:true }).click();
   // Every required choice is made through normal UI, including real retirement
   // candidates, contract renewal, the draft and spring training.
