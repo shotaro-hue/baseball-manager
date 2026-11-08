@@ -199,7 +199,7 @@ for (const corrupt of ['date', 'missing-source']) test(`E2 final regular game re
   const raw = await page.evaluate(async corrupt => {
     const { loadGame, saveGame } = await import('/baseball-manager/src/engine/saveload.js');
     const { initPlayoff } = await import('/baseball-manager/src/engine/playoff.js');
-    const { readRootBody } = await import('/baseball-manager/src/engine/saveRootBodies.js');
+    const { readRootBody, prepareRootBody } = await import('/baseball-manager/src/engine/saveRootBodies.js');
     const s = await loadGame();
     s.offseasonPlan.playoff = initPlayoff(s.teams, { year: s.year, schedule: s.schedule });
     if (!(await saveGame(s, { skipCompression: true })).ok) throw new Error('dated save setup failed');
@@ -207,7 +207,7 @@ for (const corrupt of ['date', 'missing-source']) test(`E2 final regular game re
     const root = JSON.parse(await readRootBody(localStorage.getItem(key)));
     if (corrupt === 'date') root.offseasonPlan.playoff.cs1_se.startDate = `${root.year}-01-01`;
     else delete root.schedule;
-    const raw = JSON.stringify(root);
+    const raw = await prepareRootBody(JSON.stringify(root));
     localStorage.setItem(key, raw);
     localStorage.removeItem(`${key}_bk1`); localStorage.removeItem(`${key}_bk2`);
     return raw;

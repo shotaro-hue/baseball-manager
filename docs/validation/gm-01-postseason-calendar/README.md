@@ -26,6 +26,10 @@ main `bb77dad693769c0eef454eb4422326b0d0545635`（#557マージ後）から実�
 - Chromium/WebKit：既存E2の「最終公式戦→CS途中保存→再開→日本一→翌年」を日付・終了照合付きへ拡張。従来WebKitの対象外だった同テストを対象へ追加した。WebKitではPC用入口指定`startSingle(page,false)`、その修正後には翌年の`runSingle(page,false)`で存在しないdesktop buttonを待って120秒で失敗。snapshotはmobile-homeの実ボタンを示しており、両方に画面幅を既存helperへ渡す修正を行った。その後同一シナリオがChromium 56秒、WebKit約60秒で成功。さらに実保存rootの日付/元日程を破損させてContinueを実行し、タイトルでの拒否・例外なし・原本保持を両ブラウザへ追加した。timeout/retry/期待値の緩和はしていない。最終の両ブラウザ結果・HEAD・独立レビュー結果はPR本文を正本とする。
 - 画面/CSS/ユーザー操作の変更なし。実機iPhone Safariは未実施。
 
+破損rootのE2Eを追加した初回は、WebKitでテスト準備の`localStorage.setItem`がQuotaExceededErrorになった。正常な`saveGame`は成功しており、展開済みの大きなroot JSONを直接localStorageへ置いた故障注入だけが容量上限を越えた。実装と同じ`prepareRootBody`を使用してroot bodyを格納してから、同じ不正date/元日程欠落を含むrootを読み込ませる。拒否、例外なし、タイトル保持、raw root保持の期待値は維持する。
+
+修正後の対象E2Eは両ブラウザ6件すべて成功（Chromium正常53.7秒、破損2件各約5秒、WebKit正常約60秒、破損2件各約5秒、合計2.3分）。本番ロジックは変更せず、保存容量の制限も変更していない。
+
 ## 未完了範囲
 
 今回の終了日はnative年度取引のreceiptではない。annual時計に新phaseを追加せず、無効なgameDay144の拒否を維持している。翌年度予算forecastと承認、native open-offseason、期末の新規引退判断、成長・要求額、翌春builder、annual Worker、長期プレイ、実iPhoneが残る。公開OFF/schema1/DB5。親機能・A1・通常プレイannual年度完走は未完成であり、この基盤PRの完了と区別する。次優先は翌年度予算forecastと、今回の終了根拠を併せて利用するopen-offseason。
