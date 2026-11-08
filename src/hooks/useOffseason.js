@@ -1,3 +1,7 @@
+import { toAnnualState } from '../engine/contractEconomy';
+import { postingGenerationRequest } from '../engine/humanPosting';
+import { postingApplicationViews } from '../engine/annualPostingApplications';
+import { postingPhaseId } from '../engine/annualPostingPhase';
 import {newReinforcementPlan} from '../engine/rosterPlanning';
 import {ensureDraftEvaluation} from '../engine/draftReports';
 import { draftCapacityContext, isIkuseiPlayer } from '../engine/rosterCapacity';
@@ -175,7 +179,23 @@ export function useOffseason(gs) {
   const appendCareerEntryWithSummary = (player, entry) => appendCareerEntryToPlayer(player, entry);
 
   const handleNextYear = async (sourceTeams = teams) => {
-    if (!canProgressLegacy()) return false;
+    if (!canProgressLegacy()) {
+      if (renewalSession === draftContextRef.current.getProgressSessionToken?.()) {
+        const current = draftContextRef.current;
+        let state;
+        try { state = toAnnualState(current); } catch {
+          notify?.('年度・契約の必須情報を確認できません。新制度の年度切替は進めません。', 'warn');
+          return false;
+        }
+        const pending = postingApplicationViews(state).filter(r => r.season === current.year && r.teamId === current.myId);
+        const issue = pending.some(r => r.status === 'pending') ? '受信箱で自球団のポスティング申請を承認・拒否してください。'
+          : pending.some(r => r.status === 'approved') ? '受信箱で承認済み申請の海外交渉を確定してください。'
+          : !state.transactions.some(t => t.id === postingPhaseId(current.year)) ? '12月1日の海外挑戦の希望確認を先に保存してください。'
+          : 'ポスティング工程は保存済みです。';
+        notify?.(`${issue} 新制度の翌春への年度切替は未接続のため、年度は進めません。`, 'warn');
+      }
+      return false;
+    }
     if (nextYearTransitionRef.current) return false;
     if (gs.offseasonPlan && gs.screen !== 'spring_training') return false;
     nextYearTransitionRef.current = true;
@@ -569,11 +589,27 @@ export function useOffseason(gs) {
 
   // 引退フェーズ処理（退場選手確定→成長/衰退→CPU契約→表彰）
   const handleRetirePhaseNext = async (decisions) => {
+    // This is only the annual posting stage. Never continue into the legacy
+    // retirement/growth/renewal writer after a successful posting publication.
+    if (!canProgressLegacy()) {
+      if (renewalSession !== draftContextRef.current.getProgressSessionToken?.()) return false;
+      if (Object.keys(decisions ?? {}).length) {
+        notify?.('新制度の引退判断の年度接続は未完了です。予約を確認してから海外挑戦の希望を確認してください。', 'warn');
+        return false;
+      }
+      const result = await gs.commitPostingGenerationRequest?.(postingGenerationRequest(gs), renewalSession);
+      if (renewalSession !== draftContextRef.current.getProgressSessionToken?.()) return false;
+      notify?.(result?.ok ? '海外挑戦の年度工程を保存しました。自球団の判断・海外交渉は受信箱で行ってください。退職・成長・翌春の年度処理は未接続です。'
+        : result?.error || (result?.reason === 'economy_adoption_required' ? '保存済みの海外挑戦を受信箱で復旧してください。年度は進めません。'
+          : '海外挑戦の年度工程を保存できませんでした。受信箱で保存状態を確認し、再試行してください。年度は進めません。'), 'warn');
+      return false;
+    }
     if (retireTransitionRef.current) return false;
     retireTransitionRef.current = true;
     setCareerPersistenceError(null);
     try {
     const playerMod = await loadOffseasonPlayerModule();
+    if (!canProgressLegacy()) return false;
     const safeDecisions = decisions && typeof decisions === 'object' ? decisions : {};
     const userRetiredIds = new Set(
       Object.entries(safeDecisions)

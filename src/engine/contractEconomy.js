@@ -4,7 +4,7 @@ import { inspectAnnualBudgetCoverage } from './annualBudgetPolicy';
 import { employmentContractId, projectEmploymentPlayer, validateAnnualEmploymentContract, normalizeEmploymentContract } from './seasonContract';
 import { createSeasonContract } from './seasonContract';
 import { createContractLedger, applyContractLedgerAction, contractEmploymentAt, validateContractLedger } from './contractLedger';
-import { applyAnnualTransaction, projectAnnualState } from './annualTransactions';
+import { applyAnnualTransactionAsync, applyAnnualTransaction, projectAnnualState } from './annualTransactions';
 import { quoteAnnualSpendingPlan } from './annualSpending';
 import { draftCapacityContext, isIkuseiPlayer } from './rosterCapacity';
 import { economyClockFor, validateEconomyClock } from './economyCalendar';
@@ -177,12 +177,13 @@ export function fromAnnualState(world, input) {
   return next;
 }
 
-function runCommand(world, command) {
+function runCommand(world, command, apply = applyAnnualTransaction) {
   const state = toAnnualState(world), current = identity(world);
   if (!command || Object.keys(command).some(k => !['saveId', 'epoch', 'baseRevision', 'transaction'].includes(k))
     || command.saveId !== current.saveId || command.epoch !== current.epoch || !counter(command.baseRevision)
     || command.baseRevision > current.baseRevision || !command.transaction) fail('取引のsaveId・epoch・revisionが古いか未記録です。');
   const c = command.transaction;
+  if (c.type === 'advance-posting-phase' && c.humanTeamId !== world.myId) fail('自球団の判断をCPUへ委任できません。');
   typedIds([...state.transactions.map(r => r.id), c.id]);
   if (c.type === 'depart-overseas' && !state.transactions.some(r => r.id === c.id)
     && world.contractEconomy.decisions.some(d => d.kind === 'human-acquisition' && d.status === 'pending' && d.playerId === c.playerId))
@@ -196,11 +197,14 @@ function runCommand(world, command) {
     typedIds([...state.spending.reservations, ...state.spending.resolvedReservations].map(r => r.proposal.id).concat(c.proposal.id));
     inspectContractClaims(state.spending, c.proposal);
   }
-  const result = applyAnnualTransaction(state, c);
-  if (!result.ok) fail(result.error);
-  if (command.baseRevision !== current.baseRevision && !result.replayed) fail('取引のrevisionが古くなっています。');
-  if (!result.replayed && !counter(current.baseRevision + 1)) fail('契約revisionが安全な範囲を超えています。');
-  return result;
+  const checkResult = result => {
+    if (!result.ok) fail(result.error);
+    if (command.baseRevision !== current.baseRevision && !result.replayed) fail('取引のrevisionが古くなっています。');
+    if (!result.replayed && !counter(current.baseRevision + 1)) fail('契約revisionが安全な範囲を超えています。');
+    return result;
+  };
+  const result = apply(state, c);
+  return result instanceof Promise ? result.then(checkResult) : checkResult(result);
 }
 
 export function quoteEconomyCommand(world, command) {
@@ -211,13 +215,18 @@ export function quoteEconomyCommand(world, command) {
   } catch (error) { return { ok: false, error: error.message }; }
 }
 
+function reducedWorld(world, result) {
+  if (result.replayed) return { ok: true, world, replayed: true };
+  const next = fromAnnualState(world, result.state);
+  return { ok: true, world: { ...next, contractEconomy: { ...next.contractEconomy, revision: world.contractEconomy.revision + 1 } }, replayed: false };
+}
 export function reduceEconomyCommand(world, command) {
-  try {
-    const result = runCommand(world, command);
-    if (result.replayed) return { ok: true, world, replayed: true };
-    const next = fromAnnualState(world, result.state);
-    return { ok: true, world: { ...next, contractEconomy: { ...next.contractEconomy, revision: world.contractEconomy.revision + 1 } }, replayed: false };
-  } catch (error) { return { ok: false, world, replayed: false, error: error.message }; }
+  try { return reducedWorld(world, runCommand(world, command)); }
+  catch (error) { return { ok: false, world, replayed: false, error: error.message }; }
+}
+export async function reduceEconomyCommandAsync(world, command) {
+  try { return reducedWorld(world, await runCommand(world, command, applyAnnualTransactionAsync)); }
+  catch (error) { return { ok: false, world, replayed: false, error: error.message }; }
 }
 
 export function createAnnualNewGameWorld({ teams, faPool, myId, saveId, season, policy, randomRoot }) {

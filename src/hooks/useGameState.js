@@ -1,7 +1,7 @@
 import { draftCapacityContext, evaluateRosterCapacity, isIkuseiPlayer } from '../engine/rosterCapacity';
 import { reduceRookieRequest } from '../engine/rookieContracts';
 import { reduceTradeRequest } from '../engine/humanTrade';
-import { reducePostingDecisionRequest, reducePostingMarketRequest, reducePostingGenerationRequest } from '../engine/humanPosting';
+import { reducePostingDecisionRequest, reducePostingMarketRequest, reducePostingGenerationRequestAsync } from '../engine/humanPosting';
 import { developmentRequest, reduceDevelopmentRequest } from '../engine/developmentRegistration';
 import { stadiumUpgradeCosts } from '../engine/clubFinance';
 import {createFarmCompetition} from '../engine/farmRecords';
@@ -695,21 +695,28 @@ export function useGameState() {
     const base = snapshot.world;
     try { if (contractEconomyMode(base) !== 'annual') return { ok: false, reason: 'economy_not_active' }; }
     catch { return { ok: false, reason: 'economy_candidate_invalid' }; }
-    const reduced = reduce(base, command);
-    if (!reduced.ok) return { ok: false, reason: 'economy_command_invalid', error: reduced.error };
-    if (reduced.replayed) return { ok: true, replayed: true };
     const expected = { saveId: base.saveId, epoch: base.contractEconomy.epoch,
       baseRevision: base.contractEconomy.revision,
       sessionToken: progressSessionRef.current, progressToken: progressTokenRef.current };
     const dirtySnapshot = saveDirtyTrackerRef.current.snapshot({ persistAll: !snapshot.saveExists });
     const pendingCareerEntries = [...pendingCareerEntriesRef.current];
-    const world = reduced.world;
-    const context = { expected, dirtySnapshot, pendingCareerEntries, world, status: 'saving' };
+    const context = { expected, dirtySnapshot, pendingCareerEntries, world: null, status: 'preparing' };
     economyCommitRef.current = context;
     setSaveQueueState(prev => ({ ...prev, isSaving: true }));
     setSaveResult(null);
     let result;
     try {
+      // Hold the existing mutation/save barrier while posting yields to paint.
+      // No candidate, including a replay, may outlive its original session.
+      const reduced = await reduce(base, command);
+      if (!economyMountedRef.current || economyCommitRef.current !== context
+        || progressSessionRef.current !== expected.sessionToken || progressTokenRef.current !== expected.progressToken
+        || saveDirtyTrackerRef.current.snapshot().mutationVersion !== snapshot.mutationVersion)
+        return { ok: false, reason: 'economy_session_conflict' };
+      if (!reduced.ok) return { ok: false, reason: 'economy_command_invalid', error: reduced.error };
+      if (reduced.replayed) return { ok: true, replayed: true };
+      const world = reduced.world;
+      context.world = world; context.status = 'saving';
       // Reading another offer during the autosave cooldown advances the live
       // revision. Persist that validated base under the same mutation barrier
       // before the candidate CAS; ordinary saves retain foreign-root fencing.
@@ -773,7 +780,7 @@ export function useGameState() {
 
   const commitPostingGenerationRequest = useCallback((request, sessionToken) => {
     if (!Number.isSafeInteger(sessionToken)) return Promise.resolve({ ok: false, reason: 'economy_session_conflict' });
-    return commitEconomyOperation(request, reducePostingGenerationRequest, sessionToken, { flushPendingBase: true });
+    return commitEconomyOperation(request, reducePostingGenerationRequestAsync, sessionToken, { flushPendingBase: true });
   }, [commitEconomyOperation]);
 
   const recoverEconomyCommand = useCallback(async () => {

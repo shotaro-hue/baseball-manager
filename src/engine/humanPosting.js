@@ -1,7 +1,7 @@
-import { reduceEconomyCommand, toAnnualState } from './contractEconomy';
+import { reduceEconomyCommand, reduceEconomyCommandAsync, toAnnualState } from './contractEconomy';
 import { postingApplicationViews } from './annualPostingApplications';
 import { fmtSal } from '../utils';
-import { postingGenerationId } from './generatedPostingRequests';
+import { postingPhaseId } from './annualPostingPhase';
 
 const stable = value => JSON.stringify(value, (_, v) => v && typeof v === 'object' && !Array.isArray(v)
   ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v);
@@ -14,7 +14,8 @@ export function postingGenerationRequest(world) {
   return { saveId: world.saveId, epoch: world.contractEconomy?.epoch, baseRevision: world.contractEconomy?.revision,
     season: world.year, date: world.contractEconomy?.clock.date, teamId: world.myId };
 }
-export function reducePostingGenerationRequest(world, r) {
+export const reducePostingGenerationRequestAsync = (world, request) => reducePostingGenerationRequest(world, request, reduceEconomyCommandAsync);
+export function reducePostingGenerationRequest(world, r, reduce = reduceEconomyCommand) {
   try {
     const fields = ['saveId', 'epoch', 'baseRevision', 'season', 'date', 'teamId'];
     if (!r || Object.keys(r).length !== fields.length || Object.keys(r).some(k => !fields.includes(k))
@@ -23,13 +24,13 @@ export function reducePostingGenerationRequest(world, r) {
     const state = toAnnualState(world), e = world.contractEconomy;
     if (r.saveId !== world.saveId || r.epoch !== e.epoch || r.teamId !== world.myId || r.baseRevision > e.revision)
       fail('セーブ・球団が変更されています。希望確認を開き直してください。');
-    const command = { id: postingGenerationId(r.season, r.teamId), type: 'generate-posting-requests', teamId: r.teamId };
+    const command = { id: postingPhaseId(r.season), type: 'advance-posting-phase', humanTeamId: r.teamId };
     const envelope = { saveId: r.saveId, epoch: r.epoch, baseRevision: r.baseRevision, transaction: command };
-    if (state.transactions.some(t => t.id === command.id)) return reduceEconomyCommand(world, envelope);
+    if (state.transactions.some(t => t.id === command.id)) return reduce(world, envelope);
     if (r.baseRevision !== e.revision || r.season !== world.year || r.date !== state.date
       || state.phase !== 'offseason' || r.date !== `${String(r.season).padStart(4, '0')}-12-01`)
       fail('状態が変更されています。オフシーズンの希望確認を開き直してください。');
-    return reduceEconomyCommand(world, envelope);
+    return reduce(world, envelope);
   } catch (error) { return { ok: false, world, replayed: false, error: error.message }; }
 }
 

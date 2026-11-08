@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { postingGenerationRequest } from '../../engine/humanPosting';
+import { postingPhaseId } from '../../engine/annualPostingPhase';
+import { cpuPostingReasonText } from '../../engine/cpuPosting';
+import { postingApplicationViews } from '../../engine/annualPostingApplications';
+import { postingStatusText, postingGenerationRequest } from '../../engine/humanPosting';
 import { postingGenerationId } from '../../engine/generatedPostingRequests';
 import { Button } from '../design-system/primitives';
 import { DecisionConfirmation } from './DecisionParts';
@@ -11,6 +14,8 @@ export function AnnualPostingRequests({ gs }) {
   const e = gs.contractEconomy, clock = e?.clock;
   if (e?.mode !== 'annual' || clock?.phase !== 'offseason' || clock.season !== gs.year || gs.year >= 9999) return null;
   const generation = e.engine.transactions.find(t => t.id === postingGenerationId(gs.year, gs.myId))?.generatedPostingRequests;
+  const phase = e.engine.transactions.find(t => t.id === postingPhaseId(gs.year))?.annualPostingPhase;
+  const cpu = phase && postingApplicationViews(e.engine).filter(r => r.season === gs.year && r.teamId !== gs.myId);
   const recovery = failure?.reason === 'economy_adoption_required' || gs.saveResult?.reason === 'economy_adoption_required';
   const blocked = saving || gs.saveQueueState?.isSaving || recovery;
   const issue = confirmation && !recovery && (confirmation.session !== gs.getProgressSessionToken()
@@ -30,20 +35,28 @@ export function AnnualPostingRequests({ gs }) {
   return <section className="management-decisions" aria-label="年度の海外挑戦">
     <h2 ref={heading} tabIndex={-1}>{gs.year}年度の海外挑戦</h2>
     {generation ? <p role="status">希望確認済み · 希望者 {generation.candidates.filter(c => c.requestId !== null).length}人。申請ごとに球団判断を行ってください。</p>
-      : <><p>自球団の支配下選手の希望を年一度確認します。希望があった選手は、受信箱で承認・拒否を判断できます。</p>
+      : <p>自球団の支配下選手の希望を年一度確認します。希望があった選手は、受信箱で承認・拒否を判断できます。</p>}
+    {!phase && <><p>同時にCPU球団の希望・球団判断・海外交渉も進めて保存します。自球団の判断はプレイヤーが行います。</p>
         <Button disabled={blocked} aria-expanded={Boolean(confirmation)} onClick={() => {
           if (busy.current || blocked || confirmation) return;
           setFailure(null); setConfirmation({ request: postingGenerationRequest(gs), session: gs.getProgressSessionToken() });
         }}>海外挑戦の希望を確認する</Button></>}
+    {phase && <details><summary>CPU球団の判断・交渉結果（{cpu.length}件）</summary>
+      {cpu.length === 0 ? <p>CPU球団も今年度の希望確認済みです。申請はありません。</p> : <ul>{cpu.map(r => {
+        const team = gs.teams.find(t => t.id === r.teamId), player = [...team.players, ...team.farm, ...(team.history ?? [])].find(p => p.id === r.playerId);
+        const decision = phase.decisions.find(d => d.requestId === r.id);
+        return <li key={r.id}>{team.name} · {player?.name ?? r.playerId}：{postingStatusText[r.status]}。{decision ? cpuPostingReasonText[decision.reason] : '保存済みの球団判断を維持'}</li>;
+      })}</ul>}
+    </details>}
     {saving && <p role="status">希望の保存・反映を確認しています…</p>}
     {failure && <p role="alert">{failure.error || (recovery ? '保存済みの希望を画面へ反映できませんでした。復旧してください。'
       : '希望を保存できませんでした。同じ希望判定で再試行できます。')}</p>}
     {recovery && <Button disabled={saving || gs.saveQueueState?.isSaving} onClick={() => save(true)}>保存済みの希望を復旧する</Button>}
-    {confirmation && !generation && !recovery && <DecisionConfirmation title="海外挑戦の希望確認" fallbackFocus={heading}
+    {confirmation && !phase && !recovery && <DecisionConfirmation title="海外挑戦の希望確認" fallbackFocus={heading}
       busy={saving} confirmDisabled={gs.saveQueueState?.isSaving} error={issue} onCancel={() => { setConfirmation(null); setFailure(null); }}
       onConfirm={() => save(false)} confirmLabel={failure ? '同じ希望判定で保存を再試行する' : '希望を確認して保存する'}>
       <p>海外志向・年齢・モラル・出場機会から希望を確認します。未記録の海外志向はゲーム上の推定を使います。</p>
-      <p>希望者がいない場合も今年度の確認を保存します。再開や再試行で希望を抽選し直しません。この操作では所属・契約・財務は変わりません。</p>
+      <p>希望者がいない場合も今年度の確認を保存します。再開や再試行で希望を抽選し直しません。自球団の所属・契約・財務は変わりません。CPU球団では成立した案件だけ、退団・元契約処理・譲渡金・翌年度限定追加枠を反映します。</p>
     </DecisionConfirmation>}
   </section>;
 }
