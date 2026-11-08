@@ -6,8 +6,9 @@ import { useGameState } from './useGameState';
 import { useOffseason } from './useOffseason';
 import HubContentRouter from '../components/hub/HubContentRouter';
 import { saveGame, loadGame, getSaveQueueSnapshot } from '../engine/saveload';
-import { postingDecisionRequest, postingMarketRequest, postingGenerationRequest } from '../engine/humanPosting';
+import { postingDecisionRequest, postingMarketRequest, postingGenerationRequest, offseasonPostingRequest } from '../engine/humanPosting';
 import { requestGenerationWorld } from '../engine/__tests__/fixtures/postingRequestGeneration';
+import { offseasonPostingWorld } from '../engine/__tests__/fixtures/offseasonPosting';
 import { generatedPostingWorld } from '../engine/__tests__/fixtures/postingMarketResults';
 import { postingUiWorld } from '../engine/__tests__/fixtures/postingUi';
 import { postingApplicationViews } from '../engine/annualPostingApplications';
@@ -28,7 +29,7 @@ afterEach(async () => {
   for (let i = 0; i < 150 && getSaveQueueSnapshot().isSaving; i++) await new Promise(r => setTimeout(r, 10));
   vi.restoreAllMocks(); vi.unstubAllGlobals();
 });
-async function setup(w = postingUiWorld(), panel = false) {
+async function setup(w = postingUiWorld(), panel = false, screen = 'hub') {
   expect((await saveGame(w, { skipCompression: true })).ok).toBe(true);
   w = await loadGame();
   function Harness() {
@@ -36,7 +37,7 @@ async function setup(w = postingUiWorld(), panel = false) {
     return panel && gs.myTeam ? React.createElement(HubContentRouter, { app: { gs, os, sf: {} }, tab: 'mailbox', onOpen: vi.fn() }) : null;
   }
   await act(async () => { view = create(React.createElement(Harness)); });
-  act(() => { expect(gs.hydrateSavedWorld(w, { progressToken: gs.getProgressToken(), sessionToken: gs.getProgressSessionToken() })).toBe(true); gs.setScreen('hub'); });
+  act(() => { expect(gs.hydrateSavedWorld(w, { progressToken: gs.getProgressToken(), sessionToken: gs.getProgressSessionToken() })).toBe(true); gs.setScreen(screen); });
 }
 async function run(operation) {
   let task, result, done = false;
@@ -226,6 +227,56 @@ it('annual retirement entry saves the CPU posting phase but blocks unfinished ye
   act(() => gs.setScreen('title'));
   act(() => expect(gs.hydrateSavedWorld(cold, { progressToken: gs.getProgressToken(), sessionToken: gs.getProgressSessionToken() })).toBe(true));
   expect(await run(() => old({}))).toBe(false); expect(rows.get(primary)).toBe(root);
+});
+it('annual entry publishes reserved retirements, career details and CPU posting in one durable root', async () => {
+  await setup(offseasonPostingWorld(), false, 'retire_phase');
+  expect(gs.saveDirty).toBe(false);
+  const revision = gs.contractEconomy.revision, write = localStorage.setItem;
+  let publications = 0;
+  localStorage.setItem = (k, v) => { if (k === primary) publications++; write(k, v); };
+  expect(await run(() => os.handleRetirePhaseNext({}))).toBe(false);
+  const cold = await loadGame(), e = cold.contractEconomy.engine;
+  expect(e.retirementReservations.every(r => r.finalization)).toBe(true);
+  expect(publications).toBe(1); expect(cold.contractEconomy.revision).toBe(revision + 1);
+  for (const r of e.retirementReservations) {
+    const { loadPlayerCareerLogById } = await import('../engine/saveload');
+    expect((await loadPlayerCareerLogById(String(r.playerId), cold.saveId)).filter(e => e.year === 2026)).toHaveLength(1);
+  }
+  const root = rows.get(primary);
+  expect(await run(() => os.handleRetirePhaseNext({}))).toBe(false); expect(rows.get(primary)).toBe(root);
+  expect(await run(() => os.handleNextYear())).toBe(false); expect(gs.year).toBe(2026);
+});
+it('keeps both retirement career and posting unpublished after failure, and retries the same candidate', async () => {
+  await setup(offseasonPostingWorld(), false, 'retire_phase');
+  const before = structuredClone(gs.contractEconomy), root = rows.get(primary), request = offseasonPostingRequest(gs);
+  const session = gs.getProgressSessionToken(), write = localStorage.setItem;
+  localStorage.setItem = (k, v) => { if (k === primary) throw Error('disk full'); write(k, v); };
+  expect(await run(() => gs.commitOffseasonPostingRequest(request, session))).toMatchObject({ ok: false });
+  expect(rows.get(primary)).toBe(root); expect(gs.contractEconomy).toEqual(before);
+  const { loadPlayerCareerLogById } = await import('../engine/saveload');
+  for (const r of before.engine.retirementReservations)
+    expect(await loadPlayerCareerLogById(String(r.playerId), gs.saveId)).toEqual([]);
+  localStorage.setItem = write;
+  expect(await run(() => gs.commitOffseasonPostingRequest(request, session))).toMatchObject({ ok: true });
+  const cold = await loadGame(); expect(cold.contractEconomy.engine.retirementReservations.every(r => r.finalization)).toBe(true);
+  const published = rows.get(primary);
+  expect(await run(() => gs.commitOffseasonPostingRequest(request, session))).toMatchObject({ ok: true, replayed: true });
+  expect(rows.get(primary)).toBe(published);
+});
+it('holds the retirement/posting barrier and rejects old sessions, duplicate preparation and unmount', async () => {
+  await setup(offseasonPostingWorld(), false, 'retire_phase');
+  const request = offseasonPostingRequest(gs), session = gs.getProgressSessionToken(), root = rows.get(primary);
+  expect(await gs.commitOffseasonPostingRequest(request, session + 1)).toMatchObject({ ok: false, reason: 'economy_session_conflict' });
+  let task, duplicate;
+  act(() => {
+    task = gs.commitOffseasonPostingRequest(request, session);
+    duplicate = gs.commitOffseasonPostingRequest(request, session);
+    expect(gs.setTeams([])).toBe(false); expect(gs.setSaveId('other')).toBe(false);
+  });
+  expect(await duplicate).toMatchObject({ ok: false, reason: 'economy_commit_pending' });
+  act(() => view.unmount()); view = null;
+  expect(await task).toMatchObject({ ok: false, reason: 'economy_session_conflict' });
+  expect(rows.get(primary)).toBe(root);
 });
 it('holds the common mutation barrier while the annual posting candidate yields, including duplicate calls', async () => {
   await setup(requestGenerationWorld()); const before = structuredClone(gs.teams), request = postingGenerationRequest(gs), session = gs.getProgressSessionToken();

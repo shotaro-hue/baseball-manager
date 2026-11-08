@@ -8,6 +8,7 @@ import '../calm-offseason.css';
 import {Button,MetricBand,StateLabel,DataTableFrame} from './design-system/primitives';
 import './growth-report.css';
 import {CaretRight} from '@phosphor-icons/react';
+import { offseasonPostingId } from '../engine/annualOffseasonPosting';
 
 const PlayerModal = lazy(() => import('./PlayerModal').then(m => ({ default: m.PlayerModal })));
 const money = n => Number.isFinite(n) ? fmtSal(n) : '未記録';
@@ -41,7 +42,43 @@ function PlayerInfo({ player, onProfile }) {
   return <><h3>{player.name}</h3><p>{player.pos || '役割未記録'} · {Number.isFinite(player.age) ? `${player.age}歳` : '年齢未記録'} · 年俸 {money(player.salary)}</p>
     <details><summary>{player.name}の成績・詳細</summary><div className="review-metrics">{marketMetrics(player).map(([key, value]) => <span key={key}>{key} <strong>{value}</strong></span>)}</div><p className="review-note">0は実測値。未記録は欠測、—は算出できない率です。</p><button aria-label={`${player.name}の詳細を開く`} onClick={() => onProfile(player)}>選手詳細・年度別成績</button></details></>;
 }
-export function RetirePhaseScreen({ farmState, teams, myId, year, saveId, error, onNext }) {
+export function RetirePhaseScreen(props) {
+  return props.annualWorld?.contractEconomy?.mode === 'annual'
+    ? <AnnualRetirementPostingScreen {...props} /> : <LegacyRetirePhaseScreen {...props} />;
+}
+function AnnualRetirementPostingScreen({ annualWorld: world, onPrepare, onOpenInbox, ...props }) {
+  const { year, teams } = props, e = world.contractEconomy, ts = e.engine.transactions;
+  const saved = ts.some(t => t.id === offseasonPostingId(year));
+  const reservations = (e.engine.retirementReservations ?? []).filter(r => r.season === year);
+  const pending = reservations.filter(r => !r.finalization);
+  const wrongOrder = pending.length > 0 && ts.some(t => t.generatedPostingRequests?.season === year || t.annualPostingPhase?.season === year);
+  const dated = e.clock.phase === 'offseason' && e.clock.date === `${String(year).padStart(4, '0')}-12-01`;
+  const [review, setReview] = useState(false), close = useCallback(() => setReview(false), []);
+  const advance = useAdvance(async () => { const ok = await onPrepare(); if (ok) setReview(false); return ok; });
+  return <Frame {...props} title="引退予約と海外挑戦">{() => <>
+    <p>保存済みの引退予約を確定してから、全球団の海外挑戦の希望を確認します。自球団の承認・拒否は受信箱で判断します。</p>
+    <div className="review-metrics"><span>引退予約 {reservations.length}人</span><span>未確定 {pending.length}人</span><span>対象 {teams.length}球団</span></div>
+    {reservations.length ? <ul>{reservations.map(r => {
+      const t = teams.find(t => t.id === r.teamId);
+      const p = r.finalization?.player ?? [...(t?.players ?? []), ...(t?.farm ?? [])].find(p => p.id === r.playerId);
+      return <li key={r.id}>{t?.name} · {p?.name ?? r.playerId}：{r.finalization ? '引退確定済み' : '12/1に引退確定'}</li>;
+    })}</ul> : <p>保存済みの引退予約はありません。</p>}
+    <p>当年成績を引退選手の記録に残します。残存契約の保証と欠員補充費用は年度予算へ反映します。</p>
+    {wrongOrder && <p role="alert">希望確認後に未確定の引退予約が残っています。保存履歴の順序を確認してください。</p>}
+    {!dated && <p role="alert">12月1日の年度時計が必要です。閉幕からオフ開始への接続は未完了です。</p>}
+    {saved ? <p role="status">引退予約と希望確認を保存済みです。自球団の判断は受信箱で確認してください。</p>
+      : <button className="review-primary" disabled={!dated || wrongOrder || advance.busy} onClick={() => setReview(true)}>引退予約を確定して希望を確認する</button>}
+    <div className="review-actions"><button onClick={onOpenInbox} disabled={advance.busy}>受信箱へ</button></div>
+    <p className="review-note">成長・契約更改・翌春への年度進行は未接続です。この操作では年度を進めません。</p>
+    {review && !saved && <Confirm title="引退予約と希望確認の最終確認" onClose={close}
+      onConfirm={() => advance.run()} label="予約と希望確認を保存する" disabled={!dated || wrongOrder}
+      busy={advance.busy} error={advance.failure}>
+      <p>未確定の引退予約 {pending.length}人と、{teams.length}球団の希望確認・CPU判断・海外交渉をまとめて保存します。</p>
+      <p>保存に成功すると引退選手は登録から外れ、球団履歴に残ります。自球団の希望は承認待ちになります。</p>
+    </Confirm>}
+  </>}</Frame>;
+}
+function LegacyRetirePhaseScreen({ farmState, teams, myId, year, saveId, error, onNext }) {
   const team = teams?.find(t => t.id === myId);
   const candidates = (team?.players || []).filter(p => p.age >= 35 && !p.isRetired);
   const [decisions, setDecisions] = useState(() => Object.fromEntries(candidates.filter(p => p._retireNow).map(p => [p.id, 'accepted'])));

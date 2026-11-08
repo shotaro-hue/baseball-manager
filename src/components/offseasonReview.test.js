@@ -5,6 +5,7 @@ import { RetirePhaseScreen, WaiverPhaseScreen, WaiverResultScreen, GrowthSummary
 import { calcRetireWill } from '../engine/playerCore';
 import { calcRetireWill as legacyRetireWill } from '../engine/player';
 import { releaseWaiverPlayers } from '../engine/offseasonReview';
+import { offseasonPostingWorld } from '../engine/__tests__/fixtures/offseasonPosting';
 
 vi.mock('./PlayerModal', () => ({ PlayerModal: ({ player, onClose }) => React.createElement('section', { 'aria-label': 'プロフィール' }, player.name, React.createElement('button', { onClick: onClose }, 'プロフィールを閉じる')) }));
 const text = n => typeof n === 'string' ? n : (n.children || []).map(text).join('');
@@ -21,6 +22,15 @@ function setup(Component, extra = {}) {
   const update = extra => act(() => { props = { ...props, ...extra }; view.update(React.createElement(Component, props)); });
   return { view, get props() { return props; }, button, click, choose, update };
 }
+it('annual retirement screen lists saved farm and CPU reservations without legacy retirement draws', () => {
+  const w = offseasonPostingWorld(), random = vi.spyOn(Math, 'random');
+  const ui = setup(RetirePhaseScreen, { ...w, annualWorld: w, onPrepare: vi.fn(), onOpenInbox: vi.fn() });
+  expect(text(ui.view.root)).toContain('引退予約と海外挑戦');
+  expect(text(ui.view.root)).toContain('Club 0'); expect(text(ui.view.root)).toContain('Club 1');
+  expect(ui.button('引き留める')).toBeUndefined();
+  expect(ui.button('引退予約を確定して希望を確認する')).toBeDefined();
+  expect(random).not.toHaveBeenCalled();
+});
 it('keeps ID 0 release as a draft until confirmation, supports cancellation and submits once', async () => {
   const ui = setup(WaiverPhaseScreen); ui.choose(0); ui.click('放出内容を確認する'); expect(ui.props.onNext).not.toHaveBeenCalled();
   expect(text(ui.view.root.findByProps({ role: 'dialog' }))).toContain('登録選手 1 → 0人');

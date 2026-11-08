@@ -1,4 +1,5 @@
 import { yieldToBrowser } from './yieldToBrowser';
+import { isOffseasonPostingCommand, normalizeOffseasonPosting, createOffseasonPostingSteps, inspectOffseasonPosting } from './annualOffseasonPosting';
 import { isAnnualPostingPhaseCommand, normalizeAnnualPostingPhase, createAnnualPostingPhaseSteps, inspectAnnualPostingPhases } from './annualPostingPhase';
 import { isGeneratedPostingRequestsCommand, normalizeGeneratedPostingRequests, createGeneratedPostingRequests, inspectGeneratedPostingRequests } from './generatedPostingRequests';
 import { isGeneratedPostingMarketCommand, normalizeGeneratedPostingMarket, createGeneratedPostingMarket, inspectGeneratedPostingMarkets } from './generatedPostingMarket';
@@ -66,6 +67,7 @@ const kinds = {
   'convert-to-controlled': ['teamId', 'playerId', 'contractId', 'annualSalaryManYen'],
 };
 function commandFor(input) {
+  if (isOffseasonPostingCommand(input)) return normalizeOffseasonPosting(input);
   if (isAnnualPostingPhaseCommand(input)) return normalizeAnnualPostingPhase(input);
   if (isGeneratedPostingRequestsCommand(input)) return normalizeGeneratedPostingRequests(input);
   if (isGeneratedPostingMarketCommand(input)) return normalizeGeneratedPostingMarket(input);
@@ -142,6 +144,7 @@ function inspect(state) {
   inspectGeneratedPostingMarkets(state);
   inspectGeneratedPostingRequests(state);
   inspectAnnualPostingPhases(state);
+  inspectOffseasonPosting(state);
   // One employment can end by only one route. Individually valid records from
   // incompatible branches must not jointly exempt the same source contract.
   if (new Set(departures.map(d => d.sourceContractId)).size !== departures.length) fail('同じ元契約の退団経路が重複しています。');
@@ -556,6 +559,10 @@ function* candidateSteps(input, command) {
       ...(receipt.faPersonnel ? { personnel: { winnerProposalIds: [...receipt.faPersonnel.winnerProposalIds], lostProposalIds: [...receipt.faPersonnel.lostProposalIds] } } : {}) };
   }
   assertRetirementCommandCompatible(before, c);
+  if (isOffseasonPostingCommand(c)) {
+    const result = yield* createOffseasonPostingSteps(before, c, signature, candidateSteps);
+    return { ...result, state: withFloors(result.state) };
+  }
   if (input.phase === 'offseason' && !isAnnualPostingPhaseCommand(c) && !isGeneratedPostingRequestsCommand(c) && !isGeneratedPostingMarketCommand(c) && !isPostingMarketResultCommand(c) && !isPostingQualificationCommand(c) && !isPostingApplicationCommand(c) && !isPostingCompletionCommand(c) && !isPostingDepartureCommand(c) && !isOverseasDepartureCommand(c) && !isRetirementCommand(c) && !isWinterDepartureCommand(c) && !c.type.endsWith('renewal') && !c.type.endsWith('rookie') && !c.type.endsWith('fa') && !['settle-fa-compensation', 'submit-fa-protection', 'settle-fa-personnel', 'join-fa-personnel'].includes(c.type)) fail('オフの新制度取引は翌年度契約だけが接続済みです。');
   // Snapshot and receipt enter validation together; no unaudited intermediate state.
   let protectedState = isAnnualPostingPhaseCommand(c) ? yield* createAnnualPostingPhaseSteps(before, c, signature, prepareCpuPostingBudgetAdmission)
