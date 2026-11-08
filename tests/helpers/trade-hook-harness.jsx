@@ -5,8 +5,9 @@ import { flushSync } from 'react-dom';
 import { useGameState } from '../../src/hooks/useGameState';
 import { useOffseason } from '../../src/hooks/useOffseason';
 import HubContentRouter from '../../src/components/hub/HubContentRouter';
+import AppScreenRouter from '../../src/components/AppScreenRouter';
 
-export function mountTradeView(world, { legacy = false, mailbox = false } = {}) {
+export function mountTradeView(world, { legacy = false, mailbox = false, retirement = false } = {}) {
   let committed, committedOffseason, openCase;
   function Harness() {
     const gs = useGameState(), os = useOffseason(gs), [tab, setTab] = useState(mailbox ? 'mailbox' : 'trade');
@@ -14,6 +15,8 @@ export function mountTradeView(world, { legacy = false, mailbox = false } = {}) 
     openCase = id => { setFocus(previous => ({ id, token: (previous?.token ?? 0) + 1 })); setTab('trade'); };
     useLayoutEffect(() => { committed = gs; committedOffseason = os; });
     if (!gs.myTeam) return null;
+    if (retirement && gs.screen === 'retire_phase') return <AppScreenRouter app={{
+      gs: legacy ? { ...gs, contractEconomy: undefined } : gs, os, sf: {} }} />;
     return <HubContentRouter app={{ gs: legacy ? { ...gs, contractEconomy: undefined } : gs, os, sf: {} }}
       tab={tab} focusRequest={focus} onOpen={setTab} onOpenCase={(target, id) => { openCase(id); setTab(target); }} />;
   }
@@ -24,7 +27,7 @@ export function mountTradeView(world, { legacy = false, mailbox = false } = {}) 
   flushSync(() => root.render(<Harness />));
   flushSync(() => {
     if (!committed.hydrateSavedWorld(world, { progressToken: committed.getProgressToken(), sessionToken: committed.getProgressSessionToken() })) throw Error('hydration rejected');
-    committed.setScreen('hub');
+    committed.setScreen(retirement ? 'retire_phase' : 'hub');
   });
   return { current: () => committed, offseason: () => committedOffseason, openCase: id => flushSync(() => openCase(id)),
     unmount: () => { flushSync(() => root.unmount()); target.remove(); app.style.display = ''; } };

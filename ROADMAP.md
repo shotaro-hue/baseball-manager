@@ -1,5 +1,7 @@
 # ROADMAP — NPB Franchise Manager
 
+> 2026-11-08 #556マージ後: 保存済みannual 12/1の引退整理から、期中引退予約確定→全球団postingを一候補/一revisionで保存する。自球団判断は受信箱で待ち、当年成績・残存保証・欠員留保とcareer保存を維持。[設計](./docs/superpowers/specs/2026-11-08-gm01-offseason-posting-entry-design.md)／[検証・画面・限界](./docs/validation/gm-01-offseason-posting-entry/README.md)。143試合後のgameDay144から時計を推測しない。次は明示日付を持つ閉幕/postseason producerと翌年度予算forecastをopen-offseasonへ接続する。期末新規引退判断・成長/要求額・翌春builder・Worker/通常プレイ年度完走・長期/実iPhoneは未完了。公開OFF/schema1/DB5。
+
 > 2026-11-08 #555後: annualの12/1希望確認と年度handlerから、全球団generate→CPU判断→既存市場→一候補/一revisionの保存へ接続。自球団の判断は受信箱で待つ。[設計](./docs/superpowers/specs/2026-11-08-gm01-cpu-posting-design.md)／[実経路・検証・限界](./docs/validation/gm-01-cpu-posting/README.md)。年度handlerはposting保存を年度全体の成功にせず、未接続の退職/成長/翌春へ進めない。次はopen-offseason producerから退職予約・当年成績・12/1 clockを接続する。Worker/実年度切替/長期/実iPhone/公開は残り、Task7/A1・ポスティング全体は未完成。公開OFF/schema1/DB5。
 
 > 2026-11-07 #554マージ済みmain `b022485`から、自球団の海外挑戦希望を年一度生成し、annualの受信箱→申請判断→既存海外交渉へ接続。希望ゼロも保存し、再開・再試行・候補順序による再抽選を防ぐ。欠測志向は市場と同じゲーム推定、実測0は維持。[設計](./docs/superpowers/specs/2026-11-07-gm01-posting-request-generation-design.md)／[検証と画面](./docs/validation/gm-01-posting-request-generation/README.md)。CPU判断・年度Worker/年度切替・長期/実機/公開判断は残り、Task7/A1・ポスティング全体は未完成。公開OFF/schema1/DB5。次優先は同じ希望producerと申請→結果経路のCPU/年度進行接続。最終HEAD/必須CIはPR #555を正本とする。

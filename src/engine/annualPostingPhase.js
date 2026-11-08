@@ -30,6 +30,8 @@ export function* createAnnualPostingPhaseSteps(state, c, signature, prepareBudge
   if (state.version !== 2 || state.phase !== 'offseason' || state.date !== day(state.season)
     || state.season >= 9999 || c.id !== postingPhaseId(state.season)
     || !state.teams.some(t => t.id === c.humanTeamId)) fail();
+  if ((state.retirementReservations ?? []).some(r => r.season === state.season && !r.finalization))
+    throw Error('引退予約を確定してから海外挑戦の希望を確認してください。');
   const g = { version: 1, policyVersion: 'cpu-posting-v2', season: state.season, date: state.date,
     humanTeamId: c.humanTeamId, teamIds: sorted(state.teams.map(t => t.id)), createdGenerationIds: [], decisions: [], marketIds: [] };
   let next = state;

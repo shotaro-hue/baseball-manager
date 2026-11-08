@@ -1,5 +1,5 @@
 import { toAnnualState } from '../engine/contractEconomy';
-import { postingGenerationRequest } from '../engine/humanPosting';
+import { offseasonPostingRequest } from '../engine/humanPosting';
 import { postingApplicationViews } from '../engine/annualPostingApplications';
 import { postingPhaseId } from '../engine/annualPostingPhase';
 import {newReinforcementPlan} from '../engine/rosterPlanning';
@@ -587,9 +587,19 @@ export function useOffseason(gs) {
     notify(p.name+"が引退しました","warn");
   };
 
+  const handlePrepareAnnualPosting = async () => {
+    if (canProgressLegacy() || renewalSession !== draftContextRef.current.getProgressSessionToken?.()) return false;
+    const result = await gs.commitOffseasonPostingRequest?.(offseasonPostingRequest(gs), renewalSession);
+    if (renewalSession !== draftContextRef.current.getProgressSessionToken?.()) return false;
+    notify?.(result?.ok ? '引退予約と海外挑戦の年度工程を保存しました。自球団の判断・海外交渉は受信箱で行ってください。成長・翌春の年度処理は未接続です。'
+      : result?.error || (result?.reason === 'economy_adoption_required' ? '保存済みの結果をこの画面で復旧してください。年度は進めません。'
+        : '引退予約と海外挑戦を保存できませんでした。保存状態を確認し、再試行してください。年度は進めません。'), 'warn');
+    return result?.ok === true;
+  };
+
   // 引退フェーズ処理（退場選手確定→成長/衰退→CPU契約→表彰）
   const handleRetirePhaseNext = async (decisions) => {
-    // This is only the annual posting stage. Never continue into the legacy
+    // This is only the annual retirement/posting stage. Never continue into the legacy
     // retirement/growth/renewal writer after a successful posting publication.
     if (!canProgressLegacy()) {
       if (renewalSession !== draftContextRef.current.getProgressSessionToken?.()) return false;
@@ -597,11 +607,7 @@ export function useOffseason(gs) {
         notify?.('新制度の引退判断の年度接続は未完了です。予約を確認してから海外挑戦の希望を確認してください。', 'warn');
         return false;
       }
-      const result = await gs.commitPostingGenerationRequest?.(postingGenerationRequest(gs), renewalSession);
-      if (renewalSession !== draftContextRef.current.getProgressSessionToken?.()) return false;
-      notify?.(result?.ok ? '海外挑戦の年度工程を保存しました。自球団の判断・海外交渉は受信箱で行ってください。退職・成長・翌春の年度処理は未接続です。'
-        : result?.error || (result?.reason === 'economy_adoption_required' ? '保存済みの海外挑戦を受信箱で復旧してください。年度は進めません。'
-          : '海外挑戦の年度工程を保存できませんでした。受信箱で保存状態を確認し、再試行してください。年度は進めません。'), 'warn');
+      await handlePrepareAnnualPosting();
       return false;
     }
     if (retireTransitionRef.current) return false;
@@ -1030,6 +1036,7 @@ export function useOffseason(gs) {
     handleStartRetireGame,
     handleSkipRetireGame,
     handleRetirePhaseNext,
+    handlePrepareAnnualPosting,
     handleWaiverPhaseNext,
     handlePlanningRelease,
     handlePlanningFinish,

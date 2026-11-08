@@ -183,7 +183,11 @@ function runCommand(world, command, apply = applyAnnualTransaction) {
     || command.saveId !== current.saveId || command.epoch !== current.epoch || !counter(command.baseRevision)
     || command.baseRevision > current.baseRevision || !command.transaction) fail('取引のsaveId・epoch・revisionが古いか未記録です。');
   const c = command.transaction;
-  if (c.type === 'advance-posting-phase' && c.humanTeamId !== world.myId) fail('自球団の判断をCPUへ委任できません。');
+  if (['advance-posting-phase', 'prepare-offseason-posting'].includes(c.type) && c.humanTeamId !== world.myId) fail('自球団の判断をCPUへ委任できません。');
+  if (c.type === 'prepare-offseason-posting' && !state.transactions.some(r => r.id === c.id)
+    && world.contractEconomy.decisions.some(d => d.kind === 'human-renewal' && d.status === 'pending'
+      && (state.retirementReservations ?? []).some(r => !r.finalization && r.playerId === d.playerId)))
+    fail('回答待ちの更改を解決してから引退予約を確定してください。');
   typedIds([...state.transactions.map(r => r.id), c.id]);
   if (c.type === 'depart-overseas' && !state.transactions.some(r => r.id === c.id)
     && world.contractEconomy.decisions.some(d => d.kind === 'human-acquisition' && d.status === 'pending' && d.playerId === c.playerId))

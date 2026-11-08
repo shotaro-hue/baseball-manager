@@ -1,7 +1,7 @@
 import { draftCapacityContext, evaluateRosterCapacity, isIkuseiPlayer } from '../engine/rosterCapacity';
 import { reduceRookieRequest } from '../engine/rookieContracts';
 import { reduceTradeRequest } from '../engine/humanTrade';
-import { reducePostingDecisionRequest, reducePostingMarketRequest, reducePostingGenerationRequestAsync } from '../engine/humanPosting';
+import { reducePostingDecisionRequest, reducePostingMarketRequest, reducePostingGenerationRequestAsync, reduceOffseasonPostingRequestAsync } from '../engine/humanPosting';
 import { developmentRequest, reduceDevelopmentRequest } from '../engine/developmentRegistration';
 import { stadiumUpgradeCosts } from '../engine/clubFinance';
 import {createFarmCompetition} from '../engine/farmRecords';
@@ -783,6 +783,11 @@ export function useGameState() {
     return commitEconomyOperation(request, reducePostingGenerationRequestAsync, sessionToken, { flushPendingBase: true });
   }, [commitEconomyOperation]);
 
+  const commitOffseasonPostingRequest = useCallback((request, sessionToken) => {
+    if (!Number.isSafeInteger(sessionToken)) return Promise.resolve({ ok: false, reason: 'economy_session_conflict' });
+    return commitEconomyOperation(request, reduceOffseasonPostingRequestAsync, sessionToken, { flushPendingBase: true });
+  }, [commitEconomyOperation]);
+
   const recoverEconomyCommand = useCallback(async () => {
     if (!economyMountedRef.current) return { ok: false, reason: 'economy_recovery_unavailable' };
     let context = economyCommitRef.current;
@@ -825,19 +830,24 @@ export function useGameState() {
 
   // gameDay が進んだとき、記者会見インターバルを超えていれば会見イベントをセット
   useEffect(()=>{
+    // An offseason save retains the final regular-season cursor. It must not
+    // start a new in-season interview (and dirty/save the base) on hydration.
+    if(contractEconomy?.mode === 'annual' && contractEconomy.clock.phase !== 'season') return;
     if(!isTeamIdSet(myId) || gameDay <= 1 || gameDay > 143) return;
     if(pressEvent) return; // 既にイベント表示中
+    let current = true;
     if(gameDay - lastPressDay >= PRESS_CONFERENCE_INTERVAL){
       loadPressConferenceModule()
         .then((mod) => {
-          setPressEvent(mod.pickQuestion(gameDay));
+          if(current) setPressEvent(mod.pickQuestion(gameDay));
         })
         .catch((error) => {
           console.error('Failed to load press conference module:', error);
         });
     }
+    return () => { current = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[gameDay, myId]);
+  },[gameDay, myId, contractEconomy?.mode, contractEconomy?.clock?.phase]);
 
   // シーズン日程をyear変更時に再生成（チームID・リーグ構成は不変なのでteams.lengthで十分）
   useEffect(()=>{
@@ -1512,6 +1522,7 @@ export function useGameState() {
     isAutoSaveSuspended, setIsAutoSaveSuspended,
     saveDirty, setSaveDirty: setPublicSaveDirty,
     saveQueueState, saveResult,
+    isEconomyRecoveryPending: ['recovery', 'recovering'].includes(economyCommitRef.current?.status),
     saveRevision, setSaveRevision: setPublicSaveRevision,
     persistentSummaries,
     newGameInitializationError,
@@ -1529,7 +1540,7 @@ export function useGameState() {
     getLatestNewsId,
     markSaveDirty,
     hydrateSavedWorld, hydrateLargeSaveData, getMatchHistorySnapshot, hydrateMatchHistory, applyMatchResultPatch,
-    commitEconomyCommand, commitRenewalRequest, commitAcquisitionRequest, commitDueEconomyRequest, commitRookieRequest, commitTradeRequest, commitPostingDecisionRequest, commitPostingMarketRequest, commitPostingGenerationRequest, recoverEconomyCommand,
+    commitEconomyCommand, commitRenewalRequest, commitAcquisitionRequest, commitDueEconomyRequest, commitRookieRequest, commitTradeRequest, commitPostingDecisionRequest, commitPostingMarketRequest, commitPostingGenerationRequest, commitOffseasonPostingRequest, recoverEconomyCommand,
     resetSaveTracking,
     // derived
     myTeam,
