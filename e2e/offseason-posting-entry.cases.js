@@ -63,10 +63,30 @@ for (const width of [360, 390, 1440]) test(`save generations: annual retirement 
       if (key === 'baseball_manager_v1') window.entryPublications++;
       return window.entryWrite.call(this, key, value);
     };
+    window.entryRead = Storage.prototype.getItem; window.entryAckInterrupted = false;
+    const revision = window.entryHarness.current().contractEconomy.revision;
+    Storage.prototype.getItem = function (key) {
+      if (key === 'baseball_manager_v1' && !window.entryAckInterrupted
+        && window.entryHarness.current().contractEconomy.revision === revision + 1) {
+        window.entryAckInterrupted = true; throw Error('ack interrupted');
+      }
+      return window.entryRead.call(this, key);
+    };
   });
   await page.getByRole('button', { name: '予約と希望確認を保存する', exact: true }).click();
+  const recover = page.getByRole('button', { name: '保存済みの結果を復旧する', exact: true });
+  await expect(recover).toBeVisible(); await expect(recover).toBeFocused();
+  await expect(page.getByRole('button', { name: '受信箱へ', exact: true })).toBeDisabled();
+  expect(await page.evaluate(() => window.entryHarness.current().setScreen('hub'))).toBe(false);
+  await page.evaluate(() => {
+    Storage.prototype.getItem = window.entryRead;
+    window.entryPublishedRoot = localStorage.getItem('baseball_manager_v1');
+  });
+  await capture(page, info, width, 'recovery');
+  await recover.click();
   await expect(page.getByRole('status')).toContainText('引退予約と希望確認を保存済み');
   expect(await page.evaluate(() => window.entryPublications)).toBe(1);
+  expect(await page.evaluate(() => localStorage.getItem('baseball_manager_v1') === window.entryPublishedRoot)).toBe(true);
   await page.evaluate(() => { Storage.prototype.setItem = window.entryWrite; });
   const after = await durable(page), e = after.economy.engine;
   expect(after.economy.revision).toBe(before.economy.revision + 1);

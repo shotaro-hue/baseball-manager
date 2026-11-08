@@ -46,7 +46,7 @@ export function RetirePhaseScreen(props) {
   return props.annualWorld?.contractEconomy?.mode === 'annual'
     ? <AnnualRetirementPostingScreen {...props} /> : <LegacyRetirePhaseScreen {...props} />;
 }
-function AnnualRetirementPostingScreen({ annualWorld: world, onPrepare, onOpenInbox, ...props }) {
+function AnnualRetirementPostingScreen({ annualWorld: world, onPrepare, onRecover, onOpenInbox, ...props }) {
   const { year, teams } = props, e = world.contractEconomy, ts = e.engine.transactions;
   const saved = ts.some(t => t.id === offseasonPostingId(year));
   const reservations = (e.engine.retirementReservations ?? []).filter(r => r.season === year);
@@ -55,6 +55,13 @@ function AnnualRetirementPostingScreen({ annualWorld: world, onPrepare, onOpenIn
   const dated = e.clock.phase === 'offseason' && e.clock.date === `${String(year).padStart(4, '0')}-12-01`;
   const [review, setReview] = useState(false), close = useCallback(() => setReview(false), []);
   const advance = useAdvance(async () => { const ok = await onPrepare(); if (ok) setReview(false); return ok; });
+  const recover = useAdvance(async () => {
+    const result = await onRecover(); if (result?.ok) setReview(false); return result?.ok === true;
+  });
+  const recovery = world.isEconomyRecoveryPending || world.saveResult?.reason === 'economy_adoption_required';
+  const busy = advance.busy || recover.busy || world.saveQueueState?.isSaving;
+  const recoveryButton = useRef(null);
+  useEffect(() => { if (recovery && !busy) recoveryButton.current?.focus(); }, [recovery, busy]);
   return <Frame {...props} title="引退予約と海外挑戦">{() => <>
     <p>保存済みの引退予約を確定してから、全球団の海外挑戦の希望を確認します。自球団の承認・拒否は受信箱で判断します。</p>
     <div className="review-metrics"><span>引退予約 {reservations.length}人</span><span>未確定 {pending.length}人</span><span>対象 {teams.length}球団</span></div>
@@ -66,11 +73,16 @@ function AnnualRetirementPostingScreen({ annualWorld: world, onPrepare, onOpenIn
     <p>当年成績を引退選手の記録に残します。残存契約の保証と欠員補充費用は年度予算へ反映します。</p>
     {wrongOrder && <p role="alert">希望確認後に未確定の引退予約が残っています。保存履歴の順序を確認してください。</p>}
     {!dated && <p role="alert">12月1日の年度時計が必要です。閉幕からオフ開始への接続は未完了です。</p>}
-    {saved ? <p role="status">引退予約と希望確認を保存済みです。自球団の判断は受信箱で確認してください。</p>
-      : <button className="review-primary" disabled={!dated || wrongOrder || advance.busy} onClick={() => setReview(true)}>引退予約を確定して希望を確認する</button>}
-    <div className="review-actions"><button onClick={onOpenInbox} disabled={advance.busy}>受信箱へ</button></div>
+    {recovery ? <>
+      <p role="alert">結果は保存済みですが、画面への反映を確認できませんでした。保存済みの結果を復旧してください。</p>
+      {recover.failure && <p role="alert">{recover.failure}</p>}
+      <button ref={recoveryButton} className="review-primary" disabled={busy} onClick={() => recover.run()}>保存済みの結果を復旧する</button>
+    </> : busy ? <p role="status">保存結果を確認しています…</p>
+      : saved ? <p role="status">引退予約と希望確認を保存済みです。自球団の判断は受信箱で確認してください。</p>
+        : <button className="review-primary" disabled={!dated || wrongOrder} onClick={() => setReview(true)}>引退予約を確定して希望を確認する</button>}
+    <div className="review-actions"><button onClick={onOpenInbox} disabled={busy || recovery}>受信箱へ</button></div>
     <p className="review-note">成長・契約更改・翌春への年度進行は未接続です。この操作では年度を進めません。</p>
-    {review && !saved && <Confirm title="引退予約と希望確認の最終確認" onClose={close}
+    {review && !saved && !recovery && <Confirm title="引退予約と希望確認の最終確認" onClose={close}
       onConfirm={() => advance.run()} label="予約と希望確認を保存する" disabled={!dated || wrongOrder}
       busy={advance.busy} error={advance.failure}>
       <p>未確定の引退予約 {pending.length}人と、{teams.length}球団の希望確認・CPU判断・海外交渉をまとめて保存します。</p>

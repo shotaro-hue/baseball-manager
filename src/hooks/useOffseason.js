@@ -592,7 +592,7 @@ export function useOffseason(gs) {
     const result = await gs.commitOffseasonPostingRequest?.(offseasonPostingRequest(gs), renewalSession);
     if (renewalSession !== draftContextRef.current.getProgressSessionToken?.()) return false;
     notify?.(result?.ok ? '引退予約と海外挑戦の年度工程を保存しました。自球団の判断・海外交渉は受信箱で行ってください。成長・翌春の年度処理は未接続です。'
-      : result?.error || (result?.reason === 'economy_adoption_required' ? '保存済みの結果を受信箱で復旧してください。年度は進めません。'
+      : result?.error || (result?.reason === 'economy_adoption_required' ? '保存済みの結果をこの画面で復旧してください。年度は進めません。'
         : '引退予約と海外挑戦を保存できませんでした。保存状態を確認し、再試行してください。年度は進めません。'), 'warn');
     return result?.ok === true;
   };

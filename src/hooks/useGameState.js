@@ -847,7 +847,7 @@ export function useGameState() {
     }
     return () => { current = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[gameDay, myId, contractEconomy?.mode, contractEconomy?.clock.phase]);
+  },[gameDay, myId, contractEconomy?.mode, contractEconomy?.clock?.phase]);
 
   // シーズン日程をyear変更時に再生成（チームID・リーグ構成は不変なのでteams.lengthで十分）
   useEffect(()=>{
@@ -1522,6 +1522,7 @@ export function useGameState() {
     isAutoSaveSuspended, setIsAutoSaveSuspended,
     saveDirty, setSaveDirty: setPublicSaveDirty,
     saveQueueState, saveResult,
+    isEconomyRecoveryPending: ['recovery', 'recovering'].includes(economyCommitRef.current?.status),
     saveRevision, setSaveRevision: setPublicSaveRevision,
     persistentSummaries,
     newGameInitializationError,

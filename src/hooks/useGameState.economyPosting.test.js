@@ -15,6 +15,7 @@ import { postingApplicationViews } from '../engine/annualPostingApplications';
 import { reduceEconomyCommand, toAnnualState } from '../engine/contractEconomy';
 import { envelope } from '../engine/__tests__/fixtures/faDeclarations';
 import { isIkuseiPlayer } from '../engine/rosterCapacity';
+import { RetirePhaseScreen } from '../components/OffseasonReviewScreens';
 
 let gs, os, view, rows;
 const primary = 'baseball_manager_v1';
@@ -34,6 +35,10 @@ async function setup(w = postingUiWorld(), panel = false, screen = 'hub') {
   w = await loadGame();
   function Harness() {
     gs = useGameState(); os = useOffseason(gs);
+    if (panel === 'retirement' && gs.myTeam) return React.createElement(RetirePhaseScreen, {
+      teams: gs.teams, myId: gs.myId, year: gs.year, saveId: gs.saveId, annualWorld: gs,
+      onPrepare: os.handlePrepareAnnualPosting, onRecover: gs.recoverEconomyCommand,
+      onOpenInbox: () => gs.setScreen('hub'), onNext: os.handleRetirePhaseNext });
     return panel && gs.myTeam ? React.createElement(HubContentRouter, { app: { gs, os, sf: {} }, tab: 'mailbox', onOpen: vi.fn() }) : null;
   }
   await act(async () => { view = create(React.createElement(Harness)); });
@@ -49,6 +54,40 @@ const content = n => typeof n === 'string' ? n : (n.children || []).map(content)
 const button = label => view.root.findAllByType('button').find(b => content(b) === label);
 const click = label => act(() => button(label).props.onClick());
 const open = () => act(() => view.root.findAllByType('button').find(b => content(b).includes('【ポスティング申請】')).props.onClick());
+
+it('hydrates a supported explicit legacy envelope without requiring an annual clock', async () => {
+  const w = requestGenerationWorld(); w.contractEconomy = { schemaVersion: 1, mode: 'legacy' };
+  await expect(setup(w)).resolves.toBeUndefined();
+  expect(gs.contractEconomy).toEqual(w.contractEconomy); expect(gs.myTeam).toBeDefined();
+});
+it('recovers a published retirement/posting result on the same screen without another publication', async () => {
+  await setup(offseasonPostingWorld(), 'retirement', 'retire_phase');
+  click('引退予約を確定して希望を確認する');
+  const revision = gs.contractEconomy.revision, read = localStorage.getItem; let interrupted = false;
+  localStorage.getItem = key => {
+    if (key === primary && gs.contractEconomy?.revision === revision + 1 && !interrupted) {
+      interrupted = true; throw Error('ack interrupted');
+    }
+    return read(key);
+  };
+  await run(() => button('予約と希望確認を保存する').props.onClick());
+  expect(gs.saveResult).toMatchObject({ ok: false, reason: 'economy_adoption_required' });
+  expect(button('保存済みの結果を復旧する')).toBeDefined();
+  expect(button('受信箱へ').props.disabled).toBe(true);
+  expect(gs.setScreen('hub')).toBe(false);
+  const published = rows.get(primary);
+  localStorage.getItem = key => { if (key === primary) throw Error('read unavailable'); return read(key); };
+  await run(() => button('保存済みの結果を復旧する').props.onClick());
+  expect(gs.isEconomyRecoveryPending).toBe(true);
+  expect(button('保存済みの結果を復旧する')).toBeDefined();
+  expect(rows.get(primary)).toBe(published);
+  localStorage.getItem = read;
+  await run(() => button('保存済みの結果を復旧する').props.onClick());
+  expect(rows.get(primary)).toBe(published);
+  expect(gs.contractEconomy.revision).toBe(revision + 1);
+  expect(content(view.root)).toContain('引退予約と希望確認を保存済み');
+  click('受信箱へ'); expect(gs.screen).toBe('hub');
+});
 
 it('generates annual wishes through the inbox, saves them once, then uses the existing GM decision and market path', async () => {
   await setup(requestGenerationWorld(), true);

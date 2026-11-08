@@ -43,6 +43,7 @@ Interfaces: `commitOffseasonPostingRequest`、`handlePrepareAnnualPosting`、ann
 - [x] 共通commitに接続し、年度全体の進行ガードは維持する。
 - [x] Chromium/WebKit、360/390/1440px、実12球団を検証する。
 - [x] 最終導線確認で受信箱先行による順序不整合を再現（共通取引/hook/3幅RED）。新規phaseの予約確定先行と受信箱からの戻り導線を追加する。過去phaseは凍結fixtureで維持する。
+- [x] 独立レビューのP2をRED→GREEN：clockを持たない明示legacy envelopeのhydrateと、公開後応答中断から同画面での復旧。共通barrierは維持し、復旧再失敗と再試行/追加公開なしを確認する。関連72件・ブラウザ6ケース・build成功。
 
 ### Task 3: 提出
 
