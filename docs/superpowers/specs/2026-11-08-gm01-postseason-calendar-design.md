@@ -18,7 +18,7 @@
 
 ## データ経路・互換性
 
-`generateSeasonSchedule` → `useSeasonFlow.startPlayoff` → `initPlayoff({year,schedule})` → `offseasonPlan.playoff` → 既存save/load。起点は`economyClockFor`の公式戦日付検証を再利用する。新規playoffにpolicy versionと最終公式戦日、seriesに開始日、各gameに実施日を保存する。途中再開時に保存済み日付と元日程の一致を検証し、再抽選・再生成しない。既存の未記録playoffはそのまま再開し、新しい日付や終了根拠を捏造しない。
+`generateSeasonSchedule` → `useSeasonFlow.startPlayoff` → `initPlayoff({year,schedule})` → `offseasonPlan.playoff` → 既存save/load。起点は`economyClockFor`の公式戦日付検証を再利用する。新規playoffにpolicy versionと最終公式戦日、seriesに開始日、各gameに実施日を保存する。途中再開時に保存済み日付と元日程の一致を検証し、再抽選・再生成しない。raw保存の元日程は、Appのlegacy fallback生成より先に検証する。同じ検査を共通save/loadとstate hydrationの境界でも使用し、不正候補は保存・live stateへ採用しない。render中には入力検証の例外を投げず、既存のバックアップ回復またはタイトルの読込失敗・再試行を維持する。既存の未記録playoffはそのまま再開し、新しい日付や終了根拠を捏造せず、元日程欠落時の従来fallbackも維持する。
 
 終了selectorは全seriesの結果を既存ルールで再生検証し、日付・勝ち上がり・日本一の一致を確認して終了日を返す。未完了または旧未記録履歴は終了根拠を返さない。これはnative年度取引のreceiptではなく、後続の終了producerの入力である。現在のannual clock検証は変更せず、無効なgameDay144の拒否も維持する。
 

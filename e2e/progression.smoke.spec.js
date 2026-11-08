@@ -194,6 +194,32 @@ test('E2 final regular game, postseason save/reload, offseason and next year', a
   expect(progressSignature(await saveHub(page)).played).toBe(1);
 });
 
+for (const corrupt of ['date', 'missing-source']) test(`E2 final regular game rejects corrupt postseason ${corrupt} before hydration`, async ({ page }) => {
+  await loadFixture(page, 'draw-complete', { resume: false });
+  const raw = await page.evaluate(async corrupt => {
+    const { loadGame, saveGame } = await import('/baseball-manager/src/engine/saveload.js');
+    const { initPlayoff } = await import('/baseball-manager/src/engine/playoff.js');
+    const { readRootBody } = await import('/baseball-manager/src/engine/saveRootBodies.js');
+    const s = await loadGame();
+    s.offseasonPlan.playoff = initPlayoff(s.teams, { year: s.year, schedule: s.schedule });
+    if (!(await saveGame(s, { skipCompression: true })).ok) throw new Error('dated save setup failed');
+    const key = 'baseball_manager_v1';
+    const root = JSON.parse(await readRootBody(localStorage.getItem(key)));
+    if (corrupt === 'date') root.offseasonPlan.playoff.cs1_se.startDate = `${root.year}-01-01`;
+    else delete root.schedule;
+    const raw = JSON.stringify(root);
+    localStorage.setItem(key, raw);
+    localStorage.removeItem(`${key}_bk1`); localStorage.removeItem(`${key}_bk2`);
+    return raw;
+  }, corrupt);
+  await page.reload();
+  await page.getByRole('button', { name: '続きから', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('復旧できませんでした');
+  await expect(page.getByRole('button', { name: '続きから', exact: true })).toBeEnabled();
+  await expect(page.getByRole('heading', { name: /ポストシーズン/ })).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem('baseball_manager_v1'))).toBe(raw);
+});
+
 test('E2 draw-inclusive completed fixture cannot start regular games', async ({ page }) => {
   await loadFixture(page, 'draw-complete');
   await page.getByRole('button', { name: '編成を見直す', exact:true }).click();

@@ -74,3 +74,12 @@ export function validatePlayoffCalendar(playoff, context = {}) {
   }
   return true;
 }
+
+// Validate the saved source before legacy load code can generate a replacement schedule.
+export function validatePostseasonSave(world) {
+  const plan = world.offseasonPlan;
+  if (!plan?.playoff) return false;
+  const dated = validatePlayoffCalendar(plan.playoff, { year: world.year, schedule: world.schedule });
+  if (dated && (plan.year !== world.year || plan.myId !== world.myId)) fail();
+  return dated;
+}

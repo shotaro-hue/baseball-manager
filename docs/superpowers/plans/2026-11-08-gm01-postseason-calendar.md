@@ -32,9 +32,10 @@ Interfaces: `initPlayoff(teams,{year,schedule})` keeps optional schedule for leg
 
 ### Task 2: Existing producer/save path and verification
 
-Files: `src/hooks/useSeasonFlow.js`, hook regression tests, `e2e/progression.smoke.spec.js`, validation record, ROADMAP.
+Files: `src/hooks/useSeasonFlow.js`, hook regression tests, `src/App.jsx`, `src/hooks/useGameState.js`, `src/engine/saveload.js`, `e2e/progression.smoke.spec.js`, validation record, ROADMAP.
 
 - [x] Assert date production through real final-game entry and save/reload E2E before connecting hook.
 - [x] Pass real schedule at fresh entry and validate dated resume against schedule; preserve undated history.
+- [x] Review corrections: retain 14-game JS capacity; validate raw source at save/load/hydration boundaries before legacy schedule fallback, retain title retry/backup recovery and legacy fallback.
 - [ ] Run relevant hook/save and Chromium/WebKit final-game E2E plus build.
 - [ ] Independent review, resolve evidenced findings; create PR and verify exact HEAD full CI (no merge).

@@ -16,13 +16,14 @@ main `bb77dad693769c0eef454eb4422326b0d0545635`（#557マージ後）から実�
 - 再開時の元日程欠落と上限超過試合：拒否されないREDを確認し、明示拒否へ。
 - 既存のfixture省略API：日付付き試合のhomeIdが未記録になって終了照合が失敗するREDを確認し、日付付き新規履歴では共通fixtureを取得するよう修正。旧未記録履歴の値は変更しない。
 - 独立レビューで11戦上限の誤りを検出：7引分＋勝敗交互なら14戦が必要。実ルールによる第12戦での拒否と、11/1最終公式戦の日程を誤って受け入れるREDを確認し、14戦までの容量と11月境界を検証するよう修正。
+- 独立レビューで不正日付のrender例外と、元日程欠落をAppが再生成する問題を実storageで再現。読込前検査の不足をAppテストでRED化し、検査をraw読込/fallback前と共通保存・読込・hydration境界へ移動。タイトル・session token・原本保持、正常再試行、旧未記録のfallbackを対で確認する。実保存の不正候補拒否、唯一の不正rootの保持、既存backup回復も検証する。
 
 ## ローカル検証
 
-- 関連Vitestはcalendar、playoff、economyCalendar、season hook、保存、画面flowを対象とする。修正前77件成功、レビュー修正後の最終件数はPRへ記載。
+- 関連Vitest 17ファイル134件成功。calendar、playoff、economyCalendar、season hook、保存、画面flow、App読込失敗、hydrationを対象とする。
 - calendar専用15件：実生成日程、2025/2026/2027、早期決着/両リーグ順序、特殊CS7戦、日本シリーズ7引分+追加4戦/追加7戦、移動日、途中JSON、旧履歴、日付/勝者矛盾、日程不足、12月境界、保存再試行を関連テストと合わせて確認。
-- build：初期実装で成功。最終HEADのbuild・全unit/integration・必須E2Eの正本はPRのCI結果。
-- Chromium/WebKit：既存E2の「最終公式戦→CS途中保存→再開→日本一→翌年」を日付・終了照合付きへ拡張。従来WebKitの対象外だった同テストを対象へ追加した。初回WebKitはPC用入口指定`startSingle(page,false)`で存在しないdesktop buttonを待って120秒で失敗。snapshotはmobile-homeの実ボタンを示しており、画面幅を既存helperへ渡す修正を行った。timeout/retry/期待値の緩和はしていない。最終の両ブラウザ結果・HEAD・独立レビュー結果はPR本文を正本とする。
+- build：読込境界の修正後にも成功（15.34秒）。最終HEADのbuild・全unit/integration・必須E2Eの正本はPRのCI結果。
+- Chromium/WebKit：既存E2の「最終公式戦→CS途中保存→再開→日本一→翌年」を日付・終了照合付きへ拡張。従来WebKitの対象外だった同テストを対象へ追加した。WebKitではPC用入口指定`startSingle(page,false)`、その修正後には翌年の`runSingle(page,false)`で存在しないdesktop buttonを待って120秒で失敗。snapshotはmobile-homeの実ボタンを示しており、両方に画面幅を既存helperへ渡す修正を行った。その後同一シナリオがChromium 56秒、WebKit約60秒で成功。さらに実保存rootの日付/元日程を破損させてContinueを実行し、タイトルでの拒否・例外なし・原本保持を両ブラウザへ追加した。timeout/retry/期待値の緩和はしていない。最終の両ブラウザ結果・HEAD・独立レビュー結果はPR本文を正本とする。
 - 画面/CSS/ユーザー操作の変更なし。実機iPhone Safariは未実施。
 
 ## 未完了範囲
