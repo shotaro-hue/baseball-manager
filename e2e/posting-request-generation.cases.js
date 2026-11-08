@@ -7,12 +7,48 @@ async function mount(page, options = {}) {
     const { mountTradeView } = await import('/baseball-manager/tests/helpers/trade-hook-harness.jsx');
     window.wishHarness?.unmount();
     if (!options.reload) {
-      const saved = await saveGame(requestGenerationWorld(options), { skipCompression: true });
+      const world = options.budgetHeadroom !== undefined
+        ? (await import('/baseball-manager/src/engine/__tests__/fixtures/cpuPostingBudget.js')).cpuPostingBudgetWorld({ headroom: options.budgetHeadroom })
+        : requestGenerationWorld(options);
+      const saved = await saveGame(world, { skipCompression: true });
       if (!saved.ok) throw Error(`save failed: ${JSON.stringify(saved)}`);
     }
     window.wishHarness = mountTradeView(await loadGame(), { mailbox: true, legacy: options.legacy });
   }, options);
 }
+for (const budgetHeadroom of [0, 840]) test(`save generations: annual posting CPU future budget ${budgetHeadroom} preserves human wishes after save retry`, async ({ page }) => {
+  await page.goto('/'); await mount(page, { budgetHeadroom });
+  const before = await durable(page);
+  await page.getByRole('button', { name: '海外挑戦の希望を確認する', exact: true }).click();
+  await page.evaluate(() => {
+    window.budgetRoot = localStorage.getItem('baseball_manager_v1'); window.budgetWrite = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'baseball_manager_v1') throw new DOMException('full', 'QuotaExceededError');
+      return window.budgetWrite.call(this, key, value);
+    };
+  });
+  await page.getByRole('button', { name: '希望を確認して保存する', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('希望を保存できませんでした');
+  expect(await page.evaluate(() => localStorage.getItem('baseball_manager_v1') === window.budgetRoot)).toBe(true);
+  expect(await durable(page)).toEqual(before);
+  await page.evaluate(() => { Storage.prototype.setItem = window.budgetWrite; });
+  await page.getByRole('button', { name: '同じ希望判定で保存を再試行する', exact: true }).click();
+  await expect(page.getByText(/希望確認済み/)).toBeVisible();
+  const after = await durable(page), e = after.economy.engine, phase = e.transactions.at(-1).annualPostingPhase;
+  expect(after.economy.revision).toBe(before.economy.revision + 1);
+  expect(phase.decisions.map(d => d.decision)).toEqual(budgetHeadroom ? ['approve', 'approve'] : ['reject', 'reject']);
+  expect(phase.marketIds).toHaveLength(budgetHeadroom ? 2 : 0);
+  if (!budgetHeadroom) {
+    expect(phase.decisions.map(d => d.reason)).toEqual(['future-budget', 'future-budget']);
+    expect(e.spending).toEqual(before.economy.engine.spending);
+    await page.locator('summary').filter({ hasText: 'CPU球団の判断・交渉結果' }).click();
+    await expect(page.getByText(/残存保証と欠員補充を含む将来年度の予算を確保できないため拒否/).first()).toBeVisible();
+  }
+  const humanRequests = e.postingApplications.filter(r => r.kind === 'request' && r.teamId === 0);
+  expect(humanRequests.length).toBeGreaterThan(0);
+  expect(e.postingApplications.filter(r => r.kind === 'decision').every(d => !humanRequests.some(r => r.id === d.requestId))).toBe(true);
+  await page.reload(); await mount(page, { reload: true }); expect(await durable(page)).toEqual(after);
+});
 async function durable(page) {
   await expect.poll(() => page.evaluate(async () => {
     const { getSaveQueueSnapshot } = await import('/baseball-manager/src/engine/saveload.js');

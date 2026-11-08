@@ -256,8 +256,14 @@ function inspect(state) {
 // Planner counts belong to the trusted snapshot, never the incoming command.
 // An unowned accepted rookie still needs funding; a funded hold counts once.
 function withFloors(state) {
-  const inspected = inspect(state), { teams, players } = inspected, requirements = new Map();
-  state = inspected.state;
+  const { state: checked, teams, players } = inspect(state);
+  return withRosterFloors(checked, teams, players);
+}
+
+// Internal projection for inspected input and native, unpublished departures.
+// A hypothetical departure has no market receipt and is never a save candidate.
+function withRosterFloors(state, teams, players) {
+  const requirements = new Map();
   for (const r of state.rosterRequirements) {
     const k = key(r.teamId, r.season);
     if (!teams.has(r.teamId) || !Number.isInteger(r.season) || !Number.isInteger(r.requiredControlledCount)
@@ -290,6 +296,44 @@ function withFloors(state) {
     return { ...a, minimumRosterReserveManYen: Math.max(unfundedPicks, required - funded.size, 0) * MIN_SALARY_SHIHAKA };
   });
   return { ...state, spending: { ...state.spending, authorizations } };
+}
+
+function assessTransactionSpending(before, after, mode, checkDepartureHeadroom) {
+  // A derived floor restored by a losing/cancelled bid is not new spending.
+  // Use final floors for admission; independently check actual headroom changes.
+  const comparison = mode === 'cashless-trade' ? before.spending
+    : { ...before.spending, authorizations: after.spending.authorizations };
+  const assessment = assessAnnualSpendingChange(comparison, after.spending, { mode });
+  if (!assessment.ok) return { ok: false, error: '対象年度の追加余力が不足または悪化しています。' };
+  const oldRows = new Map(quoteAnnualSpendingPlan(before.spending).map(r => [key(r.teamId, r.season), r]));
+  const rows = quoteAnnualSpendingPlan(after.spending);
+  // Cancellation/losing bids create no obligation; departures create vacancies.
+  if (checkDepartureHeadroom && rows.some(r => r.remainingManYen < 0
+    && r.remainingManYen < oldRows.get(key(r.teamId, r.season)).remainingManYen))
+    return { ok: false, error: '赤字年度の追加余力を悪化させる取引です。' };
+  return { ok: true, rows };
+}
+
+function prepareCpuPostingBudgetAdmission(state, approvedRequests) {
+  const { state: checked, teams, players } = inspect(state);
+  let projected = checked;
+  const depart = request => {
+    const command = { id: JSON.stringify(['cpu-posting-budget', request.id]), type: 'end-contract', reason: 'posting',
+      teamId: request.teamId, playerId: request.playerId, contractId: request.sourceContractId, settlement: 'retain' };
+    const next = createPostingDeparture(projected, command, stable(command));
+    const spending = { ...next.spending, offseasonDepartures: [
+      ...(projected.spending.offseasonDepartures ?? []), next.postingDepartures.at(-1),
+    ] };
+    return withRosterFloors({ ...next, spending }, teams, players);
+  };
+  // Previously fixed approvals are obligations, never new policy decisions.
+  for (const request of approvedRequests) projected = depart(request);
+  return request => {
+    const next = depart(request);
+    const assessment = assessTransactionSpending(checked, next, 'spend', true);
+    if (assessment.ok) projected = next;
+    return assessment.ok;
+  };
 }
 
 // A proposal replaces vacancies with its actual liability before admission.
@@ -509,7 +553,7 @@ function* candidateSteps(input, command) {
   assertRetirementCommandCompatible(before, c);
   if (input.phase === 'offseason' && !isAnnualPostingPhaseCommand(c) && !isGeneratedPostingRequestsCommand(c) && !isGeneratedPostingMarketCommand(c) && !isPostingMarketResultCommand(c) && !isPostingQualificationCommand(c) && !isPostingApplicationCommand(c) && !isPostingCompletionCommand(c) && !isPostingDepartureCommand(c) && !isOverseasDepartureCommand(c) && !isRetirementCommand(c) && !isWinterDepartureCommand(c) && !c.type.endsWith('renewal') && !c.type.endsWith('rookie') && !c.type.endsWith('fa') && !['settle-fa-compensation', 'submit-fa-protection', 'settle-fa-personnel', 'join-fa-personnel'].includes(c.type)) fail('オフの新制度取引は翌年度契約だけが接続済みです。');
   // Snapshot and receipt enter validation together; no unaudited intermediate state.
-  let protectedState = isAnnualPostingPhaseCommand(c) ? yield* createAnnualPostingPhaseSteps(before, c, signature)
+  let protectedState = isAnnualPostingPhaseCommand(c) ? yield* createAnnualPostingPhaseSteps(before, c, signature, prepareCpuPostingBudgetAdmission)
     : isGeneratedPostingRequestsCommand(c) ? createGeneratedPostingRequests(before, c, signature)
     : isGeneratedPostingMarketCommand(c) ? createGeneratedPostingMarket(before, c, signature)
     : isPostingMarketResultCommand(c) ? createPostingMarketResult(before, c, signature)
@@ -537,19 +581,10 @@ function* candidateSteps(input, command) {
     : c.type.endsWith('renewal') ? renewalCandidate(before, c)
     : c.type.endsWith('rookie') ? rookieCandidate(before, c) : faCandidate(before, c)));
   const mode = c.type === 'finalize-retirement' ? 'retirement' : c.type === 'trade' ? c.mode : 'spend';
-  // A derived floor restored by a losing/cancelled bid is not new spending.
-  // Use final floors for admission; independently check actual headroom changes.
-  const comparison = mode === 'cashless-trade' ? before.spending
-    : { ...before.spending, authorizations: after.spending.authorizations };
-  const assessment = assessAnnualSpendingChange(comparison, after.spending, { mode });
-  if (!assessment.ok) fail('対象年度の追加余力が不足または悪化しています。');
-  const oldRows = new Map(quoteAnnualSpendingPlan(before.spending).map(r => [key(r.teamId, r.season), r]));
-  const rows = quoteAnnualSpendingPlan(after.spending);
-  // Releasing a prorated bid may restore a larger conservative annual floor.
-  // Cancellation/losing bids create no obligation; winner admission is above.
-  // Departures must still account for real vacancies created by outgoing players.
-  if (['advance-posting-phase', 'trade', 'settle-fa-personnel', 'enter-market', 'declare-fa', 'end-contract', 'complete-posting', 'resolve-posting', 'run-posting-market'].includes(c.type)
-    && rows.some(r => r.remainingManYen < 0 && r.remainingManYen < oldRows.get(key(r.teamId, r.season)).remainingManYen)) fail('赤字年度の追加余力を悪化させる取引です。');
+  const assessment = assessTransactionSpending(before, after, mode,
+    ['advance-posting-phase', 'trade', 'settle-fa-personnel', 'enter-market', 'declare-fa', 'end-contract', 'complete-posting', 'resolve-posting', 'run-posting-market'].includes(c.type));
+  if (!assessment.ok) fail(assessment.error);
+  const rows = assessment.rows;
   return { state: { ...after, transactions: protectedState ? after.transactions : [...after.transactions, { id: c.id, signature }] }, rows, replayed: false,
     ...(personnel ? { personnel } : {}) };
 }

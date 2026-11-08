@@ -7,6 +7,8 @@ import { reduceEconomyCommand } from '../src/engine/contractEconomy';
 import { envelope } from '../src/engine/__tests__/fixtures/faDeclarations';
 import { postingGenerationId } from '../src/engine/generatedPostingRequests';
 import { validateEconomySave } from '../src/engine/economyPersistence';
+import { cpuPostingBudgetWorld } from '../src/engine/__tests__/fixtures/cpuPostingBudget';
+import legacyCpuReceipts from '../src/engine/__tests__/fixtures/cpuPostingReceiptsV1.json';
 
 const primary = 'baseball_manager_v1'; let rows, current, expected, bindings;
 const roots = () => [primary, primary + '_bk1', primary + '_bk2'].map(k => rows.get(k));
@@ -52,6 +54,40 @@ it('rebuilds the same wishes after failed publication and cold load', async () =
   const rebuilt = candidate(await loadGame(), request); expect(rebuilt.contractEconomy).toEqual(next.contractEconomy);
   localStorage.setItem = write;
   expect((await commitEconomyCandidate(rebuilt, expected, bindings)).ok).toBe(true);
+});
+it('publishes budget refusals and human wishes once after a failed save, with identical retry and cold replay', async () => {
+  current.world = cpuPostingBudgetWorld();
+  expect((await saveGame(current.world)).ok).toBe(true); current.world = await loadGame(); context();
+  const old = current.world, request = postingGenerationRequest(old), next = candidate(old), before = roots(), write = localStorage.setItem;
+  const phase = next.contractEconomy.engine.transactions.at(-1).annualPostingPhase;
+  expect(phase.decisions.map(d => d.reason)).toEqual(['future-budget', 'future-budget']);
+  localStorage.setItem = (k, v) => { if (k === primary) throw Error('full'); write(k, v); };
+  expect((await commitEconomyCandidate(next, expected, bindings)).ok).toBe(false);
+  expect(current.world).toBe(old); expect(roots()).toEqual(before);
+  const rebuilt = candidate(await loadGame(), request); expect(rebuilt.contractEconomy).toEqual(next.contractEconomy);
+  let publications = 0;
+  localStorage.setItem = (k, v) => { if (k === primary) publications++; write(k, v); };
+  expect((await commitEconomyCandidate(rebuilt, expected, bindings)).ok).toBe(true);
+  expect(publications).toBe(1);
+  const cold = await loadGame(); expect(validateEconomySave(cold)).toBe('annual');
+  expect(cold.contractEconomy).toEqual(next.contractEconomy);
+  expect(cold.contractEconomy.engine.spending).toEqual(old.contractEconomy.engine.spending);
+  expect(reducePostingGenerationRequest(cold, request)).toMatchObject({ ok: true, replayed: true, world: cold });
+  expect(publications).toBe(1);
+});
+it('saves and cold-loads v1 CPU receipts without converting decisions to the new policy', async () => {
+  const old = candidate(current.world), transactions = old.contractEconomy.engine.transactions;
+  for (const receipt of legacyCpuReceipts) {
+    const at = transactions.findIndex(t => t.id === receipt.id);
+    expect(at).toBeGreaterThanOrEqual(0); transactions[at] = structuredClone(receipt);
+  }
+  const before = JSON.parse(JSON.stringify(old.contractEconomy));
+  expect((await saveGame(old)).ok).toBe(true);
+  const cold = await loadGame(); expect(validateEconomySave(cold)).toBe('annual');
+  expect(cold.contractEconomy).toEqual(before);
+  expect(reducePostingGenerationRequest(cold, postingGenerationRequest(cold)))
+    .toMatchObject({ ok: true, replayed: true, world: cold });
+  expect(cold.contractEconomy).toEqual(before);
 });
 it('recovers published wishes without another root write or generation', async () => {
   expect((await saveGame(current.world)).ok).toBe(true); current.world = await loadGame(); context();

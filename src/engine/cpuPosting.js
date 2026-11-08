@@ -7,6 +7,7 @@ export const cpuPostingReasonText = {
   'role-depth': '必要な役割人数を維持', 'controlled-core': '複数年の主力を維持',
   'replacement-covered': '同役割の代替戦力あり', 'expiring-veteran': '満了するベテランの挑戦を承認',
   'rebuild-veteran': '再建方針でベテランの挑戦を承認', 'retain-strength': '代替戦力より高い戦力を維持',
+  'future-budget': '残存保証と欠員補充を含む将来年度の予算を確保できないため拒否',
 };
 
 // Policy v1 is a conservative game assumption, not a measured real-world rate.
@@ -24,6 +25,15 @@ export function evaluateCpuPosting(f) {
     : f.ageYears >= 30 && f.endSeason === f.season ? 'expiring-veteran'
     : f.ageYears >= 30 && f.mode === 'rebuild' ? 'rebuild-veteran' : 'retain-strength';
   return { decision: ['replacement-covered', 'expiring-veteran', 'rebuild-veteran'].includes(reason) ? 'approve' : 'reject', reason };
+}
+
+// New decisions carry the common admission result, not a predicted market fee
+// or draw. Keep v1 above frozen for already published receipts.
+export function evaluateBudgetedCpuPosting(f) {
+  if (typeof f?.budgetAffordable !== 'boolean') throw Error('CPUのポスティング予算審査を確認してください。');
+  const { budgetAffordable, ...strategy } = f, evaluation = evaluateCpuPosting(strategy);
+  return evaluation.decision === 'approve' && !budgetAffordable
+    ? { decision: 'reject', reason: 'future-budget' } : evaluation;
 }
 
 export function cpuPostingInputs(state, request, outgoing, employmentById) {

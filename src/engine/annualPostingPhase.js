@@ -1,7 +1,7 @@
 import { createGeneratedPostingRequests, postingGenerationId } from './generatedPostingRequests';
 import { createPostingApplication, postingApplicationViews } from './annualPostingApplications';
 import { createGeneratedPostingMarket } from './generatedPostingMarket';
-import { cpuPostingInputs, evaluateCpuPosting } from './cpuPosting';
+import { cpuPostingInputs, evaluateCpuPosting, evaluateBudgetedCpuPosting } from './cpuPosting';
 import { contractEmploymentAt } from './contractLedger';
 import { employmentContractId } from './seasonContract';
 
@@ -26,11 +26,11 @@ const sorted = rows => [...rows].sort((a, b) => {
 
 // Compose in annual state. The outer common transaction owns validation,
 // spending admission and the single world revision; no intermediate adoption.
-export function* createAnnualPostingPhaseSteps(state, c, signature) {
+export function* createAnnualPostingPhaseSteps(state, c, signature, prepareBudgetAdmission) {
   if (state.version !== 2 || state.phase !== 'offseason' || state.date !== day(state.season)
     || state.season >= 9999 || c.id !== postingPhaseId(state.season)
     || !state.teams.some(t => t.id === c.humanTeamId)) fail();
-  const g = { version: 1, policyVersion: 'cpu-posting-v1', season: state.season, date: state.date,
+  const g = { version: 1, policyVersion: 'cpu-posting-v2', season: state.season, date: state.date,
     humanTeamId: c.humanTeamId, teamIds: sorted(state.teams.map(t => t.id)), createdGenerationIds: [], decisions: [], marketIds: [] };
   let next = state;
   const run = (command, create) => {
@@ -51,9 +51,12 @@ export function* createAnnualPostingPhaseSteps(state, c, signature) {
   const employmentById = new Map(contractEmploymentAt(state.spending.ledger, `${String(state.season).padStart(4, '0')}-11-30`)
     .map(e => [employmentContractId(e.contract), e]));
   const outgoing = new Set(cpuRequests().filter(r => r.status === 'approved' || r.status === 'signed').map(r => r.playerId));
+  const admitBudget = prepareBudgetAdmission(next, cpuRequests().filter(r => r.status === 'approved'));
   for (const requestId of sorted(cpuRequests().filter(r => r.status === 'pending').map(r => r.id))) {
     const request = cpuRequests().find(r => r.id === requestId);
-    const inputs = cpuPostingInputs(next, request, outgoing, employmentById), evaluation = evaluateCpuPosting(inputs);
+    const strategy = cpuPostingInputs(next, request, outgoing, employmentById);
+    const inputs = { ...strategy, budgetAffordable: evaluateCpuPosting(strategy).decision !== 'approve' || admitBudget(request) };
+    const evaluation = evaluateBudgetedCpuPosting(inputs);
     const d = { requestId, decisionId: decisionId(requestId), inputs, ...evaluation };
     run(decisionCommand(d), createPostingApplication);
     next = { ...next, transactions: next.transactions.map(t => t.id === d.decisionId
@@ -79,7 +82,7 @@ export function inspectAnnualPostingPhases(state) {
     let command; try { command = JSON.parse(t.signature); } catch { /* old opaque receipt */ }
     if (!isAnnualPostingPhaseCommand(command) && t.annualPostingPhase === undefined) continue;
     const c = normalizeAnnualPostingPhase(command), g = t.annualPostingPhase;
-    if (!g || Object.keys(g).length !== 9 || g.version !== 1 || g.policyVersion !== 'cpu-posting-v1'
+    if (!g || Object.keys(g).length !== 9 || g.version !== 1 || !['cpu-posting-v1', 'cpu-posting-v2'].includes(g.policyVersion)
       || !Number.isInteger(g.season) || g.season < 1 || g.season > state.season || g.date !== day(g.season) || g.date > state.date
       || g.humanTeamId !== c.humanTeamId || c.id !== t.id || c.id !== postingPhaseId(g.season) || t.signature !== stable(c)
       || !Array.isArray(g.teamIds) || stable(g.teamIds) !== stable(sorted(state.teams.map(t => t.id))) || !g.teamIds.includes(c.humanTeamId)
@@ -96,7 +99,7 @@ export function inspectAnnualPostingPhases(state) {
         || !f || f.teamId !== r.teamId || f.playerId !== r.playerId || f.sourceContractId !== r.sourceContractId || f.season !== g.season
         || f.endSeason !== employment.get(r.sourceContractId)?.contract.endSeason
         || decisions.has(d.decisionId) || d.decisionId !== decisionId(r.id)
-        || stable(evaluateCpuPosting(f)) !== stable({ decision: d.decision, reason: d.reason })
+        || stable((g.policyVersion === 'cpu-posting-v1' ? evaluateCpuPosting : evaluateBudgetedCpuPosting)(f)) !== stable({ decision: d.decision, reason: d.reason })
         || child?.signature !== stable(decisionCommand(d))
         || stable(child.cpuPostingDecision) !== stable({ phaseId: c.id, ...d })) fail();
       decisions.add(d.decisionId);

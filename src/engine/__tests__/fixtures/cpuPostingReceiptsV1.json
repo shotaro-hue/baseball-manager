@@ -1,0 +1,1067 @@
+[
+  {
+    "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-0\\\"]\"]",
+    "signature": "{\"decision\":\"approve\",\"id\":\"[\\\"cpu-posting-decision\\\",\\\"[\\\\\\\"posting-request\\\\\\\",2026,1,\\\\\\\"club-1-0\\\\\\\"]\\\"]\",\"requestId\":\"[\\\"posting-request\\\",2026,1,\\\"club-1-0\\\"]\",\"type\":\"decide-posting\"}",
+    "postingApplication": {
+      "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-0\\\"]\"]",
+      "kind": "decision",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-0\"]",
+      "decision": "approve",
+      "decidedDate": "2026-12-01"
+    },
+    "cpuPostingDecision": {
+      "phaseId": "[\"annual-posting-phase\",2026]",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-0\"]",
+      "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-0\\\"]\"]",
+      "inputs": {
+        "teamId": 1,
+        "playerId": "club-1-0",
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-0\"]",
+        "season": 2026,
+        "ageYears": 25,
+        "endSeason": 2028,
+        "mode": "neutral",
+        "role": "一塁手",
+        "minimumDepth": 1,
+        "remainingDepth": 16,
+        "value": 44,
+        "replacementValue": 44,
+        "core": false
+      },
+      "decision": "approve",
+      "reason": "replacement-covered"
+    }
+  },
+  {
+    "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-10\\\"]\"]",
+    "signature": "{\"decision\":\"reject\",\"id\":\"[\\\"cpu-posting-decision\\\",\\\"[\\\\\\\"posting-request\\\\\\\",2026,1,\\\\\\\"club-1-10\\\\\\\"]\\\"]\",\"requestId\":\"[\\\"posting-request\\\",2026,1,\\\"club-1-10\\\"]\",\"type\":\"decide-posting\"}",
+    "postingApplication": {
+      "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-10\\\"]\"]",
+      "kind": "decision",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-10\"]",
+      "decision": "reject",
+      "decidedDate": "2026-12-01"
+    },
+    "cpuPostingDecision": {
+      "phaseId": "[\"annual-posting-phase\",2026]",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-10\"]",
+      "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-10\\\"]\"]",
+      "inputs": {
+        "teamId": 1,
+        "playerId": "club-1-10",
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-10\"]",
+        "season": 2026,
+        "ageYears": 25,
+        "endSeason": 2028,
+        "mode": "neutral",
+        "role": "捕手",
+        "minimumDepth": 6,
+        "remainingDepth": 1,
+        "value": 44,
+        "replacementValue": 44,
+        "core": false
+      },
+      "decision": "reject",
+      "reason": "role-depth"
+    }
+  },
+  {
+    "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-11\\\"]\"]",
+    "signature": "{\"decision\":\"approve\",\"id\":\"[\\\"cpu-posting-decision\\\",\\\"[\\\\\\\"posting-request\\\\\\\",2026,1,\\\\\\\"club-1-11\\\\\\\"]\\\"]\",\"requestId\":\"[\\\"posting-request\\\",2026,1,\\\"club-1-11\\\"]\",\"type\":\"decide-posting\"}",
+    "postingApplication": {
+      "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-11\\\"]\"]",
+      "kind": "decision",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-11\"]",
+      "decision": "approve",
+      "decidedDate": "2026-12-01"
+    },
+    "cpuPostingDecision": {
+      "phaseId": "[\"annual-posting-phase\",2026]",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-11\"]",
+      "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-11\\\"]\"]",
+      "inputs": {
+        "teamId": 1,
+        "playerId": "club-1-11",
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-11\"]",
+        "season": 2026,
+        "ageYears": 25,
+        "endSeason": 2028,
+        "mode": "neutral",
+        "role": "一塁手",
+        "minimumDepth": 1,
+        "remainingDepth": 15,
+        "value": 44,
+        "replacementValue": 44,
+        "core": false
+      },
+      "decision": "approve",
+      "reason": "replacement-covered"
+    }
+  },
+  {
+    "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-12\\\"]\"]",
+    "signature": "{\"decision\":\"approve\",\"id\":\"[\\\"cpu-posting-decision\\\",\\\"[\\\\\\\"posting-request\\\\\\\",2026,1,\\\\\\\"club-1-12\\\\\\\"]\\\"]\",\"requestId\":\"[\\\"posting-request\\\",2026,1,\\\"club-1-12\\\"]\",\"type\":\"decide-posting\"}",
+    "postingApplication": {
+      "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-12\\\"]\"]",
+      "kind": "decision",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-12\"]",
+      "decision": "approve",
+      "decidedDate": "2026-12-01"
+    },
+    "cpuPostingDecision": {
+      "phaseId": "[\"annual-posting-phase\",2026]",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-12\"]",
+      "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-12\\\"]\"]",
+      "inputs": {
+        "teamId": 1,
+        "playerId": "club-1-12",
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-12\"]",
+        "season": 2026,
+        "ageYears": 25,
+        "endSeason": 2028,
+        "mode": "neutral",
+        "role": "一塁手",
+        "minimumDepth": 1,
+        "remainingDepth": 14,
+        "value": 44,
+        "replacementValue": 44,
+        "core": false
+      },
+      "decision": "approve",
+      "reason": "replacement-covered"
+    }
+  },
+  {
+    "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-13\\\"]\"]",
+    "signature": "{\"decision\":\"approve\",\"id\":\"[\\\"cpu-posting-decision\\\",\\\"[\\\\\\\"posting-request\\\\\\\",2026,1,\\\\\\\"club-1-13\\\\\\\"]\\\"]\",\"requestId\":\"[\\\"posting-request\\\",2026,1,\\\"club-1-13\\\"]\",\"type\":\"decide-posting\"}",
+    "postingApplication": {
+      "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-13\\\"]\"]",
+      "kind": "decision",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-13\"]",
+      "decision": "approve",
+      "decidedDate": "2026-12-01"
+    },
+    "cpuPostingDecision": {
+      "phaseId": "[\"annual-posting-phase\",2026]",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-13\"]",
+      "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-13\\\"]\"]",
+      "inputs": {
+        "teamId": 1,
+        "playerId": "club-1-13",
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-13\"]",
+        "season": 2026,
+        "ageYears": 25,
+        "endSeason": 2028,
+        "mode": "neutral",
+        "role": "一塁手",
+        "minimumDepth": 1,
+        "remainingDepth": 13,
+        "value": 44,
+        "replacementValue": 44,
+        "core": false
+      },
+      "decision": "approve",
+      "reason": "replacement-covered"
+    }
+  },
+  {
+    "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-14\\\"]\"]",
+    "signature": "{\"decision\":\"approve\",\"id\":\"[\\\"cpu-posting-decision\\\",\\\"[\\\\\\\"posting-request\\\\\\\",2026,1,\\\\\\\"club-1-14\\\\\\\"]\\\"]\",\"requestId\":\"[\\\"posting-request\\\",2026,1,\\\"club-1-14\\\"]\",\"type\":\"decide-posting\"}",
+    "postingApplication": {
+      "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-14\\\"]\"]",
+      "kind": "decision",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-14\"]",
+      "decision": "approve",
+      "decidedDate": "2026-12-01"
+    },
+    "cpuPostingDecision": {
+      "phaseId": "[\"annual-posting-phase\",2026]",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-14\"]",
+      "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-14\\\"]\"]",
+      "inputs": {
+        "teamId": 1,
+        "playerId": "club-1-14",
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-14\"]",
+        "season": 2026,
+        "ageYears": 25,
+        "endSeason": 2028,
+        "mode": "neutral",
+        "role": "一塁手",
+        "minimumDepth": 1,
+        "remainingDepth": 12,
+        "value": 44,
+        "replacementValue": 44,
+        "core": false
+      },
+      "decision": "approve",
+      "reason": "replacement-covered"
+    }
+  },
+  {
+    "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-15\\\"]\"]",
+    "signature": "{\"decision\":\"approve\",\"id\":\"[\\\"cpu-posting-decision\\\",\\\"[\\\\\\\"posting-request\\\\\\\",2026,1,\\\\\\\"club-1-15\\\\\\\"]\\\"]\",\"requestId\":\"[\\\"posting-request\\\",2026,1,\\\"club-1-15\\\"]\",\"type\":\"decide-posting\"}",
+    "postingApplication": {
+      "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-15\\\"]\"]",
+      "kind": "decision",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-15\"]",
+      "decision": "approve",
+      "decidedDate": "2026-12-01"
+    },
+    "cpuPostingDecision": {
+      "phaseId": "[\"annual-posting-phase\",2026]",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-15\"]",
+      "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-15\\\"]\"]",
+      "inputs": {
+        "teamId": 1,
+        "playerId": "club-1-15",
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-15\"]",
+        "season": 2026,
+        "ageYears": 25,
+        "endSeason": 2028,
+        "mode": "neutral",
+        "role": "一塁手",
+        "minimumDepth": 1,
+        "remainingDepth": 11,
+        "value": 44,
+        "replacementValue": 44,
+        "core": false
+      },
+      "decision": "approve",
+      "reason": "replacement-covered"
+    }
+  },
+  {
+    "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-16\\\"]\"]",
+    "signature": "{\"decision\":\"approve\",\"id\":\"[\\\"cpu-posting-decision\\\",\\\"[\\\\\\\"posting-request\\\\\\\",2026,1,\\\\\\\"club-1-16\\\\\\\"]\\\"]\",\"requestId\":\"[\\\"posting-request\\\",2026,1,\\\"club-1-16\\\"]\",\"type\":\"decide-posting\"}",
+    "postingApplication": {
+      "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-16\\\"]\"]",
+      "kind": "decision",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-16\"]",
+      "decision": "approve",
+      "decidedDate": "2026-12-01"
+    },
+    "cpuPostingDecision": {
+      "phaseId": "[\"annual-posting-phase\",2026]",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-16\"]",
+      "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-16\\\"]\"]",
+      "inputs": {
+        "teamId": 1,
+        "playerId": "club-1-16",
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-16\"]",
+        "season": 2026,
+        "ageYears": 25,
+        "endSeason": 2028,
+        "mode": "neutral",
+        "role": "一塁手",
+        "minimumDepth": 1,
+        "remainingDepth": 10,
+        "value": 44,
+        "replacementValue": 44,
+        "core": false
+      },
+      "decision": "approve",
+      "reason": "replacement-covered"
+    }
+  },
+  {
+    "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-17\\\"]\"]",
+    "signature": "{\"decision\":\"approve\",\"id\":\"[\\\"cpu-posting-decision\\\",\\\"[\\\\\\\"posting-request\\\\\\\",2026,1,\\\\\\\"club-1-17\\\\\\\"]\\\"]\",\"requestId\":\"[\\\"posting-request\\\",2026,1,\\\"club-1-17\\\"]\",\"type\":\"decide-posting\"}",
+    "postingApplication": {
+      "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-17\\\"]\"]",
+      "kind": "decision",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-17\"]",
+      "decision": "approve",
+      "decidedDate": "2026-12-01"
+    },
+    "cpuPostingDecision": {
+      "phaseId": "[\"annual-posting-phase\",2026]",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-17\"]",
+      "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-17\\\"]\"]",
+      "inputs": {
+        "teamId": 1,
+        "playerId": "club-1-17",
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-17\"]",
+        "season": 2026,
+        "ageYears": 25,
+        "endSeason": 2028,
+        "mode": "neutral",
+        "role": "一塁手",
+        "minimumDepth": 1,
+        "remainingDepth": 9,
+        "value": 44,
+        "replacementValue": 44,
+        "core": false
+      },
+      "decision": "approve",
+      "reason": "replacement-covered"
+    }
+  },
+  {
+    "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-18\\\"]\"]",
+    "signature": "{\"decision\":\"approve\",\"id\":\"[\\\"cpu-posting-decision\\\",\\\"[\\\\\\\"posting-request\\\\\\\",2026,1,\\\\\\\"club-1-18\\\\\\\"]\\\"]\",\"requestId\":\"[\\\"posting-request\\\",2026,1,\\\"club-1-18\\\"]\",\"type\":\"decide-posting\"}",
+    "postingApplication": {
+      "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-18\\\"]\"]",
+      "kind": "decision",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-18\"]",
+      "decision": "approve",
+      "decidedDate": "2026-12-01"
+    },
+    "cpuPostingDecision": {
+      "phaseId": "[\"annual-posting-phase\",2026]",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-18\"]",
+      "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-18\\\"]\"]",
+      "inputs": {
+        "teamId": 1,
+        "playerId": "club-1-18",
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-18\"]",
+        "season": 2026,
+        "ageYears": 25,
+        "endSeason": 2028,
+        "mode": "neutral",
+        "role": "一塁手",
+        "minimumDepth": 1,
+        "remainingDepth": 8,
+        "value": 44,
+        "replacementValue": 44,
+        "core": false
+      },
+      "decision": "approve",
+      "reason": "replacement-covered"
+    }
+  },
+  {
+    "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-19\\\"]\"]",
+    "signature": "{\"decision\":\"approve\",\"id\":\"[\\\"cpu-posting-decision\\\",\\\"[\\\\\\\"posting-request\\\\\\\",2026,1,\\\\\\\"club-1-19\\\\\\\"]\\\"]\",\"requestId\":\"[\\\"posting-request\\\",2026,1,\\\"club-1-19\\\"]\",\"type\":\"decide-posting\"}",
+    "postingApplication": {
+      "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-19\\\"]\"]",
+      "kind": "decision",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-19\"]",
+      "decision": "approve",
+      "decidedDate": "2026-12-01"
+    },
+    "cpuPostingDecision": {
+      "phaseId": "[\"annual-posting-phase\",2026]",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-19\"]",
+      "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-19\\\"]\"]",
+      "inputs": {
+        "teamId": 1,
+        "playerId": "club-1-19",
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-19\"]",
+        "season": 2026,
+        "ageYears": 25,
+        "endSeason": 2028,
+        "mode": "neutral",
+        "role": "投手",
+        "minimumDepth": 1,
+        "remainingDepth": 1,
+        "value": 44,
+        "replacementValue": 44,
+        "core": false
+      },
+      "decision": "approve",
+      "reason": "replacement-covered"
+    }
+  },
+  {
+    "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-1\\\"]\"]",
+    "signature": "{\"decision\":\"reject\",\"id\":\"[\\\"cpu-posting-decision\\\",\\\"[\\\\\\\"posting-request\\\\\\\",2026,1,\\\\\\\"club-1-1\\\\\\\"]\\\"]\",\"requestId\":\"[\\\"posting-request\\\",2026,1,\\\"club-1-1\\\"]\",\"type\":\"decide-posting\"}",
+    "postingApplication": {
+      "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-1\\\"]\"]",
+      "kind": "decision",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-1\"]",
+      "decision": "reject",
+      "decidedDate": "2026-12-01"
+    },
+    "cpuPostingDecision": {
+      "phaseId": "[\"annual-posting-phase\",2026]",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-1\"]",
+      "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-1\\\"]\"]",
+      "inputs": {
+        "teamId": 1,
+        "playerId": "club-1-1",
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-1\"]",
+        "season": 2026,
+        "ageYears": 25,
+        "endSeason": 2028,
+        "mode": "neutral",
+        "role": "捕手",
+        "minimumDepth": 6,
+        "remainingDepth": 1,
+        "value": 44,
+        "replacementValue": 44,
+        "core": false
+      },
+      "decision": "reject",
+      "reason": "role-depth"
+    }
+  },
+  {
+    "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-20\\\"]\"]",
+    "signature": "{\"decision\":\"reject\",\"id\":\"[\\\"cpu-posting-decision\\\",\\\"[\\\\\\\"posting-request\\\\\\\",2026,1,\\\\\\\"club-1-20\\\\\\\"]\\\"]\",\"requestId\":\"[\\\"posting-request\\\",2026,1,\\\"club-1-20\\\"]\",\"type\":\"decide-posting\"}",
+    "postingApplication": {
+      "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-20\\\"]\"]",
+      "kind": "decision",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-20\"]",
+      "decision": "reject",
+      "decidedDate": "2026-12-01"
+    },
+    "cpuPostingDecision": {
+      "phaseId": "[\"annual-posting-phase\",2026]",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-20\"]",
+      "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-20\\\"]\"]",
+      "inputs": {
+        "teamId": 1,
+        "playerId": "club-1-20",
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-20\"]",
+        "season": 2026,
+        "ageYears": 25,
+        "endSeason": 2028,
+        "mode": "neutral",
+        "role": "投手",
+        "minimumDepth": 1,
+        "remainingDepth": 0,
+        "value": 44,
+        "replacementValue": 0,
+        "core": false
+      },
+      "decision": "reject",
+      "reason": "role-depth"
+    }
+  },
+  {
+    "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-4\\\"]\"]",
+    "signature": "{\"decision\":\"approve\",\"id\":\"[\\\"cpu-posting-decision\\\",\\\"[\\\\\\\"posting-request\\\\\\\",2026,1,\\\\\\\"club-1-4\\\\\\\"]\\\"]\",\"requestId\":\"[\\\"posting-request\\\",2026,1,\\\"club-1-4\\\"]\",\"type\":\"decide-posting\"}",
+    "postingApplication": {
+      "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-4\\\"]\"]",
+      "kind": "decision",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-4\"]",
+      "decision": "approve",
+      "decidedDate": "2026-12-01"
+    },
+    "cpuPostingDecision": {
+      "phaseId": "[\"annual-posting-phase\",2026]",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-4\"]",
+      "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-4\\\"]\"]",
+      "inputs": {
+        "teamId": 1,
+        "playerId": "club-1-4",
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-4\"]",
+        "season": 2026,
+        "ageYears": 25,
+        "endSeason": 2028,
+        "mode": "neutral",
+        "role": "一塁手",
+        "minimumDepth": 1,
+        "remainingDepth": 7,
+        "value": 44,
+        "replacementValue": 44,
+        "core": false
+      },
+      "decision": "approve",
+      "reason": "replacement-covered"
+    }
+  },
+  {
+    "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-5\\\"]\"]",
+    "signature": "{\"decision\":\"approve\",\"id\":\"[\\\"cpu-posting-decision\\\",\\\"[\\\\\\\"posting-request\\\\\\\",2026,1,\\\\\\\"club-1-5\\\\\\\"]\\\"]\",\"requestId\":\"[\\\"posting-request\\\",2026,1,\\\"club-1-5\\\"]\",\"type\":\"decide-posting\"}",
+    "postingApplication": {
+      "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-5\\\"]\"]",
+      "kind": "decision",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-5\"]",
+      "decision": "approve",
+      "decidedDate": "2026-12-01"
+    },
+    "cpuPostingDecision": {
+      "phaseId": "[\"annual-posting-phase\",2026]",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-5\"]",
+      "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-5\\\"]\"]",
+      "inputs": {
+        "teamId": 1,
+        "playerId": "club-1-5",
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-5\"]",
+        "season": 2026,
+        "ageYears": 25,
+        "endSeason": 2028,
+        "mode": "neutral",
+        "role": "一塁手",
+        "minimumDepth": 1,
+        "remainingDepth": 6,
+        "value": 44,
+        "replacementValue": 44,
+        "core": false
+      },
+      "decision": "approve",
+      "reason": "replacement-covered"
+    }
+  },
+  {
+    "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-6\\\"]\"]",
+    "signature": "{\"decision\":\"approve\",\"id\":\"[\\\"cpu-posting-decision\\\",\\\"[\\\\\\\"posting-request\\\\\\\",2026,1,\\\\\\\"club-1-6\\\\\\\"]\\\"]\",\"requestId\":\"[\\\"posting-request\\\",2026,1,\\\"club-1-6\\\"]\",\"type\":\"decide-posting\"}",
+    "postingApplication": {
+      "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-6\\\"]\"]",
+      "kind": "decision",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-6\"]",
+      "decision": "approve",
+      "decidedDate": "2026-12-01"
+    },
+    "cpuPostingDecision": {
+      "phaseId": "[\"annual-posting-phase\",2026]",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-6\"]",
+      "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-6\\\"]\"]",
+      "inputs": {
+        "teamId": 1,
+        "playerId": "club-1-6",
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-6\"]",
+        "season": 2026,
+        "ageYears": 25,
+        "endSeason": 2028,
+        "mode": "neutral",
+        "role": "一塁手",
+        "minimumDepth": 1,
+        "remainingDepth": 5,
+        "value": 44,
+        "replacementValue": 44,
+        "core": false
+      },
+      "decision": "approve",
+      "reason": "replacement-covered"
+    }
+  },
+  {
+    "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-7\\\"]\"]",
+    "signature": "{\"decision\":\"approve\",\"id\":\"[\\\"cpu-posting-decision\\\",\\\"[\\\\\\\"posting-request\\\\\\\",2026,1,\\\\\\\"club-1-7\\\\\\\"]\\\"]\",\"requestId\":\"[\\\"posting-request\\\",2026,1,\\\"club-1-7\\\"]\",\"type\":\"decide-posting\"}",
+    "postingApplication": {
+      "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-7\\\"]\"]",
+      "kind": "decision",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-7\"]",
+      "decision": "approve",
+      "decidedDate": "2026-12-01"
+    },
+    "cpuPostingDecision": {
+      "phaseId": "[\"annual-posting-phase\",2026]",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-7\"]",
+      "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-7\\\"]\"]",
+      "inputs": {
+        "teamId": 1,
+        "playerId": "club-1-7",
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-7\"]",
+        "season": 2026,
+        "ageYears": 25,
+        "endSeason": 2028,
+        "mode": "neutral",
+        "role": "一塁手",
+        "minimumDepth": 1,
+        "remainingDepth": 4,
+        "value": 44,
+        "replacementValue": 44,
+        "core": false
+      },
+      "decision": "approve",
+      "reason": "replacement-covered"
+    }
+  },
+  {
+    "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-8\\\"]\"]",
+    "signature": "{\"decision\":\"approve\",\"id\":\"[\\\"cpu-posting-decision\\\",\\\"[\\\\\\\"posting-request\\\\\\\",2026,1,\\\\\\\"club-1-8\\\\\\\"]\\\"]\",\"requestId\":\"[\\\"posting-request\\\",2026,1,\\\"club-1-8\\\"]\",\"type\":\"decide-posting\"}",
+    "postingApplication": {
+      "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-8\\\"]\"]",
+      "kind": "decision",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-8\"]",
+      "decision": "approve",
+      "decidedDate": "2026-12-01"
+    },
+    "cpuPostingDecision": {
+      "phaseId": "[\"annual-posting-phase\",2026]",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-8\"]",
+      "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-8\\\"]\"]",
+      "inputs": {
+        "teamId": 1,
+        "playerId": "club-1-8",
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-8\"]",
+        "season": 2026,
+        "ageYears": 25,
+        "endSeason": 2028,
+        "mode": "neutral",
+        "role": "一塁手",
+        "minimumDepth": 1,
+        "remainingDepth": 3,
+        "value": 44,
+        "replacementValue": 44,
+        "core": false
+      },
+      "decision": "approve",
+      "reason": "replacement-covered"
+    }
+  },
+  {
+    "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-9\\\"]\"]",
+    "signature": "{\"decision\":\"approve\",\"id\":\"[\\\"cpu-posting-decision\\\",\\\"[\\\\\\\"posting-request\\\\\\\",2026,1,\\\\\\\"club-1-9\\\\\\\"]\\\"]\",\"requestId\":\"[\\\"posting-request\\\",2026,1,\\\"club-1-9\\\"]\",\"type\":\"decide-posting\"}",
+    "postingApplication": {
+      "id": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-9\\\"]\"]",
+      "kind": "decision",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-9\"]",
+      "decision": "approve",
+      "decidedDate": "2026-12-01"
+    },
+    "cpuPostingDecision": {
+      "phaseId": "[\"annual-posting-phase\",2026]",
+      "requestId": "[\"posting-request\",2026,1,\"club-1-9\"]",
+      "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-9\\\"]\"]",
+      "inputs": {
+        "teamId": 1,
+        "playerId": "club-1-9",
+        "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-9\"]",
+        "season": 2026,
+        "ageYears": 25,
+        "endSeason": 2028,
+        "mode": "neutral",
+        "role": "一塁手",
+        "minimumDepth": 1,
+        "remainingDepth": 2,
+        "value": 44,
+        "replacementValue": 44,
+        "core": false
+      },
+      "decision": "approve",
+      "reason": "replacement-covered"
+    }
+  },
+  {
+    "id": "[\"annual-posting-phase\",2026]",
+    "signature": "{\"humanTeamId\":0,\"id\":\"[\\\"annual-posting-phase\\\",2026]\",\"type\":\"advance-posting-phase\"}",
+    "annualPostingPhase": {
+      "version": 1,
+      "policyVersion": "cpu-posting-v1",
+      "season": 2026,
+      "date": "2026-12-01",
+      "humanTeamId": 0,
+      "teamIds": [
+        0,
+        1
+      ],
+      "createdGenerationIds": [
+        "[\"posting-request-generation\",2026,0]",
+        "[\"posting-request-generation\",2026,1]"
+      ],
+      "decisions": [
+        {
+          "requestId": "[\"posting-request\",2026,1,\"club-1-0\"]",
+          "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-0\\\"]\"]",
+          "inputs": {
+            "teamId": 1,
+            "playerId": "club-1-0",
+            "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-0\"]",
+            "season": 2026,
+            "ageYears": 25,
+            "endSeason": 2028,
+            "mode": "neutral",
+            "role": "一塁手",
+            "minimumDepth": 1,
+            "remainingDepth": 16,
+            "value": 44,
+            "replacementValue": 44,
+            "core": false
+          },
+          "decision": "approve",
+          "reason": "replacement-covered"
+        },
+        {
+          "requestId": "[\"posting-request\",2026,1,\"club-1-10\"]",
+          "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-10\\\"]\"]",
+          "inputs": {
+            "teamId": 1,
+            "playerId": "club-1-10",
+            "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-10\"]",
+            "season": 2026,
+            "ageYears": 25,
+            "endSeason": 2028,
+            "mode": "neutral",
+            "role": "捕手",
+            "minimumDepth": 6,
+            "remainingDepth": 1,
+            "value": 44,
+            "replacementValue": 44,
+            "core": false
+          },
+          "decision": "reject",
+          "reason": "role-depth"
+        },
+        {
+          "requestId": "[\"posting-request\",2026,1,\"club-1-11\"]",
+          "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-11\\\"]\"]",
+          "inputs": {
+            "teamId": 1,
+            "playerId": "club-1-11",
+            "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-11\"]",
+            "season": 2026,
+            "ageYears": 25,
+            "endSeason": 2028,
+            "mode": "neutral",
+            "role": "一塁手",
+            "minimumDepth": 1,
+            "remainingDepth": 15,
+            "value": 44,
+            "replacementValue": 44,
+            "core": false
+          },
+          "decision": "approve",
+          "reason": "replacement-covered"
+        },
+        {
+          "requestId": "[\"posting-request\",2026,1,\"club-1-12\"]",
+          "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-12\\\"]\"]",
+          "inputs": {
+            "teamId": 1,
+            "playerId": "club-1-12",
+            "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-12\"]",
+            "season": 2026,
+            "ageYears": 25,
+            "endSeason": 2028,
+            "mode": "neutral",
+            "role": "一塁手",
+            "minimumDepth": 1,
+            "remainingDepth": 14,
+            "value": 44,
+            "replacementValue": 44,
+            "core": false
+          },
+          "decision": "approve",
+          "reason": "replacement-covered"
+        },
+        {
+          "requestId": "[\"posting-request\",2026,1,\"club-1-13\"]",
+          "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-13\\\"]\"]",
+          "inputs": {
+            "teamId": 1,
+            "playerId": "club-1-13",
+            "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-13\"]",
+            "season": 2026,
+            "ageYears": 25,
+            "endSeason": 2028,
+            "mode": "neutral",
+            "role": "一塁手",
+            "minimumDepth": 1,
+            "remainingDepth": 13,
+            "value": 44,
+            "replacementValue": 44,
+            "core": false
+          },
+          "decision": "approve",
+          "reason": "replacement-covered"
+        },
+        {
+          "requestId": "[\"posting-request\",2026,1,\"club-1-14\"]",
+          "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-14\\\"]\"]",
+          "inputs": {
+            "teamId": 1,
+            "playerId": "club-1-14",
+            "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-14\"]",
+            "season": 2026,
+            "ageYears": 25,
+            "endSeason": 2028,
+            "mode": "neutral",
+            "role": "一塁手",
+            "minimumDepth": 1,
+            "remainingDepth": 12,
+            "value": 44,
+            "replacementValue": 44,
+            "core": false
+          },
+          "decision": "approve",
+          "reason": "replacement-covered"
+        },
+        {
+          "requestId": "[\"posting-request\",2026,1,\"club-1-15\"]",
+          "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-15\\\"]\"]",
+          "inputs": {
+            "teamId": 1,
+            "playerId": "club-1-15",
+            "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-15\"]",
+            "season": 2026,
+            "ageYears": 25,
+            "endSeason": 2028,
+            "mode": "neutral",
+            "role": "一塁手",
+            "minimumDepth": 1,
+            "remainingDepth": 11,
+            "value": 44,
+            "replacementValue": 44,
+            "core": false
+          },
+          "decision": "approve",
+          "reason": "replacement-covered"
+        },
+        {
+          "requestId": "[\"posting-request\",2026,1,\"club-1-16\"]",
+          "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-16\\\"]\"]",
+          "inputs": {
+            "teamId": 1,
+            "playerId": "club-1-16",
+            "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-16\"]",
+            "season": 2026,
+            "ageYears": 25,
+            "endSeason": 2028,
+            "mode": "neutral",
+            "role": "一塁手",
+            "minimumDepth": 1,
+            "remainingDepth": 10,
+            "value": 44,
+            "replacementValue": 44,
+            "core": false
+          },
+          "decision": "approve",
+          "reason": "replacement-covered"
+        },
+        {
+          "requestId": "[\"posting-request\",2026,1,\"club-1-17\"]",
+          "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-17\\\"]\"]",
+          "inputs": {
+            "teamId": 1,
+            "playerId": "club-1-17",
+            "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-17\"]",
+            "season": 2026,
+            "ageYears": 25,
+            "endSeason": 2028,
+            "mode": "neutral",
+            "role": "一塁手",
+            "minimumDepth": 1,
+            "remainingDepth": 9,
+            "value": 44,
+            "replacementValue": 44,
+            "core": false
+          },
+          "decision": "approve",
+          "reason": "replacement-covered"
+        },
+        {
+          "requestId": "[\"posting-request\",2026,1,\"club-1-18\"]",
+          "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-18\\\"]\"]",
+          "inputs": {
+            "teamId": 1,
+            "playerId": "club-1-18",
+            "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-18\"]",
+            "season": 2026,
+            "ageYears": 25,
+            "endSeason": 2028,
+            "mode": "neutral",
+            "role": "一塁手",
+            "minimumDepth": 1,
+            "remainingDepth": 8,
+            "value": 44,
+            "replacementValue": 44,
+            "core": false
+          },
+          "decision": "approve",
+          "reason": "replacement-covered"
+        },
+        {
+          "requestId": "[\"posting-request\",2026,1,\"club-1-19\"]",
+          "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-19\\\"]\"]",
+          "inputs": {
+            "teamId": 1,
+            "playerId": "club-1-19",
+            "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-19\"]",
+            "season": 2026,
+            "ageYears": 25,
+            "endSeason": 2028,
+            "mode": "neutral",
+            "role": "投手",
+            "minimumDepth": 1,
+            "remainingDepth": 1,
+            "value": 44,
+            "replacementValue": 44,
+            "core": false
+          },
+          "decision": "approve",
+          "reason": "replacement-covered"
+        },
+        {
+          "requestId": "[\"posting-request\",2026,1,\"club-1-1\"]",
+          "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-1\\\"]\"]",
+          "inputs": {
+            "teamId": 1,
+            "playerId": "club-1-1",
+            "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-1\"]",
+            "season": 2026,
+            "ageYears": 25,
+            "endSeason": 2028,
+            "mode": "neutral",
+            "role": "捕手",
+            "minimumDepth": 6,
+            "remainingDepth": 1,
+            "value": 44,
+            "replacementValue": 44,
+            "core": false
+          },
+          "decision": "reject",
+          "reason": "role-depth"
+        },
+        {
+          "requestId": "[\"posting-request\",2026,1,\"club-1-20\"]",
+          "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-20\\\"]\"]",
+          "inputs": {
+            "teamId": 1,
+            "playerId": "club-1-20",
+            "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-20\"]",
+            "season": 2026,
+            "ageYears": 25,
+            "endSeason": 2028,
+            "mode": "neutral",
+            "role": "投手",
+            "minimumDepth": 1,
+            "remainingDepth": 0,
+            "value": 44,
+            "replacementValue": 0,
+            "core": false
+          },
+          "decision": "reject",
+          "reason": "role-depth"
+        },
+        {
+          "requestId": "[\"posting-request\",2026,1,\"club-1-4\"]",
+          "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-4\\\"]\"]",
+          "inputs": {
+            "teamId": 1,
+            "playerId": "club-1-4",
+            "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-4\"]",
+            "season": 2026,
+            "ageYears": 25,
+            "endSeason": 2028,
+            "mode": "neutral",
+            "role": "一塁手",
+            "minimumDepth": 1,
+            "remainingDepth": 7,
+            "value": 44,
+            "replacementValue": 44,
+            "core": false
+          },
+          "decision": "approve",
+          "reason": "replacement-covered"
+        },
+        {
+          "requestId": "[\"posting-request\",2026,1,\"club-1-5\"]",
+          "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-5\\\"]\"]",
+          "inputs": {
+            "teamId": 1,
+            "playerId": "club-1-5",
+            "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-5\"]",
+            "season": 2026,
+            "ageYears": 25,
+            "endSeason": 2028,
+            "mode": "neutral",
+            "role": "一塁手",
+            "minimumDepth": 1,
+            "remainingDepth": 6,
+            "value": 44,
+            "replacementValue": 44,
+            "core": false
+          },
+          "decision": "approve",
+          "reason": "replacement-covered"
+        },
+        {
+          "requestId": "[\"posting-request\",2026,1,\"club-1-6\"]",
+          "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-6\\\"]\"]",
+          "inputs": {
+            "teamId": 1,
+            "playerId": "club-1-6",
+            "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-6\"]",
+            "season": 2026,
+            "ageYears": 25,
+            "endSeason": 2028,
+            "mode": "neutral",
+            "role": "一塁手",
+            "minimumDepth": 1,
+            "remainingDepth": 5,
+            "value": 44,
+            "replacementValue": 44,
+            "core": false
+          },
+          "decision": "approve",
+          "reason": "replacement-covered"
+        },
+        {
+          "requestId": "[\"posting-request\",2026,1,\"club-1-7\"]",
+          "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-7\\\"]\"]",
+          "inputs": {
+            "teamId": 1,
+            "playerId": "club-1-7",
+            "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-7\"]",
+            "season": 2026,
+            "ageYears": 25,
+            "endSeason": 2028,
+            "mode": "neutral",
+            "role": "一塁手",
+            "minimumDepth": 1,
+            "remainingDepth": 4,
+            "value": 44,
+            "replacementValue": 44,
+            "core": false
+          },
+          "decision": "approve",
+          "reason": "replacement-covered"
+        },
+        {
+          "requestId": "[\"posting-request\",2026,1,\"club-1-8\"]",
+          "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-8\\\"]\"]",
+          "inputs": {
+            "teamId": 1,
+            "playerId": "club-1-8",
+            "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-8\"]",
+            "season": 2026,
+            "ageYears": 25,
+            "endSeason": 2028,
+            "mode": "neutral",
+            "role": "一塁手",
+            "minimumDepth": 1,
+            "remainingDepth": 3,
+            "value": 44,
+            "replacementValue": 44,
+            "core": false
+          },
+          "decision": "approve",
+          "reason": "replacement-covered"
+        },
+        {
+          "requestId": "[\"posting-request\",2026,1,\"club-1-9\"]",
+          "decisionId": "[\"cpu-posting-decision\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-9\\\"]\"]",
+          "inputs": {
+            "teamId": 1,
+            "playerId": "club-1-9",
+            "sourceContractId": "[\"initial-contract\",\"inseason-release\",\"club-1-9\"]",
+            "season": 2026,
+            "ageYears": 25,
+            "endSeason": 2028,
+            "mode": "neutral",
+            "role": "一塁手",
+            "minimumDepth": 1,
+            "remainingDepth": 2,
+            "value": 44,
+            "replacementValue": 44,
+            "core": false
+          },
+          "decision": "approve",
+          "reason": "replacement-covered"
+        }
+      ],
+      "marketIds": [
+        "[\"cpu-posting-market\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-0\\\"]\"]",
+        "[\"cpu-posting-market\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-11\\\"]\"]",
+        "[\"cpu-posting-market\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-12\\\"]\"]",
+        "[\"cpu-posting-market\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-13\\\"]\"]",
+        "[\"cpu-posting-market\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-14\\\"]\"]",
+        "[\"cpu-posting-market\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-15\\\"]\"]",
+        "[\"cpu-posting-market\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-16\\\"]\"]",
+        "[\"cpu-posting-market\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-17\\\"]\"]",
+        "[\"cpu-posting-market\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-18\\\"]\"]",
+        "[\"cpu-posting-market\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-19\\\"]\"]",
+        "[\"cpu-posting-market\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-4\\\"]\"]",
+        "[\"cpu-posting-market\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-5\\\"]\"]",
+        "[\"cpu-posting-market\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-6\\\"]\"]",
+        "[\"cpu-posting-market\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-7\\\"]\"]",
+        "[\"cpu-posting-market\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-8\\\"]\"]",
+        "[\"cpu-posting-market\",\"[\\\"posting-request\\\",2026,1,\\\"club-1-9\\\"]\"]"
+      ]
+    }
+  }
+]
