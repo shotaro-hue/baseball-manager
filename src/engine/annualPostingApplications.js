@@ -38,6 +38,10 @@ function assertAvailable(state, r) {
       && contractEmploymentAt(state.spending.ledger, h.effectiveDate).some(e => employmentContractId(e.contract) === employmentContractId(h.contract)))) fail();
   return p;
 }
+export function canRequestPosting(state, teamId, playerId, contractId) {
+  try { assertAvailable(state, { season: state.season, teamId, playerId, sourceContractId: contractId }); return true; }
+  catch { return false; }
+}
 function requestRecord(c, season) {
   return { id: c.id, kind: 'request', season, teamId: c.teamId, playerId: c.playerId,
     sourceContractId: c.contractId, requestedDate: day(season, '12-01') };

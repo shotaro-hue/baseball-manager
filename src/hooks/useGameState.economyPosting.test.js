@@ -6,7 +6,8 @@ import { useGameState } from './useGameState';
 import { useOffseason } from './useOffseason';
 import HubContentRouter from '../components/hub/HubContentRouter';
 import { saveGame, loadGame, getSaveQueueSnapshot } from '../engine/saveload';
-import { postingDecisionRequest, postingMarketRequest } from '../engine/humanPosting';
+import { postingDecisionRequest, postingMarketRequest, postingGenerationRequest } from '../engine/humanPosting';
+import { requestGenerationWorld } from '../engine/__tests__/fixtures/postingRequestGeneration';
 import { generatedPostingWorld } from '../engine/__tests__/fixtures/postingMarketResults';
 import { postingUiWorld } from '../engine/__tests__/fixtures/postingUi';
 import { postingApplicationViews } from '../engine/annualPostingApplications';
@@ -47,6 +48,43 @@ const content = n => typeof n === 'string' ? n : (n.children || []).map(content)
 const button = label => view.root.findAllByType('button').find(b => content(b) === label);
 const click = label => act(() => button(label).props.onClick());
 const open = () => act(() => view.root.findAllByType('button').find(b => content(b).includes('【ポスティング申請】')).props.onClick());
+
+it('generates annual wishes through the inbox, saves them once, then uses the existing GM decision and market path', async () => {
+  await setup(requestGenerationWorld(), true);
+  click('海外挑戦の希望を確認する');
+  await run(() => button('希望を確認して保存する').props.onClick());
+  const cold = await loadGame(), requests = postingApplicationViews(toAnnualState(cold));
+  expect(requests.length).toBeGreaterThan(0);
+  expect(content(view.root)).toContain('希望確認済み');
+  expect(button('海外挑戦の希望を確認する')).toBeUndefined();
+  const requestId = requests[0].id;
+  expect(await run(() => gs.commitPostingDecisionRequest(postingDecisionRequest(gs, requestId, 'approve'), gs.getProgressSessionToken()))).toMatchObject({ ok: true });
+  expect(await run(() => gs.commitPostingMarketRequest(postingMarketRequest(gs, requestId), gs.getProgressSessionToken()))).toMatchObject({ ok: true });
+  expect((await loadGame()).contractEconomy.engine.postingMarketResults).toHaveLength(1);
+});
+it('keeps generation confirmation on write failure and retries the same wishes', async () => {
+  await setup(requestGenerationWorld(), true); click('海外挑戦の希望を確認する');
+  const root = rows.get(primary), before = structuredClone(gs.contractEconomy), write = localStorage.setItem;
+  localStorage.setItem = (k, v) => { if (k === primary) throw Error('full'); write(k, v); };
+  await run(() => button('希望を確認して保存する').props.onClick());
+  expect(content(view.root)).toContain('希望を保存できませんでした');
+  expect(rows.get(primary)).toBe(root); expect(gs.contractEconomy).toEqual(before);
+  localStorage.setItem = write;
+  for (let i = 0; i < 150 && button('同じ希望判定で保存を再試行する').props.disabled; i++)
+    await act(async () => { await new Promise(r => setTimeout(r, 10)); });
+  await run(() => button('同じ希望判定で保存を再試行する').props.onClick());
+  expect(content(view.root)).toContain('希望確認済み');
+  expect((await loadGame()).contractEconomy.engine.transactions.filter(t => t.generatedPostingRequests)).toHaveLength(1);
+});
+it('saves an empty wish check and rejects old sessions without starting another batch', async () => {
+  await setup(requestGenerationWorld({ interested: false }), true);
+  const request = postingGenerationRequest(gs), session = gs.getProgressSessionToken();
+  expect(await run(() => gs.commitPostingGenerationRequest(request, session))).toMatchObject({ ok: true });
+  expect(content(view.root)).toContain('希望者 0人');
+  expect(await run(() => gs.commitPostingGenerationRequest(request, session))).toMatchObject({ ok: true, replayed: true });
+  expect(await run(() => gs.commitPostingGenerationRequest(request, session + 1))).toMatchObject({ ok: false, reason: 'economy_session_conflict' });
+  expect((await loadGame()).contractEconomy.engine.transactions).toHaveLength(1);
+});
 
 it.each(['signed', 'no-offer', 'declined'])('generates %s once through the human save path and replays after cold load', async outcome => {
   await setup(generatedPostingWorld(outcome));

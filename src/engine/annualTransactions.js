@@ -1,3 +1,4 @@
+import { isGeneratedPostingRequestsCommand, normalizeGeneratedPostingRequests, createGeneratedPostingRequests, inspectGeneratedPostingRequests } from './generatedPostingRequests';
 import { isGeneratedPostingMarketCommand, normalizeGeneratedPostingMarket, createGeneratedPostingMarket, inspectGeneratedPostingMarkets } from './generatedPostingMarket';
 import { isPostingMarketResultCommand, normalizePostingMarketResult, createPostingMarketResult } from './annualPostingMarketResults';
 import { isPostingApplicationCommand, normalizePostingApplication, inspectAnnualPostingApplications, createPostingApplication } from './annualPostingApplications';
@@ -63,6 +64,7 @@ const kinds = {
   'convert-to-controlled': ['teamId', 'playerId', 'contractId', 'annualSalaryManYen'],
 };
 function commandFor(input) {
+  if (isGeneratedPostingRequestsCommand(input)) return normalizeGeneratedPostingRequests(input);
   if (isGeneratedPostingMarketCommand(input)) return normalizeGeneratedPostingMarket(input);
   if (isPostingMarketResultCommand(input)) return normalizePostingMarketResult(input);
   if (isPostingQualificationCommand(input)) return normalizePostingQualificationCommand(input);
@@ -135,6 +137,7 @@ function inspect(state) {
   inspectAnnualPostingApplications(state);
   inspectAnnualPostingQualifications(state);
   inspectGeneratedPostingMarkets(state);
+  inspectGeneratedPostingRequests(state);
   // One employment can end by only one route. Individually valid records from
   // incompatible branches must not jointly exempt the same source contract.
   if (new Set(departures.map(d => d.sourceContractId)).size !== departures.length) fail('同じ元契約の退団経路が重複しています。');
@@ -499,9 +502,10 @@ function candidate(input, command) {
       ...(receipt.faPersonnel ? { personnel: { winnerProposalIds: [...receipt.faPersonnel.winnerProposalIds], lostProposalIds: [...receipt.faPersonnel.lostProposalIds] } } : {}) };
   }
   assertRetirementCommandCompatible(before, c);
-  if (input.phase === 'offseason' && !isGeneratedPostingMarketCommand(c) && !isPostingMarketResultCommand(c) && !isPostingQualificationCommand(c) && !isPostingApplicationCommand(c) && !isPostingCompletionCommand(c) && !isPostingDepartureCommand(c) && !isOverseasDepartureCommand(c) && !isRetirementCommand(c) && !isWinterDepartureCommand(c) && !c.type.endsWith('renewal') && !c.type.endsWith('rookie') && !c.type.endsWith('fa') && !['settle-fa-compensation', 'submit-fa-protection', 'settle-fa-personnel', 'join-fa-personnel'].includes(c.type)) fail('オフの新制度取引は翌年度契約だけが接続済みです。');
+  if (input.phase === 'offseason' && !isGeneratedPostingRequestsCommand(c) && !isGeneratedPostingMarketCommand(c) && !isPostingMarketResultCommand(c) && !isPostingQualificationCommand(c) && !isPostingApplicationCommand(c) && !isPostingCompletionCommand(c) && !isPostingDepartureCommand(c) && !isOverseasDepartureCommand(c) && !isRetirementCommand(c) && !isWinterDepartureCommand(c) && !c.type.endsWith('renewal') && !c.type.endsWith('rookie') && !c.type.endsWith('fa') && !['settle-fa-compensation', 'submit-fa-protection', 'settle-fa-personnel', 'join-fa-personnel'].includes(c.type)) fail('オフの新制度取引は翌年度契約だけが接続済みです。');
   // Snapshot and receipt enter validation together; no unaudited intermediate state.
-  let protectedState = isGeneratedPostingMarketCommand(c) ? createGeneratedPostingMarket(before, c, signature)
+  let protectedState = isGeneratedPostingRequestsCommand(c) ? createGeneratedPostingRequests(before, c, signature)
+    : isGeneratedPostingMarketCommand(c) ? createGeneratedPostingMarket(before, c, signature)
     : isPostingMarketResultCommand(c) ? createPostingMarketResult(before, c, signature)
     : isPostingQualificationCommand(c) ? createPostingQualification(before, c, signature)
     : isPostingApplicationCommand(c) ? createPostingApplication(before, c, signature)

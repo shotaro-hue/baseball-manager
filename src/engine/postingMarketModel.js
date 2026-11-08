@@ -1,5 +1,6 @@
 import { rng, rngf } from '../utils';
 import { economyRandomContext } from './economyRandom';
+import { postingPreference } from './postingPreference';
 import { assessSalaryPerformance } from './salaryDemand';
 import { POSTING_NUMERIC_SCALE as S, postingNumberRatio, postingPow2, postingAgeFactor,
   postingPriceUsd, postingScore, postingMoneyScore } from './postingMarketNumbers';
@@ -151,9 +152,7 @@ function evaluate(inputs, root, scope, legacy) {
   if (scope?.season !== f.season || scope.subjectId !== f.playerId || scope.operationId !== f.requestId) fail();
   const interest = economyRandomContext(root, scope, 'posting:interest:v1');
   const price = economyRandomContext(root, scope, 'posting:price:v1');
-  const estimated = economyRandomContext(root, { ...scope, operationId: 'posting-preference' }, 'posting:preference:v1');
-  const preference = f.personality.overseas.recorded ? { source: 'recorded', value: f.personality.overseas.value }
-    : { source: 'game-estimate', value: rng(0, 100, estimated) };
+  const preference = postingPreference(f.personality.overseas.recorded ? f.personality.overseas.value : null, root, scope);
   const assessment = { ...scouting(f), interestDraw: rngf(0, 1, interest) };
   const offer = assessment.interestDraw < assessment.interestProbability ? terms(f, assessment, price, legacy) : null;
   const decision = offer ? acceptance(f, offer, preference, legacy) : null;

@@ -1,5 +1,7 @@
 # ROADMAP — NPB Franchise Manager
 
+> 2026-11-07 #554マージ済みmain `b022485`から、自球団の海外挑戦希望を年一度生成し、annualの受信箱→申請判断→既存海外交渉へ接続。希望ゼロも保存し、再開・再試行・候補順序による再抽選を防ぐ。欠測志向は市場と同じゲーム推定、実測0は維持。[設計](./docs/superpowers/specs/2026-11-07-gm01-posting-request-generation-design.md)／[検証と画面](./docs/validation/gm-01-posting-request-generation/README.md)。CPU判断・年度Worker/年度切替・長期/実機/公開判断は残り、Task7/A1・ポスティング全体は未完成。公開OFF/schema1/DB5。次優先は同じ希望producerと申請→結果経路のCPU/年度進行接続。最終HEAD/必須CIはPR #555を正本とする。
+
 > 2026-11-07 #551・#552マージ済みmain `e15c57d`から、保存済みポスティング申請の球団判断と結果確認を通知→受信箱へ統合。承認を市場成立と区別し、所属・契約・財務を維持したまま判断を保存する。成立/提示なし/本人辞退と譲渡金・翌年度限定追加枠を保存証跡から表示する。[今回の検証・画面・未完了条件](./docs/validation/gm-01-posting-human/README.md)。通常プレイの希望発生/価格/本人受諾producer、CPU・年度Worker・A1全体の統合プレイと公開判断は残る。ポスティング全体/Task7/A1は未完了、公開OFF/schema1/DB5。次優先は市場policyの具体化・校正と再現可能なproducer。
 
 > 2026-11-06 #550マージ済みmain `1700d6f`から、承認済みposting申請の明示市場結果（成立/提示なし/辞退）を共通保存へ接続。成立時だけ既存退団・譲渡金・翌年度限定追加許可を一候補で確定し、不成立では元契約と所属/財務を維持。[設計](./docs/superpowers/specs/2026-11-06-gm01-posting-market-results-design.md)／[検証と限界](./docs/validation/gm-01-posting-market-results/README.md)。価格/受諾/希望producer・pool容量・人UI/CPU/年度Worker・長期/実機は後続。Task7/A1未完了、公開OFF、schema1/DB5。提出HEAD/独立レビュー/CIは対象PRを正本とする。

@@ -1,6 +1,7 @@
 import { reduceEconomyCommand, toAnnualState } from './contractEconomy';
 import { postingApplicationViews } from './annualPostingApplications';
 import { fmtSal } from '../utils';
+import { postingGenerationId } from './generatedPostingRequests';
 
 const stable = value => JSON.stringify(value, (_, v) => v && typeof v === 'object' && !Array.isArray(v)
   ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v);
@@ -8,6 +9,29 @@ const validId = v => (typeof v === 'string' && v.trim().length > 0) || (Number.i
 const fail = message => { throw Error(message); };
 export const postingStatusText = { pending: '球団判断待ち', approved: '球団承認・市場結果待ち', rejected: '球団拒否',
   signed: '海外契約成立', 'no-offer': '提示なし・不成立', declined: '本人辞退・不成立' };
+
+export function postingGenerationRequest(world) {
+  return { saveId: world.saveId, epoch: world.contractEconomy?.epoch, baseRevision: world.contractEconomy?.revision,
+    season: world.year, date: world.contractEconomy?.clock.date, teamId: world.myId };
+}
+export function reducePostingGenerationRequest(world, r) {
+  try {
+    const fields = ['saveId', 'epoch', 'baseRevision', 'season', 'date', 'teamId'];
+    if (!r || Object.keys(r).length !== fields.length || Object.keys(r).some(k => !fields.includes(k))
+      || !validId(r.teamId) || !Number.isSafeInteger(r.baseRevision) || r.baseRevision < 0
+      || !Number.isInteger(r.season) || r.season < 1 || r.season >= 9999) fail('海外挑戦希望の確認内容を確認してください。');
+    const state = toAnnualState(world), e = world.contractEconomy;
+    if (r.saveId !== world.saveId || r.epoch !== e.epoch || r.teamId !== world.myId || r.baseRevision > e.revision)
+      fail('セーブ・球団が変更されています。希望確認を開き直してください。');
+    const command = { id: postingGenerationId(r.season, r.teamId), type: 'generate-posting-requests', teamId: r.teamId };
+    const envelope = { saveId: r.saveId, epoch: r.epoch, baseRevision: r.baseRevision, transaction: command };
+    if (state.transactions.some(t => t.id === command.id)) return reduceEconomyCommand(world, envelope);
+    if (r.baseRevision !== e.revision || r.season !== world.year || r.date !== state.date
+      || state.phase !== 'offseason' || r.date !== `${String(r.season).padStart(4, '0')}-12-01`)
+      fail('状態が変更されています。オフシーズンの希望確認を開き直してください。');
+    return reduceEconomyCommand(world, envelope);
+  } catch (error) { return { ok: false, world, replayed: false, error: error.message }; }
+}
 
 export function postingDecisionRequest(world, requestId, decision) {
   return { saveId: world.saveId, epoch: world.contractEconomy?.epoch, baseRevision: world.contractEconomy?.revision,
@@ -71,6 +95,8 @@ export function postingMailbox(world, mailbox = []) {
   const e = world.contractEconomy, engine = e.engine;
   const results = new Map((engine.postingMarketResults ?? []).map(r => [r.requestId, r]));
   const generated = new Map(engine.transactions.filter(t => t.generatedPostingMarket).map(t => [t.generatedPostingMarket.resultId, t.generatedPostingMarket]));
+  const wishes = new Map(engine.transactions.flatMap(t => (t.generatedPostingRequests?.candidates ?? [])
+    .filter(c => c.requestId !== null).map(c => [c.requestId, c])));
   const departures = new Map((engine.postingDepartures ?? []).map(r => [r.id, r]));
   const incomes = new Map((e.incomeReceipts ?? []).filter(r => r.kind === 'posting').map(r => [r.transactionId, r]));
   const players = new Map([...(world.faPool ?? []), ...(world.teams ?? []).flatMap(t => [...t.players, ...t.farm, ...(t.history ?? [])])].map(p => [p.id, p]));
@@ -79,6 +105,8 @@ export function postingMailbox(world, mailbox = []) {
     const result = results.get(r.id), departure = result && departures.get(JSON.stringify([result.completionId, 'posting-departure']));
     const player = departure?.player ?? players.get(r.playerId), name = player?.name ?? `選手 ${r.playerId}`;
     let body = `${name} / ${r.season}年度\n${postingStatusText[r.status]}\n`;
+    const wish = wishes.get(r.id);
+    if (wish) body += `海外挑戦の希望確認時：${wish.inputs.ageYears}歳、海外志向 ${wish.evaluation.preference.value}${wish.evaluation.preference.source === 'game-estimate' ? '（未記録のためゲーム上の推定）' : ''}。年齢・モラル・出場機会も踏まえた本人の希望です。\n`;
     if (r.status === 'pending') body += '海外挑戦の申請です。球団として承認または拒否を判断してください。承認だけでは移籍・入金は確定しません。';
     if (r.status === 'approved') body += '球団は海外交渉を承認しました。市場結果待ちです。交渉を進めると提示条件と本人の判断が確定します。承認による退団・入金はありません。';
     if (r.status === 'rejected') body += '球団が申請を拒否しました。この判断による所属・契約・財務の変更はありません。';
