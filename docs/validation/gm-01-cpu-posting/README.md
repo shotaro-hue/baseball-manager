@@ -41,7 +41,30 @@
 - 共通保存・実hookの初回46件、追加の非同期barrier/unmountを含む24件成功。
   inline/chunked、希望ゼロ、保存失敗→同じ結果で再試行、採用復旧、親後付け拒否、stale identity/sessionを含む。
 - Chromium初回6件成功: 360/390/1440、保存失敗/再試行/再開、自球団の既存判断・市場、年度入口と翌春停止。
-- 最終対象回帰・WebKit・実12球団ブラウザ測定・独立レビュー・最新HEADのCIは後段へ記録する。
+- 最終対象回帰: **26ファイル426件成功**（下記コマンド）。既存更改/FA/新人/トレード/育成、
+  共通commit/復旧、#554数値互換、legacyを含む。テスト削除/skip追加/timeout変更はしていない。
+- ブラウザ: 対象7ケース×Chromium/WebKitの**14件成功**。Chromiumは初回6件と、同一production sourceでの
+  画面記録3件＋追加12球団1件で検証。重複実行分を件数へ加算しない。
+- 全件test/build/必須E2Eの結果は最新HEADの提出PR本文へ記録する。ローカルで同じ全セットを重複しない。
+
+```sh
+npx vitest run src/hooks/useGameState.economy*.test.js src/hooks/useOffseason*.test.js src/engine/__tests__/annualPosting*.test.js src/engine/__tests__/generatedPostingRequests.test.js src/engine/__tests__/cpuPosting.test.js src/engine/__tests__/postingMarketNumericCompatibility.test.js tests/economy-commit*.test.js tests/generated-posting-*.test.js
+npm run test:e2e -- save-generations.spec.js --grep 'annual posting wishes|annual posting entry|twelve-club CPU posting' --workers=1 --retries=0
+```
+
+ローカルWebKitは不足Debianライブラリを/tmpへ取得・展開した。既存ラッパーがLD_LIBRARY_PATHを
+上書きするため、同じWebKit2215の配布binaryを一時ラッパーから起動し、ライブラリとbundle場所だけを指定。
+host事前確認の代わりに実binaryの依存を解決した。アサーション/timeout/retry/skip/CI設定は変更なし。
+最初の起動失敗7件は不足ライブラリによるもので、成功へ算入していない。CIは通常構成。
+
+## 独立レビュー
+
+対象SHA `314d9b25949012d62732efaee29275e2758ecdea`、base `114181dc`。
+別コンテキストへSHA/差分、要件、設計/計画、実名簿入口と実年度handler/受信箱/保存経路を渡した。
+**確定P0/P1/P2/P3なし、修正指摘なし**。レビュアー自身のnative/CPU policy 23件も成功。
+共有async commit barrier、複数承認の役割維持、判断前に市場を参照しないこと、親子/prefixと歴史、
+未接続年度処理を成功扱いしないことを確認した。実save/browserを独立担当が再実行したとは報告しない。
+レビュー後は検証文書と画像のみを追記し、production sourceは変更していない。
 
 ## 性能と環境
 
@@ -53,7 +76,29 @@ Node24.22.1。実12球団の自然な性格・名簿に引退予約・正式更�
 この観測から、判断ごとの同じ台帳の再検証を一度へまとめ、UI経路では同じnative generatorの
 球団・案件境界で既存yieldToBrowserへ制御を返す。保存と変更のbarrierは候補準備から保持する。
 価格・乱数・ID・判断/結果・全年度審査は同期経路と一致する。Workerは追加・変更しない。
-共通保存境界の全体検証/圧縮は同期区間を含み、ブラウザの最大応答間隔も測定して残す。
+共通保存境界の全体検証/圧縮は同期区間を含む。
+
+| 実12球団・ブラウザ各1測定 | 確認開始〜採用 | timer更新回数 | 最大応答間隔 | primary公開 | CPU判断 / 市場 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Chromium141 | 10,407ms | 265 | 1,223ms | 1 | 120 / 98 |
+| WebKit26.0 | 14,252ms | 237 | 2,472ms | 1 | 119 / 93 |
+
+測定は20ms timerで行い、native処理中にも更新が続くことを確認。初期名簿の生成乱数を含む別worldなので
+ブラウザ間の件数/時間を同一seedの比較へ転用しない。選手ごとの保存はなく、失敗/復旧も同じ一括候補を使う。
+**同期の保存検証には秒単位の応答停止が残る**。画面停止ゼロ/実機快適性の保証はせず、
+一般公開前の性能改善・実iPhone確認を残す。
+
+## 画面記録
+
+#555のmain上の同じ合成world/同じ幅の生成前画面と、今回の生成前/再開後を比較。
+新規CSS/表示境界の変更なし。360/390/1440の画像を開き、文字・主操作・横はみ出しを確認した。
+テスト内のlegacy非表示参照は比較前のmain画面とは区別し、ここではmainの既存記録を使う。
+
+| 幅 | #555後mainの生成前 | 今回の生成前 | 保存失敗 | 再開・CPU結果と自球団判断待ち |
+| --- | --- | --- | --- | --- |
+| 360 | [main](../gm-01-posting-request-generation/360-after.png) | [after](./360-after.png) | [failure](./360-failure.png) | [reload](./360-reload.png) |
+| 390 | [main](../gm-01-posting-request-generation/390-after.png) | [after](./390-after.png) | [failure](./390-failure.png) | [reload](./390-reload.png) |
+| 1440 | [main](../gm-01-posting-request-generation/1440-after.png) | [after](./1440-after.png) | [failure](./1440-failure.png) | [reload](./1440-reload.png) |
 
 ## 未接続・未検証と次工程
 
