@@ -16,7 +16,7 @@ import { activeRenewalPlans } from './renewalPlanning';
 import { employmentContractId, projectEmploymentPlayer, validateAnnualEmploymentContract } from './seasonContract';
 import { MIN_SALARY_SHIHAKA, MAX_SHIHAKA_TOTAL } from '../constants';
 import { createSeasonContract, contractSeasonsRemaining } from './seasonContract';
-import { contractEmploymentAt, applyContractLedgerAction } from './contractLedger';
+import { contractEmploymentAt, contractEmploymentsAt, applyContractLedgerAction } from './contractLedger';
 import { quoteAnnualSpendingPlan, assessAnnualSpendingChange, reserveContractProposal,
   commitContractReservation, cancelContractReservation } from './annualSpending';
 import { parseContractDate, registrationDateAllowed } from './contractCalendar';
@@ -270,12 +270,15 @@ function withRosterFloors(state, teams, players) {
       || r.requiredControlledCount < 0 || r.requiredControlledCount > MAX_SHIHAKA_TOTAL || requirements.has(k)) fail('年度別の必要人数を確認してください。');
     requirements.set(k, r.requiredControlledCount);
   }
-  const employmentByDate = new Map(), plans = activeRenewalPlans(state.spending);
+  const budgetDate = a => a.season === state.season ? state.date : yearStart(a.season);
+  const employmentByDate = contractEmploymentsAt(state.spending.ledger, state.spending.authorizations
+    .filter(a => a.season >= state.spending.budgetSeason).map(budgetDate));
+  const plans = activeRenewalPlans(state.spending), capacities = new Map();
   const authorizations = state.spending.authorizations.map(a => {
     if (a.season < state.spending.budgetSeason) return a;
     const required = requirements.get(key(a.teamId, a.season));
     if (required === undefined || !teams.has(a.teamId)) fail('全対象年度に球団の必要人数が必要です。');
-    const date = a.season === state.season ? state.date : yearStart(a.season);
+    const date = budgetDate(a);
     const funded = new Set();
     const count = (playerId, registrationType, reservation = false) => {
       const p = players.get(playerId);
@@ -284,38 +287,40 @@ function withRosterFloors(state, teams, players) {
       // untyped C-1 inputs use current metadata; do not invent ledger history.
       if (registrationType === 'controlled' || (registrationType === undefined && !isIkuseiPlayer(p))) funded.add(playerId);
     };
-    if (!employmentByDate.has(date)) employmentByDate.set(date, contractEmploymentAt(state.spending.ledger, date));
     for (const e of employmentByDate.get(date)) if (e.teamId === a.teamId) count(e.contract.playerId, e.registrationType);
     for (const h of state.spending.reservations) {
       const p = h.proposal;
       if (p.teamId === a.teamId && p.contract.startSeason <= a.season && p.contract.endSeason >= a.season) count(p.contract.playerId, p.contract.registrationType, true);
     }
     for (const p of plans) if (p.teamId === a.teamId && p.season === a.season) count(p.playerId, p.registrationType);
-    const capacity = evaluateRosterCapacity(teams.get(a.teamId), { ...faPersonnelCapacityContext(state), teams: state.teams });
+    if (!capacities.has(a.teamId)) capacities.set(a.teamId,
+      evaluateRosterCapacity(teams.get(a.teamId), { ...faPersonnelCapacityContext(state), teams: state.teams }));
+    const capacity = capacities.get(a.teamId);
     const unfundedPicks = a.season === state.spending.budgetSeason ? capacity.acceptedPicks.filter(p => !funded.has(p.id)).length : 0;
     return { ...a, minimumRosterReserveManYen: Math.max(unfundedPicks, required - funded.size, 0) * MIN_SALARY_SHIHAKA };
   });
   return { ...state, spending: { ...state.spending, authorizations } };
 }
 
-function assessTransactionSpending(before, after, mode, checkDepartureHeadroom) {
+function assessTransactionSpending(before, after, mode, checkDepartureHeadroom, { beforeRows, includeRows = true } = {}) {
   // A derived floor restored by a losing/cancelled bid is not new spending.
   // Use final floors for admission; independently check actual headroom changes.
   const comparison = mode === 'cashless-trade' ? before.spending
     : { ...before.spending, authorizations: after.spending.authorizations };
   const assessment = assessAnnualSpendingChange(comparison, after.spending, { mode });
   if (!assessment.ok) return { ok: false, error: '対象年度の追加余力が不足または悪化しています。' };
-  const oldRows = new Map(quoteAnnualSpendingPlan(before.spending).map(r => [key(r.teamId, r.season), r]));
-  const rows = quoteAnnualSpendingPlan(after.spending);
+  const oldRows = new Map((beforeRows ?? quoteAnnualSpendingPlan(before.spending)).map(r => [key(r.teamId, r.season), r]));
+  const rows = assessment.rows;
   // Cancellation/losing bids create no obligation; departures create vacancies.
   if (checkDepartureHeadroom && rows.some(r => r.remainingManYen < 0
     && r.remainingManYen < oldRows.get(key(r.teamId, r.season)).remainingManYen))
     return { ok: false, error: '赤字年度の追加余力を悪化させる取引です。' };
-  return { ok: true, rows };
+  return { ok: true, ...(includeRows ? { rows: quoteAnnualSpendingPlan(after.spending) } : {}) };
 }
 
 function prepareCpuPostingBudgetAdmission(state, approvedRequests) {
   const { state: checked, teams, players } = inspect(state);
+  const beforeRows = quoteAnnualSpendingPlan(checked.spending);
   let projected = checked;
   const depart = request => {
     const command = { id: JSON.stringify(['cpu-posting-budget', request.id]), type: 'end-contract', reason: 'posting',
@@ -330,7 +335,7 @@ function prepareCpuPostingBudgetAdmission(state, approvedRequests) {
   for (const request of approvedRequests) projected = depart(request);
   return request => {
     const next = depart(request);
-    const assessment = assessTransactionSpending(checked, next, 'spend', true);
+    const assessment = assessTransactionSpending(checked, next, 'spend', true, { beforeRows, includeRows: false });
     if (assessment.ok) projected = next;
     return assessment.ok;
   };

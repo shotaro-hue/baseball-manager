@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createSeasonContract } from '../seasonContract';
 import { createContractLedger, applyContractLedgerAction as apply, contractLiabilityRows as rows,
-  validateContractLedger, closeContractLedgerThrough as close, isContractLedgerExtension, contractEmploymentAt } from '../contractLedger';
+  validateContractLedger, closeContractLedgerThrough as close, isContractLedgerExtension, contractEmploymentAt, contractEmploymentsAt } from '../contractLedger';
 
 const proposal = ({ id = 'sign-1', contractId = 'c1', playerId = 0, teamId = 0,
   salary = 10000, years = 3, date = '2026-02-01', guaranteed = true } = {}) => ({ id, type: 'sign', teamId, effectiveDate: date,
@@ -11,6 +11,30 @@ const transfer = (id, date, teamId = 0, toTeamId = 1) => ({ id, type: 'transfer'
 const end = (id, date, reason = 'release', settlement = 'retain', teamId = 0) => ({ id, type: 'end', contractId: 'c1', teamId, effectiveDate: date, reason, settlement });
 const amount = (ledger, teamId, season, kind) => rows(ledger).filter(r => r.teamId === teamId && r.season === season && (!kind || r.kind === kind)).reduce((n, r) => n + r.amountManYen, 0);
 const opened = extra => apply(createContractLedger(), proposal(extra));
+
+it('projects multiple budget dates with the same dated payer, salary and retained-employment boundaries', () => {
+  let ledger = opened();
+  ledger = apply(ledger, { id: 'raise', type: 'increase', contractId: 'c1', teamId: 0,
+    effectiveDate: '2026-07-01', annualSalaryManYen: 12000 });
+  ledger = apply(ledger, transfer('move', '2026-07-16'));
+  ledger = apply(ledger, end('posting', '2027-02-01', 'posting', 'retain', 1));
+  const before = JSON.stringify(ledger), dates = ['2026-06-30', '2026-07-01', '2026-07-16', '2027-02-01', '2028-02-01'];
+  const projected = contractEmploymentsAt(ledger, dates);
+  expect(projected.get(dates[0])[0]).toMatchObject({ teamId: 0, annualSalaryManYen: 10000 });
+  expect(projected.get(dates[1])[0]).toMatchObject({ teamId: 0, annualSalaryManYen: 12000 });
+  expect(projected.get(dates[2])[0]).toMatchObject({ teamId: 1, annualSalaryManYen: 12000 });
+  expect(projected.get(dates[3])).toEqual([]); expect(projected.get(dates[4])).toEqual([]);
+  expect(amount(ledger, 1, 2028, 'guarantee')).toBe(12000);
+  expect(JSON.stringify(ledger)).toBe(before);
+  for (const date of dates) expect(projected.get(date)).toEqual(contractEmploymentAt(ledger, date));
+});
+it('validates every new multi-date projection instead of caching a previously valid mutable ledger', () => {
+  const ledger = opened();
+  expect(contractEmploymentsAt(ledger, ['2027-02-01']).get('2027-02-01')).toHaveLength(1);
+  ledger.records[0].contract.endSeason++;
+  expect(() => contractEmploymentsAt(ledger, ['2027-02-01'])).toThrow();
+  expect(() => contractEmploymentsAt(opened(), ['2027-02-30'])).toThrow();
+});
 
 describe('dated development contract conversion', () => {
   const development = (salary = 240, registrationType = 'development') => {

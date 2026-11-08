@@ -199,8 +199,9 @@ export function quoteAnnualSpendingPlan(plan) { return prepare(plan).rows; }
 
 function newLedgerActions(before, after) {
   const result = [];
+  const beforeById = new Map(before.records.map(r => [employmentContractId(r.contract), r]));
   for (const record of after.records) {
-    const old = before.records.find(r => employmentContractId(r.contract) === employmentContractId(record.contract));
+    const old = beforeById.get(employmentContractId(record.contract));
     if (!old) result.push({ type: 'sign', effectiveDate: record.effectiveDate });
     result.push(...record.changes.slice(old?.changes.length ?? 0));
   }

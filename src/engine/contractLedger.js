@@ -196,13 +196,15 @@ export function closeContractLedgerThrough(ledger, season) {
 export function isContractLedgerExtension(before, after) {
   validateContractLedger(before); validateContractLedger(after);
   if (after.version !== before.version || after.closedThroughSeason < before.closedThroughSeason) return false;
+  const beforeById = new Map(before.records.map(r => [employmentContractId(r.contract), r]));
+  const afterById = new Map(after.records.map(r => [employmentContractId(r.contract), r]));
   for (const record of after.records) {
-    const old = before.records.find(r => employmentContractId(r.contract) === employmentContractId(record.contract));
+    const old = beforeById.get(employmentContractId(record.contract));
     if (!old && (isLegacyOpening(record.contract) || parseContractDate(record.effectiveDate).year <= before.closedThroughSeason)) return false;
     if (record.changes.slice(old?.changes.length ?? 0).some(action => parseContractDate(action.effectiveDate).year <= before.closedThroughSeason)) return false;
   }
   return before.records.every(old => {
-    const next = after.records.find(r => employmentContractId(r.contract) === employmentContractId(old.contract));
+    const next = afterById.get(employmentContractId(old.contract));
     return next && signature(opening(old)) === signature(opening(next)) && next.changes.length >= old.changes.length
       && old.changes.every((action, i) => signature(action) === signature(next.changes[i]));
   });
@@ -211,7 +213,19 @@ export function isContractLedgerExtension(before, after) {
 /** Current employment, independent of retained guarantee liability. */
 export function contractEmploymentAt(ledger, date) {
   parseContractDate(date);
-  return viewsFor(ledger).filter(view => view.effectiveDate <= date && date < view.employmentEndDate).map(view => {
+  return employmentAt(viewsFor(ledger), date);
+}
+
+// One validated, synchronous snapshot for an annual budget's several dates.
+// No cross-call cache: mutable/cold-loaded input is validated on every call.
+export function contractEmploymentsAt(ledger, dates) {
+  const unique = [...new Set(dates)]; unique.forEach(parseContractDate);
+  const views = viewsFor(ledger);
+  return new Map(unique.map(date => [date, employmentAt(views, date)]));
+}
+
+function employmentAt(views, date) {
+  return views.filter(view => view.effectiveDate <= date && date < view.employmentEndDate).map(view => {
     const payer = view.payers.find(p => p.startDate <= date && date < p.endDate);
     const rate = view.rates.filter(r => r.startDate <= date).at(-1);
     const registration = view.registrations.filter(r => r.startDate <= date).at(-1);
