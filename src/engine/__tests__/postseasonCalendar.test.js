@@ -129,6 +129,31 @@ describe('dated postseason from real official schedule', () => {
     const p = start();
     expect(() => playoff.nextPlayoffFixture({ ...p.cs1_se, games: [{}, {}, {}] })).toThrow();
     const j = { ...playoff.createSeries(teams[0], teams[6], 'japan'), startDate: '2026-10-15' };
-    expect(() => playoff.nextPlayoffFixture({ ...j, games: Array(11).fill({}) })).toThrow();
+    expect(() => playoff.nextPlayoffFixture({ ...j, games: Array(14).fill({}) })).toThrow();
+  });
+
+  it('resumes a split extended Japan Series through the fourteenth deciding game', () => {
+    let p = start();
+    while (p.phase !== 'jpSeries') {
+      const key = p.phase, s = p[key];
+      p = playoff.advancePlayoff({ ...p, [key]: playoff.recordSeriesGame(s, { score: { my: 1, opp: 0 } }, playoff.nextPlayoffFixture(s)) });
+    }
+    for (let n = 1; n <= 14; n++) {
+      if (n === 12) p = JSON.parse(JSON.stringify(playoff.encodePlayoff(p)));
+      const s = p.jpSeries;
+      const score = n <= 7 ? { my: 0, opp: 0 } : n % 2 === 0 ? { my: 1, opp: 0 } : { my: 0, opp: 1 };
+      p = playoff.advancePlayoff({ ...p, jpSeries: playoff.recordSeriesGame(s, { score }, playoff.nextPlayoffFixture(s)) });
+    }
+    expect(p.jpSeries).toMatchObject({ done: true, wins: [4, 3], winner: 0 });
+    expect(p.jpSeries.games).toHaveLength(14);
+    expect(playoff.postseasonClosingDate(p, { year, schedule })).toBe(p.jpSeries.games[13].date);
+  });
+
+  it('reserves capacity through the maximum split series at the November boundary', () => {
+    const dates = schedule.slice();
+    dates[143] = { ...dates[143], date: { month: 10, day: 31 } };
+    expect(() => playoff.initPlayoff(teams, { year, schedule: dates })).not.toThrow();
+    dates[143] = { ...dates[143], date: { month: 11, day: 1 } };
+    expect(() => playoff.initPlayoff(teams, { year, schedule: dates })).toThrow();
   });
 });

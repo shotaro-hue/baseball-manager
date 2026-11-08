@@ -106,6 +106,7 @@ test('E1 new game, five games, persisted reload, one more game', async ({ page }
 
 test('E2 final regular game, postseason save/reload, offseason and next year', async ({ page }) => {
   test.setTimeout(120_000); // Full annual lifecycle includes real simulation, storage and lazy screens.
+  const mobile = page.viewportSize().width < 768;
   await loadFixture(page, 'late');
   const before = progressSignature(await readSave(page));
   const press = page.getByRole('dialog', { name: '記者会見', exact: true });
@@ -116,7 +117,7 @@ test('E2 final regular game, postseason save/reload, offseason and next year', a
   await press.getByRole('button', { name: '回答する', exact: true }).click();
   await expect(press).toHaveCount(0);
   await expect(page.locator('.topbar')).toContainText('残り1試合');
-  await startSingle(page, page.viewportSize().width < 768);
+  await startSingle(page, mobile);
   await page.getByRole('button', { name: /オートシムモード/ }).click();
   await expect(page.getByRole('heading', { name: `${before.year}年 ポストシーズン`, exact:true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'まとめてシム', exact:true })).toHaveCount(0);
@@ -189,7 +190,7 @@ test('E2 final regular game, postseason save/reload, offseason and next year', a
   const reopened = await saveHub(page);
   expect(reopened.scheduleArchive).toEqual(next.scheduleArchive);
   expect(progressSignature(reopened)).toEqual(nextProgress);
-  await runSingle(page, false);
+  await runSingle(page, mobile);
   expect(progressSignature(await saveHub(page)).played).toBe(1);
 });
 

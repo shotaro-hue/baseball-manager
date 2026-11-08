@@ -37,11 +37,11 @@ export function postseasonStartDate(calendar, kind) {
 }
 
 export function playoffGameDate(series, number) {
-  const limit = { first: 3, final: series.year >= 2026 ? 7 : 6, japan: 11 }[series.kind];
+  const limit = { first: 3, final: series.year >= 2026 ? 7 : 6, japan: 14 }[series.kind];
   if (!Number.isSafeInteger(number) || number < 1 || limit === undefined || number > limit) fail();
   const { year } = parseContractDate(series.startDate);
   if (series.year !== year) fail();
-  // Venue changes after games 2, 5 and 8; four wins end even an extended JS by game 11.
+  // Existing venues change after games 2, 5 and 8. Seven draws + seven decisive games can require 14 games.
   const restDays = series.kind === 'japan' ? [2, 5, 8].filter(n => number > n).length : 0;
   return beforeOffseason(plusDays(series.startDate, number - 1 + restDays), year);
 }
@@ -50,7 +50,7 @@ export function createPostseasonCalendar({ year, schedule }) {
   const regularSeasonEndDate = economyClockFor({ season: year, phase: 'season', schedule, gameDay: SEASON_GAMES }).date;
   const calendar = { version: 1, regularSeasonEndDate };
   // Refuse a calendar that cannot fit its longest supported series before 12/1.
-  playoffGameDate({ kind: 'japan', year, startDate: postseasonStartDate(calendar, 'japan') }, 11);
+  playoffGameDate({ kind: 'japan', year, startDate: postseasonStartDate(calendar, 'japan') }, 14);
   return calendar;
 }
 
