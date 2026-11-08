@@ -58,6 +58,7 @@ const signature = action => JSON.stringify(normalize(action));
 function projectRecord(record) {
   if (!record || !Array.isArray(record.changes)) fail();
   const first = opening(record), c = first.contract, endDate = yearDate(c.endSeason, '12-01');
+  const actions = [first];
   const view = { contract: c, effectiveDate: first.effectiveDate, employmentEndDate: endDate,
     liabilityEndDate: endDate, lastDate: first.effectiveDate, ended: false,
     payers: [{ teamId: first.teamId, startDate: first.effectiveDate, endDate }],
@@ -65,6 +66,7 @@ function projectRecord(record) {
     registrations: [{ startDate: first.effectiveDate, registrationType: c.registrationType }] };
   for (const raw of record.changes) {
     const action = normalize(raw), date = action.effectiveDate, current = view.payers.at(-1);
+    actions.push(action);
     if (action.terminationAgreement && action.terminationAgreement.agreedDate < view.lastDate)
       fail('解除合意は現在の雇用・給与条件の確定後に記録してください。');
     if (['sign', 'legacy-opening'].includes(action.type) || action.contractId !== employmentContractId(c) || view.ended
@@ -94,7 +96,7 @@ function projectRecord(record) {
     }
     view.lastDate = date;
   }
-  return view;
+  return { ...view, actions };
 }
 
 function rowsFor(view) {
@@ -132,11 +134,11 @@ function viewsFor(ledger) {
   };
   for (const record of ledger.records) {
     if (isLegacyOpening(record?.contract) && ledger.version !== 2) fail('開始残高には台帳v2が必要です。');
-    const view = projectRecord(record);
+    const { actions, ...view } = projectRecord(record);
     typedId(view.contract.playerId, playerIds);
     if (contractIds.has(String(employmentContractId(view.contract)))) fail('契約IDが重複しています。');
     contractIds.add(String(employmentContractId(view.contract)));
-    for (const action of [opening(record), ...record.changes.map(normalize)]) {
+    for (const action of actions) {
       typedId(action.teamId, teamIds);
       if (action.type === 'transfer') typedId(action.toTeamId, teamIds);
       if (actionIds.has(String(action.id))) fail('取引IDが重複しています。');
@@ -168,7 +170,7 @@ export function applyContractLedgerAction(ledger, input) {
   const action = normalize(input);
   if (action.type === 'legacy-opening') fail('開始残高は移行候補でのみ生成できます。');
   for (const record of ledger.records) {
-    const previous = [opening(record), ...record.changes].find(a => a.id === action.id);
+    const previous = record.actionId === action.id ? opening(record) : record.changes.find(a => a.id === action.id);
     if (previous) {
       if (signature(previous) !== signature(action)) fail('同じ取引IDの条件が変わっています。');
       return ledger;
@@ -205,7 +207,7 @@ export function isContractLedgerExtension(before, after) {
   }
   return before.records.every(old => {
     const next = afterById.get(employmentContractId(old.contract));
-    return next && signature(opening(old)) === signature(opening(next)) && next.changes.length >= old.changes.length
+    return next && JSON.stringify(opening(old)) === JSON.stringify(opening(next)) && next.changes.length >= old.changes.length
       && old.changes.every((action, i) => signature(action) === signature(next.changes[i]));
   });
 }
