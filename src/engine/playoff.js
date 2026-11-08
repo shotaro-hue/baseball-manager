@@ -111,29 +111,59 @@ export function encodePlayoff(playoff) {
       ? { ...playoff[key], teams: playoff[key].teams.map(playoffTeam) } : null])) };
 }
 
-// An input for the future annual close command, not an annual transaction receipt.
-export function postseasonClosingDate(playoff, context) {
-  if (!validatePlayoffCalendar(playoff, context)) return null;
+// Replay every saved series, including those after an unfinished one. Shared
+// by persistence and closing; undated histories retain their legacy contract.
+export function validatePlayoffResults(playoff, context = {}) {
+  if (!validatePlayoffCalendar(playoff, context)) return false;
   const fail = () => { throw new Error('ポストシーズンの確定結果が保存履歴と一致しません。'); };
+  const sameTeam = (a, b) => a && b && ['id', 'league', 'wins', 'losses', 'draws'].every(field => a[field] === b[field]);
+  const entrants = [playoff.se1, ...(playoff.cs1_se?.teams ?? []), playoff.pa1, ...(playoff.cs1_pa?.teams ?? [])];
+  if (entrants.length !== 6 || new Set(entrants.map(t => t?.id)).size !== 6
+    || entrants.some((t, i) => !t || t.id == null || t.league !== (i < 3 ? 'セ' : 'パ')
+      || (context.teams && !context.teams.some(club => club.id === t.id && club.league === t.league)))) fail();
   for (const key of PLAYOFF_ORDER) {
     const series = playoff[key];
-    if (!series) { if (playoff.champion) fail(); return null; }
+    if (!series) continue;
+    if (!Array.isArray(series.teams) || series.teams.length !== 2) fail();
     let replay = { ...createSeries(...series.teams, series.kind, playoff.year), startDate: series.startDate };
     for (const game of series.games) {
-      if (replay.done || !Array.isArray(game.scores) || game.scores.length !== 2) fail();
+      if (replay.done || !Array.isArray(game.scores) || game.scores.length !== 2
+        || game.scores.some(n => !Number.isSafeInteger(n) || n < 0)) fail();
       replay = recordSeriesGame(replay, { score: { my: game.scores[0], opp: game.scores[1] } }, nextPlayoffFixture(replay));
       const expected = replay.games.at(-1);
       if (['date', 'score', 'winner', 'drew', 'won0', 'homeId'].some(field => expected[field] !== game[field])) fail();
     }
     if (replay.done !== series.done || replay.winner !== series.winner || replay.need !== series.need
-      || replay.maxGames !== series.maxGames || JSON.stringify(replay.wins) !== JSON.stringify(series.wins)
+      || replay.maxGames !== series.maxGames || replay.rulesVersion !== series.rulesVersion
+      || JSON.stringify(replay.wins) !== JSON.stringify(series.wins)
       || JSON.stringify(replay.adv) !== JSON.stringify(series.adv)) fail();
-    if (!series.done) { if (playoff.champion) fail(); return null; }
   }
-  const winner = key => playoff[key].teams[playoff[key].winner].id;
-  if (playoff.cs2_se.teams[0].id !== playoff.se1.id || playoff.cs2_se.teams[1].id !== winner('cs1_se')
-    || playoff.cs2_pa.teams[0].id !== playoff.pa1.id || playoff.cs2_pa.teams[1].id !== winner('cs1_pa')
-    || playoff.jpSeries.teams[0].id !== winner('cs2_se') || playoff.jpSeries.teams[1].id !== winner('cs2_pa')
-    || playoff.phase !== 'champion' || playoff.champion?.id !== winner('jpSeries')) fail();
+  const winner = key => playoff[key]?.done ? playoff[key].teams[playoff[key].winner] : null;
+  for (const [key, top, challenger] of [
+    ['cs2_se', playoff.se1, winner('cs1_se')], ['cs2_pa', playoff.pa1, winner('cs1_pa')],
+    ['jpSeries', winner('cs2_se'), winner('cs2_pa')],
+  ]) {
+    const series = playoff[key];
+    if (series && (!sameTeam(series.teams[0], top) || !sameTeam(series.teams[1], challenger))) fail();
+  }
+  const next = advancePlayoff(playoff);
+  if (playoff.phase !== next.phase || playoff.rulesVersion !== (playoff.year >= 2026 ? 2026 : 2025)
+    || (next.phase === 'champion' ? !sameTeam(playoff.champion, winner('jpSeries')) : playoff.champion != null)) fail();
+  return true;
+}
+
+// Validate the saved source before legacy load code can generate a replacement schedule.
+export function validatePostseasonSave(world) {
+  const plan = world.offseasonPlan;
+  if (!plan?.playoff) return false;
+  const dated = validatePlayoffResults(plan.playoff, { year: world.year, schedule: world.schedule, teams: world.teams });
+  if (dated && (plan.year !== world.year || plan.myId !== world.myId))
+    throw new Error('ポストシーズンの日付・保存履歴を確認してください。');
+  return dated;
+}
+
+// An input for the future annual close command, not an annual transaction receipt.
+export function postseasonClosingDate(playoff, context) {
+  if (!validatePlayoffResults(playoff, context) || playoff.phase !== 'champion') return null;
   return playoff.jpSeries.games.at(-1).date;
 }

@@ -6,7 +6,7 @@ import {registerFaMarketCases} from './helpers/fa-market-cases';
 import { test, expect } from '@playwright/test';
 import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
-import { startNewGame, mainNavigation, runBatch, runSingle, startSingle, saveHub, waitSaveIdle, readSave, reloadAndLoad, progressSignature, loadFixture } from './helpers/progression';
+import { startNewGame, mainNavigation, openBatch, runBatch, runSingle, startSingle, saveHub, waitSaveIdle, readSave, reloadAndLoad, progressSignature, loadFixture } from './helpers/progression';
 
 // Preserve the emergency-coverage scenarios independently of new-game roster calibration.
 const injuryTeams=JSON.parse(gunzipSync(readFileSync(new URL('./fixtures/injury-rosters-122d02b-seed1.json.gz',import.meta.url))));
@@ -102,6 +102,60 @@ test('E1 new game, five games, persisted reload, one more game', async ({ page }
     const { loadGame } = await import('/baseball-manager/src/engine/saveload.js');
     return (await loadGame()).contractEconomy;
   })).toBeUndefined();
+});
+
+test('E2 final regular game in batch saves its dated plan before an immediate reload', async ({ page }) => {
+  const mobile = page.viewportSize().width < 768;
+  await loadFixture(page, 'late');
+  const initial = await readSave(page), before = progressSignature(initial);
+  const press = page.getByRole('dialog', { name: '記者会見', exact: true });
+  await expect(press).toBeVisible();
+  await press.getByRole('button').filter({ hasNotText: '回答する' }).nth(0).click();
+  await press.getByRole('button', { name: '回答する', exact: true }).click();
+  await expect(press).toHaveCount(0);
+  await waitSaveIdle(page);
+  // Inspect the FIRST publication, so a later 750ms autosave cannot mask a
+  // missing plan in the batch's own completed save. Storage remains real.
+  await page.evaluate(async () => {
+    const { readRootBody, decodeRootJson } = await import('/baseball-manager/src/engine/saveRootBodies.js');
+    const original = Storage.prototype.setItem;
+    window.batchPublishedRoots = [];
+    Storage.prototype.setItem = function(key, value) {
+      original.call(this, key, value);
+      if (key === 'baseball_manager_v1') window.batchPublishedRoots.push((async () => {
+        const body = await readRootBody(value);
+        return JSON.parse(await decodeRootJson(body) ?? body);
+      })());
+    };
+  });
+  const panel = await openBatch(page, mobile);
+  await panel.getByLabel('まとめて進める試合数').selectOption('1');
+  await panel.getByRole('button', { name: 'まとめてシム', exact: true }).click();
+  await expect(page.getByRole('heading', { name: `${before.year}年 ポストシーズン`, exact: true })).toBeVisible();
+  await waitSaveIdle(page);
+  const first = await page.evaluate(async () => (await Promise.all(window.batchPublishedRoots)).find(s => s.gameDay === 144));
+  expect(first?.offseasonPlan).toMatchObject({ stage: 'postseason', resumeScreen: 'playoff' });
+  const saved = await readSave(page);
+  expect(first.offseasonPlan).toEqual(saved.offseasonPlan);
+  expect(progressSignature(saved).played).toBe(143);
+  expect(Object.keys(saved.gameResultsMap)).toHaveLength(143);
+  expect(saved.gameResultsMap).toMatchObject(initial.gameResultsMap);
+  expect(saved.allTeamResultsMap).toMatchObject(initial.allTeamResultsMap);
+  expect(saved.gameResultsMap[143]).toBeDefined();
+  const date = saved.schedule[143].date;
+  expect(saved.offseasonPlan.playoff.calendar.regularSeasonEndDate).toBe(
+    `${before.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`);
+  const start = new Date(`${saved.offseasonPlan.playoff.calendar.regularSeasonEndDate}T00:00:00Z`);
+  start.setUTCDate(start.getUTCDate() + 2);
+  expect(saved.offseasonPlan.playoff.cs1_se.startDate).toBe(start.toISOString().slice(0, 10));
+  await reloadAndLoad(page);
+  await expect(page.getByRole('heading', { name: `${before.year}年 ポストシーズン`, exact: true })).toBeVisible();
+  const restored = await readSave(page);
+  expect(restored.offseasonPlan).toEqual(saved.offseasonPlan);
+  expect(restored.schedule).toEqual(saved.schedule);
+  expect(restored.teams).toEqual(saved.teams);
+  expect(restored.gameResultsMap).toEqual(saved.gameResultsMap);
+  expect(restored.allTeamResultsMap).toEqual(saved.allTeamResultsMap);
 });
 
 test('E2 final regular game, postseason save/reload, offseason and next year', async ({ page }) => {

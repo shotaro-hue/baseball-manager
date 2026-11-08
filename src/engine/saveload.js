@@ -1,6 +1,6 @@
 import { retirementCareerEntries } from './annualRetirements';
 import { validateEconomyClock } from './economyCalendar';
-import { validatePostseasonSave } from './postseasonCalendar';
+import { validatePostseasonSave } from './playoff';
 import { saveFailure } from './saveDiagnostics';
 import { validateEconomySave, economySaveMetadata, economyOverwriteIssue,
   economyRecoveryGuard, matchesEconomyRecoveryGuard } from './economyPersistence';

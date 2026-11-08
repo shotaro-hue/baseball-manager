@@ -113,11 +113,12 @@ export function useSeasonFlow(gs) {
   const savedPostseason = gs.offseasonPlan?.stage === 'postseason'
     && gs.offseasonPlan.year === year && gs.offseasonPlan.myId === myId ? gs.offseasonPlan.playoff : null;
   const playoff = playoffState ?? savedPostseason;
+  const postseasonPlan = next => ({ version: 1, year, myId, stage: 'postseason',
+    resumeScreen: 'playoff', playoff: encodePlayoff(next) });
   const setPlayoff = value => {
     const next = typeof value === 'function' ? value(playoff) : value;
     setPlayoffState(next);
-    if (next) gs.setOffseasonPlan?.({ version: 1, year, myId, stage: 'postseason',
-      resumeScreen: 'playoff', playoff: encodePlayoff(next) });
+    if (next) gs.setOffseasonPlan?.(postseasonPlan(next));
   };
   const startPlayoff = teamList => initPlayoff(teamList, { year, schedule,
     ...standingsContext(getSeasonHistory?.(), getGameResultsMap?.(), year) });
@@ -947,6 +948,10 @@ export function useSeasonFlow(gs) {
       if(baseToken!=null&&baseToken!==gs.getProgressToken?.()) {notify("編成またはロードが変更されたため古い試合結果を破棄しました", "warn");return;}
       nextState.battedBallReceipt = await archiveRun?.seal(result.archiveRun) ?? null;
       if (!canAdopt(baseToken)) return;
+      // The Worker carries the pre-batch plan. Adopt and save the final game
+      // with its new plan explicitly, without waiting for a React render.
+      const nextPlayoff = shouldEnterPlayoff ? startPlayoff(nextState.teams) : null;
+      if (nextPlayoff) nextState.offseasonPlan = postseasonPlan(nextPlayoff);
       if(gs.applyProgressCandidate && !gs.applyProgressCandidate(nextState,{baseToken}))return;
       if (gs.applyProgressCandidate) archiveRun?.adopt();
       setNews(nextState.news);
@@ -967,7 +972,7 @@ export function useSeasonFlow(gs) {
       }
 
       if (shouldEnterPlayoff) {
-        setPlayoff(startPlayoff(nextState.teams));
+        setPlayoff(nextPlayoff);
         setScreen("playoff");
       } else {
         setScreen("batch_result");
