@@ -13,6 +13,7 @@ import { executeCpuTrade } from '../engine/cpuTradeExecution';
 import { encodePlayoff, initPlayoff } from '../engine/playoff';
 import { createPostseasonCalendar } from '../engine/postseasonCalendar';
 import { standingsContext } from '../engine/standings';
+import { mergeTeamResultMaps } from '../engine/matchHistory';
 import { processCpuFaBids } from '../engine/contract';
 import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, MAX_ROSTER } from '../constants';
 import { createBattedBallBatchRecords } from '../engine/battedBallProfile';
@@ -120,11 +121,10 @@ export function useSeasonFlow(gs) {
     setPlayoffState(next);
     if (next) gs.setOffseasonPlan?.(postseasonPlan(next));
   };
-  const startPlayoff = teamList => initPlayoff(teamList, { year, schedule,
-    ...standingsContext(getSeasonHistory?.(), getGameResultsMap?.(), year) });
+  const startPlayoff = (teamList, allTeamResultsMap = gs.allTeamResultsMap) => initPlayoff(teamList, { year, schedule,
+    ...standingsContext(getSeasonHistory?.(), allTeamResultsMap, year) });
   const [currentGameTeams, setCurrentGameTeams] = useState(null);
   const [batchProgress, setBatchProgress] = useState(null);
-  const pendingPlayoffRef = useRef(false);
   const startingRef = useRef(false);
   const appliedGameRef = useRef(null);
   const requestRegularGames = count => regularSeasonRequest({ teams, myId, gameDay, year, schedule, offseasonPlan: gs.offseasonPlan, gameResultsMap: getGameResultsMap() }, count);
@@ -165,15 +165,6 @@ export function useSeasonFlow(gs) {
 
   const prevMyPlayersRef = useRef(null);
   const prevMyFarmRef = useRef(null);
-
-  useEffect(()=>{
-    if(pendingPlayoffRef.current){
-      pendingPlayoffRef.current=false;
-      setPlayoff(startPlayoff(teams));
-      setScreen('playoff');
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[teams]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -399,6 +390,7 @@ export function useSeasonFlow(gs) {
       news: getNewsBySelector({ limit: 1000 }),
       mailbox: getMailboxBySelector({ limit: 1000 }),
       gameResultsMap: getGameResultsMap(),
+      allTeamResultsMap: gs.allTeamResultsMap,
       scheduleArchive: getScheduleArchive(),
       myId,
       gameDay,
@@ -517,6 +509,9 @@ export function useSeasonFlow(gs) {
       if(baseToken!=null&&baseToken!==gs.getProgressToken?.()) {notify("編成またはロードが変更されたため古い試合結果を破棄しました", "warn");return;}
       nextState.battedBallReceipt = await archiveRun?.seal(result.archiveRun) ?? null;
       if (!canAdopt(baseToken)) return;
+      const nextPlayoff = screenDirective === 'playoff'
+        ? startPlayoff(nextState.teams, mergeTeamResultMaps(gs.allTeamResultsMap, result.allTeamResultsPatch)) : null;
+      if (nextPlayoff) nextState.offseasonPlan = postseasonPlan(nextPlayoff);
       if(gs.applyProgressCandidate && !gs.applyProgressCandidate(nextState,{baseToken}))return;
       if (gs.applyProgressCandidate) archiveRun?.adopt();
       setNews(nextState.news);
@@ -534,7 +529,7 @@ export function useSeasonFlow(gs) {
       }
 
       if (screenDirective === "playoff") {
-        setPlayoff(startPlayoff(nextState.teams));
+        setPlayoff(nextPlayoff);
         setScreen("playoff");
         return;
       }
@@ -689,8 +684,8 @@ export function useSeasonFlow(gs) {
     }
     updatedTeams = finishFarmProgress(updatedTeams,farmProgress,gameDay);
     updatedTeams = applyScheduledCpuManagement(updatedTeams, gameDay, myId, farmProgress?.competition ?? gs.farmCompetition);
-    publishAfterAdoption(setAllTeamResultsMap, prev=>{
-      const next={...prev};
+    const nextTeamResults = (() => {
+      const next={...gs.allTeamResultsMap};
       const recordGame=(homeId,awayId,cr,hPlayers,aPlayers,oppHName,oppAName)=>{
         const bs=computeBoxScore(cr.log||[],cr.inningSummary||[],hPlayers,aPlayers,cr.score.my,cr.score.opp);
         const hWon=cr.won; const drew=cr.score.my===cr.score.opp;
@@ -700,8 +695,15 @@ export function useSeasonFlow(gs) {
       for(const{matchup,cr,homeTeam,awayTeam}of cpuSimResults){
         recordGame(matchup.homeId,matchup.awayId,cr,homeTeam.players,awayTeam.players,homeTeam.name,awayTeam.name);
       }
+      const homeResult = isHome ? { ...r, won } : { ...r,
+        won: r.score.opp > r.score.my, score: { my: r.score.opp, opp: r.score.my } };
+      recordGame(isHome ? myId : _oppId, isHome ? _oppId : myId, homeResult,
+        isHome ? myT.players : currentOpp.players, isHome ? currentOpp.players : myT.players,
+        isHome ? myT.name : currentOpp.name, isHome ? currentOpp.name : myT.name);
       return next;
-    });
+    })();
+    publishAfterAdoption(setAllTeamResultsMap, () => nextTeamResults);
+    const nextPlayoff = gameDay >= SEASON_GAMES ? startPlayoff(updatedTeams, nextTeamResults) : null;
     publishAfterAdoption(setGameResult, {score:r.score,won,log:r.log||[],inningSummary:r.inningSummary||[],oppTeam:currentOpp,gameNo:gameDay,isHome});
     const autoDate = gameDayToDate(gameDay, schedule);
     if (autoDate && autoDate.month === TRADE_DEADLINE_MONTH) {
@@ -728,6 +730,7 @@ export function useSeasonFlow(gs) {
     if(gs.applyProgressCandidate) {
       const candidate={teams:updatedTeams,myId,saveId:gs.saveId,year,gameDay:gameDay+1,schedule,seasonHistory:getSeasonHistory?.()??gs.seasonHistory,
         battedBallReceipt: receipt,
+        ...(nextPlayoff ? { offseasonPlan: postseasonPlan(nextPlayoff) } : {}),
         ...(farmProgress?{farmCompetition:farmProgress.competition,farmCompetitionVersion:1}:{})};
       if(!gs.applyProgressCandidate(candidate,{baseToken}))return;
       normalArchive.run?.adopt();
@@ -766,7 +769,8 @@ export function useSeasonFlow(gs) {
       return;
     }
     if(gameDay>=SEASON_GAMES){
-      pendingPlayoffRef.current=true;
+      setPlayoff(nextPlayoff);
+      setScreen('playoff');
     }
     else setScreen("result");
     } finally { void normalArchive.run?.discard(); }
@@ -833,6 +837,7 @@ export function useSeasonFlow(gs) {
       news: currentNews,
       mailbox: currentMailbox,
       gameResultsMap: currentGameResultsMap,
+      allTeamResultsMap: gs.allTeamResultsMap,
       scheduleArchive: currentScheduleArchive,
       myId,
       gameDay,
@@ -950,7 +955,8 @@ export function useSeasonFlow(gs) {
       if (!canAdopt(baseToken)) return;
       // The Worker carries the pre-batch plan. Adopt and save the final game
       // with its new plan explicitly, without waiting for a React render.
-      const nextPlayoff = shouldEnterPlayoff ? startPlayoff(nextState.teams) : null;
+      const nextPlayoff = shouldEnterPlayoff
+        ? startPlayoff(nextState.teams, mergeTeamResultMaps(gs.allTeamResultsMap, result.allTeamResultsPatch)) : null;
       if (nextPlayoff) nextState.offseasonPlan = postseasonPlan(nextPlayoff);
       if(gs.applyProgressCandidate && !gs.applyProgressCandidate(nextState,{baseToken}))return;
       if (gs.applyProgressCandidate) archiveRun?.adopt();
@@ -1077,9 +1083,9 @@ export function useSeasonFlow(gs) {
     }
     updatedTeams = finishFarmProgress(updatedTeams,farmProgress,gameDay);
     updatedTeams = applyScheduledCpuManagement(updatedTeams, gameDay, myId, farmProgress?.competition ?? gs.farmCompetition);
-    publishAfterAdoption(setAllTeamResultsMap, prev=>{
+    const nextTeamResults = (() => {
       try {
-        const next={...prev};
+        const next={...gs.allTeamResultsMap};
         const recordGame=(homeId,awayId,cr,hPlayers,aPlayers,oppHName,oppAName)=>{
           const bs=computeBoxScore(cr.log,cr.inningSummary,hPlayers,aPlayers,cr.score.my,cr.score.opp);
           const hWon=cr.won;
@@ -1109,9 +1115,11 @@ export function useSeasonFlow(gs) {
         return next;
       } catch (error) {
         console.error("[TacticalPostGame] failed to build all-team results", error);
-        return prev;
+        return gs.allTeamResultsMap;
       }
-    });
+    })();
+    publishAfterAdoption(setAllTeamResultsMap, () => nextTeamResults);
+    const nextPlayoff = gameDay >= SEASON_GAMES ? startPlayoff(updatedTeams, nextTeamResults) : null;
     publishAfterAdoption(setGameResult, { ...gsResult, isHome });
     const _tmpl=won?NEWS_TEMPLATES_WIN:NEWS_TEMPLATES_LOSE;
     const _scoreStr=gsResult.score.my+"-"+gsResult.score.opp;
@@ -1147,6 +1155,7 @@ export function useSeasonFlow(gs) {
     if(gs.applyProgressCandidate) {
       const candidate={teams:updatedTeams,myId,saveId:gs.saveId,year,gameDay:gameDay+1,schedule,seasonHistory:getSeasonHistory?.()??gs.seasonHistory,
         battedBallReceipt: receipt,
+        ...(nextPlayoff ? { offseasonPlan: postseasonPlan(nextPlayoff) } : {}),
         ...(farmProgress?{farmCompetition:farmProgress.competition,farmCompetitionVersion:1}:{})};
       if(!gs.applyProgressCandidate(candidate,{baseToken}))return;
       normalArchive.run?.adopt();
@@ -1167,7 +1176,8 @@ export function useSeasonFlow(gs) {
       return;
     }
       if(gameDay>=SEASON_GAMES){
-        pendingPlayoffRef.current=true;
+        setPlayoff(nextPlayoff);
+        setScreen('playoff');
       }
       else setScreen("result");
     } catch (error) {
