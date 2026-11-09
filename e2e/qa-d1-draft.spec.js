@@ -143,16 +143,28 @@ test('generated draft browser journey, persistence and candidate return',async({
   for(const eventType of ['pointerdown','keydown']){
     const save=page.getByRole('button',{name:'途中保存',exact:true});
     await expect(save).toBeEnabled();await save.focus();
-    const immediate=await list.evaluate((el,eventType)=>{
-      el.scrollTop-=120;el.dispatchEvent(new Event('scroll',{bubbles:true}));
-      const expected=el.scrollTop,before=window.__qaManualSavePositions.length;
-      const button=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='途中保存');
-      button.dispatchEvent(eventType==='keydown'
-        ?new KeyboardEvent('keydown',{key:'Enter',code:'Enter',bubbles:true})
-        :new PointerEvent('pointerdown',{bubbles:true}));
-      button.click();
-      return {expected,requested:window.__qaManualSavePositions.slice(before)};
-    },eventType);
+    let immediate;
+    // A queued save can disable the button after the external enabled/focus
+    // checks. Wait for readiness in the SAME browser task as the action.
+    // Only the precondition is polled: once an action runs, even an empty or
+    // stale payload ends the poll and fails the unchanged assertion below.
+    await expect.poll(async()=>{
+      const result=await list.evaluate((el,eventType)=>{
+        const button=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='途中保存');
+        if(!button||button.disabled)return null;
+        button.focus();
+        if(button.disabled||document.activeElement!==button)return null;
+        el.scrollTop-=120;el.dispatchEvent(new Event('scroll',{bubbles:true}));
+        const expected=el.scrollTop,before=window.__qaManualSavePositions.length;
+        button.dispatchEvent(eventType==='keydown'
+          ?new KeyboardEvent('keydown',{key:'Enter',code:'Enter',bubbles:true})
+          :new PointerEvent('pointerdown',{bubbles:true}));
+        button.click();
+        return {expected,requested:window.__qaManualSavePositions.slice(before)};
+      },eventType);
+      if(result===null)return false;
+      immediate=result;return true;
+    }).toBe(true);
     expect(immediate.requested,`${eventType} manual payload`).toEqual([immediate.expected]);
     await waitSaveIdle(page);
   }
@@ -162,7 +174,9 @@ test('generated draft browser journey, persistence and candidate return',async({
   await expect(keyboardSave).toBeEnabled();await keyboardSave.focus();
   const manualBefore=await page.evaluate(()=>window.__qaManualSavePositions.length);
   const keyboardScroll=await list.evaluate(el=>{el.scrollTop-=120;el.dispatchEvent(new Event('scroll',{bubbles:true}));return el.scrollTop;});
-  await page.keyboard.press('Enter');await waitSaveIdle(page);
+  // Resolve an enabled target and focus it as part of the real key action;
+  // a queued save can invalidate the earlier focus while preparing scroll.
+  await keyboardSave.and(page.locator(':enabled')).press('Enter');await waitSaveIdle(page);
   expect(await page.evaluate(before=>window.__qaManualSavePositions.slice(before),manualBefore)).toEqual([keyboardScroll]);
   expect((await readSave(page)).offseasonPlan.draftViews.lottery.candidateView.listScroll).toBe(keyboardScroll);
   await reloadAndLoad(page);await expect(list).toBeVisible();
