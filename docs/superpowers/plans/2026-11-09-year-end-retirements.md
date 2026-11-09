@@ -30,9 +30,9 @@
 
 **Interfaces:** yearEndRetirementsId(season)、yearEndRetirementCandidates(state,humanTeamId)、normalizeYearEndRetirements、createYearEndRetirementsSteps(state,c,signature,applySteps)、inspectYearEndRetirements(state)。新reserve-year-end-retirementは既存finalize-retirementと合成する。
 
-- [ ] 成功・0件・人の意向/CPU/予約混在・保証・入力不変・JSON/順序・改ざん・競合/古い入力の回帰を追加しRED確認。
-- [ ] 期末source/親receipt/審査と保存履歴保護を実装、unit/隣接群GREEN。
-- [ ] 実bootstrap/PR-C入口と性能を確認しcommit。
+- [x] 成功・0件・人の意向/CPU/予約混在・保証・入力不変・JSON/順序・改ざん・競合/古い入力の回帰を追加しRED確認。
+- [x] 期末source/親receipt/審査と保存履歴保護を実装、unit/隣接群GREEN。
+- [x] 実bootstrap/PR-C入口と性能を確認しcommit。
 
 ## Task 2: 既存画面/保存操作への接続
 
@@ -40,11 +40,15 @@
 
 **Interfaces:** yearEndRetirementsRequest(world,decisions)、reduceYearEndRetirementsRequestAsync、commitYearEndRetirementsRequest(request,sessionToken)、handleYearEndRetirements(decisions)。UIは結果ではなくaccept/retain意向を渡す。
 
-- [ ] 実保存の失敗/再試行・cold reload・career・旧session/revision・barrier・公開後復旧、UI選択/結果/旧冬互換をRED確認。
-- [ ] 既存commit/復旧と画面に接続しGREEN。postingは別操作。
-- [ ] 360/390/1440pxの前後/操作・Chromium/WebKitを検証、既存必須CIの対象へ追加。
-- [ ] 独立レビュー→指摘実証/修正→exact HEAD必須CI→PR提示。
+- [x] 実保存の失敗/再試行・cold reload・career・旧session/revision・barrier・公開後復旧、UI選択/結果/旧冬互換をRED確認。
+- [x] 既存commit/復旧と画面に接続しGREEN。postingは別操作。
+- [x] 360/390/1440pxの前後/操作・Chromium/WebKitを検証、既存必須CIの対象へ追加。
+- [ ] 独立レビュー→指摘実証/修正は完了。exact HEAD必須CI→PR提示は進行中。
 
 ## 実行記録
 
 - AGENTS.mdに従い新規cloneの専用ブランチで作業。新規worktreeの追加は不要。既存計画/コードの照合と独立scopeレビューから本工程を選定し、追加承認待ちは設けない。
+
+- core新規27/hook5、計32件。初期RED→GREENと独立レビューのP2整合性5ケースRED→GREENを確認。関連8ファイル195件成功。
+- Chromium4件、公式WebKit4件（360/390/1440pxと公開後復旧）成功。WebKitの不足依存を公式配布から/tmpへ展開し実起動。実iPhoneとは区別。
+- レビュー対象082f55fのP2は完全worldでの逆参照検証で修正。中間子candidateの既存共通審査は維持。その他の確定P0/P1/P2なし。

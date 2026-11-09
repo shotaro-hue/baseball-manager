@@ -14,6 +14,7 @@ import { budgetForecastWorld } from './fixtures/budgetForecast';
 import { closeNativePostseason } from './fixtures/openOffseason';
 import { economyClockFor } from '../economyCalendar';
 import { retirementCareerEntries } from '../annualRetirements';
+import { createSeasonContract } from '../seasonContract';
 
 function winter() {
   const w = closedPostseasonWorld();
@@ -136,4 +137,67 @@ it('makes player/club order and unrelated random draws irrelevant to stored deci
   for (let i = 0; i < 20; i++) Math.random();
   const b = reduceEconomyCommand(other, c); expect(b.ok, b.error).toBe(true);
   expect(b.world.contractEconomy.engine.transactions).toEqual(a.world.contractEconomy.engine.transactions);
+});
+
+it.each(['remove parent', 'omit retired CPU', 'swap source/final'])('rejects orphan year-end retirements on a fresh save extension: %s', edit => {
+  const w = winter(), r = reduceEconomyCommand(w, command(w)); expect(r.ok).toBe(true);
+  const n = r.world, ts = n.contractEconomy.engine.transactions, g = ts.at(-1).yearEndRetirements;
+  if (edit === 'remove parent') ts.pop();
+  else if (edit === 'omit retired CPU') {
+    const cpu = g.candidates.find(r => r.teamId !== w.myId);
+    g.candidates = g.candidates.filter(r => r !== cpu);
+    g.createdReservationIds = g.createdReservationIds.filter(id => id !== cpu.reservationId);
+  } else {
+    const reserve = ts.findIndex(t => t.id === g.createdReservationIds[0]);
+    const final = ts.findIndex(t => t.retirement?.reservationId === g.createdReservationIds[0]);
+    [ts[reserve], ts[final]] = [ts[final], ts[reserve]];
+  }
+  expect(() => validateEconomySave(n)).toThrow();
+});
+
+it('requires parent claims for aggregate finalization of an original in-season reservation', () => {
+  let w = budgetForecastWorld(); w.gameDay = 120;
+  w.contractEconomy.clock = economyClockFor({ season: w.year, phase: 'season', gameDay: w.gameDay, schedule: w.schedule });
+  const p = w.teams[0].players[0], reserved = reduceEconomyCommand(w, wrap(w, { id: 'old-reserved', type: 'reserve-retirement', teamId: 0, playerId: p.id, contractId: p.contractId }));
+  expect(reserved.ok).toBe(true); w = reserved.world; closeNativePostseason(w);
+  w = reduceOpenOffseasonRequest(w, openOffseasonRequest(w)).world;
+  const r = reduceEconomyCommand(w, command(w, [])); expect(r.ok).toBe(true);
+  const g = r.world.contractEconomy.engine.transactions.at(-1).yearEndRetirements;
+  expect(g.finalizationIds).toHaveLength(1); g.finalizationIds = []; g.finalizedReservationIds = [];
+  expect(() => validateEconomySave(r.world)).toThrow();
+});
+
+it('prevents a direct late year-end retirement from overturning a saved retain success', () => {
+  const w = winter(), p = w.teams[0].players[0]; p.retireStyle = 0;
+  const r = reduceEconomyCommand(w, command(w, [{ playerId: p.id, choice: 'retain' }])); expect(r.ok).toBe(true);
+  expect(r.world.contractEconomy.engine.transactions.at(-1).yearEndRetirements.candidates[0].outcome).toBe('retained');
+  const n = r.world;
+  expect(reduceEconomyCommand(n, wrap(n, { id: 'late-reserve', type: 'reserve-year-end-retirement',
+    teamId: w.myId, playerId: p.id, contractId: p.contractId }))).toMatchObject({ ok: false, world: n });
+});
+
+it.each([0, 1])('does not cancel club %s formal renewal promises to force retirement', teamId => {
+  const source = budgetForecastWorld().teams.map(t => ({ ...t, players: t.players.map(p => ({ ...p,
+    contractYearsLeft: 1, age: t.id < 2 ? 42 : 20, retireStyle: 100 })) }));
+  let w = yearEndReviewWorld(source), p = w.teams.find(t => t.id === teamId).players[0];
+  const offered = reduceEconomyCommand(w, wrap(w, { id: 'promise', type: 'offer-renewal', contractId: p.contractId,
+    proposal: { id: 'promised-renewal', type: 'sign', teamId, effectiveDate: '2027-02-01', contract: createSeasonContract({
+      contractId: 'promised-contract', playerId: p.id, signedSeason: 2026, agreementPhase: 'offseason', purpose: 'renewal',
+      termYears: 2, annualSalaryManYen: 1000, registrationType: 'controlled', guaranteed: true }) } }));
+  expect(offered.ok, offered.error).toBe(true); w = offered.world;
+  const pending = structuredClone(w);
+  expect(reduceEconomyCommand(w, command(w))).toMatchObject({ ok: false, world: w }); expect(w).toEqual(pending);
+  const accepted = reduceEconomyCommand(w, wrap(w, { id: 'promise-accepted', type: 'accept-renewal', proposalId: 'promised-renewal', contractId: p.contractId }));
+  expect(accepted.ok, accepted.error).toBe(true); w = accepted.world;
+  expect(validateEconomySave(w)).toBe('annual');
+  const before = structuredClone(w);
+  expect(reduceEconomyCommand(w, command(w))).toMatchObject({ ok: false, world: w }); expect(w).toEqual(before);
+});
+
+it('excludes a low-will human and keeps saved decisions valid after surviving players change', () => {
+  const w = winter(), p = w.teams[0].players[0]; p.age = 35; p.retireStyle = 0; p.stats = { PA: 500 };
+  const r = reduceEconomyCommand(w, command(w, [])); expect(r.ok, r.error).toBe(true);
+  expect(r.world.contractEconomy.engine.transactions.at(-1).yearEndRetirements.candidates.every(r => r.teamId !== w.myId)).toBe(true);
+  const n = r.world; n.teams[0].players[0].age++; n.teams[0].players[0].stats.PA++;
+  expect(validateEconomySave(n)).toBe('annual');
 });

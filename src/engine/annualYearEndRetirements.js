@@ -132,12 +132,33 @@ export function inspectYearEndRetirements(state) {
     for (let i = 0; i < g.finalizedReservationIds.length; i++) {
       const r = (state.retirementReservations ?? []).find(r => r.id === g.finalizedReservationIds[i]);
       const f = ts.get(g.finalizationIds[i]);
+      const source = r && ts.get(r.id);
       if (!r || r.season !== g.season || !f || f.id !== finalizeId(r.id) || r.finalization?.id !== f.id
-        || f.index <= previous || f.index >= ts.get(t.id).index) fail();
+        || !source || source.index >= f.index || f.index <= previous || f.index >= ts.get(t.id).index) fail();
       previous = f.index;
     }
     if (created.some(r => !g.finalizedReservationIds.includes(r))
       || state.transactions.some(other => (other.generatedPostingRequests?.season === g.season || other.annualPostingPhase?.season === g.season)
         && ts.get(other.id).index < ts.get(t.id).index)) fail();
+  }
+}
+
+// Only complete worlds cross the adapter/save boundary. The shared projector
+// also validates intermediate children while their aggregate parent is still
+// being built, so reverse membership belongs here rather than in withFloors.
+export function assertYearEndRetirementCoverage(state) {
+  const parents = state.transactions.filter(t => t.yearEndRetirements);
+  for (const r of state.retirementReservations ?? []) {
+    if (r.origin === 'year-end') {
+      const owners = parents.filter(t => t.yearEndRetirements.candidates.some(row => row.reservationId === r.id
+        && row.playerId === r.playerId && row.teamId === r.teamId && ['accepted', 'retain_failed'].includes(row.outcome))
+        && t.yearEndRetirements.createdReservationIds.includes(r.id));
+      if (owners.length !== 1 || !r.finalization
+        || !owners[0].yearEndRetirements.finalizedReservationIds.includes(r.id)
+        || !owners[0].yearEndRetirements.finalizationIds.includes(r.finalization.id)) fail();
+    }
+    if (r.finalization?.id === finalizeId(r.id)
+      && parents.filter(t => t.yearEndRetirements.finalizedReservationIds.includes(r.id)
+        && t.yearEndRetirements.finalizationIds.includes(r.finalization.id)).length !== 1) fail();
   }
 }

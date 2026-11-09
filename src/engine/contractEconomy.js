@@ -1,5 +1,6 @@
 import { nativeFaExerciseOrigins } from './annualFaDeclarations';
 import { inspectRetirementCalendar } from './annualRetirements';
+import { assertYearEndRetirementCoverage } from './annualYearEndRetirements';
 import { inspectAnnualBudgetCoverage } from './annualBudgetPolicy';
 import { employmentContractId, projectEmploymentPlayer, validateAnnualEmploymentContract, normalizeEmploymentContract } from './seasonContract';
 import { createSeasonContract } from './seasonContract';
@@ -126,9 +127,11 @@ export function contractEconomyMode(world) {
 export function toAnnualState(world) {
   if (contractEconomyMode(world) !== 'annual') fail('新契約制度のworldが必要です。');
   const e = world.contractEconomy;
-  return projectAnnualState({ ...e.engine, spending: { ...e.engine.spending, staffContracts: e.staffContracts }, ...e.clock, teams: world.teams, faPool: world.faPool,
+  const state = projectAnnualState({ ...e.engine, spending: { ...e.engine.spending, staffContracts: e.staffContracts }, ...e.clock, teams: world.teams, faPool: world.faPool,
     gameDay: world.gameDay, incomeReceipts: e.incomeReceipts, economyRandomRoot: e.randomRoot,
     economyIdentity: identity(world), faExerciseBirth: e.faExerciseBirth, draftContext: draftCapacityContext(world.offseasonPlan, world.year, world.teams) });
+  assertYearEndRetirementCoverage(state);
+  return state;
 }
 
 function projectDraftPlan(world, state) {
