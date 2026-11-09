@@ -10,6 +10,7 @@ import { contractEconomyMode, reduceEconomyCommand } from '../engine/contractEco
 import { reduceAcquisitionRequest } from '../engine/acquisitionDecisions';
 import { advanceEconomyDecisions } from '../engine/economyDecisions';
 import { validateEconomySave } from '../engine/economyPersistence';
+import { validatePostseasonSave } from '../engine/playoff';
 import { reduceRenewalRequest } from '../engine/renewalDecisions';
 import { saveFeedback } from '../engine/saveFeedback';
 import { emptyBattedBallReceipt, validateBattedBallReceipt } from '../engine/battedBallRun';
@@ -412,6 +413,7 @@ export function useGameState() {
     try {
       world = structuredClone(saved);
       const mode = validateEconomySave(world);
+      validatePostseasonSave(world);
       validateFarmSaveState(world);
       if ('battedBallReceipt' in world) validateBattedBallReceipt(world.battedBallReceipt, world.saveId);
       if (!Array.isArray(world.teams) || !Array.isArray(world.faPool)

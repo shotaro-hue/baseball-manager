@@ -11,6 +11,7 @@ import { applyRegularSeasonTeamUpdate } from '../engine/regularGameUpdates';
 import { generateCpuOffer, generateCpuCpuTrade, classifyTeam, evaluateFrontOfficePlan } from '../engine/trade';
 import { executeCpuTrade } from '../engine/cpuTradeExecution';
 import { encodePlayoff, initPlayoff } from '../engine/playoff';
+import { createPostseasonCalendar } from '../engine/postseasonCalendar';
 import { standingsContext } from '../engine/standings';
 import { processCpuFaBids } from '../engine/contract';
 import { SEASON_GAMES, BATCH, NEWS_TEMPLATES_WIN, NEWS_TEMPLATES_LOSE, INTERVIEW_QUESTIONS_WIN, INTERVIEW_QUESTIONS_LOSE, INTERVIEW_OPTIONS_WIN, INTERVIEW_OPTIONS_LOSE, TRADE_DEADLINE_MONTH, TRADE_DEADLINE_PROB_EARLY, TRADE_DEADLINE_PROB_PEAK, TRADE_DEADLINE_CPU_CPU_PROB, MAX_ROSTER } from '../constants';
@@ -112,13 +113,14 @@ export function useSeasonFlow(gs) {
   const savedPostseason = gs.offseasonPlan?.stage === 'postseason'
     && gs.offseasonPlan.year === year && gs.offseasonPlan.myId === myId ? gs.offseasonPlan.playoff : null;
   const playoff = playoffState ?? savedPostseason;
+  const postseasonPlan = next => ({ version: 1, year, myId, stage: 'postseason',
+    resumeScreen: 'playoff', playoff: encodePlayoff(next) });
   const setPlayoff = value => {
     const next = typeof value === 'function' ? value(playoff) : value;
     setPlayoffState(next);
-    if (next) gs.setOffseasonPlan?.({ version: 1, year, myId, stage: 'postseason',
-      resumeScreen: 'playoff', playoff: encodePlayoff(next) });
+    if (next) gs.setOffseasonPlan?.(postseasonPlan(next));
   };
-  const startPlayoff = teamList => initPlayoff(teamList, { year,
+  const startPlayoff = teamList => initPlayoff(teamList, { year, schedule,
     ...standingsContext(getSeasonHistory?.(), getGameResultsMap?.(), year) });
   const [currentGameTeams, setCurrentGameTeams] = useState(null);
   const [batchProgress, setBatchProgress] = useState(null);
@@ -129,6 +131,10 @@ export function useSeasonFlow(gs) {
   const allowRegularGames = count => {
     const request = requestRegularGames(count);
     if (!request.count) notify(request.reason, 'warn');
+    if (request.count && gameDay + request.count > SEASON_GAMES) {
+      try { createPostseasonCalendar({ year, schedule }); }
+      catch (error) { notify(error.message, 'warn'); return 0; }
+    }
     return request.count;
   };
   const isBatchCancelledRef = useRef(false);
@@ -942,6 +948,10 @@ export function useSeasonFlow(gs) {
       if(baseToken!=null&&baseToken!==gs.getProgressToken?.()) {notify("編成またはロードが変更されたため古い試合結果を破棄しました", "warn");return;}
       nextState.battedBallReceipt = await archiveRun?.seal(result.archiveRun) ?? null;
       if (!canAdopt(baseToken)) return;
+      // The Worker carries the pre-batch plan. Adopt and save the final game
+      // with its new plan explicitly, without waiting for a React render.
+      const nextPlayoff = shouldEnterPlayoff ? startPlayoff(nextState.teams) : null;
+      if (nextPlayoff) nextState.offseasonPlan = postseasonPlan(nextPlayoff);
       if(gs.applyProgressCandidate && !gs.applyProgressCandidate(nextState,{baseToken}))return;
       if (gs.applyProgressCandidate) archiveRun?.adopt();
       setNews(nextState.news);
@@ -962,7 +972,7 @@ export function useSeasonFlow(gs) {
       }
 
       if (shouldEnterPlayoff) {
-        setPlayoff(startPlayoff(nextState.teams));
+        setPlayoff(nextPlayoff);
         setScreen("playoff");
       } else {
         setScreen("batch_result");

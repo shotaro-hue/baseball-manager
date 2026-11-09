@@ -6,6 +6,8 @@ import { economyFixture } from './engine/__tests__/fixtures/economyWorld';
 import { TEAM_DEFS } from './constants';
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
+import { initPlayoff } from './engine/playoff';
+import { generateSeasonSchedule } from './engine/scheduleGen';
 
 const mock = vi.hoisted(() => ({ load: vi.fn(), status: 'unrecoverable', app: null }));
 const saved = () => ({ ...JSON.parse(gunzipSync(readFileSync(new URL('../e2e/fixtures/new-game.json.gz', import.meta.url)))), saveId: 'load-retry' });
@@ -112,4 +114,44 @@ it('keeps a read-conflict warning and retries from the latest root without apply
   expect(message()).toContain('読込中にセーブが更新');
   mock.status = 'primary'; mock.load.mockResolvedValue(saved()); await load();
   expect(mock.app.gs.screen).toBe('hub'); expect(mock.app.loadError).toBeNull();
+});
+
+function postseasonSave(dated = true) {
+  const s = saved();
+  s.gameDay = 144;
+  s.teams = s.teams.map(t => ({ ...t, wins: 142, losses: 0, draws: 1 }));
+  s.schedule = generateSeasonSchedule(s.year, s.teams);
+  s.offseasonPlan = { version: 1, year: s.year, myId: s.myId, stage: 'postseason', resumeScreen: 'playoff',
+    playoff: initPlayoff(s.teams, { year: s.year, ...(dated ? { schedule: s.schedule } : {}) }) };
+  return s;
+}
+
+it.each(['date', 'missing-source'])('rejects dated %s before hydration, retains the title and original data, and allows a valid retry', async corrupt => {
+  const bad = postseasonSave();
+  if (corrupt === 'date') bad.offseasonPlan.playoff.cs1_se.startDate = `${bad.year}-01-01`;
+  else delete bad.schedule;
+  const original = JSON.stringify(bad);
+  mock.status = 'primary'; mock.load.mockResolvedValue(bad);
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  await mount();
+  const token = mock.app.gs.getProgressSessionToken();
+  await load();
+  expect(mock.app.gs.screen).toBe('title');
+  expect(mock.app.gs.teams).toEqual([]);
+  expect(mock.app.gs.getProgressSessionToken()).toBe(token);
+  expect(message()).toContain('読み込めませんでした');
+  expect(resume().props.disabled).toBe(false);
+  expect(JSON.stringify(bad)).toBe(original);
+  mock.load.mockResolvedValue(postseasonSave()); await load();
+  expect(mock.app.gs.screen).toBe('playoff');
+  expect(mock.app.loadError).toBeNull();
+});
+
+it('retains the missing-schedule fallback for undated legacy postseason saves', async () => {
+  const legacy = postseasonSave(false); delete legacy.schedule;
+  mock.status = 'primary'; mock.load.mockResolvedValue(legacy);
+  await mount(); await load();
+  expect(mock.app.gs.screen).toBe('playoff');
+  expect(mock.app.gs.schedule).toHaveLength(146);
+  expect(mock.app.gs.offseasonPlan.playoff).toEqual(legacy.offseasonPlan.playoff);
 });

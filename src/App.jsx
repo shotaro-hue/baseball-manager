@@ -11,6 +11,7 @@ import { useOffseason } from './hooks/useOffseason';
 import AppScreenRouter from './components/AppScreenRouter';
 import HubShell from './components/hub/HubShell';
 import { planningResumeScreen } from './engine/offseasonPlanning';
+import { validatePostseasonSave } from './engine/playoff';
 
 let appSaveModulePromise = null;
 let appScheduleModulePromise = null;
@@ -73,6 +74,7 @@ export default function App() {
           return;
         }
 
+        validatePostseasonSave(saved);
         if (contractEconomyMode(saved) === 'annual' && !ANNUAL_ECONOMY_RELEASE_ENABLED) {
           setLoadError('このバージョンでは新契約制度のセーブを再開できません。保存データは変更していません。');
           return;

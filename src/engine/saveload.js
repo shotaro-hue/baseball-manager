@@ -1,5 +1,6 @@
 import { retirementCareerEntries } from './annualRetirements';
 import { validateEconomyClock } from './economyCalendar';
+import { validatePostseasonSave } from './playoff';
 import { saveFailure } from './saveDiagnostics';
 import { validateEconomySave, economySaveMetadata, economyOverwriteIssue,
   economyRecoveryGuard, matchesEconomyRecoveryGuard } from './economyPersistence';
@@ -275,6 +276,7 @@ function validateAndMigrateSave(state, eligibilityContext) {
     return { ok: false };
   }
   const mode = validateEconomySave(state);
+  validatePostseasonSave(state);
   // Introduced data is validated as-is; a corrupt ledger must reach backup recovery.
   validateFarmSaveState(state);
   for (const team of state.teams) {
@@ -637,6 +639,8 @@ async function saveGameImpl(state, options = {}, onPublished) {
   let economyMode;
   try { economyMode = validateEconomySave(state); }
   catch (error) { return failedSave('economy_payload_invalid', 'validate_state', 'saveGame', error); }
+  try { validatePostseasonSave(state); }
+  catch (error) { return failedSave('postseason_payload_invalid', 'validate_state', 'validatePostseasonSave', error); }
   try {
     safeState = sanitizeSaveState(state);
     safeState.saveId = ensureSaveId(safeState.saveId);
