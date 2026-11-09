@@ -41,23 +41,23 @@ function approval(input, policy, precedingApproved) {
 }
 // Pure quote only. Boundary receipts/publication are owned by annual rollover.
 // Inputs are explicit payroll-before estimates; no legacy cash/budget fallback.
-export function quoteAnnualBudgetPolicy(world, policy) {
+function quoteBudgetPolicy(world, policy, budgetSeason) {
   const e=world?.contractEconomy, spending=e?.engine?.spending;
   if (e?.mode !== 'annual' || !Array.isArray(world.teams) || !world.teams.length
-    || !year(world.year) || world.year !== e.clock?.season
+    || !year(world.year) || !year(budgetSeason) || world.year !== e.clock?.season
     || spending?.budgetSeason !== world.year + Number(e.clock?.phase === 'offseason') || !Array.isArray(policy?.forecasts)) fail();
   const supplements = inspectAnnualIncome(toAnnualState(world)); // Never repair an invalid input world.
-  const end=annualBudgetHorizon(spending), teams=new Map(), typed=new Set();
+  const end=annualBudgetHorizon({...spending,budgetSeason}), teams=new Map(), typed=new Set();
   for (const t of world.teams) { if(!id(t.id)||typed.has(String(t.id)))fail(); typed.add(String(t.id)); teams.set(t.id,t); }
   const forecasts=new Map();
   for(const f of policy.forecasts){
-    if(!f||!teams.has(f.teamId)||!year(f.season)||f.season<spending.budgetSeason||f.season>end||forecasts.has(key(f.teamId,f.season)))fail();
+    if(!f||!teams.has(f.teamId)||!year(f.season)||f.season<budgetSeason||f.season>end||forecasts.has(key(f.teamId,f.season)))fail();
     forecasts.set(key(f.teamId,f.season),f);
   }
   const authorizations=[],budgetPolicies=[],rosterRequirements=[];
   for(const teamId of teams.keys()){
     let precedingApproved;
-    for(let season=spending.budgetSeason;season<=end;season++){
+    for(let season=budgetSeason;season<=end;season++){
       const f=forecasts.get(key(teamId,season));if(!f)fail();
       const approvedManYen=approval(f,policy,precedingApproved), pair={teamId,season};
       precedingApproved=approvedManYen;
@@ -72,6 +72,20 @@ export function quoteAnnualBudgetPolicy(world, policy) {
     }
   }
   return {authorizations,budgetPolicies,rosterRequirements};
+}
+
+export function quoteAnnualBudgetPolicy(world, policy) {
+  return quoteBudgetPolicy(world, policy, world?.contractEconomy?.engine?.spending?.budgetSeason);
+}
+
+// Quote next year's planning range against the validated CURRENT world. This
+// neither changes its clock/budgetSeason nor creates a rollover candidate.
+export function quoteNextAnnualBudgetPolicy(world, policy) {
+  if (!year(world?.year) || !year(world.year + 1)) fail();
+  const result = quoteBudgetPolicy(world, policy, world.year + 1);
+  for (const rows of Object.values(result)) rows.sort((a, b) =>
+    String(a.teamId).localeCompare(String(b.teamId), 'en', { numeric: true }) || a.season - b.season);
+  return result;
 }
 export function inspectAnnualBudgetCoverage(world) {
   const e=world.contractEconomy;
