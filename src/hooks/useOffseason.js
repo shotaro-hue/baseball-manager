@@ -1,4 +1,5 @@
 import { toAnnualState } from '../engine/contractEconomy';
+import { openOffseasonRequest } from '../engine/annualOpenOffseason';
 import { offseasonPostingRequest } from '../engine/humanPosting';
 import { postingApplicationViews } from '../engine/annualPostingApplications';
 import { postingPhaseId } from '../engine/annualPostingPhase';
@@ -587,6 +588,18 @@ export function useOffseason(gs) {
     notify(p.name+"が引退しました","warn");
   };
 
+  const handleOpenAnnualOffseason = async () => {
+    if (gs.contractEconomy?.mode !== 'annual' || renewalSession !== draftContextRef.current.getProgressSessionToken?.()) return false;
+    try {
+      const result = await gs.commitOpenOffseasonRequest?.(openOffseasonRequest(gs), renewalSession);
+      if (renewalSession !== draftContextRef.current.getProgressSessionToken?.()) return false;
+      notify?.(result?.ok ? '閉幕と翌年度予算を保存しました。12月1日の引退予約・海外挑戦の確認へ進めます。成長・翌春は未接続です。'
+        : result?.error || (result?.reason === 'economy_adoption_required' ? '保存済みのオフ開始結果を復旧してください。'
+          : 'オフ開始を保存できませんでした。保存状態を確認し、再試行してください。'), 'warn');
+      return result?.ok === true;
+    } catch (error) { notify?.(error.message, 'warn'); return false; }
+  };
+
   const handlePrepareAnnualPosting = async () => {
     if (canProgressLegacy() || renewalSession !== draftContextRef.current.getProgressSessionToken?.()) return false;
     const result = await gs.commitOffseasonPostingRequest?.(offseasonPostingRequest(gs), renewalSession);
@@ -599,15 +612,16 @@ export function useOffseason(gs) {
 
   // 引退フェーズ処理（退場選手確定→成長/衰退→CPU契約→表彰）
   const handleRetirePhaseNext = async (decisions) => {
-    // This is only the annual retirement/posting stage. Never continue into the legacy
-    // retirement/growth/renewal writer after a successful posting publication.
+    // Each native boundary stops here. Never continue into the legacy
+    // retirement/growth/renewal writer after a successful publication.
     if (!canProgressLegacy()) {
       if (renewalSession !== draftContextRef.current.getProgressSessionToken?.()) return false;
       if (Object.keys(decisions ?? {}).length) {
         notify?.('新制度の引退判断の年度接続は未完了です。予約を確認してから海外挑戦の希望を確認してください。', 'warn');
         return false;
       }
-      await handlePrepareAnnualPosting();
+      if (gs.contractEconomy?.clock.phase === 'season') await handleOpenAnnualOffseason();
+      else await handlePrepareAnnualPosting();
       return false;
     }
     if (retireTransitionRef.current) return false;
@@ -1036,6 +1050,7 @@ export function useOffseason(gs) {
     handleStartRetireGame,
     handleSkipRetireGame,
     handleRetirePhaseNext,
+    handleOpenAnnualOffseason,
     handlePrepareAnnualPosting,
     handleWaiverPhaseNext,
     handlePlanningRelease,

@@ -102,7 +102,9 @@ export function inspectAnnualDepartures(state) {
       || (d.season === state.season && (d.notifiedDate > state.date
         || (d.phase === 'season' ? !['season', 'offseason'].includes(state.phase)
           || (state.phase === 'season' && (!Number.isSafeInteger(state.gameDay) || state.gameDay < 1
-            || state.gameDay > SEASON_GAMES || d.gameDay > state.gameDay)) : state.phase !== 'offseason')))) fail();
+            // Historical official exits survive the dated closing snapshot;
+            // seasonRecordFor still rejects a new exit outside rounds 1..143.
+            || state.gameDay > SEASON_GAMES + 1 || d.gameDay > state.gameDay)) : state.phase !== 'offseason')))) fail();
     seen.add(String(d.id)); contracts.add(String(d.sourceContractId));
     const receipts = state.transactions.filter(r => r.id === d.id);
     if (receipts.length !== 1) fail();

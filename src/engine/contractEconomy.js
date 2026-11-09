@@ -11,6 +11,7 @@ import { economyClockFor, validateEconomyClock } from './economyCalendar';
 import { inspectAnnualDepartureCalendar } from './annualDepartures';
 import { postingBudgetSupplement } from './postingIncome';
 import { inspectAnnualIncome, inspectAnnualIncomeCalendar } from './annualIncome';
+import { inspectOpenOffseason } from './annualOpenOffseason';
 
 // A1-1a is a pure, fixture-only boundary. Activation/persistence is A1-1d/4b.
 export const ANNUAL_ECONOMY_RELEASE_ENABLED = false;
@@ -103,6 +104,7 @@ function inspectEnvelope(world) {
   const supplements = inspectAnnualIncome({ ...e.engine, ...e.clock, gameDay: world.gameDay, incomeReceipts: e.incomeReceipts, economyIdentity: identity(world) });
   inspectBudgetApprovals(spending.authorizations, e.budgetPolicies, supplements);
   inspectAnnualBudgetCoverage(world);
+  inspectOpenOffseason(world);
   if (Object.hasOwn(spending, 'staffContracts') || Object.hasOwn(spending, 'offseasonDepartures')) fail('スタッフ契約・退団記録の投影を支出正本へ重複保存できません。');
   // All NEW native terms are guaranteed; v1 fixtures remain independent.
   const contracts = recordedContracts(spending);
