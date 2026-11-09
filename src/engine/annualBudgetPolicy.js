@@ -83,8 +83,12 @@ export function quoteAnnualBudgetPolicy(world, policy) {
 export function quoteNextAnnualBudgetPolicy(world, policy) {
   if (!year(world?.year) || !year(world.year + 1)) fail();
   const result = quoteBudgetPolicy(world, policy, world.year + 1);
-  for (const rows of Object.values(result)) rows.sort((a, b) =>
-    String(a.teamId).localeCompare(String(b.teamId), 'en', { numeric: true }) || a.season - b.season);
+  for (const rows of Object.values(result)) rows.sort((a, b) => {
+    const x = JSON.stringify(a.teamId), y = JSON.stringify(b.teamId);
+    const teamOrder = typeof a.teamId === 'number' && typeof b.teamId === 'number'
+      ? a.teamId - b.teamId : x < y ? -1 : x > y ? 1 : 0;
+    return teamOrder || a.season - b.season;
+  });
   return result;
 }
 export function inspectAnnualBudgetCoverage(world) {

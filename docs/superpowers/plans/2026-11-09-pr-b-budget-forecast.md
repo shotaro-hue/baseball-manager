@@ -24,7 +24,7 @@
 - [x] `annualBudgetForecast.js`に`forecastNextAnnualBudget(world, options)`を実装しGREEN。
 - [x] `tests/annual-budget-forecast.integration.test.js`で実保存/冷読込から再生成一致・見積の保存復元・不正root保持を確認。年度境界の保存として扱わない。
 - [x] 対象回帰、build、12球団静的年次表と限界を記録。UI変更なしのため専用画面確認はPR-Cへ。
-- [ ] 独立レビューの指摘を検証/必要修正。
+- [x] 独立レビューの指摘を検証/必要修正。
 - [ ] PR作成→最新HEADの必須CI全体を確認し提出。開発者のマージ判断で止める。
 
 ## 実行判断
@@ -32,3 +32,5 @@
 ユーザーの既存確定スコープとマージ後実行指示、AGENTS.mdに従い再承認を求めない。係数に本番既定値が無い事実を維持し、記録済みpolicyまたは明示設定を入力とする。過年度財務の新規archive/stateは追加しない。CIの同一commitの全件結果を再利用し、同じ全セットをローカルで重複させない。
 
 追加判断: locale照合で同順になる異なる収入receipt IDを実native commandで再現し、locale非依存の全順序へ限定修正した。旧API・保存形式・係数は変更しない。過年度archive/年度candidateは作らない。
+
+独立レビュー判断: 固定12球団の範囲内に確定指摘なし。汎用の新quote APIにも決定性を保証する意図を優先し、文字列ID同順のソート1領域だけを回帰付きで補強。旧API出力/ルールの変更はないため互換性コストは追加しない。

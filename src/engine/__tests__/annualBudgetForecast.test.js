@@ -1,7 +1,7 @@
 import { beforeAll, expect, it, vi } from 'vitest';
 import { createInitialTeams } from '../bootstrapTeams';
 import { forecastClubFinance, applyClubGameFinance, startClubFinance } from '../clubFinance';
-import { reduceEconomyCommand, fromAnnualState, toAnnualState } from '../contractEconomy';
+import { createAnnualNewGameWorld, reduceEconomyCommand, fromAnnualState, toAnnualState } from '../contractEconomy';
 import { generateSeasonSchedule } from '../scheduleGen';
 import { economyPolicy, freezeEconomy } from './fixtures/economyWorld';
 import { completion } from './fixtures/postingIncome';
@@ -243,4 +243,17 @@ it('keeps income evidence deterministic even when distinct receipt IDs collate e
   }
   const firstResult = build(w), reversed = json(w); reversed.contractEconomy.incomeReceipts.reverse();
   expect(build(reversed)).toEqual(firstResult);
+});
+
+it('also keeps the standalone next-year quote ordered for distinct string club IDs that collate equally', () => {
+  const teams = ['é', 'e\u0301'].map(id => ({ id,
+    players: [{ id: `player-${id}`, salary: 1000, contractYearsLeft: 3 }], farm: [] }));
+  const w = createAnnualNewGameWorld({ teams, faPool: [], myId: teams[0].id, saveId: 'unicode-clubs', season: 2026,
+    policy: economyPolicy(teams), randomRoot: { algorithmVersion: 1, seed: 'unicode-clubs' } });
+  const p = { ...forecastSettings(), forecasts: teams.flatMap(t => Array.from({ length: 8 }, (_, i) => ({
+    teamId: t.id, season: 2027 + i, source: 'profile', operatingSurplusesManYen: [10000],
+    supportManYen: 0, previousApprovedManYen: null,
+  }))) };
+  expect(nextQuote).toBeTypeOf('function');
+  expect(nextQuote({ ...w, teams: [...w.teams].reverse() }, p)).toEqual(nextQuote(w, p));
 });
