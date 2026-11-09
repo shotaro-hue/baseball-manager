@@ -97,7 +97,7 @@ R1〜R5以外の**確定した未修正P0は本監査では認定していない
 
 ## 保存互換
 
-保存フィールド、schema1、DB5、公開OFF、5年archive、旧契約の挙動は変更しない。Workerの一時payloadに全球団mapを渡すだけで、保存schemaを追加しない。旧履歴の不足は警告付き前年/ID fallbackのまま。旧履歴・欠測を実測0に補完せず、保存済みの旧/途中CSを再作成・再順位付けしない。
+保存フィールド、schema1、DB5、公開OFF、5年archive、旧契約の挙動は変更しない。一括Workerの一時payloadに全球団mapを渡すだけで、保存schemaを追加しない。旧履歴の不足は警告付き前年/ID fallbackのまま。旧履歴・欠測を実測0に補完せず、保存済みの旧/途中CSを再作成・再順位付けしない。
 
 `standingsContext`の引数名を実構造に合わせ、`rankLeague`の既存`gameResultsMap` option名は互換維持した。試合・履歴・保存candidateのtoken/receipt、tracked queue、backup optionsを維持。単独/戦術をannual用の新しい保存barrierへ置き換えていない。
 
@@ -109,7 +109,7 @@ R1〜R5以外の**確定した未修正P0は本監査では認定していない
 - GREEN: 実名簿/生成日程、実Worker core/両hook/実保存によるhome/away・1/2試合patch・引分・最初の一括保存・cold reload・年度履歴・順位tab・旧undated plan、旧不足履歴/パ/入力不変を検証。スコア生成とブラウザWorker輸送だけをテストで制御。
 - 追加テストの保存完了は実`handleSave`のPromiseを観測する。並列全件検証と同時実行した際に1秒pollingが保存完了前に切れたため、timeoutを伸ばさず実保存完了を待つ形へ修正した。既存テストの期待値/timeout/retry/skipは変更していない。
 - 必須CI/最終HEAD・独立レビュー・最終件数はPR本文を正本とする。ローカルの途中検証と最終HEADのCIを区別する。
-- Chromiumの既存最終戦4ケース成功。WebKitは初回OSライブラリ不足。公式Debianライブラリを/tmpへ展開して実起動を再検証。自動テストで実iPhone Safariを代用したとは扱わない。
+- Chromiumの既存最終戦4ケース成功。WebKitは初回OSライブラリ不足。公式Debianライブラリを/tmpのブラウザコピーへ展開し、実起動後3ケース成功。年度一巡1ケースは120秒の総時間上限で失敗し、翌春ホームまで到達したsnapshotを保持。コード固定/競合負荷を除いて該当ケースを再確認し、結果はPR本文へ記載する。自動テストで実iPhone Safariを代用したとは扱わない。
 
 ## PR-B / PR-Cへの引継ぎ
 

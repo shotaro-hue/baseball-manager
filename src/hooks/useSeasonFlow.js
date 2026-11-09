@@ -390,7 +390,6 @@ export function useSeasonFlow(gs) {
       news: getNewsBySelector({ limit: 1000 }),
       mailbox: getMailboxBySelector({ limit: 1000 }),
       gameResultsMap: getGameResultsMap(),
-      allTeamResultsMap: gs.allTeamResultsMap,
       scheduleArchive: getScheduleArchive(),
       myId,
       gameDay,
