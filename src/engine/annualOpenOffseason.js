@@ -2,6 +2,8 @@ import { toAnnualState, fromAnnualState } from './contractEconomy';
 import { economyClockFor, postseasonBoundaryDate, validateEconomyClock } from './economyCalendar';
 import { parseContractDate } from './contractCalendar';
 import { forecastNextAnnualBudget } from './annualBudgetForecast';
+import { rankLeague, standingsContext } from './standings';
+import { SEASON_GAMES } from '../constants';
 
 const kind = 'open-offseason';
 const counter = n => Number.isSafeInteger(n) && n >= 0;
@@ -12,6 +14,22 @@ const isBoundaryReceipt = r => {
   let id; try { id = JSON.parse(r?.id); } catch { /* Earlier opaque receipts stay compatible. */ }
   return r?.kind === kind || Array.isArray(id) && id.length === 4 && id[3] === kind;
 };
+
+// Qualification needs full match history/previous standings, which live
+// outside the reducer's domain slice. Check at full-world preparation/save
+// boundaries, never re-rank a partial reducer state with missing evidence.
+export function inspectOffseasonQualification(world) {
+  const e = world.contractEconomy;
+  if (!(world.gameDay === SEASON_GAMES + 1 && e.clock.phase === 'season' && e.cycle.stage === 'postseason')
+    && !e.cycle.transitionReceipts.some(r => r?.kind === kind && r.season === world.year)) return;
+  const p = world.offseasonPlan?.playoff;
+  const context = standingsContext(world.seasonHistory, world.allTeamResultsMap, world.year);
+  for (const [league, first, series] of [['セ', p?.se1, p?.cs1_se], ['パ', p?.pa1, p?.cs1_pa]]) {
+    const expected = rankLeague(world.teams, league, context).teams.slice(0, 3).map(t => t.id);
+    const actual = [first?.id, ...(series?.teams ?? []).map(t => t.id)];
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) fail();
+  }
+}
 
 // Optional in old saves. New receipts bind existing fields; no new envelope,
 // forecast archive or clock phase is required.
@@ -57,6 +75,7 @@ export function reduceOpenOffseasonRequest(world, r) {
     const e = world.contractEconomy;
     if (r.saveId !== world.saveId || r.epoch !== e.epoch || r.teamId !== world.myId || r.season !== world.year
       || !year(r.season) || !counter(r.baseRevision) || r.baseRevision > e.revision) fail();
+    inspectOffseasonQualification(world);
     const id = transitionId(world, r.season), receipt = e.cycle.transitionReceipts.find(t => t?.id === id);
     if (receipt) {
       if (receipt.closingDate !== r.closingDate) fail();

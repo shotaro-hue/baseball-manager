@@ -12,6 +12,7 @@
 
 - 年度・名簿・契約・収入は、現在保存されている同一saveId/epoch/revisionのworld。
 - 閉幕は`offseasonPlan.playoff`の全試合結果を既存`postseasonClosingDate`で検証する。plan年度/球団、元日程、完了した公式戦数、出場球団の凍結成績も照合する。144という数から日付を推測しない。
+- 出場資格と順序は全worldのallTeamResultsMap/seasonHistoryから既存standingsContext/rankLeagueで照合する。これらを持たないreducerの部分stateを再順位付けせず、producer/再生と保存境界で検証する。同率判定と旧履歴のfallbackは既存ルールを維持する。
 - 既存clockのphaseは増やさない。`phase=season / gameDay=144 / cycle.stage=postseason`は、保存された日付付き完了結果がありclock.dateがその閉幕日と一致する場合だけ有効にする。`economyClockFor`の公式戦1〜143制限は維持。日付なし旧履歴・未完了・7月All-Star行への参照・推測値は拒否する。この入力を実ゲームから作るannual Workerは後続工程。
 - 翌年度予算はPR-B `forecastNextAnnualBudget`を現在のclubFinanceと検証済み収入から生成する。記録済み係数/支援を使い、欠測は推定のまま。過年度財務archiveはないため外部履歴・独自係数・既製quoteをrequestで受け取らない。根拠不足は非変更で拒否する。
 - candidateではY年を維持し、clockだけY年12/1・offseasonTurn 0、budgetSeason Y+1、cycle.stage offseason-openへ進める。現在/過去の承認行を保ち、必要な将来承認・許可・人数行を既存形式へ置換する。旧budget/nextClubBudgetは使わず、budget表示は既存台帳から再投影する。postingの年度限定追加枠は既存quoteを使う。

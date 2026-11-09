@@ -11,7 +11,8 @@ import { offseasonPostingRequest, reduceOffseasonPostingRequest } from '../human
 import { validateEconomySave, economyOverwriteIssue } from '../economyPersistence';
 import { quoteAnnualSpendingPlan } from '../annualSpending';
 import { forecastNextAnnualBudget } from '../annualBudgetForecast';
-import { initPlayoff } from '../playoff';
+import { initPlayoff, postseasonClosingDate } from '../playoff';
+import { tiedClosingWorld } from '../../../tests/helpers/closed-ranking';
 const json = v => JSON.parse(JSON.stringify(v));
 let requestFor, reduce;
 beforeAll(async () => {
@@ -190,6 +191,30 @@ it('feeds the existing native retirement/posting preparation without a fabricate
   expect(prepared.world.contractEconomy.cycle.transitionReceipts).toEqual([closingReceipt]);
   expect(prepared.world.contractEconomy.engine.transactions.filter(t => t.generatedPostingRequests)).toHaveLength(12);
   expect(prepared.world.year).toBe(2026); expect(validateEconomySave(prepared.world)).toBe('annual');
+});
+
+it.each(['candidate', 'save', 'replay'])('refuses lower-place playoff entrants before accepting the %s', boundary => {
+  let w = closedPostseasonWorld(); const r = request(w);
+  if (boundary === 'replay') w = opened(w);
+  w.offseasonPlan.playoff = completedPlayoff(w.teams.filter(t => [3, 4, 5, 9, 10, 11].includes(t.id)), w.year, w.schedule);
+  const closingDate = postseasonClosingDate(w.offseasonPlan.playoff, { year: w.year, schedule: w.schedule, teams: w.teams });
+  expect(closingDate).toBe(r.closingDate);
+  if (boundary !== 'save') expect(run(w, r)).toMatchObject({ ok: false, world: w });
+  else expect(() => validateEconomySave(w)).toThrow();
+});
+
+it.each([false, true])('keeps the existing head-to-head and prior-year tie rules (previous only=%s)', previousOnly => {
+  const w = tiedClosingWorld({ previousOnly });
+  expect(w.offseasonPlan.playoff.se1.id).toBe(previousOnly ? 1 : 0);
+  const q = opened(w); expect(validateEconomySave(q)).toBe('annual');
+  expect(q.offseasonPlan.playoff).toEqual(w.offseasonPlan.playoff);
+});
+
+it('keeps an older native postseason stage with a valid official clock readable before completed boundary evidence exists', () => {
+  const w = budgetForecastWorld(); w.gameDay = 143;
+  w.contractEconomy.clock = economyClockFor({ season: w.year, phase: 'season', schedule: w.schedule, gameDay: w.gameDay });
+  w.contractEconomy.cycle.stage = 'postseason';
+  expect(w.offseasonPlan).toBeNull(); expect(validateEconomySave(w)).toBe('annual');
 });
 
 it.each([

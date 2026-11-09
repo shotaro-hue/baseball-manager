@@ -7,6 +7,7 @@ import { validateRenewalDecisions, preservesRenewalDecisions } from './renewalDe
 import { validateAcquisitionDecisions, preservesAcquisitionDecisions } from './acquisitionDecisions';
 import { validateRookieContracts } from './rookieContracts';
 import { validatePlayerEligibility } from './playerEligibility';
+import { inspectOffseasonQualification } from './annualOpenOffseason';
 
 // Storage validation only. Commit acknowledgements/barrier live in saveload;
 // activation and application hydration remain separate A1-1d stages.
@@ -15,6 +16,7 @@ export function validateEconomySave(world) {
     validatePlayerEligibility(p, { year: world.year });
   const mode = contractEconomyMode(world);
   if (mode === 'annual') {
+    inspectOffseasonQualification(world);
     validateRenewalDecisions(world);
     validateAcquisitionDecisions(world);
     validateRookieContracts(world);

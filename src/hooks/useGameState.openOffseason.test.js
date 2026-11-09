@@ -11,6 +11,7 @@ import { openOffseasonRequest, reduceOpenOffseasonRequest } from '../engine/annu
 import { closedPostseasonWorld } from '../engine/__tests__/fixtures/openOffseason';
 import { offseasonPostingWorld } from '../engine/__tests__/fixtures/offseasonPosting';
 import { createInitialTeams } from '../engine/bootstrapTeams';
+import { tiedClosingWorld } from '../../tests/helpers/closed-ranking';
 const primary = 'baseball_manager_v1';
 let gs, os, view, storage;
 beforeEach(() => {
@@ -164,6 +165,15 @@ it('keeps nonempty retirement decisions outside the narrow boundary operation', 
   await setup(); const original = roots();
   expect(await run(() => os.handleRetirePhaseNext({ player: 'accepted' }))).toBe(false);
   expect(roots()).toEqual(original); expect(gs.contractEconomy.revision).toBe(0);
+});
+
+it('uses the full saved head-to-head map through publication and reducer adoption', async () => {
+  await setup(tiedClosingWorld()); const r = request();
+  expect(gs.offseasonPlan.playoff.se1.id).toBe(0);
+  expect(await run(() => commit(r))).toMatchObject({ ok: true });
+  const saved = await loadGame(); expect(saved.offseasonPlan.playoff.se1.id).toBe(0);
+  expect(saved.allTeamResultsMap).toEqual(gs.allTeamResultsMap);
+  expect(gs.contractEconomy.cycle.transitionReceipts).toHaveLength(1);
 });
 
 it.each(['legacy', 'explicit-legacy', 'older-native-winter'])('preserves a %s save without opening or implicitly converting it', async mode => {

@@ -3,8 +3,8 @@ import { initPlayoff, advancePlayoff, recordSeriesGame, encodePlayoff, postseaso
 
 // Existing producers, not a year-transition implementation. The future annual
 // Worker must supply this complete snapshot; public gameplay remains legacy.
-export function completedPlayoff(teams, year, schedule, extended = false) {
-  let p = initPlayoff(teams, { year, ...(schedule ? { schedule } : {}) });
+export function completedPlayoff(teams, year, schedule, extended = false, context = {}) {
+  let p = initPlayoff(teams, { year, ...(schedule ? { schedule } : {}), ...context });
   while (p.phase !== 'champion') {
     const key = p.phase, s = p[key], n = s.games.length + 1;
     const score = extended && key === 'jpSeries'
