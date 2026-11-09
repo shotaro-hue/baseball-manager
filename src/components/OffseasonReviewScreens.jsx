@@ -9,6 +9,7 @@ import {Button,MetricBand,StateLabel,DataTableFrame} from './design-system/primi
 import './growth-report.css';
 import {CaretRight} from '@phosphor-icons/react';
 import { offseasonPostingId } from '../engine/annualOffseasonPosting';
+import { requiresYearEndRetirements, yearEndRetirementsId, yearEndRetirementCandidates } from '../engine/annualYearEndRetirements';
 
 const PlayerModal = lazy(() => import('./PlayerModal').then(m => ({ default: m.PlayerModal })));
 const money = n => Number.isFinite(n) ? fmtSal(n) : '未記録';
@@ -46,15 +47,22 @@ export function RetirePhaseScreen(props) {
   return props.annualWorld?.contractEconomy?.mode === 'annual'
     ? <AnnualRetirementPostingScreen {...props} /> : <LegacyRetirePhaseScreen {...props} />;
 }
-function AnnualRetirementPostingScreen({ annualWorld: world, onPrepare, onRecover, onOpenInbox, ...props }) {
+function AnnualRetirementPostingScreen({ annualWorld: world, onPrepare, onYearEnd, onRecover, onOpenInbox, ...props }) {
   const { year, teams } = props, e = world.contractEconomy, ts = e.engine.transactions;
   const saved = ts.some(t => t.id === offseasonPostingId(year));
+  const yearEnd = ts.find(t => t.id === yearEndRetirementsId(year))?.yearEndRetirements;
+  const needsReview = requiresYearEndRetirements(world);
+  const candidates = needsReview ? yearEndRetirementCandidates({ teams, retirementReservations: e.engine.retirementReservations }, world.myId)
+    .filter(r => r.teamId === world.myId) : [];
+  const [choices, setChoices] = useState([]);
+  const scope = JSON.stringify([world.saveId, e.epoch, e.revision]);
   const reservations = (e.engine.retirementReservations ?? []).filter(r => r.season === year);
   const pending = reservations.filter(r => !r.finalization);
   const wrongOrder = pending.length > 0 && ts.some(t => t.generatedPostingRequests?.season === year || t.annualPostingPhase?.season === year);
   const dated = e.clock.phase === 'offseason' && e.clock.date === `${String(year).padStart(4, '0')}-12-01`;
   const [review, setReview] = useState(false), close = useCallback(() => setReview(false), []);
-  const advance = useAdvance(async () => { const ok = await onPrepare(); if (ok) setReview(false); return ok; });
+  const advance = useAdvance(async () => { const ok = await (needsReview ? onYearEnd(choices) : onPrepare()); if (ok) setReview(false); return ok; });
+  useEffect(() => { setChoices([]); setReview(false); }, [scope]);
   const recover = useAdvance(async () => {
     const result = await onRecover(); if (result?.ok) setReview(false); return result?.ok === true;
   });
@@ -62,8 +70,30 @@ function AnnualRetirementPostingScreen({ annualWorld: world, onPrepare, onRecove
   const busy = advance.busy || recover.busy || world.saveQueueState?.isSaving;
   const recoveryButton = useRef(null);
   useEffect(() => { if (recovery && !busy) recoveryButton.current?.focus(); }, [recovery, busy]);
-  return <Frame {...props} title="引退予約と海外挑戦">{() => <>
-    <p>保存済みの引退予約を確定してから、全球団の海外挑戦の希望を確認します。自球団の承認・拒否は受信箱で判断します。</p>
+  const unanswered = candidates.some(r => !choices.some(d => d.playerId === r.playerId));
+  return <Frame {...props} title="引退予約と海外挑戦">{profile => <>
+    <p>{needsReview ? '自球団の期末引退を判断します。引き留めの結果とCPU球団の判断は、保存時に一度だけ確定します。' : '保存済みの引退予約を確定してから、全球団の海外挑戦の希望を確認します。自球団の承認・拒否は受信箱で判断します。'}</p>
+    {needsReview && <section aria-label="期末の引退判断">
+      <h2>期末の引退判断</h2>
+      {!candidates.length && <p>新規の判断が必要な自球団選手はいません。CPU球団と予約済みの引退を確認して保存します。</p>}
+      {candidates.map(row => {
+        const team = teams.find(t => t.id === row.teamId), p = [...team.players, ...team.farm].find(p => p.id === row.playerId);
+        const choice = choices.find(d => d.playerId === row.playerId)?.choice;
+        const choose = choice => setChoices(ds => [...ds.filter(d => d.playerId !== row.playerId), { playerId: row.playerId, choice }]);
+        return <article className="review-card" key={row.playerId}>
+          <PlayerInfo player={p} onProfile={profile} />
+          <p>{team.farm.some(p => p.id === row.playerId) ? '二軍' : '一軍'} · 引退意欲 {calcRetireWill(row.inputs)}（ゲーム内判定）</p>
+          <p>選択：{choice === 'accept' ? '引退を受け入れる予定' : choice === 'retain' ? '引き留めを試みる予定' : '未選択'}</p>
+          <div className="review-actions"><button disabled={busy || recovery} aria-pressed={choice === 'accept'} onClick={() => choose('accept')}>引退を受け入れる</button>
+            <button disabled={busy || recovery} aria-pressed={choice === 'retain'} onClick={() => choose('retain')}>引き留めを試みる</button></div>
+          <p className="review-note">引き留めは成功しない場合があります。保存失敗・再開で結果を引き直しません。</p>
+        </article>;
+      })}
+    </section>}
+    {yearEnd && <section aria-label="保存済みの期末引退結果"><h2>保存済みの期末引退結果</h2>
+      <p>新規引退 {yearEnd.candidates.filter(r => ['accepted', 'retain_failed'].includes(r.outcome)).length}人 · 引き留め成功 {yearEnd.candidates.filter(r => r.outcome === 'retained').length}人</p>
+      {yearEnd.candidates.map(r => <p key={r.playerId}>{teams.find(t => t.id === r.teamId)?.name} · {r.name}：{retirementLabels[r.outcome] ?? '現役続行'}</p>)}
+    </section>}
     <div className="review-metrics"><span>引退予約 {reservations.length}人</span><span>未確定 {pending.length}人</span><span>対象 {teams.length}球団</span></div>
     {reservations.length ? <ul>{reservations.map(r => {
       const t = teams.find(t => t.id === r.teamId);
@@ -79,14 +109,17 @@ function AnnualRetirementPostingScreen({ annualWorld: world, onPrepare, onRecove
       <button ref={recoveryButton} className="review-primary" disabled={busy} onClick={() => recover.run()}>保存済みの結果を復旧する</button>
     </> : busy ? <p role="status">保存結果を確認しています…</p>
       : saved ? <p role="status">引退予約と希望確認を保存済みです。自球団の判断は受信箱で確認してください。</p>
-        : <button className="review-primary" disabled={!dated || wrongOrder} onClick={() => setReview(true)}>引退予約を確定して希望を確認する</button>}
+        : <button className="review-primary" disabled={!dated || wrongOrder || needsReview && unanswered} onClick={() => setReview(true)}>{needsReview ? '期末の引退判断を確認する' : '引退予約を確定して希望を確認する'}</button>}
     <div className="review-actions"><button onClick={onOpenInbox} disabled={busy || recovery}>受信箱へ</button></div>
     <p className="review-note">成長・契約更改・翌春への年度進行は未接続です。この操作では年度を進めません。</p>
-    {review && !saved && !recovery && <Confirm title="引退予約と希望確認の最終確認" onClose={close}
-      onConfirm={() => advance.run()} label="予約と希望確認を保存する" disabled={!dated || wrongOrder}
+    {review && !saved && !recovery && <Confirm title={needsReview ? '期末引退判断の最終確認' : '引退予約と希望確認の最終確認'} onClose={close}
+      onConfirm={() => advance.run()} label={needsReview ? '引退判断を保存する' : '予約と希望確認を保存する'} disabled={!dated || wrongOrder || needsReview && unanswered}
       busy={advance.busy} error={advance.failure}>
-      <p>未確定の引退予約 {pending.length}人と、{teams.length}球団の希望確認・CPU判断・海外交渉をまとめて保存します。</p>
-      <p>保存に成功すると引退選手は登録から外れ、球団履歴に残ります。自球団の希望は承認待ちになります。</p>
+      {needsReview ? <><p>自球団の意向 {choices.length}人、{teams.length}球団の期末判断、未確定の予約 {pending.length}人をまとめて保存します。</p>
+        <ul>{candidates.map(r => <li key={r.playerId}>{r.name}：{choices.find(d => d.playerId === r.playerId)?.choice === 'retain' ? '引き留めを試みる' : '引退を受け入れる'}</li>)}</ul>
+        <p>保存後に結果を確認できます。海外挑戦の希望確認は次の操作です。</p></> : <>
+        <p>未確定の引退予約 {pending.length}人と、{teams.length}球団の希望確認・CPU判断・海外交渉をまとめて保存します。</p>
+        <p>保存に成功すると引退選手は登録から外れ、球団履歴に残ります。自球団の希望は承認待ちになります。</p></>}
     </Confirm>}
   </>}</Frame>;
 }

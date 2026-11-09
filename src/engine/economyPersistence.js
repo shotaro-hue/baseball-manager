@@ -72,6 +72,10 @@ function preservesEconomyHistory(before, after) {
     .slice((before.engine.postingDepartures ?? []).length).map(d => d.id));
   const newTransactions = new Set(after.engine.transactions.slice(before.engine.transactions.length).map(t => t.id));
   if (after.engine.transactions.slice(before.engine.transactions.length).some(t => {
+    const g = t.yearEndRetirements;
+    return g && [...g.createdReservationIds, ...g.finalizationIds].some(id => !newTransactions.has(id));
+  })) return false;
+  if (after.engine.transactions.slice(before.engine.transactions.length).some(t => {
     const g = t.annualOffseasonPosting;
     return g && [...g.finalizationIds, ...(g.createdPostingPhase ? [g.postingPhaseId] : [])]
       .some(id => !newTransactions.has(id));
