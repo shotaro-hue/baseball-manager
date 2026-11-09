@@ -42,10 +42,10 @@
 
 **Interfaces:** `commitOpenOffseasonRequest(request, sessionToken)` uses Task 1 reducer under existing `commitEconomyOperation`. `handleOpenAnnualOffseason` calls it, retaining the existing handler's session fence; `handleRetirePhaseNext` routes closed postseason to this operation and always stops before legacy annual processing.
 
-- [ ] Write hook tests that use real IndexedDB save/load and React adoption for success, failure/retry, duplicate, old session, barrier, ack recovery, backup, older native winter and legacy saves; confirm missing connection RED.
-- [ ] Connect the dedicated commit and handler. Do not add UI/state managers or automatically execute posting/spring.
-- [ ] Run new hook tests and existing posting/economy commit regressions; add real browser tests under the existing save-generations suite for publication/retry/reload and recovery. Run Chromium and mobile WebKit with `--workers=1 --retries=0`.
-- [ ] Record sources, before/after Mermaid, compatibility, validation and remaining work under `docs/validation/pr-c-open-offseason/README.md`; update ROADMAP's current note. Commit.
+- [x] Write hook tests that use real IndexedDB save/load and React adoption for success, failure/retry, duplicate, old session, barrier, ack recovery, backup, older native winter and legacy saves; confirm missing connection RED.
+- [x] Connect the dedicated commit and handler. Do not add UI/state managers or automatically execute posting/spring.
+- [x] Run new hook tests and existing posting/economy commit regressions; add real browser tests under the existing save-generations suite for publication/retry/reload and recovery. Run Chromium and mobile WebKit with `--workers=1 --retries=0`.
+- [x] Record sources, before/after Mermaid, compatibility, validation and remaining work under `docs/validation/pr-c-open-offseason/README.md`; update ROADMAP's current note. Commit.
 - [ ] Obtain fresh-context independent review of full base..HEAD and real data entry. Verify any findings with repro/tests. Run build and exact final HEAD mandatory CI, create PR, and stop for developer merge judgment.
 
 ## Execution record
@@ -58,3 +58,6 @@
 - Additional RED: real reserve-retirement/ceremony and in-season release each reject the completed gameDay144 snapshot in historical read validation. Permit reading their old facts through 144, preserving 1..143 creation/calendar checks and the world-level dated boundary requirement.
 - Task 1 GREEN: related eight files 374 passed; final new file 40 passed including a zero-approval/deficit case that retains all guaranteed contracts.
 - Task 2 initial RED: 13 failures (missing hook API/handler) and one pre-existing nonempty-decision refusal passed.
+- Hook GREEN 14 passed; existing economyCommit 18 and economyPosting 24 passed. New unit chain verifies the actual open candidate feeds existing 12-club native retirement/posting preparation.
+- Browser GREEN: Chromium 2 / mobile WebKit 2. Ruling: React's recovery flag becomes observable after the save promise resolves; wait for the committed flag with the existing default waitForFunction policy. Keep pending=true and exactly one publication assertions; do not change runtime deadlines/retries.
+- Task 2 final local GREEN: 13 related files / 468 tests passed, including all 55 new unit/hook tests. `npm run build` passed (existing chunk-size warning only). Final exact-HEAD full suite and mandatory browser matrix are delegated to existing CI, not duplicated locally.

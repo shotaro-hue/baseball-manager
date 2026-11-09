@@ -7,6 +7,7 @@ import { stadiumUpgradeCosts } from '../engine/clubFinance';
 import {createFarmCompetition} from '../engine/farmRecords';
 import {validateFarmSaveState} from '../engine/farmMigration';
 import { contractEconomyMode, reduceEconomyCommand } from '../engine/contractEconomy';
+import { reduceOpenOffseasonRequest } from '../engine/annualOpenOffseason';
 import { reduceAcquisitionRequest } from '../engine/acquisitionDecisions';
 import { advanceEconomyDecisions } from '../engine/economyDecisions';
 import { validateEconomySave } from '../engine/economyPersistence';
@@ -790,6 +791,11 @@ export function useGameState() {
     return commitEconomyOperation(request, reduceOffseasonPostingRequestAsync, sessionToken, { flushPendingBase: true });
   }, [commitEconomyOperation]);
 
+  const commitOpenOffseasonRequest = useCallback((request, sessionToken) => {
+    if (sessionToken === undefined) return Promise.resolve({ ok: false, reason: 'economy_session_conflict' });
+    return commitEconomyOperation(request, reduceOpenOffseasonRequest, sessionToken, { flushPendingBase: true });
+  }, [commitEconomyOperation]);
+
   const recoverEconomyCommand = useCallback(async () => {
     if (!economyMountedRef.current) return { ok: false, reason: 'economy_recovery_unavailable' };
     let context = economyCommitRef.current;
@@ -1542,7 +1548,7 @@ export function useGameState() {
     getLatestNewsId,
     markSaveDirty,
     hydrateSavedWorld, hydrateLargeSaveData, getMatchHistorySnapshot, hydrateMatchHistory, applyMatchResultPatch,
-    commitEconomyCommand, commitRenewalRequest, commitAcquisitionRequest, commitDueEconomyRequest, commitRookieRequest, commitTradeRequest, commitPostingDecisionRequest, commitPostingMarketRequest, commitPostingGenerationRequest, commitOffseasonPostingRequest, recoverEconomyCommand,
+    commitEconomyCommand, commitRenewalRequest, commitAcquisitionRequest, commitDueEconomyRequest, commitRookieRequest, commitTradeRequest, commitPostingDecisionRequest, commitPostingMarketRequest, commitPostingGenerationRequest, commitOffseasonPostingRequest, commitOpenOffseasonRequest, recoverEconomyCommand,
     resetSaveTracking,
     // derived
     myTeam,

@@ -7,6 +7,7 @@ import { economyClockFor, validateEconomyClock } from '../economyCalendar';
 import { contractEconomyMode, toAnnualState, reduceEconomyCommand, ANNUAL_ECONOMY_RELEASE_ENABLED } from '../contractEconomy';
 import { reserve, wrap } from './fixtures/annualRetirements';
 import { retirementIncomeCommand } from './fixtures/retirementIncome';
+import { offseasonPostingRequest, reduceOffseasonPostingRequest } from '../humanPosting';
 import { validateEconomySave, economyOverwriteIssue } from '../economyPersistence';
 import { quoteAnnualSpendingPlan } from '../annualSpending';
 import { forecastNextAnnualBudget } from '../annualBudgetForecast';
@@ -174,6 +175,21 @@ it('leaves legacy and pre-boundary native saves unchanged', () => {
     const before = json(w); const result = run(w, r);
     expect(result).toMatchObject({ ok: false }); expect(result.world).toBe(w); expect(json(w)).toEqual(before);
   }
+});
+
+it('feeds the existing native retirement/posting preparation without a fabricated winter clock', () => {
+  let w = budgetForecastWorld(createInitialTeams());
+  w.gameDay = 90; w.contractEconomy.clock = economyClockFor({ season: w.year, phase: 'season', schedule: w.schedule, gameDay: w.gameDay });
+  const player = w.teams[0].farm[0];
+  const reserved = reduceEconomyCommand(w, reserve(w, player.id)); expect(reserved.ok, reserved.error).toBe(true);
+  w = opened(closeNativePostseason(reserved.world));
+  const closingReceipt = json(w.contractEconomy.cycle.transitionReceipts[0]);
+  const prepared = reduceOffseasonPostingRequest(w, offseasonPostingRequest(w)); expect(prepared.ok, prepared.error).toBe(true);
+  expect(prepared.world.contractEconomy.revision).toBe(3);
+  expect(prepared.world.contractEconomy.engine.retirementReservations[0].finalization).toBeDefined();
+  expect(prepared.world.contractEconomy.cycle.transitionReceipts).toEqual([closingReceipt]);
+  expect(prepared.world.contractEconomy.engine.transactions.filter(t => t.generatedPostingRequests)).toHaveLength(12);
+  expect(prepared.world.year).toBe(2026); expect(validateEconomySave(prepared.world)).toBe('annual');
 });
 
 it.each([
