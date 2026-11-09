@@ -55,6 +55,12 @@ export function economySaveMetadata(world) {
 
 function preservesEconomyHistory(before, after) {
   if (canonical(before.randomRoot) !== canonical(after.randomRoot)) return false;
+  const oldTransitions = before.cycle.transitionReceipts, nextTransitions = after.cycle.transitionReceipts;
+  if (nextTransitions.length < oldTransitions.length
+    || !oldTransitions.every((r, i) => canonical(r) === canonical(nextTransitions[i]))) return false;
+  for (const r of nextTransitions.slice(oldTransitions.length)) if (r?.kind === 'open-offseason'
+    && (before.clock.phase !== 'season' || before.cycle.stage !== 'postseason'
+      || before.clock.date !== r.closingDate || r.baseRevision !== before.revision)) return false;
   const oldIncome = before.incomeReceipts, nextIncome = after.incomeReceipts;
   if (!Array.isArray(oldIncome) || !Array.isArray(nextIncome) || nextIncome.length < oldIncome.length
     || !oldIncome.every((row, i) => canonical(row) === canonical(nextIncome[i]))) return false;

@@ -67,7 +67,9 @@ export function inspectAnnualRetirements(state) {
       || parseContractDate(r.notifiedDate).year !== r.season || r.notifiedDate >= r.effectiveDate
       || r.effectiveDate !== day(r.season, '12-01') || !Number.isSafeInteger(r.gameDay) || r.gameDay < 1 || r.gameDay > SEASON_GAMES
       || (r.season === state.season && (r.notifiedDate > state.date || !['season', 'offseason'].includes(state.phase)
-        || (state.phase === 'season' && (!Number.isSafeInteger(state.gameDay) || state.gameDay < r.gameDay || state.gameDay > SEASON_GAMES))))) fail();
+        // Reading an earlier reservation at the completed postseason boundary
+        // is valid. Creating a reservation still requires official round 1..143.
+        || (state.phase === 'season' && (!Number.isSafeInteger(state.gameDay) || state.gameDay < r.gameDay || state.gameDay > SEASON_GAMES + 1))))) fail();
     seen.add(String(r.id)); people.add(String(r.playerId));
     const { finalization, ...reservation } = r;
     const c = normalizeRetirementCommand({ id: r.id, type: 'reserve-retirement', teamId: r.teamId, playerId: r.playerId, contractId: r.sourceContractId });
