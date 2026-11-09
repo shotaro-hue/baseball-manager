@@ -63,6 +63,8 @@ export function rankLeague(teams, league, { gameResultsMap = {}, previousStandin
   return { teams: ranked, warnings: [...warnings] };
 }
 
-export function standingsContext(history, gameResultsMap, year) {
-  return { gameResultsMap, previousStandings: history?.standingsHistory?.find(s => s.year === year - 1) };
+// The public rankLeague option keeps its historical name; it always contains
+// all clubs keyed by team ID, never the user-only day map.
+export function standingsContext(history, allTeamResultsMap, year) {
+  return { gameResultsMap: allTeamResultsMap, previousStandings: history?.standingsHistory?.find(s => s.year === year - 1) };
 }

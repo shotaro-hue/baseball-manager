@@ -784,7 +784,7 @@ export function useOffseason(gs) {
     const newInductees=checkHallOfFame(currentSeasonHistory.hallOfFame,allAlumni,year);
     const newHoF=[...currentSeasonHistory.hallOfFame,...newInductees];
     if(newInductees.length>0){newInductees.forEach(h=>{setMailbox(prev=>[...prev,{id:uid(),type:"hof",read:false,title:"🏛 殿堂入り: "+h.playerName,from:"球団殿堂委員会",dateLabel:year+"年",timestamp:Date.now(),body:h.playerName+"選手が"+year+"年度の球団殿堂入りを果たした。"+[h.careerHR>0?"通算"+h.careerHR+"本塁打":"",h.careerW>0?"通算"+h.careerW+"勝":"",h.careerPA>0?"通算"+h.careerPA+"打席":""].filter(Boolean).join(" / ")}]);});}
-    const makeRanking=(lg)=>rankLeague(developedTeams, lg, standingsContext(currentSeasonHistory, getGameResultsMap(), year))
+    const makeRanking=(lg)=>rankLeague(developedTeams, lg, standingsContext(currentSeasonHistory, allTeamResultsMap, year))
       .teams.map(t=>({id:t.id,name:t.name,emoji:t.emoji,wins:t.wins,losses:t.losses,draws:t.draws,rf:t.rf,ra:t.ra}));
     const standingsSnap={year,central:makeRanking("セ"),pacific:makeRanking("パ"),titles:awards.titles,playerAwards:{mvpCentral:awards.mvp?.central,mvpPacific:awards.mvp?.pacific,sawamura:awards.sawamura,rookie:awards.rookie}};
     setSeasonHistory(prev=>({...prev,awards:[...prev.awards,awards],records:newRec,hallOfFame:newHoF,standingsHistory:[...(prev.standingsHistory||[]),standingsSnap]}));

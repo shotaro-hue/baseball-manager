@@ -436,7 +436,7 @@ export default function HubContentRouter({ app, tab, onTabChange, onOpen = onTab
         <StandingsTab
           teams={teams}
           myId={myId}
-          rankingContext={standingsContext(gs.getSeasonHistory(), gs.getGameResultsMap(), year)}
+          rankingContext={standingsContext(gs.getSeasonHistory(), gs.allTeamResultsMap, year)}
           onTeamClick={gs.handleTeamClick}
         />
       </DeferredHubTab>

@@ -1,3 +1,5 @@
+import { rankLeague, standingsContext } from '../engine/standings';
+import { mergeTeamResultMaps } from '../engine/matchHistory';
 import {prepareFarmProgress,finishFarmProgress} from '../engine/farmProgression';
 import {selectFarmUsage} from '../engine/farmSelectors';
 import { regularSeasonRequest } from '../engine/seasonProgress';
@@ -119,14 +121,8 @@ function applyDhToTeam(team, useDh) {
   return prepareTeamForGame(team, useDh);
 }
 
-function calcLeagueRank(teamId, allTeams, league) {
-  const sameLeague = [...allTeams.filter((team) => team.league === league)]
-    .sort((a, b) => {
-      const pa = a.wins / Math.max(1, a.wins + a.losses);
-      const pb = b.wins / Math.max(1, b.wins + b.losses);
-      return pb - pa || (b.rf - b.ra) - (a.rf - a.ra);
-    });
-  return sameLeague.findIndex((team) => team.id === teamId) + 1;
+function calcLeagueRank(teamId, allTeams, league, context) {
+  return rankLeague(allTeams, league, context).teams.findIndex(team => team.id === teamId) + 1;
 }
 
 function tryCpuCpuDeadlineTrade(teamsArr, currentGameDay, schedule, myId) {
@@ -562,7 +558,8 @@ export function simulateSeasonBatch({
   const batchInjuries = [];
   const cpuHighlights = [];
 
-  const beforeRank = calcLeagueRank(state.myId, newTeams, myTeamBefore.league);
+  const beforeRank = calcLeagueRank(state.myId, newTeams, myTeamBefore.league,
+    standingsContext(state.seasonHistory, state.allTeamResultsMap, state.year));
   const beforeRecord = {
     w: myTeamBefore.wins,
     l: myTeamBefore.losses,
@@ -850,7 +847,8 @@ export function simulateSeasonBatch({
   const afterRecord = afterMyTeam
     ? { w: afterMyTeam.wins, l: afterMyTeam.losses, d: afterMyTeam.draws ?? 0 }
     : { w: 0, l: 0, d: 0 };
-  const afterRank = afterMyTeam ? calcLeagueRank(state.myId, newTeams, afterMyTeam.league) : beforeRank;
+  const afterRank = afterMyTeam ? calcLeagueRank(state.myId, newTeams, afterMyTeam.league,
+    standingsContext(nextSeasonHistory, mergeTeamResultMaps(state.allTeamResultsMap, allTeamResultsPatch), state.year)) : beforeRank;
 
   const nextState = {
     ...state,
