@@ -7,6 +7,7 @@ import { useOffseason } from './useOffseason';
 import { saveGame, loadGame, getSaveQueueSnapshot, loadPlayerCareerLogById } from '../engine/saveload';
 import { yearEndReviewWorld } from '../engine/__tests__/fixtures/yearEndRetirements';
 import { RetirePhaseScreen } from '../components/OffseasonReviewScreens';
+import { postingGenerationRequest } from '../engine/humanPosting';
 let gs, os, view, storage;
 const primary = 'baseball_manager_v1';
 beforeEach(() => {
@@ -64,6 +65,10 @@ it('keeps the root and player on failed publication and retries the same decisio
 it('guards the new entry against a stale session and the posting shortcut', async () => {
   const w = await setup(), handler = os.handleYearEndRetirements, root = storage.get(primary);
   expect(await run(() => os.handlePrepareAnnualPosting())).toBe(false); expect(storage.get(primary)).toBe(root);
+  const r = postingGenerationRequest(gs), session = gs.getProgressSessionToken();
+  expect(await run(() => gs.commitPostingGenerationRequest(r, session))).toMatchObject({ ok: false });
+  expect(await run(() => gs.commitOffseasonPostingRequest(r, session))).toMatchObject({ ok: false });
+  expect(storage.get(primary)).toBe(root); expect(gs.contractEconomy.revision).toBe(w.contractEconomy.revision);
   act(() => expect(gs.hydrateSavedWorld(w, { progressToken: gs.getProgressToken(), sessionToken: gs.getProgressSessionToken() })).toBe(true));
   expect(await run(() => handler(choices()))).toBe(false); expect(storage.get(primary)).toBe(root);
 });

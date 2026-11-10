@@ -98,3 +98,24 @@ test('save generations: year-end retirement review continues into posting withou
       posting: e.engine.transactions.filter(t => t.annualOffseasonPosting).length };
   })).toEqual({ revision: 3, years: 1, posting: 1 });
 });
+
+test('save generations: year-end retirement review is required from the inbox before new posting', async ({ page }) => {
+  await page.goto('/'); await mount(page);
+  await page.getByRole('button', { name: '受信箱へ', exact: true }).click();
+  await expect(page.getByRole('region', { name: '年度の海外挑戦' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '海外挑戦の希望を確認する', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '期末の引退判断へ', exact: true }).click();
+  await expect(page.getByRole('region', { name: '期末の引退判断', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => ({ revision: window.yearEndHarness.current().contractEconomy.revision,
+    prepared: window.yearEndHarness.current().contractEconomy.engine.transactions.some(t => t.annualPostingPhase) })))
+    .toEqual({ revision: 1, prepared: false });
+  await page.getByRole('button', { name: '引退を受け入れる', exact: true }).click();
+  await page.getByRole('button', { name: '期末の引退判断を確認する' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '引退判断を保存する' }).click();
+  await expect(page.getByRole('region', { name: '保存済みの期末引退結果' })).toBeVisible();
+  await page.getByRole('button', { name: '受信箱へ', exact: true }).click();
+  await page.getByRole('button', { name: '海外挑戦の希望を確認する', exact: true }).click();
+  await page.getByRole('region', { name: '海外挑戦の希望確認', exact: true }).getByRole('button', { name: '希望を確認して保存する', exact: true }).click();
+  await expect(page.getByRole('region', { name: '年度の海外挑戦' }).getByRole('status')).toContainText('希望確認済み');
+  expect(await page.evaluate(() => window.yearEndHarness.current().contractEconomy.revision)).toBe(3);
+});

@@ -57,6 +57,18 @@ flowchart TD
 
 この修正後は関連hook/UI3ファイル43件成功。Chromium5件/WebKit5件、計10件成功（再読込なしの連続操作を含む）。旧HEADのCI #735は停止し、修正後HEADのCIを最終受入に使う。ローカルの全suiteも旧HEADから開始した実行中に修正したため、最終HEAD全件の根拠として流用しない。
 
+### 受信箱の別入口も同じ順序へ接続
+
+追加の別入口確認で、新open-offseason直後に受信箱で希望生成すると期末引退全体を飛ばせるP1を再現した。別コンテキストも実producer/reducerで確認。`contractEconomy.runCommand`の共通world境界で、新規`advance-posting-phase`/`prepare-offseason-posting`/`generate-posting-requests`を未判断時に拒否する。既存IDの再利用・保存済み旧phaseは維持する。受信箱も同じpredicateで引退判断へ戻し、受信箱自体の閲覧は妨げない。
+
+両準備API・直接生成・実保存拒否の4ケースと実受信箱旅程をRED→GREENで検証。最新追加はcore30/hook5、計35件。関連8ファイル160件成功（従来の引退単体群は前段で確認）。元のPR-C→posting統合は、新規判断を実取引で間に入れ、元の閉幕receipt/成績/引退/12球団/時計の期待値を保持する。追加操作分だけrevisionを3→4とした。
+
+旧有効順序は、修正前`e636103`の実producerから固定した[旧posting済みfixture](../../../src/engine/__tests__/fixtures/yearEndOldPosting.md)でcold validation/replayを確認する。修正後の入口を抜け道で動かして旧fixtureを捏造しない。別コンテキストが修正差分とfixtureの由来を再確認し、両準備拒否・直接生成拒否・旧保存の4件を独立に成功。修正に未解消の確定指摘なし。
+
+旧CI #736も旧HEADとなったため停止。最終HEAD/必須CI/ブラウザ件数はPR本文を正本とする。
+
+共通入口修正後の最終ブラウザ検証は、Chromium6件/WebKit6件、計12件成功。受信箱の未判断誘導→判断保存→受信箱からの希望生成、reloadなしの連続操作、3幅の保存失敗/再試行/cold reload、公開後復旧を同じ最終ソースで確認した。既存timeout/retries/期待値は維持する。
+
 ## 同一状態の画面比較
 
 12球団の小規模native fixture、同じ保存済み12/1から比較。変更前は基準mainの既存画面を描画、変更後は実AppScreenRouter/実hookを使用。比較撮影だけの一時moduleは削除した。
@@ -68,6 +80,14 @@ flowchart TD
 | 1440px | [変更前](screenshots/1440-before.png) | [判断](screenshots/1440-review.png) | [結果](screenshots/1440-saved.png) |
 
 保存失敗の確認dialog保持/同じ意向の再試行とcold reloadはE2E添付画像/traceも記録する。表示境界/CSS変更はない。モバイル判断画面とdesktop結果も画像を開いて確認した。
+
+受信箱内の「年度の海外挑戦」パネルも、同じnative world・同じwrapperで比較した（修正前componentと修正後component。実ナビ操作は別途E2E）。
+
+| 幅 | 受信箱の変更前 | 受信箱の変更後 |
+|---|---|---|
+| 360px | [変更前](screenshots/360-inbox-before.png) | [判断への案内](screenshots/360-inbox-after.png) |
+| 390px | [変更前](screenshots/390-inbox-before.png) | [判断への案内](screenshots/390-inbox-after.png) |
+| 1440px | [変更前](screenshots/1440-inbox-before.png) | [判断への案内](screenshots/1440-inbox-after.png) |
 
 ## 互換と残る限界
 

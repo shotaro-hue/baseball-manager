@@ -1,6 +1,6 @@
 import { nativeFaExerciseOrigins } from './annualFaDeclarations';
 import { inspectRetirementCalendar } from './annualRetirements';
-import { assertYearEndRetirementCoverage } from './annualYearEndRetirements';
+import { assertYearEndRetirementCoverage, requiresYearEndRetirements } from './annualYearEndRetirements';
 import { inspectAnnualBudgetCoverage } from './annualBudgetPolicy';
 import { employmentContractId, projectEmploymentPlayer, validateAnnualEmploymentContract, normalizeEmploymentContract } from './seasonContract';
 import { createSeasonContract } from './seasonContract';
@@ -188,6 +188,9 @@ function runCommand(world, command, apply = applyAnnualTransaction) {
     || command.saveId !== current.saveId || command.epoch !== current.epoch || !counter(command.baseRevision)
     || command.baseRevision > current.baseRevision || !command.transaction) fail('取引のsaveId・epoch・revisionが古いか未記録です。');
   const c = command.transaction;
+  if (['advance-posting-phase', 'prepare-offseason-posting', 'generate-posting-requests'].includes(c.type)
+    && !state.transactions.some(r => r.id === c.id) && requiresYearEndRetirements(world))
+    fail('先に期末の引退判断を保存してください。');
   if (['advance-posting-phase', 'prepare-offseason-posting', 'prepare-year-end-retirements'].includes(c.type) && c.humanTeamId !== world.myId) fail('自球団の判断をCPUへ委任できません。');
   if (c.type === 'prepare-year-end-retirements' && !state.transactions.some(r => r.id === c.id)
     && world.contractEconomy.decisions.some(d => d.kind === 'human-renewal' && d.status === 'pending'))

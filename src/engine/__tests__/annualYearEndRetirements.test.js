@@ -1,4 +1,6 @@
 import { expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
 import { closedPostseasonWorld } from './fixtures/openOffseason';
 import { openOffseasonRequest, reduceOpenOffseasonRequest } from '../annualOpenOffseason';
 import { reduceEconomyCommand, reduceEconomyCommandAsync, toAnnualState } from '../contractEconomy';
@@ -6,7 +8,7 @@ import { validateEconomySave, economyOverwriteIssue } from '../economyPersistenc
 import { contractLiabilityRows } from '../contractLedger';
 import { wrap } from './fixtures/annualRetirements';
 import { freezeEconomy } from './fixtures/economyWorld';
-import { reduceOffseasonPostingRequest, offseasonPostingRequest } from '../humanPosting';
+import { reducePostingGenerationRequest, reduceOffseasonPostingRequest, offseasonPostingRequest } from '../humanPosting';
 import { createInitialTeams } from '../bootstrapTeams';
 import { yearEndReviewWorld } from './fixtures/yearEndRetirements';
 import { yearEndRetirementCandidates } from '../annualYearEndRetirements';
@@ -15,6 +17,7 @@ import { closeNativePostseason } from './fixtures/openOffseason';
 import { economyClockFor } from '../economyCalendar';
 import { retirementCareerEntries } from '../annualRetirements';
 import { createSeasonContract } from '../seasonContract';
+import { postingGenerationId } from '../generatedPostingRequests';
 
 function winter() {
   const w = closedPostseasonWorld();
@@ -84,9 +87,23 @@ it.each([
 });
 
 it('refuses to insert fresh retirement decisions after posting while keeping that old save readable', () => {
-  const w = winter(), p = reduceOffseasonPostingRequest(w, offseasonPostingRequest(w)); expect(p.ok).toBe(true);
+  // Fixed by the actual pre-guard producer; do not manufacture new posting
+  // through a now-forbidden order merely to stand in for an older save.
+  const w = JSON.parse(gunzipSync(readFileSync(new URL('./fixtures/yearEndOldPosting.json.gz', import.meta.url))));
+  const p = reduceOffseasonPostingRequest(w, offseasonPostingRequest(w)); expect(p.ok).toBe(true); expect(p.replayed).toBe(true);
   expect(validateEconomySave(p.world)).toBe('annual');
   expect(reduceEconomyCommand(p.world, command(p.world))).toMatchObject({ ok: false, world: p.world });
+});
+
+it.each([reducePostingGenerationRequest, reduceOffseasonPostingRequest])('requires year-end review at the shared posting preparation boundary', prepare => {
+  const w = freezeEconomy(winter()), before = structuredClone(w);
+  const r = prepare(w, offseasonPostingRequest(w));
+  expect(r).toMatchObject({ ok: false, world: w }); expect(r.error).toContain('期末'); expect(w).toEqual(before);
+});
+it('rejects direct per-club posting generation before year-end review', () => {
+  const w = freezeEconomy(winter());
+  const r = reduceEconomyCommand(w, wrap(w, { id: postingGenerationId(w.year, w.myId), type: 'generate-posting-requests', teamId: w.myId }));
+  expect(r).toMatchObject({ ok: false, world: w }); expect(r.error).toContain('期末');
 });
 
 it.each(['outcome', 'inputs', 'child', 'order'])('rejects corrupt year-end evidence: %s', edit => {
