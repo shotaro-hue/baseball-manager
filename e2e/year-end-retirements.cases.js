@@ -116,6 +116,8 @@ test('save generations: year-end retirement review is required from the inbox be
   await page.getByRole('button', { name: '受信箱へ', exact: true }).click();
   await page.getByRole('button', { name: '海外挑戦の希望を確認する', exact: true }).click();
   await page.getByRole('region', { name: '海外挑戦の希望確認', exact: true }).getByRole('button', { name: '希望を確認して保存する', exact: true }).click();
-  await expect(page.getByRole('region', { name: '年度の海外挑戦' }).getByRole('status')).toContainText('希望確認済み');
+  const posting = page.getByRole('region', { name: '年度の海外挑戦' });
+  await expect(posting.getByRole('status').filter({ hasText: '希望確認済み' })).toBeVisible();
+  await expect(posting.getByRole('status').filter({ hasText: '希望の保存・反映を確認しています…' })).toHaveCount(0);
   expect(await page.evaluate(() => window.yearEndHarness.current().contractEconomy.revision)).toBe(3);
 });
