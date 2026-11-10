@@ -61,13 +61,15 @@ function AnnualRetirementPostingScreen({ annualWorld: world, onPrepare, onYearEn
   const wrongOrder = pending.length > 0 && ts.some(t => t.generatedPostingRequests?.season === year || t.annualPostingPhase?.season === year);
   const dated = e.clock.phase === 'offseason' && e.clock.date === `${String(year).padStart(4, '0')}-12-01`;
   const [review, setReview] = useState(false), close = useCallback(() => setReview(false), []);
-  const advance = useAdvance(async () => { const ok = await (needsReview ? onYearEnd(choices) : onPrepare()); if (ok) setReview(false); return ok; });
+  const yearEndAdvance = useAdvance(async () => { const ok = await onYearEnd(choices); if (ok) setReview(false); return ok; });
+  const postingAdvance = useAdvance(async () => { const ok = await onPrepare(); if (ok) setReview(false); return ok; });
+  const advance = needsReview ? yearEndAdvance : postingAdvance;
   useEffect(() => { setChoices([]); setReview(false); }, [scope]);
   const recover = useAdvance(async () => {
     const result = await onRecover(); if (result?.ok) setReview(false); return result?.ok === true;
   });
   const recovery = world.isEconomyRecoveryPending || world.saveResult?.reason === 'economy_adoption_required';
-  const busy = advance.busy || recover.busy || world.saveQueueState?.isSaving;
+  const busy = yearEndAdvance.busy || postingAdvance.busy || recover.busy || world.saveQueueState?.isSaving;
   const recoveryButton = useRef(null);
   useEffect(() => { if (recovery && !busy) recoveryButton.current?.focus(); }, [recovery, busy]);
   const unanswered = candidates.some(r => !choices.some(d => d.playerId === r.playerId));
@@ -114,7 +116,7 @@ function AnnualRetirementPostingScreen({ annualWorld: world, onPrepare, onYearEn
     <p className="review-note">成長・契約更改・翌春への年度進行は未接続です。この操作では年度を進めません。</p>
     {review && !saved && !recovery && <Confirm title={needsReview ? '期末引退判断の最終確認' : '引退予約と希望確認の最終確認'} onClose={close}
       onConfirm={() => advance.run()} label={needsReview ? '引退判断を保存する' : '予約と希望確認を保存する'} disabled={!dated || wrongOrder || needsReview && unanswered}
-      busy={advance.busy} error={advance.failure}>
+      busy={busy} error={advance.failure}>
       {needsReview ? <><p>自球団の意向 {choices.length}人、{teams.length}球団の期末判断、未確定の予約 {pending.length}人をまとめて保存します。</p>
         <ul>{candidates.map(r => <li key={r.playerId}>{r.name}：{choices.find(d => d.playerId === r.playerId)?.choice === 'retain' ? '引き留めを試みる' : '引退を受け入れる'}</li>)}</ul>
         <p>保存後に結果を確認できます。海外挑戦の希望確認は次の操作です。</p></> : <>

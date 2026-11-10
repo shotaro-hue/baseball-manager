@@ -53,6 +53,10 @@ flowchart TD
 
 レビューが追加未実行とした正式留保/将来契約の人・CPU対、低意欲除外・生存選手の後続変更は、実装側で対象検証を追加。最終HEADの全件/ブラウザ/CIをレビュー実施の代わりにはせず、結果をPRへ記載する。
 
+提出前の追加確認で、reloadを挟まず引退保存→postingを同画面で続けると、旧useAdvanceの成功済みlockが残り二つ目を実行できないことを実装側で再現した。初期E2Eはcold reload後のpostingだけを確認していた。実hook/UIの連続操作をRED→GREENで修正し、二つの独立操作へそれぞれ既存useAdvanceを適用する。共通legacyのlockは変更しない。reloadなしの実ブラウザ回帰を追加し、両操作の一回保存/revisionを確認する。最終件数・最新HEADのCIはPR本文を正本とする。
+
+この修正後は関連hook/UI3ファイル43件成功。Chromium5件/WebKit5件、計10件成功（再読込なしの連続操作を含む）。旧HEADのCI #735は停止し、修正後HEADのCIを最終受入に使う。ローカルの全suiteも旧HEADから開始した実行中に修正したため、最終HEAD全件の根拠として流用しない。
+
 ## 同一状態の画面比較
 
 12球団の小規模native fixture、同じ保存済み12/1から比較。変更前は基準mainの既存画面を描画、変更後は実AppScreenRouter/実hookを使用。比較撮影だけの一時moduleは削除した。

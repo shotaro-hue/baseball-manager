@@ -82,3 +82,19 @@ test('save generations: year-end retirement review recovers a published result w
     .toEqual({ sameRoot: true, publications: 1 });
   await page.evaluate(() => { Storage.prototype.setItem = window.yearEndFault.write; });
 });
+
+test('save generations: year-end retirement review continues into posting without reloading', async ({ page }) => {
+  await page.goto('/'); await mount(page);
+  await page.getByRole('button', { name: '引退を受け入れる', exact: true }).click();
+  await page.getByRole('button', { name: '期末の引退判断を確認する' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '引退判断を保存する' }).click();
+  await expect(page.getByRole('region', { name: '保存済みの期末引退結果' })).toBeVisible();
+  await page.getByRole('button', { name: '引退予約を確定して希望を確認する' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '予約と希望確認を保存する' }).click();
+  await expect(page.getByRole('status')).toContainText('引退予約と希望確認を保存済み');
+  expect(await page.evaluate(() => {
+    const e = window.yearEndHarness.current().contractEconomy;
+    return { revision: e.revision, years: e.engine.transactions.filter(t => t.yearEndRetirements).length,
+      posting: e.engine.transactions.filter(t => t.annualOffseasonPosting).length };
+  })).toEqual({ revision: 3, years: 1, posting: 1 });
+});

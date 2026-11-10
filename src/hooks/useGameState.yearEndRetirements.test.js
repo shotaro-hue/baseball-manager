@@ -89,4 +89,7 @@ it('collects intent in the annual review screen and shows only saved results', a
   await run(() => button('引退判断を保存する').props.onClick());
   expect(facts().candidates[0].outcome).toBe('accepted');
   expect(button('引退予約を確定して希望を確認する')).toBeTruthy();
+  act(() => button('引退予約を確定して希望を確認する').props.onClick());
+  await run(() => button('予約と希望確認を保存する').props.onClick());
+  expect(gs.contractEconomy.engine.transactions.at(-1).annualOffseasonPosting).toBeDefined();
 });

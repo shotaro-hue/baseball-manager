@@ -52,3 +52,5 @@
 - core新規27/hook5、計32件。初期RED→GREENと独立レビューのP2整合性5ケースRED→GREENを確認。関連8ファイル195件成功。
 - Chromium4件、公式WebKit4件（360/390/1440pxと公開後復旧）成功。WebKitの不足依存を公式配布から/tmpへ展開し実起動。実iPhoneとは区別。
 - レビュー対象082f55fのP2は完全worldでの逆参照検証で修正。中間子candidateの既存共通審査は維持。その他の確定P0/P1/P2なし。
+- 追加の実装側確認でreloadなしの同画面連続操作に成功済みUI lockが残ることを再現。hook/UIの同一旅程RED→GREEN、操作ごとに既存lockを分離し、実ブラウザ回帰を追加。旧CI #735は旧HEADの記録とし、修正後HEADの必須CIを最終根拠とする。
+- 連続操作修正後hook/UI43件・Chromium5件/WebKit5件が成功。旧HEADから開始したローカル全suiteは最終HEAD根拠として流用しない。通常CIで同じ全セットを理由なくさらに重複実行しない。
