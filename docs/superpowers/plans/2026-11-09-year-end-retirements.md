@@ -66,6 +66,7 @@
 - [x] 実producer→`validateEconomySave`/`toAnnualState`→初回保存/冷読込/backup復旧でcontinued欠落・入力/ID改変、accepted欠落、子ID改変を調査。
 - [x] 判断: continuedの過去母集団は既存証跡から証明不能。現在名簿で遡及再計算せず、検出限界を検証文書とPRへ明記する。公開済みreceiptの変更拒否と正常なcontinued履歴はテストで維持する。
 - [x] 旧native冬で人向けAPIは拒否、共通APIは新規判断を受理する不一致を再現。修正前の実producerから保存済み操作fixtureを固定する。
-- [ ] `annualYearEndRetirements.test.js`/hookに新規共通API拒否の回帰を追加しREDを確認。正常open済み・保存済み再実行・旧posting・不正revision/年度/sessionを対で検証する。
-- [ ] `contractEconomy.js`の`runCommand`で新規期末判断だけ`requiresYearEndRetirements(world)`を要求しGREEN。読込検証と既存receiptのreplayには開始条件を遡及適用しない。
-- [ ] 関連unit/integration/hook・Chromium/WebKit E2Eを実行し、AGENTS.mdに従う独立レビュー、既存ブランチへの追加コミット、最終HEAD必須CI確認、PRへの結果記録を行う。マージせず停止する。
+- [x] `annualYearEndRetirements.test.js`/hookに新規共通API拒否の回帰を追加しREDを確認。正常open済み・保存済み再実行・旧posting・不正revision/年度/sessionを対で検証する。
+- [x] `contractEconomy.js`の`runCommand`で新規期末判断だけ`requiresYearEndRetirements(world)`を要求しGREEN。読込検証と既存receiptのreplayには開始条件を遡及適用しない。
+- [x] 関連12ファイル351件・Chromium6/WebKit6件成功。追加回帰16件、既存3件の失敗→成功を確認。実iPhoneは未検証。
+- 最終提出: AGENTS.mdに従う独立レビュー、既存ブランチへの追加コミット、最終HEAD必須CI確認、PRへの結果記録を行う。最終SHA/CI/レビューの確定結果はPR本文を正本とし、マージせず停止する。

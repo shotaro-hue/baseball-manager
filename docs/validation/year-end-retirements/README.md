@@ -62,8 +62,10 @@ receiptは`toAnnualState`から既存の`inspectOpenOffseason`で先に検証さ
 
 - RED: 新規共通APIの同期/非同期2件、実保存hook1件が`ok:true`のため失敗。最小4行追加後、同じ3件を含むcore44/hook7の51件成功。
 - 新規回帰はcore14/hook2の計16件。既存テストの削除・skip追加・期待値緩和・retry/timeout変更なし。
-- 関連unit/integration/hookの追加7ファイル264件成功。`npm run build`成功（既存のbundleサイズ警告あり）。
-- Chromiumの既存期末引退E2E6件成功。WebKit・最終HEAD必須CI・独立レビューの結果はPR本文と本節の追記を参照。
+- 関連unit/integration/hookは7ファイル264件と、core/hook/postingの5ファイル87件、計12ファイル351件成功。`npm run build`成功（既存のbundleサイズ警告あり）。
+- Chromium6件/WebKit6件、計12件成功。各360/390/1440pxの失敗→同意向再試行→cold reload、公開後ack中断/一回公開、reloadなしposting、受信箱の先行拒否を含む。既存の`save-generations.spec.js --grep 'year-end retirement' --workers=1 --retries=0`を各projectで実行。
+- WebKit初回6件は全てアプリ実行前に`libwoff2dec.so.1.0.2`不足で起動失敗。公式ラッパーが外部`LD_LIBRARY_PATH`を上書きするため、公式WebKit v2215の同一コピーとチェックサム照合済みDebian 13依存10パッケージを`/tmp`へ配置して再実行し全6件成功。ldconfig事前検査だけ省略し、ブラウザとテストの実行は省略していない。CI設定・待機時間・retry・テスト期待値は変更していない。
+- 最終HEAD必須CI・独立レビューの結果はPR本文/最終報告を正本とする。旧HEAD #738の成功を新HEADのCI結果として流用しない。
 - 公開OFF/schemaVersion1/DB5、保存→公開root照合→React採用確認→ackの順序を維持。保存やhook本体の変更なし。
 - 実iPhone Safariは未実施。指摘①の完全性は残るため、マージ判断はこの限界の受容を条件とする。
 
