@@ -58,3 +58,14 @@
 - 旧e636103の実producerから旧posting保存fixtureを固定し、再利用を検証。独立レビュアーが限定修正差分と互換fixtureを再確認、対象4件成功。受信箱パネルの3幅比較画像と限定レビューを完了。旧CI #736は停止し、最終HEADの必須CIを確認する。
 - 最終ソースのChromium6件/WebKit6件、計12件成功。受信箱経由・reloadなし連続操作・3幅の保存/再試行/再開・公開後復旧を含む。
 - CI #737で受信箱E2Eの汎用status指定が一時的な2要素に一致して失敗。保存済み表示を特定し、処理中表示が消えるまで確認する。製品・期待する保存結果・timeout/retries/CI設定は変更しない。別の既存open-offseason単体テストの10秒超過は基準mainのCPU負荷下でも再現し、待機デッドロックは否定した。詳細は検証記録。修正後HEADの必須CIを確認する。
+
+## 2026-11-14 PR #562レビュー指摘の調査・最小修正
+
+ユーザーの調査・追加コミット・最終CI確認指示に従って同じPRを継続する。基準mainは`259c200b`、調査開始HEADは`88f081ad`で変化なし。公開OFF/schema1/DB5、既存テスト・保存順序・履歴保護を維持し、新機能・新形式・暗黙移行は加えない。
+
+- [x] 実producer→`validateEconomySave`/`toAnnualState`→初回保存/冷読込/backup復旧でcontinued欠落・入力/ID改変、accepted欠落、子ID改変を調査。
+- [x] 判断: continuedの過去母集団は既存証跡から証明不能。現在名簿で遡及再計算せず、検出限界を検証文書とPRへ明記する。公開済みreceiptの変更拒否と正常なcontinued履歴はテストで維持する。
+- [x] 旧native冬で人向けAPIは拒否、共通APIは新規判断を受理する不一致を再現。修正前の実producerから保存済み操作fixtureを固定する。
+- [ ] `annualYearEndRetirements.test.js`/hookに新規共通API拒否の回帰を追加しREDを確認。正常open済み・保存済み再実行・旧posting・不正revision/年度/sessionを対で検証する。
+- [ ] `contractEconomy.js`の`runCommand`で新規期末判断だけ`requiresYearEndRetirements(world)`を要求しGREEN。読込検証と既存receiptのreplayには開始条件を遡及適用しない。
+- [ ] 関連unit/integration/hook・Chromium/WebKit E2Eを実行し、AGENTS.mdに従う独立レビュー、既存ブランチへの追加コミット、最終HEAD必須CI確認、PRへの結果記録を行う。マージせず停止する。

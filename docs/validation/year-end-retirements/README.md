@@ -2,6 +2,71 @@
 
 基準main `259c200b18518a228f69abd12274c304be57a027`（PR-C #561マージ済み）。[設計](../../superpowers/specs/2026-11-09-year-end-retirements-design.md)／[計画](../../superpowers/plans/2026-11-09-year-end-retirements.md)。最終HEAD・必須CIは提出PR本文を正本とする。
 
+## 2026-11-14 PR #562の指摘再調査
+
+開始時の最新mainは上記と同じ、PR HEADは`88f081ad8a5a23d1a5db3fa3566be8cd8661c9fe`。
+差分38ファイルと既存設計・テストを照合。GitHubのコメント・レビュー・未解決threadは0件、旧HEADのCI #738は成功。
+以下はユーザーの2指摘を現行コードで再現した結果であり、以前の「確定指摘なし」を更新する。
+
+### 指摘①: CPU continuedの保存証跡（再現、P2相当の検出限界を残す）
+
+`yearEndReviewWorld()`の実閉幕/財務/open-offseason producerから、自球団・CPUのaccepted各1名に、
+CPU球団2の`age:35, retireStyle:0, stats:{PA:500}`を加え、実`reduceEconomyCommand`で生成。
+候補3名はaccepted/accepted/continued。各改変は正常な生成結果の独立cloneへ適用した。
+
+| 改変 | `validateEconomySave` / `toAnnualState` | 元worldからの初回`saveGame` | 冷読込・backup復旧 |
+|---|---|---|---|
+| CPU continued行を削除 | 通過 | 成功（候補2名） | 改変後の2名を受理 |
+| continuedの保存入力PAを500→501 | 通過 | 成功（候補3名） | 改変後の入力を受理 |
+| continuedのplayerIdを`phantom-continued`へ変更 | 通過 | 成功（候補3名） | 改変後のIDを受理 |
+| CPU accepted行とそのcreatedReservationIds要素を削除 | 拒否 | `economy_payload_invalid` | 元の正常worldを維持 |
+| 親finalizationIdsの先頭を2個目のIDへ変更 | 拒否 | `economy_payload_invalid` | 元の正常worldを維持 |
+
+保存は実`saveGame`/`loadGame`とfake-indexeddb、冷読込は新しいlocalStorageオブジェクトでwarm観測を破棄。
+backup復旧は保存rootをbk1へ置いてprimaryを除き、再度cold `loadGame`し`source:backup-1`を確認。
+再現専用の一時テスト2件は成功後に除去し、破損受理を正しい挙動として必須テストへ固定していない。
+
+全改変とも、既に公開済みの**正常な判断world**を上書きする場合は同revisionで`economy_revision_conflict`、
+revisionを進めても`economy_history_conflict`となる。新規候補への`economyOverwriteIssue`単独検査は
+全例nullだが、accepted/親子不整合はそれより前のpayload検証で拒否される。
+公開済みcontinued履歴の削除・入力/ID変更拒否を3回帰へ追加した。
+
+原因: `inspectYearEndRetirements`は存在する行のスコア入力・固定乱数結果を検証し、
+`assertYearEndRetirementCoverage`は引退子取引から親を逆引きする。continuedには子取引がなく、
+親signatureにもCPU対象一覧はない。既存形式だけでは「当時の全候補が記録された」ことを独立に証明できない。
+実producerは保存時に全候補を列挙するが、初回保存前に上記のように改変された整合的payloadを検出する保証はない。
+
+**この指摘は解消済みとは扱わない。** 新しい正本・母集団snapshot・digest・暗黙移行は追加しない。
+現在の名簿/年齢/成績から過去候補を再計算すると合法な成長・配置・移籍・年度更新を拒否し得るため採用しない。
+正しいcontinued履歴は、その後の入力変更・一軍→二軍移動・翌年engine投影でも検証/旧コマンドreplayが成功する回帰を追加。
+翌年投影は検証用であり、本番annual年度更新の完走確認ではない。
+
+### 指摘②: 開始根拠の共通API検証（再現、P2、最小修正）
+
+開始receiptなしの既存`winter(economyFixture())`・明示gameDay144で、人向け
+`reduceYearEndRetirementsRequestAsync`は拒否する一方、同期/非同期`reduceEconomyCommand`は新規実行した。
+実hookの`commitEconomyCommand`でも保存が成功し、入口条件の不一致を確認。
+
+`contractEconomy.runCommand`で、**未保存の**`prepare-year-end-retirements`だけ既存の
+`requiresYearEndRetirements(world)`を要求する。これにより正常な同年度open-offseason receiptが必要になり、
+posting保存後の後付け実行も引き続き拒否する。UI・engine保存形式・読込検証は変更しない。
+receiptは`toAnnualState`から既存の`inspectOpenOffseason`で先に検証される。
+
+修正前の実producerで固定した[開始receiptなしの保存済み判断fixture](../../../src/engine/__tests__/fixtures/yearEndOldNativeDecision.md)
+を追加。正当な旧native冬の読込/従来posting、新open済みの新規実行、旧保存済み判断のcold validation・
+元revisionの同期/非同期/人向けreplay・実保存/backup復旧が成功する。
+保存済み操作のreplayには新しい開始根拠を遡及要求しない。不正save/epoch/revision/年度/日付、
+保存意向の変更、既存hookの旧sessionは拒否する。
+
+### 検証と判断
+
+- RED: 新規共通APIの同期/非同期2件、実保存hook1件が`ok:true`のため失敗。最小4行追加後、同じ3件を含むcore44/hook7の51件成功。
+- 新規回帰はcore14/hook2の計16件。既存テストの削除・skip追加・期待値緩和・retry/timeout変更なし。
+- 関連unit/integration/hookの追加7ファイル264件成功。`npm run build`成功（既存のbundleサイズ警告あり）。
+- Chromiumの既存期末引退E2E6件成功。WebKit・最終HEAD必須CI・独立レビューの結果はPR本文と本節の追記を参照。
+- 公開OFF/schemaVersion1/DB5、保存→公開root照合→React採用確認→ackの順序を維持。保存やhook本体の変更なし。
+- 実iPhone Safariは未実施。指摘①の完全性は残るため、マージ判断はこの限界の受容を条件とする。
+
 ## プレイヤーができることと完成範囲
 
 保存済みnative 12/1の引退整理で、自球団の一軍/二軍の期末引退候補を確認し、受入/慰留の意向を選んで保存する。CPU判断も同時に確定し、結果と保証を確認後、別操作で既存の海外挑戦希望確認へ進む。保存失敗は同じ意向で再試行、公開後の中断は同じ画面から復旧できる。

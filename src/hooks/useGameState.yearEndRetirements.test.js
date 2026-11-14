@@ -1,6 +1,8 @@
 import React from 'react';
 import { act, create } from 'react-test-renderer';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { useGameState } from './useGameState';
 import { useOffseason } from './useOffseason';
@@ -8,6 +10,8 @@ import { saveGame, loadGame, getSaveQueueSnapshot, loadPlayerCareerLogById } fro
 import { yearEndReviewWorld } from '../engine/__tests__/fixtures/yearEndRetirements';
 import { RetirePhaseScreen } from '../components/OffseasonReviewScreens';
 import { postingGenerationRequest } from '../engine/humanPosting';
+import { economyFixture } from '../engine/__tests__/fixtures/economyWorld';
+import { winter, wrap } from '../engine/__tests__/fixtures/annualRetirements';
 let gs, os, view, storage;
 const primary = 'baseball_manager_v1';
 beforeEach(() => {
@@ -97,4 +101,35 @@ it('collects intent in the annual review screen and shows only saved results', a
   act(() => button('引退予約を確定して希望を確認する').props.onClick());
   await run(() => button('予約と希望確認を保存する').props.onClick());
   expect(gs.contractEconomy.engine.transactions.at(-1).annualOffseasonPosting).toBeDefined();
+});
+
+it('keeps the saved old winter and root unchanged when the common commit API lacks opening evidence', async () => {
+  const old = winter(economyFixture()); old.gameDay = 144;
+  Object.assign(old.teams[0].players[0], { age: 42, retireStyle: 100 });
+  const w = await setup(old), root = storage.get(primary);
+  const c = wrap(w, { id: JSON.stringify(['year-end-retirements', w.year]), type: 'prepare-year-end-retirements',
+    humanTeamId: w.myId, decisions: [{ playerId: 0, choice: 'accept' }] });
+  expect(await run(() => gs.commitEconomyCommand(c))).toMatchObject({ ok: false });
+  expect(storage.get(primary)).toBe(root);
+  expect(gs.teams).toEqual(w.teams); expect(gs.contractEconomy).toEqual(w.contractEconomy);
+  expect((await loadGame()).contractEconomy).toEqual(w.contractEconomy);
+});
+
+it('cold-loads and recovers a pre-guard saved continued decision then reuses the original request', async () => {
+  const w = JSON.parse(gunzipSync(readFileSync(new URL('../engine/__tests__/fixtures/yearEndOldNativeDecision.json.gz', import.meta.url))));
+  await setup(w); const root = storage.get(primary), economy = structuredClone(w.contractEconomy);
+  const c = wrap(w, { id: JSON.stringify(['year-end-retirements', w.year]), type: 'prepare-year-end-retirements',
+    humanTeamId: w.myId, decisions: [{ playerId: 0, choice: 'accept' }] }); c.baseRevision = 0;
+  expect(await run(() => gs.commitEconomyCommand(c))).toMatchObject({ ok: true, replayed: true });
+  expect(storage.get(primary)).toBe(root);
+  // A new storage object drops this module's warm observation/cache, while
+  // retaining the actual IndexedDB bodies for a cold backup read.
+  storage.set('baseball_manager_v1_bk1', root); storage.delete(primary);
+  vi.stubGlobal('localStorage', { getItem: k => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, String(v)), removeItem: k => storage.delete(k) });
+  const loaded = await loadGame(); expect(loaded.contractEconomy).toEqual(economy);
+  act(() => expect(gs.hydrateSavedWorld(loaded, { progressToken: gs.getProgressToken(), sessionToken: gs.getProgressSessionToken() })).toBe(true));
+  expect(await run(() => gs.commitYearEndRetirementsRequest({ saveId: w.saveId, epoch: economy.epoch, baseRevision: 0,
+    season: w.year, date: economy.clock.date, teamId: w.myId, decisions: c.transaction.decisions }, gs.getProgressSessionToken())))
+    .toMatchObject({ ok: true, replayed: true });
+  expect(gs.contractEconomy).toEqual(economy); expect(storage.get(primary)).toBeUndefined();
 });

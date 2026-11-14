@@ -3,11 +3,11 @@ import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { closedPostseasonWorld } from './fixtures/openOffseason';
 import { openOffseasonRequest, reduceOpenOffseasonRequest } from '../annualOpenOffseason';
-import { reduceEconomyCommand, reduceEconomyCommandAsync, toAnnualState } from '../contractEconomy';
+import { reduceEconomyCommand, reduceEconomyCommandAsync, quoteEconomyCommand, toAnnualState, fromAnnualState } from '../contractEconomy';
 import { validateEconomySave, economyOverwriteIssue } from '../economyPersistence';
 import { contractLiabilityRows } from '../contractLedger';
-import { wrap } from './fixtures/annualRetirements';
-import { freezeEconomy } from './fixtures/economyWorld';
+import { wrap, winter as oldWinter } from './fixtures/annualRetirements';
+import { economyFixture, freezeEconomy } from './fixtures/economyWorld';
 import { reducePostingGenerationRequest, reduceOffseasonPostingRequest, offseasonPostingRequest } from '../humanPosting';
 import { createInitialTeams } from '../bootstrapTeams';
 import { yearEndReviewWorld } from './fixtures/yearEndRetirements';
@@ -18,6 +18,7 @@ import { economyClockFor } from '../economyCalendar';
 import { retirementCareerEntries } from '../annualRetirements';
 import { createSeasonContract } from '../seasonContract';
 import { postingGenerationId } from '../generatedPostingRequests';
+import { yearEndRetirementsRequest, reduceYearEndRetirementsRequestAsync } from '../humanYearEndRetirements';
 
 function winter() {
   const w = closedPostseasonWorld();
@@ -217,4 +218,93 @@ it('excludes a low-will human and keeps saved decisions valid after surviving pl
   expect(r.world.contractEconomy.engine.transactions.at(-1).yearEndRetirements.candidates.every(r => r.teamId !== w.myId)).toBe(true);
   const n = r.world; n.teams[0].players[0].age++; n.teams[0].players[0].stats.PA++;
   expect(validateEconomySave(n)).toBe('annual');
+});
+
+it.each([reduceEconomyCommand, reduceEconomyCommandAsync])('requires an open-offseason receipt for fresh year-end decisions at the common world API (%#)', async reduce => {
+  const w = oldWinter(economyFixture()); w.gameDay = 144;
+  Object.assign(w.teams[0].players[0], { age: 42, retireStyle: 100 });
+  const before = structuredClone(w), c = command(w);
+  expect(validateEconomySave(w)).toBe('annual');
+  expect(w.contractEconomy.cycle.transitionReceipts).toEqual([]);
+  expect(await reduceYearEndRetirementsRequestAsync(w, yearEndRetirementsRequest(w, c.transaction.decisions)))
+    .toMatchObject({ ok: false, world: w });
+  const r = await reduce(freezeEconomy(w), c);
+  expect(r).toMatchObject({ ok: false, replayed: false, world: w });
+  expect(r.error).toContain('オフ開始');
+  expect(quoteEconomyCommand(w, c)).toMatchObject({ ok: false });
+  expect(w).toEqual(before);
+  // Old winter can still use its original posting workflow.
+  const posting = reduceOffseasonPostingRequest(w, offseasonPostingRequest(w));
+  expect(posting.ok, posting.error).toBe(true);
+  expect(validateEconomySave(posting.world)).toBe('annual');
+});
+
+it('keeps pre-guard saved decisions with CPU continued readable and replayable without an opening receipt', async () => {
+  const w = JSON.parse(gunzipSync(readFileSync(new URL('./fixtures/yearEndOldNativeDecision.json.gz', import.meta.url))));
+  const before = structuredClone(w), g = w.contractEconomy.engine.transactions.at(-1).yearEndRetirements;
+  expect(w.contractEconomy.cycle.transitionReceipts).toEqual([]);
+  expect(g.candidates.map(r => r.outcome)).toEqual(['accepted', 'continued']);
+  expect(validateEconomySave(w)).toBe('annual');
+  const c = command(w, [{ playerId: 0, choice: 'accept' }]); c.baseRevision = 0;
+  for (const reduce of [reduceEconomyCommand, reduceEconomyCommandAsync]) {
+    expect(await reduce(freezeEconomy(w), c)).toMatchObject({ ok: true, replayed: true, world: w });
+  }
+  expect(await reduceYearEndRetirementsRequestAsync(w, { ...yearEndRetirementsRequest(w, c.transaction.decisions), baseRevision: 0 }))
+    .toMatchObject({ ok: true, replayed: true, world: w });
+  expect(w).toEqual(before);
+});
+
+it('keeps CPU continued evidence independent of later player inputs and placement', () => {
+  const w = winter(), p = w.teams[2].players[0];
+  Object.assign(p, { age: 35, retireStyle: 0, stats: { PA: 500 } });
+  const r = reduceEconomyCommand(w, command(w)); expect(r.ok, r.error).toBe(true);
+  const n = r.world, g = structuredClone(n.contractEconomy.engine.transactions.at(-1).yearEndRetirements);
+  expect(g.candidates.find(c => c.playerId === p.id)).toMatchObject({ outcome: 'continued', reservationId: null });
+  const team = n.teams[2], survivor = team.players.pop();
+  Object.assign(survivor, { age: 42, retireStyle: 100, stats: { PA: 0 }, morale: 20 }); team.farm.push(survivor);
+  expect(validateEconomySave(JSON.parse(JSON.stringify(n)))).toBe('annual');
+  expect(n.contractEconomy.engine.transactions.at(-1).yearEndRetirements).toEqual(g);
+  expect(reduceEconomyCommand(n, command(w))).toMatchObject({ ok: true, replayed: true, world: n });
+  // Isolate historical validation with the existing ledger/policies. This is
+  // an engine-level next-year projection, not the unfinished annual rollover.
+  const later = structuredClone(n), e = later.contractEconomy;
+  later.year = 2027; later.gameDay = 0; later.schedule = []; later.offseasonPlan = null;
+  e.clock = economyClockFor({ season: 2027, phase: 'preseason' }); e.cycle.season = 2027; e.cycle.stage = 'new-season';
+  const projected = fromAnnualState(later, toAnnualState(later));
+  expect(validateEconomySave(projected)).toBe('annual');
+  expect(projected.contractEconomy.engine.transactions.at(-1).yearEndRetirements).toEqual(g);
+  expect(reduceEconomyCommand(projected, command(w))).toMatchObject({ ok: true, replayed: true, world: projected });
+});
+
+it.each(['delete continued', 'change inputs', 'change player ID'])('protects already published CPU continued evidence: %s', edit => {
+  const w = winter(), p = w.teams[2].players[0];
+  Object.assign(p, { age: 35, retireStyle: 0, stats: { PA: 500 } });
+  const r = reduceEconomyCommand(w, command(w)); expect(r.ok, r.error).toBe(true);
+  const n = structuredClone(r.world), g = n.contractEconomy.engine.transactions.at(-1).yearEndRetirements;
+  const row = g.candidates.find(c => c.playerId === p.id); expect(row.outcome).toBe('continued');
+  if (edit === 'delete continued') g.candidates.splice(g.candidates.indexOf(row), 1);
+  if (edit === 'change inputs') row.inputs.stats.PA++;
+  if (edit === 'change player ID') row.playerId = 'phantom-continued';
+  expect(economyOverwriteIssue(r.world, n)).toBe('economy_revision_conflict');
+  n.contractEconomy.revision++;
+  expect(economyOverwriteIssue(r.world, n)).toBe('economy_history_conflict');
+});
+
+it.each([
+  ['save', r => { r.saveId = 'other'; }], ['epoch', r => { r.epoch = 'other'; }],
+  ['stale revision', r => { r.baseRevision--; }], ['future revision', r => { r.baseRevision++; }],
+  ['season', r => { r.season--; }], ['date', r => { r.date = '2026-12-02'; }],
+])('rejects an invalid %s on a fresh human request after opening', async (_, edit) => {
+  const w = winter(), request = yearEndRetirementsRequest(w, command(w).transaction.decisions), before = structuredClone(w);
+  edit(request);
+  expect(await reduceYearEndRetirementsRequestAsync(freezeEconomy(w), request)).toMatchObject({ ok: false, world: w });
+  expect(w).toEqual(before);
+});
+
+it('replays an original request after opening but refuses to change its saved intent', async () => {
+  const w = winter(), d = command(w).transaction.decisions, request = yearEndRetirementsRequest(w, d);
+  const r = await reduceYearEndRetirementsRequestAsync(w, request); expect(r.ok, r.error).toBe(true);
+  expect(await reduceYearEndRetirementsRequestAsync(r.world, request)).toMatchObject({ ok: true, replayed: true, world: r.world });
+  expect(await reduceYearEndRetirementsRequestAsync(r.world, { ...request, decisions: [{ playerId: d[0].playerId, choice: 'retain' }] }))
+    .toMatchObject({ ok: false, world: r.world });
 });

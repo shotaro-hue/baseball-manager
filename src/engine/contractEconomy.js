@@ -192,6 +192,10 @@ function runCommand(world, command, apply = applyAnnualTransaction) {
     && !state.transactions.some(r => r.id === c.id) && requiresYearEndRetirements(world))
     fail('先に期末の引退判断を保存してください。');
   if (['advance-posting-phase', 'prepare-offseason-posting', 'prepare-year-end-retirements'].includes(c.type) && c.humanTeamId !== world.myId) fail('自球団の判断をCPUへ委任できません。');
+  // Require the same opening evidence as the human entry for NEW decisions.
+  // Saved pre-guard operations remain readable/replayable without backfilling it.
+  if (c.type === 'prepare-year-end-retirements' && !state.transactions.some(r => r.id === c.id)
+    && !requiresYearEndRetirements(world)) fail('オフ開始を保存してから期末引退判断を確定してください。');
   if (c.type === 'prepare-year-end-retirements' && !state.transactions.some(r => r.id === c.id)
     && world.contractEconomy.decisions.some(d => d.kind === 'human-renewal' && d.status === 'pending'))
     fail('回答待ちの更改を解決してから期末引退判断を確定してください。');
