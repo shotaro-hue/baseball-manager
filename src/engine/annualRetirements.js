@@ -12,9 +12,9 @@ const stable = value => JSON.stringify(value, (_, v) => v && !Array.isArray(v) &
   ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v);
 const day = (year, suffix) => `${String(year).padStart(4, '0')}-${suffix}`;
 const players = team => [...team.players, ...team.farm];
-export const isRetirementCommand = c => ['reserve-retirement', 'finalize-retirement'].includes(c?.type);
+export const isRetirementCommand = c => ['reserve-retirement', 'reserve-year-end-retirement', 'finalize-retirement'].includes(c?.type);
 export function normalizeRetirementCommand(c) {
-  const fields = c?.type === 'reserve-retirement' ? ['id', 'type', 'teamId', 'playerId', 'contractId']
+  const fields = ['reserve-retirement', 'reserve-year-end-retirement'].includes(c?.type) ? ['id', 'type', 'teamId', 'playerId', 'contractId']
     : c?.type === 'finalize-retirement' ? ['id', 'type', 'reservationId'] : null;
   if (!fields || !c || Object.keys(c).some(k => !fields.includes(k))
     || fields.some(k => k !== 'type' && !id(c[k]))) fail();
@@ -27,7 +27,8 @@ function sourceFor(state, r) {
   const final = r.finalization;
   const original = { ...source, changes: source.changes.filter(a => a.id !== final?.endAction?.id) };
   if (stable(original) !== stable(r.sourceRecord)) fail();
-  const employment = contractEmploymentAt({ ...state.spending.ledger, records: [r.sourceRecord] }, r.notifiedDate)[0];
+  const employment = contractEmploymentAt({ ...state.spending.ledger, records: [r.sourceRecord] },
+    r.origin === 'year-end' ? day(r.season, '11-30') : r.notifiedDate)[0];
   if (!employment || employment.teamId !== r.teamId || employment.contract.playerId !== r.playerId) fail();
   return employment;
 }
@@ -62,17 +63,21 @@ export function inspectAnnualRetirements(state) {
   if (!Array.isArray(reservations) || (state.version !== 2 && reservations.length)) fail();
   const seen = new Set(), people = new Set(), finals = new Set(), provenEnds = new Set(), departures = [];
   for (const r of reservations) {
+    const yearEnd = r.origin === 'year-end';
     if (!r || ![r.id, r.teamId, r.playerId, r.sourceContractId].every(id)
       || seen.has(String(r.id)) || people.has(String(r.playerId)) || !Number.isInteger(r.season) || r.season < 1 || r.season > state.season
-      || parseContractDate(r.notifiedDate).year !== r.season || r.notifiedDate >= r.effectiveDate
-      || r.effectiveDate !== day(r.season, '12-01') || !Number.isSafeInteger(r.gameDay) || r.gameDay < 1 || r.gameDay > SEASON_GAMES
+      || r.origin !== undefined && !yearEnd
+      || parseContractDate(r.notifiedDate).year !== r.season
+      || (yearEnd ? r.notifiedDate !== r.effectiveDate || r.gameDay !== SEASON_GAMES + 1
+        : r.notifiedDate >= r.effectiveDate || !Number.isSafeInteger(r.gameDay) || r.gameDay < 1 || r.gameDay > SEASON_GAMES)
+      || r.effectiveDate !== day(r.season, '12-01')
       || (r.season === state.season && (r.notifiedDate > state.date || !['season', 'offseason'].includes(state.phase)
         // Reading an earlier reservation at the completed postseason boundary
         // is valid. Creating a reservation still requires official round 1..143.
         || (state.phase === 'season' && (!Number.isSafeInteger(state.gameDay) || state.gameDay < r.gameDay || state.gameDay > SEASON_GAMES + 1))))) fail();
     seen.add(String(r.id)); people.add(String(r.playerId));
     const { finalization, ...reservation } = r;
-    const c = normalizeRetirementCommand({ id: r.id, type: 'reserve-retirement', teamId: r.teamId, playerId: r.playerId, contractId: r.sourceContractId });
+    const c = normalizeRetirementCommand({ id: r.id, type: yearEnd ? 'reserve-year-end-retirement' : 'reserve-retirement', teamId: r.teamId, playerId: r.playerId, contractId: r.sourceContractId });
     const receipts = state.transactions.filter(t => t.id === r.id), receipt = receipts[0];
     if (receipts.length !== 1 || receipt.signature !== stable(c) || stable(receipt.retirementReservation) !== stable(reservation)) fail();
     sourceFor(state, r);
@@ -106,7 +111,7 @@ export function inspectAnnualRetirements(state) {
   }
   for (const t of state.transactions) {
     let c; try { c = JSON.parse(t.signature); } catch { /* legacy opaque signature */ }
-    if ((c?.type === 'reserve-retirement' || t.retirementReservation !== undefined) && !seen.has(String(t.id))) fail();
+    if ((['reserve-retirement', 'reserve-year-end-retirement'].includes(c?.type) || t.retirementReservation !== undefined) && !seen.has(String(t.id))) fail();
     if ((c?.type === 'finalize-retirement' || t.retirement !== undefined) && !finals.has(String(t.id))) fail();
   }
   for (const team of state.teams) for (const p of team.history ?? []) {
@@ -120,6 +125,7 @@ export function inspectAnnualRetirements(state) {
 
 export function inspectRetirementCalendar(world) {
   for (const r of world.contractEconomy.engine.retirementReservations ?? []) {
+    if (r.origin === 'year-end') continue; // Explicit 12/1 decision, never an invented official-round date.
     const schedules = r.season === world.year ? [world.schedule]
       : (world.scheduleArchive ?? []).filter(a => a?.year === r.season && a.schedule != null).map(a => a.schedule);
     for (const schedule of schedules) if (economyClockFor({ season: r.season, phase: 'season', schedule, gameDay: r.gameDay }).date !== r.notifiedDate) fail();
@@ -140,15 +146,20 @@ export function assertRetirementCommandCompatible(state, c) {
 export function createAnnualRetirement(state, c, signature) {
   if (state.version !== 2) fail();
   const reservations = state.retirementReservations ?? [];
-  if (c.type === 'reserve-retirement') {
-    if (state.phase !== 'season' || !Number.isSafeInteger(state.gameDay) || state.gameDay < 1 || state.gameDay > SEASON_GAMES
-      || state.date >= day(state.season, '12-01') || reservations.some(r => r.playerId === c.playerId)) fail();
+  if (['reserve-retirement', 'reserve-year-end-retirement'].includes(c.type)) {
+    const yearEnd = c.type === 'reserve-year-end-retirement';
+    if (yearEnd ? state.phase !== 'offseason' || state.date !== day(state.season, '12-01') || state.gameDay !== SEASON_GAMES + 1
+      || state.transactions.some(t => t.generatedPostingRequests?.season === state.season || t.annualPostingPhase?.season === state.season)
+      : state.phase !== 'season' || !Number.isSafeInteger(state.gameDay) || state.gameDay < 1 || state.gameDay > SEASON_GAMES
+      || state.date >= day(state.season, '12-01')) fail();
+    if (reservations.some(r => r.playerId === c.playerId)) fail();
     const team = state.teams.find(t => t.id === c.teamId), player = team && players(team).find(p => p.id === c.playerId);
-    if (!player || player.isRetired || player._retireNow) fail();
+    if (!player || player.isRetired || player._retireNow || yearEnd && !(Number.isFinite(player.age) && player.age >= 35)) fail();
     assertNoPromise(state, c.playerId);
     const source = state.spending.ledger.records.find(r => employmentContractId(r.contract) === c.contractId);
     const r = { id: c.id, season: state.season, teamId: c.teamId, playerId: c.playerId, sourceContractId: c.contractId,
-      sourceRecord: structuredClone(source), notifiedDate: state.date, gameDay: state.gameDay, effectiveDate: day(state.season, '12-01') };
+      sourceRecord: structuredClone(source), notifiedDate: state.date, gameDay: state.gameDay, effectiveDate: day(state.season, '12-01'),
+      ...(yearEnd ? { origin: 'year-end' } : {}) };
     sourceFor(state, r);
     return { ...state, retirementReservations: [...reservations, r], transactions: [...state.transactions,
       { id: c.id, signature, retirementReservation: structuredClone(r) }] };

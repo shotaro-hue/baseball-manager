@@ -1,4 +1,5 @@
 import { yieldToBrowser } from './yieldToBrowser';
+import { isYearEndRetirementsCommand, normalizeYearEndRetirements, createYearEndRetirementsSteps, inspectYearEndRetirements } from './annualYearEndRetirements';
 import { isOffseasonPostingCommand, normalizeOffseasonPosting, createOffseasonPostingSteps, inspectOffseasonPosting } from './annualOffseasonPosting';
 import { isAnnualPostingPhaseCommand, normalizeAnnualPostingPhase, createAnnualPostingPhaseSteps, inspectAnnualPostingPhases } from './annualPostingPhase';
 import { isGeneratedPostingRequestsCommand, normalizeGeneratedPostingRequests, createGeneratedPostingRequests, inspectGeneratedPostingRequests } from './generatedPostingRequests';
@@ -67,6 +68,7 @@ const kinds = {
   'convert-to-controlled': ['teamId', 'playerId', 'contractId', 'annualSalaryManYen'],
 };
 function commandFor(input) {
+  if (isYearEndRetirementsCommand(input)) return normalizeYearEndRetirements(input);
   if (isOffseasonPostingCommand(input)) return normalizeOffseasonPosting(input);
   if (isAnnualPostingPhaseCommand(input)) return normalizeAnnualPostingPhase(input);
   if (isGeneratedPostingRequestsCommand(input)) return normalizeGeneratedPostingRequests(input);
@@ -145,6 +147,7 @@ function inspect(state) {
   inspectGeneratedPostingRequests(state);
   inspectAnnualPostingPhases(state);
   inspectOffseasonPosting(state);
+  inspectYearEndRetirements(state);
   // One employment can end by only one route. Individually valid records from
   // incompatible branches must not jointly exempt the same source contract.
   if (new Set(departures.map(d => d.sourceContractId)).size !== departures.length) fail('同じ元契約の退団経路が重複しています。');
@@ -559,6 +562,10 @@ function* candidateSteps(input, command) {
       ...(receipt.faPersonnel ? { personnel: { winnerProposalIds: [...receipt.faPersonnel.winnerProposalIds], lostProposalIds: [...receipt.faPersonnel.lostProposalIds] } } : {}) };
   }
   assertRetirementCommandCompatible(before, c);
+  if (isYearEndRetirementsCommand(c)) {
+    const result = yield* createYearEndRetirementsSteps(before, c, signature, candidateSteps);
+    return { ...result, state: withFloors(result.state) };
+  }
   if (isOffseasonPostingCommand(c)) {
     const result = yield* createOffseasonPostingSteps(before, c, signature, candidateSteps);
     return { ...result, state: withFloors(result.state) };

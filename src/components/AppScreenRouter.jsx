@@ -262,6 +262,7 @@ export default function AppScreenRouter({ app }) {
           <RetirePhaseScreen
             annualWorld={gs.contractEconomy?.mode === 'annual' ? gs : undefined}
             onPrepare={os.handlePrepareAnnualPosting}
+            onYearEnd={os.handleYearEndRetirements}
             onRecover={gs.recoverEconomyCommand}
             onOpenInbox={() => { setTab('mailbox'); setScreen('hub'); }}
             farmState={{farmCompetition:gs.farmCompetition,year:gs.year,teams:gs.teams,seasonHistory:gs.getSeasonHistory?.()??gs.seasonHistory}}

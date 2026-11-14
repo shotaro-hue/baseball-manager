@@ -1,5 +1,6 @@
 import { nativeFaExerciseOrigins } from './annualFaDeclarations';
 import { inspectRetirementCalendar } from './annualRetirements';
+import { assertYearEndRetirementCoverage, requiresYearEndRetirements } from './annualYearEndRetirements';
 import { inspectAnnualBudgetCoverage } from './annualBudgetPolicy';
 import { employmentContractId, projectEmploymentPlayer, validateAnnualEmploymentContract, normalizeEmploymentContract } from './seasonContract';
 import { createSeasonContract } from './seasonContract';
@@ -126,9 +127,11 @@ export function contractEconomyMode(world) {
 export function toAnnualState(world) {
   if (contractEconomyMode(world) !== 'annual') fail('新契約制度のworldが必要です。');
   const e = world.contractEconomy;
-  return projectAnnualState({ ...e.engine, spending: { ...e.engine.spending, staffContracts: e.staffContracts }, ...e.clock, teams: world.teams, faPool: world.faPool,
+  const state = projectAnnualState({ ...e.engine, spending: { ...e.engine.spending, staffContracts: e.staffContracts }, ...e.clock, teams: world.teams, faPool: world.faPool,
     gameDay: world.gameDay, incomeReceipts: e.incomeReceipts, economyRandomRoot: e.randomRoot,
     economyIdentity: identity(world), faExerciseBirth: e.faExerciseBirth, draftContext: draftCapacityContext(world.offseasonPlan, world.year, world.teams) });
+  assertYearEndRetirementCoverage(state);
+  return state;
 }
 
 function projectDraftPlan(world, state) {
@@ -185,7 +188,17 @@ function runCommand(world, command, apply = applyAnnualTransaction) {
     || command.saveId !== current.saveId || command.epoch !== current.epoch || !counter(command.baseRevision)
     || command.baseRevision > current.baseRevision || !command.transaction) fail('取引のsaveId・epoch・revisionが古いか未記録です。');
   const c = command.transaction;
-  if (['advance-posting-phase', 'prepare-offseason-posting'].includes(c.type) && c.humanTeamId !== world.myId) fail('自球団の判断をCPUへ委任できません。');
+  if (['advance-posting-phase', 'prepare-offseason-posting', 'generate-posting-requests'].includes(c.type)
+    && !state.transactions.some(r => r.id === c.id) && requiresYearEndRetirements(world))
+    fail('先に期末の引退判断を保存してください。');
+  if (['advance-posting-phase', 'prepare-offseason-posting', 'prepare-year-end-retirements'].includes(c.type) && c.humanTeamId !== world.myId) fail('自球団の判断をCPUへ委任できません。');
+  // Require the same opening evidence as the human entry for NEW decisions.
+  // Saved pre-guard operations remain readable/replayable without backfilling it.
+  if (c.type === 'prepare-year-end-retirements' && !state.transactions.some(r => r.id === c.id)
+    && !requiresYearEndRetirements(world)) fail('オフ開始を保存してから期末引退判断を確定してください。');
+  if (c.type === 'prepare-year-end-retirements' && !state.transactions.some(r => r.id === c.id)
+    && world.contractEconomy.decisions.some(d => d.kind === 'human-renewal' && d.status === 'pending'))
+    fail('回答待ちの更改を解決してから期末引退判断を確定してください。');
   if (c.type === 'prepare-offseason-posting' && !state.transactions.some(r => r.id === c.id)
     && world.contractEconomy.decisions.some(d => d.kind === 'human-renewal' && d.status === 'pending'
       && (state.retirementReservations ?? []).some(r => !r.finalization && r.playerId === d.playerId)))
