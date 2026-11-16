@@ -14,16 +14,16 @@
 旧postingの途中保存、直接request-postingの抜け道、旧コーチ観測不足、後年履歴保持、初回保存前の証跡改変。
 
 ### Task 1: deterministic growth + transaction
-- [ ] RED: real open/retirement producer→survivor coverage, deterministic RNG, old salary/stats/career/future terms, coach year, measured zero/missing and recorded awards.
-- [ ] Minimal optional RNG in player.js; annualYearEndGrowth.js report/create/inspect; wire annualTransactions/contractEconomy; opening coach observation and new posting guards.
-- [ ] GREEN: focused core and compatibility tests.
+- [x] RED: real open/retirement producer→survivor coverage, deterministic RNG, old salary/stats/career/future terms, coach year, measured zero/missing and recorded awards.
+- [x] Minimal optional RNG in player.js; annualYearEndGrowth.js report/create/inspect; wire annualTransactions/contractEconomy; opening coach observation and new posting guards.
+- [x] GREEN: focused core and compatibility tests.
 
 ### Task 2: save and UI
-- [ ] RED: hook save failure/retry/cold/backup/recovery/stale session and posting rejection.
-- [ ] Existing commitEconomyOperation hookup; retire-phase save/result display; inbox directs to pending growth.
-- [ ] GREEN: hook and browser 360/390/1440 with screenshots, error/reload/recovery.
+- [x] RED: hook save failure/retry/cold/backup/recovery/stale session and posting rejection.
+- [x] Existing commitEconomyOperation hookup; retire-phase save/result display; inbox directs to pending growth.
+- [x] GREEN: hook and browser 360/390/1440 with screenshots, error/reload/recovery.
 
 ### Task 3: independent review and delivery
-- [ ] Independent reviewer receives final diff, requirements and real producers; reproduce/fix findings with regressions.
-- [ ] Document validation/limits and remaining annual work; update ROADMAP.
-- [ ] Branch commit/push and PR; require all mandatory CI on the same final HEAD. Stop for developer merge decision.
+- [x] Independent reviewer receives final diff, requirements and real producers; reproduce/fix findings with regressions.
+- [x] Document validation/limits and remaining annual work; update ROADMAP.
+- [x] Branch commit/push and PR #563. Final HEAD / mandatory CI status is tracked in the PR body; stop for developer merge decision after all required checks succeed.

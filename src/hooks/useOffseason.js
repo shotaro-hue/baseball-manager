@@ -597,7 +597,7 @@ export function useOffseason(gs) {
     try {
       const result = await gs.commitOpenOffseasonRequest?.(openOffseasonRequest(gs), renewalSession);
       if (renewalSession !== draftContextRef.current.getProgressSessionToken?.()) return false;
-      notify?.(result?.ok ? '閉幕と翌年度予算を保存しました。12月1日の引退予約・海外挑戦の確認へ進めます。成長・翌春は未接続です。'
+      notify?.(result?.ok ? '閉幕と翌年度予算を保存しました。12月1日の引退判断、その後の成長・要求年俸の保存へ進めます。翌春への進行は未接続です。'
         : result?.error || (result?.reason === 'economy_adoption_required' ? '保存済みのオフ開始結果を復旧してください。'
           : 'オフ開始を保存できませんでした。保存状態を確認し、再試行してください。'), 'warn');
       return result?.ok === true;
