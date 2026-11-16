@@ -1,3 +1,4 @@
+import { growthCommand } from './fixtures/yearEndGrowth';
 import { expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
@@ -70,7 +71,8 @@ it('records a zero-candidate year and hands its unchanged players to separate po
   expect(r.world.contractEconomy.engine.transactions.at(-1).yearEndRetirements.candidates).toEqual([]);
   expect(r.world.teams).toEqual(w.teams);
   expect(await reduceEconomyCommandAsync(w, c)).toEqual(r);
-  const posting = reduceOffseasonPostingRequest(r.world, offseasonPostingRequest(r.world));
+  const grown = reduceEconomyCommand(r.world, growthCommand(r.world)); expect(grown.ok, grown.error).toBe(true);
+  const posting = reduceOffseasonPostingRequest(grown.world, offseasonPostingRequest(grown.world));
   expect(posting.ok, posting.error).toBe(true);
 });
 

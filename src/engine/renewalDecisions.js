@@ -1,3 +1,4 @@
+import { savedYearEndSalary } from './annualYearEndGrowth';
 import { ACCEPT_THRESHOLD } from '../constants';
 import { calcPlayerDemand, evaluateRenewalOffer } from './contract';
 import { contractEconomyMode, reduceEconomyCommand, toAnnualState } from './contractEconomy';
@@ -176,7 +177,7 @@ export function reduceRenewalRequest(world, request) {
       if (!employment) fail('現在の契約が見つかりません。');
       const demand = calcPlayerDemand(player, { year: world.year, team, teams: world.teams,
         awards: world.seasonHistory?.awards?.find(a => a.year === world.year),
-        championship: world.seasonHistory?.championships?.find(c => c.year === world.year) });
+        championship: world.seasonHistory?.championships?.find(c => c.year === world.year) }, savedYearEndSalary(world, player.id));
       const evaluation = evaluateRenewalOffer(player, { salary: action.salary, years: action.years }, team, world.teams, demand);
       const score = evaluation.score;
       if (!Number.isFinite(player.salary) || player.salary <= 0 || !evaluation.valid

@@ -1,3 +1,4 @@
+import { growthCommand } from './fixtures/yearEndGrowth';
 import { beforeAll, expect, it, vi } from 'vitest';
 import { closedPostseasonWorld, completedPlayoff, closeNativePostseason } from './fixtures/openOffseason';
 import { budgetForecastWorld, observedFinance } from './fixtures/budgetForecast';
@@ -190,8 +191,10 @@ it('feeds the existing native retirement/posting preparation without a fabricate
     .map(r => ({ playerId: r.playerId, choice: 'accept' }));
   const reviewed = reduceEconomyCommand(w, wrap(w, { id: yearEndRetirementsId(w.year), type: 'prepare-year-end-retirements', humanTeamId: w.myId, decisions }));
   expect(reviewed.ok, reviewed.error).toBe(true); w = reviewed.world;
+  w.teams.forEach(t=>[...t.players,...t.farm].forEach(p=>{ p.age ??= 20; }));
+  const grown = reduceEconomyCommand(w, growthCommand(w)); expect(grown.ok, grown.error).toBe(true); w = grown.world;
   const prepared = reduceOffseasonPostingRequest(w, offseasonPostingRequest(w)); expect(prepared.ok, prepared.error).toBe(true);
-  expect(prepared.world.contractEconomy.revision).toBe(4); // Open, year-end review, then separate posting after the reservation.
+  expect(prepared.world.contractEconomy.revision).toBe(5); // Reservation, open, year-end review, growth, then posting.
   expect(prepared.world.contractEconomy.engine.retirementReservations[0].finalization).toBeDefined();
   expect(prepared.world.contractEconomy.cycle.transitionReceipts).toEqual([closingReceipt]);
   expect(prepared.world.contractEconomy.engine.transactions.filter(t => t.generatedPostingRequests)).toHaveLength(12);

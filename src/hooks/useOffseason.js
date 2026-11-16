@@ -1,3 +1,5 @@
+import { yearEndGrowthRequest } from '../engine/humanYearEndGrowth';
+import { requiresYearEndGrowth } from '../engine/annualYearEndGrowth';
 import { toAnnualState } from '../engine/contractEconomy';
 import { openOffseasonRequest } from '../engine/annualOpenOffseason';
 import { yearEndRetirementsRequest } from '../engine/humanYearEndRetirements';
@@ -607,21 +609,32 @@ export function useOffseason(gs) {
     try {
       const result = await gs.commitYearEndRetirementsRequest?.(yearEndRetirementsRequest(gs, decisions), renewalSession);
       if (renewalSession !== draftContextRef.current.getProgressSessionToken?.()) return false;
-      notify?.(result?.ok ? '期末の引退判断を保存しました。結果を確認してから海外挑戦の希望確認へ進んでください。'
+      notify?.(result?.ok ? '期末の引退判断を保存しました。結果を確認してから年度末成長・要求年俸を保存してください。'
         : result?.error || (result?.reason === 'economy_adoption_required' ? '保存済みの引退結果をこの画面で復旧してください。'
           : '引退判断を保存できませんでした。同じ判断で再試行できます。'), 'warn');
       return result?.ok === true;
     } catch (error) { notify?.(error.message, 'warn'); return false; }
   };
 
+  const handleYearEndGrowth = async () => {
+    if (canProgressLegacy() || renewalSession !== draftContextRef.current.getProgressSessionToken?.()) return false;
+    try {
+      const result = await gs.commitYearEndGrowthRequest?.(yearEndGrowthRequest(gs), renewalSession);
+      if (renewalSession !== draftContextRef.current.getProgressSessionToken?.()) return false;
+      notify?.(result?.ok ? '年度末成長・要求年俸を保存しました。結果を確認して海外挑戦へ進めます。'
+        : result?.error || '成長・要求年俸を保存できませんでした。同じ結果で再試行・復旧できます。', 'warn');
+      return result?.ok === true;
+    } catch (error) { notify?.(error.message, 'warn'); return false; }
+  };
+
   const handlePrepareAnnualPosting = async () => {
     if (canProgressLegacy() || renewalSession !== draftContextRef.current.getProgressSessionToken?.()) return false;
-    if (requiresYearEndRetirements(gs)) {
-      notify?.('先に期末の引退判断を保存してください。', 'warn'); return false;
+    if (requiresYearEndRetirements(gs) || requiresYearEndGrowth(gs)) {
+      notify?.('先に期末の引退判断と年度末成長・要求年俸を保存してください。', 'warn'); return false;
     }
     const result = await gs.commitOffseasonPostingRequest?.(offseasonPostingRequest(gs), renewalSession);
     if (renewalSession !== draftContextRef.current.getProgressSessionToken?.()) return false;
-    notify?.(result?.ok ? '引退予約と海外挑戦の年度工程を保存しました。自球団の判断・海外交渉は受信箱で行ってください。成長・翌春の年度処理は未接続です。'
+    notify?.(result?.ok ? '引退予約と海外挑戦の年度工程を保存しました。自球団の判断・海外交渉は受信箱で行ってください。翌春の年度処理は未接続です。'
       : result?.error || (result?.reason === 'economy_adoption_required' ? '保存済みの結果をこの画面で復旧してください。年度は進めません。'
         : '引退予約と海外挑戦を保存できませんでした。保存状態を確認し、再試行してください。年度は進めません。'), 'warn');
     return result?.ok === true;
@@ -639,6 +652,7 @@ export function useOffseason(gs) {
         return false;
       }
       if (gs.contractEconomy?.clock.phase === 'season') await handleOpenAnnualOffseason();
+      else if (requiresYearEndGrowth(gs) && !requiresYearEndRetirements(gs)) await handleYearEndGrowth();
       else await handlePrepareAnnualPosting();
       return false;
     }
@@ -1071,6 +1085,7 @@ export function useOffseason(gs) {
     handleOpenAnnualOffseason,
     handlePrepareAnnualPosting,
     handleYearEndRetirements,
+    handleYearEndGrowth,
     handleWaiverPhaseNext,
     handlePlanningRelease,
     handlePlanningFinish,

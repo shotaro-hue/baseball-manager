@@ -1,3 +1,4 @@
+import { requiresYearEndGrowth, growthContextFor, inspectGrowthOpening } from './annualYearEndGrowth';
 import { nativeFaExerciseOrigins } from './annualFaDeclarations';
 import { inspectRetirementCalendar } from './annualRetirements';
 import { assertYearEndRetirementCoverage, requiresYearEndRetirements } from './annualYearEndRetirements';
@@ -89,7 +90,7 @@ function inspectEnvelope(world) {
     || !Object.hasOwn(world, 'offseasonPlan') || (world.offseasonPlan !== null && (typeof world.offseasonPlan !== 'object' || Array.isArray(world.offseasonPlan)))
     || !world.faYears || typeof world.faYears !== 'object' || Array.isArray(world.faYears)
     || !e.engine || e.engine.version !== 2 || engineArrays.some(k => !Array.isArray(e.engine[k]))
-    || ['teams', 'faPool', 'draftContext', 'season', 'phase', 'date', 'gameDay', 'economyIdentity', 'faExerciseBirth'].some(k => Object.hasOwn(e.engine, k))
+    || ['teams', 'faPool', 'draftContext', 'season', 'phase', 'date', 'gameDay', 'economyIdentity', 'faExerciseBirth', 'yearEndGrowthContext'].some(k => Object.hasOwn(e.engine, k))
     || ['budgetPolicies', 'staffContracts', 'incomeReceipts', 'decisions'].some(k => !Array.isArray(e[k]))
     || e.cycle?.season !== world.year || !['playing', 'postseason', 'offseason-open', 'planning', 'ready-for-spring', 'new-season'].includes(e.cycle.stage)
     || !Array.isArray(e.cycle.transitionReceipts) || e.migration?.version !== 1
@@ -102,7 +103,7 @@ function inspectEnvelope(world) {
   const spending = e.engine.spending;
   if (!spending || !Array.isArray(spending.ledger?.records) || !Array.isArray(spending.reservations)
     || !Array.isArray(spending.resolvedReservations)) fail('契約台帳・正式留保が未記録です。');
-  const supplements = inspectAnnualIncome({ ...e.engine, ...e.clock, gameDay: world.gameDay, incomeReceipts: e.incomeReceipts, economyIdentity: identity(world) });
+  const supplements = inspectAnnualIncome({ ...e.engine, ...e.clock, yearEndGrowthContext: growthContextFor(world), gameDay: world.gameDay, incomeReceipts: e.incomeReceipts, economyIdentity: identity(world) });
   inspectBudgetApprovals(spending.authorizations, e.budgetPolicies, supplements);
   inspectAnnualBudgetCoverage(world);
   inspectOpenOffseason(world);
@@ -128,9 +129,10 @@ export function toAnnualState(world) {
   if (contractEconomyMode(world) !== 'annual') fail('新契約制度のworldが必要です。');
   const e = world.contractEconomy;
   const state = projectAnnualState({ ...e.engine, spending: { ...e.engine.spending, staffContracts: e.staffContracts }, ...e.clock, teams: world.teams, faPool: world.faPool,
-    gameDay: world.gameDay, incomeReceipts: e.incomeReceipts, economyRandomRoot: e.randomRoot,
+    yearEndGrowthContext: growthContextFor(world), gameDay: world.gameDay, incomeReceipts: e.incomeReceipts, economyRandomRoot: e.randomRoot,
     economyIdentity: identity(world), faExerciseBirth: e.faExerciseBirth, draftContext: draftCapacityContext(world.offseasonPlan, world.year, world.teams) });
   assertYearEndRetirementCoverage(state);
+  inspectGrowthOpening(world);
   return state;
 }
 
@@ -188,6 +190,12 @@ function runCommand(world, command, apply = applyAnnualTransaction) {
     || command.saveId !== current.saveId || command.epoch !== current.epoch || !counter(command.baseRevision)
     || command.baseRevision > current.baseRevision || !command.transaction) fail('取引のsaveId・epoch・revisionが古いか未記録です。');
   const c = command.transaction;
+  if (c.type === 'prepare-year-end-growth' && !state.transactions.some(r => r.id === c.id)
+    && (!requiresYearEndGrowth(world) || world.contractEconomy.decisions.some(d => d.kind === 'human-renewal' && d.status === 'pending')))
+    fail('オフ開始と引退判断を保存し、回答待ちの更改を解決してから成長を確定してください。');
+  if ((typeof c.type === 'string' && c.type.includes('posting') || c.type === 'end-contract' && c.reason === 'posting')
+    && !state.transactions.some(r => r.id === c.id) && requiresYearEndGrowth(world))
+    fail('先に期末の引退判断と年度末成長・要求年俸を保存してください。');
   if (['advance-posting-phase', 'prepare-offseason-posting', 'generate-posting-requests'].includes(c.type)
     && !state.transactions.some(r => r.id === c.id) && requiresYearEndRetirements(world))
     fail('先に期末の引退判断を保存してください。');

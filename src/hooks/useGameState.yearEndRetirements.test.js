@@ -30,7 +30,7 @@ async function setup(w = yearEndReviewWorld(), ui = false) {
   function Harness() {
     gs = useGameState(); os = useOffseason(gs);
     return ui && gs.myTeam ? React.createElement(RetirePhaseScreen, { teams: gs.teams, myId: gs.myId, year: gs.year,
-      annualWorld: gs, onYearEnd: os.handleYearEndRetirements, onPrepare: os.handlePrepareAnnualPosting,
+      annualWorld: gs, onYearEnd: os.handleYearEndRetirements, onGrowth: os.handleYearEndGrowth, onPrepare: os.handlePrepareAnnualPosting,
       onRecover: gs.recoverEconomyCommand, onOpenInbox: () => {} }) : null;
   }
   await act(async () => { view = create(React.createElement(Harness)); });
@@ -55,6 +55,7 @@ it('saves the full year-end outcome and career then exposes separate posting', a
   expect(gs.teams[0].players).toEqual([]); expect(gs.saveDirty).toBe(false);
   expect((await loadGame()).contractEconomy).toEqual(gs.contractEconomy);
   expect((await loadPlayerCareerLogById(String(p.id), w.saveId)).filter(r => r.year === w.year)).toHaveLength(1);
+  expect(await run(() => os.handleYearEndGrowth())).toBe(true);
   expect(await run(() => os.handlePrepareAnnualPosting())).toBe(true);
 });
 it('keeps the root and player on failed publication and retries the same decisions once', async () => {
@@ -97,6 +98,9 @@ it('collects intent in the annual review screen and shows only saved results', a
   expect(view.root.findByProps({ role: 'dialog' })).toBeTruthy();
   await run(() => button('引退判断を保存する').props.onClick());
   expect(facts().candidates[0].outcome).toBe('accepted');
+  expect(button('年度末成長・要求年俸を確認する')).toBeTruthy();
+  act(() => button('年度末成長・要求年俸を確認する').props.onClick());
+  await run(() => button('成長・要求年俸を保存する').props.onClick());
   expect(button('引退予約を確定して希望を確認する')).toBeTruthy();
   act(() => button('引退予約を確定して希望を確認する').props.onClick());
   await run(() => button('予約と希望確認を保存する').props.onClick());

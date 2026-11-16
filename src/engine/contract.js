@@ -62,8 +62,8 @@ export function getLegacyFaProgress(player) {
    選手が要求する年俸・抵抗係数を算出する
 ═══════════════════════════════════════════════ */
 
-export function calcPlayerDemand(player, context = {}) {
-  const demand = calculateSalaryDemand(player, context);
+export function calcPlayerDemand(player, context = {}, fixedSalary) {
+  const demand = fixedSalary ?? calculateSalaryDemand(player, context);
   const money = player.personality?.money ?? 50;
   const morale = player.morale ?? 70;
   let resistance = .5;

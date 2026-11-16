@@ -1,3 +1,4 @@
+import { requiresYearEndGrowth } from '../../engine/annualYearEndGrowth';
 import { useEffect, useRef, useState } from 'react';
 import { postingPhaseId } from '../../engine/annualPostingPhase';
 import { cpuPostingReasonText } from '../../engine/cpuPosting';
@@ -17,7 +18,8 @@ export function AnnualPostingRequests({ gs }) {
   const generation = e.engine.transactions.find(t => t.id === postingGenerationId(gs.year, gs.myId))?.generatedPostingRequests;
   const phase = e.engine.transactions.find(t => t.id === postingPhaseId(gs.year))?.annualPostingPhase;
   const needsYearEnd = requiresYearEndRetirements(gs);
-  const needsRetirement = needsYearEnd || (e.engine.retirementReservations ?? []).some(r => r.season === gs.year && !r.finalization);
+  const needsGrowth = requiresYearEndGrowth(gs);
+  const needsRetirement = needsYearEnd || needsGrowth || (e.engine.retirementReservations ?? []).some(r => r.season === gs.year && !r.finalization);
   const cpu = phase && postingApplicationViews(e.engine).filter(r => r.season === gs.year && r.teamId !== gs.myId);
   const recovery = failure?.reason === 'economy_adoption_required' || gs.saveResult?.reason === 'economy_adoption_required';
   const blocked = saving || gs.saveQueueState?.isSaving || recovery;
@@ -40,8 +42,8 @@ export function AnnualPostingRequests({ gs }) {
     {generation ? <p role="status">希望確認済み · 希望者 {generation.candidates.filter(c => c.requestId !== null).length}人。申請ごとに球団判断を行ってください。</p>
       : <p>自球団の支配下選手の希望を年一度確認します。希望があった選手は、受信箱で承認・拒否を判断できます。</p>}
     {!phase && (needsRetirement ? <>
-      <p>{needsYearEnd ? '希望確認の前に期末の引退判断が必要です。自球団の判断とCPU球団の結果を先に保存してください。' : '希望確認の前に引退予約の確定が必要です。予約を確認し、希望確認とまとめて保存してください。'}</p>
-      <Button disabled={blocked} onClick={() => gs.setScreen('retire_phase')}>{needsYearEnd ? '期末の引退判断へ' : '引退予約の確認へ'}</Button>
+      <p>{needsYearEnd ? '希望確認の前に期末の引退判断が必要です。自球団の判断とCPU球団の結果を先に保存してください。' : needsGrowth ? '希望確認の前に年度末成長・要求年俸の保存が必要です。' : '希望確認の前に引退予約の確定が必要です。予約を確認し、希望確認とまとめて保存してください。'}</p>
+      <Button disabled={blocked} onClick={() => gs.setScreen('retire_phase')}>{needsYearEnd ? '期末の引退判断へ' : needsGrowth ? '年度末成長・要求年俸へ' : '引退予約の確認へ'}</Button>
     </> : <><p>同時にCPU球団の希望・球団判断・海外交渉も進めて保存します。自球団の判断はプレイヤーが行います。</p>
         <Button disabled={blocked} aria-expanded={Boolean(confirmation)} onClick={() => {
           if (busy.current || blocked || confirmation) return;

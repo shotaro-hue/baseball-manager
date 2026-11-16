@@ -1,4 +1,4 @@
-import { rng, clamp, uid, pname, CITIES } from '../utils';
+import { rng, rngf, clamp, uid, pname, CITIES } from '../utils';
 import {
   FIELDING_POSITIONS, PLAYER_TYPES_B, PLAYER_TYPES_P, PLAYER_COMMENTS_B, PLAYER_COMMENTS_P, MIN_SALARY_IKUSEI,
   FOREIGN_PLAYER_NAMES, FOREIGN_NATIONALITIES, INJURY_BODY_PARTS, INJURY_RECURRENCE_MULTIPLIER,
@@ -310,34 +310,34 @@ const PITCHER_DECLINE_WEIGHTS = {
   velocity: 1.4, stamina: 1.2, sharpness: 0.9, control: 0.8, breaking: 0.7, variety: 0.6,
 };
 
-function calcGrowthBudget(p) {
+function calcGrowthBudget(p, context) {
   const age = p.age;
   const pot = p.potential ?? 65;
   let base;
-  if      (age <= 20) base = rng(8, 13)  + Math.round((pot - 65) * 0.5);
-  else if (age <= 24) base = rng(12, 18) + Math.round((pot - 65) * 0.7);
-  else if (age <= 27) base = rng(4, 8);
-  else if (age <= 30) base = rng(-1, 4);
-  else if (age <= 33) base = rng(-5, -2);
-  else if (age <= 37) base = rng(-9, -5);
-  else                base = rng(-12, -8);
+  if      (age <= 20) base = rng(8, 13, context)  + Math.round((pot - 65) * 0.5);
+  else if (age <= 24) base = rng(12, 18, context) + Math.round((pot - 65) * 0.7);
+  else if (age <= 27) base = rng(4, 8, context);
+  else if (age <= 30) base = rng(-1, 4, context);
+  else if (age <= 33) base = rng(-5, -2, context);
+  else if (age <= 37) base = rng(-9, -5, context);
+  else                base = rng(-12, -8, context);
 
   // ブレイクアウト/バスト（若手のみ）
   if (age <= 26) {
-    const roll = Math.random();
+    const roll = rngf(0, 1, context);
     if (roll < 0.05) return base * 2;   // ブレイク 5%
     if (roll < 0.08) return 0;           // バスト   3%
   }
 
   // 晩年ブレイクスルー（28〜34歳: 2%確率で改善ボーナス）
   if (age >= 28 && age <= 34 && base < 0) {
-    if (Math.random() < 0.02) return Math.abs(base) * 1.5;
+    if (rngf(0, 1, context) < 0.02) return Math.abs(base) * 1.5;
   }
 
   return base;
 }
 
-function applyGrowthToAbilities(abilities, keys, budget, trainingFocus, potential, isPitcher = false) {
+function applyGrowthToAbilities(abilities, keys, budget, trainingFocus, potential, isPitcher = false, context) {
   if (!abilities || budget === 0) return { ...abilities };
   const cap = Math.min(potential ?? 90, 99);
   const result = { ...abilities };
@@ -345,7 +345,12 @@ function applyGrowthToAbilities(abilities, keys, budget, trainingFocus, potentia
   let remaining = Math.abs(budget);
 
   // キーをシャッフルして偏りを防ぐ
-  const shuffled = [...keys].sort(() => Math.random() - 0.5);
+  const shuffled = [...keys];
+  if (context === undefined) shuffled.sort(() => rngf(0, 1) - 0.5);
+  else for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = rng(0, i, context);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
   if (trainingFocus && keys.includes(trainingFocus)) {
     const idx = shuffled.indexOf(trainingFocus);
     shuffled.splice(idx, 1);
@@ -359,11 +364,11 @@ function applyGrowthToAbilities(abilities, keys, budget, trainingFocus, potentia
     // 投手衰退時: 速球は優先的に、制球・変化球は緩やかに衰退
     const declineWeight = (!isGrowth && isPitcher) ? (PITCHER_DECLINE_WEIGHTS[key] ?? 1.0) : 1.0;
     if (isGrowth) {
-      const gain = isFocus ? Math.min(remaining, rng(4, 10)) : Math.min(remaining, rng(2, 6));
+      const gain = isFocus ? Math.min(remaining, rng(4, 10, context)) : Math.min(remaining, rng(2, 6, context));
       result[key] = Math.min(cap, (result[key] || 50) + gain);
       remaining -= gain;
     } else {
-      const rawLoss = isFocus ? rng(0, 2) : rng(2, 5);
+      const rawLoss = isFocus ? rng(0, 2, context) : rng(2, 5, context);
       const loss = Math.min(remaining, Math.round(rawLoss * declineWeight));
       result[key] = Math.max(1, (result[key] || 50) - loss);
       remaining -= Math.max(1, loss);
@@ -378,7 +383,7 @@ function applyGrowthToAbilities(abilities, keys, budget, trainingFocus, potentia
  * @param {Object[]} coaches  - チームコーチリスト（batting/pitching コーチのボーナスを加算）
  * @returns {{ players: Object[], summary: { breakout: Object[], growth: Object[], decline: Object[] } }}
  */
-export function developPlayers(players, coaches = []) {
+export function developPlayers(players, coaches = [], contextFor = () => undefined) {
   const summary = { breakout: [], growth: [], decline: [] };
 
   // コーチボーナス: 成長フェーズにのみ加算（劣化は防がない）
@@ -387,7 +392,8 @@ export function developPlayers(players, coaches = []) {
   const mentalBonus   = coaches.filter(c => c.type === 'mental').reduce((s, c)   => s + Math.floor((c.bonus || 0) / 2), 0);
 
   const developed = players.map(p => {
-    const rawBudget = calcGrowthBudget(p);
+    const context = contextFor(p);
+    const rawBudget = calcGrowthBudget(p, context);
     const coachBonus = (p.isPitcher ? pitchingBonus : battingBonus) + mentalBonus;
     const budget = rawBudget > 0 ? rawBudget + coachBonus : rawBudget;
     const focus  = p.trainingFocus ?? null;
@@ -396,14 +402,14 @@ export function developPlayers(players, coaches = []) {
 
     if (p.isPitcher && p.pitching) {
       const before = { ...p.pitching };
-      newP.pitching = applyGrowthToAbilities(p.pitching, PITCHER_KEYS, budget, focus, pot, true);
+      newP.pitching = applyGrowthToAbilities(p.pitching, PITCHER_KEYS, budget, focus, pot, true, context);
       const diff = PITCHER_KEYS.reduce((s, k) => s + (newP.pitching[k] || 0) - (before[k] || 0), 0);
       if (budget > 0 && diff >= 8) summary.breakout.push({ p, diff, type: 'pitcher' });
       else if (diff > 1)  summary.growth.push({ p, diff });
       else if (diff < -4) summary.decline.push({ p, diff });
     } else if (!p.isPitcher && p.batting) {
       const before = { ...p.batting };
-      newP.batting = applyGrowthToAbilities(p.batting, BATTER_KEYS, budget, focus, pot, false);
+      newP.batting = applyGrowthToAbilities(p.batting, BATTER_KEYS, budget, focus, pot, false, context);
       const diff = BATTER_KEYS.reduce((s, k) => s + (newP.batting[k] || 0) - (before[k] || 0), 0);
       if (budget > 0 && diff >= 10) summary.breakout.push({ p, diff, type: 'batter' });
       else if (diff > 1)  summary.growth.push({ p, diff });

@@ -1,3 +1,4 @@
+import './year-end-growth.cases.js';
 import { test, expect } from '@playwright/test';
 import './human-trade.cases.js';
 import './human-posting.cases.js';
