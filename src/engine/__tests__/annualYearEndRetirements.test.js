@@ -199,12 +199,13 @@ it('prevents a direct late year-end retirement from overturning a saved retain s
 it.each([0, 1])('does not cancel club %s formal renewal promises to force retirement', teamId => {
   const source = budgetForecastWorld().teams.map(t => ({ ...t, players: t.players.map(p => ({ ...p,
     contractYearsLeft: 1, age: t.id < 2 ? 42 : 20, retireStyle: 100 })) }));
-  let w = yearEndReviewWorld(source), p = w.teams.find(t => t.id === teamId).players[0];
+  let w = closedPostseasonWorld(source), p = w.teams.find(t => t.id === teamId).players[0];
   const offered = reduceEconomyCommand(w, wrap(w, { id: 'promise', type: 'offer-renewal', contractId: p.contractId,
     proposal: { id: 'promised-renewal', type: 'sign', teamId, effectiveDate: '2027-02-01', contract: createSeasonContract({
-      contractId: 'promised-contract', playerId: p.id, signedSeason: 2026, agreementPhase: 'offseason', purpose: 'renewal',
+      contractId: 'promised-contract', playerId: p.id, signedSeason: 2026, agreementPhase: 'season', purpose: 'renewal',
       termYears: 2, annualSalaryManYen: 1000, registrationType: 'controlled', guaranteed: true }) } }));
   expect(offered.ok, offered.error).toBe(true); w = offered.world;
+  const opened = reduceOpenOffseasonRequest(w, openOffseasonRequest(w)); expect(opened.ok, opened.error).toBe(true); w = opened.world;
   const pending = structuredClone(w);
   expect(reduceEconomyCommand(w, command(w))).toMatchObject({ ok: false, world: w }); expect(w).toEqual(pending);
   const accepted = reduceEconomyCommand(w, wrap(w, { id: 'promise-accepted', type: 'accept-renewal', proposalId: 'promised-renewal', contractId: p.contractId }));

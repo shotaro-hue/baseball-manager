@@ -1,4 +1,4 @@
-import { requiresYearEndGrowth, growthContextFor, inspectGrowthOpening } from './annualYearEndGrowth';
+import { requiresYearEndGrowth, growthContextFor, inspectGrowthOpening, yearEndGrowthRenewalIssue } from './annualYearEndGrowth';
 import { nativeFaExerciseOrigins } from './annualFaDeclarations';
 import { inspectRetirementCalendar } from './annualRetirements';
 import { assertYearEndRetirementCoverage, requiresYearEndRetirements } from './annualYearEndRetirements';
@@ -190,6 +190,11 @@ function runCommand(world, command, apply = applyAnnualTransaction) {
     || command.saveId !== current.saveId || command.epoch !== current.epoch || !counter(command.baseRevision)
     || command.baseRevision > current.baseRevision || !command.transaction) fail('取引のsaveId・epoch・revisionが古いか未記録です。');
   const c = command.transaction;
+  if (['offer-renewal', 'replace-renewal'].includes(c.type) && c.proposal?.teamId === world.myId
+    && !state.transactions.some(r => r.id === c.id)) {
+    const growthIssue = yearEndGrowthRenewalIssue(world);
+    if (growthIssue) fail(growthIssue);
+  }
   if (c.type === 'prepare-year-end-growth' && !state.transactions.some(r => r.id === c.id)
     && (!requiresYearEndGrowth(world) || world.contractEconomy.decisions.some(d => d.kind === 'human-renewal' && d.status === 'pending')))
     fail('オフ開始と引退判断を保存し、回答待ちの更改を解決してから成長を確定してください。');

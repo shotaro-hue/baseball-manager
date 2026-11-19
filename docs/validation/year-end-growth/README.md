@@ -43,3 +43,16 @@ main `ffbf4114`（#562マージ済み）から、native 12/1の期末引退判�
 最終独立追認: core19/history2/hook5の26件成功。実12球団の実保存/再読込も成功し、当初4指摘と再獲得回帰の解消を確認。新規ブロッカーなし、最終同一HEADの必須CI成功を提出条件とする。
 
 [360結果](screenshots/360-result.png) / [390結果](screenshots/390-result.png) / [1440結果](screenshots/1440-result.png)
+
+## 2026-11-19 PR #563レビュー修正
+
+- 開始HEAD `baa30d7a77022b85551c5b4bcaf28b0edeafc147`、main `ffbf4114`、CI #742成功を確認。
+- 指摘P2を再現: 実native new-game/閉幕/open/引退確定→人向け新規更改保存成功→turn0/dueTurn2/dueDate:null→成長保存拒否。`decisionClock`は2〜4ターン待ち。native hookの年度進行は翌春未接続として停止し、オフターンを進める画面操作はない。取消できるため永久的deadlockとはしないが、不要取消を強いる進行阻害。
+- 原因は新規更改入口が成長の前提を確認せず、成長入口だけがpending更改を拒否していたこと。共通理由関数（既存requiresYearEndGrowthを再利用）をhuman reducer/共通world API/画面に追加し、offer/replaceだけ拒否。保存済みreplayを先に扱い、取消/回答/復旧は制限しない。
+- RED: human offerのopen直後/引退確定後2件、同期/非同期world API2件、画面1件で修正前の成功/操作可能を確認。GREENへ修正。修正前実producerから生成したpending保存を固定fixtureとして保持し、旧提示の読込/replay/差替拒否/取消/回答を検証。
+- シーズン中、オフ開始前からの期日到来済み提示、旧native、実producerの旧posting済み進行、固定旧posting保存、CPU raw提示を維持。成長後はposting未実行でも固定要求で提示できる。既存の保証/正式留保テストは期待結果を変えず、提示元だけを正規のオフ開始前へ更新。
+- 実保存hookで拒否時root/world不変、成長保存失敗→cold再読込でも制約維持→成長保存成功→固定要求で提示→replay一回、読込一致を確認。
+- 画面では新規/差替え確認だけ停止し、理由と「年度末成長の保存へ」を表示。既存取消/回答/復旧は維持。確認中にopenへ変わった古い確認画面も送信しない。
+- 独立レビューでquote/直接replace同期非同期/偽replay/teamId偽装/CPU/旧replay/成長後提示を追加実証し、P1/P2なし。P3の不正cycle時に停止表示より前に例外になる回帰は、RED→GREENで既存停止表示を維持するよう修正。
+- 旧コーチ観測の欠測限界、年度完走・長期成長表示/モバイル性能・実iPhone未検証は継続。schema1/DB5/公開OFF、既存保存barrierを維持。新規PR/main push/merge/auto-mergeなし。今回追加コミットの最終SHA・必須CIと画面結果はPR本文を正本とする。
+- ローカル検証: 関連8ファイル179件成功、P3修正後の契約画面10件成功。Chromium/WebKitそれぞれ360/390/1440pxの3件、合計6件成功。実契約画面→成長画面リンク→保存失敗→再読込して制約保持→成長保存→固定要求で提示→保存再開を確認。変更前/後の画面は各ブラウザレポートの `blocked` / `saved` 添付。WebKitは既存の/tmp配置済み公式ブラウザ/不足ライブラリで実行し、事前OS検査だけを省略。実iPhoneではない。

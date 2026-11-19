@@ -23,6 +23,11 @@ export function requiresYearEndGrowth(world) {
   return e?.mode === 'annual' && e.cycle.transitionReceipts.some(r => r.kind === 'open-offseason' && r.season === world.year)
     && !e.engine.transactions.some(t => t.id === yearEndGrowthId(world.year)) && !hasSeasonPosting(e.engine, world.year);
 }
+export function yearEndGrowthRenewalIssue(world) {
+  return requiresYearEndGrowth(world)
+    ? '期末引退判断を確定し、年度末成長・要求年俸を保存してから新しい更改条件を提示してください。既存提示の取消・回答は引き続き行えます。'
+    : null;
+}
 export const growthPlayerIds = state => state.teams.flatMap(t => [...t.players, ...t.farm])
   .filter(p => !p.isRetired && !p._retireNow).map(p => p.id).sort(order);
 export function normalizeYearEndGrowth(c) {

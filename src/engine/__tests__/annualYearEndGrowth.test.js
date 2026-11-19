@@ -1,3 +1,5 @@
+import { closedPostseasonWorld } from './fixtures/openOffseason';
+import { openRenewalWinter, reviewRenewalWinter } from './fixtures/renewalGrowth';
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { economyClockFor } from '../economyCalendar';
@@ -120,9 +122,10 @@ it('preserves saved growth after later ages, placement, stats and next-year engi
 
 it('preserves formal reservations and future guaranteed contracts and reuses the fixed salary assessment',()=>{
  const source=budgetForecastWorld().teams.map(t=>({...t,players:t.players.map(p=>({...p,age:20,contractYearsLeft:1,stats:{PA:0}}))}));
- let w=growthSource(source);const p=w.teams[0].players[0];
- const proposal={id:'future-offer',type:'sign',teamId:w.myId,effectiveDate:'2027-02-01',contract:createSeasonContract({contractId:'future',playerId:p.id,signedSeason:2026,agreementPhase:'offseason',purpose:'renewal',termYears:2,annualSalaryManYen:2000,registrationType:'controlled',guaranteed:true})};
+ let w=closedPostseasonWorld(source);const p=w.teams[0].players[0];
+ const proposal={id:'future-offer',type:'sign',teamId:w.myId,effectiveDate:'2027-02-01',contract:createSeasonContract({contractId:'future',playerId:p.id,signedSeason:2026,agreementPhase:'season',purpose:'renewal',termYears:2,annualSalaryManYen:2000,registrationType:'controlled',guaranteed:true})};
  let r=reduceEconomyCommand(w,wrap(w,{id:'future-reserve',type:'offer-renewal',contractId:p.contractId,proposal}));expect(r.ok,r.error).toBe(true);w=r.world;
+ w=reviewRenewalWinter(openRenewalWinter(w));
  const before=structuredClone(w.contractEconomy.engine.spending);
  r=reduceEconomyCommand(w,growthCommand(w));expect(r.ok,r.error).toBe(true);expect(r.world.contractEconomy.engine.spending).toEqual(before);
  const fixed=savedYearEndSalary(r.world,p.id),changed={...r.world.teams[0].players[0],stats:{}};

@@ -1,4 +1,4 @@
-import { savedYearEndSalary } from './annualYearEndGrowth';
+import { savedYearEndSalary, yearEndGrowthRenewalIssue } from './annualYearEndGrowth';
 import { ACCEPT_THRESHOLD } from '../constants';
 import { calcPlayerDemand, evaluateRenewalOffer } from './contract';
 import { contractEconomyMode, reduceEconomyCommand, toAnnualState } from './contractEconomy';
@@ -164,6 +164,8 @@ export function reduceRenewalRequest(world, request) {
     if (request.baseRevision !== e.revision) fail('更改のrevisionが古くなっています。再確認してください。');
     let next;
     if (action.type === 'offer') {
+      const growthIssue = yearEndGrowthRenewalIssue(world);
+      if (growthIssue) fail(growthIssue);
       const clock = e.clock;
       if (!['season', 'offseason'].includes(clock.phase) || (clock.phase === 'offseason' && clock.offseasonTurn > 30))
         fail('新しい更改を提示できる期間ではありません。');
