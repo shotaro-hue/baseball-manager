@@ -72,12 +72,14 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      # Azure's Ubuntu mirror repeatedly stalled for 30s per package in CI #477,
-      # consuming 22m43s before tests. Keep Ubuntu's signed archive and test budget.
+      # Azure (#477) and EC2 (#744) mirrors exhausted setup time before tests.
+      # Keep Ubuntu's signed archive, assertions, retries and test budget.
       - name: Use Ubuntu archive for browser dependencies
         # Hosted images can use mirror+file:/etc/apt/apt-mirrors.txt; replacing
         # only .sources/.list silently left the slow Azure endpoint active.
-        run: sudo python3 scripts/ci/use-ubuntu-archive.py
+        run: |
+          python3 -m unittest discover -s scripts/ci -p 'test_*.py'
+          sudo python3 scripts/ci/use-ubuntu-archive.py
       - name: Install Chromium and WebKit
         run: npx playwright install --with-deps chromium webkit
       - name: Run E2E subset (one worker, no retries)

@@ -1,5 +1,6 @@
-"""Keep signed Ubuntu sources, replacing Azure even behind apt mirror lists."""
+"""Keep signed Ubuntu sources, replacing cloud mirrors behind apt mirror lists."""
 from pathlib import Path
+import re
 import sys
 
 
@@ -12,10 +13,9 @@ def use_ubuntu_archive(apt_root):
         if not path.is_file():
             continue
         original = path.read_text()
-        updated = original
-        for scheme in ('http', 'https'):
-            updated = updated.replace(f'{scheme}://azure.archive.ubuntu.com/ubuntu',
-                                      'https://archive.ubuntu.com/ubuntu')
+        updated = re.sub(
+            r'https?://(?:azure|[a-z0-9-]+\.ec2)\.archive\.ubuntu\.com/ubuntu(?=[/\s]|$)',
+            'https://archive.ubuntu.com/ubuntu', original)
         if updated != original:
             path.write_text(updated)
             print(f'Updated Ubuntu archive: {path}')
