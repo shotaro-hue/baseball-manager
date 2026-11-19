@@ -1,3 +1,5 @@
+import { reduceYearEndGrowthRequestAsync } from '../engine/humanYearEndGrowth';
+import { requiresYearEndGrowth } from '../engine/annualYearEndGrowth';
 import { draftCapacityContext, evaluateRosterCapacity, isIkuseiPlayer } from '../engine/rosterCapacity';
 import { reduceRookieRequest } from '../engine/rookieContracts';
 import { reduceTradeRequest } from '../engine/humanTrade';
@@ -802,6 +804,11 @@ export function useGameState() {
     return commitEconomyOperation(request, reduceYearEndRetirementsRequestAsync, sessionToken, { flushPendingBase: true });
   }, [commitEconomyOperation]);
 
+  const commitYearEndGrowthRequest = useCallback((request, sessionToken) => {
+    if (!Number.isSafeInteger(sessionToken)) return Promise.resolve({ ok: false, reason: 'economy_session_conflict' });
+    return commitEconomyOperation(request, reduceYearEndGrowthRequestAsync, sessionToken, { flushPendingBase: true });
+  }, [commitEconomyOperation]);
+
   const recoverEconomyCommand = useCallback(async () => {
     if (!economyMountedRef.current) return { ok: false, reason: 'economy_recovery_unavailable' };
     let context = economyCommitRef.current;
@@ -1432,17 +1439,19 @@ export function useGameState() {
   },[myTeam,upd,myId,notify]);
 
   const hireCoach = useCallback((cd,cg)=>{
+    if (requiresYearEndGrowth(gameState)) { notify("年度末成長を保存してから翌年度コーチを変更してください。", "warn"); return false; }
     if (economyCommitRef.current) return false;
     if(!myTeam||myTeam.budget<cg.salary*12){notify("予算不足","warn");return;}
     upd(myId,t=>({...t,budget:t.budget-cg.salary*12,coaches:[...t.coaches,{type:cd.type,typeName:cd.name,emoji:cd.emoji,name:pname(),grade:cg.g,label:cg.label,salary:cg.salary*12,bonus:cg.bonus}]}));
     notify(`${cd.name}(Lv${cg.g})を雇いました！`,"ok");
-  },[myTeam,upd,myId,notify]);
+  },[myTeam,upd,myId,notify,gameState]);
 
   const fireCoach = useCallback((idx)=>{
+    if (requiresYearEndGrowth(gameState)) { notify("年度末成長を保存してから翌年度コーチを変更してください。", "warn"); return false; }
     if (economyCommitRef.current) return false;
     upd(myId,t=>({...t,coaches:t.coaches.filter((_,i)=>i!==idx)}));
     notify("コーチを解雇","warn");
-  },[upd,myId,notify]);
+  },[upd,myId,notify,gameState]);
 
   // Compatibility entry points only. No dispatch, timer, dirty mark or success
   // notification: old reports/missions remain untouched in both economy modes.
@@ -1554,7 +1563,7 @@ export function useGameState() {
     getLatestNewsId,
     markSaveDirty,
     hydrateSavedWorld, hydrateLargeSaveData, getMatchHistorySnapshot, hydrateMatchHistory, applyMatchResultPatch,
-    commitEconomyCommand, commitRenewalRequest, commitAcquisitionRequest, commitDueEconomyRequest, commitRookieRequest, commitTradeRequest, commitPostingDecisionRequest, commitPostingMarketRequest, commitPostingGenerationRequest, commitOffseasonPostingRequest, commitOpenOffseasonRequest, commitYearEndRetirementsRequest, recoverEconomyCommand,
+    commitEconomyCommand, commitRenewalRequest, commitAcquisitionRequest, commitDueEconomyRequest, commitRookieRequest, commitTradeRequest, commitPostingDecisionRequest, commitPostingMarketRequest, commitPostingGenerationRequest, commitOffseasonPostingRequest, commitOpenOffseasonRequest, commitYearEndRetirementsRequest, commitYearEndGrowthRequest, recoverEconomyCommand,
     resetSaveTracking,
     // derived
     myTeam,

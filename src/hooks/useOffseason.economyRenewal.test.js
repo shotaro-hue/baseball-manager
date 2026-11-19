@@ -1,3 +1,5 @@
+import { reviewRenewalWinter } from '../engine/__tests__/fixtures/renewalGrowth';
+import { savedYearEndSalary } from '../engine/annualYearEndGrowth';
 import React from 'react';
 import { act, create } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -144,4 +146,21 @@ it.each([
   expect(saved.contractEconomy.engine.transactions).toHaveLength(2);
   expect(saved.contractEconomy.engine.spending.reservations).toHaveLength(0);
   expect(saved.teams[0].players[0].salary).toBe(10000);
+});
+
+it('keeps blocked offers and growth publication failures unchanged across reload, then uses the saved demand',async()=>{
+ const w=reviewRenewalWinter();await setup(w);const p=w.teams[0].players[0],root=storage.get(primary);
+ const blocked=await run(()=>os.handleContractOffer(p.id,2000,2));expect(blocked.ok).toBe(false);expect(blocked.error).toContain('年度末成長');
+ expect(storage.get(primary)).toBe(root);expect(gs.contractEconomy).toEqual(w.contractEconomy);
+ const write=localStorage.setItem;localStorage.setItem=(k,v)=>{if(k===primary)throw Error('quota');write(k,v);};
+ expect(await run(()=>os.handleYearEndGrowth())).toBe(false);expect(storage.get(primary)).toBe(root);
+ localStorage.setItem=write;
+ const loaded=await loadGame();act(()=>expect(gs.hydrateSavedWorld(loaded,{progressToken:gs.getProgressToken(),sessionToken:gs.getProgressSessionToken()})).toBe(true));
+ expect((await run(()=>os.handleContractOffer(p.id,2000,2))).ok).toBe(false);expect(storage.get(primary)).toBe(root);
+ expect(await run(()=>os.handleYearEndGrowth())).toBe(true);
+ const request=renewalRequest(gs,{type:'offer',playerId:p.id,salary:2000,years:2});
+ expect(await run(()=>gs.commitRenewalRequest(request,gs.getProgressSessionToken()))).toMatchObject({ok:true});
+ expect(gs.contractEconomy.decisions.at(-1).demand).toMatchObject(savedYearEndSalary(gs,p.id));
+ const saved=storage.get(primary);expect(await run(()=>gs.commitRenewalRequest(request,gs.getProgressSessionToken()))).toMatchObject({ok:true,replayed:true});expect(storage.get(primary)).toBe(saved);
+ const final=await loadGame();expect(final.contractEconomy).toEqual(gs.contractEconomy);expect(final.teams).toEqual(gs.teams);
 });

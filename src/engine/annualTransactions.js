@@ -1,3 +1,4 @@
+import { isYearEndGrowthCommand, normalizeYearEndGrowth, createYearEndGrowth, inspectYearEndGrowth } from './annualYearEndGrowth';
 import { yieldToBrowser } from './yieldToBrowser';
 import { isYearEndRetirementsCommand, normalizeYearEndRetirements, createYearEndRetirementsSteps, inspectYearEndRetirements } from './annualYearEndRetirements';
 import { isOffseasonPostingCommand, normalizeOffseasonPosting, createOffseasonPostingSteps, inspectOffseasonPosting } from './annualOffseasonPosting';
@@ -68,6 +69,7 @@ const kinds = {
   'convert-to-controlled': ['teamId', 'playerId', 'contractId', 'annualSalaryManYen'],
 };
 function commandFor(input) {
+  if (isYearEndGrowthCommand(input)) return normalizeYearEndGrowth(input);
   if (isYearEndRetirementsCommand(input)) return normalizeYearEndRetirements(input);
   if (isOffseasonPostingCommand(input)) return normalizeOffseasonPosting(input);
   if (isAnnualPostingPhaseCommand(input)) return normalizeAnnualPostingPhase(input);
@@ -148,6 +150,7 @@ function inspect(state) {
   inspectAnnualPostingPhases(state);
   inspectOffseasonPosting(state);
   inspectYearEndRetirements(state);
+  inspectYearEndGrowth(state);
   // One employment can end by only one route. Individually valid records from
   // incompatible branches must not jointly exempt the same source contract.
   if (new Set(departures.map(d => d.sourceContractId)).size !== departures.length) fail('同じ元契約の退団経路が重複しています。');
@@ -562,6 +565,10 @@ function* candidateSteps(input, command) {
       ...(receipt.faPersonnel ? { personnel: { winnerProposalIds: [...receipt.faPersonnel.winnerProposalIds], lostProposalIds: [...receipt.faPersonnel.lostProposalIds] } } : {}) };
   }
   assertRetirementCommandCompatible(before, c);
+  if (isYearEndGrowthCommand(c)) {
+    const state = withFloors(createYearEndGrowth(before, c, signature));
+    return { state, rows: quoteAnnualSpendingPlan(state.spending), replayed: false };
+  }
   if (isYearEndRetirementsCommand(c)) {
     const result = yield* createYearEndRetirementsSteps(before, c, signature, candidateSteps);
     return { ...result, state: withFloors(result.state) };

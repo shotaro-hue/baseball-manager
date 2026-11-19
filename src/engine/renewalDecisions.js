@@ -1,3 +1,4 @@
+import { savedYearEndSalary, yearEndGrowthRenewalIssue } from './annualYearEndGrowth';
 import { ACCEPT_THRESHOLD } from '../constants';
 import { calcPlayerDemand, evaluateRenewalOffer } from './contract';
 import { contractEconomyMode, reduceEconomyCommand, toAnnualState } from './contractEconomy';
@@ -163,6 +164,8 @@ export function reduceRenewalRequest(world, request) {
     if (request.baseRevision !== e.revision) fail('更改のrevisionが古くなっています。再確認してください。');
     let next;
     if (action.type === 'offer') {
+      const growthIssue = yearEndGrowthRenewalIssue(world);
+      if (growthIssue) fail(growthIssue);
       const clock = e.clock;
       if (!['season', 'offseason'].includes(clock.phase) || (clock.phase === 'offseason' && clock.offseasonTurn > 30))
         fail('新しい更改を提示できる期間ではありません。');
@@ -176,7 +179,7 @@ export function reduceRenewalRequest(world, request) {
       if (!employment) fail('現在の契約が見つかりません。');
       const demand = calcPlayerDemand(player, { year: world.year, team, teams: world.teams,
         awards: world.seasonHistory?.awards?.find(a => a.year === world.year),
-        championship: world.seasonHistory?.championships?.find(c => c.year === world.year) });
+        championship: world.seasonHistory?.championships?.find(c => c.year === world.year) }, savedYearEndSalary(world, player.id));
       const evaluation = evaluateRenewalOffer(player, { salary: action.salary, years: action.years }, team, world.teams, demand);
       const score = evaluation.score;
       if (!Number.isFinite(player.salary) || player.salary <= 0 || !evaluation.valid

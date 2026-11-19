@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
+import { renewalClosingWorld, openRenewalWinter } from '../../engine/__tests__/fixtures/renewalGrowth';
 import React from 'react';
 import { act, create } from 'react-test-renderer';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -106,4 +109,41 @@ it('routes both the management destination and offseason renewal to the annual v
   const oldScreen = vi.fn(() => React.createElement('div', null, 'old screen'));
   act(() => view.update(React.createElement(ContractRenewalRoute, { gs: { ...gs, screen: 'contract_renewal_phase' }, os: {}, myTeam: gs.myTeam, myId: 0, year: 2026, ScreenComponent: oldScreen })));
   expect(view.root.findAllByType(AnnualContractTab)).toHaveLength(1); expect(oldScreen).not.toHaveBeenCalled();
+});
+
+it('explains the growth prerequisite, blocks fresh confirmation and links to the year-end screen',()=>{
+ const w=openRenewalWinter(),setScreen=vi.fn();setup({...state(w),setScreen},{});
+ act(()=>view.root.findByProps({'aria-label':'Playerの契約を確認'}).props.onClick());
+ expect(button('提示条件を確認する').props.disabled).toBe(true);
+ expect(text(view.root)).toContain('年度末成長');
+ click('年度末成長の保存へ');expect(setScreen).toHaveBeenCalledWith('retire_phase');
+});
+
+it('keeps cancellation and due replies enabled for old pending offers while blocking replacement',async()=>{
+ const w=JSON.parse(gunzipSync(readFileSync(new URL('../../engine/__tests__/fixtures/renewalBeforeGrowthPending.json.gz',import.meta.url))));
+ const cancel=vi.fn(async proposalId=>reduceRenewalRequest(w,renewalRequest(w,{type:'cancel',proposalId})));
+ setup({...state(w),setScreen:vi.fn()},{handleCancelRenewal:cancel});
+ act(()=>view.root.findByProps({'aria-label':'Playerの契約を確認'}).props.onClick());
+ expect(button('提示条件を確認する').props.disabled).toBe(true);
+ expect(view.root.findAllByType('fieldset')[0].props.disabled).toBe(false);
+ click('提示を取り消す');await act(async()=>{await button('取消を確定する').props.onClick();});
+ expect(cancel).toHaveBeenCalledWith(w.contractEconomy.decisions[0].proposalId);expect(text(view.root)).toContain('提示を取り消しました');
+ const due=structuredClone(w);due.contractEconomy.clock.offseasonTurn=2;
+ const resolve=vi.fn(async()=>reduceRenewalRequest(due,renewalRequest(due,{type:'resolve-due'})));
+ act(()=>view.update(React.createElement(AnnualContractTab,{gs:state(due),os:{handleResolveRenewals:resolve}})));
+ expect(button('届いた回答を確認する').props.disabled).toBe(false);
+ await act(async()=>{await button('届いた回答を確認する').props.onClick();});expect(resolve).toHaveBeenCalledTimes(1);
+});
+it('prevents a confirmation opened before native opening from submitting after the prerequisite changes',()=>{
+ const closing=renewalClosingWorld(),offer=vi.fn();setup(state(closing),{handleContractOffer:offer});
+ act(()=>view.root.findByProps({'aria-label':'Playerの契約を確認'}).props.onClick());click('提示条件を確認する');
+ const opened=openRenewalWinter(closing);
+ act(()=>view.update(React.createElement(AnnualContractTab,{gs:state(opened),os:{handleContractOffer:offer}})));
+ expect(button('この条件で提示する').props.disabled).toBe(true);
+ click('この条件で提示する');expect(offer).not.toHaveBeenCalled();
+});
+
+it('keeps the existing invalid-data stop message when the annual cycle is absent',()=>{
+ const gs=state();delete gs.contractEconomy.cycle;
+ expect(()=>setup(gs,{})).not.toThrow();expect(text(view.root)).toContain('更改操作を停止しています');
 });

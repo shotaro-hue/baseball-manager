@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toAnnualState } from '../../engine/contractEconomy';
+import { yearEndGrowthRenewalIssue } from '../../engine/annualYearEndGrowth';
 import { contractEmploymentAt } from '../../engine/contractLedger';
 import { quoteAnnualSpendingPlan } from '../../engine/annualSpending';
 import { dueRenewalDecisions, validateRenewalDecisions } from '../../engine/renewalDecisions';
@@ -56,6 +57,7 @@ export function AnnualContractTab({ gs, os, focusRequest }) {
   }, [focusRequest?.token]);
   const recovery = failure?.reason === 'economy_adoption_required' || gs.saveResult?.reason === 'economy_adoption_required';
   const blocked = busy || gs.saveQueueState?.isSaving || recovery;
+  const growthIssue = model.error ? null : yearEndGrowthRenewalIssue(gs);
   const pending = selected?.latest?.status === 'pending' ? selected.latest : null;
   const replyDue = pending && model.due.some(d => d.proposalId === pending.proposalId);
   const valid = selected?.eligible && salary.trim() !== '' && Number.isSafeInteger(Number(salary))
@@ -74,7 +76,7 @@ export function AnnualContractTab({ gs, os, focusRequest }) {
   };
   const confirm = () => {
     if (inFlight.current || gs.saveQueueState?.isSaving || recovery || replyDue || !selected) return;
-    if (confirmation === 'offer' && valid) return run(() => os.handleContractOffer(selected.player.id, Number(salary), years,
+    if (confirmation === 'offer' && valid && !growthIssue) return run(() => os.handleContractOffer(selected.player.id, Number(salary), years,
       pending ? { replaceProposalId: pending.proposalId } : {}), '提示を保存しました。回答待ちです。');
     if (confirmation === 'cancel' && pending) return run(() => os.handleCancelRenewal(pending.proposalId), '提示を取り消しました。');
   };
@@ -83,6 +85,8 @@ export function AnnualContractTab({ gs, os, focusRequest }) {
   const clock = gs.contractEconomy.clock;
   return <main className={`management-decisions ${selectedId !== null ? 'decision-selected' : ''}`} data-ds="contract-management">
     <h1>契約更改</h1><p>来季の条件を提示し、回答を確認します。今季の年俸・所属は変わりません。</p>
+    {growthIssue && <section aria-label="更改前の年度末成長"><p>{growthIssue}</p>
+      <Button disabled={blocked} onClick={() => gs.setScreen('retire_phase')}>年度末成長の保存へ</Button></section>}
     <MetricBand items={[moneyMetric(`${gs.year + 1}年度の追加余力`, money(nextBudget?.remainingManYen)),
       { label: '回答待ち', value: model.entries.filter(e => e.state === 'waiting').length, unit: '人' }]} />
     {busy && <p role="status">保存・反映を確認しています…</p>}
@@ -109,12 +113,12 @@ export function AnnualContractTab({ gs, os, focusRequest }) {
               {[1, 2, 3, 4, 5, 6, 7].filter(y => !isIkuseiPlayer(selected.player) || y <= ikuseiContractYears(selected.player)).map(y => <option key={y} value={y}>{y}年</option>)}
             </select></label></div>
           <p className="decision-note">提示時に契約期間の各年度の予算を確保します。回答で合意した条件は翌年2月1日から有効です。</p>
-          <Button disabled={!valid || blocked || (clock.phase === 'offseason' && clock.offseasonTurn > 30)} onClick={() => setConfirmation('offer')}>提示条件を確認する</Button>
+          <Button disabled={!valid || blocked || Boolean(growthIssue) || (clock.phase === 'offseason' && clock.offseasonTurn > 30)} onClick={() => setConfirmation('offer')}>提示条件を確認する</Button>
           {pending && <Button variant="secondary" onClick={() => setConfirmation('cancel')}>提示を取り消す</Button>}
         </fieldset> : <p>現在は新たな更改の対象ではありません。</p>}
         {confirmation && <DecisionConfirmation title={confirmation === 'offer' ? '提示条件の最終確認' : '提示取消の確認'}
           fallbackFocus={focus.heading} onCancel={() => { if (!blocked) setConfirmation(null); }} onConfirm={confirm}
-          confirmLabel={confirmation === 'offer' ? 'この条件で提示する' : '取消を確定する'} error={blocked ? '保存・復旧の完了を待ってください。' : replyDue ? '回答期日に到達しています。先に回答を確認してください。' : confirmation === 'offer' && !valid ? '提示条件を確認してください。' : null}>
+          confirmLabel={confirmation === 'offer' ? 'この条件で提示する' : '取消を確定する'} error={blocked ? '保存・復旧の完了を待ってください。' : replyDue ? '回答期日に到達しています。先に回答を確認してください。' : confirmation === 'offer' && growthIssue ? growthIssue : confirmation === 'offer' && !valid ? '提示条件を確認してください。' : null}>
           {confirmation === 'offer' && pending && <p>保存済みの提示：年俸{money(pending.request.action.salary)}・{pending.request.action.years}年</p>}
           <p>{confirmation === 'offer' ? `${pending ? '差替後の提示：' : ''}${gs.year + 1}年度から年俸${money(Number(salary))}・${years}年。${pending ? '保存が完了すると現在の提示を置き換えます。' : ''}` : '回答待ちの提示と予算の確保を取り消します。今季の契約は維持します。'}</p>
         </DecisionConfirmation>}

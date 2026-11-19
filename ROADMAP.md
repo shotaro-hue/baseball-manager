@@ -1,5 +1,7 @@
 # ROADMAP — NPB Franchise Manager
 
+> 2026-11-16 GM-01 A1-3b: #562マージ後、native12/1の引退確定後に全球団一軍/二軍の成長・要求年俸を一度保存する工程。旧年度コーチ観測・操作/選手別乱数・旧実績/記録済表彰・固定要求額と理由表示を既存保存barrierへ接続し、新規posting前に必須化。[設計](./docs/superpowers/specs/2026-11-16-year-end-growth-design.md)／[検証・互換性・限界](./docs/validation/year-end-growth/README.md)。公開OFF/schema1/DB5。CPU更改/FA・翌春builder（加齢/成績初期化/年度切替）・通常annual Worker/年度完走・初年度policy/公開・長期/実機は残り、A1全体は未完成。最終HEAD/必須CIは提出PR本文を正本とする。
+
 > 2026-11-09 #561マージ後: 保存済みnative12/1の期末引退を既存画面へ接続。人の受入/慰留意向とCPU判断を固定し、元年career・球団履歴・保証を一candidateで保存、結果確認後に既存postingへ渡す。[設計](./docs/superpowers/specs/2026-11-09-year-end-retirements-design.md)／[検証・正本・残工程](./docs/validation/year-end-retirements/README.md)。通常annualの実試合/Worker、成長・要求額/翌春、公開・長期/実機は残り、年度完走/Task7/A1は未完成。公開OFF/schema1/DB5、最終HEAD/CIは提出PR本文を正本とする。
 
 > 2026-11-09 PR-C（#560マージ後main `a61be5da`）: 保存済みnative閉幕根拠とPR-B予算forecastを、12/1の単一candidate→既存保存barrier→公開root照合→採用確認へ接続。[設計](./docs/superpowers/specs/2026-11-09-native-open-offseason-design.md)／[検証・正本・限界](./docs/validation/pr-c-open-offseason/README.md)。日付付き完了結果のある144だけを時計に認め、All-Star/未完了/旧無日付の拒否を維持。一般プレイannual切替・成長/要求年俸・翌春builder・annual Worker全面接続は後続で、親機能の年度完走は未完成。公開OFF/schema1/DB5、提出/マージ状況はPRを正本とする。

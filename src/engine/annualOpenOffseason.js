@@ -1,3 +1,4 @@
+import { growthCoachObservation, inspectGrowthCoaches } from './annualYearEndGrowth';
 import { toAnnualState, fromAnnualState } from './contractEconomy';
 import { economyClockFor, postseasonBoundaryDate, validateEconomyClock } from './economyCalendar';
 import { parseContractDate } from './contractCalendar';
@@ -39,6 +40,7 @@ export function inspectOpenOffseason(world) {
   for (const r of e.cycle.transitionReceipts) {
     if (!isBoundaryReceipt(r)) continue;
     const fields = ['id', 'kind', 'version', 'season', 'closingDate', 'baseRevision', 'revision', 'budgetSeason', 'endSeason'];
+    if (r.growthCoaches !== undefined) { fields.push('growthCoaches'); inspectGrowthCoaches(r.growthCoaches); }
     if (Object.keys(r).length !== fields.length || Object.keys(r).some(k => !fields.includes(k))
       || r.kind !== kind || r.version !== 1 || !year(r.season) || r.season > world.year
       || r.id !== transitionId(world, r.season) || seen.has(r.season)
@@ -91,7 +93,7 @@ export function reduceOpenOffseasonRequest(world, r) {
       revision: e.revision + 1, clock: economyClockFor({ season: world.year, phase: 'offseason', offseasonTurn: 0 }),
       cycle: { ...e.cycle, stage: 'offseason-open', transitionReceipts: [...e.cycle.transitionReceipts, {
         id, kind, version: 1, season: world.year, closingDate: r.closingDate, baseRevision: e.revision, revision: e.revision + 1,
-        budgetSeason: forecast.budgetSeason, endSeason: forecast.endSeason }] },
+        budgetSeason: forecast.budgetSeason, endSeason: forecast.endSeason, growthCoaches: growthCoachObservation(world.teams, world.year) }] },
       budgetPolicies: [...keepPast(e.budgetPolicies), ...q.budgetPolicies], engine: { ...e.engine,
         spending: { ...e.engine.spending, budgetSeason: forecast.budgetSeason,
           authorizations: [...keepPast(e.engine.spending.authorizations), ...q.authorizations] },

@@ -1,3 +1,4 @@
+import { growthCommand } from './fixtures/yearEndGrowth';
 import { expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
@@ -70,7 +71,8 @@ it('records a zero-candidate year and hands its unchanged players to separate po
   expect(r.world.contractEconomy.engine.transactions.at(-1).yearEndRetirements.candidates).toEqual([]);
   expect(r.world.teams).toEqual(w.teams);
   expect(await reduceEconomyCommandAsync(w, c)).toEqual(r);
-  const posting = reduceOffseasonPostingRequest(r.world, offseasonPostingRequest(r.world));
+  const grown = reduceEconomyCommand(r.world, growthCommand(r.world)); expect(grown.ok, grown.error).toBe(true);
+  const posting = reduceOffseasonPostingRequest(grown.world, offseasonPostingRequest(grown.world));
   expect(posting.ok, posting.error).toBe(true);
 });
 
@@ -197,12 +199,13 @@ it('prevents a direct late year-end retirement from overturning a saved retain s
 it.each([0, 1])('does not cancel club %s formal renewal promises to force retirement', teamId => {
   const source = budgetForecastWorld().teams.map(t => ({ ...t, players: t.players.map(p => ({ ...p,
     contractYearsLeft: 1, age: t.id < 2 ? 42 : 20, retireStyle: 100 })) }));
-  let w = yearEndReviewWorld(source), p = w.teams.find(t => t.id === teamId).players[0];
+  let w = closedPostseasonWorld(source), p = w.teams.find(t => t.id === teamId).players[0];
   const offered = reduceEconomyCommand(w, wrap(w, { id: 'promise', type: 'offer-renewal', contractId: p.contractId,
     proposal: { id: 'promised-renewal', type: 'sign', teamId, effectiveDate: '2027-02-01', contract: createSeasonContract({
-      contractId: 'promised-contract', playerId: p.id, signedSeason: 2026, agreementPhase: 'offseason', purpose: 'renewal',
+      contractId: 'promised-contract', playerId: p.id, signedSeason: 2026, agreementPhase: 'season', purpose: 'renewal',
       termYears: 2, annualSalaryManYen: 1000, registrationType: 'controlled', guaranteed: true }) } }));
   expect(offered.ok, offered.error).toBe(true); w = offered.world;
+  const opened = reduceOpenOffseasonRequest(w, openOffseasonRequest(w)); expect(opened.ok, opened.error).toBe(true); w = opened.world;
   const pending = structuredClone(w);
   expect(reduceEconomyCommand(w, command(w))).toMatchObject({ ok: false, world: w }); expect(w).toEqual(pending);
   const accepted = reduceEconomyCommand(w, wrap(w, { id: 'promise-accepted', type: 'accept-renewal', proposalId: 'promised-renewal', contractId: p.contractId }));
