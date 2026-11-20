@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toAnnualState } from '../../engine/contractEconomy';
 import { yearEndGrowthRenewalIssue } from '../../engine/annualYearEndGrowth';
+import { dueAcquisitionDecisions } from '../../engine/acquisitionDecisions';
+import { isDecisionDue } from '../../engine/decisionClock';
 import { contractEmploymentAt } from '../../engine/contractLedger';
 import { quoteAnnualSpendingPlan } from '../../engine/annualSpending';
 import { dueRenewalDecisions, validateRenewalDecisions } from '../../engine/renewalDecisions';
@@ -26,7 +28,7 @@ function contractView(gs) {
         group: isIkuseiPlayer(player) ? 'ikusei' : roster === 'farm' ? 'farm' : 'active',
         status: latest ? statusText[latest.status] : future ? '来季契約済み' : eligible ? '要対応' : '継続契約' };
     }));
-    return { entries, due: dueRenewalDecisions(gs), rows: quoteAnnualSpendingPlan(state.spending).filter(r => r.teamId === gs.myId) };
+    return { entries, due: [...dueRenewalDecisions(gs), ...dueAcquisitionDecisions(gs)], rows: quoteAnnualSpendingPlan(state.spending).filter(r => r.teamId === gs.myId) };
   } catch { return { error: '契約データを確認できないため、更改操作を停止しています。保存データを読み直してください。' }; }
 }
 
@@ -83,12 +85,30 @@ export function AnnualContractTab({ gs, os, focusRequest }) {
   if (model.error) return <p role="alert">{model.error}</p>;
   const nextBudget = model.rows.find(r => r.season === gs.year + 1);
   const clock = gs.contractEconomy.clock;
+  const waiting = gs.contractEconomy.decisions.filter(d => d.teamId === gs.myId && d.status === 'pending');
+  const playerNames = new Map([...gs.teams.flatMap(t => [...t.players, ...t.farm]), ...gs.faPool].map(p => [p.id, p.name]));
+  const replyTurn = d => {
+    for (let turn = clock.offseasonTurn; turn <= 37; turn++)
+      if (isDecisionDue(d, { ...clock, offseasonTurn: turn })) return turn;
+    return null;
+  };
   return <main className={`management-decisions ${selectedId !== null ? 'decision-selected' : ''}`} data-ds="contract-management">
     <h1>契約更改</h1><p>来季の条件を提示し、回答を確認します。今季の年俸・所属は変わりません。</p>
     {growthIssue && <section aria-label="更改前の年度末成長"><p>{growthIssue}</p>
       <Button disabled={blocked} onClick={() => gs.setScreen('retire_phase')}>年度末成長の保存へ</Button></section>}
     <MetricBand items={[moneyMetric(`${gs.year + 1}年度の追加余力`, money(nextBudget?.remainingManYen)),
       { label: '回答待ち', value: model.entries.filter(e => e.state === 'waiting').length, unit: '人' }]} />
+    {clock.phase === 'offseason' && <section aria-label="オフシーズンのターン進行">
+      <p><strong>オフ第{clock.offseasonTurn}ターン</strong> · 更改・獲得の回答待ち：{waiting.length}件</p>
+      <p className="decision-note">新規提示は第30ターンまで、最終回答は第37ターンです。日付・年度は進まず、期日に達した回答を一緒に保存します。</p>
+      {waiting.length > 0 && <details><summary>回答予定の選手と条件を確認する</summary><ul>
+        {waiting.map(d => <li key={d.proposalId}>{playerNames.get(d.playerId) ?? '選手'}（{d.kind === 'human-renewal' ? '更改' : '獲得'}）：
+          {d.dueDate ? `${d.dueDate} / ` : ''}{isDecisionDue(d, clock) ? '現在回答期日に到達' : replyTurn(d) === null ? '最終期限の確認が必要' : `第${replyTurn(d)}ターン`}
+          {' · '}{money(d.request.action.salary)} / {d.request.action.years}年</li>)}
+      </ul></details>}
+      <Button disabled={blocked || clock.offseasonTurn >= 37} onClick={() => run(() => os.handleAdvanceOffseasonTurn(), 'ターンと期日を迎えた回答を保存しました。')}>オフシーズンを1ターン進める</Button>
+      {clock.offseasonTurn >= 37 && <p className="decision-note">最終回答ターンに到達しました。届いた回答と未判断の選手を確認してください。次の市場工程への進行は現在準備中です。</p>}
+    </section>}
     {busy && <p role="status">保存・反映を確認しています…</p>}
     {feedback && <p role="status" className="decision-receipt">{feedback}</p>}
     {failure && <p role="alert" className="decision-error">{failure.error || (recovery

@@ -1,5 +1,7 @@
 # ROADMAP — NPB Franchise Manager
 
+> 2026-11-20 GM-01 A1-3c-1: #563後の先行分割。契約更改画面のオフ1ターン進行と既存更改/獲得回答を一candidate・一revisionで保存し、旧成長前pendingの回答も接続。[設計](./docs/superpowers/specs/2026-11-20-offseason-turns-design.md) / [検証](./docs/validation/offseason-turns/README.md)。CPU更改/満了判断/FA市場供給・工程完了判定は次PR。今回提出後に停止。A1-3c全体・年度完走は未完成、公開OFF/schema1/DB5。最終HEAD/必須CIは提出PR本文が正本。
+
 > 2026-11-16 GM-01 A1-3b: #562マージ後、native12/1の引退確定後に全球団一軍/二軍の成長・要求年俸を一度保存する工程。旧年度コーチ観測・操作/選手別乱数・旧実績/記録済表彰・固定要求額と理由表示を既存保存barrierへ接続し、新規posting前に必須化。[設計](./docs/superpowers/specs/2026-11-16-year-end-growth-design.md)／[検証・互換性・限界](./docs/validation/year-end-growth/README.md)。公開OFF/schema1/DB5。CPU更改/FA・翌春builder（加齢/成績初期化/年度切替）・通常annual Worker/年度完走・初年度policy/公開・長期/実機は残り、A1全体は未完成。最終HEAD/必須CIは提出PR本文を正本とする。
 
 > 2026-11-09 #561マージ後: 保存済みnative12/1の期末引退を既存画面へ接続。人の受入/慰留意向とCPU判断を固定し、元年career・球団履歴・保証を一candidateで保存、結果確認後に既存postingへ渡す。[設計](./docs/superpowers/specs/2026-11-09-year-end-retirements-design.md)／[検証・正本・残工程](./docs/validation/year-end-retirements/README.md)。通常annualの実試合/Worker、成長・要求額/翌春、公開・長期/実機は残り、年度完走/Task7/A1は未完成。公開OFF/schema1/DB5、最終HEAD/CIは提出PR本文を正本とする。
