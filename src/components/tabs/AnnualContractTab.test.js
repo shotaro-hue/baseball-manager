@@ -5,6 +5,8 @@ import React from 'react';
 import { act, create } from 'react-test-renderer';
 import { afterEach, expect, it, vi } from 'vitest';
 import { AnnualContractTab } from './AnnualContractTab';
+import { acquisitionFixture } from '../../engine/__tests__/fixtures/acquisitionWorld';
+import { reduceAcquisitionRequest, acquisitionRequest } from '../../engine/acquisitionDecisions';
 import { renewalFixture } from '../../engine/__tests__/fixtures/renewalWorld';
 import { renewalRequest, reduceRenewalRequest } from '../../engine/renewalDecisions';
 import HubContentRouter from '../hub/HubContentRouter';
@@ -146,4 +148,45 @@ it('prevents a confirmation opened before native opening from submitting after t
 it('keeps the existing invalid-data stop message when the annual cycle is absent',()=>{
  const gs=state();delete gs.contractEconomy.cycle;
  expect(()=>setup(gs,{})).not.toThrow();expect(text(view.root)).toContain('更改操作を停止しています');
+});
+
+it('shows offseason clock and pending schedules, saves a single turn, and stops at37',async()=>{
+ const w=renewalFixture({phase:'offseason',date:'2026-12-01'});
+ const offered=reduceRenewalRequest(w,renewalRequest(w,{type:'offer',playerId:0,salary:12000,years:1})).world;
+ const advance=vi.fn(async()=>({ok:true}));setup(state(offered),{handleAdvanceOffseasonTurn:advance});
+ expect(text(view.root)).toContain('オフ第0ターン');expect(text(view.root)).toContain('更改・獲得の回答待ち：1件');
+ expect(text(view.root)).toContain(`第${offered.contractEconomy.decisions[0].dueTurn}ターン`);
+ await act(async()=>{await button('オフシーズンを1ターン進める').props.onClick();});expect(advance).toHaveBeenCalledTimes(1);
+ const last=structuredClone(offered);last.contractEconomy.clock.offseasonTurn=37;
+ act(()=>view.update(React.createElement(AnnualContractTab,{gs:state(last),os:{handleAdvanceOffseasonTurn:advance}})));
+ expect(button('オフシーズンを1ターン進める').props.disabled).toBe(true);expect(text(view.root)).toContain('最終回答ターン');
+});
+
+it('resolves overdue acquisition-only promises from an old beyond-deadline contract screen',async()=>{
+ const w=acquisitionFixture({phase:'offseason',date:'2026-12-01'});
+ const pending=reduceAcquisitionRequest(w,acquisitionRequest(w,{type:'offer',playerId:'free',salary:12000,years:1})).world;
+ pending.contractEconomy.clock.offseasonTurn=38;
+ const resolve=vi.fn(async()=>({ok:true}));setup(state(pending),{handleResolveRenewals:resolve});
+ expect(text(view.root)).toContain('現在回答期日に到達');expect(button('届いた回答を確認する')).toBeTruthy();
+ await act(async()=>{await button('届いた回答を確認する').props.onClick();});expect(resolve).toHaveBeenCalledTimes(1);
+});
+
+it('blocks native empty turns before growth and keeps the growth route available',()=>{
+ const w=openRenewalWinter(),setScreen=vi.fn();setup({...state(w),setScreen},{});
+ expect(button('オフシーズンを1ターン進める').props.disabled).toBe(true);
+ expect(text(view.root)).toContain('年度末成長・要求年俸を保存');
+ expect(button('年度末成長の保存へ').props.disabled).toBe(false);
+ click('年度末成長の保存へ');expect(setScreen).toHaveBeenCalledWith('retire_phase');
+});
+it('allows authentic pending rescue and disables further turns as soon as the saved answer resolves',async()=>{
+ let w=JSON.parse(gunzipSync(readFileSync(new URL('../../engine/__tests__/fixtures/renewalBeforeGrowthPending.json.gz',import.meta.url))));
+ const { advanceOffseasonTurn,offseasonTurnRequest }=await import('../../engine/economyDecisions');
+ const os={handleAdvanceOffseasonTurn:async()=>{const r=advanceOffseasonTurn(w,offseasonTurnRequest(w));expect(r.ok,r.error).toBe(true);w=r.world;return r;}};
+ setup({...state(w),setScreen:vi.fn()},os);
+ expect(button('オフシーズンを1ターン進める').props.disabled).toBe(false);expect(text(view.root)).toContain('回答待ちがなくなったら');
+ for(let i=0;i<2;i++){
+  await act(async()=>{await button('オフシーズンを1ターン進める').props.onClick();});
+  act(()=>view.update(React.createElement(AnnualContractTab,{gs:state(w),os})));
+ }
+ expect(w.contractEconomy.decisions[0].status).toBe('accepted');expect(button('オフシーズンを1ターン進める').props.disabled).toBe(true);
 });

@@ -1,3 +1,4 @@
+import { offseasonTurnRequest } from '../engine/economyDecisions';
 import { yearEndGrowthRequest } from '../engine/humanYearEndGrowth';
 import { requiresYearEndGrowth } from '../engine/annualYearEndGrowth';
 import { toAnnualState } from '../engine/contractEconomy';
@@ -96,6 +97,9 @@ export function useOffseason(gs) {
     ? gs.commitDueEconomyRequest(acquisitionRequest(gs, { type: 'resolve-due' }), renewalSession)
     : Promise.resolve({ ok: false, reason: 'economy_not_active' });
   const handleResolveRenewals = handleResolveEconomyDecisions;
+  const handleAdvanceOffseasonTurn = () => gs.commitOffseasonTurnRequest
+    ? gs.commitOffseasonTurnRequest(offseasonTurnRequest(gs), renewalSession)
+    : Promise.resolve({ ok: false, reason: 'economy_not_active' });
   const commitRookie = action => gs.commitRookieRequest
     ? gs.commitRookieRequest(rookieRequest(gs, action), renewalSession)
     : Promise.resolve({ ok: false, reason: 'economy_not_active' });
@@ -1067,7 +1071,7 @@ export function useOffseason(gs) {
     handleSpringTrainingComplete,
     handleContractOffer,
     handleCancelRenewal,
-    handleResolveRenewals,
+    handleResolveRenewals, handleAdvanceOffseasonTurn,
     handleContractRenewalSign,
     handleFaPhaseNext,
     handleAcquisitionOffer, handleCancelAcquisition, handleResolveEconomyDecisions, handleReserveRookie, handleDeclineRookie,
