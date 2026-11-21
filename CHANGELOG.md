@@ -1,5 +1,8 @@
 # 変更履歴
 
+## 2026-11-21
+- PR #564 P2: 年度末成長・要求年俸の保存前は、正当な自球団更改/獲得pendingがない空ターン進行を共通reducerと契約画面で拒否。旧pendingの回答・取消/replay・第37/38の救済、成長後/旧native/旧posting/legacy、既存保存境界と期限を維持。
+
 ## 2026-11-20
 - GM-01 A1-3c-1: native契約画面のオフ時計・回答予定・1ターン進行を既存更改/獲得schedulerと保存barrierへ接続。現在期日→1刻み→新期日を一保存にまとめ、失敗/復旧・旧session/revision・旧成長前pendingを検証。CPU更改/満了/FA供給は後続。公開OFF/schema1/DB5。
 

@@ -58,3 +58,36 @@ Chromium 360/390/1440で6件成功。提示→保存再開→turn→書込失敗
 WebKitは実iPhone Safariではない。実iPhone/モバイル実機の性能、長期経済校正、CPU更改/満了/市場供給、翌春は未検証/後続。既存の全world検証・保存には実データ量に応じた費用が残る。ターン新設を理由に歴史検証を省略しない。
 
 最終HEAD・PR番号・全必須CI結果はPR本文を正本とする。CI待ち・旧HEADの成功を最終成功とは扱わない。
+
+
+## 2026-11-21 P2修正の追補
+
+旧HEAD `0ac5626` で、実openRenewalWinter→空turn31→引退/成長保存→新規提示拒否を再現。新規engine6ケース・UI2ケース・hook2ケースのREDを確認した（後から追加した互換性3ケースは既存動作を固定するGREEN）。既存テストの削除/期待値変更/skip/timeout/retry変更は行わない。
+
+共通 `offseasonTurnGrowthIssue` をengine entryとUIで利用する。既存 `requiresYearEndGrowth` と、自球団のhuman-renewal/human-acquisition pendingだけを読む。engineは正本・両decision validatorで正当性を確認してから判定し、拒否ではworld/revision/clock/台帳/留保/decisionsを変更しない。UIは空進行停止・成長保存への既存導線と、旧pending救済中の案内を区別する。
+
+pendingのある最後の操作は、既存の現在回答→時計+1→新回答の順をそのまま行う。回答確定後の次の空進行を拒否する。現在dueの案件は既存回答確認だけでも処理でき、取消・replay・37/38救済も無制限に新turnを許す理由にはしない。成長後/旧native/既posting済み保存は新たな成長を要求せず、legacy writer、schema1/DB5/公開OFF、保存barrierは変更しない。
+
+修正productionは `src/engine/economyDecisions.js` と `src/components/tabs/AnnualContractTab.jsx`。annualYearEndGrowth/annualYearEndRetirements/useOffseason/useGameStateは既存責務を確認して再利用し、変更しない。今回追加はengine9＋UI2＋hook2＝13回帰。新しいnative producer/旧producer由来gzipを使い、薄い手作り保存だけで検証しない。
+
+修正後の最終テスト・独立レビュー・新CIは確認後にPR本文へ記録する。#747は旧HEADの基準結果であり修正後の検証結果ではない。実iPhone Safariは引き続き未検証。
+
+
+### 修正後の検証記録
+
+- 関連Vitest 7ファイル91件成功（既存78＋今回13）。engine9、UI2、hook2の追加。実12球団・1,034選手については、既存hookケースへ成長前拒否/元world不変を追加し、その31.6秒の再実行も成功。保存後は通常load経路とcareer generationを引き続き照合した。
+- 新規PlaywrightはChromium/WebKit各360/390/1440px、計12件成功。新規nativeはUI/直接hook双方で拒否→cold reload→拒否維持→成長保存→turn1。旧producer pendingはcold reload→turn1/2→受諾→空進行拒否→cold reload後も拒否を確認。横溢れ/pageerrorなし。既存30秒/worker1/retry0を維持。
+- 新たな別コンテキストの独立レビューで確定P1/P2なし。レビュアーはengine/UI36件と追加hook2件、偽pending拒否・他球団pending除外・現在due→+1→次turn拒否を確認した。レビュアーのブラウザ/実機検証は未実施で、上記ブラウザと実12球団は実装担当が検証した。
+- 比較用pre-fix PNGは旧HEAD `0ac5626` のAnnualContractTab表示部品を、同じreviewRenewalWinter保存・900px高で描画したもの。旧reducerの不具合再現は別途REDで確認済み。一時的な旧表示部品は検証後に削除し、製品へ追加していない。
+
+```
+npx vitest run src/engine/__tests__/offseasonGrowthGate.test.js src/engine/__tests__/offseasonTurns.test.js src/engine/__tests__/renewalGrowthOrder.test.js src/engine/__tests__/acquisitionDecisions.test.js src/components/tabs/AnnualContractTab.test.js
+npx vitest run src/hooks/useOffseason.turns.test.js src/hooks/useOffseason.economyRenewal.test.js
+npm run test:e2e -- management-decisions.spec.js --grep 'pre-growth turn gate|old pending turn rescue' --workers=1 --retries=0
+```
+
+| 幅 | 旧HEADの表示 | 成長前拒否 | 旧回答救済後の停止 | 成長保存後 |
+|---|---|---|---|---|
+| 360 | [Chromium](./review-2026-11-21/chromium-360-pre-fix.png) | [Chromium](./review-2026-11-21/chromium-360-growth-blocked.png) / [WebKit](./review-2026-11-21/mobile-webkit-360-growth-blocked.png) | [Chromium](./review-2026-11-21/chromium-360-old-rescued.png) / [WebKit](./review-2026-11-21/mobile-webkit-360-old-rescued.png) | [Chromium](./review-2026-11-21/chromium-360-growth-saved.png) / [WebKit](./review-2026-11-21/mobile-webkit-360-growth-saved.png) |
+| 390 | [Chromium](./review-2026-11-21/chromium-390-pre-fix.png) | [Chromium](./review-2026-11-21/chromium-390-growth-blocked.png) / [WebKit](./review-2026-11-21/mobile-webkit-390-growth-blocked.png) | [Chromium](./review-2026-11-21/chromium-390-old-rescued.png) / [WebKit](./review-2026-11-21/mobile-webkit-390-old-rescued.png) | [Chromium](./review-2026-11-21/chromium-390-growth-saved.png) / [WebKit](./review-2026-11-21/mobile-webkit-390-growth-saved.png) |
+| 1440 | [Chromium](./review-2026-11-21/chromium-1440-pre-fix.png) | [Chromium](./review-2026-11-21/chromium-1440-growth-blocked.png) / [WebKit](./review-2026-11-21/mobile-webkit-1440-growth-blocked.png) | [Chromium](./review-2026-11-21/chromium-1440-old-rescued.png) / [WebKit](./review-2026-11-21/mobile-webkit-1440-old-rescued.png) | [Chromium](./review-2026-11-21/chromium-1440-growth-saved.png) / [WebKit](./review-2026-11-21/mobile-webkit-1440-growth-saved.png) |

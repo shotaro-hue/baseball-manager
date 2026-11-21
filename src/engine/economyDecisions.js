@@ -2,6 +2,7 @@ import { acquisitionRequest, reduceAcquisitionRequest, validateAcquisitionDecisi
 import { renewalRequest, reduceRenewalRequest, validateRenewalDecisions, dueRenewalDecisions } from './renewalDecisions';
 import { validateEconomyClock } from './economyCalendar';
 import { contractEconomyMode, toAnnualState } from './contractEconomy';
+import { requiresYearEndGrowth } from './annualYearEndGrowth';
 
 // Explicit saved-clock boundary for human UI now, day/Worker producers later.
 // Both reducers run in one unpublished candidate; a failure returns the original.
@@ -39,6 +40,15 @@ export function offseasonTurnRequest(world) {
     baseRevision: world.contractEconomy?.revision, action: { type: 'advance-offseason-turn' } };
 }
 
+// Read-only shared guidance for the reducer and contract screen. Existing
+// promises may still reach their saved answers before growth is available.
+export function offseasonTurnGrowthIssue(world) {
+  return requiresYearEndGrowth(world) && !world.contractEconomy.decisions.some(d => d.status === 'pending'
+    && d.teamId === world.myId && ['human-renewal', 'human-acquisition'].includes(d.kind))
+    ? '先に期末引退判断を確定し、年度末成長・要求年俸を保存してください。回答待ちのない成長保存前はターンを進められません。'
+    : null;
+}
+
 export function advanceOffseasonTurn(world, request) {
   try {
     const e = world.contractEconomy;
@@ -50,6 +60,8 @@ export function advanceOffseasonTurn(world, request) {
     toAnnualState(world); validateRenewalDecisions(world); validateAcquisitionDecisions(world);
     if (e.clock.phase !== 'offseason' || e.clock.offseasonTurn >= 37)
       throw new Error('オフのターン進行は第37ターンまでです。届いた回答・未解決案件を確認してください。');
+    const growthIssue = offseasonTurnGrowthIssue(world);
+    if (growthIssue) throw new Error(growthIssue);
     const resolve = source => {
       if (!dueRenewalDecisions(source).length && !dueAcquisitionDecisions(source).length) return source;
       const r = advanceEconomyDecisions(source, acquisitionRequest(source, { type: 'resolve-due' }));

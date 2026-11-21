@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
+import { reviewRenewalWinter } from '../engine/__tests__/fixtures/renewalGrowth';
 import React from 'react';
 import { act, create } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -78,7 +81,9 @@ it('recovers a published turn and answer without writing or processing them twic
  expect(gs.contractEconomy.clock.offseasonTurn).toBe(due);expect(gs.contractEconomy.decisions[0].status).toBe('accepted');
 });
 it('uses actual twelve-club year-end producers and saves their due reply through the real barrier',async()=>{
- const source=growthSource(createInitialTeams());const grown=reduceEconomyCommand(source,growthCommand(source));expect(grown.ok,grown.error).toBe(true);
+ const source=growthSource(createInitialTeams()),sourceBefore=structuredClone(source);
+ expect(advanceOffseasonTurn(source,offseasonTurnRequest(source))).toMatchObject({ok:false,world:source});expect(source).toEqual(sourceBefore);
+ const grown=reduceEconomyCommand(source,growthCommand(source));expect(grown.ok,grown.error).toBe(true);
  const p=grown.world.teams[0].players.find(p=>p.contractYearsLeft===1);
  const offer=reduceRenewalRequest(grown.world,renewalRequest(grown.world,{type:'offer',playerId:p.id,salary:Math.max(p.salary,20000),years:1}));expect(offer.ok,offer.error).toBe(true);
  let ready=offer.world;const d=ready.contractEconomy.decisions.at(-1);
@@ -99,4 +104,29 @@ it('flushes an acknowledged mail-read base before the turn CAS without losing th
  expect(await run(()=>os.handleAdvanceOffseasonTurn())).toMatchObject({ok:true});
  const loaded=await loadGame();expect(loaded.mailbox.find(m=>m.id===mailId).read).toBe(true);
  expect(loaded.contractEconomy.clock.offseasonTurn).toBe(1);expect(loaded.contractEconomy.decisions[0].status).toBe('pending');
+});
+
+it('keeps the native growth gate after cold reload and allows a turn after growth is actually saved',async()=>{
+ await setup(reviewRenewalWinter());const before=structuredClone(gs.contractEconomy),root=storage.get(primary);
+ expect(await run(()=>os.handleAdvanceOffseasonTurn())).toMatchObject({ok:false});expect(gs.contractEconomy).toEqual(before);expect(storage.get(primary)).toBe(root);
+ const callback=os.handleAdvanceOffseasonTurn,loaded=await loadGame();
+ act(()=>expect(gs.hydrateSavedWorld(loaded,{progressToken:gs.getProgressToken(),sessionToken:gs.getProgressSessionToken()})).toBe(true));
+ expect(await run(callback)).toMatchObject({ok:false,reason:'economy_session_conflict'});
+ expect(await run(()=>os.handleAdvanceOffseasonTurn())).toMatchObject({ok:false});expect(storage.get(primary)).toBe(root);
+ expect(await run(()=>os.handleYearEndGrowth())).toBe(true);const grown=structuredClone(gs.contractEconomy.engine),teams=structuredClone(gs.teams);
+ expect(await run(()=>os.handleAdvanceOffseasonTurn())).toMatchObject({ok:true});expect(gs.contractEconomy.clock.offseasonTurn).toBe(1);
+ expect(gs.contractEconomy.engine).toEqual(grown);expect(gs.teams).toEqual(teams);expect((await loadGame()).contractEconomy).toEqual(gs.contractEconomy);
+});
+it('rescues a pre-growth saved answer through failure and cold reload, then saves no further empty turns',async()=>{
+ const original=JSON.parse(gunzipSync(readFileSync(new URL('../engine/__tests__/fixtures/renewalBeforeGrowthPending.json.gz',import.meta.url))));
+ await setup(original);expect((await run(()=>os.handleAdvanceOffseasonTurn())).ok).toBe(true);
+ const before=structuredClone(gs.contractEconomy),root=storage.get(primary),write=localStorage.setItem;
+ localStorage.setItem=(k,v)=>{if(k===primary)throw Error('quota');write(k,v);};
+ expect(await run(()=>os.handleAdvanceOffseasonTurn())).toMatchObject({ok:false});expect(gs.contractEconomy).toEqual(before);expect(storage.get(primary)).toBe(root);
+ localStorage.setItem=write;const loaded=await loadGame();
+ act(()=>expect(gs.hydrateSavedWorld(loaded,{progressToken:gs.getProgressToken(),sessionToken:gs.getProgressSessionToken()})).toBe(true));
+ expect(await run(()=>os.handleAdvanceOffseasonTurn())).toMatchObject({ok:true});expect(gs.contractEconomy.decisions[0].status).toBe('accepted');
+ const accepted=structuredClone(gs.contractEconomy),saved=storage.get(primary);
+ expect(await run(()=>os.handleAdvanceOffseasonTurn())).toMatchObject({ok:false});expect(gs.contractEconomy).toEqual(accepted);expect(storage.get(primary)).toBe(saved);
+ expect(await run(()=>gs.commitRenewalRequest(original.contractEconomy.decisions[0].request,gs.getProgressSessionToken()))).toMatchObject({ok:true,replayed:true});expect(storage.get(primary)).toBe(saved);
 });

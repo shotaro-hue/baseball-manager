@@ -31,3 +31,11 @@ schema1/DB5/公開OFF。main push/merge禁止。既存テスト削除/skip/期�
 - [x] Independent reviewer with diff, spec and real producers; validate and fix findings.
 - [x] Update CHANGELOG/SPEC/ROADMAP and validation record, preserve explicit deferred CPU/FA scope.
 - [ ] Commit branch, push and create PR; all mandatory CI on final SHA; stop for user merge.
+
+
+### PR #564 review fix (2026-11-21)
+- [x] Confirm main/PR 0ac5626, inspect existing #747, code/design and saved producers.
+- [x] RED: actual native open→empty turn31→growth→offer rejected; empty open/retirement state, terminal old answers, hook reload and UI gate.
+- [x] Share offseasonTurnGrowthIssue in engine/UI; preserve pending resolution, legacy/posting compatibility, deadlines and save barrier.
+- [x] GREEN: focused Vitest 91 cases, new browser 12 cases, real 12-club refusal + reply preservation, independent review with no confirmed P1/P2.
+- [ ] Add commit to existing PR #564 and verify all mandatory CI on its final HEAD; no new PR or merge.

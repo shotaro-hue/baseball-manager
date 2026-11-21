@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toAnnualState } from '../../engine/contractEconomy';
 import { yearEndGrowthRenewalIssue } from '../../engine/annualYearEndGrowth';
+import { offseasonTurnGrowthIssue } from '../../engine/economyDecisions';
 import { dueAcquisitionDecisions } from '../../engine/acquisitionDecisions';
 import { isDecisionDue } from '../../engine/decisionClock';
 import { contractEmploymentAt } from '../../engine/contractLedger';
@@ -60,6 +61,7 @@ export function AnnualContractTab({ gs, os, focusRequest }) {
   const recovery = failure?.reason === 'economy_adoption_required' || gs.saveResult?.reason === 'economy_adoption_required';
   const blocked = busy || gs.saveQueueState?.isSaving || recovery;
   const growthIssue = model.error ? null : yearEndGrowthRenewalIssue(gs);
+  const turnGrowthIssue = model.error ? null : offseasonTurnGrowthIssue(gs);
   const pending = selected?.latest?.status === 'pending' ? selected.latest : null;
   const replyDue = pending && model.due.some(d => d.proposalId === pending.proposalId);
   const valid = selected?.eligible && salary.trim() !== '' && Number.isSafeInteger(Number(salary))
@@ -101,12 +103,13 @@ export function AnnualContractTab({ gs, os, focusRequest }) {
     {clock.phase === 'offseason' && <section aria-label="オフシーズンのターン進行">
       <p><strong>オフ第{clock.offseasonTurn}ターン</strong> · 更改・獲得の回答待ち：{waiting.length}件</p>
       <p className="decision-note">新規提示は第30ターンまで、最終回答は第37ターンです。日付・年度は進まず、期日に達した回答を一緒に保存します。</p>
+      {turnGrowthIssue ? <p className="decision-note">{turnGrowthIssue}</p> : growthIssue && <p className="decision-note">成長保存前は保存済みの回答待ち案件を解決するために進行できます。回答待ちがなくなったら年度末成長・要求年俸を保存してください。</p>}
       {waiting.length > 0 && <details><summary>回答予定の選手と条件を確認する</summary><ul>
         {waiting.map(d => <li key={d.proposalId}>{playerNames.get(d.playerId) ?? '選手'}（{d.kind === 'human-renewal' ? '更改' : '獲得'}）：
           {d.dueDate ? `${d.dueDate} / ` : ''}{isDecisionDue(d, clock) ? '現在回答期日に到達' : replyTurn(d) === null ? '最終期限の確認が必要' : `第${replyTurn(d)}ターン`}
           {' · '}{money(d.request.action.salary)} / {d.request.action.years}年</li>)}
       </ul></details>}
-      <Button disabled={blocked || clock.offseasonTurn >= 37} onClick={() => run(() => os.handleAdvanceOffseasonTurn(), 'ターンと期日を迎えた回答を保存しました。')}>オフシーズンを1ターン進める</Button>
+      <Button disabled={blocked || Boolean(turnGrowthIssue) || clock.offseasonTurn >= 37} onClick={() => run(() => os.handleAdvanceOffseasonTurn(), 'ターンと期日を迎えた回答を保存しました。')}>オフシーズンを1ターン進める</Button>
       {clock.offseasonTurn >= 37 && <p className="decision-note">最終回答ターンに到達しました。届いた回答と未判断の選手を確認してください。次の市場工程への進行は現在準備中です。</p>}
     </section>}
     {busy && <p role="status">保存・反映を確認しています…</p>}

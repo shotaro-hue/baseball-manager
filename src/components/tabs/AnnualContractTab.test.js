@@ -170,3 +170,23 @@ it('resolves overdue acquisition-only promises from an old beyond-deadline contr
  expect(text(view.root)).toContain('現在回答期日に到達');expect(button('届いた回答を確認する')).toBeTruthy();
  await act(async()=>{await button('届いた回答を確認する').props.onClick();});expect(resolve).toHaveBeenCalledTimes(1);
 });
+
+it('blocks native empty turns before growth and keeps the growth route available',()=>{
+ const w=openRenewalWinter(),setScreen=vi.fn();setup({...state(w),setScreen},{});
+ expect(button('オフシーズンを1ターン進める').props.disabled).toBe(true);
+ expect(text(view.root)).toContain('年度末成長・要求年俸を保存');
+ expect(button('年度末成長の保存へ').props.disabled).toBe(false);
+ click('年度末成長の保存へ');expect(setScreen).toHaveBeenCalledWith('retire_phase');
+});
+it('allows authentic pending rescue and disables further turns as soon as the saved answer resolves',async()=>{
+ let w=JSON.parse(gunzipSync(readFileSync(new URL('../../engine/__tests__/fixtures/renewalBeforeGrowthPending.json.gz',import.meta.url))));
+ const { advanceOffseasonTurn,offseasonTurnRequest }=await import('../../engine/economyDecisions');
+ const os={handleAdvanceOffseasonTurn:async()=>{const r=advanceOffseasonTurn(w,offseasonTurnRequest(w));expect(r.ok,r.error).toBe(true);w=r.world;return r;}};
+ setup({...state(w),setScreen:vi.fn()},os);
+ expect(button('オフシーズンを1ターン進める').props.disabled).toBe(false);expect(text(view.root)).toContain('回答待ちがなくなったら');
+ for(let i=0;i<2;i++){
+  await act(async()=>{await button('オフシーズンを1ターン進める').props.onClick();});
+  act(()=>view.update(React.createElement(AnnualContractTab,{gs:state(w),os})));
+ }
+ expect(w.contractEconomy.decisions[0].status).toBe('accepted');expect(button('オフシーズンを1ターン進める').props.disabled).toBe(true);
+});
