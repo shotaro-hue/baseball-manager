@@ -159,7 +159,8 @@ function viewsFor(ledger) {
   };
   for (const record of ledger.records) {
     if (isLegacyOpening(record?.contract) && ledger.version !== 2) fail('開始残高には台帳v2が必要です。');
-    const { actions, rows, ...view } = snapshotViews.get(record) ?? projectRecord(record);
+    const cached = snapshotViews.get(record);
+    const view = cached ?? projectRecord(record), { actions } = view;
     typedId(view.contract.playerId, playerIds);
     if (contractIds.has(String(employmentContractId(view.contract)))) fail('契約IDが重複しています。');
     contractIds.add(String(employmentContractId(view.contract)));
@@ -177,7 +178,7 @@ function viewsFor(ledger) {
     const list = byPlayer.get(view.contract.playerId) ?? [];
     if (view.effectiveDate < view.employmentEndDate) list.push(view);
     byPlayer.set(view.contract.playerId, list);
-    views.push({ ...view, actions, rows: rows ?? rowsFor(view) });
+    views.push(cached ?? { ...view, rows: rowsFor(view) });
   }
   for (const list of byPlayer.values()) {
     list.sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate));
@@ -210,6 +211,10 @@ export function applyContractLedgerAction(ledger, input) {
     records = ledger.records.map(r => employmentContractId(r.contract) === action.contractId ? { ...r, changes: [...r.changes, action] } : r);
   }
   const next = { ...ledger, records };
+  // Keep the private immutable candidate path intact across its next action.
+  // Snapshot creation validates the new record and every cross-record ID and
+  // overlap once; ordinary/cold ledgers retain the mutable public result.
+  if (snapshotLedgers.has(ledger)) return snapshotContractLedger(next);
   validateContractLedger(next);
   return next;
 }

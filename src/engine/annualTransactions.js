@@ -274,7 +274,7 @@ function withFloors(state) {
 
 // Internal projection for inspected input and native, unpublished departures.
 // A hypothetical departure has no market receipt and is never a save candidate.
-function withRosterFloors(state, teams, players) {
+function withRosterFloors(state, teams, players, capacities = new Map()) {
   const requirements = new Map();
   for (const r of state.rosterRequirements) {
     const k = key(r.teamId, r.season);
@@ -285,7 +285,7 @@ function withRosterFloors(state, teams, players) {
   const budgetDate = a => a.season === state.season ? state.date : yearStart(a.season);
   const employmentByDate = contractEmploymentsAt(state.spending.ledger, state.spending.authorizations
     .filter(a => a.season >= state.spending.budgetSeason).map(budgetDate));
-  const plans = activeRenewalPlans(state.spending), capacities = new Map();
+  const plans = activeRenewalPlans(state.spending);
   const authorizations = state.spending.authorizations.map(a => {
     if (a.season < state.spending.budgetSeason) return a;
     const required = requirements.get(key(a.teamId, a.season));
@@ -565,10 +565,20 @@ function conversionCandidate(state, c) {
 // roster-floor and spending-admission functions without replaying all history.
 function cpuContractChildren(source) {
   const { players } = inspect(source);
+  let capacityInput, capacities;
+  const project = state => {
+    // Only this unpublished native batch shares capacity results. Renewals
+    // change liabilities, not ownership or draft assignments. A departure
+    // replaces teams and must inspect the entire league again.
+    if (!capacityInput || capacityInput.teams !== state.teams
+      || capacityInput.draftContext !== state.draftContext || capacityInput.faPersonnelMoves !== state.faPersonnelMoves) {
+      capacityInput = state; capacities = new Map();
+    }
+    return withRosterFloors(state, new Map(state.teams.map(t => [t.id, t])), players, capacities);
+  };
   return function* (input, command) {
     yield;
     const c = commandFor(command), signature = stable(c);
-    const project = state => withRosterFloors(state, new Map(state.teams.map(t => [t.id, t])), players);
     const before = input;
     let next, departure;
     if (isWinterDepartureCommand(c)) {
