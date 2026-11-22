@@ -263,7 +263,7 @@ export function assessAnnualSpendingChange(before, after, { mode = 'spend' } = {
   if (!['spend', 'cashless-trade', 'retirement'].includes(mode) || before.budgetSeason !== after.budgetSeason
     || a.authorizations !== b.authorizations || a.historicalFloors !== b.historicalFloors
     || !isContractLedgerExtension(before.ledger, after.ledger)) fail('支出審査で既存の許可額や契約履歴を書き換えることはできません。');
-  if (sorted(before.renewalPlans ?? []) !== sorted(after.renewalPlans ?? [])) fail('通常取引で未更改計画の根拠を変更できません。');
+  if (before.renewalPlans !== after.renewalPlans && sorted(before.renewalPlans ?? []) !== sorted(after.renewalPlans ?? [])) fail('通常取引で未更改計画の根拠を変更できません。');
   if (sorted(a.staffCosts) !== sorted(b.staffCosts)) fail('スタッフ年度契約の変更は専用処理が必要です。');
   const actions = newLedgerActions(before.ledger, after.ledger);
   const retirement = mode === 'retirement';
@@ -278,7 +278,7 @@ export function assessAnnualSpendingChange(before, after, { mode = 'spend' } = {
     fail('引退確定では既存債務をretainし、新しい支出・留保を追加できません。');
   if (!retirement && actions.some(action => parseContractDate(action.effectiveDate).year < before.budgetSeason)) fail('過去年度の取引を追加できません。');
   const nextResolved = new Map(b.resolutions.map(r => [r.proposal.id, r]));
-  for (const old of a.resolutions) if (JSON.stringify(nextResolved.get(old.proposal.id)) !== JSON.stringify(old)) fail('解決済みオファーの履歴を消去・変更できません。');
+  for (const old of a.resolutions) if (nextResolved.get(old.proposal.id) !== old && JSON.stringify(nextResolved.get(old.proposal.id)) !== JSON.stringify(old)) fail('解決済みオファーの履歴を消去・変更できません。');
   for (const old of before.reservations) {
     const next = after.reservations.find(r => r.proposal.id === old.proposal.id) ?? nextResolved.get(old.proposal.id);
     if (!next || next.kind !== old.kind || proposalSignature(next.proposal) !== proposalSignature(old.proposal)) fail('既存オファーの識別情報を消去・変更できません。');

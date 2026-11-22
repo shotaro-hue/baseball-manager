@@ -137,14 +137,13 @@ function freezeSnapshot(value) {
 }
 export function snapshotContractLedger(ledger) {
   if (snapshotLedgers.has(ledger)) return ledger;
-  validateContractLedger(ledger);
-  const snapshot = freezeSnapshot({ ...ledger, records: ledger.records.map(record => {
-    if (snapshotViews.has(record)) return record;
-    const copy = freezeSnapshot(structuredClone(record)), view = projectRecord(copy);
-    snapshotViews.set(copy, freezeSnapshot({ ...view, rows: rowsFor(view) }));
-    return copy;
-  }) });
-  snapshotLedgers.set(snapshot, freezeSnapshot(viewsFor(snapshot)));
+  const snapshot = freezeSnapshot({ ...ledger, records: ledger.records.map(record =>
+    snapshotViews.has(record) ? record : freezeSnapshot(structuredClone(record))) });
+  // Validate the exact isolated copy once, including all cross-record IDs and
+  // overlaps. Its normalized projections are detached from mutable inputs.
+  const views = freezeSnapshot(viewsFor(snapshot));
+  snapshot.records.forEach((record, i) => { if (!snapshotViews.has(record)) snapshotViews.set(record, views[i]); });
+  snapshotLedgers.set(snapshot, views);
   return snapshot;
 }
 
@@ -178,7 +177,7 @@ function viewsFor(ledger) {
     const list = byPlayer.get(view.contract.playerId) ?? [];
     if (view.effectiveDate < view.employmentEndDate) list.push(view);
     byPlayer.set(view.contract.playerId, list);
-    views.push({ ...view, rows: rows ?? rowsFor(view) });
+    views.push({ ...view, actions, rows: rows ?? rowsFor(view) });
   }
   for (const list of byPlayer.values()) {
     list.sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate));

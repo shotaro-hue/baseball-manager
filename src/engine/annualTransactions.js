@@ -356,10 +356,11 @@ function prepareCpuPostingBudgetAdmission(state, approvedRequests) {
 
 // A proposal replaces vacancies with its actual liability before admission.
 // Share this projection for FA and renewals; the spending module owns histories.
-function reserveAnnualProposal(state, kind, proposal, replaceId, project = withFloors) {
+function reserveAnnualProposal(state, kind, proposal, replaceId, project = withFloors, snapshot = value => value) {
   const projected = project({ ...state, spending: { ...state.spending,
     reservations: [...state.spending.reservations.filter(h => h.proposal.id !== replaceId), { kind, proposal }] } });
-  return reserveContractProposal(projected.spending.authorizations === state.spending.authorizations ? state.spending : { ...state.spending, authorizations: projected.spending.authorizations },
+  const baseline = projected.spending.authorizations === state.spending.authorizations ? state.spending : { ...state.spending, authorizations: projected.spending.authorizations };
+  return reserveContractProposal(snapshot(baseline),
     { kind, proposal, ...(replaceId !== undefined ? { replaceId } : {}) });
 }
 
@@ -396,7 +397,7 @@ function faCandidate(state, c) {
   return { ...state, spending, faPool: state.faPool.filter(x => x.id !== player.id), teams: state.teams.map(t => t.id === team.id ? nextTeam : t) };
 }
 
-function renewalCandidate(state, c, project = withFloors) {
+function renewalCandidate(state, c, project = withFloors, snapshot = value => value) {
   const proposing = ['offer-renewal', 'replace-renewal'].includes(c.type);
   const previous = c.type !== 'offer-renewal'
     ? state.spending.reservations.find(h => h.kind === 'renewal' && h.proposal.id === c.proposalId) : null;
@@ -424,7 +425,7 @@ function renewalCandidate(state, c, project = withFloors) {
       || state.spending.reservations.some(h => h.proposal.id === p.id)
       || state.spending.reservations.some(h => h.kind === 'renewal' && h.proposal.contract.playerId === terms.playerId
         && h.proposal.id !== previous?.proposal.id)) fail('更改オファーは既存の留保を明示して差し替えてください。');
-    return { ...state, spending: reserveAnnualProposal(state, 'renewal', p, previous?.proposal.id, project) };
+    return { ...state, spending: reserveAnnualProposal(state, 'renewal', p, previous?.proposal.id, project, snapshot) };
   }
   // Future employment goes into the ledger. Current roster salary/term/placement
   // stay unchanged until the separately implemented annual rollover.
@@ -578,7 +579,7 @@ function cpuContractChildren(source) {
       departure = next.faDeclarations.at(-1);
     } else {
       if (!['offer-renewal', 'accept-renewal', 'reject-renewal'].includes(c.type)) fail('CPU契約整理の子取引が不正です。');
-      next = renewalCandidate(before, c, project);
+      next = renewalCandidate(before, c, project, snapshotAnnualSpendingProposals);
       next = { ...next, transactions: [...next.transactions, { id: c.id, signature }] };
     }
     if (departure) next = { ...next, spending: { ...next.spending,
