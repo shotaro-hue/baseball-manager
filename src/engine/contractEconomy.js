@@ -1,3 +1,4 @@
+import { assertCpuContractsCoverage, cpuContractsIssue } from './annualCpuContracts';
 import { requiresYearEndGrowth, growthContextFor, inspectGrowthOpening, yearEndGrowthRenewalIssue } from './annualYearEndGrowth';
 import { nativeFaExerciseOrigins } from './annualFaDeclarations';
 import { inspectRetirementCalendar } from './annualRetirements';
@@ -132,6 +133,7 @@ export function toAnnualState(world) {
     yearEndGrowthContext: growthContextFor(world), gameDay: world.gameDay, incomeReceipts: e.incomeReceipts, economyRandomRoot: e.randomRoot,
     economyIdentity: identity(world), faExerciseBirth: e.faExerciseBirth, draftContext: draftCapacityContext(world.offseasonPlan, world.year, world.teams) });
   assertYearEndRetirementCoverage(state);
+  assertCpuContractsCoverage(state);
   inspectGrowthOpening(world);
   return state;
 }
@@ -204,7 +206,7 @@ function runCommand(world, command, apply = applyAnnualTransaction) {
   if (['advance-posting-phase', 'prepare-offseason-posting', 'generate-posting-requests'].includes(c.type)
     && !state.transactions.some(r => r.id === c.id) && requiresYearEndRetirements(world))
     fail('先に期末の引退判断を保存してください。');
-  if (['advance-posting-phase', 'prepare-offseason-posting', 'prepare-year-end-retirements'].includes(c.type) && c.humanTeamId !== world.myId) fail('自球団の判断をCPUへ委任できません。');
+  if (['prepare-cpu-contracts', 'advance-posting-phase', 'prepare-offseason-posting', 'prepare-year-end-retirements'].includes(c.type) && c.humanTeamId !== world.myId) fail('自球団の判断をCPUへ委任できません。');
   // Require the same opening evidence as the human entry for NEW decisions.
   // Saved pre-guard operations remain readable/replayable without backfilling it.
   if (c.type === 'prepare-year-end-retirements' && !state.transactions.some(r => r.id === c.id)
@@ -216,6 +218,7 @@ function runCommand(world, command, apply = applyAnnualTransaction) {
     && world.contractEconomy.decisions.some(d => d.kind === 'human-renewal' && d.status === 'pending'
       && (state.retirementReservations ?? []).some(r => !r.finalization && r.playerId === d.playerId)))
     fail('回答待ちの更改を解決してから引退予約を確定してください。');
+  if (c.type === 'prepare-cpu-contracts' && !state.transactions.some(r => r.id === c.id) && cpuContractsIssue(world)) fail(cpuContractsIssue(world));
   typedIds([...state.transactions.map(r => r.id), c.id]);
   if (c.type === 'depart-overseas' && !state.transactions.some(r => r.id === c.id)
     && world.contractEconomy.decisions.some(d => d.kind === 'human-acquisition' && d.status === 'pending' && d.playerId === c.playerId))

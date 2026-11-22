@@ -190,3 +190,11 @@ it('allows authentic pending rescue and disables further turns as soon as the sa
  }
  expect(w.contractEconomy.decisions[0].status).toBe('accepted');expect(button('オフシーズンを1ターン進める').props.disabled).toBe(true);
 });
+
+it('offers CPU contract settlement only in winter after growth and shows saved reasons', async () => {
+ const w=renewalFixture({phase:'offseason',date:'2026-12-01'}),run=vi.fn(async()=>({ok:true}));
+ setup(state(w),{handleCpuContracts:run});
+ expect(button('CPU球団の契約を整理する')).toBeTruthy();
+ await act(async()=>{await button('CPU球団の契約を整理する').props.onClick();});
+ expect(run).toHaveBeenCalledTimes(1);expect(text(view.root)).toContain('CPU球団の契約・市場供給を保存しました');
+});

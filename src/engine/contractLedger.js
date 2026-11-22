@@ -123,7 +123,33 @@ function rowsFor(view) {
   return rows;
 }
 
+// Opt-in, private immutable records for a multi-transaction candidate. Mutable
+// saves never enter this cache: snapshots clone and recursively freeze records.
+// Whole-ledger identity/overlap checks still run on every inspection.
+const snapshotViews = new WeakMap();
+const snapshotLedgers = new WeakMap();
+export const isContractLedgerSnapshotRecord = record => snapshotViews.has(record);
+function freezeSnapshot(value) {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    Object.values(value).forEach(freezeSnapshot); Object.freeze(value);
+  }
+  return value;
+}
+export function snapshotContractLedger(ledger) {
+  if (snapshotLedgers.has(ledger)) return ledger;
+  validateContractLedger(ledger);
+  const snapshot = freezeSnapshot({ ...ledger, records: ledger.records.map(record => {
+    if (snapshotViews.has(record)) return record;
+    const copy = freezeSnapshot(structuredClone(record)), view = projectRecord(copy);
+    snapshotViews.set(copy, freezeSnapshot({ ...view, rows: rowsFor(view) }));
+    return copy;
+  }) });
+  snapshotLedgers.set(snapshot, freezeSnapshot(viewsFor(snapshot)));
+  return snapshot;
+}
+
 function viewsFor(ledger) {
+  if (snapshotLedgers.has(ledger)) return snapshotLedgers.get(ledger);
   if (!ledger || ![1, 2].includes(ledger.version) || !Array.isArray(ledger.records)
     || !Number.isInteger(ledger.closedThroughSeason) || ledger.closedThroughSeason < 0 || ledger.closedThroughSeason > 9999) fail();
   const contractIds = new Set(), actionIds = new Set(), byPlayer = new Map(), views = [];
@@ -134,7 +160,7 @@ function viewsFor(ledger) {
   };
   for (const record of ledger.records) {
     if (isLegacyOpening(record?.contract) && ledger.version !== 2) fail('開始残高には台帳v2が必要です。');
-    const { actions, ...view } = projectRecord(record);
+    const { actions, rows, ...view } = snapshotViews.get(record) ?? projectRecord(record);
     typedId(view.contract.playerId, playerIds);
     if (contractIds.has(String(employmentContractId(view.contract)))) fail('契約IDが重複しています。');
     contractIds.add(String(employmentContractId(view.contract)));
@@ -152,7 +178,7 @@ function viewsFor(ledger) {
     const list = byPlayer.get(view.contract.playerId) ?? [];
     if (view.effectiveDate < view.employmentEndDate) list.push(view);
     byPlayer.set(view.contract.playerId, list);
-    views.push({ ...view, rows: rowsFor(view) });
+    views.push({ ...view, rows: rows ?? rowsFor(view) });
   }
   for (const list of byPlayer.values()) {
     list.sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate));
@@ -197,6 +223,7 @@ export function closeContractLedgerThrough(ledger, season) {
 
 export function isContractLedgerExtension(before, after) {
   validateContractLedger(before); validateContractLedger(after);
+  if (before === after) return true;
   if (after.version !== before.version || after.closedThroughSeason < before.closedThroughSeason) return false;
   const beforeById = new Map(before.records.map(r => [employmentContractId(r.contract), r]));
   const afterById = new Map(after.records.map(r => [employmentContractId(r.contract), r]));
@@ -207,6 +234,7 @@ export function isContractLedgerExtension(before, after) {
   }
   return before.records.every(old => {
     const next = afterById.get(employmentContractId(old.contract));
+    if (next === old) return true;
     return next && JSON.stringify(opening(old)) === JSON.stringify(opening(next)) && next.changes.length >= old.changes.length
       && old.changes.every((action, i) => signature(action) === signature(next.changes[i]));
   });
@@ -219,7 +247,8 @@ export function contractEmploymentAt(ledger, date) {
 }
 
 // One validated, synchronous snapshot for an annual budget's several dates.
-// No cross-call cache: mutable/cold-loaded input is validated on every call.
+// Mutable/cold-loaded input is validated on every call. Only explicitly
+// cloned, deeply frozen candidate snapshots reuse per-record projections.
 export function contractEmploymentsAt(ledger, dates) {
   const unique = [...new Set(dates)]; unique.forEach(parseContractDate);
   const views = viewsFor(ledger);

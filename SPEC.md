@@ -1,5 +1,7 @@
 # Baseball Manager 2025 — 仕様書
 
+> 2026-11-21 GM-01 A1-3c-2: annual契約画面からCPU更改・満了/自由契約・国内/海外FA宣言を正式台帳/市場へ一括保存する。新規nativeは成長→posting→CPU整理、自球団判断は維持。schema1/DB5/公開OFF、通常annual Worker・翌春/年度切替・年度完走は未接続。[設計](./docs/superpowers/specs/2026-11-21-annual-cpu-contracts-design.md) / [検証と限界](./docs/validation/annual-cpu-contracts/README.md)。
+
 > 2026-11-21 PR #564レビュー修正: requiresYearEndGrowth対象で自球団の正当な更改/獲得pendingがなければ、成長保存まで空ターンを進めない。旧pendingの解決を伴う進行と既存回答/取消/replayを維持し、pending解消後は成長保存へ案内する。期限・旧native/旧posting/legacy・公開OFF/schema1/DB5は維持。
 
 > 2026-11-20 GM-01 A1-3c-1: native契約更改画面からオフを1ターン進め、期日の更改・獲得回答を時計と一緒に保存する。12/1・年度を維持、新規提示は第30まで、進行は第37まで。成長前の既存回答処理を維持し、新規提示の成長ガードは維持。[設計](./docs/superpowers/specs/2026-11-20-offseason-turns-design.md)。CPU更改/満了/FA供給・翌春は後続、公開OFF/schema1/DB5。

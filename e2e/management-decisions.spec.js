@@ -1,3 +1,4 @@
+import "./cpu-contracts.cases.js";
 import "./offseason-growth-gate.cases.js";
 import "./offseason-turns.cases.js";
 import './renewal-growth-order.cases.js';
