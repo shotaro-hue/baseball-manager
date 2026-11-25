@@ -25,7 +25,10 @@ for(const width of [360,390,1440])test(`management decisions: pre-growth turn ga
  await page.getByRole('button',{name:'年度末成長の保存へ'}).click();await page.getByRole('button',{name:'年度末成長・要求年俸を確認する'}).click();
  await page.getByRole('dialog').getByRole('button',{name:'成長・要求年俸を保存する'}).click();
  await expect(page.getByRole('region',{name:'保存済みの成長・要求年俸'})).toBeVisible();
- await page.evaluate(()=>window.growthTurnHarness.current().setScreen('hub'));
+ // Adoption renders the result before its acknowledgement releases the save
+ // barrier. Follow the existing navigation control's enabled state first.
+ await expect(page.getByRole('button',{name:'受信箱へ',exact:true})).toBeEnabled();
+ expect(await page.evaluate(()=>window.growthTurnHarness.current().setScreen('hub'))).toBe(true);
  await expect(next()).toBeEnabled();await next().click();await expect(page.getByText('オフ第1ターン',{exact:true})).toBeVisible();
  await info.attach(`${width}-growth-saved`,{body:await page.screenshot({fullPage:true}),contentType:'image/png'});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(errors).toEqual([]);

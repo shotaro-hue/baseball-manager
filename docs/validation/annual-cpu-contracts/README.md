@@ -45,3 +45,10 @@ Chromium/WebKitそれぞれ360/390/1440pxの3ケース、合計6ケースで保�
 HEAD `ed4507a2` のCI #752は、全ブラウザ12群と集約が成功、単体群は5006件成功・実12球団CPU整理60秒超過と既存bootstrapオフ開始10秒超過・既存skip2件だった。保存validatorの1呼出し内だけexact clone+freezeした台帳を持つshadow worldを作り、既存の全inspectorと名簿/予算投影照合を同じ台帳へ向ける。返す値は従来のmodeだけで、元worldや保存payloadは置換しない。次回のmutable/cold入力は再コピー・全検査する。独立レビューで追加root metadataへのfreeze漏れを再現し、records以外のmetadataもcloneして隔離した。
 
 同じprofileで確認した重複として、日付別の雇用は呼出し内で球団別に一度だけ索引化し、全年度の資金枠計算を維持する。同一台帳の新action探索は、両入力のprepareとextension検査後に空と判定する。保存barrier・検査内容・閾値・skip/retryを維持。metadata非freeze、cold/混在入力の後変更、台帳/回答の同時欠落、日付別雇用の重複読取に回帰を追加した。関連327件・hook21件（実CPU6件と既存オフ開始15件）・別コンテキスト74件、build成功。ローカルCPU本体29.4秒、既存bootstrap本体4.5秒。最終HEADの必須CI成功を確認するまでdraftを維持する。
+
+## CI #753の検証結果と画面検証の競合
+HEAD `e25d8fb6` では全単体/統合5014件が成功・既存skip2件。実12球団CPU本体48.7秒と既存bootstrapオフ開始7.9秒で既存上限内を確認した。CPU画面のChromium/WebKit各3幅も全6件成功したが、management群は115成功・既存pre-growth gate360px Chromiumの1件失敗だった。artifact traceのcall@199は結果表示直後の直接setScreen('hub')がfalse（保存barrierによる拒否）、続くturn button不存在を記録している。
+
+保存結果の描画と保存確認完了は異なるため、既存ナビゲーション『受信箱へ』がenabledとなる条件を確認してから画面を切り替え、setScreenの成功値trueも新たにassertする。元の成長gate/再読込/ターン/横溢れ/pageerrorの期待、5秒expect・30秒テスト上限・workers1/retries0、製品barrierは維持する。独立レビューはtraceとbusy/commit解放の実行経路を照合し、新規P1/P2なし。最終HEADのCI結果はPR本文を正本とする。
+
+修正後、Chromium/WebKit各360/390/1440pxで成長gate・旧pending救済・CPU整理の計18件が成功（2.1分、既存上限、workers1/retries0）。製品コードは前HEADから変更していない。最終HEADの必須CIを再実行する。
