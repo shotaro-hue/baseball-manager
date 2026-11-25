@@ -1,3 +1,4 @@
+import { cpuContractsRequest, cpuContractsId } from '../engine/annualCpuContracts';
 import { offseasonTurnRequest } from '../engine/economyDecisions';
 import { yearEndGrowthRequest } from '../engine/humanYearEndGrowth';
 import { requiresYearEndGrowth } from '../engine/annualYearEndGrowth';
@@ -100,6 +101,9 @@ export function useOffseason(gs) {
   const handleAdvanceOffseasonTurn = () => gs.commitOffseasonTurnRequest
     ? gs.commitOffseasonTurnRequest(offseasonTurnRequest(gs), renewalSession)
     : Promise.resolve({ ok: false, reason: 'economy_not_active' });
+  const handleCpuContracts = () => gs.commitCpuContractsRequest
+    ? gs.commitCpuContractsRequest(cpuContractsRequest(gs), renewalSession)
+    : Promise.resolve({ ok: false, reason: 'economy_not_active' });
   const commitRookie = action => gs.commitRookieRequest
     ? gs.commitRookieRequest(rookieRequest(gs, action), renewalSession)
     : Promise.resolve({ ok: false, reason: 'economy_not_active' });
@@ -200,7 +204,8 @@ export function useOffseason(gs) {
         const issue = pending.some(r => r.status === 'pending') ? '受信箱で自球団のポスティング申請を承認・拒否してください。'
           : pending.some(r => r.status === 'approved') ? '受信箱で承認済み申請の海外交渉を確定してください。'
           : !state.transactions.some(t => t.id === postingPhaseId(current.year)) ? '12月1日の海外挑戦の希望確認を先に保存してください。'
-          : 'ポスティング工程は保存済みです。';
+          : !state.transactions.some(t => t.id === cpuContractsId(current.year)) ? '契約画面でCPU球団の更改・満了・市場供給を保存してください。'
+          : 'CPU契約整理とポスティング工程は保存済みです。自球団の未判断・回答待ちは別途確認してください。';
         notify?.(`${issue} 新制度の翌春への年度切替は未接続のため、年度は進めません。`, 'warn');
       }
       return false;
@@ -1071,7 +1076,7 @@ export function useOffseason(gs) {
     handleSpringTrainingComplete,
     handleContractOffer,
     handleCancelRenewal,
-    handleResolveRenewals, handleAdvanceOffseasonTurn,
+    handleResolveRenewals, handleAdvanceOffseasonTurn, handleCpuContracts,
     handleContractRenewalSign,
     handleFaPhaseNext,
     handleAcquisitionOffer, handleCancelAcquisition, handleResolveEconomyDecisions, handleReserveRookie, handleDeclineRookie,

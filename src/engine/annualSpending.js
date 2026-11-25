@@ -1,6 +1,6 @@
 import { activeRenewalPlans } from './renewalPlanning';
-import { employmentContractId } from './seasonContract';
-import { createContractLedger, applyContractLedgerAction, contractLiabilityRows,
+import { employmentContractId, normalizeEmploymentContract } from './seasonContract';
+import { createContractLedger, applyContractLedgerAction, snapshotContractLedger, isContractLedgerSnapshotRecord, contractLiabilityRows,
   isContractLedgerExtension } from './contractLedger';
 import { parseContractDate } from './contractCalendar';
 import { acquisitionOfferMetadata, acquisitionAnswerMetadata } from './acquisitionMarket';
@@ -22,13 +22,47 @@ const isFaCompensationCostId = value => {
   catch { return false; }
 };
 
+// CPU candidates may opt in to immutable proposal snapshots. Ordinary saved
+// or caller-mutable proposals are always normalized and validated afresh.
+const proposalSnapshots = new WeakMap(), snapshotHolds = new WeakSet(), snapshotSignatures = new WeakMap();
+const spendingSnapshots = new WeakMap(), immutableValues = new WeakSet(), resolutionSnapshots = new WeakMap();
+function snapshotValue(v) {
+  if (!v || typeof v !== 'object' || immutableValues.has(v) || proposalSnapshots.has(v)) return v;
+  const copy=Array.isArray(v)?v.map(snapshotValue):Object.fromEntries(Object.entries(v).map(([k,x])=>[k,snapshotValue(x)]));
+  Object.freeze(copy);immutableValues.add(copy);return copy;
+}
+function freezeProposal(value) {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    Object.values(value).forEach(freezeProposal); Object.freeze(value);
+  }
+  return value;
+}
+function snapshotProposal(input) {
+  if (proposalSnapshots.has(input)) return input;
+  const copy = freezeProposal(structuredClone(normalizedProposal(input)));
+  proposalSnapshots.set(copy, copy); snapshotSignatures.set(copy, JSON.stringify(copy)); return copy;
+}
+export function snapshotAnnualSpendingProposals(plan) {
+  if (spendingSnapshots.has(plan)) return plan;
+  const snapshot = hold => {
+    if (snapshotHolds.has(hold)) return hold;
+    const copy = Object.freeze({ ...snapshotValue(hold), proposal: snapshotProposal(hold.proposal),
+      ...(hold.acceptedProposal ? { acceptedProposal: snapshotProposal(hold.acceptedProposal) } : {}) });
+    snapshotHolds.add(copy); return copy;
+  };
+  const copy=Object.freeze({ ...Object.fromEntries(Object.entries(plan).filter(([k])=>!['ledger','reservations','resolvedReservations'].includes(k)).map(([k,v])=>[k,snapshotValue(v)])),
+    ledger:snapshotContractLedger(plan.ledger),reservations:Object.freeze(plan.reservations.map(snapshot)),resolvedReservations:Object.freeze(plan.resolvedReservations.map(snapshot)) });
+  spendingSnapshots.set(copy,freezeProposal(prepare(copy)));return copy;
+}
+
 function normalizedProposal(input) {
+  if (proposalSnapshots.has(input)) return proposalSnapshots.get(input);
   if (input?.type !== 'sign') fail('留保する契約の種類を確認してください。');
   const record = applyContractLedgerAction(createContractLedger(), input).records[0];
   return { id: record.actionId, type: 'sign', teamId: record.initialTeamId,
     effectiveDate: record.effectiveDate, contract: record.contract, ...acquisitionOfferMetadata(input) };
 }
-const proposalSignature = proposal => JSON.stringify(normalizedProposal(proposal));
+const proposalSignature = proposal => snapshotSignatures.get(proposal) ?? JSON.stringify(normalizedProposal(proposal));
 const matchingPurpose = (kind, proposal) => kind === 'renewal'
   ? proposal.contract.purpose === 'renewal' : ['offer', 'rookie'].includes(kind) && proposal.contract.purpose === 'acquisition';
 const resolutionFor = (hold, resolution, acceptedProposal, answeredDate) => ({ kind: hold.kind,
@@ -50,6 +84,7 @@ const overlaps = (a, b) => a.contract.playerId === b.contract.playerId
   && b.effectiveDate < `${String(a.contract.endSeason).padStart(4, '0')}-12-01`;
 
 function prepare(plan) {
+  if (spendingSnapshots.has(plan)) return spendingSnapshots.get(plan);
   if (!plan || plan.version !== 1 || !year(plan.budgetSeason) || !Array.isArray(plan.authorizations)
     || !Array.isArray(plan.reservations) || !Array.isArray(plan.resolvedReservations) || !Array.isArray(plan.oneOffCosts)) fail();
   const liabilities = contractLiabilityRows(plan.ledger);
@@ -77,8 +112,17 @@ function prepare(plan) {
     row.tokens.push(['contract', cost.contractId, cost.playerId, cost.kind, cost.amountManYen]);
   }
   const resolvedIds = new Set(), resolutions = [];
+  const recordsByAction = new Map(plan.ledger.records.map(record => [record.actionId, record]));
   const appliedIds = new Set(plan.ledger.records.flatMap(r => [r.actionId, ...r.changes.map(a => a.id)]));
   for (const resolved of plan.resolvedReservations) {
+    // An immutable answer and the exact immutable accepted record cannot
+    // change between children. Reuse only that certificate, while still
+    // checking whole-ledger validity, receipt uniqueness and new action IDs.
+    const cached=resolutionSnapshots.get(resolved);
+    if(cached && (cached.record ? recordsByAction.get(cached.value.proposal.id)===cached.record : !appliedIds.has(cached.value.proposal.id))) {
+      if(resolvedIds.has(cached.value.proposal.id))fail('オファーの解決履歴が重複または無効です。');
+      resolvedIds.add(cached.value.proposal.id);resolutions.push(cached.value);continue;
+    }
     if (!resolved || !['cancelled', 'replaced', 'accepted', 'lost', 'rejected'].includes(resolved.resolution)) fail('オファーの解決履歴を確認してください。');
     const proposal = normalizedProposal(resolved.proposal);
     if (!matchingPurpose(resolved.kind, proposal) || resolvedIds.has(proposal.id)
@@ -88,11 +132,17 @@ function prepare(plan) {
     if (hasAccepted && resolved.resolution !== 'accepted') fail('未受諾の履歴に受諾条件を記録できません。');
     const accepted = hasAccepted ? delayedOfferProposal(resolved, resolved.acceptedProposal) : proposal;
     if (resolved.resolution === 'accepted') {
-      const record = plan.ledger.records.find(r => r.actionId === proposal.id);
-      if (!record || proposalSignature({ id: record.actionId, type: 'sign', teamId: record.initialTeamId,
-        effectiveDate: record.effectiveDate, contract: record.contract, ...acquisitionOfferMetadata(accepted) }) !== proposalSignature(accepted)) fail('受諾履歴と確定契約が一致しません。');
+      const record = recordsByAction.get(proposal.id);
+      // contractLiabilityRows above has validated the complete ledger record.
+      // Canonicalize its contract without reconstructing a second payroll
+      // ledger for every historical accepted proposal on every quote.
+      if (!record || JSON.stringify({ id: record.actionId, type: 'sign', teamId: record.initialTeamId,
+        effectiveDate: record.effectiveDate, contract: normalizeEmploymentContract(record.contract), ...acquisitionOfferMetadata(accepted) }) !== proposalSignature(accepted)) fail('受諾履歴と確定契約が一致しません。');
     } else if (appliedIds.has(proposal.id)) fail('解決済みオファーの取引IDを再利用できません。');
-    resolutions.push(resolutionFor({ kind: resolved.kind, proposal }, resolved.resolution, hasAccepted ? accepted : undefined, resolved.answeredDate));
+    const value=resolutionFor({ kind: resolved.kind, proposal }, resolved.resolution, hasAccepted ? accepted : undefined, resolved.answeredDate);
+    if(snapshotHolds.has(resolved) && (resolved.resolution!=='accepted' || isContractLedgerSnapshotRecord(recordsByAction.get(proposal.id))))resolutionSnapshots.set(resolved,{value:freezeProposal(value),
+      record:resolved.resolution==='accepted'?recordsByAction.get(proposal.id):null});
+    resolutions.push(value);
   }
   const compensation = prepareFaCompensations(plan, resolutions);
   for (const obligation of compensation.obligations) {
@@ -198,6 +248,7 @@ function prepare(plan) {
 export function quoteAnnualSpendingPlan(plan) { return prepare(plan).rows; }
 
 function newLedgerActions(before, after) {
+  if (before === after) return [];
   const result = [];
   const beforeById = new Map(before.records.map(r => [employmentContractId(r.contract), r]));
   for (const record of after.records) {
@@ -213,7 +264,7 @@ export function assessAnnualSpendingChange(before, after, { mode = 'spend' } = {
   if (!['spend', 'cashless-trade', 'retirement'].includes(mode) || before.budgetSeason !== after.budgetSeason
     || a.authorizations !== b.authorizations || a.historicalFloors !== b.historicalFloors
     || !isContractLedgerExtension(before.ledger, after.ledger)) fail('支出審査で既存の許可額や契約履歴を書き換えることはできません。');
-  if (sorted(before.renewalPlans ?? []) !== sorted(after.renewalPlans ?? [])) fail('通常取引で未更改計画の根拠を変更できません。');
+  if (before.renewalPlans !== after.renewalPlans && sorted(before.renewalPlans ?? []) !== sorted(after.renewalPlans ?? [])) fail('通常取引で未更改計画の根拠を変更できません。');
   if (sorted(a.staffCosts) !== sorted(b.staffCosts)) fail('スタッフ年度契約の変更は専用処理が必要です。');
   const actions = newLedgerActions(before.ledger, after.ledger);
   const retirement = mode === 'retirement';
@@ -228,7 +279,7 @@ export function assessAnnualSpendingChange(before, after, { mode = 'spend' } = {
     fail('引退確定では既存債務をretainし、新しい支出・留保を追加できません。');
   if (!retirement && actions.some(action => parseContractDate(action.effectiveDate).year < before.budgetSeason)) fail('過去年度の取引を追加できません。');
   const nextResolved = new Map(b.resolutions.map(r => [r.proposal.id, r]));
-  for (const old of a.resolutions) if (JSON.stringify(nextResolved.get(old.proposal.id)) !== JSON.stringify(old)) fail('解決済みオファーの履歴を消去・変更できません。');
+  for (const old of a.resolutions) if (nextResolved.get(old.proposal.id) !== old && JSON.stringify(nextResolved.get(old.proposal.id)) !== JSON.stringify(old)) fail('解決済みオファーの履歴を消去・変更できません。');
   for (const old of before.reservations) {
     const next = after.reservations.find(r => r.proposal.id === old.proposal.id) ?? nextResolved.get(old.proposal.id);
     if (!next || next.kind !== old.kind || proposalSignature(next.proposal) !== proposalSignature(old.proposal)) fail('既存オファーの識別情報を消去・変更できません。');
@@ -316,8 +367,9 @@ export function reserveContractProposal(plan, { kind, proposal: input, replaceId
   if (replaceId !== undefined && (!id(replaceId) || !plan.reservations.some(r => r.proposal.id === replaceId))) fail('置き換える留保が見つかりません。');
   const replaced = plan.reservations.find(r => r.proposal.id === replaceId);
   const reservations = [...plan.reservations.filter(r => replaceId === undefined || r.proposal.id !== replaceId), { kind, proposal }];
-  const next = { ...plan, reservations, resolvedReservations: replaced
+  let next = { ...plan, reservations, resolvedReservations: replaced
     ? [...plan.resolvedReservations, resolutionFor(replaced, 'replaced')] : plan.resolvedReservations };
+  if (spendingSnapshots.has(plan)) next = snapshotAnnualSpendingProposals(next);
   if (!assessAnnualSpendingChange(plan, next).ok) fail('全対象年度の追加余力が不足しています。');
   return next;
 }
@@ -357,12 +409,13 @@ export function commitContractReservation(plan, input, { effectiveDate, answered
   const compensationAmount = faCashCompensationManYen(proposal);
   const losing = plan.reservations.filter(r => r.proposal.id !== proposal.id && overlaps(accepted, r.proposal));
   const resolvedIds = new Set([proposal.id, ...losing.map(r => r.proposal.id)]);
-  const next = { ...plan, ledger: applyContractLedgerAction(plan.ledger, accepted),
+  let next = { ...plan, ledger: applyContractLedgerAction(plan.ledger, accepted),
     ...(compensationAmount > 0 ? { faCompensations: [...(plan.faCompensations ?? []), { proposalId: proposal.id, resolution: 'pending' }] } : {}),
     reservations: plan.reservations.filter(r => !resolvedIds.has(r.proposal.id)),
     resolvedReservations: [...plan.resolvedReservations,
       resolutionFor(held, 'accepted', accepted === proposal ? undefined : accepted, answeredDate),
       ...losing.map(r => resolutionFor(r, 'lost', undefined, r.proposal.marketEntry ? answeredDate : undefined))] };
+  if (spendingSnapshots.has(plan)) next = snapshotAnnualSpendingProposals(next);
   if (!assessAnnualSpendingChange(plan, next).ok) fail('受諾時点の年度別追加余力が不足しています。');
   return next;
 }

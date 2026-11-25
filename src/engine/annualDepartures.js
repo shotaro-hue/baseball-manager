@@ -93,7 +93,7 @@ export function inspectAnnualDepartureCalendar(world) {
 export function inspectAnnualDepartures(state) {
   const departures = state.offseasonDepartures ?? [];
   if (!Array.isArray(departures)) fail();
-  const seen = new Set(), contracts = new Set();
+  const seen = new Set(), contracts = new Set(), histories = new Map();
   const lookup = departures.length ? departureContracts(state.spending.ledger) : null;
   for (const d of departures) {
     if (!d || !validId(d.id) || seen.has(String(d.id)) || contracts.has(String(d.sourceContractId))
@@ -116,7 +116,8 @@ export function inspectAnnualDepartures(state) {
     if (c.id !== d.id || stable(c) !== receipt.signature || stable(receipt.departure) !== stable(d)
       || stable(expected) !== stable(d)) fail();
     const team = state.teams.find(t => t.id === d.teamId);
-    if (!team?.history?.some(p => stable(p) === stable(departureHistory(d)))) fail();
+    if (!histories.has(d.teamId)) histories.set(d.teamId, new Set((team?.history ?? []).map(stable)));
+    if (!histories.get(d.teamId).has(stable(departureHistory(d)))) fail();
     const acquired = state.spending.resolvedReservations.some(r => r.kind === 'offer' && r.resolution === 'accepted'
       && r.proposal.contract.playerId === d.player.id && stable(r.proposal.marketEntry) === stable(d.marketEntry));
     if (!acquired) {

@@ -1,3 +1,4 @@
+import { reduceEconomyCommandAsync as reduceCpuContractsRequestAsync } from '../engine/contractEconomy';
 import { reduceYearEndGrowthRequestAsync } from '../engine/humanYearEndGrowth';
 import { requiresYearEndGrowth } from '../engine/annualYearEndGrowth';
 import { draftCapacityContext, evaluateRosterCapacity, isIkuseiPlayer } from '../engine/rosterCapacity';
@@ -767,6 +768,10 @@ export function useGameState() {
   const commitOffseasonTurnRequest = useCallback((request, sessionToken) => {
     if (!Number.isSafeInteger(sessionToken)) return Promise.resolve({ ok: false, reason: 'economy_session_conflict' });
     return commitEconomyOperation(request, advanceOffseasonTurn, sessionToken, { flushPendingBase: true });
+  }, [commitEconomyOperation]);
+  const commitCpuContractsRequest = useCallback((request, sessionToken) => {
+    if (!Number.isSafeInteger(sessionToken) || request?.transaction?.type !== 'prepare-cpu-contracts') return Promise.resolve({ ok: false, reason: 'economy_session_conflict' });
+    return commitEconomyOperation(request, reduceCpuContractsRequestAsync, sessionToken, { flushPendingBase: true });
   }, [commitEconomyOperation]);
   const commitRookieRequest = useCallback((request, sessionToken) => {
     if (!Number.isSafeInteger(sessionToken)) return Promise.resolve({ ok: false, reason: 'economy_session_conflict' });
@@ -1567,7 +1572,7 @@ export function useGameState() {
     getLatestNewsId,
     markSaveDirty,
     hydrateSavedWorld, hydrateLargeSaveData, getMatchHistorySnapshot, hydrateMatchHistory, applyMatchResultPatch,
-    commitEconomyCommand, commitRenewalRequest, commitAcquisitionRequest, commitDueEconomyRequest, commitOffseasonTurnRequest, commitRookieRequest, commitTradeRequest, commitPostingDecisionRequest, commitPostingMarketRequest, commitPostingGenerationRequest, commitOffseasonPostingRequest, commitOpenOffseasonRequest, commitYearEndRetirementsRequest, commitYearEndGrowthRequest, recoverEconomyCommand,
+    commitEconomyCommand, commitRenewalRequest, commitAcquisitionRequest, commitDueEconomyRequest, commitOffseasonTurnRequest, commitCpuContractsRequest, commitRookieRequest, commitTradeRequest, commitPostingDecisionRequest, commitPostingMarketRequest, commitPostingGenerationRequest, commitOffseasonPostingRequest, commitOpenOffseasonRequest, commitYearEndRetirementsRequest, commitYearEndGrowthRequest, recoverEconomyCommand,
     resetSaveTracking,
     // derived
     myTeam,

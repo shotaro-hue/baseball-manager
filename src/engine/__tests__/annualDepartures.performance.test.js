@@ -80,3 +80,16 @@ it('never trusts an earlier spending projection in place of current world valida
   expect(quoteAnnualTransaction(state, JSON.parse(state.transactions[0].signature)).ok).toBe(false);
   expect(JSON.stringify(state)).toBe(before);
 });
+
+it('reads each alumni snapshot once per inspection and rechecks later history changes', () => {
+  const state = longHistory(2, 2), history = state.teams[0].history;
+  let reads = 0;
+  for (const player of history) {
+    const name = player.name;
+    Object.defineProperty(player, 'name', { enumerable: true, configurable: true, get() { reads++; return name; } });
+  }
+  expect(departures.inspectAnnualDepartures(state)).toHaveLength(4);
+  expect(reads).toBe(history.length);
+  Object.defineProperty(history[0], 'name', { enumerable: true, configurable: true, value: 'changed after inspection' });
+  expect(() => departures.inspectAnnualDepartures(state)).toThrow();
+});

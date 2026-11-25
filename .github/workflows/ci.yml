@@ -23,7 +23,9 @@ jobs:
       - name: Build
         run: npm run build
       - name: All unit and integration tests (including stress and physics)
-        run: npm test
+        # Keep all cases and deadlines; bound CPU contention between real-world
+        # contract/save scenarios and Monte Carlo suites on hosted runners.
+        run: npm test -- --maxWorkers=2 --minWorkers=2
 
   progression-e2e-suites:
     name: e2e-${{ matrix.suite.name }}

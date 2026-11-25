@@ -1,3 +1,4 @@
+import { isCpuContractsCommand, normalizeCpuContracts, createCpuContractsSteps, inspectCpuContracts } from './annualCpuContracts';
 import { isYearEndGrowthCommand, normalizeYearEndGrowth, createYearEndGrowth, inspectYearEndGrowth } from './annualYearEndGrowth';
 import { yieldToBrowser } from './yieldToBrowser';
 import { isYearEndRetirementsCommand, normalizeYearEndRetirements, createYearEndRetirementsSteps, inspectYearEndRetirements } from './annualYearEndRetirements';
@@ -19,9 +20,9 @@ import { activeRenewalPlans } from './renewalPlanning';
 import { employmentContractId, projectEmploymentPlayer, validateAnnualEmploymentContract } from './seasonContract';
 import { MIN_SALARY_SHIHAKA, MAX_SHIHAKA_TOTAL } from '../constants';
 import { createSeasonContract, contractSeasonsRemaining } from './seasonContract';
-import { contractEmploymentAt, contractEmploymentsAt, applyContractLedgerAction } from './contractLedger';
+import { contractEmploymentAt, contractEmploymentsAt, snapshotContractLedger, applyContractLedgerAction } from './contractLedger';
 import { quoteAnnualSpendingPlan, assessAnnualSpendingChange, reserveContractProposal,
-  commitContractReservation, cancelContractReservation } from './annualSpending';
+  commitContractReservation, snapshotAnnualSpendingProposals, cancelContractReservation } from './annualSpending';
 import { parseContractDate, registrationDateAllowed } from './contractCalendar';
 import { ownedPlayers, validContractTerms } from './renewalRules';
 import { evaluateRosterCapacity, isIkuseiPlayer } from './rosterCapacity';
@@ -69,6 +70,7 @@ const kinds = {
   'convert-to-controlled': ['teamId', 'playerId', 'contractId', 'annualSalaryManYen'],
 };
 function commandFor(input) {
+  if (isCpuContractsCommand(input)) return normalizeCpuContracts(input);
   if (isYearEndGrowthCommand(input)) return normalizeYearEndGrowth(input);
   if (isYearEndRetirementsCommand(input)) return normalizeYearEndRetirements(input);
   if (isOffseasonPostingCommand(input)) return normalizeOffseasonPosting(input);
@@ -151,6 +153,7 @@ function inspect(state) {
   inspectOffseasonPosting(state);
   inspectYearEndRetirements(state);
   inspectYearEndGrowth(state);
+  inspectCpuContracts(state);
   // One employment can end by only one route. Individually valid records from
   // incompatible branches must not jointly exempt the same source contract.
   if (new Set(departures.map(d => d.sourceContractId)).size !== departures.length) fail('同じ元契約の退団経路が重複しています。');
@@ -271,7 +274,7 @@ function withFloors(state) {
 
 // Internal projection for inspected input and native, unpublished departures.
 // A hypothetical departure has no market receipt and is never a save candidate.
-function withRosterFloors(state, teams, players) {
+function withRosterFloors(state, teams, players, capacities = new Map()) {
   const requirements = new Map();
   for (const r of state.rosterRequirements) {
     const k = key(r.teamId, r.season);
@@ -282,7 +285,15 @@ function withRosterFloors(state, teams, players) {
   const budgetDate = a => a.season === state.season ? state.date : yearStart(a.season);
   const employmentByDate = contractEmploymentsAt(state.spending.ledger, state.spending.authorizations
     .filter(a => a.season >= state.spending.budgetSeason).map(budgetDate));
-  const plans = activeRenewalPlans(state.spending), capacities = new Map();
+  const employmentByClub = new Map([...employmentByDate].map(([date, rows]) => {
+    const clubs = new Map();
+    for (const row of rows) {
+      const teamId = row.teamId, list = clubs.get(teamId) ?? [];
+      list.push(row); clubs.set(teamId, list);
+    }
+    return [date, clubs];
+  }));
+  const plans = activeRenewalPlans(state.spending);
   const authorizations = state.spending.authorizations.map(a => {
     if (a.season < state.spending.budgetSeason) return a;
     const required = requirements.get(key(a.teamId, a.season));
@@ -296,7 +307,7 @@ function withRosterFloors(state, teams, players) {
       // untyped C-1 inputs use current metadata; do not invent ledger history.
       if (registrationType === 'controlled' || (registrationType === undefined && !isIkuseiPlayer(p))) funded.add(playerId);
     };
-    for (const e of employmentByDate.get(date)) if (e.teamId === a.teamId) count(e.contract.playerId, e.registrationType);
+    for (const e of employmentByClub.get(date).get(a.teamId) ?? []) count(e.contract.playerId, e.registrationType);
     for (const h of state.spending.reservations) {
       const p = h.proposal;
       if (p.teamId === a.teamId && p.contract.startSeason <= a.season && p.contract.endSeason >= a.season) count(p.contract.playerId, p.contract.registrationType, true);
@@ -308,7 +319,8 @@ function withRosterFloors(state, teams, players) {
     const unfundedPicks = a.season === state.spending.budgetSeason ? capacity.acceptedPicks.filter(p => !funded.has(p.id)).length : 0;
     return { ...a, minimumRosterReserveManYen: Math.max(unfundedPicks, required - funded.size, 0) * MIN_SALARY_SHIHAKA };
   });
-  return { ...state, spending: { ...state.spending, authorizations } };
+  const sameFloors=authorizations.every((a,i)=>a.minimumRosterReserveManYen===state.spending.authorizations[i].minimumRosterReserveManYen);
+  return sameFloors ? state : { ...state, spending: { ...state.spending, authorizations } };
 }
 
 function assessTransactionSpending(before, after, mode, checkDepartureHeadroom, { beforeRows, includeRows = true } = {}) {
@@ -352,10 +364,11 @@ function prepareCpuPostingBudgetAdmission(state, approvedRequests) {
 
 // A proposal replaces vacancies with its actual liability before admission.
 // Share this projection for FA and renewals; the spending module owns histories.
-function reserveAnnualProposal(state, kind, proposal, replaceId) {
-  const projected = withFloors({ ...state, spending: { ...state.spending,
+function reserveAnnualProposal(state, kind, proposal, replaceId, project = withFloors, snapshot = value => value) {
+  const projected = project({ ...state, spending: { ...state.spending,
     reservations: [...state.spending.reservations.filter(h => h.proposal.id !== replaceId), { kind, proposal }] } });
-  return reserveContractProposal({ ...state.spending, authorizations: projected.spending.authorizations },
+  const baseline = projected.spending.authorizations === state.spending.authorizations ? state.spending : { ...state.spending, authorizations: projected.spending.authorizations };
+  return reserveContractProposal(snapshot(baseline),
     { kind, proposal, ...(replaceId !== undefined ? { replaceId } : {}) });
 }
 
@@ -392,7 +405,7 @@ function faCandidate(state, c) {
   return { ...state, spending, faPool: state.faPool.filter(x => x.id !== player.id), teams: state.teams.map(t => t.id === team.id ? nextTeam : t) };
 }
 
-function renewalCandidate(state, c) {
+function renewalCandidate(state, c, project = withFloors, snapshot = value => value, currentEmployments) {
   const proposing = ['offer-renewal', 'replace-renewal'].includes(c.type);
   const previous = c.type !== 'offer-renewal'
     ? state.spending.reservations.find(h => h.kind === 'renewal' && h.proposal.id === c.proposalId) : null;
@@ -404,9 +417,10 @@ function renewalCandidate(state, c) {
   if (!['season', 'offseason'].includes(state.phase)) fail('翌年度更改のフェーズを確認してください。');
   const team = state.teams.find(t => t.id === p.teamId), terms = p.contract;
   const player = team && ownedPlayers(team).find(p => p.id === terms.playerId);
-  const current = contractEmploymentAt(state.spending.ledger, rosterDate(state))
+  const current = currentEmployments ? currentEmployments.get(c.contractId) : contractEmploymentAt(state.spending.ledger, rosterDate(state))
     .find(e => e.teamId === p.teamId && e.contract.playerId === terms.playerId && employmentContractId(e.contract) === c.contractId);
-  if (!player || player.isRetired || player._retireNow || !current || current.contract.endSeason !== state.season)
+  if (!player || player.isRetired || player._retireNow || !current || current.teamId !== p.teamId
+    || current.contract.playerId !== terms.playerId || employmentContractId(current.contract) !== c.contractId || current.contract.endSeason !== state.season)
     fail('更改対象の現在契約・所属・満了年度を確認してください。');
   const registrationType = isIkuseiPlayer(player) ? 'development' : 'controlled';
   if (terms.purpose !== 'renewal' || terms.signedSeason !== state.season || terms.startSeason !== state.season + 1
@@ -420,7 +434,7 @@ function renewalCandidate(state, c) {
       || state.spending.reservations.some(h => h.proposal.id === p.id)
       || state.spending.reservations.some(h => h.kind === 'renewal' && h.proposal.contract.playerId === terms.playerId
         && h.proposal.id !== previous?.proposal.id)) fail('更改オファーは既存の留保を明示して差し替えてください。');
-    return { ...state, spending: reserveAnnualProposal(state, 'renewal', p, previous?.proposal.id) };
+    return { ...state, spending: reserveAnnualProposal(state, 'renewal', p, previous?.proposal.id, project, snapshot) };
   }
   // Future employment goes into the ledger. Current roster salary/term/placement
   // stay unchanged until the separately implemented annual rollover.
@@ -555,6 +569,58 @@ function conversionCandidate(state, c) {
   return { ...state, teams, spending: { ...state.spending, ledger } };
 }
 
+// Private batch path for native CPU children. Entry and final candidate are
+// fully inspected; within the unpublished batch, reuse canonical creation,
+// roster-floor and spending-admission functions without replaying all history.
+function cpuContractChildren(source) {
+  const { players } = inspect(source);
+  // This private batch only signs next-February renewals and records December
+  // departures. November employment is fixed; live roster ownership is still
+  // checked for every child. Public renewal operations always inspect afresh.
+  const currentEmployments = new Map(contractEmploymentAt(source.spending.ledger, rosterDate(source))
+    .map(e => [employmentContractId(e.contract), e]));
+  let capacityInput, capacities;
+  const project = state => {
+    // Only this unpublished native batch shares capacity results. Renewals
+    // change liabilities, not ownership or draft assignments. A departure
+    // replaces teams and must inspect the entire league again.
+    if (!capacityInput || capacityInput.teams !== state.teams
+      || capacityInput.draftContext !== state.draftContext || capacityInput.faPersonnelMoves !== state.faPersonnelMoves) {
+      capacityInput = state; capacities = new Map();
+    }
+    return withRosterFloors(state, new Map(state.teams.map(t => [t.id, t])), players, capacities);
+  };
+  return function* (input, command) {
+    yield;
+    const c = commandFor(command), signature = stable(c);
+    const before = input;
+    let next, departure;
+    if (isWinterDepartureCommand(c)) {
+      next = createWinterDeparture(before, c, signature);
+      departure = next.offseasonDepartures.at(-1);
+    } else if (isFaDeclarationCommand(c)) {
+      next = createFaDeclaration(before, c, signature);
+      departure = next.faDeclarations.at(-1);
+    } else {
+      if (!['offer-renewal', 'accept-renewal', 'reject-renewal'].includes(c.type)) fail('CPU契約整理の子取引が不正です。');
+      next = renewalCandidate(before, c, project, snapshotAnnualSpendingProposals, currentEmployments);
+      next = { ...next, transactions: [...next.transactions, { id: c.id, signature }] };
+    }
+    if (departure) next = { ...next, spending: { ...next.spending,
+      offseasonDepartures: [...(before.spending.offseasonDepartures ?? []), departure] } };
+    const projected = departure ? project(next) : next;
+    const after = { ...projected, spending: snapshotAnnualSpendingProposals(projected.spending) };
+    // reserveAnnualProposal already applies final floors and admission;
+    // commitContractReservation rechecks the same held liability. Renewals
+    // preserve ownership, and acceptance replaces the funded hold one-for-one.
+    const assessment = departure ? assessTransactionSpending(before, after, 'spend', true)
+      : { ok: true, rows: quoteAnnualSpendingPlan(after.spending) };
+    if (!assessment.ok) fail(assessment.error);
+    return { state: after,
+      rows: assessment.rows, replayed: false };
+  };
+}
+
 function* candidateSteps(input, command) {
   yield;
   const c = commandFor(command), before = withFloors(input), signature = stable(c);
@@ -565,6 +631,10 @@ function* candidateSteps(input, command) {
       ...(receipt.faPersonnel ? { personnel: { winnerProposalIds: [...receipt.faPersonnel.winnerProposalIds], lostProposalIds: [...receipt.faPersonnel.lostProposalIds] } } : {}) };
   }
   assertRetirementCommandCompatible(before, c);
+  if (isCpuContractsCommand(c)) {
+    const result = yield* createCpuContractsSteps({ ...before, spending: snapshotAnnualSpendingProposals({ ...before.spending, ledger: snapshotContractLedger(before.spending.ledger) }) }, c, signature, cpuContractChildren(before));
+    return { ...result, state: withFloors(result.state) };
+  }
   if (isYearEndGrowthCommand(c)) {
     const state = withFloors(createYearEndGrowth(before, c, signature));
     return { state, rows: quoteAnnualSpendingPlan(state.spending), replayed: false };
@@ -625,8 +695,16 @@ function candidate(input, command) {
 export async function applyAnnualTransactionAsync(state, command) {
   try {
     const steps = candidateSteps(state, command);
-    let step;
-    while (!(step = steps.next()).done) await yieldToBrowser();
+    let step, lastYield = -Infinity;
+    while (!(step = steps.next()).done) {
+      // CPU batches have thousands of small scheduling points. Coalesce only
+      // those within one frame, rather than waiting a whole frame per child.
+      // The first yield still paints the pending UI before any CPU work.
+      const now = performance.now();
+      if (!isCpuContractsCommand(command) || now - lastYield >= 16) {
+        await yieldToBrowser(); lastYield = performance.now();
+      }
+    }
     return { ok: true, ...step.value };
   } catch (error) { return { ok: false, state, error: error.message }; }
 }

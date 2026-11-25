@@ -1,3 +1,4 @@
+import { cpuContractsId, cpuContractsIssue } from '../../engine/annualCpuContracts';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toAnnualState } from '../../engine/contractEconomy';
 import { yearEndGrowthRenewalIssue } from '../../engine/annualYearEndGrowth';
@@ -87,6 +88,8 @@ export function AnnualContractTab({ gs, os, focusRequest }) {
   if (model.error) return <p role="alert">{model.error}</p>;
   const nextBudget = model.rows.find(r => r.season === gs.year + 1);
   const clock = gs.contractEconomy.clock;
+  const cpuIssue = cpuContractsIssue(gs);
+  const cpuResult = gs.contractEconomy.engine.transactions.find(t => t.id === cpuContractsId(gs.year))?.cpuContracts;
   const waiting = gs.contractEconomy.decisions.filter(d => d.teamId === gs.myId && d.status === 'pending');
   const playerNames = new Map([...gs.teams.flatMap(t => [...t.players, ...t.farm]), ...gs.faPool].map(p => [p.id, p.name]));
   const replyTurn = d => {
@@ -111,6 +114,15 @@ export function AnnualContractTab({ gs, os, focusRequest }) {
       </ul></details>}
       <Button disabled={blocked || Boolean(turnGrowthIssue) || clock.offseasonTurn >= 37} onClick={() => run(() => os.handleAdvanceOffseasonTurn(), 'ターンと期日を迎えた回答を保存しました。')}>オフシーズンを1ターン進める</Button>
       {clock.offseasonTurn >= 37 && <p className="decision-note">最終回答ターンに到達しました。届いた回答と未判断の選手を確認してください。次の市場工程への進行は現在準備中です。</p>}
+    </section>}
+    {clock.phase === 'offseason' && <section aria-label="CPU球団の契約整理">
+      <h2>CPU球団の契約整理</h2>
+      <p>他球団の更改・契約満了・FA宣言を確定し、未契約選手を市場へ登録します。自球団の判断は残ります。</p>
+      {cpuIssue && !cpuResult && <p>{cpuIssue}</p>}
+      {!cpuResult ? <Button disabled={blocked || Boolean(cpuIssue)} onClick={() => run(() => os.handleCpuContracts(), 'CPU球団の契約・市場供給を保存しました。')}>CPU球団の契約を整理する</Button>
+        : <><p role="status">CPU球団の整理を保存済み：更改{cpuResult.rows.filter(r => r.outcome === 'renewed').length}人・継続{cpuResult.rows.filter(r => r.outcome === 'continuing').length}人・市場登録{cpuResult.rows.filter(r => !['renewed','continuing'].includes(r.outcome)).length}人</p>
+          <details><summary>球団別の結果と理由</summary><ul>{cpuResult.rows.map(r => <li key={r.playerId}>{gs.teams.find(t => t.id === r.teamId)?.name ?? '球団'} / {r.name}：{{renewed:'更改',continuing:'継続',expiry:'契約満了',release:'自由契約','domestic-fa':'国内FA宣言','overseas-fa':'海外FA宣言'}[r.outcome]} · {r.reason}</li>)}</ul></details></>}
+      <p className="decision-note">翌春加入・年度切替には未接続です。自球団の未判断・回答待ちを含む工程全体の完了ではありません。</p>
     </section>}
     {busy && <p role="status">保存・反映を確認しています…</p>}
     {feedback && <p role="status" className="decision-receipt">{feedback}</p>}
