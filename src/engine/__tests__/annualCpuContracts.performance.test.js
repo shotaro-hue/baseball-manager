@@ -34,12 +34,15 @@ it('shares unchanged roster-capacity inspection across CPU renewals and rechecks
   world.contractEconomy.engine.spending.budgetSeason = 2027;
   world = fromAnnualState(world, toAnnualState(world));
   const inspected = vi.spyOn(capacity, 'evaluateRosterCapacity');
+  const employment = vi.spyOn(ledger, 'contractEmploymentAt');
   const result = reduceEconomyCommand(world, cpuContractsRequest(world));
   expect(result.ok, result.error).toBe(true);
   expect(result.world.contractEconomy.engine.transactions.at(-1).cpuContracts.rows.every(r => r.outcome === 'renewed')).toBe(true);
   // Whole-state entry/final inspections remain; eight unchanged offers must
   // not add sixteen scans of the league's owned IDs and draft assignments.
   expect(inspected.mock.calls.length).toBeLessThan(40);
+  // Future signs and December departures cannot change November ownership.
+  expect(employment.mock.calls.filter(([, date]) => date === '2026-11-30').length).toBeLessThanOrEqual(12);
   const broken = structuredClone(result.world);
   broken.teams[1].players.push({ ...broken.teams[1].players[0] });
   expect(() => toAnnualState(broken)).toThrow();

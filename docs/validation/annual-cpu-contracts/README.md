@@ -12,7 +12,7 @@ annual契約画面の「CPU球団の契約を整理する」から、既存の�
 ## 実12球団
 `createInitialTeams()`（実データ12球団、初期1,034選手）→既存閉幕/予算/open→期末引退→成長/要求保存→既存posting→実useOffseason/useGameStateのCPU保存→loadGameを検証する。通常annual Workerによる年度完走とは区別する。
 
-2026-11-25の保存検証修正後計測: CPU対象937人、更改752・継続33・国内FA7・満了145。保存・再読込・照合の計測27.3秒、テスト本体29.4秒、生成/fixture準備を含むファイル全体44.3秒（ローカルNode/fake-indexeddb）。[集計](real12-result.json)。対象数は生成時の引退結果により変わる。自球団、年/12月1日、現在給与/登録区分、既存取引を維持し、CPU全件が将来雇用または正式市場履歴に対応すること、再読込後の全engine/名簿/市場、全チームの年度別quoteと表示予算を照合した。stockデータの生成結果だけで全FA枝の資格を保証しないため、資格済みfixtureで国内/海外FAを別に検証する。
+2026-11-25の保存検証修正後計測: CPU対象943人、更改756・継続35・国内FA6・満了146。保存・再読込・照合の計測26.1秒、テスト本体28.4秒、生成/fixture準備を含むファイル全体44.0秒（ローカルNode/fake-indexeddb）。[集計](real12-result.json)。対象数は生成時の引退結果により変わる。自球団、年/12月1日、現在給与/登録区分、既存取引を維持し、CPU全件が将来雇用または正式市場履歴に対応すること、再読込後の全engine/名簿/市場、全チームの年度別quoteと表示予算を照合した。stockデータの生成結果だけで全FA枝の資格を保証しないため、資格済みfixtureで国内/海外FAを別に検証する。
 
 再現: `CPU_VALIDATION_DIR=/tmp/cpu-validation npx vitest run src/hooks/useOffseason.cpuContracts.test.js`。指定時のみsource.json/result.jsonを出力する。実データ生成はbeforeAll、保存前のfixture読込はbeforeEachへ置き、CPU操作テストの60秒上限は緩和しない。既存テストの削除・skip追加・timeout/retry緩和なし。
 
@@ -52,3 +52,10 @@ HEAD `e25d8fb6` では全単体/統合5014件が成功・既存skip2件。実12�
 保存結果の描画と保存確認完了は異なるため、既存ナビゲーション『受信箱へ』がenabledとなる条件を確認してから画面を切り替え、setScreenの成功値trueも新たにassertする。元の成長gate/再読込/ターン/横溢れ/pageerrorの期待、5秒expect・30秒テスト上限・workers1/retries0、製品barrierは維持する。独立レビューはtraceとbusy/commit解放の実行経路を照合し、新規P1/P2なし。最終HEADのCI結果はPR本文を正本とする。
 
 修正後、Chromium/WebKit各360/390/1440pxで成長gate・旧pending救済・CPU整理の計18件が成功（2.1分、既存上限、workers1/retries0）。製品コードは前HEADから変更していない。最終HEADの必須CIを再実行する。
+
+## CI #754と実行リソースの固定
+製品コードが同じ#753/#754で、全単体群の実行時間は548秒→850秒、CPU本体は48.7秒成功→60秒超過に変動した（#754は5013成功・CPU超過1件・既存skip2）。各閾値は変更せず、CIのnpm testへmaxWorkers=2/minWorkers=2を指定してCPU競合を抑える。全テストのinclude/exclude・各timeout・retry・25分job上限・E2Eは維持する。最終CIでは5016件の全対象、stress/physics、実CPUの60秒以内成功を再確認する。
+
+private CPUバッチは翌2/1の更改と12月の退団だけなので、11/30時点の雇用を一度索引化する。各子取引の現在roster所属、team/player/source契約ID・満了年・登録区分・正式予算審査は維持し、public経路は毎回fresh lookupのままとする。8更改の11/30照会は27回→12回のRED→GREEN。同じ937人入力のcore測定は15.28秒→15.03秒で、完全な候補world（全契約/名簿/予算/市場/履歴/receipt）の値も一致した。これは小改善で、CI安定化をローカル計測だけで成功扱いしない。給与group集計の試作は15.48秒で改善せず、コード/新APIは採用していない。
+
+2 workersで関連348件、別コンテキスト99件、Chromium/WebKit各3幅のCPU画面6件、buildが成功。直前の成長gate/旧pending/CPU18件も成功しており、5秒expect・30秒E2E・retry0を維持する。最終SHAと必須CI結果はPR本文へ記録する。

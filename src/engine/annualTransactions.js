@@ -405,7 +405,7 @@ function faCandidate(state, c) {
   return { ...state, spending, faPool: state.faPool.filter(x => x.id !== player.id), teams: state.teams.map(t => t.id === team.id ? nextTeam : t) };
 }
 
-function renewalCandidate(state, c, project = withFloors, snapshot = value => value) {
+function renewalCandidate(state, c, project = withFloors, snapshot = value => value, currentEmployments) {
   const proposing = ['offer-renewal', 'replace-renewal'].includes(c.type);
   const previous = c.type !== 'offer-renewal'
     ? state.spending.reservations.find(h => h.kind === 'renewal' && h.proposal.id === c.proposalId) : null;
@@ -417,9 +417,10 @@ function renewalCandidate(state, c, project = withFloors, snapshot = value => va
   if (!['season', 'offseason'].includes(state.phase)) fail('翌年度更改のフェーズを確認してください。');
   const team = state.teams.find(t => t.id === p.teamId), terms = p.contract;
   const player = team && ownedPlayers(team).find(p => p.id === terms.playerId);
-  const current = contractEmploymentAt(state.spending.ledger, rosterDate(state))
+  const current = currentEmployments ? currentEmployments.get(c.contractId) : contractEmploymentAt(state.spending.ledger, rosterDate(state))
     .find(e => e.teamId === p.teamId && e.contract.playerId === terms.playerId && employmentContractId(e.contract) === c.contractId);
-  if (!player || player.isRetired || player._retireNow || !current || current.contract.endSeason !== state.season)
+  if (!player || player.isRetired || player._retireNow || !current || current.teamId !== p.teamId
+    || current.contract.playerId !== terms.playerId || employmentContractId(current.contract) !== c.contractId || current.contract.endSeason !== state.season)
     fail('更改対象の現在契約・所属・満了年度を確認してください。');
   const registrationType = isIkuseiPlayer(player) ? 'development' : 'controlled';
   if (terms.purpose !== 'renewal' || terms.signedSeason !== state.season || terms.startSeason !== state.season + 1
@@ -573,6 +574,11 @@ function conversionCandidate(state, c) {
 // roster-floor and spending-admission functions without replaying all history.
 function cpuContractChildren(source) {
   const { players } = inspect(source);
+  // This private batch only signs next-February renewals and records December
+  // departures. November employment is fixed; live roster ownership is still
+  // checked for every child. Public renewal operations always inspect afresh.
+  const currentEmployments = new Map(contractEmploymentAt(source.spending.ledger, rosterDate(source))
+    .map(e => [employmentContractId(e.contract), e]));
   let capacityInput, capacities;
   const project = state => {
     // Only this unpublished native batch shares capacity results. Renewals
@@ -597,7 +603,7 @@ function cpuContractChildren(source) {
       departure = next.faDeclarations.at(-1);
     } else {
       if (!['offer-renewal', 'accept-renewal', 'reject-renewal'].includes(c.type)) fail('CPU契約整理の子取引が不正です。');
-      next = renewalCandidate(before, c, project, snapshotAnnualSpendingProposals);
+      next = renewalCandidate(before, c, project, snapshotAnnualSpendingProposals, currentEmployments);
       next = { ...next, transactions: [...next.transactions, { id: c.id, signature }] };
     }
     if (departure) next = { ...next, spending: { ...next.spending,
