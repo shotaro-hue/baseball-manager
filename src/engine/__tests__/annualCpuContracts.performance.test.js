@@ -1,11 +1,29 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import * as capacity from '../rosterCapacity';
+import * as ledger from '../contractLedger';
+import { projectAnnualState } from '../annualTransactions';
 import { renewalFixture } from './fixtures/renewalWorld';
 import { economyPolicy } from './fixtures/economyWorld';
 import { createAnnualNewGameWorld, fromAnnualState, toAnnualState, reduceEconomyCommand } from '../contractEconomy';
 import { cpuContractsRequest } from '../annualCpuContracts';
 
 afterEach(() => vi.restoreAllMocks());
+
+it('indexes dated employment by club once while preserving every annual funding floor', () => {
+  const state = toAnnualState(renewalFixture()), expected = projectAnnualState(state);
+  const original = ledger.contractEmploymentsAt;
+  let reads = 0, employments = 0;
+  vi.spyOn(ledger, 'contractEmploymentsAt').mockImplementation((...args) => {
+    const result = original(...args);
+    for (const rows of result.values()) for (const row of rows) {
+      const teamId = row.teamId; employments++;
+      Object.defineProperty(row, 'teamId', { enumerable: true, get() { reads++; return teamId; } });
+    }
+    return result;
+  });
+  expect(projectAnnualState(state)).toEqual(expected);
+  expect(employments).toBeGreaterThan(0); expect(reads).toBe(employments);
+});
 
 it('shares unchanged roster-capacity inspection across CPU renewals and rechecks the final candidate', () => {
   const teams = structuredClone(renewalFixture().teams), player = teams[1].players[0];

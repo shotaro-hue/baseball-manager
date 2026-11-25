@@ -137,7 +137,8 @@ function freezeSnapshot(value) {
 }
 export function snapshotContractLedger(ledger) {
   if (snapshotLedgers.has(ledger)) return ledger;
-  const snapshot = freezeSnapshot({ ...ledger, records: ledger.records.map(record =>
+  const { records, ...metadata } = ledger;
+  const snapshot = freezeSnapshot({ ...structuredClone(metadata), records: records.map(record =>
     snapshotViews.has(record) ? record : freezeSnapshot(structuredClone(record))) });
   // Validate the exact isolated copy once, including all cross-record IDs and
   // overlaps. Its normalized projections are detached from mutable inputs.

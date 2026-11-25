@@ -248,6 +248,7 @@ function prepare(plan) {
 export function quoteAnnualSpendingPlan(plan) { return prepare(plan).rows; }
 
 function newLedgerActions(before, after) {
+  if (before === after) return [];
   const result = [];
   const beforeById = new Map(before.records.map(r => [employmentContractId(r.contract), r]));
   for (const record of after.records) {

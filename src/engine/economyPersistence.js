@@ -1,6 +1,6 @@
 import { contractEconomyMode, toAnnualState } from './contractEconomy';
 import { hasSelectedTeam } from './teamId';
-import { contractEmploymentAt, isContractLedgerExtension } from './contractLedger';
+import { contractEmploymentAt, isContractLedgerExtension, snapshotContractLedger } from './contractLedger';
 import { employmentPlayerFields } from './seasonContract';
 import { quoteAnnualSpendingPlan } from './annualSpending';
 import { validateRenewalDecisions, preservesRenewalDecisions } from './renewalDecisions';
@@ -16,6 +16,12 @@ export function validateEconomySave(world) {
     validatePlayerEligibility(p, { year: world.year });
   const mode = contractEconomyMode(world);
   if (mode === 'annual') {
+    // This synchronous inspection uses one exact, isolated ledger for all of
+    // its existing validators. Nothing is adopted or persisted from this shadow
+    // world; a subsequent mutable/cold input is cloned and fully checked again.
+    const e = world.contractEconomy;
+    world = { ...world, contractEconomy: { ...e, engine: { ...e.engine,
+      spending: { ...e.engine.spending, ledger: snapshotContractLedger(e.engine.spending.ledger) } } } };
     inspectOffseasonQualification(world);
     validateRenewalDecisions(world);
     validateAcquisitionDecisions(world);

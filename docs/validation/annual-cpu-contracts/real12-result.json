@@ -1,11 +1,11 @@
 {
-  "elapsedMs": 23679.175991000004,
+  "elapsedMs": 27320.182662999996,
   "teams": 12,
-  "rows": 942,
+  "rows": 937,
   "outcomes": {
-    "continuing": 35,
-    "renewed": 850,
-    "expiry": 56,
-    "domestic-fa": 1
+    "renewed": 752,
+    "continuing": 33,
+    "expiry": 145,
+    "domestic-fa": 7
   }
 }

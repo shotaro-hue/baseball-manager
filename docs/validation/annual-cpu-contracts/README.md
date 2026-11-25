@@ -12,7 +12,7 @@ annual契約画面の「CPU球団の契約を整理する」から、既存の�
 ## 実12球団
 `createInitialTeams()`（実データ12球団、初期1,034選手）→既存閉幕/予算/open→期末引退→成長/要求保存→既存posting→実useOffseason/useGameStateのCPU保存→loadGameを検証する。通常annual Workerによる年度完走とは区別する。
 
-2026-11-22の性能修正後計測: CPU対象942人、更改850・継続35・国内FA1・満了56。保存・再読込・照合の計測23.7秒、テスト本体25.8秒、生成/fixture準備を含むファイル全体39.5秒（ローカルNode/fake-indexeddb）。[集計](real12-result.json)。対象数は生成時の引退結果により変わる。自球団、年/12月1日、現在給与/登録区分、既存取引を維持し、CPU全件が将来雇用または正式市場履歴に対応すること、再読込後の全engine/名簿/市場、全チームの年度別quoteと表示予算を照合した。stockデータの生成結果だけで全FA枝の資格を保証しないため、資格済みfixtureで国内/海外FAを別に検証する。
+2026-11-25の保存検証修正後計測: CPU対象937人、更改752・継続33・国内FA7・満了145。保存・再読込・照合の計測27.3秒、テスト本体29.4秒、生成/fixture準備を含むファイル全体44.3秒（ローカルNode/fake-indexeddb）。[集計](real12-result.json)。対象数は生成時の引退結果により変わる。自球団、年/12月1日、現在給与/登録区分、既存取引を維持し、CPU全件が将来雇用または正式市場履歴に対応すること、再読込後の全engine/名簿/市場、全チームの年度別quoteと表示予算を照合した。stockデータの生成結果だけで全FA枝の資格を保証しないため、資格済みfixtureで国内/海外FAを別に検証する。
 
 再現: `CPU_VALIDATION_DIR=/tmp/cpu-validation npx vitest run src/hooks/useOffseason.cpuContracts.test.js`。指定時のみsource.json/result.jsonを出力する。実データ生成はbeforeAll、保存前のfixture読込はbeforeEachへ置き、CPU操作テストの60秒上限は緩和しない。既存テストの削除・skip追加・timeout/retry緩和なし。
 
@@ -40,3 +40,8 @@ Chromium/WebKitそれぞれ360/390/1440pxの3ケース、合計6ケースで保�
 前回HEAD `02768fcc` でも全件CIは実12球団hookの60秒超過1件、5005件成功・既存skip2件だった。実hookのprofileでは、専用immutable recordにもviewを作り直す処理、apply後のraw検査とsnapshot検査の二重化、各更改提示での全12球団の登録枠再計算を確認した。cached viewはdeep-freeze済みのものだけ共有し、専用snapshotへのapplyは新action・closed-year・全record ID/型/期間重複を検査したsnapshotを返す。通常mutable/coldの戻り値は変えない。登録枠は非公開CPUバッチ内だけteams/draftContext/faPersonnelMovesの同一参照で共有し、退団後は再計算する。財務のfunded人数・新人の未資金枠は各提示で計算し直す。
 
 新規回帰は不変入力からの取引結果の隔離とcold改変拒否、8件更改の登録枠計算重複（46回から削減）および最終重複名簿拒否のRED→GREEN。関連170件・実hook6件、別コンテキスト17件成功。保存barrier・全体検査・上限・skip/retryは変更しない。最終HEADでCIを実行し、結果はPR本文へ記録する。
+
+## CI #752と保存検証の隔離
+HEAD `ed4507a2` のCI #752は、全ブラウザ12群と集約が成功、単体群は5006件成功・実12球団CPU整理60秒超過と既存bootstrapオフ開始10秒超過・既存skip2件だった。保存validatorの1呼出し内だけexact clone+freezeした台帳を持つshadow worldを作り、既存の全inspectorと名簿/予算投影照合を同じ台帳へ向ける。返す値は従来のmodeだけで、元worldや保存payloadは置換しない。次回のmutable/cold入力は再コピー・全検査する。独立レビューで追加root metadataへのfreeze漏れを再現し、records以外のmetadataもcloneして隔離した。
+
+同じprofileで確認した重複として、日付別の雇用は呼出し内で球団別に一度だけ索引化し、全年度の資金枠計算を維持する。同一台帳の新action探索は、両入力のprepareとextension検査後に空と判定する。保存barrier・検査内容・閾値・skip/retryを維持。metadata非freeze、cold/混在入力の後変更、台帳/回答の同時欠落、日付別雇用の重複読取に回帰を追加した。関連327件・hook21件（実CPU6件と既存オフ開始15件）・別コンテキスト74件、build成功。ローカルCPU本体29.4秒、既存bootstrap本体4.5秒。最終HEADの必須CI成功を確認するまでdraftを維持する。

@@ -285,6 +285,14 @@ function withRosterFloors(state, teams, players, capacities = new Map()) {
   const budgetDate = a => a.season === state.season ? state.date : yearStart(a.season);
   const employmentByDate = contractEmploymentsAt(state.spending.ledger, state.spending.authorizations
     .filter(a => a.season >= state.spending.budgetSeason).map(budgetDate));
+  const employmentByClub = new Map([...employmentByDate].map(([date, rows]) => {
+    const clubs = new Map();
+    for (const row of rows) {
+      const teamId = row.teamId, list = clubs.get(teamId) ?? [];
+      list.push(row); clubs.set(teamId, list);
+    }
+    return [date, clubs];
+  }));
   const plans = activeRenewalPlans(state.spending);
   const authorizations = state.spending.authorizations.map(a => {
     if (a.season < state.spending.budgetSeason) return a;
@@ -299,7 +307,7 @@ function withRosterFloors(state, teams, players, capacities = new Map()) {
       // untyped C-1 inputs use current metadata; do not invent ledger history.
       if (registrationType === 'controlled' || (registrationType === undefined && !isIkuseiPlayer(p))) funded.add(playerId);
     };
-    for (const e of employmentByDate.get(date)) if (e.teamId === a.teamId) count(e.contract.playerId, e.registrationType);
+    for (const e of employmentByClub.get(date).get(a.teamId) ?? []) count(e.contract.playerId, e.registrationType);
     for (const h of state.spending.reservations) {
       const p = h.proposal;
       if (p.teamId === a.teamId && p.contract.startSeason <= a.season && p.contract.endSeason >= a.season) count(p.contract.playerId, p.contract.registrationType, true);
